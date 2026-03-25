@@ -80,7 +80,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
         lhs.index == rhs.index &&
         lhs.opacity == rhs.opacity &&
         lhs.visible == rhs.visible &&
-        lhs.pixelData == rhs.pixelData
+        lhs.pixelData.count == rhs.pixelData.count
     }
 }
 
@@ -94,6 +94,6 @@ struct MetalDocumentSnapshot: Equatable {
         lhs.width == rhs.width &&
         lhs.height == rhs.height &&
         lhs.revision == rhs.revision &&
-        lhs.layers == rhs.layers
+        lhs.layers.count == rhs.layers.count
     }
 }

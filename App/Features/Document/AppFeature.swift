@@ -1,8 +1,11 @@
 import ComposableArchitecture
 import Foundation
+import os
 
 @Reducer
 struct AppFeature {
+    private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
+
     @ObservableState
     struct State: Equatable {
         var isHydrating = true
@@ -25,6 +28,7 @@ struct AppFeature {
         case task
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
+        case loadPresentationAfterLaunch
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
@@ -47,25 +51,41 @@ struct AppFeature {
             switch action {
             case .task:
                 state.isHydrating = true
-                return .merge(
-                    .run { [paintDocumentClient] send in
-                        let lightweightPresentation = paintDocumentClient.lightweightPresentation()
-                        await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                Self.startupLogger.debug("AppFeature.task started")
+                return .run { [paintDocumentClient] send in
+                    let startupClock = ContinuousClock()
+                    let bootstrapStart = startupClock.now
 
-                        let presentation = paintDocumentClient.presentation()
-                        await send(.presentationLoaded(presentation))
-                    },
-                    .run { [paintDocumentClient] _ in
-                        paintDocumentClient.warmUpRendering()
-                    }
-                )
+                    Self.startupLogger.debug("Loading lightweight presentation")
+                    let lightweightPresentation = paintDocumentClient.lightweightPresentation()
+                    let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
+                    Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
+                    await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                    await send(.loadPresentationAfterLaunch)
+                }
 
             case let .bootstrapPresentationLoaded(presentation):
                 state.applyPresentation(presentation)
+                state.isHydrating = false
+                Self.startupLogger.debug("Bootstrap presentation applied; initial UI is ready")
                 return .none
+
+            case .loadPresentationAfterLaunch:
+                return .run { [paintDocumentClient] send in
+                    let clock = ContinuousClock()
+                    try? await Task.sleep(for: .milliseconds(150))
+
+                    let presentationStart = clock.now
+                    Self.startupLogger.debug("Loading full presentation after initial launch")
+                    let presentation = paintDocumentClient.presentation()
+                    let presentationDuration = presentationStart.duration(to: clock.now)
+                    Self.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
+                    await send(.presentationLoaded(presentation))
+                }
 
             case let .presentationLoaded(presentation):
                 state.applyPresentation(presentation)
+                Self.startupLogger.debug("Full presentation applied")
                 return .none
 
             case .brushPalette(.delegate(.clearActiveLayer)):

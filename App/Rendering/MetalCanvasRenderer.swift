@@ -2,6 +2,7 @@ import Foundation
 import Metal
 import MetalKit
 import AVFoundation
+import os
 import simd
 
 private struct MetalQuadVertex {
@@ -65,6 +66,7 @@ private enum MetalCanvasRendererCache {
 }
 
 final class MetalCanvasView: MTKView, MTKViewDelegate {
+    private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Renderer")
     private let commandQueue: MTLCommandQueue?
     private let layerPipeline: MTLRenderPipelineState?
     private let paperPipeline: MTLRenderPipelineState?
@@ -74,6 +76,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var appliedRevision: Int = -1
 
     init() {
+        let clock = ContinuousClock()
+        let start = clock.now
         let resources = MetalCanvasRendererCache.shared
         let metalDevice = resources.device
         self.commandQueue = resources.commandQueue
@@ -90,6 +94,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         enableSetNeedsDisplay = false
         isPaused = false
         delegate = self
+        let duration = start.duration(to: clock.now)
+        Self.logger.debug("MetalCanvasView initialized in \(String(describing: duration), privacy: .public)")
     }
 
     @available(*, unavailable)
@@ -99,10 +105,6 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
 
     func update(snapshot: MetalDocumentSnapshot?) {
         pendingSnapshot = snapshot
-    }
-
-    nonisolated static func warmUpRenderingResources() {
-        _ = MetalCanvasRendererCache.shared
     }
 
     func contentRect(for viewSize: CGSize, documentSize: CGSize) -> CGRect {
@@ -181,6 +183,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private func applyPendingSnapshotIfNeeded(device: MTLDevice) {
         guard let snapshot = pendingSnapshot, snapshot.revision != appliedRevision else { return }
 
+        let clock = ContinuousClock()
+        let start = clock.now
         var nextTextures: [Int: MTLTexture] = [:]
         for layer in snapshot.layers {
             let descriptor = MTLTextureDescriptor.texture2DDescriptor(
@@ -207,6 +211,9 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         }
         layerTextures = nextTextures
         appliedRevision = snapshot.revision
+        let duration = start.duration(to: clock.now)
+        let megabytes = snapshot.layers.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
+        Self.logger.debug("Applied snapshot revision \(snapshot.revision) with \(snapshot.layers.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
     }
 
     static func makePipeline(

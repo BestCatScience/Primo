@@ -11,7 +11,6 @@ struct PaintDocumentClient: Sendable {
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
     var clearLayer: @Sendable (Int) -> Void
-    var warmUpRendering: @Sendable () -> Void
 
     static let live: PaintDocumentClient = {
         let sessionBox = PaintDocumentSessionBox()
@@ -24,8 +23,7 @@ struct PaintDocumentClient: Sendable {
             addLayer: { name in sessionBox.session.addLayer(name: name) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
-            clearLayer: { index in sessionBox.session.clearLayer(index: index) },
-            warmUpRendering: { MetalCanvasView.warmUpRenderingResources() }
+            clearLayer: { index in sessionBox.session.clearLayer(index: index) }
         )
     }()
 }

@@ -1,19 +1,29 @@
 import CoreGraphics
 import Foundation
+import os
 
 final class PaintDocumentSession: @unchecked Sendable {
+    private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Document")
     let bridge: APPaintDocumentBridge
     private var revision: Int = 0
 
     init(width: Int = 1152, height: Int = 1536) {
+        let clock = ContinuousClock()
+        let start = clock.now
         self.bridge = APPaintDocumentBridge(width: width, height: height)
+        let duration = start.duration(to: clock.now)
+        Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {
+        let clock = ContinuousClock()
+        let start = clock.now
         let infos = bridge.layerInfos()
         let rows = Array(infos.enumerated().map { index, layer in
             LayerRowModel(index: index, name: layer.name, visible: layer.visible, opacity: layer.opacity)
         }.reversed())
+        let duration = start.duration(to: clock.now)
+        Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
             activeLayerIndex: bridge.activeLayerIndex,
@@ -23,6 +33,8 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     func presentation() -> PaintDocumentPresentation {
+        let clock = ContinuousClock()
+        let start = clock.now
         revision += 1
         let infos = bridge.layerInfos()
         let snapshots = infos.enumerated().map { index, info in
@@ -36,6 +48,9 @@ final class PaintDocumentSession: @unchecked Sendable {
         let rows = Array(infos.enumerated().map { index, layer in
             LayerRowModel(index: index, name: layer.name, visible: layer.visible, opacity: layer.opacity)
         }.reversed())
+        let duration = start.duration(to: clock.now)
+        let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
+        Self.logger.debug("presentation produced revision \(self.revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
             activeLayerIndex: bridge.activeLayerIndex,
