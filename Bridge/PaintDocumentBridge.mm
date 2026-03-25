@@ -153,7 +153,7 @@
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
 
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGBitmapInfo bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrderDefault;
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedLast;
     CGImageRef image = CGImageCreate((size_t)_document->width(),
                                      (size_t)_document->height(),
                                      8,

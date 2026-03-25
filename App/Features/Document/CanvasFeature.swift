@@ -4,9 +4,11 @@ import Foundation
 
 @Reducer
 struct CanvasFeature {
+    static let defaultCanvasSize = CGSize(width: 1152, height: 1536)
+
     @ObservableState
     struct State: Equatable {
-        var canvasSize: CGSize = CGSize(width: 1536, height: 2048)
+        var canvasSize: CGSize = CanvasFeature.defaultCanvasSize
         var renderSnapshot: MetalDocumentSnapshot?
         var predictedPreview: [PreviewStrokePoint] = []
     }

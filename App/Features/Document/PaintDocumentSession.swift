@@ -5,8 +5,21 @@ final class PaintDocumentSession: @unchecked Sendable {
     let bridge: APPaintDocumentBridge
     private var revision: Int = 0
 
-    init(width: Int = 1536, height: Int = 2048) {
+    init(width: Int = 1152, height: Int = 1536) {
         self.bridge = APPaintDocumentBridge(width: width, height: height)
+    }
+
+    func lightweightPresentation() -> PaintDocumentPresentation {
+        let infos = bridge.layerInfos()
+        let rows = Array(infos.enumerated().map { index, layer in
+            LayerRowModel(index: index, name: layer.name, visible: layer.visible, opacity: layer.opacity)
+        }.reversed())
+        return PaintDocumentPresentation(
+            canvasSize: CGSize(width: bridge.width, height: bridge.height),
+            activeLayerIndex: bridge.activeLayerIndex,
+            layerRows: rows,
+            renderSnapshot: nil
+        )
     }
 
     func presentation() -> PaintDocumentPresentation {

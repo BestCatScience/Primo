@@ -5,13 +5,17 @@ import Foundation
 struct AppFeature {
     @ObservableState
     struct State: Equatable {
+        var isHydrating = true
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
         var canvas = CanvasFeature.State()
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
             canvas.canvasSize = presentation.canvasSize
-            canvas.renderSnapshot = presentation.renderSnapshot
+            if let renderSnapshot = presentation.renderSnapshot {
+                canvas.renderSnapshot = renderSnapshot
+                isHydrating = false
+            }
             layerSidebar.layers = presentation.layerRows
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
         }
@@ -19,6 +23,8 @@ struct AppFeature {
 
     enum Action: Equatable {
         case task
+        case bootstrapPresentationLoaded(PaintDocumentPresentation)
+        case presentationLoaded(PaintDocumentPresentation)
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
@@ -40,7 +46,26 @@ struct AppFeature {
         Reduce { state, action in
             switch action {
             case .task:
-                state.applyPresentation(paintDocumentClient.presentation())
+                state.isHydrating = true
+                return .merge(
+                    .run { [paintDocumentClient] send in
+                        let lightweightPresentation = paintDocumentClient.lightweightPresentation()
+                        await send(.bootstrapPresentationLoaded(lightweightPresentation))
+
+                        let presentation = paintDocumentClient.presentation()
+                        await send(.presentationLoaded(presentation))
+                    },
+                    .run { [paintDocumentClient] _ in
+                        paintDocumentClient.warmUpRendering()
+                    }
+                )
+
+            case let .bootstrapPresentationLoaded(presentation):
+                state.applyPresentation(presentation)
+                return .none
+
+            case let .presentationLoaded(presentation):
+                state.applyPresentation(presentation)
                 return .none
 
             case .brushPalette(.delegate(.clearActiveLayer)):

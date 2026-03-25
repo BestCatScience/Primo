@@ -17,6 +17,53 @@ private struct MetalQuadUniforms {
     var paperSeed: Float
 }
 
+private enum MetalCanvasRendererCache {
+    static let shared = Resources()
+
+    final class Resources {
+        let device: MTLDevice?
+        let commandQueue: MTLCommandQueue?
+        let layerPipeline: MTLRenderPipelineState?
+        let paperPipeline: MTLRenderPipelineState?
+        let vertexBuffer: MTLBuffer?
+
+        init() {
+            let metalDevice = MTLCreateSystemDefaultDevice()
+            self.device = metalDevice
+            self.commandQueue = metalDevice?.makeCommandQueue()
+
+            if let metalDevice {
+                self.vertexBuffer = metalDevice.makeBuffer(bytes: [
+                    MetalQuadVertex(position: SIMD2<Float>(0, 0), uv: SIMD2<Float>(0, 1)),
+                    MetalQuadVertex(position: SIMD2<Float>(1, 0), uv: SIMD2<Float>(1, 1)),
+                    MetalQuadVertex(position: SIMD2<Float>(0, 1), uv: SIMD2<Float>(0, 0)),
+                    MetalQuadVertex(position: SIMD2<Float>(1, 1), uv: SIMD2<Float>(1, 0))
+                ], length: MemoryLayout<MetalQuadVertex>.stride * 4)
+
+                let library = metalDevice.makeDefaultLibrary()
+                self.paperPipeline = MetalCanvasView.makePipeline(
+                    device: metalDevice,
+                    library: library,
+                    vertex: "canvasVertex",
+                    fragment: "paperFragment",
+                    blending: false
+                )
+                self.layerPipeline = MetalCanvasView.makePipeline(
+                    device: metalDevice,
+                    library: library,
+                    vertex: "canvasVertex",
+                    fragment: "layerFragment",
+                    blending: true
+                )
+            } else {
+                self.vertexBuffer = nil
+                self.paperPipeline = nil
+                self.layerPipeline = nil
+            }
+        }
+    }
+}
+
 final class MetalCanvasView: MTKView, MTKViewDelegate {
     private let commandQueue: MTLCommandQueue?
     private let layerPipeline: MTLRenderPipelineState?
@@ -27,37 +74,12 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var appliedRevision: Int = -1
 
     init() {
-        let metalDevice = MTLCreateSystemDefaultDevice()
-        self.commandQueue = metalDevice?.makeCommandQueue()
-
-        if let metalDevice {
-            self.vertexBuffer = metalDevice.makeBuffer(bytes: [
-                MetalQuadVertex(position: SIMD2<Float>(0, 0), uv: SIMD2<Float>(0, 1)),
-                MetalQuadVertex(position: SIMD2<Float>(1, 0), uv: SIMD2<Float>(1, 1)),
-                MetalQuadVertex(position: SIMD2<Float>(0, 1), uv: SIMD2<Float>(0, 0)),
-                MetalQuadVertex(position: SIMD2<Float>(1, 1), uv: SIMD2<Float>(1, 0))
-            ], length: MemoryLayout<MetalQuadVertex>.stride * 4)
-
-            let library = metalDevice.makeDefaultLibrary()
-            self.paperPipeline = MetalCanvasView.makePipeline(
-                device: metalDevice,
-                library: library,
-                vertex: "canvasVertex",
-                fragment: "paperFragment",
-                blending: false
-            )
-            self.layerPipeline = MetalCanvasView.makePipeline(
-                device: metalDevice,
-                library: library,
-                vertex: "canvasVertex",
-                fragment: "layerFragment",
-                blending: true
-            )
-        } else {
-            self.vertexBuffer = nil
-            self.paperPipeline = nil
-            self.layerPipeline = nil
-        }
+        let resources = MetalCanvasRendererCache.shared
+        let metalDevice = resources.device
+        self.commandQueue = resources.commandQueue
+        self.vertexBuffer = resources.vertexBuffer
+        self.paperPipeline = resources.paperPipeline
+        self.layerPipeline = resources.layerPipeline
 
         super.init(frame: .zero, device: metalDevice)
 
@@ -77,6 +99,10 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
 
     func update(snapshot: MetalDocumentSnapshot?) {
         pendingSnapshot = snapshot
+    }
+
+    nonisolated static func warmUpRenderingResources() {
+        _ = MetalCanvasRendererCache.shared
     }
 
     func contentRect(for viewSize: CGSize, documentSize: CGSize) -> CGRect {
@@ -183,7 +209,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         appliedRevision = snapshot.revision
     }
 
-    private static func makePipeline(
+    static func makePipeline(
         device: MTLDevice,
         library: MTLLibrary?,
         vertex: String,

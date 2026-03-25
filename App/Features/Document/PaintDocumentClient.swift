@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 struct PaintDocumentClient: Sendable {
+    var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     var presentation: @Sendable () -> PaintDocumentPresentation
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
@@ -10,20 +11,27 @@ struct PaintDocumentClient: Sendable {
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
     var clearLayer: @Sendable (Int) -> Void
+    var warmUpRendering: @Sendable () -> Void
 
     static let live: PaintDocumentClient = {
-        let session = PaintDocumentSession()
+        let sessionBox = PaintDocumentSessionBox()
         return PaintDocumentClient(
-            presentation: { session.presentation() },
-            beginStroke: { sample, brush in session.beginStroke(sample: sample, brush: brush) },
-            appendStroke: { sample in session.appendStroke(sample: sample) },
-            endStroke: { session.endStroke() },
-            addLayer: { name in session.addLayer(name: name) },
-            setActiveLayer: { index in session.setActiveLayer(index: index) },
-            setLayerVisibility: { index, isVisible in session.setLayerVisibility(index: index, isVisible: isVisible) },
-            clearLayer: { index in session.clearLayer(index: index) }
+            lightweightPresentation: { sessionBox.session.lightweightPresentation() },
+            presentation: { sessionBox.session.presentation() },
+            beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
+            appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
+            endStroke: { sessionBox.session.endStroke() },
+            addLayer: { name in sessionBox.session.addLayer(name: name) },
+            setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
+            setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
+            clearLayer: { index in sessionBox.session.clearLayer(index: index) },
+            warmUpRendering: { MetalCanvasView.warmUpRenderingResources() }
         )
     }()
+}
+
+private final class PaintDocumentSessionBox: @unchecked Sendable {
+    lazy var session = PaintDocumentSession()
 }
 
 private enum PaintDocumentClientKey: DependencyKey {

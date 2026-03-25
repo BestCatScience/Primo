@@ -9,7 +9,7 @@ struct ContentView: View {
             BrushPaletteView(
                 store: store.scope(
                     state: \.brushPalette,
-                    action: { .brushPalette($0) }
+                    action: \.brushPalette
                 )
             )
             .frame(width: 280)
@@ -28,22 +28,35 @@ struct ContentView: View {
                 CanvasView(
                     store: store.scope(
                         state: \.canvas,
-                        action: { .canvas($0) }
+                        action: \.canvas
                     )
                 )
                 .padding(28)
+
+                if store.isHydrating {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Preparing studio...")
+                            .font(.headline)
+                            .foregroundStyle(Color.black.opacity(0.7))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
             }
 
             LayerSidebarView(
                 store: store.scope(
                     state: \.layerSidebar,
-                    action: { .layerSidebar($0) }
+                    action: \.layerSidebar
                 )
             )
             .frame(width: 300)
         }
         .task {
-            await store.send(.task).finish()
+            store.send(.task)
         }
     }
 }

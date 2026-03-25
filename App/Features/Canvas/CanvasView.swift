@@ -1,32 +1,20 @@
 import ComposableArchitecture
+import AVFoundation
 import SwiftUI
 import UIKit
 
 struct CanvasView: UIViewRepresentable {
     let store: StoreOf<CanvasFeature>
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(store: store)
-    }
-
     func makeUIView(context: Context) -> PaintCanvasContainerView {
         let view = PaintCanvasContainerView()
-        view.sendAction = { context.coordinator.viewStore.send($0) }
+        view.sendAction = { store.send($0) }
         return view
     }
 
     func updateUIView(_ uiView: PaintCanvasContainerView, context: Context) {
-        let state = context.coordinator.viewStore.state
-        uiView.documentSize = state.canvasSize
-        uiView.update(snapshot: state.renderSnapshot, predictedPreview: state.predictedPreview)
-    }
-
-    final class Coordinator {
-        let viewStore: ViewStore<CanvasFeature.State, CanvasFeature.Action>
-
-        init(store: StoreOf<CanvasFeature>) {
-            self.viewStore = ViewStore(store, observe: { $0 })
-        }
+        uiView.documentSize = store.canvasSize
+        uiView.update(snapshot: store.renderSnapshot, predictedPreview: store.predictedPreview)
     }
 }
 
@@ -34,22 +22,15 @@ final class PaintCanvasContainerView: UIView {
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
-    private let rendererView = MetalCanvasView()
+    private var rendererView: MetalCanvasView?
     private let previewLayer = CAShapeLayer()
+    private var pendingSnapshot: MetalDocumentSnapshot?
+    private var hasScheduledRendererInstallation = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
         isMultipleTouchEnabled = false
-
-        rendererView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(rendererView)
-        NSLayoutConstraint.activate([
-            rendererView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            rendererView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            rendererView.topAnchor.constraint(equalTo: topAnchor),
-            rendererView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
 
         previewLayer.strokeColor = UIColor.black.withAlphaComponent(0.18).cgColor
         previewLayer.fillColor = UIColor.clear.cgColor
@@ -69,8 +50,14 @@ final class PaintCanvasContainerView: UIView {
         previewLayer.frame = bounds
     }
 
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        scheduleRendererInstallationIfNeeded()
+    }
+
     func update(snapshot: MetalDocumentSnapshot?, predictedPreview: [PreviewStrokePoint]) {
-        rendererView.update(snapshot: snapshot)
+        pendingSnapshot = snapshot
+        rendererView?.update(snapshot: snapshot)
         updatePreview(predictedPreview)
     }
 
@@ -116,7 +103,7 @@ final class PaintCanvasContainerView: UIView {
     }
 
     private func canvasPoint(from location: CGPoint) -> CGPoint {
-        let fitted = rendererView.contentRect(for: bounds.size, documentSize: documentSize)
+        let fitted = contentRect()
         guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
 
         let x = ((location.x - fitted.minX) / fitted.width) * documentSize.width
@@ -133,7 +120,7 @@ final class PaintCanvasContainerView: UIView {
             return
         }
 
-        let fitted = rendererView.contentRect(for: bounds.size, documentSize: documentSize)
+        let fitted = contentRect()
         let path = UIBezierPath()
         for (index, preview) in points.enumerated() {
             let point = CGPoint(
@@ -147,5 +134,43 @@ final class PaintCanvasContainerView: UIView {
             }
         }
         previewLayer.path = path.cgPath
+    }
+
+    private func scheduleRendererInstallationIfNeeded() {
+        guard window != nil, rendererView == nil, !hasScheduledRendererInstallation else { return }
+        hasScheduledRendererInstallation = true
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.installRendererIfNeeded()
+        }
+    }
+
+    private func installRendererIfNeeded() {
+        guard rendererView == nil else { return }
+
+        let rendererView = MetalCanvasView()
+        rendererView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(rendererView)
+        sendSubviewToBack(rendererView)
+        NSLayoutConstraint.activate([
+            rendererView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            rendererView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            rendererView.topAnchor.constraint(equalTo: topAnchor),
+            rendererView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+        rendererView.update(snapshot: pendingSnapshot)
+        self.rendererView = rendererView
+    }
+
+    private func contentRect() -> CGRect {
+        if let rendererView {
+            return rendererView.contentRect(for: bounds.size, documentSize: documentSize)
+        }
+
+        let paperRect = bounds.insetBy(dx: 18, dy: 18)
+        let drawableRect = paperRect.insetBy(dx: 20, dy: 20)
+        guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
+        return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
     }
 }
