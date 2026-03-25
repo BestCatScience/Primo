@@ -41,6 +41,15 @@ struct LayerRowModel: Identifiable, Equatable {
     }
 }
 
+struct LayerCanvasBuffer: Identifiable, Equatable {
+    var id: Int { index }
+    let index: Int
+    var name: String
+    var visible: Bool
+    var opacity: Double
+    var strokes: [PreviewStrokeTrack] = []
+}
+
 struct StylusSample: Equatable {
     let point: CGPoint
     let pressure: CGFloat
@@ -66,6 +75,26 @@ struct PreviewStrokePoint: Identifiable, Equatable {
         lhs.id == rhs.id &&
         lhs.point == rhs.point &&
         lhs.pressure == rhs.pressure
+    }
+}
+
+struct PreviewStrokeStyle: Equatable {
+    let radius: CGFloat
+    let opacity: CGFloat
+    let color: CGColor
+}
+
+struct PreviewStrokeTrack: Identifiable, Equatable {
+    let id = UUID()
+    let layerIndex: Int
+    let points: [PreviewStrokePoint]
+    let style: PreviewStrokeStyle
+
+    static func == (lhs: PreviewStrokeTrack, rhs: PreviewStrokeTrack) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.layerIndex == rhs.layerIndex &&
+        lhs.points == rhs.points &&
+        lhs.style == rhs.style
     }
 }
 

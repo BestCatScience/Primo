@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CoreGraphics
 import Foundation
 import os
 
@@ -29,6 +30,9 @@ struct StudioPanelLayoutState: Equatable {
 @Reducer
 struct AppFeature {
     private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
+    private enum CancelID {
+        case deferredPresentationRefresh
+    }
 
     @ObservableState
     struct State: Equatable {
@@ -42,12 +46,47 @@ struct AppFeature {
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
             canvas.canvasSize = presentation.canvasSize
+            canvas.activeLayerIndex = presentation.activeLayerIndex
+            let previousRevision = canvas.renderSnapshot?.revision ?? canvas.lastCommittedRenderRevision
+            var nextBuffers: [LayerCanvasBuffer] = []
+            let existingBuffers = Dictionary(uniqueKeysWithValues: canvas.layerBuffers.map { ($0.index, $0) })
+            for row in presentation.layerRows.sorted(by: { $0.index < $1.index }) {
+                var buffer = existingBuffers[row.index] ?? LayerCanvasBuffer(
+                    index: row.index,
+                    name: row.name,
+                    visible: row.visible,
+                    opacity: row.opacity
+                )
+                buffer.name = row.name
+                buffer.visible = row.visible
+                buffer.opacity = row.opacity
+                nextBuffers.append(buffer)
+            }
+            canvas.layerBuffers = nextBuffers
             if let renderSnapshot = presentation.renderSnapshot {
                 canvas.renderSnapshot = renderSnapshot
+                canvas.lastCommittedRenderRevision = renderSnapshot.revision
                 isHydrating = false
+                if !canvas.isStrokeActive &&
+                    canvas.isAwaitingCommittedRender &&
+                    renderSnapshot.revision > previousRevision {
+                    canvas.isAwaitingCommittedRender = false
+                    canvas.lastRenderedLocalBufferRevision = canvas.localBufferRevision
+                }
             }
             layerSidebar.layers = presentation.layerRows
+            layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
+            canvas.previewStyle = PreviewStrokeStyle(
+                radius: CGFloat(brushPalette.runtimeSettings.radius),
+                opacity: CGFloat(brushPalette.runtimeSettings.opacity),
+                color: CGColor(
+                    red: CGFloat(brushPalette.runtimeSettings.red) / 255.0,
+                    green: CGFloat(brushPalette.runtimeSettings.green) / 255.0,
+                    blue: CGFloat(brushPalette.runtimeSettings.blue) / 255.0,
+                    alpha: 1.0
+                )
+            )
         }
 
         func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
@@ -106,6 +145,8 @@ struct AppFeature {
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch
+        case deferredPresentationRefresh
+        case clearActiveLayerButtonTapped
         case panelCollapseToggled(StudioPanelKind)
         case panelMoved(StudioPanelKind, StudioPanelSide)
         case panelStackToggled(StudioPanelKind)
@@ -169,6 +210,12 @@ struct AppFeature {
                 Self.startupLogger.debug("Full presentation applied")
                 return .none
 
+            case .deferredPresentationRefresh:
+                return .run { [paintDocumentClient] send in
+                    await send(.presentationLoaded(paintDocumentClient.presentation()))
+                }
+                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+
             case let .panelCollapseToggled(panel):
                 state.toggleCollapse(for: panel)
                 return .none
@@ -190,18 +237,38 @@ struct AppFeature {
                 state.swapStackOrder()
                 return .none
 
-            case .brushPalette(.delegate(.clearActiveLayer)):
-                paintDocumentClient.clearLayer(state.layerSidebar.activeLayerIndex)
+            case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
+                let activeLayerIndex = state.layerSidebar.activeLayerIndex
+                paintDocumentClient.clearLayer(activeLayerIndex)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                    state.canvas.localBufferRevision += 1
+                }
                 state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .brushPalette:
+                state.canvas.previewStyle = PreviewStrokeStyle(
+                    radius: CGFloat(state.brushPalette.runtimeSettings.radius),
+                    opacity: CGFloat(state.brushPalette.runtimeSettings.opacity),
+                    color: CGColor(
+                        red: CGFloat(state.brushPalette.runtimeSettings.red) / 255.0,
+                        green: CGFloat(state.brushPalette.runtimeSettings.green) / 255.0,
+                        blue: CGFloat(state.brushPalette.runtimeSettings.blue) / 255.0,
+                        alpha: 1.0
+                    )
+                )
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
                 paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
+                state.canvas.activeLayerIndex = state.layerSidebar.layers.count
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
             case let .layerSidebar(.delegate(.selectLayer(index))):
                 paintDocumentClient.setActiveLayer(index)
+                state.canvas.activeLayerIndex = index
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
@@ -215,22 +282,26 @@ struct AppFeature {
 
             case let .canvas(.delegate(.beginStroke(sample))):
                 paintDocumentClient.beginStroke(sample, state.brushPalette.runtimeSettings)
-                state.applyPresentation(paintDocumentClient.presentation())
-                return .none
+                return .send(.deferredPresentationRefresh)
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 for sample in samples {
                     paintDocumentClient.appendStroke(sample)
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
-                return .none
+                return .run { send in
+                    try? await Task.sleep(for: .milliseconds(16))
+                    await send(.deferredPresentationRefresh)
+                }
+                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()
-                state.applyPresentation(paintDocumentClient.presentation())
-                return .none
+                return .concatenate(
+                    .cancel(id: CancelID.deferredPresentationRefresh),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
 
-            case .brushPalette, .layerSidebar, .canvas:
+            case .layerSidebar, .canvas:
                 return .none
             }
         }

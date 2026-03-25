@@ -27,6 +27,7 @@ struct LayerSidebarView: View {
                 }
 
                 ForEach(store.layers) { layer in
+                    let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
                     HStack(spacing: 12) {
                         Button {
                             store.send(.visibilityButtonTapped(layer.index))
@@ -47,7 +48,11 @@ struct LayerSidebarView: View {
                         Spacer()
 
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white)
+                            .fill(Color(red: 0.97, green: 0.96, blue: 0.93))
+                            .overlay {
+                                LayerThumbnailView(buffer: buffer)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                                     .stroke(Color.black.opacity(0.08), lineWidth: 1)
@@ -69,5 +74,41 @@ struct LayerSidebarView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct LayerThumbnailView: View {
+    let buffer: LayerCanvasBuffer?
+
+    var body: some View {
+        GeometryReader { geometry in
+            Canvas { context, size in
+                guard let buffer else { return }
+
+                for stroke in buffer.strokes {
+                    guard stroke.points.count > 1 else { continue }
+
+                    var path = Path()
+                    for (index, point) in stroke.points.enumerated() {
+                        let mapped = CGPoint(
+                            x: (point.point.x / 1152.0) * size.width,
+                            y: (point.point.y / 1536.0) * size.height
+                        )
+                        if index == 0 {
+                            path.move(to: mapped)
+                        } else {
+                            path.addLine(to: mapped)
+                        }
+                    }
+
+                    let color = Color(cgColor: stroke.style.color).opacity(buffer.opacity * 0.9)
+                    context.stroke(
+                        path,
+                        with: .color(color),
+                        style: StrokeStyle(lineWidth: max(0.6, stroke.style.radius * 0.18), lineCap: .round, lineJoin: .round)
+                    )
+                }
+            }
+        }
     }
 }

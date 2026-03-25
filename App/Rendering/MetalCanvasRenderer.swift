@@ -108,8 +108,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     }
 
     func contentRect(for viewSize: CGSize, documentSize: CGSize) -> CGRect {
-        let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 18, dy: 18)
-        let drawableRect = paperRect.insetBy(dx: 20, dy: 20)
+        let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
+        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
         return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
     }
@@ -134,7 +134,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
             height: pendingSnapshot?.height ?? 1
         )
 
-        let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 18, dy: 18)
+        let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
         let contentRect = self.contentRect(for: viewSize, documentSize: snapshotSize)
 
         if let paperPipeline {

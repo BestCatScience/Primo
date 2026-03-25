@@ -6,6 +6,7 @@ struct LayerSidebarFeature {
     @ObservableState
     struct State: Equatable {
         var layers: [LayerRowModel] = []
+        var layerBuffers: [LayerCanvasBuffer] = []
         var activeLayerIndex: Int = 0
     }
 

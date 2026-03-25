@@ -5,46 +5,93 @@ struct ContentView: View {
     let store: StoreOf<AppFeature>
 
     var body: some View {
-        HStack(spacing: 0) {
-            panelRail(for: .leading)
+        VStack(spacing: 0) {
+            topBar
 
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.84, green: 0.86, blue: 0.82),
-                        Color(red: 0.76, green: 0.77, blue: 0.73)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+            HStack(spacing: 0) {
+                panelRail(for: .leading)
 
-                CanvasView(
-                    store: store.scope(
-                        state: \.canvas,
-                        action: \.canvas
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.84, green: 0.86, blue: 0.82),
+                            Color(red: 0.76, green: 0.77, blue: 0.73)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                )
-                .padding(28)
+                    .ignoresSafeArea()
 
-                if store.isHydrating {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .controlSize(.large)
-                        Text("Preparing studio...")
-                            .font(.headline)
-                            .foregroundStyle(Color.black.opacity(0.7))
+                    CanvasView(
+                        store: store.scope(
+                            state: \.canvas,
+                            action: \.canvas
+                        )
+                    )
+                    .padding(8)
+
+                    if store.isHydrating {
+                        VStack(spacing: 12) {
+                            ProgressView()
+                                .controlSize(.large)
+                            Text("Preparing studio...")
+                                .font(.headline)
+                                .foregroundStyle(Color.black.opacity(0.7))
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 20)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 20)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
-            }
 
-            panelRail(for: .trailing)
+                panelRail(for: .trailing)
+            }
         }
         .task {
             store.send(.task)
+        }
+    }
+
+    private var topBar: some View {
+        HStack(spacing: 14) {
+            Text("atelierprime")
+                .font(.system(size: 18, weight: .black, design: .rounded))
+                .tracking(0.4)
+
+            Text("Active Layer: \(activeLayerName)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.black.opacity(0.72))
+
+            Spacer()
+
+            Button("Clear Active Layer") {
+                store.send(.clearActiveLayerButtonTapped)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.black)
+            )
+            .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.97, green: 0.95, blue: 0.91),
+                    Color(red: 0.91, green: 0.89, blue: 0.84)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.black.opacity(0.08))
+                .frame(height: 1)
         }
     }
 
@@ -127,6 +174,10 @@ struct ContentView: View {
 
     private func panels(on side: StudioPanelSide) -> [StudioPanelKind] {
         store.stackedPanelOrder.filter { panelState(for: $0).side == side }
+    }
+
+    private var activeLayerName: String {
+        store.layerSidebar.layers.first(where: { $0.index == store.layerSidebar.activeLayerIndex })?.name ?? "Layer \(store.layerSidebar.activeLayerIndex + 1)"
     }
 }
 

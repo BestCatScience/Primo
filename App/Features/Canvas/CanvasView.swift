@@ -14,7 +14,14 @@ struct CanvasView: UIViewRepresentable {
 
     func updateUIView(_ uiView: PaintCanvasContainerView, context: Context) {
         uiView.documentSize = store.canvasSize
-        uiView.update(snapshot: store.renderSnapshot, predictedPreview: store.predictedPreview)
+        uiView.update(
+            snapshot: store.renderSnapshot,
+            layerBuffers: store.layerBuffers,
+            showsCommittedOverlay: true,
+            liveStroke: store.liveStroke,
+            predictedPreview: store.predictedPreview,
+            previewStyle: store.previewStyle
+        )
     }
 }
 
@@ -23,7 +30,9 @@ final class PaintCanvasContainerView: UIView {
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
     private var rendererView: MetalCanvasView?
-    private let previewLayer = CAShapeLayer()
+    private let committedStrokeContainerLayer = CALayer()
+    private let liveStrokeLayer = CAShapeLayer()
+    private let predictedStrokeLayer = CAShapeLayer()
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var hasScheduledRendererInstallation = false
 
@@ -32,12 +41,11 @@ final class PaintCanvasContainerView: UIView {
         backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
         isMultipleTouchEnabled = false
 
-        previewLayer.strokeColor = UIColor.black.withAlphaComponent(0.18).cgColor
-        previewLayer.fillColor = UIColor.clear.cgColor
-        previewLayer.lineWidth = 1.5
-        previewLayer.lineCap = .round
-        previewLayer.lineJoin = .round
-        layer.addSublayer(previewLayer)
+        configureStrokeLayer(liveStrokeLayer, opacity: 1.0)
+        configureStrokeLayer(predictedStrokeLayer, opacity: 0.22)
+        layer.addSublayer(committedStrokeContainerLayer)
+        layer.addSublayer(liveStrokeLayer)
+        layer.addSublayer(predictedStrokeLayer)
     }
 
     @available(*, unavailable)
@@ -47,7 +55,9 @@ final class PaintCanvasContainerView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        previewLayer.frame = bounds
+        committedStrokeContainerLayer.frame = bounds
+        liveStrokeLayer.frame = bounds
+        predictedStrokeLayer.frame = bounds
     }
 
     override func didMoveToWindow() {
@@ -55,10 +65,19 @@ final class PaintCanvasContainerView: UIView {
         scheduleRendererInstallationIfNeeded()
     }
 
-    func update(snapshot: MetalDocumentSnapshot?, predictedPreview: [PreviewStrokePoint]) {
+    func update(
+        snapshot: MetalDocumentSnapshot?,
+        layerBuffers: [LayerCanvasBuffer],
+        showsCommittedOverlay: Bool,
+        liveStroke: [PreviewStrokePoint],
+        predictedPreview: [PreviewStrokePoint],
+        previewStyle: PreviewStrokeStyle
+    ) {
         pendingSnapshot = snapshot
         rendererView?.update(snapshot: snapshot)
-        updatePreview(predictedPreview)
+        updateCommittedStrokeLayers(layerBuffers, showsCommittedOverlay: showsCommittedOverlay)
+        updateStrokeLayer(liveStrokeLayer, with: liveStroke, style: previewStyle, opacityMultiplier: 0.85)
+        updateStrokeLayer(predictedStrokeLayer, with: predictedPreview, style: previewStyle, opacityMultiplier: 0.28)
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -114,9 +133,14 @@ final class PaintCanvasContainerView: UIView {
         )
     }
 
-    private func updatePreview(_ points: [PreviewStrokePoint]) {
-        guard points.count > 1 else {
-            previewLayer.path = nil
+    private func updateStrokeLayer(
+        _ strokeLayer: CAShapeLayer,
+        with points: [PreviewStrokePoint],
+        style: PreviewStrokeStyle,
+        opacityMultiplier: CGFloat
+    ) {
+        guard !points.isEmpty else {
+            strokeLayer.path = nil
             return
         }
 
@@ -129,11 +153,37 @@ final class PaintCanvasContainerView: UIView {
             )
             if index == 0 {
                 path.move(to: point)
+                if points.count == 1 {
+                    path.addLine(to: CGPoint(x: point.x + 0.01, y: point.y + 0.01))
+                }
             } else {
                 path.addLine(to: point)
             }
         }
-        previewLayer.path = path.cgPath
+        strokeLayer.path = path.cgPath
+        if let color = style.color.copy(alpha: style.opacity * opacityMultiplier) {
+            strokeLayer.strokeColor = color
+        }
+        strokeLayer.lineWidth = max(1.0, style.radius * 2.0)
+    }
+
+    private func updateCommittedStrokeLayers(_ layerBuffers: [LayerCanvasBuffer], showsCommittedOverlay: Bool) {
+        committedStrokeContainerLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        guard showsCommittedOverlay else { return }
+
+        for buffer in layerBuffers where buffer.visible {
+            for stroke in buffer.strokes {
+                let strokeLayer = CAShapeLayer()
+                configureStrokeLayer(strokeLayer, opacity: 1.0)
+                updateStrokeLayer(
+                    strokeLayer,
+                    with: stroke.points,
+                    style: stroke.style,
+                    opacityMultiplier: CGFloat(buffer.opacity) * 0.92
+                )
+                committedStrokeContainerLayer.addSublayer(strokeLayer)
+            }
+        }
     }
 
     private func scheduleRendererInstallationIfNeeded() {
@@ -163,13 +213,21 @@ final class PaintCanvasContainerView: UIView {
         self.rendererView = rendererView
     }
 
+    private func configureStrokeLayer(_ strokeLayer: CAShapeLayer, opacity: CGFloat) {
+        strokeLayer.strokeColor = UIColor.black.withAlphaComponent(opacity).cgColor
+        strokeLayer.fillColor = UIColor.clear.cgColor
+        strokeLayer.lineWidth = 1.5
+        strokeLayer.lineCap = .round
+        strokeLayer.lineJoin = .round
+    }
+
     private func contentRect() -> CGRect {
         if let rendererView {
             return rendererView.contentRect(for: bounds.size, documentSize: documentSize)
         }
 
-        let paperRect = bounds.insetBy(dx: 18, dy: 18)
-        let drawableRect = paperRect.insetBy(dx: 20, dy: 20)
+        let paperRect = bounds.insetBy(dx: 6, dy: 6)
+        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
         return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
     }
