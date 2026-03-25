@@ -1,0 +1,44 @@
+name: atelierprime
+options:
+  deploymentTarget:
+    iOS: 26.0
+packages:
+  ComposableArchitecture:
+    url: https://github.com/pointfreeco/swift-composable-architecture
+    exactVersion: 1.25.2
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.atelierprime.app
+    SWIFT_VERSION: 5.10
+    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
+    CLANG_CXX_LIBRARY: libc++
+targets:
+  atelierprime:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Bridge
+      - path: Engine
+        excludes:
+          - "**/*.md"
+    settings:
+      base:
+        INFOPLIST_FILE: App/Support/Info.plist
+        PRODUCT_NAME: atelierprime
+        TARGETED_DEVICE_FAMILY: 2
+        IPHONEOS_DEPLOYMENT_TARGET: 26.0
+        SWIFT_OBJC_BRIDGING_HEADER: App/Support/atelierprime-Bridging-Header.h
+        CLANG_ENABLE_OBJC_ARC: YES
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/Engine/include
+    dependencies:
+      - package: ComposableArchitecture
+      - sdk: AVFoundation.framework
+      - sdk: CoreGraphics.framework
+      - sdk: Foundation.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: UIKit.framework
+    scheme:
+      testTargets: []
