@@ -3,11 +3,14 @@ import SwiftUI
 
 struct LayerSidebarView: View {
     let store: StoreOf<LayerSidebarFeature>
+    var showsTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Layers")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+            if showsTitle {
+                Text("Layers")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+            }
 
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
@@ -65,8 +68,6 @@ struct LayerSidebarView: View {
                 Spacer()
             }
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(red: 0.92, green: 0.90, blue: 0.86))
     }
 }

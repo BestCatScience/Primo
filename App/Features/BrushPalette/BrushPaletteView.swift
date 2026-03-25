@@ -3,11 +3,14 @@ import SwiftUI
 
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
+    var showsTitle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text("Brush")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
+            if showsTitle {
+                Text("Brush")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Preset")
@@ -59,8 +62,6 @@ struct BrushPaletteView: View {
 
             Spacer()
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(red: 0.94, green: 0.92, blue: 0.88))
     }
 }
