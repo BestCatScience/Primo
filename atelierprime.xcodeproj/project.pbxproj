@@ -32,6 +32,7 @@
 		A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* BrushPaletteFeature.swift */; };
 		A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* LayerSidebarFeature.swift */; };
 		A00000000000000000000043 /* CanvasFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001B /* CanvasFeature.swift */; };
+		A00000000000000000000044 /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000045 /* InputHandler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +65,7 @@
 		A00000000000000000000034 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		A00000000000000000000036 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		A00000000000000000000038 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		A00000000000000000000045 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -212,6 +214,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000005 /* CanvasView.swift */,
+				A00000000000000000000045 /* InputHandler.swift */,
 			);
 			path = Canvas;
 			sourceTree = "<group>";
@@ -318,6 +321,7 @@
 				A00000000000000000000043 /* CanvasFeature.swift in Sources */,
 				A00000000000000000000025 /* CanvasView.swift in Sources */,
 				A00000000000000000000022 /* ContentView.swift in Sources */,
+				A00000000000000000000044 /* InputHandler.swift in Sources */,
 				A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */,
 				A00000000000000000000027 /* LayerSidebarView.swift in Sources */,
 				A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */,
@@ -438,6 +442,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 2RZR3M2YPU;
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -477,6 +482,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 2RZR3M2YPU;
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				HEADER_SEARCH_PATHS = (
@@ -548,7 +554,6 @@
 			productName = ComposableArchitecture;
 		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = A00000000000000000000070 /* Project object */;
 }

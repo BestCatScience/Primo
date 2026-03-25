@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
+import simd
 
 struct BrushPreset: Identifiable, Equatable {
     var id: String { name }
@@ -63,6 +64,51 @@ struct StylusSample: Equatable {
         lhs.altitude == rhs.altitude &&
         lhs.azimuth == rhs.azimuth &&
         lhs.timestamp == rhs.timestamp
+    }
+}
+
+struct StrokePoint: Equatable {
+    var position: SIMD2<Float>
+    var pressure: Float
+    var altitude: Float
+    var azimuth: Float
+    var timestamp: Double
+    var isPredicted: Bool
+
+    var cgPoint: CGPoint {
+        CGPoint(x: CGFloat(position.x), y: CGFloat(position.y))
+    }
+
+    var stylusSample: StylusSample {
+        StylusSample(
+            point: cgPoint,
+            pressure: CGFloat(pressure),
+            altitude: CGFloat(altitude),
+            azimuth: CGFloat(azimuth),
+            timestamp: timestamp
+        )
+    }
+
+    var previewPoint: PreviewStrokePoint {
+        PreviewStrokePoint(
+            point: cgPoint,
+            pressure: CGFloat(pressure)
+        )
+    }
+}
+
+struct Stroke: Equatable {
+    var points: [StrokePoint] = []
+    var predictedPoints: [StrokePoint] = []
+    var color: SIMD4<Float> = SIMD4(0, 0, 0, 1)
+    var brushSize: Float = 4.0
+
+    var confirmedPreviewPoints: [PreviewStrokePoint] {
+        points.map(\.previewPoint)
+    }
+
+    var predictedPreviewPoints: [PreviewStrokePoint] {
+        predictedPoints.map(\.previewPoint)
     }
 }
 

@@ -17,8 +17,7 @@ struct CanvasFeature {
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
-        var liveStroke: [PreviewStrokePoint] = []
-        var predictedPreview: [PreviewStrokePoint] = []
+        var activeStroke: Stroke?
         var isStrokeActive = false
         var isAwaitingCommittedRender = false
         var previewStyle = PreviewStrokeStyle(
@@ -29,10 +28,8 @@ struct CanvasFeature {
     }
 
     enum Action: Equatable {
-        case strokeBegan(StylusSample)
-        case strokeSamples([StylusSample])
-        case predictedPreviewUpdated([StylusSample])
-        case strokeEnded
+        case strokeUpdated(Stroke)
+        case strokeEnded(Stroke)
         case delegate(Delegate)
     }
 
@@ -45,31 +42,36 @@ struct CanvasFeature {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .strokeBegan(sample):
+            case let .strokeUpdated(stroke):
+                let previousPointCount = state.activeStroke?.points.count ?? 0
+                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
+
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
-                state.predictedPreview = []
-                state.liveStroke = [
-                    PreviewStrokePoint(point: sample.point, pressure: min(max(sample.pressure, 0.15), 1.0))
-                ]
-                return .send(.delegate(.beginStroke(sample)))
-            case let .strokeSamples(samples):
-                state.liveStroke.append(contentsOf: samples.map {
-                    PreviewStrokePoint(point: $0.point, pressure: min(max($0.pressure, 0.15), 1.0))
-                })
-                return .send(.delegate(.appendSamples(samples)))
-            case let .predictedPreviewUpdated(samples):
-                state.predictedPreview = samples.map {
-                    PreviewStrokePoint(point: $0.point, pressure: min(max($0.pressure, 0.15), 1.0))
+                state.activeStroke = stroke
+
+                guard !appendedSamples.isEmpty else { return .none }
+                if previousPointCount == 0 {
+                    let first = appendedSamples[0]
+                    var effects: [Effect<Action>] = [
+                        .send(.delegate(.beginStroke(first)))
+                    ]
+                    let remainder = Array(appendedSamples.dropFirst())
+                    if !remainder.isEmpty {
+                        effects.append(.send(.delegate(.appendSamples(remainder))))
+                    }
+                    return .concatenate(effects)
                 }
-                return .none
-            case .strokeEnded:
+
+                return .send(.delegate(.appendSamples(appendedSamples)))
+
+            case let .strokeEnded(stroke):
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = true
-                if !state.liveStroke.isEmpty {
+                if !stroke.points.isEmpty {
                     let track = PreviewStrokeTrack(
                         layerIndex: state.activeLayerIndex,
-                        points: state.liveStroke,
+                        points: stroke.confirmedPreviewPoints,
                         style: state.previewStyle
                     )
                     if let bufferIndex = state.layerBuffers.firstIndex(where: { $0.index == state.activeLayerIndex }) {
@@ -87,8 +89,7 @@ struct CanvasFeature {
                     }
                     state.localBufferRevision += 1
                 }
-                state.liveStroke = []
-                state.predictedPreview = []
+                state.activeStroke = nil
                 return .send(.delegate(.endStroke))
             case .delegate:
                 return .none
