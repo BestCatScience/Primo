@@ -10,20 +10,15 @@ struct LayerSidebarView: View {
             VStack(alignment: .leading, spacing: 18) {
                 if showsTitle {
                     Text("Layers")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(StudioTheme.Typography.title(30))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(alignment: .center) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("STACK")
-                                .font(.system(size: 11, weight: .black, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.45))
-                            Text("\(store.layers.count) Layers")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
+                        Text("\(store.layers.count) Layers")
+                            .font(StudioTheme.Typography.title(20))
+                            .foregroundStyle(.white.opacity(0.9))
 
                         Spacer()
 
@@ -31,13 +26,13 @@ struct LayerSidebarView: View {
                             store.send(.addLayerButtonTapped)
                         } label: {
                             Label("Add", systemImage: "plus")
-                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .font(StudioTheme.Typography.label(13))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(Color(red: 0.89, green: 0.45, blue: 0.24))
+                                        .fill(StudioTheme.Palette.accent)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -47,7 +42,7 @@ struct LayerSidebarView: View {
                         let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
                         HStack(spacing: 14) {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Color.white.opacity(0.06))
+                                .fill(StudioTheme.Palette.cardFillStrong)
                                 .frame(width: 56, height: 56)
                                 .overlay {
                                     LayerThumbnailView(buffer: buffer)
@@ -56,10 +51,10 @@ struct LayerSidebarView: View {
 
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(layer.name)
-                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .font(StudioTheme.Typography.title(16))
                                     .foregroundStyle(.white.opacity(0.92))
                                 Text("Opacity \(Int(layer.opacity * 100))%")
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .font(StudioTheme.Typography.mono(11))
                                     .foregroundStyle(.white.opacity(0.48))
 
                                 HStack(spacing: 8) {
@@ -79,7 +74,7 @@ struct LayerSidebarView: View {
                                     .frame(width: 34, height: 34)
                                     .background(
                                         RoundedRectangle(cornerRadius: 11, style: .continuous)
-                                            .fill(Color.white.opacity(0.06))
+                                            .fill(StudioTheme.Palette.cardFillStrong)
                                     )
                             }
                             .buttonStyle(.plain)
@@ -87,11 +82,11 @@ struct LayerSidebarView: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .fill(store.activeLayerIndex == layer.index ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+                                .fill(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                .stroke(store.activeLayerIndex == layer.index ? Color(red: 0.96, green: 0.62, blue: 0.31).opacity(0.55) : Color.white.opacity(0.05), lineWidth: 1)
+                                .stroke(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder, lineWidth: 1)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                         .onTapGesture {
@@ -107,13 +102,13 @@ struct LayerSidebarView: View {
 
     private func capsuleTag(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .black, design: .monospaced))
+            .font(StudioTheme.Typography.mono(10))
             .foregroundStyle(.white.opacity(0.56))
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.06))
+                    .fill(StudioTheme.Palette.cardFillStrong)
             )
     }
 }

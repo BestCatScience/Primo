@@ -11,7 +11,7 @@ struct BrushPaletteView: View {
             VStack(alignment: .leading, spacing: 20) {
                 if showsTitle {
                     Text("Brush")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(StudioTheme.Typography.title(30))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
@@ -33,7 +33,7 @@ struct BrushPaletteView: View {
                             .frame(width: 82, height: 82)
                             .overlay(
                                 Circle()
-                                    .fill(Color.white.opacity(0.92))
+                                    .fill(StudioTheme.Palette.textPrimary)
                                     .frame(width: max(12, store.brushRadius * 4), height: max(12, store.brushRadius * 4))
                             )
 
@@ -57,17 +57,12 @@ struct BrushPaletteView: View {
                                 Circle()
                                     .fill(preset.color)
                                     .frame(width: 18, height: 18)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(preset.name)
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    Text("Studio preset")
-                                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                        .foregroundStyle(.white.opacity(0.45))
-                                }
+                                Text(preset.name)
+                                    .font(StudioTheme.Typography.title(15))
                                 Spacer()
                                 if store.selectedBrush == preset {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color(red: 0.98, green: 0.70, blue: 0.33))
+                                        .foregroundStyle(StudioTheme.Palette.accentBright)
                                 }
                             }
                             .foregroundStyle(.white.opacity(0.88))
@@ -75,7 +70,7 @@ struct BrushPaletteView: View {
                             .padding(.vertical, 12)
                             .background(
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(store.selectedBrush == preset ? Color.white.opacity(0.10) : Color.white.opacity(0.04))
+                                    .fill(store.selectedBrush == preset ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
                             )
                         }
                         .buttonStyle(.plain)
@@ -91,7 +86,7 @@ struct BrushPaletteView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(Color.white.opacity(0.04))
+                        .fill(StudioTheme.Palette.cardFill)
                 )
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -101,7 +96,7 @@ struct BrushPaletteView: View {
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            Color.white.opacity(0.92),
+                                            StudioTheme.Palette.textPrimary,
                                             Color.white.opacity(0.55)
                                         ],
                                         startPoint: .topLeading,
@@ -117,31 +112,23 @@ struct BrushPaletteView: View {
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Color Palette")
-                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .font(StudioTheme.Typography.title(15))
                                 .foregroundStyle(.white.opacity(0.9))
                             Text(store.selectedBrush?.name ?? "Custom Mix")
-                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .font(StudioTheme.Typography.body(12))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
 
                         Spacer(minLength: 0)
                     }
 
-                    ColorPicker("自由に色を選択", selection: $store.brushColor, supportsOpacity: false)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    ColorPicker("", selection: $store.brushColor, supportsOpacity: false)
                         .labelsHidden()
-                        .overlay(alignment: .leading) {
-                            Text("自由に色を選択")
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.82))
-                                .allowsHitTesting(false)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
+                                .fill(StudioTheme.Palette.hairline)
                         )
 
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 10) {
@@ -161,24 +148,24 @@ struct BrushPaletteView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color.white.opacity(0.04))
+                        .fill(StudioTheme.Palette.cardFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
 
                 Button("Clear Active Layer") {
                     store.send(.clearActiveLayerButtonTapped)
                 }
                 .buttonStyle(.plain)
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(StudioTheme.Typography.label(13))
                 .foregroundStyle(.white.opacity(0.92))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(Color(red: 0.89, green: 0.45, blue: 0.24))
+                        .fill(StudioTheme.Palette.accent)
                 )
             }
             .padding(.bottom, 10)
@@ -188,18 +175,18 @@ struct BrushPaletteView: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.system(size: 11, weight: .black, design: .monospaced))
+            .font(StudioTheme.Typography.mono(11))
             .foregroundStyle(.white.opacity(0.48))
     }
 
     private func metricRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(StudioTheme.Typography.mono(11))
                 .foregroundStyle(.white.opacity(0.48))
             Spacer()
             Text(value)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .font(StudioTheme.Typography.title(13))
                 .foregroundStyle(.white.opacity(0.92))
         }
     }
@@ -208,15 +195,15 @@ struct BrushPaletteView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .font(StudioTheme.Typography.title(12))
                     .foregroundStyle(.white.opacity(0.88))
                 Spacer()
                 Text(value)
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .font(StudioTheme.Typography.mono(11))
                     .foregroundStyle(.white.opacity(0.5))
             }
             slider
-                .tint(Color(red: 0.96, green: 0.62, blue: 0.31))
+                .tint(StudioTheme.Palette.accentBright)
         }
     }
 

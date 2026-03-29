@@ -6,8 +6,6 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            topBar
-
             HStack(spacing: 0) {
                 panelRail(for: .leading)
 
@@ -18,208 +16,116 @@ struct ContentView: View {
 
             bottomBar
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.11, green: 0.12, blue: 0.15),
-                    Color(red: 0.08, green: 0.09, blue: 0.11)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            ZStack {
+                StudioTheme.Gradients.appBackground
+
+                RadialGradient(
+                    colors: [
+                        StudioTheme.Palette.accentGlow.opacity(0.22),
+                        .clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 30,
+                    endRadius: 520
+                )
+
+                RadialGradient(
+                    colors: [
+                        StudioTheme.Palette.coolGlow.opacity(0.20),
+                        .clear
+                    ],
+                    center: .bottomLeading,
+                    startRadius: 40,
+                    endRadius: 520
+                )
+            }
         )
+        .ignoresSafeArea()
         .task {
             store.send(.task)
         }
     }
 
-    private var topBar: some View {
-        HStack(spacing: 18) {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+    private var centerStage: some View {
+        ZStack {
+            ZStack {
+                StudioTheme.Gradients.stage
+
+                Rectangle()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.95, green: 0.61, blue: 0.31),
-                                Color(red: 0.79, green: 0.35, blue: 0.20)
+                                StudioTheme.Palette.cardFillStrong,
+                                .clear,
+                                StudioTheme.Palette.accentBright.opacity(0.10)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 34, height: 34)
-                    .overlay(
-                        Image(systemName: "scribble.variable")
-                            .font(.system(size: 15, weight: .black))
-                            .foregroundStyle(.white)
+                    .mask(
+                        Rectangle()
+                            .rotationEffect(.degrees(-18))
+                            .scaleEffect(1.6)
                     )
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("atelierprime")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .tracking(0.8)
-                    Text("Studio Workspace / Illustration")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.52))
-                }
             }
-
-            HStack(spacing: 10) {
-                chromePill(title: activeLayerName, systemImage: "square.3.layers.3d.down.right")
-                chromePill(title: "\(Int(store.brushPalette.brushRadius)) px", systemImage: "pencil.line")
-                chromePill(title: "\(Int(store.brushPalette.brushOpacity * 100))%", systemImage: "circle.lefthalf.filled")
-            }
-
-            Spacer()
-
-            HStack(spacing: 10) {
-                toolbarAction(title: "Navigator", systemImage: "square.on.square.dashed")
-                toolbarAction(title: "History", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-
-                Button {
-                    store.send(.clearActiveLayerButtonTapped)
-                } label: {
-                    Label("Clear Layer", systemImage: "trash")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
-                        )
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.9))
-
-                Button {
-                    store.send(.task)
-                } label: {
-                    Label("Sync", systemImage: "arrow.clockwise")
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.94, green: 0.63, blue: 0.36),
-                                            Color(red: 0.85, green: 0.41, blue: 0.24)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-            }
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 16)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.16, green: 0.17, blue: 0.21),
-                    Color(red: 0.10, green: 0.11, blue: 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.white.opacity(0.08))
-                .frame(height: 1)
-        }
-    }
-
-    private var centerStage: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.17, green: 0.19, blue: 0.22),
-                    Color(red: 0.10, green: 0.11, blue: 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
             .overlay {
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: 320, height: 320)
-                        .blur(radius: 90)
-                        .offset(x: -260, y: -140)
+                        .fill(StudioTheme.Palette.cardFillStrong)
+                        .frame(width: 360, height: 360)
+                        .blur(radius: 100)
+                        .offset(x: -320, y: -180)
 
                     Circle()
-                        .fill(Color(red: 0.94, green: 0.55, blue: 0.27).opacity(0.18))
+                        .fill(StudioTheme.Palette.accent.opacity(0.24))
+                        .frame(width: 320, height: 320)
+                        .blur(radius: 90)
+                        .offset(x: 380, y: 220)
+
+                    Circle()
+                        .fill(StudioTheme.Palette.coolGlow.opacity(0.18))
                         .frame(width: 280, height: 280)
-                        .blur(radius: 70)
-                        .offset(x: 300, y: 180)
+                        .blur(radius: 90)
+                        .offset(x: -220, y: 260)
                 }
             }
+            .overlay {
+                DiagonalStageLines()
+                    .opacity(0.16)
+                    .blendMode(.screen)
+                    .allowsHitTesting(false)
+            }
 
-            HStack(spacing: 18) {
-                toolDock
+            VStack {
+                HStack(alignment: .top, spacing: 18) {
+                    toolDock
 
-                ZStack {
-                    RoundedRectangle(cornerRadius: 34, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.23, green: 0.24, blue: 0.28),
-                                    Color(red: 0.14, green: 0.15, blue: 0.19)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                    ZStack {
+                        stageChrome
+
+                        CanvasView(
+                            store: store.scope(
+                                state: \.canvas,
+                                action: \.canvas
                             )
                         )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 34, style: .continuous)
-                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                        )
-                        .shadow(color: .black.opacity(0.32), radius: 28, y: 18)
+                        .padding(18)
 
-                    CanvasView(
-                        store: store.scope(
-                            state: \.canvas,
-                            action: \.canvas
-                        )
-                    )
-                    .padding(18)
-
-                    VStack {
-                        HStack {
-                            CanvasHUD(title: "Document", value: "1152 x 1536")
-                            Spacer()
-                            CanvasHUD(title: "Zoom", value: "75% - 400%")
-                        }
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            CanvasHUD(title: "Input", value: "Apple Pencil / Pinch")
-                        }
-                    }
-                    .padding(20)
-
-                    if store.isHydrating {
-                        VStack(spacing: 12) {
+                        if store.isHydrating {
                             ProgressView()
                                 .controlSize(.large)
-                            Text("Preparing studio...")
-                                .font(.headline)
-                                .foregroundStyle(.white.opacity(0.86))
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 20)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 20)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 18)
         }
     }
 
@@ -304,8 +210,41 @@ struct ContentView: View {
         store.stackedPanelOrder.filter { panelState(for: $0).side == side }
     }
 
-    private var activeLayerName: String {
-        store.layerSidebar.layers.first(where: { $0.index == store.layerSidebar.activeLayerIndex })?.name ?? "Layer \(store.layerSidebar.activeLayerIndex + 1)"
+    private var stageChrome: some View {
+        RoundedRectangle(cornerRadius: 38, style: .continuous)
+            .fill(StudioTheme.Gradients.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.03),
+                                StudioTheme.Palette.accentBright.opacity(0.28)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.16),
+                                .clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+                    .mask(
+                        RoundedRectangle(cornerRadius: 38, style: .continuous)
+                    )
+            }
+            .shadow(color: .black.opacity(0.42), radius: 34, y: 22)
     }
 
     private var toolDock: some View {
@@ -314,15 +253,15 @@ struct ContentView: View {
                 Button(action: {}) {
                     VStack(spacing: 6) {
                         Image(systemName: tool.systemImage)
-                            .font(.system(size: 17, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                         Text(tool.title)
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(StudioTheme.Typography.label(10))
                     }
-                    .foregroundStyle(tool.isPrimary ? Color.white : Color.white.opacity(0.75))
+                    .foregroundStyle(tool.isPrimary ? Color.white : StudioTheme.Palette.textSecondary)
                     .frame(width: 64, height: 64)
                     .background(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(tool.isPrimary ? Color(red: 0.89, green: 0.45, blue: 0.24) : Color.white.opacity(0.06))
+                            .fill(tool.isPrimary ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -335,70 +274,39 @@ struct ContentView: View {
             Spacer()
         }
         .padding(12)
-        .frame(width: 88)
+        .frame(width: 96)
         .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.white.opacity(0.04))
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(StudioTheme.Palette.cardFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         )
     }
 
     private var bottomBar: some View {
         HStack(spacing: 16) {
-            Text("Workspace Status")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.86))
-
             Text("Layer Count \(store.layerSidebar.layers.count)")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.58))
+                .font(StudioTheme.Typography.mono(11))
+                .foregroundStyle(StudioTheme.Palette.textMuted)
 
             Text("Opacity \(Int(store.brushPalette.brushOpacity * 100))%")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.58))
+                .font(StudioTheme.Typography.mono(11))
+                .foregroundStyle(StudioTheme.Palette.textMuted)
 
             Spacer()
-
-            Text("Clip-inspired studio chrome")
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.54))
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 10)
-        .background(Color.black.opacity(0.35))
+        .background(StudioTheme.Palette.overlayBlack)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.white.opacity(0.06))
+                .fill(StudioTheme.Palette.cardBorder)
                 .frame(height: 1)
         }
     }
 
-    private func chromePill(title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundStyle(.white.opacity(0.72))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.06))
-            )
-    }
-
-    private func toolbarAction(title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                    .fill(Color.white.opacity(0.05))
-            )
-            .foregroundStyle(.white.opacity(0.76))
-    }
 }
 
 private struct CanvasHUD: View {
@@ -408,22 +316,38 @@ private struct CanvasHUD: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .black, design: .monospaced))
+                .font(StudioTheme.Typography.mono(10))
                 .foregroundStyle(.white.opacity(0.45))
             Text(value)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.85))
+                .font(StudioTheme.Typography.title(12))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.black.opacity(0.3))
+                .fill(StudioTheme.Palette.overlayBlack)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
+    }
+}
+
+private struct DiagonalStageLines: View {
+    var body: some View {
+        GeometryReader { geometry in
+            Path { path in
+                let width = geometry.size.width
+                let height = geometry.size.height
+                stride(from: -height, through: width + height, by: 36).forEach { offset in
+                    path.move(to: CGPoint(x: offset, y: 0))
+                    path.addLine(to: CGPoint(x: offset - height, y: height))
+                }
+            }
+            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
     }
 }
 
@@ -490,9 +414,15 @@ private struct StudioPanelShell<Content: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(panelBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(alignment: .top) {
+            Capsule(style: .continuous)
+                .fill(StudioTheme.Gradients.accentBar)
+                .frame(width: isCollapsed ? 26 : 92, height: 5)
+                .padding(.top, 10)
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.07), lineWidth: 1)
+                .strokeBorder(StudioTheme.Palette.hairline, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.22), radius: 24, y: 14)
     }
@@ -500,7 +430,7 @@ private struct StudioPanelShell<Content: View>: View {
     private var header: some View {
         HStack(spacing: 10) {
             Text(title)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(StudioTheme.Typography.title(22))
                 .foregroundStyle(.white.opacity(0.92))
                 .lineLimit(1)
 
@@ -521,18 +451,11 @@ private struct StudioPanelShell<Content: View>: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Color.white.opacity(0.03))
+        .background(StudioTheme.Palette.cardFill)
     }
 
     private var panelBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.17, green: 0.18, blue: 0.21),
-                Color(red: 0.11, green: 0.12, blue: 0.15)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        StudioTheme.Gradients.panel
     }
 
     private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
@@ -543,7 +466,7 @@ private struct StudioPanelShell<Content: View>: View {
                 .frame(width: 30, height: 30)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isActive ? Color(red: 0.89, green: 0.45, blue: 0.24) : Color.white.opacity(0.06))
+                        .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                 )
         }
         .buttonStyle(.plain)

@@ -33,6 +33,7 @@
 		A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* LayerSidebarFeature.swift */; };
 		A00000000000000000000043 /* CanvasFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001B /* CanvasFeature.swift */; };
 		A00000000000000000000044 /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000045 /* InputHandler.swift */; };
+		A00000000000000000000046 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000047 /* StudioTheme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +67,7 @@
 		A00000000000000000000036 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		A00000000000000000000038 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		A00000000000000000000045 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
+		A00000000000000000000047 /* StudioTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -198,6 +200,7 @@
 			children = (
 				A0000000000000000000000A /* atelierprime-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
+				A00000000000000000000047 /* StudioTheme.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -326,6 +329,7 @@
 				A00000000000000000000027 /* LayerSidebarView.swift in Sources */,
 				A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */,
 				A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */,
+				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,

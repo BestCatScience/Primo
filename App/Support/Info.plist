@@ -18,10 +18,12 @@
   <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
-  <key>LSRequiresIPhoneOS</key>
-  <true/>
-  <key>UILaunchScreen</key>
-  <dict/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UILaunchScreen</key>
+	<dict/>
   <key>UISupportedInterfaceOrientations~ipad</key>
   <array>
     <string>UIInterfaceOrientationPortrait</string>
