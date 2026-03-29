@@ -8,4 +8,5 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var red: UInt8
     var green: UInt8
     var blue: UInt8
+    var isEraser: Bool = false
 }

@@ -3,6 +3,46 @@ import SwiftUI
 import CoreGraphics
 import simd
 
+enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case brush
+    case erase
+    case select
+    case move
+    case shape
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .brush:
+            return "Brush"
+        case .erase:
+            return "Erase"
+        case .select:
+            return "Select"
+        case .move:
+            return "Move"
+        case .shape:
+            return "Shape"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .brush:
+            return "paintbrush.pointed"
+        case .erase:
+            return "eraser"
+        case .select:
+            return "lasso"
+        case .move:
+            return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
+        case .shape:
+            return "square.on.circle"
+        }
+    }
+}
+
 struct BrushPreset: Identifiable, Equatable {
     var id: String { name }
     let name: String

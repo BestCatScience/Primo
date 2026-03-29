@@ -74,6 +74,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var layerTextures: [Int: MTLTexture] = [:]
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var appliedRevision: Int = -1
+    private var viewportOffset: CGSize = .zero
 
     init() {
         let clock = ContinuousClock()
@@ -103,15 +104,17 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func update(snapshot: MetalDocumentSnapshot?) {
+    func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize) {
         pendingSnapshot = snapshot
+        self.viewportOffset = viewportOffset
     }
 
-    func contentRect(for viewSize: CGSize, documentSize: CGSize) -> CGRect {
+    func contentRect(for viewSize: CGSize, documentSize: CGSize, viewportOffset: CGSize) -> CGRect {
         let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
         return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+            .offsetBy(dx: viewportOffset.width, dy: viewportOffset.height)
     }
 
     func draw(in view: MTKView) {
@@ -135,7 +138,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         )
 
         let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
-        let contentRect = self.contentRect(for: viewSize, documentSize: snapshotSize)
+        let contentRect = self.contentRect(for: viewSize, documentSize: snapshotSize, viewportOffset: viewportOffset)
 
         if let paperPipeline {
             var paperUniforms = MetalQuadUniforms(

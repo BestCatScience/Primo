@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) uint8_t red;
 @property (nonatomic) uint8_t green;
 @property (nonatomic) uint8_t blue;
+@property (nonatomic) BOOL eraser;
 
 @end
 

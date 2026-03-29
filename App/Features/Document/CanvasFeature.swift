@@ -20,6 +20,8 @@ struct CanvasFeature {
         var activeStroke: Stroke?
         var isStrokeActive = false
         var isAwaitingCommittedRender = false
+        var currentTool: StudioToolKind = .brush
+        var viewportOffset: CGSize = .zero
         var previewStyle = PreviewStrokeStyle(
             radius: 3.0,
             opacity: 0.9,
@@ -30,6 +32,7 @@ struct CanvasFeature {
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
+        case viewportOffsetChanged(CGSize)
         case delegate(Delegate)
     }
 
@@ -37,18 +40,27 @@ struct CanvasFeature {
         case beginStroke(StylusSample)
         case appendSamples([StylusSample])
         case endStroke
+        case commitStroke([StylusSample])
     }
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .viewportOffsetChanged(offset):
+                state.viewportOffset = offset
+                return .none
+
             case let .strokeUpdated(stroke):
                 let previousPointCount = state.activeStroke?.points.count ?? 0
-                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
-
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
                 state.activeStroke = stroke
+
+                if state.currentTool == .shape {
+                    return .none
+                }
+
+                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
 
                 guard !appendedSamples.isEmpty else { return .none }
                 if previousPointCount == 0 {
@@ -90,6 +102,9 @@ struct CanvasFeature {
                     state.localBufferRevision += 1
                 }
                 state.activeStroke = nil
+                if state.currentTool == .shape {
+                    return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
+                }
                 return .send(.delegate(.endStroke))
             case .delegate:
                 return .none

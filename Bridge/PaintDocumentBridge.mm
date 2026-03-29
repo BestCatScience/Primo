@@ -22,6 +22,7 @@
         _tiltInfluence = 0.75;
         _maxDarkness = 0.95;
         _pressureSensitivity = 0.4;
+        _eraser = NO;
     }
     return self;
 }
@@ -122,6 +123,7 @@
     settings.red = brush.red;
     settings.green = brush.green;
     settings.blue = brush.blue;
+    settings.eraser = brush.eraser;
 
     atelierprime::StrokePoint startPoint;
     startPoint.x = (float)point.x;

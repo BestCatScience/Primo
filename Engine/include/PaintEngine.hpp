@@ -24,6 +24,7 @@ struct BrushSettings {
     uint8_t red = 24;
     uint8_t green = 24;
     uint8_t blue = 24;
+    bool eraser = false;
 };
 
 struct StrokePoint {

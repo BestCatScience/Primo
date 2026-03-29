@@ -109,6 +109,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.red = brush.red
         descriptor.green = brush.green
         descriptor.blue = brush.blue
+        descriptor.eraser = brush.isEraser
         return descriptor
     }
 

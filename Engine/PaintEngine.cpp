@@ -230,6 +230,18 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
 void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha) {
     const float srcA = clamp01(alpha);
     const float dstA = static_cast<float>(dst[3]) / 255.0F;
+
+    if (activeBrush_.eraser) {
+        const float outA = clamp01(dstA * (1.0F - srcA));
+        dst[3] = static_cast<uint8_t>(outA * 255.0F);
+        if (outA <= 0.001F) {
+            dst[0] = 0U;
+            dst[1] = 0U;
+            dst[2] = 0U;
+        }
+        return;
+    }
+
     const float outA = std::min(activeBrush_.maxDarkness, dstA + (srcA * (1.0F - (dstA * 0.8F))));
     const float blend = outA <= 0.0F ? 0.0F : (outA - dstA) / outA;
 

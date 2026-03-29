@@ -77,7 +77,32 @@ struct AppFeature {
             layerSidebar.layers = presentation.layerRows
             layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
-            canvas.previewStyle = PreviewStrokeStyle(
+            canvas.previewStyle = previewStrokeStyle()
+        }
+
+        func resolvedBrushSettings() -> BrushRuntimeSettings {
+            var settings = brushPalette.runtimeSettings
+            if canvas.currentTool == .erase {
+                settings.isEraser = true
+            }
+            return settings
+        }
+
+        func previewStrokeStyle() -> PreviewStrokeStyle {
+            if canvas.currentTool == .erase {
+                return PreviewStrokeStyle(
+                    radius: CGFloat(brushPalette.runtimeSettings.radius),
+                    opacity: 0.78,
+                    color: CGColor(
+                        red: 0.92,
+                        green: 0.95,
+                        blue: 0.98,
+                        alpha: 1.0
+                    )
+                )
+            }
+
+            return PreviewStrokeStyle(
                 radius: CGFloat(brushPalette.runtimeSettings.radius),
                 opacity: CGFloat(brushPalette.runtimeSettings.opacity),
                 color: CGColor(
@@ -146,7 +171,12 @@ struct AppFeature {
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch
         case deferredPresentationRefresh
+        case refreshPresentationRequested
+        case toolSelected(StudioToolKind)
         case clearActiveLayerButtonTapped
+        case activeLayerVisibilityToggled
+        case selectPreviousLayer
+        case selectNextLayer
         case panelCollapseToggled(StudioPanelKind)
         case panelMoved(StudioPanelKind, StudioPanelSide)
         case panelStackToggled(StudioPanelKind)
@@ -216,6 +246,15 @@ struct AppFeature {
                 }
                 .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
+            case .refreshPresentationRequested:
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .toolSelected(tool):
+                state.canvas.currentTool = tool
+                state.canvas.previewStyle = state.previewStrokeStyle()
+                return .none
+
             case let .panelCollapseToggled(panel):
                 state.toggleCollapse(for: panel)
                 return .none
@@ -247,17 +286,43 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case .activeLayerVisibilityToggled:
+                let activeLayerIndex = state.layerSidebar.activeLayerIndex
+                guard let layer = state.layerSidebar.layers.first(where: { $0.index == activeLayerIndex }) else {
+                    return .none
+                }
+                paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .selectPreviousLayer:
+                guard
+                    let currentPosition = state.layerSidebar.layers.firstIndex(where: { $0.index == state.layerSidebar.activeLayerIndex }),
+                    currentPosition > 0
+                else {
+                    return .none
+                }
+                let targetIndex = state.layerSidebar.layers[currentPosition - 1].index
+                paintDocumentClient.setActiveLayer(targetIndex)
+                state.canvas.activeLayerIndex = targetIndex
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .selectNextLayer:
+                guard
+                    let currentPosition = state.layerSidebar.layers.firstIndex(where: { $0.index == state.layerSidebar.activeLayerIndex }),
+                    currentPosition < state.layerSidebar.layers.count - 1
+                else {
+                    return .none
+                }
+                let targetIndex = state.layerSidebar.layers[currentPosition + 1].index
+                paintDocumentClient.setActiveLayer(targetIndex)
+                state.canvas.activeLayerIndex = targetIndex
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case .brushPalette:
-                state.canvas.previewStyle = PreviewStrokeStyle(
-                    radius: CGFloat(state.brushPalette.runtimeSettings.radius),
-                    opacity: CGFloat(state.brushPalette.runtimeSettings.opacity),
-                    color: CGColor(
-                        red: CGFloat(state.brushPalette.runtimeSettings.red) / 255.0,
-                        green: CGFloat(state.brushPalette.runtimeSettings.green) / 255.0,
-                        blue: CGFloat(state.brushPalette.runtimeSettings.blue) / 255.0,
-                        alpha: 1.0
-                    )
-                )
+                state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
@@ -281,7 +346,7 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
-                paintDocumentClient.beginStroke(sample, state.brushPalette.runtimeSettings)
+                paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
                 return .send(.deferredPresentationRefresh)
 
             case let .canvas(.delegate(.appendSamples(samples))):
@@ -295,6 +360,18 @@ struct AppFeature {
                 .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case .canvas(.delegate(.endStroke)):
+                paintDocumentClient.endStroke()
+                return .concatenate(
+                    .cancel(id: CancelID.deferredPresentationRefresh),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
+
+            case let .canvas(.delegate(.commitStroke(samples))):
+                guard let first = samples.first else { return .none }
+                paintDocumentClient.beginStroke(first, state.resolvedBrushSettings())
+                for sample in samples.dropFirst() {
+                    paintDocumentClient.appendStroke(sample)
+                }
                 paintDocumentClient.endStroke()
                 return .concatenate(
                     .cancel(id: CancelID.deferredPresentationRefresh),

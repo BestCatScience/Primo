@@ -13,8 +13,6 @@ struct ContentView: View {
 
                 panelRail(for: .trailing)
             }
-
-            bottomBar
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
@@ -42,10 +40,177 @@ struct ContentView: View {
                 )
             }
         )
-        .ignoresSafeArea()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            menuBar
+                .zIndex(1000)
+        }
+        .ignoresSafeArea(edges: [.horizontal, .bottom])
         .task {
             store.send(.task)
         }
+    }
+
+    private var menuBar: some View {
+        HStack(spacing: 18) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(StudioTheme.Palette.accent)
+                    .frame(width: 10, height: 10)
+
+                Text("atelierprime")
+                    .font(StudioTheme.Typography.label(12))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+            }
+
+            menuBarMenu("設定") {
+                Button(store.brushPanel.isCollapsed ? "ブラシパネルを表示" : "ブラシパネルを隠す") {
+                    store.send(.panelCollapseToggled(.brush))
+                }
+
+                Button(store.layerPanel.isCollapsed ? "レイヤーパネルを表示" : "レイヤーパネルを隠す") {
+                    store.send(.panelCollapseToggled(.layers))
+                }
+
+                Divider()
+
+                Button(isStacked(.brush) || isStacked(.layers) ? "パネルの重なりを解除" : "パネルを重ねる") {
+                    store.send(.panelStackToggled(.brush))
+                }
+
+                Button("スタック順を入れ替え") {
+                    store.send(.panelStackOrderSwapRequested)
+                }
+                .disabled(!isStacked(.brush) && !isStacked(.layers))
+            }
+
+            menuBarMenu("ファイル") {
+                Button("新規キャンバス") {}
+                    .disabled(true)
+                Button("開く") {}
+                    .disabled(true)
+                Button("保存") {}
+                    .disabled(true)
+                Button("書き出し") {}
+                    .disabled(true)
+            }
+
+            menuBarMenu("編集") {
+                Button("アクティブレイヤーをクリア") {
+                    store.send(.clearActiveLayerButtonTapped)
+                }
+
+                Button("表示を更新") {
+                    store.send(.refreshPresentationRequested)
+                }
+            }
+
+            menuBarMenu("ページ管理") {
+                Button("ページを追加") {}
+                    .disabled(true)
+                Button("ページを複製") {}
+                    .disabled(true)
+                Button("ページを削除") {}
+                    .disabled(true)
+            }
+
+            menuBarMenu("レイヤー") {
+                Button("新規レイヤー") {
+                    store.send(.layerSidebar(.addLayerButtonTapped))
+                }
+
+                Button(activeLayerIsVisible ? "アクティブレイヤーを非表示" : "アクティブレイヤーを表示") {
+                    store.send(.activeLayerVisibilityToggled)
+                }
+                .disabled(activeLayer == nil)
+
+                Divider()
+
+                Button("ひとつ上のレイヤーを選択") {
+                    store.send(.selectPreviousLayer)
+                }
+                .disabled(!canSelectPreviousLayer)
+
+                Button("ひとつ下のレイヤーを選択") {
+                    store.send(.selectNextLayer)
+                }
+                .disabled(!canSelectNextLayer)
+
+                Divider()
+
+                Button("アクティブレイヤーをクリア") {
+                    store.send(.clearActiveLayerButtonTapped)
+                }
+                .disabled(activeLayer == nil)
+            }
+
+            Spacer(minLength: 12)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 6)
+        .background(
+            ZStack {
+                StudioTheme.Palette.overlayBlack.opacity(0.98)
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.05),
+                        StudioTheme.Palette.cardFill.opacity(0.18)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        )
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(StudioTheme.Palette.cardBorder.opacity(0.95))
+                .frame(height: 1)
+        }
+        .contentShape(Rectangle())
+        .compositingGroup()
+        .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
+    }
+
+    private func menuBarMenu<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        Menu {
+            content()
+        } label: {
+            Text(title)
+                .font(StudioTheme.Typography.label(12))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(StudioTheme.Palette.cardFillStrong.opacity(0.92))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(StudioTheme.Palette.cardBorder.opacity(0.8), lineWidth: 1)
+                }
+        }
+    }
+
+    private var activeLayer: LayerRowModel? {
+        store.layerSidebar.layers.first { $0.index == store.layerSidebar.activeLayerIndex }
+    }
+
+    private var activeLayerIsVisible: Bool {
+        activeLayer?.visible ?? false
+    }
+
+    private var activeLayerPosition: Int? {
+        store.layerSidebar.layers.firstIndex { $0.index == store.layerSidebar.activeLayerIndex }
+    }
+
+    private var canSelectPreviousLayer: Bool {
+        guard let activeLayerPosition else { return false }
+        return activeLayerPosition > 0
+    }
+
+    private var canSelectNextLayer: Bool {
+        guard let activeLayerPosition else { return false }
+        return activeLayerPosition < store.layerSidebar.layers.count - 1
     }
 
     private var centerStage: some View {
@@ -165,10 +330,11 @@ struct ContentView: View {
             isCollapsed: panelState.isCollapsed,
             isStacked: isStacked,
             onToggleCollapse: { store.send(.panelCollapseToggled(panel)) },
-            onMoveLeading: { store.send(.panelMoved(panel, .leading)) },
-            onMoveTrailing: { store.send(.panelMoved(panel, .trailing)) },
             onToggleStack: { store.send(.panelStackToggled(panel)) },
-            onSwapStackOrder: { store.send(.panelStackOrderSwapRequested) }
+            onSwapStackOrder: { store.send(.panelStackOrderSwapRequested) },
+            onDragEnded: { translation in
+                handlePanelDragEnded(panel, translation: translation)
+            }
         ) {
             switch panel {
             case .brush:
@@ -208,6 +374,25 @@ struct ContentView: View {
 
     private func panels(on side: StudioPanelSide) -> [StudioPanelKind] {
         store.stackedPanelOrder.filter { panelState(for: $0).side == side }
+    }
+
+    private func handlePanelDragEnded(_ panel: StudioPanelKind, translation: CGSize) {
+        let horizontalThreshold: CGFloat = 70
+        let verticalThreshold: CGFloat = 42
+
+        if translation.width > horizontalThreshold {
+            store.send(.panelMoved(panel, .trailing))
+            return
+        }
+
+        if translation.width < -horizontalThreshold {
+            store.send(.panelMoved(panel, .leading))
+            return
+        }
+
+        if isStacked(panel), abs(translation.height) > verticalThreshold {
+            store.send(.panelStackOrderSwapRequested)
+        }
     }
 
     private var stageChrome: some View {
@@ -250,22 +435,26 @@ struct ContentView: View {
     private var toolDock: some View {
         VStack(spacing: 14) {
             ForEach(studioTools) { tool in
-                Button(action: {}) {
+                let isActive = store.canvas.currentTool == tool
+
+                Button {
+                    store.send(.toolSelected(tool))
+                } label: {
                     VStack(spacing: 6) {
                         Image(systemName: tool.systemImage)
                             .font(.system(size: 18, weight: .bold))
                         Text(tool.title)
                             .font(StudioTheme.Typography.label(10))
                     }
-                    .foregroundStyle(tool.isPrimary ? Color.white : StudioTheme.Palette.textSecondary)
+                    .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
                     .frame(width: 64, height: 64)
                     .background(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(tool.isPrimary ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
+                            .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(Color.white.opacity(tool.isPrimary ? 0.12 : 0.06), lineWidth: 1)
+                            .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -283,28 +472,6 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         )
-    }
-
-    private var bottomBar: some View {
-        HStack(spacing: 16) {
-            Text("Layer Count \(store.layerSidebar.layers.count)")
-                .font(StudioTheme.Typography.mono(11))
-                .foregroundStyle(StudioTheme.Palette.textMuted)
-
-            Text("Opacity \(Int(store.brushPalette.brushOpacity * 100))%")
-                .font(StudioTheme.Typography.mono(11))
-                .foregroundStyle(StudioTheme.Palette.textMuted)
-
-            Spacer()
-        }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 10)
-        .background(StudioTheme.Palette.overlayBlack)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(StudioTheme.Palette.cardBorder)
-                .frame(height: 1)
-        }
     }
 
 }
@@ -351,20 +518,7 @@ private struct DiagonalStageLines: View {
     }
 }
 
-private struct StudioTool: Identifiable {
-    let id: String
-    let title: String
-    let systemImage: String
-    let isPrimary: Bool
-}
-
-private let studioTools: [StudioTool] = [
-    StudioTool(id: "brush", title: "Brush", systemImage: "paintbrush.pointed", isPrimary: true),
-    StudioTool(id: "erase", title: "Erase", systemImage: "eraser", isPrimary: false),
-    StudioTool(id: "lasso", title: "Select", systemImage: "lasso", isPrimary: false),
-    StudioTool(id: "move", title: "Move", systemImage: "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left", isPrimary: false),
-    StudioTool(id: "shape", title: "Shape", systemImage: "square.on.circle", isPrimary: false)
-]
+private let studioTools: [StudioToolKind] = [.brush, .erase, .select, .move, .shape]
 
 private struct StudioPanelShell<Content: View>: View {
     let title: String
@@ -372,11 +526,13 @@ private struct StudioPanelShell<Content: View>: View {
     let isCollapsed: Bool
     let isStacked: Bool
     let onToggleCollapse: () -> Void
-    let onMoveLeading: () -> Void
-    let onMoveTrailing: () -> Void
     let onToggleStack: () -> Void
     let onSwapStackOrder: () -> Void
+    let onDragEnded: (CGSize) -> Void
     let content: Content
+
+    @State private var dragOffset: CGSize = .zero
+    @GestureState private var isDragging = false
 
     init(
         title: String,
@@ -384,10 +540,9 @@ private struct StudioPanelShell<Content: View>: View {
         isCollapsed: Bool,
         isStacked: Bool,
         onToggleCollapse: @escaping () -> Void,
-        onMoveLeading: @escaping () -> Void,
-        onMoveTrailing: @escaping () -> Void,
         onToggleStack: @escaping () -> Void,
         onSwapStackOrder: @escaping () -> Void,
+        onDragEnded: @escaping (CGSize) -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
@@ -395,10 +550,9 @@ private struct StudioPanelShell<Content: View>: View {
         self.isCollapsed = isCollapsed
         self.isStacked = isStacked
         self.onToggleCollapse = onToggleCollapse
-        self.onMoveLeading = onMoveLeading
-        self.onMoveTrailing = onMoveTrailing
         self.onToggleStack = onToggleStack
         self.onSwapStackOrder = onSwapStackOrder
+        self.onDragEnded = onDragEnded
         self.content = content()
     }
 
@@ -414,6 +568,14 @@ private struct StudioPanelShell<Content: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(panelBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(alignment: .topTrailing) {
+            if isDragging {
+                dragBadge
+                    .padding(.top, 12)
+                    .padding(.trailing, 12)
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
         .overlay(alignment: .top) {
             Capsule(style: .continuous)
                 .fill(StudioTheme.Gradients.accentBar)
@@ -424,22 +586,39 @@ private struct StudioPanelShell<Content: View>: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(StudioTheme.Palette.hairline, lineWidth: 1)
         )
+        .offset(dragOffset)
+        .scaleEffect(isDragging ? 1.015 : 1.0)
+        .rotationEffect(.degrees(Double(dragOffset.width / 42)))
         .shadow(color: Color.black.opacity(0.22), radius: 24, y: 14)
+        .shadow(color: StudioTheme.Palette.accent.opacity(isDragging ? 0.18 : 0.0), radius: 20, y: 10)
+        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: dragOffset)
+        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isDragging)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            Text(title)
-                .font(StudioTheme.Typography.title(22))
-                .foregroundStyle(.white.opacity(0.92))
-                .lineLimit(1)
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(StudioTheme.Palette.accent.opacity(0.9))
+                    .frame(width: 4, height: 30)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(StudioTheme.Typography.title(22))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineLimit(1)
+
+                    Text(isStacked ? "Drag sideways to move, up/down to reorder" : "Drag sideways to move")
+                        .font(StudioTheme.Typography.mono(10))
+                        .foregroundStyle(StudioTheme.Palette.textMuted)
+                        .lineLimit(1)
+                }
+            }
 
             if !isCollapsed {
                 Spacer(minLength: 8)
 
                 HStack(spacing: 6) {
-                    panelButton(systemName: "rectangle.leadinghalf.inset.filled", isActive: side == .leading, action: onMoveLeading)
-                    panelButton(systemName: "rectangle.trailinghalf.inset.filled", isActive: side == .trailing, action: onMoveTrailing)
                     panelButton(systemName: isStacked ? "square.split.2x1" : "square.split.1x2", isActive: isStacked, action: onToggleStack)
                     if isStacked {
                         panelButton(systemName: "arrow.up.arrow.down", isActive: false, action: onSwapStackOrder)
@@ -451,11 +630,45 @@ private struct StudioPanelShell<Content: View>: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(StudioTheme.Palette.cardFill)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.06),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .gesture(panelDragGesture)
     }
 
     private var panelBackground: LinearGradient {
         StudioTheme.Gradients.panel
+    }
+
+    private var dragBadge: some View {
+        Text(side == .leading ? "Drop to right rail" : "Drop to left rail")
+            .font(StudioTheme.Typography.mono(10))
+            .foregroundStyle(.white.opacity(0.82))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+    }
+
+    private var panelDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($isDragging) { _, state, _ in
+                state = true
+            }
+            .onChanged { value in
+                dragOffset = value.translation
+            }
+            .onEnded { value in
+                dragOffset = .zero
+                onDragEnded(value.translation)
+            }
     }
 
     private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {

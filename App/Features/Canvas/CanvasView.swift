@@ -20,7 +20,9 @@ struct CanvasView: UIViewRepresentable {
             layerBuffers: store.layerBuffers,
             showsCommittedOverlay: true,
             activeStroke: store.activeStroke,
-            previewStyle: store.previewStyle
+            previewStyle: store.previewStyle,
+            currentTool: store.currentTool,
+            viewportOffset: store.viewportOffset
         )
     }
 }
@@ -36,6 +38,10 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var hasScheduledRendererInstallation = false
     private let inputHandler = InputHandler()
+    private var viewportOffset: CGSize = .zero
+    private var currentTool: StudioToolKind = .brush
+    private var panStartLocation: CGPoint?
+    private var panStartOffset: CGSize = .zero
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -80,10 +86,15 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         layerBuffers: [LayerCanvasBuffer],
         showsCommittedOverlay: Bool,
         activeStroke: Stroke?,
-        previewStyle: PreviewStrokeStyle
+        previewStyle: PreviewStrokeStyle,
+        currentTool: StudioToolKind,
+        viewportOffset: CGSize
     ) {
         pendingSnapshot = snapshot
-        rendererView?.update(snapshot: snapshot)
+        self.currentTool = currentTool
+        self.viewportOffset = viewportOffset
+        rendererView?.update(snapshot: snapshot, viewportOffset: viewportOffset)
+        inputHandler.tool = currentTool
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
         updateCommittedStrokeLayers(layerBuffers, showsCommittedOverlay: showsCommittedOverlay)
@@ -92,18 +103,22 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if handlePanTouchesIfNeeded(touches, phase: .began) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if handlePanTouchesIfNeeded(touches, phase: .moved) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if handlePanTouchesIfNeeded(touches, phase: .ended) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if handlePanTouchesIfNeeded(touches, phase: .cancelled) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
@@ -262,7 +277,7 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
             rendererView.topAnchor.constraint(equalTo: topAnchor),
             rendererView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
-        rendererView.update(snapshot: pendingSnapshot)
+        rendererView.update(snapshot: pendingSnapshot, viewportOffset: viewportOffset)
         self.rendererView = rendererView
     }
 
@@ -283,13 +298,59 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
 
     private func contentRect() -> CGRect {
         if let rendererView {
-            return rendererView.contentRect(for: bounds.size, documentSize: documentSize)
+            return rendererView.contentRect(for: bounds.size, documentSize: documentSize, viewportOffset: viewportOffset)
         }
 
         let paperRect = bounds.insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect).offsetBy(dx: viewportOffset.width, dy: viewportOffset.height)
+    }
+
+    private enum PanPhase {
+        case began
+        case moved
+        case ended
+        case cancelled
+    }
+
+    private func handlePanTouchesIfNeeded(_ touches: Set<UITouch>, phase: PanPhase) -> Bool {
+        guard currentTool == .move, let touch = touches.first else {
+            if phase == .ended || phase == .cancelled {
+                panStartLocation = nil
+            }
+            return false
+        }
+
+        let location = touch.preciseLocation(in: self)
+        switch phase {
+        case .began:
+            panStartLocation = location
+            panStartOffset = viewportOffset
+        case .moved:
+            guard let panStartLocation else { return true }
+            let nextOffset = CGSize(
+                width: panStartOffset.width + (location.x - panStartLocation.x),
+                height: panStartOffset.height + (location.y - panStartLocation.y)
+            )
+            let clampedOffset = clampedViewportOffset(nextOffset)
+            sendAction?(.viewportOffsetChanged(clampedOffset))
+        case .ended, .cancelled:
+            panStartLocation = nil
+        }
+        return true
+    }
+
+    private func clampedViewportOffset(_ proposedOffset: CGSize) -> CGSize {
+        let paperRect = bounds.insetBy(dx: 6, dy: 6)
+        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
+        let fitted = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        let horizontalLimit = max(0, (fitted.width - drawableRect.width) / 2 + 120)
+        let verticalLimit = max(0, (fitted.height - drawableRect.height) / 2 + 120)
+        return CGSize(
+            width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
+            height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
+        )
     }
 }
 
