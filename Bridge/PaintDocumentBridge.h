@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CGFloat velocityInfluence;
 @property (nonatomic) CGFloat tiltInfluence;
 @property (nonatomic) CGFloat maxDarkness;
+@property (nonatomic) CGFloat pressureSensitivity;
 @property (nonatomic) uint8_t red;
 @property (nonatomic) uint8_t green;
 @property (nonatomic) uint8_t blue;

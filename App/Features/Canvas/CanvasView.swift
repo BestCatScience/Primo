@@ -144,26 +144,76 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         }
 
         let fitted = contentRect()
-        let path = UIBezierPath()
-        for (index, preview) in points.enumerated() {
-            let point = CGPoint(
-                x: fitted.minX + ((preview.point.x / max(documentSize.width, 1)) * fitted.width),
-                y: fitted.minY + ((preview.point.y / max(documentSize.height, 1)) * fitted.height)
+        let scaleX = fitted.width / max(documentSize.width, 1)
+        let scaleY = fitted.height / max(documentSize.height, 1)
+        let baseRadius = max(0.5, style.radius * min(scaleX, scaleY))
+
+        let mapped: [(pos: CGPoint, r: CGFloat)] = points.map { preview in
+            let pos = CGPoint(
+                x: fitted.minX + (preview.point.x / max(documentSize.width, 1)) * fitted.width,
+                y: fitted.minY + (preview.point.y / max(documentSize.height, 1)) * fitted.height
             )
-            if index == 0 {
-                path.move(to: point)
-                if points.count == 1 {
-                    path.addLine(to: CGPoint(x: point.x + 0.01, y: point.y + 0.01))
+            let r = max(0.4, baseRadius * (0.05 + preview.pressure * 0.95))
+            return (pos, r)
+        }
+
+        let fillPath = UIBezierPath()
+
+        if mapped.count == 1 {
+            let sp = mapped[0]
+            fillPath.append(UIBezierPath(
+                ovalIn: CGRect(x: sp.pos.x - sp.r, y: sp.pos.y - sp.r, width: sp.r * 2, height: sp.r * 2)
+            ))
+        } else {
+            var leftEdge: [CGPoint] = []
+            var rightEdge: [CGPoint] = []
+
+            for i in 0..<mapped.count {
+                let sp = mapped[i]
+                let tx: CGFloat
+                let ty: CGFloat
+                if i == 0 {
+                    tx = mapped[1].pos.x - sp.pos.x
+                    ty = mapped[1].pos.y - sp.pos.y
+                } else if i == mapped.count - 1 {
+                    tx = sp.pos.x - mapped[i - 1].pos.x
+                    ty = sp.pos.y - mapped[i - 1].pos.y
+                } else {
+                    tx = mapped[i + 1].pos.x - mapped[i - 1].pos.x
+                    ty = mapped[i + 1].pos.y - mapped[i - 1].pos.y
                 }
-            } else {
-                path.addLine(to: point)
+
+                let len = max(0.001, hypot(tx, ty))
+                let nx = -ty / len * sp.r
+                let ny = tx / len * sp.r
+                leftEdge.append(CGPoint(x: sp.pos.x + nx, y: sp.pos.y + ny))
+                rightEdge.append(CGPoint(x: sp.pos.x - nx, y: sp.pos.y - ny))
             }
+
+            fillPath.move(to: leftEdge[0])
+            for i in 1..<leftEdge.count {
+                fillPath.addLine(to: leftEdge[i])
+            }
+            for i in (0..<rightEdge.count).reversed() {
+                fillPath.addLine(to: rightEdge[i])
+            }
+            fillPath.close()
+
+            let first = mapped[0]
+            fillPath.append(UIBezierPath(
+                ovalIn: CGRect(x: first.pos.x - first.r, y: first.pos.y - first.r, width: first.r * 2, height: first.r * 2)
+            ))
+            let last = mapped[mapped.count - 1]
+            fillPath.append(UIBezierPath(
+                ovalIn: CGRect(x: last.pos.x - last.r, y: last.pos.y - last.r, width: last.r * 2, height: last.r * 2)
+            ))
         }
-        strokeLayer.path = path.cgPath
-        if let color = style.color.copy(alpha: style.opacity * opacityMultiplier) {
-            strokeLayer.strokeColor = color
-        }
-        strokeLayer.lineWidth = max(1.0, style.radius * 2.0)
+
+        strokeLayer.path = fillPath.cgPath
+        strokeLayer.fillRule = .nonZero
+        strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
+        strokeLayer.strokeColor = nil
+        strokeLayer.lineWidth = 0
     }
 
     private func updateCommittedStrokeLayers(_ layerBuffers: [LayerCanvasBuffer], showsCommittedOverlay: Bool) {

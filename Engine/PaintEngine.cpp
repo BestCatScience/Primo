@@ -48,9 +48,9 @@ float cubicBezier(float p0, float p1, float p2, float p3, float t) {
     return (mt2 * mt * p0) + (3.0F * mt2 * t * p1) + (3.0F * mt * t2 * p2) + (t2 * t * p3);
 }
 
-float evaluatePressureCurve(float pressure) {
+float evaluatePressureCurve(float pressure, float sensitivity) {
     const float t = clamp01(pressure);
-    return cubicBezier(0.0F, 0.3F, 0.8F, 1.0F, t);
+    return std::pow(t, std::max(0.05F, sensitivity));
 }
 
 float smoothstep(float edge0, float edge1, float value) {
@@ -188,12 +188,12 @@ std::span<const uint8_t> PaintDocument::composite() const noexcept {
 }
 
 void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
-    const float curvedPressure = evaluatePressureCurve(point.pressure);
+    const float curvedPressure = evaluatePressureCurve(point.pressure, activeBrush_.pressureSensitivity);
     const float altitude = clamp01(std::sin(std::max(0.05F, point.altitude)));
     const float tiltRatio = std::max(0.18F, altitude);
     const float velocityFactor = std::exp(-point.speed * activeBrush_.velocityInfluence);
-    const float effectiveOpacity = clamp01(activeBrush_.opacity * curvedPressure * velocityFactor * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence * 0.35F));
-    const float majorRadius = std::max(0.75F, activeBrush_.radius * (0.35F + (curvedPressure * 0.9F)) / lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
+    const float effectiveOpacity = clamp01(activeBrush_.opacity * (0.15F + (curvedPressure * 0.85F)) * velocityFactor * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence * 0.35F));
+    const float majorRadius = std::max(0.75F, activeBrush_.radius * (0.08F + (curvedPressure * 1.2F)) / lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
     const float minorRadius = std::max(0.6F, majorRadius * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
     const float maxRadius = std::max(majorRadius, minorRadius);
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - maxRadius - 1.0F)));

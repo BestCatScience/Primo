@@ -105,6 +105,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.velocityInfluence = 0.012
         descriptor.tiltInfluence = 0.75
         descriptor.maxDarkness = 0.95
+        descriptor.pressureSensitivity = brush.pressureSensitivity
         descriptor.red = brush.red
         descriptor.green = brush.green
         descriptor.blue = brush.blue

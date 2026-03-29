@@ -21,6 +21,7 @@
         _velocityInfluence = 0.012;
         _tiltInfluence = 0.75;
         _maxDarkness = 0.95;
+        _pressureSensitivity = 0.4;
     }
     return self;
 }
@@ -117,6 +118,7 @@
     settings.velocityInfluence = (float)brush.velocityInfluence;
     settings.tiltInfluence = (float)brush.tiltInfluence;
     settings.maxDarkness = (float)brush.maxDarkness;
+    settings.pressureSensitivity = (float)brush.pressureSensitivity;
     settings.red = brush.red;
     settings.green = brush.green;
     settings.blue = brush.blue;

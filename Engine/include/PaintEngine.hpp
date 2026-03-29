@@ -20,6 +20,7 @@ struct BrushSettings {
     float velocityInfluence = 0.012F;
     float tiltInfluence = 0.75F;
     float maxDarkness = 0.95F;
+    float pressureSensitivity = 0.4F;
     uint8_t red = 24;
     uint8_t green = 24;
     uint8_t blue = 24;
