@@ -6,74 +6,115 @@ struct LayerSidebarView: View {
     var showsTitle = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if showsTitle {
-                Text("Layers")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
-            }
-
+        ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Spacer()
-                    Button {
-                        store.send(.addLayerButtonTapped)
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.black))
-                    }
+                if showsTitle {
+                    Text("Layers")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.94))
                 }
 
-                ForEach(store.layers) { layer in
-                    let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
-                    HStack(spacing: 12) {
-                        Button {
-                            store.send(.visibilityButtonTapped(layer.index))
-                        } label: {
-                            Image(systemName: layer.visible ? "eye.fill" : "eye.slash.fill")
-                                .foregroundStyle(layer.visible ? .black : .gray)
-                        }
-                        .buttonStyle(.plain)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(layer.name)
-                                .font(.headline)
-                            Text("Opacity \(Int(layer.opacity * 100))%")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(alignment: .center) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("STACK")
+                                .font(.system(size: 11, weight: .black, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.45))
+                            Text("\(store.layers.count) Layers")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.9))
                         }
 
                         Spacer()
 
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(red: 0.97, green: 0.96, blue: 0.93))
-                            .overlay {
-                                LayerThumbnailView(buffer: buffer)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            }
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
-                            )
-                            .frame(width: 46, height: 46)
+                        Button {
+                            store.send(.addLayerButtonTapped)
+                        } label: {
+                            Label("Add", systemImage: "plus")
+                                .font(.system(size: 13, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(Color(red: 0.89, green: 0.45, blue: 0.24))
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(store.activeLayerIndex == layer.index ? Color(red: 0.90, green: 0.86, blue: 0.80) : Color.white.opacity(0.75))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .onTapGesture {
-                        store.send(.layerTapped(layer.index))
+
+                    ForEach(store.layers) { layer in
+                        let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
+                        HStack(spacing: 14) {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: 56, height: 56)
+                                .overlay {
+                                    LayerThumbnailView(buffer: buffer)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                }
+
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(layer.name)
+                                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.92))
+                                Text("Opacity \(Int(layer.opacity * 100))%")
+                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(.white.opacity(0.48))
+
+                                HStack(spacing: 8) {
+                                    capsuleTag(layer.visible ? "Visible" : "Hidden")
+                                    capsuleTag(store.activeLayerIndex == layer.index ? "Active" : "Standby")
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                store.send(.visibilityButtonTapped(layer.index))
+                            } label: {
+                                Image(systemName: layer.visible ? "eye.fill" : "eye.slash.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(layer.visible ? .white.opacity(0.9) : .white.opacity(0.45))
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                            .fill(Color.white.opacity(0.06))
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(store.activeLayerIndex == layer.index ? Color.white.opacity(0.12) : Color.white.opacity(0.04))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(store.activeLayerIndex == layer.index ? Color(red: 0.96, green: 0.62, blue: 0.31).opacity(0.55) : Color.white.opacity(0.05), lineWidth: 1)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .onTapGesture {
+                            store.send(.layerTapped(layer.index))
+                        }
                     }
                 }
-
-                Spacer()
+                .padding(.bottom, 10)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func capsuleTag(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .black, design: .monospaced))
+            .foregroundStyle(.white.opacity(0.56))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
     }
 }
 

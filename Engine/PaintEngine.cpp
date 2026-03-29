@@ -41,13 +41,6 @@ float smoothNoise(float x, float y) {
     return lerp(lerp(a, b, ux), lerp(c, d, ux), uy);
 }
 
-float cubicBezier(float p0, float p1, float p2, float p3, float t) {
-    const float mt = 1.0F - t;
-    const float mt2 = mt * mt;
-    const float t2 = t * t;
-    return (mt2 * mt * p0) + (3.0F * mt2 * t * p1) + (3.0F * mt * t2 * p2) + (t2 * t * p3);
-}
-
 float evaluatePressureCurve(float pressure, float sensitivity) {
     const float t = clamp01(pressure);
     return std::pow(t, std::max(0.05F, sensitivity));
