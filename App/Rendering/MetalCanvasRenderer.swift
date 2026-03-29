@@ -239,8 +239,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
             attachment?.isBlendingEnabled = true
             attachment?.rgbBlendOperation = .add
             attachment?.alphaBlendOperation = .add
-            attachment?.sourceRGBBlendFactor = .sourceAlpha
-            attachment?.sourceAlphaBlendFactor = .sourceAlpha
+            attachment?.sourceRGBBlendFactor = .one
+            attachment?.sourceAlphaBlendFactor = .one
             attachment?.destinationRGBBlendFactor = .oneMinusSourceAlpha
             attachment?.destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }

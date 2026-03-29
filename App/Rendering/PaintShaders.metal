@@ -55,6 +55,6 @@ fragment float4 layerFragment(VertexOut in [[stage_in]],
     constexpr sampler textureSampler(address::clamp_to_edge, filter::linear);
     float4 color = layerTexture.sample(textureSampler, in.uv);
     color.a *= uniforms.opacity;
-    color.rgb *= uniforms.opacity;
+    color.rgb *= color.a;
     return color;
 }

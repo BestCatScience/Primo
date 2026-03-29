@@ -134,6 +134,10 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         style: PreviewStrokeStyle,
         opacityMultiplier: CGFloat
     ) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
         guard !points.isEmpty else {
             strokeLayer.path = nil
             return
@@ -163,6 +167,10 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
     }
 
     private func updateCommittedStrokeLayers(_ layerBuffers: [LayerCanvasBuffer], showsCommittedOverlay: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
         committedStrokeContainerLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
         guard showsCommittedOverlay else { return }
 
@@ -209,6 +217,13 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
     }
 
     private func configureStrokeLayer(_ strokeLayer: CAShapeLayer, opacity: CGFloat) {
+        strokeLayer.actions = [
+            "path": NSNull(),
+            "strokeColor": NSNull(),
+            "lineWidth": NSNull(),
+            "opacity": NSNull(),
+            "hidden": NSNull()
+        ]
         strokeLayer.strokeColor = UIColor.black.withAlphaComponent(opacity).cgColor
         strokeLayer.fillColor = UIColor.clear.cgColor
         strokeLayer.lineWidth = 1.5
