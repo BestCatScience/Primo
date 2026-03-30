@@ -50,6 +50,24 @@ struct ContentView: View {
             store.send(.task)
         }
         .sheet(item: Binding(
+            get: { store.newCanvasDraft },
+            set: { _ in store.send(.newCanvasDismissed) }
+        )) { draft in
+            NewCanvasSheet(
+                widthText: Binding(
+                    get: { draft.widthText },
+                    set: { store.send(.newCanvasWidthChanged($0)) }
+                ),
+                heightText: Binding(
+                    get: { draft.heightText },
+                    set: { store.send(.newCanvasHeightChanged($0)) }
+                ),
+                onCancel: { store.send(.newCanvasDismissed) },
+                onCreate: { store.send(.newCanvasConfirmed) }
+            )
+            .presentationDetents([.height(320)])
+        }
+        .sheet(item: Binding(
             get: { store.exportSheet },
             set: { _ in store.send(.exportSheetDismissed) }
         )) { export in
@@ -102,12 +120,16 @@ struct ContentView: View {
             }
 
             menuBarMenu("ファイル") {
-                Button("新規キャンバス") {}
-                    .disabled(true)
+                Button("新規キャンバス") {
+                    store.send(.newCanvasRequested)
+                }
                 Button("開く") {}
                     .disabled(true)
                 Button("保存") {
                     store.send(.saveDocumentRequested)
+                }
+                Button("写真に保存") {
+                    store.send(.saveToPhotosRequested)
                 }
                 Button("書き出し") {
                     store.send(.exportDocumentRequested)
@@ -495,6 +517,57 @@ struct ContentView: View {
         )
     }
 
+}
+
+private struct NewCanvasSheet: View {
+    @Binding var widthText: String
+    @Binding var heightText: String
+    let onCancel: () -> Void
+    let onCreate: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("新規キャンバス")
+                    .font(.title3.weight(.semibold))
+
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("幅")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("1152", text: $widthText)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.numberPad)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("高さ")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("1536", text: $heightText)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.numberPad)
+                    }
+                }
+
+                Text("px 単位で入力します。64〜8192 の範囲で指定できます。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .padding(20)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル", action: onCancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("作成", action: onCreate)
+                }
+            }
+        }
+    }
 }
 
 private struct ShareSheet: UIViewControllerRepresentable {

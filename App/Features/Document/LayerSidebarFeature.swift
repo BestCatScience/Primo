@@ -8,6 +8,7 @@ struct LayerSidebarFeature {
         var layers: [LayerRowModel] = []
         var layerBuffers: [LayerCanvasBuffer] = []
         var activeLayerIndex: Int = 0
+        var renderSnapshot: MetalDocumentSnapshot?
     }
 
     enum Action: Equatable {

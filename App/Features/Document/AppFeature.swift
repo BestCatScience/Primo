@@ -2,6 +2,8 @@ import ComposableArchitecture
 import CoreGraphics
 import Foundation
 import os
+import Photos
+import UIKit
 
 struct ShareExport: Equatable, Identifiable {
     let id = UUID()
@@ -45,6 +47,7 @@ struct AppFeature {
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
         var canvas = CanvasFeature.State()
+        var newCanvasDraft: NewCanvasDraft?
         var brushPanel = StudioPanelLayoutState(side: .leading)
         var layerPanel = StudioPanelLayoutState(side: .trailing)
         var stackedPanelOrder: [StudioPanelKind] = [.brush, .layers]
@@ -67,6 +70,9 @@ struct AppFeature {
                 buffer.name = row.name
                 buffer.visible = row.visible
                 buffer.opacity = row.opacity
+                if presentation.renderSnapshot != nil {
+                    buffer.strokes.removeAll()
+                }
                 nextBuffers.append(buffer)
             }
             canvas.layerBuffers = nextBuffers
@@ -78,12 +84,14 @@ struct AppFeature {
                     canvas.isAwaitingCommittedRender &&
                     renderSnapshot.revision > previousRevision {
                     canvas.isAwaitingCommittedRender = false
+                    canvas.pendingCommittedStroke = nil
                     canvas.lastRenderedLocalBufferRevision = canvas.localBufferRevision
                 }
             }
             layerSidebar.layers = presentation.layerRows
             layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
+            layerSidebar.renderSnapshot = presentation.renderSnapshot
             canvas.previewStyle = previewStrokeStyle()
         }
 
@@ -179,10 +187,17 @@ struct AppFeature {
         case loadPresentationAfterLaunch
         case deferredPresentationRefresh
         case refreshPresentationRequested
+        case newCanvasRequested
+        case newCanvasDismissed
+        case newCanvasWidthChanged(String)
+        case newCanvasHeightChanged(String)
+        case newCanvasConfirmed
         case saveDocumentRequested
+        case saveToPhotosRequested
         case exportDocumentRequested
         case exportSheetDismissed
         case bannerDismissed
+        case photoLibrarySaveCompleted(PhotoLibrarySaveResult)
         case toolSelected(StudioToolKind)
         case clearActiveLayerButtonTapped
         case activeLayerVisibilityToggled
@@ -195,6 +210,34 @@ struct AppFeature {
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
+    }
+
+    enum PhotoLibrarySaveError: Error, Equatable {
+        case accessDenied
+        case imageDecodeFailed
+        case saveFailed
+
+        var message: String {
+            switch self {
+            case .accessDenied:
+                return "写真へのアクセスが許可されていません"
+            case .imageDecodeFailed:
+                return "PNGの読み込みに失敗しました"
+            case .saveFailed:
+                return "写真への保存に失敗しました"
+            }
+        }
+    }
+
+    enum PhotoLibrarySaveResult: Equatable {
+        case success
+        case failure(PhotoLibrarySaveError)
+    }
+
+    struct NewCanvasDraft: Equatable, Identifiable {
+        let id = UUID()
+        var widthText: String = "1152"
+        var heightText: String = "1536"
     }
 
     @Dependency(\.paintDocumentClient) var paintDocumentClient
@@ -261,6 +304,43 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case .newCanvasRequested:
+                state.newCanvasDraft = NewCanvasDraft()
+                return .none
+
+            case .newCanvasDismissed:
+                state.newCanvasDraft = nil
+                return .none
+
+            case let .newCanvasWidthChanged(width):
+                state.newCanvasDraft?.widthText = width
+                return .none
+
+            case let .newCanvasHeightChanged(height):
+                state.newCanvasDraft?.heightText = height
+                return .none
+
+            case .newCanvasConfirmed:
+                guard let draft = state.newCanvasDraft else { return .none }
+                guard
+                    let width = Int(draft.widthText),
+                    let height = Int(draft.heightText),
+                    (64...8192).contains(width),
+                    (64...8192).contains(height)
+                else {
+                    state.bannerMessage = "幅と高さは64〜8192pxで入力してください"
+                    return .none
+                }
+
+                paintDocumentClient.createDocument(width, height)
+                state.newCanvasDraft = nil
+                state.exportSheet = nil
+                state.bannerMessage = "新規キャンバスを作成しました"
+                state.canvas = CanvasFeature.State()
+                state.layerSidebar = LayerSidebarFeature.State()
+                state.applyPresentation(paintDocumentClient.lightweightPresentation())
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+
             case .saveDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData() else {
                     state.bannerMessage = "保存に失敗しました"
@@ -271,6 +351,31 @@ struct AppFeature {
                     state.bannerMessage = "保存しました: \(url.lastPathComponent)"
                 } catch {
                     state.bannerMessage = "保存に失敗しました"
+                }
+                return .none
+
+            case .saveToPhotosRequested:
+                guard let pngData = paintDocumentClient.compositePNGData() else {
+                    state.bannerMessage = "写真への保存に失敗しました"
+                    return .none
+                }
+                return .run { send in
+                    do {
+                        try await Self.savePNGToPhotoLibrary(data: pngData)
+                        await send(.photoLibrarySaveCompleted(.success))
+                    } catch let error as PhotoLibrarySaveError {
+                        await send(.photoLibrarySaveCompleted(.failure(error)))
+                    } catch {
+                        await send(.photoLibrarySaveCompleted(.failure(.saveFailed)))
+                    }
+                }
+
+            case let .photoLibrarySaveCompleted(result):
+                switch result {
+                case .success:
+                    state.bannerMessage = "写真に保存しました"
+                case let .failure(error):
+                    state.bannerMessage = error.message
                 }
                 return .none
 
@@ -392,13 +497,21 @@ struct AppFeature {
 
             case let .canvas(.delegate(.beginStroke(sample))):
                 paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
-                return .none
+                return .run { send in
+                    try? await Task.sleep(for: .milliseconds(24))
+                    await send(.deferredPresentationRefresh)
+                }
+                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 for sample in samples {
                     paintDocumentClient.appendStroke(sample)
                 }
-                return .none
+                return .run { send in
+                    try? await Task.sleep(for: .milliseconds(24))
+                    await send(.deferredPresentationRefresh)
+                }
+                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()
@@ -450,5 +563,33 @@ private extension AppFeature {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return "atelierprime-\(formatter.string(from: Date())).png"
+    }
+
+    static func savePNGToPhotoLibrary(data: Data) async throws {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else {
+            throw PhotoLibrarySaveError.accessDenied
+        }
+
+        guard let image = UIImage(data: data) else {
+            throw PhotoLibrarySaveError.imageDecodeFailed
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }, completionHandler: { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: PhotoLibrarySaveError.saveFailed)
+                }
+            })
+        }
     }
 }

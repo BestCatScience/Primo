@@ -18,8 +18,8 @@ struct CanvasView: UIViewRepresentable {
         uiView.update(
             snapshot: store.renderSnapshot,
             layerBuffers: store.layerBuffers,
-            showsCommittedOverlay: true,
-            activeStroke: store.activeStroke,
+            showsCommittedOverlay: store.renderSnapshot == nil,
+            activeStroke: store.activeStroke ?? store.pendingCommittedStroke,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
@@ -66,8 +66,17 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
         layer.addSublayer(committedStrokeContainerLayer)
         layer.addSublayer(liveStrokeLayer)
         layer.addSublayer(predictedStrokeLayer)
+
+        let twoFingerPanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTwoFingerPan(_:)))
+        twoFingerPanRecognizer.minimumNumberOfTouches = 2
+        twoFingerPanRecognizer.maximumNumberOfTouches = 2
+        twoFingerPanRecognizer.delegate = self
+        twoFingerPanRecognizer.cancelsTouchesInView = false
+        addGestureRecognizer(twoFingerPanRecognizer)
+
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchRecognizer.delegate = self
+        pinchRecognizer.cancelsTouchesInView = false
         addGestureRecognizer(pinchRecognizer)
         addInteraction(UIPencilInteraction())
     }
@@ -386,6 +395,28 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
             width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
             height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
         )
+    }
+
+    @objc
+    private func handleTwoFingerPan(_ recognizer: UIPanGestureRecognizer) {
+        switch recognizer.state {
+        case .began:
+            panStartOffset = viewportOffset
+
+        case .changed:
+            let translation = recognizer.translation(in: self)
+            let proposedOffset = CGSize(
+                width: panStartOffset.width + translation.x,
+                height: panStartOffset.height + translation.y
+            )
+            sendAction?(.viewportOffsetChanged(clampedViewportOffset(proposedOffset)))
+
+        case .ended, .cancelled, .failed:
+            panStartLocation = nil
+
+        default:
+            break
+        }
     }
 
     @objc

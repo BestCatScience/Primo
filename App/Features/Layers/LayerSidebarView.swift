@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 struct LayerSidebarView: View {
     let store: StoreOf<LayerSidebarFeature>
@@ -39,13 +40,15 @@ struct LayerSidebarView: View {
                     }
 
                     ForEach(store.layers) { layer in
-                        let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
                         HStack(spacing: 14) {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(StudioTheme.Palette.cardFillStrong)
                                 .frame(width: 56, height: 56)
                                 .overlay {
-                                    LayerThumbnailView(buffer: buffer)
+                                    LayerThumbnailView(
+                                        snapshot: store.renderSnapshot,
+                                        layerIndex: layer.index
+                                    )
                                         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 }
 
@@ -114,37 +117,49 @@ struct LayerSidebarView: View {
 }
 
 private struct LayerThumbnailView: View {
-    let buffer: LayerCanvasBuffer?
+    let snapshot: MetalDocumentSnapshot?
+    let layerIndex: Int
 
     var body: some View {
-        GeometryReader { geometry in
-            Canvas { context, size in
-                guard let buffer else { return }
-
-                for stroke in buffer.strokes {
-                    guard stroke.points.count > 1 else { continue }
-
-                    var path = Path()
-                    for (index, point) in stroke.points.enumerated() {
-                        let mapped = CGPoint(
-                            x: (point.point.x / 1152.0) * size.width,
-                            y: (point.point.y / 1536.0) * size.height
-                        )
-                        if index == 0 {
-                            path.move(to: mapped)
-                        } else {
-                            path.addLine(to: mapped)
-                        }
-                    }
-
-                    let color = Color(cgColor: stroke.style.color).opacity(buffer.opacity * 0.9)
-                    context.stroke(
-                        path,
-                        with: .color(color),
-                        style: StrokeStyle(lineWidth: max(0.6, stroke.style.radius * 0.18), lineCap: .round, lineJoin: .round)
-                    )
-                }
+        Group {
+            if let image = rasterThumbnail {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFill()
+            } else {
+                Color.clear
             }
         }
+    }
+
+    private var rasterThumbnail: UIImage? {
+        guard
+            let snapshot,
+            let layer = snapshot.layers.first(where: { $0.index == layerIndex }),
+            let provider = CGDataProvider(data: layer.pixelData as CFData)
+        else {
+            return nil
+        }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue)
+        guard let image = CGImage(
+            width: snapshot.width,
+            height: snapshot.height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: snapshot.width * 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+
+        return UIImage(cgImage: image)
     }
 }

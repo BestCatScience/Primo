@@ -25,7 +25,10 @@ final class InputHandler {
 
         switch touch.phase {
         case .began:
-            let firstPoint = makePoint(touch, in: view, predicted: false)
+            var firstPoint = makePoint(touch, in: view, predicted: false)
+            if firstPoint.pressure <= 0.001 {
+                firstPoint.pressure = 0.3
+            }
             shapeStartPoint = firstPoint
             currentStroke = Stroke(points: [firstPoint], predictedPoints: [], color: brushColor, brushSize: brushSize)
             fallthrough
@@ -96,7 +99,7 @@ final class InputHandler {
                 continue
             }
 
-            if candidate.pressure <= 0.001 {
+            if candidate.pressure <= 0.02 {
                 if isFinishingStroke {
                     continue
                 }
@@ -106,7 +109,7 @@ final class InputHandler {
             let delta = candidate.position - previous.position
             let distance = simd_length(delta)
 
-            if shouldReject(candidate, to: stroke.points, distance: distance) {
+            if shouldReject(candidate, to: stroke.points, distance: distance, isFinishingStroke: isFinishingStroke) {
                 continue
             }
 
@@ -132,13 +135,17 @@ final class InputHandler {
         }
     }
 
-    private func shouldReject(_ candidate: StrokePoint, to points: [StrokePoint], distance: Float) -> Bool {
+    private func shouldReject(_ candidate: StrokePoint, to points: [StrokePoint], distance: Float, isFinishingStroke: Bool) -> Bool {
         guard let previous = points.last else { return true }
         if distance < 0.01 {
             return true
         }
 
-        let absurdJumpDistance = max(brushSize * 14.0, 220.0)
+        if isFinishingStroke && candidate.pressure <= 0.05 {
+            return true
+        }
+
+        let absurdJumpDistance = max(brushSize * 30.0, 480.0)
         if distance > absurdJumpDistance {
             return true
         }
@@ -153,9 +160,16 @@ final class InputHandler {
         let normalizedCurrent = (candidate.position - previous.position) / max(distance, 0.001)
         let alignment = simd_dot(normalizedPrevious, normalizedCurrent)
 
-        let hookThreshold = max(brushSize * 1.8, 24.0)
-        if alignment < -0.75 && distance > hookThreshold {
-            return true
+        if isFinishingStroke {
+            let hookThreshold = max(brushSize * 2.4, 28.0)
+            if alignment < -0.9 && distance > hookThreshold {
+                return true
+            }
+
+            let tailThreshold = max(previousDistance * 3.2, brushSize * 2.4, 26.0)
+            if distance > tailThreshold {
+                return true
+            }
         }
 
         return false

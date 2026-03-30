@@ -192,6 +192,9 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float effectiveOpacity = clamp01(activeBrush_.opacity * (0.15F + (curvedPressure * 0.85F)) * velocityFactor * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence * 0.35F));
     const float majorRadius = std::max(0.75F, activeBrush_.radius * (0.08F + (curvedPressure * 1.2F)) / lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
     const float minorRadius = std::max(0.6F, majorRadius * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
+    if (effectiveOpacity <= 0.01F || majorRadius <= 0.8F) {
+        return;
+    }
     const float maxRadius = std::max(majorRadius, minorRadius);
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - maxRadius - 1.0F)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + maxRadius + 1.0F)));
