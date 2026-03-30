@@ -109,7 +109,7 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
         inputHandler.brushColor = previewStyle.simdColor
         updateCommittedStrokeLayers(layerBuffers, showsCommittedOverlay: showsCommittedOverlay)
         updateStrokeLayer(liveStrokeLayer, with: activeStroke?.confirmedPreviewPoints ?? [], style: previewStyle, opacityMultiplier: 0.85)
-        updateStrokeLayer(predictedStrokeLayer, with: activeStroke?.predictedPreviewPoints ?? [], style: previewStyle, opacityMultiplier: 0.28)
+        predictedStrokeLayer.path = nil
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -182,63 +182,71 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
             return (pos, r)
         }
 
-        let fillPath = UIBezierPath()
-
         if mapped.count == 1 {
             let sp = mapped[0]
-            fillPath.append(UIBezierPath(
+            let circlePath = UIBezierPath(
                 ovalIn: CGRect(x: sp.pos.x - sp.r, y: sp.pos.y - sp.r, width: sp.r * 2, height: sp.r * 2)
-            ))
+            )
+            strokeLayer.path = circlePath.cgPath
+            strokeLayer.fillRule = .nonZero
+            strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
+            strokeLayer.strokeColor = nil
+            strokeLayer.lineWidth = 0
+        } else if style.radius <= 6 {
+            let centerlinePath = UIBezierPath()
+            centerlinePath.lineCapStyle = .round
+            centerlinePath.lineJoinStyle = .round
+            centerlinePath.move(to: mapped[0].pos)
+            for point in mapped.dropFirst() {
+                centerlinePath.addLine(to: point.pos)
+            }
+
+            let averageRadius = mapped.reduce(CGFloat.zero) { $0 + $1.r } / CGFloat(mapped.count)
+            strokeLayer.path = centerlinePath.cgPath
+            strokeLayer.fillColor = nil
+            strokeLayer.strokeColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
+            strokeLayer.lineWidth = max(1.0, averageRadius * 2.0)
         } else {
-            var leftEdge: [CGPoint] = []
-            var rightEdge: [CGPoint] = []
+            let stampedPath = UIBezierPath()
+            let minimumRadius = max(0.35, mapped.map(\.r).min() ?? 0.35)
+            let stampSpacing = max(0.12, minimumRadius * 0.35)
 
-            for i in 0..<mapped.count {
-                let sp = mapped[i]
-                let tx: CGFloat
-                let ty: CGFloat
-                if i == 0 {
-                    tx = mapped[1].pos.x - sp.pos.x
-                    ty = mapped[1].pos.y - sp.pos.y
-                } else if i == mapped.count - 1 {
-                    tx = sp.pos.x - mapped[i - 1].pos.x
-                    ty = sp.pos.y - mapped[i - 1].pos.y
-                } else {
-                    tx = mapped[i + 1].pos.x - mapped[i - 1].pos.x
-                    ty = mapped[i + 1].pos.y - mapped[i - 1].pos.y
+            func appendStamp(at point: CGPoint, radius: CGFloat) {
+                stampedPath.append(UIBezierPath(
+                    ovalIn: CGRect(
+                        x: point.x - radius,
+                        y: point.y - radius,
+                        width: radius * 2,
+                        height: radius * 2
+                    )
+                ))
+            }
+
+            appendStamp(at: mapped[0].pos, radius: mapped[0].r)
+
+            for (start, end) in zip(mapped, mapped.dropFirst()) {
+                let dx = end.pos.x - start.pos.x
+                let dy = end.pos.y - start.pos.y
+                let distance = hypot(dx, dy)
+                let steps = max(1, Int(ceil(distance / stampSpacing)))
+
+                for step in 1...steps {
+                    let t = CGFloat(step) / CGFloat(steps)
+                    let point = CGPoint(
+                        x: start.pos.x + dx * t,
+                        y: start.pos.y + dy * t
+                    )
+                    let radius = start.r + (end.r - start.r) * t
+                    appendStamp(at: point, radius: radius)
                 }
-
-                let len = max(0.001, hypot(tx, ty))
-                let nx = -ty / len * sp.r
-                let ny = tx / len * sp.r
-                leftEdge.append(CGPoint(x: sp.pos.x + nx, y: sp.pos.y + ny))
-                rightEdge.append(CGPoint(x: sp.pos.x - nx, y: sp.pos.y - ny))
             }
 
-            fillPath.move(to: leftEdge[0])
-            for i in 1..<leftEdge.count {
-                fillPath.addLine(to: leftEdge[i])
-            }
-            for i in (0..<rightEdge.count).reversed() {
-                fillPath.addLine(to: rightEdge[i])
-            }
-            fillPath.close()
-
-            let first = mapped[0]
-            fillPath.append(UIBezierPath(
-                ovalIn: CGRect(x: first.pos.x - first.r, y: first.pos.y - first.r, width: first.r * 2, height: first.r * 2)
-            ))
-            let last = mapped[mapped.count - 1]
-            fillPath.append(UIBezierPath(
-                ovalIn: CGRect(x: last.pos.x - last.r, y: last.pos.y - last.r, width: last.r * 2, height: last.r * 2)
-            ))
+            strokeLayer.path = stampedPath.cgPath
+            strokeLayer.fillRule = .nonZero
+            strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
+            strokeLayer.strokeColor = nil
+            strokeLayer.lineWidth = 0
         }
-
-        strokeLayer.path = fillPath.cgPath
-        strokeLayer.fillRule = .nonZero
-        strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
-        strokeLayer.strokeColor = nil
-        strokeLayer.lineWidth = 0
     }
 
     private func updateCommittedStrokeLayers(_ layerBuffers: [LayerCanvasBuffer], showsCommittedOverlay: Bool) {

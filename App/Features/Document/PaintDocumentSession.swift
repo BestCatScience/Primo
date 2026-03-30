@@ -133,9 +133,6 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     private func normalizedPressure(_ pressure: CGFloat) -> CGFloat {
-        if pressure <= 0 {
-            return 0.65
-        }
-        return min(max(pressure, 0.15), 1.0)
+        min(max(pressure, 0.0), 1.0)
     }
 }

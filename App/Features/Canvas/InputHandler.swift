@@ -27,7 +27,7 @@ final class InputHandler {
         case .began:
             let firstPoint = makePoint(touch, in: view, predicted: false)
             shapeStartPoint = firstPoint
-            currentStroke = Stroke(points: [], predictedPoints: [], color: brushColor, brushSize: brushSize)
+            currentStroke = Stroke(points: [firstPoint], predictedPoints: [], color: brushColor, brushSize: brushSize)
             fallthrough
 
         case .moved, .stationary:
@@ -36,24 +36,11 @@ final class InputHandler {
             if tool == .shape, let shapeStartPoint {
                 let currentPoint = makePoint(touch, in: view, predicted: false)
                 stroke.points = interpolatedPoints(from: shapeStartPoint, to: currentPoint, predicted: false)
-                let predictedTouch = (event?.predictedTouches(for: touch) ?? []).last
-                if let predictedTouch {
-                    let predictedPoint = makePoint(predictedTouch, in: view, predicted: true)
-                    stroke.predictedPoints = interpolatedPoints(from: shapeStartPoint, to: predictedPoint, predicted: true)
-                } else {
-                    stroke.predictedPoints.removeAll()
-                }
+                stroke.predictedPoints.removeAll()
             } else {
                 let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
-                for coalescedTouch in coalescedTouches {
-                    stroke.points.append(makePoint(coalescedTouch, in: view, predicted: false))
-                }
-
+                appendFilteredPoints(from: coalescedTouches, to: &stroke, in: view, isFinishingStroke: false)
                 stroke.predictedPoints.removeAll()
-                let predictedTouches = event?.predictedTouches(for: touch) ?? []
-                for predictedTouch in predictedTouches {
-                    stroke.predictedPoints.append(makePoint(predictedTouch, in: view, predicted: true))
-                }
             }
 
             currentStroke = stroke
@@ -65,10 +52,7 @@ final class InputHandler {
                     let finalPoint = makePoint(touch, in: view, predicted: false)
                     stroke.points = interpolatedPoints(from: shapeStartPoint, to: finalPoint, predicted: false)
                 } else {
-                    let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
-                    for coalescedTouch in coalescedTouches {
-                        stroke.points.append(makePoint(coalescedTouch, in: view, predicted: false))
-                    }
+                    appendFilteredPoints(from: [touch], to: &stroke, in: view, isFinishingStroke: true)
                 }
 
                 var finalStroke = stroke
@@ -102,6 +86,79 @@ final class InputHandler {
         guard touch.type == .pencil || touch.maximumPossibleForce > 0 else { return 0.65 }
         guard touch.maximumPossibleForce > 0 else { return 0.65 }
         return Float(touch.force / touch.maximumPossibleForce)
+    }
+
+    private func appendFilteredPoints(from touches: [UITouch], to stroke: inout Stroke, in view: UIView, isFinishingStroke: Bool) {
+        for touch in touches {
+            var candidate = makePoint(touch, in: view, predicted: false)
+            guard let previous = stroke.points.last else {
+                stroke.points.append(candidate)
+                continue
+            }
+
+            if candidate.pressure <= 0.001 {
+                if isFinishingStroke {
+                    continue
+                }
+                candidate.pressure = max(previous.pressure * 0.92, 0.12)
+            }
+
+            let delta = candidate.position - previous.position
+            let distance = simd_length(delta)
+
+            if shouldReject(candidate, to: stroke.points, distance: distance) {
+                continue
+            }
+
+            let interpolationSpacing = max(brushSize * 0.35, 1.5)
+            if distance > interpolationSpacing {
+                let steps = max(1, Int(ceil(distance / interpolationSpacing)))
+                for step in 1...steps {
+                    let t = Float(step) / Float(steps)
+                    stroke.points.append(
+                        StrokePoint(
+                            position: previous.position + (delta * t),
+                            pressure: previous.pressure + ((candidate.pressure - previous.pressure) * t),
+                            altitude: previous.altitude + ((candidate.altitude - previous.altitude) * t),
+                            azimuth: previous.azimuth + ((candidate.azimuth - previous.azimuth) * t),
+                            timestamp: previous.timestamp + Double(Float(candidate.timestamp - previous.timestamp) * t),
+                            isPredicted: false
+                        )
+                    )
+                }
+            } else {
+                stroke.points.append(candidate)
+            }
+        }
+    }
+
+    private func shouldReject(_ candidate: StrokePoint, to points: [StrokePoint], distance: Float) -> Bool {
+        guard let previous = points.last else { return true }
+        if distance < 0.01 {
+            return true
+        }
+
+        let absurdJumpDistance = max(brushSize * 14.0, 220.0)
+        if distance > absurdJumpDistance {
+            return true
+        }
+
+        guard points.count >= 2 else { return false }
+        let beforePrevious = points[points.count - 2]
+        let previousDelta = previous.position - beforePrevious.position
+        let previousDistance = simd_length(previousDelta)
+        guard previousDistance > 0.001 else { return false }
+
+        let normalizedPrevious = previousDelta / previousDistance
+        let normalizedCurrent = (candidate.position - previous.position) / max(distance, 0.001)
+        let alignment = simd_dot(normalizedPrevious, normalizedCurrent)
+
+        let hookThreshold = max(brushSize * 1.8, 24.0)
+        if alignment < -0.75 && distance > hookThreshold {
+            return true
+        }
+
+        return false
     }
 
     private func interpolatedPoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {

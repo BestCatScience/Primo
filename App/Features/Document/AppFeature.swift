@@ -392,17 +392,13 @@ struct AppFeature {
 
             case let .canvas(.delegate(.beginStroke(sample))):
                 paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
-                return .send(.deferredPresentationRefresh)
+                return .none
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 for sample in samples {
                     paintDocumentClient.appendStroke(sample)
                 }
-                return .run { send in
-                    try? await Task.sleep(for: .milliseconds(16))
-                    await send(.deferredPresentationRefresh)
-                }
-                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+                return .none
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()

@@ -181,6 +181,10 @@ std::span<const uint8_t> PaintDocument::composite() const noexcept {
 }
 
 void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
+    if (point.pressure <= 0.001F) {
+        return;
+    }
+
     const float curvedPressure = evaluatePressureCurve(point.pressure, activeBrush_.pressureSensitivity);
     const float altitude = clamp01(std::sin(std::max(0.05F, point.altitude)));
     const float tiltRatio = std::max(0.18F, altitude);
