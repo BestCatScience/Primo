@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
@@ -48,6 +49,23 @@ struct ContentView: View {
         .task {
             store.send(.task)
         }
+        .sheet(item: Binding(
+            get: { store.exportSheet },
+            set: { _ in store.send(.exportSheetDismissed) }
+        )) { export in
+            ShareSheet(items: [export.url])
+        }
+        .overlay(alignment: .bottom) {
+            if let bannerMessage = store.bannerMessage {
+                BannerToast(message: bannerMessage)
+                    .padding(.bottom, 18)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
+                            store.send(.bannerDismissed)
+                        }
+                    }
+            }
+        }
     }
 
     private var menuBar: some View {
@@ -88,10 +106,12 @@ struct ContentView: View {
                     .disabled(true)
                 Button("開く") {}
                     .disabled(true)
-                Button("保存") {}
-                    .disabled(true)
-                Button("書き出し") {}
-                    .disabled(true)
+                Button("保存") {
+                    store.send(.saveDocumentRequested)
+                }
+                Button("書き出し") {
+                    store.send(.exportDocumentRequested)
+                }
             }
 
             menuBarMenu("編集") {
@@ -287,6 +307,7 @@ struct ContentView: View {
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
@@ -474,6 +495,37 @@ struct ContentView: View {
         )
     }
 
+}
+
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct BannerToast: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(StudioTheme.Typography.label(13))
+            .foregroundStyle(.white.opacity(0.94))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
+    }
 }
 
 private struct CanvasHUD: View {

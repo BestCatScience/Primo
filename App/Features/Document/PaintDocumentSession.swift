@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import os
+import UIKit
 
 final class PaintDocumentSession: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Document")
@@ -90,6 +91,13 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func clearLayer(index: Int) {
         bridge.clearLayer(at: index)
+    }
+
+    func compositePNGData() -> Data? {
+        guard let imageRef = bridge.makeCompositeImage() else {
+            return nil
+        }
+        return UIImage(cgImage: imageRef).pngData()
     }
 
     private func makeBrushDescriptor(from brush: BrushRuntimeSettings) -> APBrushDescriptor {

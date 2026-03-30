@@ -22,6 +22,7 @@ struct CanvasFeature {
         var isAwaitingCommittedRender = false
         var currentTool: StudioToolKind = .brush
         var viewportOffset: CGSize = .zero
+        var zoomScale: CGFloat = 1.0
         var previewStyle = PreviewStrokeStyle(
             radius: 3.0,
             opacity: 0.9,
@@ -33,6 +34,7 @@ struct CanvasFeature {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
         case viewportOffsetChanged(CGSize)
+        case zoomScaleChanged(CGFloat)
         case delegate(Delegate)
     }
 
@@ -48,6 +50,10 @@ struct CanvasFeature {
             switch action {
             case let .viewportOffsetChanged(offset):
                 state.viewportOffset = offset
+                return .none
+
+            case let .zoomScaleChanged(scale):
+                state.zoomScale = min(max(scale, 0.6), 4.0)
                 return .none
 
             case let .strokeUpdated(stroke):

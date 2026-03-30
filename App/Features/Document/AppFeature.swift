@@ -3,6 +3,11 @@ import CoreGraphics
 import Foundation
 import os
 
+struct ShareExport: Equatable, Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -43,6 +48,8 @@ struct AppFeature {
         var brushPanel = StudioPanelLayoutState(side: .leading)
         var layerPanel = StudioPanelLayoutState(side: .trailing)
         var stackedPanelOrder: [StudioPanelKind] = [.brush, .layers]
+        var exportSheet: ShareExport?
+        var bannerMessage: String?
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
             canvas.canvasSize = presentation.canvasSize
@@ -172,6 +179,10 @@ struct AppFeature {
         case loadPresentationAfterLaunch
         case deferredPresentationRefresh
         case refreshPresentationRequested
+        case saveDocumentRequested
+        case exportDocumentRequested
+        case exportSheetDismissed
+        case bannerDismissed
         case toolSelected(StudioToolKind)
         case clearActiveLayerButtonTapped
         case activeLayerVisibilityToggled
@@ -248,6 +259,40 @@ struct AppFeature {
 
             case .refreshPresentationRequested:
                 state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .saveDocumentRequested:
+                guard let pngData = paintDocumentClient.compositePNGData() else {
+                    state.bannerMessage = "保存に失敗しました"
+                    return .none
+                }
+                do {
+                    let url = try Self.writePNGToDocuments(data: pngData)
+                    state.bannerMessage = "保存しました: \(url.lastPathComponent)"
+                } catch {
+                    state.bannerMessage = "保存に失敗しました"
+                }
+                return .none
+
+            case .exportDocumentRequested:
+                guard let pngData = paintDocumentClient.compositePNGData() else {
+                    state.bannerMessage = "書き出しに失敗しました"
+                    return .none
+                }
+                do {
+                    let url = try Self.writePNGToTemporaryDirectory(data: pngData)
+                    state.exportSheet = ShareExport(url: url)
+                } catch {
+                    state.bannerMessage = "書き出しに失敗しました"
+                }
+                return .none
+
+            case .exportSheetDismissed:
+                state.exportSheet = nil
+                return .none
+
+            case .bannerDismissed:
+                state.bannerMessage = nil
                 return .none
 
             case let .toolSelected(tool):
@@ -382,5 +427,32 @@ struct AppFeature {
                 return .none
             }
         }
+    }
+}
+
+private extension AppFeature {
+    static func writePNGToDocuments(data: Data) throws -> URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let exportsDirectory = documentsDirectory.appendingPathComponent("atelierprime", isDirectory: true)
+        try FileManager.default.createDirectory(at: exportsDirectory, withIntermediateDirectories: true)
+        let url = exportsDirectory.appendingPathComponent(exportFilename())
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    static func writePNGToTemporaryDirectory(data: Data) throws -> URL {
+        let temporaryDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("atelierprime-export", isDirectory: true)
+        try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        let url = temporaryDirectory.appendingPathComponent(exportFilename())
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    static func exportFilename() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return "atelierprime-\(formatter.string(from: Date())).png"
     }
 }

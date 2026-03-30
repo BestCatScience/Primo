@@ -22,12 +22,13 @@ struct CanvasView: UIViewRepresentable {
             activeStroke: store.activeStroke,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
-            viewportOffset: store.viewportOffset
+            viewportOffset: store.viewportOffset,
+            zoomScale: store.zoomScale
         )
     }
 }
 
-final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
+final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate {
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
@@ -39,14 +40,18 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
     private var hasScheduledRendererInstallation = false
     private let inputHandler = InputHandler()
     private var viewportOffset: CGSize = .zero
+    private var zoomScale: CGFloat = 1.0
     private var currentTool: StudioToolKind = .brush
     private var panStartLocation: CGPoint?
     private var panStartOffset: CGSize = .zero
+    private var pinchStartScale: CGFloat = 1.0
+    private var pinchAnchorDocumentPoint: CGPoint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
-        isMultipleTouchEnabled = false
+        isMultipleTouchEnabled = true
+        clipsToBounds = true
         inputHandler.delegate = self
         inputHandler.pointMapper = { [weak self] location, view in
             guard let self else {
@@ -61,6 +66,9 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         layer.addSublayer(committedStrokeContainerLayer)
         layer.addSublayer(liveStrokeLayer)
         layer.addSublayer(predictedStrokeLayer)
+        let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinchRecognizer.delegate = self
+        addGestureRecognizer(pinchRecognizer)
         addInteraction(UIPencilInteraction())
     }
 
@@ -88,12 +96,14 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         activeStroke: Stroke?,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
-        viewportOffset: CGSize
+        viewportOffset: CGSize,
+        zoomScale: CGFloat
     ) {
         pendingSnapshot = snapshot
         self.currentTool = currentTool
         self.viewportOffset = viewportOffset
-        rendererView?.update(snapshot: snapshot, viewportOffset: viewportOffset)
+        self.zoomScale = zoomScale
+        rendererView?.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
         inputHandler.tool = currentTool
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
@@ -277,7 +287,7 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
             rendererView.topAnchor.constraint(equalTo: topAnchor),
             rendererView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
-        rendererView.update(snapshot: pendingSnapshot, viewportOffset: viewportOffset)
+        rendererView.update(snapshot: pendingSnapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
         self.rendererView = rendererView
     }
 
@@ -298,13 +308,28 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
 
     private func contentRect() -> CGRect {
         if let rendererView {
-            return rendererView.contentRect(for: bounds.size, documentSize: documentSize, viewportOffset: viewportOffset)
+            return rendererView.contentRect(
+                for: bounds.size,
+                documentSize: documentSize,
+                viewportOffset: viewportOffset,
+                zoomScale: zoomScale
+            )
         }
 
         let paperRect = bounds.insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect).offsetBy(dx: viewportOffset.width, dy: viewportOffset.height)
+        let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        let scaledSize = CGSize(
+            width: fittedRect.width * zoomScale,
+            height: fittedRect.height * zoomScale
+        )
+        return CGRect(
+            x: fittedRect.midX - (scaledSize.width / 2) + viewportOffset.width,
+            y: fittedRect.midY - (scaledSize.height / 2) + viewportOffset.height,
+            width: scaledSize.width,
+            height: scaledSize.height
+        )
     }
 
     private enum PanPhase {
@@ -345,12 +370,95 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate {
         let paperRect = bounds.insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         let fitted = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let horizontalLimit = max(0, (fitted.width - drawableRect.width) / 2 + 120)
-        let verticalLimit = max(0, (fitted.height - drawableRect.height) / 2 + 120)
+        let scaledWidth = fitted.width * zoomScale
+        let scaledHeight = fitted.height * zoomScale
+        let horizontalLimit = max(0, (scaledWidth - drawableRect.width) / 2 + 120)
+        let verticalLimit = max(0, (scaledHeight - drawableRect.height) / 2 + 120)
         return CGSize(
             width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
             height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
         )
+    }
+
+    @objc
+    private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
+        guard documentSize.width > 0, documentSize.height > 0 else { return }
+
+        let location = recognizer.location(in: self)
+        switch recognizer.state {
+        case .began:
+            pinchStartScale = zoomScale
+            pinchAnchorDocumentPoint = documentPoint(at: location, in: contentRect())
+
+        case .changed:
+            guard let pinchAnchorDocumentPoint else { return }
+            let newScale = min(max(pinchStartScale * recognizer.scale, 0.6), 4.0)
+            let newOffset = offsetKeepingDocumentPointStable(
+                pinchAnchorDocumentPoint,
+                at: location,
+                zoomScale: newScale
+            )
+            sendAction?(.zoomScaleChanged(newScale))
+            sendAction?(.viewportOffsetChanged(newOffset))
+
+        case .ended, .cancelled, .failed:
+            pinchAnchorDocumentPoint = nil
+
+        default:
+            break
+        }
+    }
+
+    private func documentPoint(at viewPoint: CGPoint, in rect: CGRect) -> CGPoint {
+        CGPoint(
+            x: ((viewPoint.x - rect.minX) / max(rect.width, 1)) * documentSize.width,
+            y: ((viewPoint.y - rect.minY) / max(rect.height, 1)) * documentSize.height
+        )
+    }
+
+    private func offsetKeepingDocumentPointStable(_ documentPoint: CGPoint, at viewPoint: CGPoint, zoomScale: CGFloat) -> CGSize {
+        let paperRect = bounds.insetBy(dx: 6, dy: 6)
+        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
+        let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        let scaledSize = CGSize(
+            width: fittedRect.width * zoomScale,
+            height: fittedRect.height * zoomScale
+        )
+        let normalizedX = documentPoint.x / max(documentSize.width, 1)
+        let normalizedY = documentPoint.y / max(documentSize.height, 1)
+        let desiredOrigin = CGPoint(
+            x: viewPoint.x - (normalizedX * scaledSize.width),
+            y: viewPoint.y - (normalizedY * scaledSize.height)
+        )
+        let baseOrigin = CGPoint(
+            x: fittedRect.midX - (scaledSize.width / 2),
+            y: fittedRect.midY - (scaledSize.height / 2)
+        )
+        return clampedViewportOffset(
+            CGSize(
+                width: desiredOrigin.x - baseOrigin.x,
+                height: desiredOrigin.y - baseOrigin.y
+            ),
+            zoomScale: zoomScale
+        )
+    }
+
+    private func clampedViewportOffset(_ proposedOffset: CGSize, zoomScale: CGFloat) -> CGSize {
+        let paperRect = bounds.insetBy(dx: 6, dy: 6)
+        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
+        let fitted = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        let scaledWidth = fitted.width * zoomScale
+        let scaledHeight = fitted.height * zoomScale
+        let horizontalLimit = max(0, (scaledWidth - drawableRect.width) / 2 + 120)
+        let verticalLimit = max(0, (scaledHeight - drawableRect.height) / 2 + 120)
+        return CGSize(
+            width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
+            height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
+        )
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
     }
 }
 

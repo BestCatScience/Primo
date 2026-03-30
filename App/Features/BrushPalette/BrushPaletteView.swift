@@ -34,7 +34,10 @@ struct BrushPaletteView: View {
                             .overlay(
                                 Circle()
                                     .fill(StudioTheme.Palette.textPrimary)
-                                    .frame(width: max(12, store.brushRadius * 4), height: max(12, store.brushRadius * 4))
+                                    .frame(
+                                        width: min(68, max(12, store.brushRadius * 4)),
+                                        height: min(68, max(12, store.brushRadius * 4))
+                                    )
                             )
 
                         VStack(alignment: .leading, spacing: 8) {
@@ -78,7 +81,7 @@ struct BrushPaletteView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    sliderRow(title: "Size", value: "\(Int(store.brushRadius))", slider: Slider(value: $store.brushRadius, in: 1...18))
+                    sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
                     sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
                     sliderRow(title: "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
                     sliderRow(title: "Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium", slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))

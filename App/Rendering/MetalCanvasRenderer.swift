@@ -75,6 +75,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var appliedRevision: Int = -1
     private var viewportOffset: CGSize = .zero
+    private var zoomScale: CGFloat = 1.0
 
     init() {
         let clock = ContinuousClock()
@@ -104,17 +105,27 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize) {
+    func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize, zoomScale: CGFloat) {
         pendingSnapshot = snapshot
         self.viewportOffset = viewportOffset
+        self.zoomScale = zoomScale
     }
 
-    func contentRect(for viewSize: CGSize, documentSize: CGSize, viewportOffset: CGSize) -> CGRect {
+    func contentRect(for viewSize: CGSize, documentSize: CGSize, viewportOffset: CGSize, zoomScale: CGFloat) -> CGRect {
         let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        return AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-            .offsetBy(dx: viewportOffset.width, dy: viewportOffset.height)
+        let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
+        let scaledSize = CGSize(
+            width: fittedRect.width * zoomScale,
+            height: fittedRect.height * zoomScale
+        )
+        return CGRect(
+            x: fittedRect.midX - (scaledSize.width / 2) + viewportOffset.width,
+            y: fittedRect.midY - (scaledSize.height / 2) + viewportOffset.height,
+            width: scaledSize.width,
+            height: scaledSize.height
+        )
     }
 
     func draw(in view: MTKView) {
@@ -137,13 +148,17 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
             height: pendingSnapshot?.height ?? 1
         )
 
-        let paperRect = CGRect(origin: .zero, size: viewSize).insetBy(dx: 6, dy: 6)
-        let contentRect = self.contentRect(for: viewSize, documentSize: snapshotSize, viewportOffset: viewportOffset)
+        let contentRect = self.contentRect(
+            for: viewSize,
+            documentSize: snapshotSize,
+            viewportOffset: viewportOffset,
+            zoomScale: zoomScale
+        )
 
         if let paperPipeline {
             var paperUniforms = MetalQuadUniforms(
-                origin: SIMD2<Float>(Float(paperRect.minX * contentScaleFactor), Float(paperRect.minY * contentScaleFactor)),
-                size: SIMD2<Float>(Float(paperRect.width * contentScaleFactor), Float(paperRect.height * contentScaleFactor)),
+                origin: SIMD2<Float>(Float(contentRect.minX * contentScaleFactor), Float(contentRect.minY * contentScaleFactor)),
+                size: SIMD2<Float>(Float(contentRect.width * contentScaleFactor), Float(contentRect.height * contentScaleFactor)),
                 viewport: viewport,
                 opacity: 1.0,
                 paperSeed: 0.17
