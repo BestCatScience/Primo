@@ -20,10 +20,10 @@
   <string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
-  <key>NSPhotoLibraryAddUsageDescription</key>
-  <string>書き出したPNGを写真ライブラリに保存するために使用します。</string>
   <key>UISupportedInterfaceOrientations~ipad</key>
   <array>
     <string>UIInterfaceOrientationPortrait</string>

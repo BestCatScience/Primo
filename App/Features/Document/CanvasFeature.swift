@@ -1,7 +1,6 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
-import simd
 
 @Reducer
 struct CanvasFeature {
@@ -19,7 +18,6 @@ struct CanvasFeature {
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
         var activeStroke: Stroke?
-        var pendingCommittedStroke: Stroke?
         var isStrokeActive = false
         var isAwaitingCommittedRender = false
         var currentTool: StudioToolKind = .brush
@@ -62,7 +60,6 @@ struct CanvasFeature {
                 let previousPointCount = state.activeStroke?.points.count ?? 0
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
-                state.pendingCommittedStroke = nil
                 state.activeStroke = stroke
 
                 if state.currentTool == .shape {
@@ -89,17 +86,7 @@ struct CanvasFeature {
             case let .strokeEnded(stroke):
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = true
-                state.pendingCommittedStroke = stroke.points.isEmpty ? nil : stroke
-                if state.currentTool == .erase,
-                   let bufferIndex = state.layerBuffers.firstIndex(where: { $0.index == state.activeLayerIndex }) {
-                    state.layerBuffers[bufferIndex].strokes.removeAll()
-                    state.localBufferRevision += 1
-                }
-                if shouldPersistCommittedTrack(
-                    for: stroke,
-                    tool: state.currentTool,
-                    previewRadius: Float(state.previewStyle.radius)
-                ) {
+                if !stroke.points.isEmpty {
                     let track = PreviewStrokeTrack(
                         layerIndex: state.activeLayerIndex,
                         points: stroke.confirmedPreviewPoints,
@@ -129,19 +116,5 @@ struct CanvasFeature {
                 return .none
             }
         }
-    }
-
-    private func shouldPersistCommittedTrack(for stroke: Stroke, tool: StudioToolKind, previewRadius: Float) -> Bool {
-        guard !stroke.points.isEmpty else { return false }
-        guard tool != .erase else { return false }
-        if tool == .shape {
-            return true
-        }
-
-        guard stroke.points.count >= 2 else { return false }
-        let pathLength = zip(stroke.points, stroke.points.dropFirst()).reduce(Float.zero) { partialResult, pair in
-            partialResult + simd_length(pair.1.position - pair.0.position)
-        }
-        return pathLength >= max(previewRadius * 0.35, 1.5)
     }
 }
