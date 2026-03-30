@@ -37,6 +37,39 @@ struct StrokePoint {
     float speed = 0.0F;
 };
 
+struct DirtyRect {
+    int minX = 0;
+    int minY = 0;
+    int maxX = -1;
+    int maxY = -1;
+
+    bool empty() const noexcept { return maxX < minX || maxY < minY; }
+
+    void expand(int x0, int y0, int x1, int y1) noexcept {
+        if (empty()) {
+            minX = x0;
+            minY = y0;
+            maxX = x1;
+            maxY = y1;
+        } else {
+            if (x0 < minX) minX = x0;
+            if (y0 < minY) minY = y0;
+            if (x1 > maxX) maxX = x1;
+            if (y1 > maxY) maxY = y1;
+        }
+    }
+
+    void reset() noexcept {
+        minX = 0;
+        minY = 0;
+        maxX = -1;
+        maxY = -1;
+    }
+
+    int width() const noexcept { return empty() ? 0 : (maxX - minX + 1); }
+    int height() const noexcept { return empty() ? 0 : (maxY - minY + 1); }
+};
+
 struct Layer {
     std::string name;
     bool visible = true;
@@ -65,6 +98,9 @@ public:
     void appendStroke(StrokePoint point);
     void endStroke();
 
+    DirtyRect consumeDirtyRect() noexcept;
+    std::vector<uint8_t> pixelDataForRect(int layerIndex, const DirtyRect& rect) const;
+
     std::span<const uint8_t> composite() const noexcept;
 
 private:
@@ -74,6 +110,7 @@ private:
     BrushSettings activeBrush_;
     StrokePoint previousPoint_{};
     bool strokeInFlight_ = false;
+    DirtyRect dirtyRect_;
     std::vector<Layer> layers_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;

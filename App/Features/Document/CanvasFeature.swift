@@ -28,11 +28,13 @@ struct CanvasFeature {
             opacity: 0.9,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
+        var pendingIncrementalUpdate: IncrementalLayerUpdate?
     }
 
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
+        case applyIncrementalUpdate(IncrementalLayerUpdate)
         case viewportOffsetChanged(CGSize)
         case zoomScaleChanged(CGFloat)
         case delegate(Delegate)
@@ -48,6 +50,10 @@ struct CanvasFeature {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .applyIncrementalUpdate(update):
+                state.pendingIncrementalUpdate = update
+                return .none
+
             case let .viewportOffsetChanged(offset):
                 state.viewportOffset = offset
                 return .none
@@ -60,6 +66,7 @@ struct CanvasFeature {
                 let previousPointCount = state.activeStroke?.points.count ?? 0
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
+                state.pendingIncrementalUpdate = nil
                 state.activeStroke = stroke
 
                 if state.currentTool == .shape {
@@ -108,6 +115,7 @@ struct CanvasFeature {
                     state.localBufferRevision += 1
                 }
                 state.activeStroke = nil
+                state.pendingIncrementalUpdate = nil
                 if state.currentTool == .shape {
                     return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
                 }

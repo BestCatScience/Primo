@@ -3,6 +3,23 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@interface APDirtyRect : NSObject
+
+@property (nonatomic, readonly) NSInteger originX;
+@property (nonatomic, readonly) NSInteger originY;
+@property (nonatomic, readonly) NSInteger width;
+@property (nonatomic, readonly) NSInteger height;
+@property (nonatomic, readonly) BOOL empty;
+
+- (instancetype)initWithOriginX:(NSInteger)originX
+                        originY:(NSInteger)originY
+                          width:(NSInteger)width
+                         height:(NSInteger)height NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)init NS_UNAVAILABLE;
+
+@end
+
 @interface APBrushDescriptor : NSObject
 
 @property (nonatomic) CGFloat radius;
@@ -70,6 +87,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)endStroke NS_SWIFT_NAME(endStroke());
 
 - (CGImageRef _Nullable)createCompositeImage CF_RETURNS_RETAINED NS_SWIFT_NAME(makeCompositeImage());
+
+- (APDirtyRect *)consumeDirtyRect NS_SWIFT_NAME(consumeDirtyRect());
+- (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect NS_SWIFT_NAME(pixelDataForLayer(at:in:));
 
 @end
 

@@ -73,6 +73,7 @@ struct AppFeature {
             if let renderSnapshot = presentation.renderSnapshot {
                 canvas.renderSnapshot = renderSnapshot
                 canvas.lastCommittedRenderRevision = renderSnapshot.revision
+                canvas.pendingIncrementalUpdate = nil
                 isHydrating = false
                 if !canvas.isStrokeActive &&
                     canvas.isAwaitingCommittedRender &&
@@ -402,10 +403,7 @@ struct AppFeature {
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()
-                return .concatenate(
-                    .cancel(id: CancelID.deferredPresentationRefresh),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
-                )
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
             case let .canvas(.delegate(.commitStroke(samples))):
                 guard let first = samples.first else { return .none }
@@ -414,10 +412,7 @@ struct AppFeature {
                     paintDocumentClient.appendStroke(sample)
                 }
                 paintDocumentClient.endStroke()
-                return .concatenate(
-                    .cancel(id: CancelID.deferredPresentationRefresh),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
-                )
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
             case .layerSidebar, .canvas:
                 return .none

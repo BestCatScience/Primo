@@ -20,10 +20,8 @@
   <string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UIRequiresFullScreen</key>
-	<true/>
-	<key>UILaunchScreen</key>
-	<dict/>
+		<key>UILaunchScreen</key>
+		<dict/>
   <key>UISupportedInterfaceOrientations~ipad</key>
   <array>
     <string>UIInterfaceOrientationPortrait</string>

@@ -130,6 +130,7 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     activeBrush_ = brush;
     previousPoint_ = point;
     strokeInFlight_ = true;
+    dirtyRect_.reset();
     point.speed = 0.0F;
     stampDab(layers_[static_cast<size_t>(activeLayerIndex_)], point);
     compositeDirty_ = true;
@@ -172,6 +173,29 @@ void PaintDocument::endStroke() {
     strokeInFlight_ = false;
 }
 
+DirtyRect PaintDocument::consumeDirtyRect() noexcept {
+    DirtyRect result = dirtyRect_;
+    dirtyRect_.reset();
+    return result;
+}
+
+std::vector<uint8_t> PaintDocument::pixelDataForRect(int layerIndex, const DirtyRect& rect) const {
+    if (layerIndex < 0 || layerIndex >= layerCount() || rect.empty()) {
+        return {};
+    }
+    const auto& layer = layers_[static_cast<size_t>(layerIndex)];
+    const int rectWidth = rect.width();
+    const int rectHeight = rect.height();
+    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * 4U);
+    for (int row = 0; row < rectHeight; ++row) {
+        const int srcY = rect.minY + row;
+        const size_t srcOffset = (static_cast<size_t>(srcY) * static_cast<size_t>(width_) + static_cast<size_t>(rect.minX)) * 4U;
+        const size_t dstOffset = static_cast<size_t>(row) * static_cast<size_t>(rectWidth) * 4U;
+        std::copy_n(layer.pixels.data() + srcOffset, static_cast<size_t>(rectWidth) * 4U, result.data() + dstOffset);
+    }
+    return result;
+}
+
 std::span<const uint8_t> PaintDocument::composite() const noexcept {
     if (compositeDirty_) {
         rebuildComposite();
@@ -197,6 +221,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + maxRadius + 1.0F)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - maxRadius - 1.0F)));
     const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + maxRadius + 1.0F)));
+    dirtyRect_.expand(minX, minY, maxX, maxY);
     const float cosAngle = std::cos(point.azimuth);
     const float sinAngle = std::sin(point.azimuth);
 
@@ -246,13 +271,33 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
         return;
     }
 
-    const float outA = std::min(activeBrush_.maxDarkness, dstA + (srcA * (1.0F - (dstA * 0.8F))));
-    const float blend = outA <= 0.0F ? 0.0F : (outA - dstA) / outA;
+    const float dstR = static_cast<float>(dst[0]) / 255.0F;
+    const float dstG = static_cast<float>(dst[1]) / 255.0F;
+    const float dstB = static_cast<float>(dst[2]) / 255.0F;
+    const float srcR = static_cast<float>(r) / 255.0F;
+    const float srcG = static_cast<float>(g) / 255.0F;
+    const float srcB = static_cast<float>(b) / 255.0F;
 
-    dst[0] = static_cast<uint8_t>(std::lerp(static_cast<float>(dst[0]), static_cast<float>(r), std::max(blend, srcA * 0.6F)));
-    dst[1] = static_cast<uint8_t>(std::lerp(static_cast<float>(dst[1]), static_cast<float>(g), std::max(blend, srcA * 0.6F)));
-    dst[2] = static_cast<uint8_t>(std::lerp(static_cast<float>(dst[2]), static_cast<float>(b), std::max(blend, srcA * 0.6F)));
-    dst[3] = static_cast<uint8_t>(outA * 255.0F);
+    const float outA = dstA + (srcA * (1.0F - dstA));
+    if (outA <= 0.001F) {
+        dst[0] = 0U;
+        dst[1] = 0U;
+        dst[2] = 0U;
+        dst[3] = 0U;
+        return;
+    }
+
+    const float outRPremul = (srcR * srcA) + (dstR * dstA * (1.0F - srcA));
+    const float outGPremul = (srcG * srcA) + (dstG * dstA * (1.0F - srcA));
+    const float outBPremul = (srcB * srcA) + (dstB * dstA * (1.0F - srcA));
+    const float outR = clamp01(outRPremul / outA);
+    const float outG = clamp01(outGPremul / outA);
+    const float outB = clamp01(outBPremul / outA);
+
+    dst[0] = static_cast<uint8_t>(outR * 255.0F);
+    dst[1] = static_cast<uint8_t>(outG * 255.0F);
+    dst[2] = static_cast<uint8_t>(outB * 255.0F);
+    dst[3] = static_cast<uint8_t>(clamp01(outA) * 255.0F);
 }
 
 void PaintDocument::rebuildComposite() const {

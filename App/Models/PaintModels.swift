@@ -212,3 +212,19 @@ struct MetalDocumentSnapshot: Equatable {
         lhs.layers.count == rhs.layers.count
     }
 }
+
+struct IncrementalLayerUpdate: Equatable, Identifiable {
+    let id = UUID()
+    let layerIndex: Int
+    let originX: Int
+    let originY: Int
+    let width: Int
+    let height: Int
+    let pixelData: Data
+
+    var isEmpty: Bool { width <= 0 || height <= 0 || pixelData.isEmpty }
+
+    static func == (lhs: IncrementalLayerUpdate, rhs: IncrementalLayerUpdate) -> Bool {
+        lhs.id == rhs.id
+    }
+}

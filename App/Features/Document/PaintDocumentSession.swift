@@ -7,6 +7,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Document")
     let bridge: APPaintDocumentBridge
     private var revision: Int = 0
+    private var activeStrokeLayerIndex: Int?
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
@@ -66,6 +67,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
+        activeStrokeLayerIndex = Int(bridge.activeLayerIndex)
         bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
     }
 
@@ -75,6 +77,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func endStroke() {
         bridge.endStroke()
+        activeStrokeLayerIndex = nil
     }
 
     func addLayer(name: String) {
@@ -98,6 +101,22 @@ final class PaintDocumentSession: @unchecked Sendable {
             return nil
         }
         return UIImage(cgImage: imageRef).pngData()
+    }
+
+    func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
+        let dirtyRect = bridge.consumeDirtyRect()
+        guard !dirtyRect.empty else { return nil }
+        let layerIndex = activeStrokeLayerIndex ?? Int(bridge.activeLayerIndex)
+        let pixelData = bridge.pixelDataForLayer(at: layerIndex, in: dirtyRect) as Data
+        guard !pixelData.isEmpty else { return nil }
+        return IncrementalLayerUpdate(
+            layerIndex: layerIndex,
+            originX: Int(dirtyRect.originX),
+            originY: Int(dirtyRect.originY),
+            width: Int(dirtyRect.width),
+            height: Int(dirtyRect.height),
+            pixelData: pixelData
+        )
     }
 
     private func makeBrushDescriptor(from brush: BrushRuntimeSettings) -> APBrushDescriptor {

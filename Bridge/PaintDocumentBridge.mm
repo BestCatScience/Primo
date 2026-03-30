@@ -5,6 +5,25 @@
 #include "../Engine/include/PaintEngine.hpp"
 #include <memory>
 
+@implementation APDirtyRect
+
+- (instancetype)initWithOriginX:(NSInteger)originX
+                        originY:(NSInteger)originY
+                          width:(NSInteger)width
+                         height:(NSInteger)height {
+    self = [super init];
+    if (self) {
+        _originX = originX;
+        _originY = originY;
+        _width = width;
+        _height = height;
+        _empty = (width <= 0 || height <= 0);
+    }
+    return self;
+}
+
+@end
+
 @implementation APBrushDescriptor
 
 - (instancetype)init {
@@ -173,6 +192,27 @@
     CGColorSpaceRelease(colorSpace);
     CGDataProviderRelease(provider);
     return image;
+}
+
+- (APDirtyRect *)consumeDirtyRect {
+    auto rect = _document->consumeDirtyRect();
+    if (rect.empty()) {
+        return [[APDirtyRect alloc] initWithOriginX:0 originY:0 width:0 height:0];
+    }
+    return [[APDirtyRect alloc] initWithOriginX:rect.minX
+                                       originY:rect.minY
+                                         width:rect.width()
+                                        height:rect.height()];
+}
+
+- (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect {
+    atelierprime::DirtyRect engineRect;
+    engineRect.minX = (int)rect.originX;
+    engineRect.minY = (int)rect.originY;
+    engineRect.maxX = (int)(rect.originX + rect.width - 1);
+    engineRect.maxY = (int)(rect.originY + rect.height - 1);
+    auto pixels = _document->pixelDataForRect((int)index, engineRect);
+    return [NSData dataWithBytes:pixels.data() length:pixels.size()];
 }
 
 @end

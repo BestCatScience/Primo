@@ -52,7 +52,8 @@ final class InputHandler {
                     let finalPoint = makePoint(touch, in: view, predicted: false)
                     stroke.points = interpolatedPoints(from: shapeStartPoint, to: finalPoint, predicted: false)
                 } else {
-                    appendFilteredPoints(from: [touch], to: &stroke, in: view, isFinishingStroke: true)
+                    let finishingTouches = event?.coalescedTouches(for: touch) ?? [touch]
+                    appendFilteredPoints(from: finishingTouches, to: &stroke, in: view, isFinishingStroke: true)
                 }
 
                 var finalStroke = stroke
@@ -106,6 +107,10 @@ final class InputHandler {
             let delta = candidate.position - previous.position
             let distance = simd_length(delta)
 
+            if isFinishingStroke && shouldRejectFinishingJump(candidate, previous: previous, distance: distance) {
+                continue
+            }
+
             if shouldReject(candidate, to: stroke.points, distance: distance) {
                 continue
             }
@@ -130,6 +135,14 @@ final class InputHandler {
                 stroke.points.append(candidate)
             }
         }
+    }
+
+    private func shouldRejectFinishingJump(_ candidate: StrokePoint, previous: StrokePoint, distance: Float) -> Bool {
+        // Lift-off samples can occasionally jump away from the nib while pressure drops rapidly.
+        // Reject those trailing points to keep ink anchored under the pencil tip.
+        let jumpThreshold = max(brushSize * 3.0, 12.0)
+        let pressureDropThreshold = max(0.08, previous.pressure * 0.5)
+        return distance > jumpThreshold && candidate.pressure < pressureDropThreshold
     }
 
     private func shouldReject(_ candidate: StrokePoint, to points: [StrokePoint], distance: Float) -> Bool {

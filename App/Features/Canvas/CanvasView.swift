@@ -23,7 +23,8 @@ struct CanvasView: UIViewRepresentable {
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
-            zoomScale: store.zoomScale
+            zoomScale: store.zoomScale,
+            incrementalUpdate: store.pendingIncrementalUpdate
         )
     }
 }
@@ -97,13 +98,18 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         viewportOffset: CGSize,
-        zoomScale: CGFloat
+        zoomScale: CGFloat,
+        incrementalUpdate: IncrementalLayerUpdate?
     ) {
         pendingSnapshot = snapshot
         self.currentTool = currentTool
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
+        rendererView?.updateDocumentSize(documentSize)
         rendererView?.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
+        if let incrementalUpdate, !incrementalUpdate.isEmpty {
+            rendererView?.applyIncrementalUpdate(incrementalUpdate)
+        }
         inputHandler.tool = currentTool
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
