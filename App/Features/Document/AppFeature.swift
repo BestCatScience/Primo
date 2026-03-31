@@ -180,6 +180,8 @@ struct AppFeature {
         case loadPresentationAfterLaunch
         case deferredPresentationRefresh
         case refreshPresentationRequested
+        case undoRequested
+        case redoRequested
         case saveDocumentRequested
         case exportDocumentRequested
         case exportSheetDismissed
@@ -261,6 +263,20 @@ struct AppFeature {
             case .refreshPresentationRequested:
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
+
+            case .undoRequested:
+                guard !state.canvas.isStrokeActive else {
+                    state.bannerMessage = "描画中は取り消しできません"
+                    return .none
+                }
+                return .send(.canvas(.requestLocalUndo))
+
+            case .redoRequested:
+                guard !state.canvas.isStrokeActive else {
+                    state.bannerMessage = "描画中はやり直しできません"
+                    return .none
+                }
+                return .send(.canvas(.requestLocalRedo))
 
             case .saveDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData() else {

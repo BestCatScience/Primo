@@ -115,6 +115,16 @@ struct ContentView: View {
             }
 
             menuBarMenu("編集") {
+                Button("取り消す") {
+                    store.send(.undoRequested)
+                }
+
+                Button("やり直す") {
+                    store.send(.redoRequested)
+                }
+
+                Divider()
+
                 Button("アクティブレイヤーをクリア") {
                     store.send(.clearActiveLayerButtonTapped)
                 }

@@ -80,6 +80,24 @@ final class PaintDocumentSession: @unchecked Sendable {
         activeStrokeLayerIndex = nil
     }
 
+    func canUndo() -> Bool {
+        bridge.canUndo()
+    }
+
+    func canRedo() -> Bool {
+        bridge.canRedo()
+    }
+
+    @discardableResult
+    func undo() -> Bool {
+        bridge.undo()
+    }
+
+    @discardableResult
+    func redo() -> Bool {
+        bridge.redo()
+    }
+
     func addLayer(name: String) {
         bridge.activeLayerIndex = bridge.addLayer(name: name)
     }

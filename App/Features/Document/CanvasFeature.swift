@@ -29,12 +29,16 @@ struct CanvasFeature {
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var pendingIncrementalUpdate: IncrementalLayerUpdate?
+        var localUndoTicket: Int = 0
+        var localRedoTicket: Int = 0
     }
 
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
         case applyIncrementalUpdate(IncrementalLayerUpdate)
+        case requestLocalUndo
+        case requestLocalRedo
         case viewportOffsetChanged(CGSize)
         case zoomScaleChanged(CGFloat)
         case delegate(Delegate)
@@ -52,6 +56,14 @@ struct CanvasFeature {
             switch action {
             case let .applyIncrementalUpdate(update):
                 state.pendingIncrementalUpdate = update
+                return .none
+
+            case .requestLocalUndo:
+                state.localUndoTicket &+= 1
+                return .none
+
+            case .requestLocalRedo:
+                state.localRedoTicket &+= 1
                 return .none
 
             case let .viewportOffsetChanged(offset):

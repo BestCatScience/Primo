@@ -21,7 +21,9 @@ struct CanvasView: UIViewRepresentable {
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
-            zoomScale: store.zoomScale
+            zoomScale: store.zoomScale,
+            undoTicket: store.localUndoTicket,
+            redoTicket: store.localRedoTicket
         )
     }
 }
@@ -47,6 +49,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var cachedCompositeImage: UIImage?
     private var committedRasterImage: UIImage?
     private var inFlightRasterImage: UIImage?
+    private var undoStack: [UIImage?] = []
+    private var redoStack: [UIImage?] = []
+    private let maxHistoryDepth = 80
+    private var appliedUndoTicket: Int = -1
+    private var appliedRedoTicket: Int = -1
     private var currentPreviewStyle = PreviewStrokeStyle(
         radius: 3.0,
         opacity: 0.9,
@@ -104,12 +111,15 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         viewportOffset: CGSize,
-        zoomScale: CGFloat
+        zoomScale: CGFloat,
+        undoTicket: Int,
+        redoTicket: Int
     ) {
         self.currentTool = currentTool
         self.currentPreviewStyle = previewStyle
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
+        applyUndoRedoTickets(undoTicket: undoTicket, redoTicket: redoTicket)
 
         let frame = contentRect()
         imageView.frame = frame
@@ -184,6 +194,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
         guard documentSize.width > 0, documentSize.height > 0 else { return }
 
+        pushUndoSnapshot()
+        redoStack.removeAll(keepingCapacity: true)
         if let inFlightRasterImage {
             committedRasterImage = compositedRaster(
                 base: committedRasterImage,
@@ -199,6 +211,38 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             )
         }
         committedImageView.image = committedRasterImage
+    }
+
+    private func applyUndoRedoTickets(undoTicket: Int, redoTicket: Int) {
+        if appliedUndoTicket != undoTicket {
+            appliedUndoTicket = undoTicket
+            performLocalUndo()
+        }
+        if appliedRedoTicket != redoTicket {
+            appliedRedoTicket = redoTicket
+            performLocalRedo()
+        }
+    }
+
+    private func performLocalUndo() {
+        guard !undoStack.isEmpty else { return }
+        redoStack.append(committedRasterImage)
+        committedRasterImage = undoStack.removeLast()
+        committedImageView.image = committedRasterImage
+    }
+
+    private func performLocalRedo() {
+        guard !redoStack.isEmpty else { return }
+        undoStack.append(committedRasterImage)
+        committedRasterImage = redoStack.removeLast()
+        committedImageView.image = committedRasterImage
+    }
+
+    private func pushUndoSnapshot() {
+        undoStack.append(committedRasterImage)
+        if undoStack.count > maxHistoryDepth {
+            undoStack.removeFirst(undoStack.count - maxHistoryDepth)
+        }
     }
 
     private func rasterizedStrokeSegment(

@@ -8,6 +8,10 @@ struct PaintDocumentClient: Sendable {
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
+    var canUndo: @Sendable () -> Bool
+    var canRedo: @Sendable () -> Bool
+    var undo: @Sendable () -> Bool
+    var redo: @Sendable () -> Bool
     var addLayer: @Sendable (String) -> Void
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
@@ -23,6 +27,10 @@ struct PaintDocumentClient: Sendable {
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
             endStroke: { sessionBox.session.endStroke() },
+            canUndo: { sessionBox.session.canUndo() },
+            canRedo: { sessionBox.session.canRedo() },
+            undo: { sessionBox.session.undo() },
+            redo: { sessionBox.session.redo() },
             addLayer: { name in sessionBox.session.addLayer(name: name) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
