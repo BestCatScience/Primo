@@ -1,45 +1,40 @@
-import ComposableArchitecture
 import AVFoundation
+import ComposableArchitecture
 import SwiftUI
-import simd
 import UIKit
+import simd
 
 struct CanvasView: UIViewRepresentable {
     let store: StoreOf<CanvasFeature>
 
-    func makeUIView(context: Context) -> PaintCanvasContainerView {
-        let view = PaintCanvasContainerView()
+    func makeUIView(context: Context) -> RasterCanvasContainerView {
+        let view = RasterCanvasContainerView()
         view.sendAction = { store.send($0) }
         return view
     }
 
-    func updateUIView(_ uiView: PaintCanvasContainerView, context: Context) {
+    func updateUIView(_ uiView: RasterCanvasContainerView, context: Context) {
         uiView.documentSize = store.canvasSize
         uiView.update(
             snapshot: store.renderSnapshot,
-            layerBuffers: store.layerBuffers,
-            showsCommittedOverlay: true,
             activeStroke: store.activeStroke,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
-            zoomScale: store.zoomScale,
-            incrementalUpdate: store.pendingIncrementalUpdate
+            zoomScale: store.zoomScale
         )
     }
 }
 
-final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate {
+final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate {
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
-    private var rendererView: MetalCanvasView?
-    private let committedStrokeContainerLayer = CALayer()
-    private let liveStrokeLayer = CAShapeLayer()
-    private let predictedStrokeLayer = CAShapeLayer()
-    private var pendingSnapshot: MetalDocumentSnapshot?
-    private var hasScheduledRendererInstallation = false
+    private let imageView = UIImageView()
+    private let committedImageView = UIImageView()
+    private let inFlightImageView = UIImageView()
     private let inputHandler = InputHandler()
+
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
     private var currentTool: StudioToolKind = .brush
@@ -48,28 +43,46 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
     private var pinchStartScale: CGFloat = 1.0
     private var pinchAnchorDocumentPoint: CGPoint?
 
+    private var cachedRevision: Int = -1
+    private var cachedCompositeImage: UIImage?
+    private var committedRasterImage: UIImage?
+    private var inFlightRasterImage: UIImage?
+    private var currentPreviewStyle = PreviewStrokeStyle(
+        radius: 3.0,
+        opacity: 0.9,
+        color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
+    )
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
         isMultipleTouchEnabled = true
         clipsToBounds = true
+
         inputHandler.delegate = self
         inputHandler.pointMapper = { [weak self] location, view in
-            guard let self else {
-                return SIMD2(Float(location.x), Float(location.y))
-            }
+            guard let self else { return SIMD2(Float(location.x), Float(location.y)) }
             let point = self.canvasPoint(from: location, in: view)
             return SIMD2(Float(point.x), Float(point.y))
         }
 
-        configureStrokeLayer(liveStrokeLayer, opacity: 1.0)
-        configureStrokeLayer(predictedStrokeLayer, opacity: 0.22)
-        layer.addSublayer(committedStrokeContainerLayer)
-        layer.addSublayer(liveStrokeLayer)
-        layer.addSublayer(predictedStrokeLayer)
+        imageView.contentMode = .scaleToFill
+        imageView.isUserInteractionEnabled = false
+        addSubview(imageView)
+
+        committedImageView.contentMode = .scaleToFill
+        committedImageView.isUserInteractionEnabled = false
+        addSubview(committedImageView)
+
+        inFlightImageView.contentMode = .scaleToFill
+        inFlightImageView.isUserInteractionEnabled = false
+        addSubview(inFlightImageView)
+
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchRecognizer.delegate = self
+        pinchRecognizer.cancelsTouchesInView = false
         addGestureRecognizer(pinchRecognizer)
+
         addInteraction(UIPencilInteraction())
     }
 
@@ -80,42 +93,50 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        committedStrokeContainerLayer.frame = bounds
-        liveStrokeLayer.frame = bounds
-        predictedStrokeLayer.frame = bounds
-    }
-
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        scheduleRendererInstallationIfNeeded()
+        imageView.frame = contentRect()
+        committedImageView.frame = contentRect()
+        inFlightImageView.frame = contentRect()
     }
 
     func update(
         snapshot: MetalDocumentSnapshot?,
-        layerBuffers: [LayerCanvasBuffer],
-        showsCommittedOverlay: Bool,
         activeStroke: Stroke?,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         viewportOffset: CGSize,
-        zoomScale: CGFloat,
-        incrementalUpdate: IncrementalLayerUpdate?
+        zoomScale: CGFloat
     ) {
-        pendingSnapshot = snapshot
         self.currentTool = currentTool
+        self.currentPreviewStyle = previewStyle
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
-        rendererView?.updateDocumentSize(documentSize)
-        rendererView?.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
-        if let incrementalUpdate, !incrementalUpdate.isEmpty {
-            rendererView?.applyIncrementalUpdate(incrementalUpdate)
-        }
+
+        let frame = contentRect()
+        imageView.frame = frame
+        committedImageView.frame = frame
+        inFlightImageView.frame = frame
         inputHandler.tool = currentTool
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
-        updateCommittedStrokeLayers(layerBuffers, showsCommittedOverlay: showsCommittedOverlay)
-        updateStrokeLayer(liveStrokeLayer, with: activeStroke?.confirmedPreviewPoints ?? [], style: previewStyle, opacityMultiplier: 0.85)
-        predictedStrokeLayer.path = nil
+        if activeStroke == nil, inFlightRasterImage != nil {
+            inFlightRasterImage = nil
+            inFlightImageView.image = nil
+        }
+
+        guard let snapshot else {
+            committedImageView.image = committedRasterImage
+            return
+        }
+
+        if snapshot.revision != cachedRevision {
+            cachedRevision = snapshot.revision
+            cachedCompositeImage = renderCompositeImage(from: snapshot)
+            if committedRasterImage == nil {
+                committedRasterImage = cachedCompositeImage
+            }
+        }
+        imageView.image = nil
+        committedImageView.image = committedRasterImage
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -139,11 +160,212 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
     }
 
     func didUpdateStroke(_ stroke: Stroke) {
+        let points = stroke.confirmedPreviewPoints
+        guard !points.isEmpty else { return }
+        guard documentSize.width > 0, documentSize.height > 0 else { return }
+        inFlightRasterImage = rasterizedStrokeSegment(
+            points: points,
+            style: currentPreviewStyle,
+            onto: nil,
+            documentSize: documentSize,
+            includesLeadingPoint: true
+        )
+        inFlightImageView.image = inFlightRasterImage
         sendAction?(.strokeUpdated(stroke))
     }
 
     func didEndStroke(_ stroke: Stroke) {
-        sendAction?(.strokeEnded(stroke))
+        defer {
+            sendAction?(.strokeEnded(stroke))
+        }
+        defer {
+            inFlightRasterImage = nil
+            inFlightImageView.image = nil
+        }
+        guard documentSize.width > 0, documentSize.height > 0 else { return }
+
+        if let inFlightRasterImage {
+            committedRasterImage = compositedRaster(
+                base: committedRasterImage,
+                overlay: inFlightRasterImage,
+                documentSize: documentSize
+            )
+        } else if !stroke.confirmedPreviewPoints.isEmpty {
+            committedRasterImage = rasterizedCommittedStroke(
+                points: stroke.confirmedPreviewPoints,
+                style: currentPreviewStyle,
+                onto: committedRasterImage,
+                documentSize: documentSize
+            )
+        }
+        committedImageView.image = committedRasterImage
+    }
+
+    private func rasterizedStrokeSegment(
+        points: [PreviewStrokePoint],
+        style: PreviewStrokeStyle,
+        onto base: UIImage?,
+        documentSize: CGSize,
+        includesLeadingPoint: Bool
+    ) -> UIImage? {
+        let pixelWidth = max(1, Int(documentSize.width))
+        let pixelHeight = max(1, Int(documentSize.height))
+        let bounds = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
+
+        let strokeAlpha = min(max(style.opacity, 0.0), 1.0)
+        let strokeStamp = UIGraphicsImageRenderer(size: bounds.size, format: format).image { stampContext in
+            let stampCG = stampContext.cgContext
+            let opaqueColor = UIColor(cgColor: style.color).withAlphaComponent(1.0).cgColor
+            stampCG.setFillColor(opaqueColor)
+            drawPressureSensitiveDabs(
+                points: points,
+                baseRadius: max(0.6, style.radius),
+                in: stampCG,
+                includesLeadingPoint: includesLeadingPoint
+            )
+        }
+
+        return renderer.image { context in
+            base?.draw(in: bounds)
+
+            strokeStamp.draw(in: bounds, blendMode: .normal, alpha: strokeAlpha)
+        }
+    }
+
+    private func rasterizedCommittedStroke(
+        points: [PreviewStrokePoint],
+        style: PreviewStrokeStyle,
+        onto base: UIImage?,
+        documentSize: CGSize
+    ) -> UIImage? {
+        rasterizedStrokeSegment(
+            points: points,
+            style: style,
+            onto: base,
+            documentSize: documentSize,
+            includesLeadingPoint: true
+        )
+    }
+
+    private func compositedRaster(base: UIImage?, overlay: UIImage, documentSize: CGSize) -> UIImage? {
+        let pixelWidth = max(1, Int(documentSize.width))
+        let pixelHeight = max(1, Int(documentSize.height))
+        let bounds = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.opaque = false
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
+
+        return renderer.image { _ in
+            base?.draw(in: bounds)
+            overlay.draw(in: bounds)
+        }
+    }
+
+    private func drawPressureSensitiveDabs(
+        points: [PreviewStrokePoint],
+        baseRadius: CGFloat,
+        in cg: CGContext,
+        includesLeadingPoint: Bool
+    ) {
+        guard !points.isEmpty else { return }
+
+        func clampedPressure(_ pressure: CGFloat) -> CGFloat {
+            min(max(pressure, 0.08), 1.0)
+        }
+
+        func drawDab(at point: CGPoint, radius: CGFloat) {
+            let r = max(0.4, radius)
+            cg.fillEllipse(in: CGRect(x: point.x - r, y: point.y - r, width: r * 2.0, height: r * 2.0))
+        }
+
+        if points.count == 1 {
+            guard includesLeadingPoint else { return }
+            let p = points[0]
+            drawDab(at: p.point, radius: baseRadius * clampedPressure(p.pressure))
+            return
+        }
+
+        if includesLeadingPoint {
+            let p = points[0]
+            drawDab(at: p.point, radius: baseRadius * clampedPressure(p.pressure))
+        }
+
+        for index in 1..<points.count {
+            let from = points[index - 1]
+            let to = points[index]
+
+            let fromRadius = baseRadius * clampedPressure(from.pressure)
+            let toRadius = baseRadius * clampedPressure(to.pressure)
+            let dx = to.point.x - from.point.x
+            let dy = to.point.y - from.point.y
+            let distance = hypot(dx, dy)
+
+            let spacing = max(0.4, min(fromRadius, toRadius) * 0.45)
+            let steps = max(1, Int(ceil(distance / spacing)))
+            for step in 1...steps {
+                let t = CGFloat(step) / CGFloat(steps)
+                let point = CGPoint(x: from.point.x + dx * t, y: from.point.y + dy * t)
+                let radius = fromRadius + (toRadius - fromRadius) * t
+                drawDab(at: point, radius: radius)
+            }
+        }
+    }
+
+    private func renderCompositeImage(from snapshot: MetalDocumentSnapshot) -> UIImage? {
+        let width = snapshot.width
+        let height = snapshot.height
+        guard width > 0, height > 0 else { return nil }
+
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        context.setFillColor(UIColor(red: 0.93, green: 0.92, blue: 0.89, alpha: 1.0).cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        for layer in snapshot.layers where layer.visible {
+            guard let image = makeLayerImage(pixelData: layer.pixelData, width: width, height: height) else { continue }
+            context.saveGState()
+            context.setAlpha(CGFloat(layer.opacity))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            context.restoreGState()
+        }
+
+        guard let cgImage = context.makeImage() else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+
+    private func makeLayerImage(pixelData: Data, width: Int, height: Int) -> CGImage? {
+        guard pixelData.count == width * height * 4 else { return nil }
+        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
     }
 
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
@@ -159,185 +381,12 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
         )
     }
 
-    private func updateStrokeLayer(
-        _ strokeLayer: CAShapeLayer,
-        with points: [PreviewStrokePoint],
-        style: PreviewStrokeStyle,
-        opacityMultiplier: CGFloat
-    ) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        defer { CATransaction.commit() }
-
-        guard !points.isEmpty else {
-            strokeLayer.path = nil
-            return
-        }
-
-        let fitted = contentRect()
-        let scaleX = fitted.width / max(documentSize.width, 1)
-        let scaleY = fitted.height / max(documentSize.height, 1)
-        let baseRadius = max(0.5, style.radius * min(scaleX, scaleY))
-
-        let mapped: [(pos: CGPoint, r: CGFloat)] = points.map { preview in
-            let pos = CGPoint(
-                x: fitted.minX + (preview.point.x / max(documentSize.width, 1)) * fitted.width,
-                y: fitted.minY + (preview.point.y / max(documentSize.height, 1)) * fitted.height
-            )
-            let r = max(0.4, baseRadius * (0.05 + preview.pressure * 0.95))
-            return (pos, r)
-        }
-
-        if mapped.count == 1 {
-            let sp = mapped[0]
-            let circlePath = UIBezierPath(
-                ovalIn: CGRect(x: sp.pos.x - sp.r, y: sp.pos.y - sp.r, width: sp.r * 2, height: sp.r * 2)
-            )
-            strokeLayer.path = circlePath.cgPath
-            strokeLayer.fillRule = .nonZero
-            strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
-            strokeLayer.strokeColor = nil
-            strokeLayer.lineWidth = 0
-        } else if style.radius <= 6 {
-            let centerlinePath = UIBezierPath()
-            centerlinePath.lineCapStyle = .round
-            centerlinePath.lineJoinStyle = .round
-            centerlinePath.move(to: mapped[0].pos)
-            for point in mapped.dropFirst() {
-                centerlinePath.addLine(to: point.pos)
-            }
-
-            let averageRadius = mapped.reduce(CGFloat.zero) { $0 + $1.r } / CGFloat(mapped.count)
-            strokeLayer.path = centerlinePath.cgPath
-            strokeLayer.fillColor = nil
-            strokeLayer.strokeColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
-            strokeLayer.lineWidth = max(1.0, averageRadius * 2.0)
-        } else {
-            let stampedPath = UIBezierPath()
-            let minimumRadius = max(0.35, mapped.map(\.r).min() ?? 0.35)
-            let stampSpacing = max(0.12, minimumRadius * 0.35)
-
-            func appendStamp(at point: CGPoint, radius: CGFloat) {
-                stampedPath.append(UIBezierPath(
-                    ovalIn: CGRect(
-                        x: point.x - radius,
-                        y: point.y - radius,
-                        width: radius * 2,
-                        height: radius * 2
-                    )
-                ))
-            }
-
-            appendStamp(at: mapped[0].pos, radius: mapped[0].r)
-
-            for (start, end) in zip(mapped, mapped.dropFirst()) {
-                let dx = end.pos.x - start.pos.x
-                let dy = end.pos.y - start.pos.y
-                let distance = hypot(dx, dy)
-                let steps = max(1, Int(ceil(distance / stampSpacing)))
-
-                for step in 1...steps {
-                    let t = CGFloat(step) / CGFloat(steps)
-                    let point = CGPoint(
-                        x: start.pos.x + dx * t,
-                        y: start.pos.y + dy * t
-                    )
-                    let radius = start.r + (end.r - start.r) * t
-                    appendStamp(at: point, radius: radius)
-                }
-            }
-
-            strokeLayer.path = stampedPath.cgPath
-            strokeLayer.fillRule = .nonZero
-            strokeLayer.fillColor = style.color.copy(alpha: style.opacity * opacityMultiplier)
-            strokeLayer.strokeColor = nil
-            strokeLayer.lineWidth = 0
-        }
-    }
-
-    private func updateCommittedStrokeLayers(_ layerBuffers: [LayerCanvasBuffer], showsCommittedOverlay: Bool) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        defer { CATransaction.commit() }
-
-        committedStrokeContainerLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
-        guard showsCommittedOverlay else { return }
-
-        for buffer in layerBuffers where buffer.visible {
-            for stroke in buffer.strokes {
-                let strokeLayer = CAShapeLayer()
-                configureStrokeLayer(strokeLayer, opacity: 1.0)
-                updateStrokeLayer(
-                    strokeLayer,
-                    with: stroke.points,
-                    style: stroke.style,
-                    opacityMultiplier: CGFloat(buffer.opacity) * 0.92
-                )
-                committedStrokeContainerLayer.addSublayer(strokeLayer)
-            }
-        }
-    }
-
-    private func scheduleRendererInstallationIfNeeded() {
-        guard window != nil, rendererView == nil, !hasScheduledRendererInstallation else { return }
-        hasScheduledRendererInstallation = true
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.installRendererIfNeeded()
-        }
-    }
-
-    private func installRendererIfNeeded() {
-        guard rendererView == nil else { return }
-
-        let rendererView = MetalCanvasView()
-        rendererView.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(rendererView)
-        sendSubviewToBack(rendererView)
-        NSLayoutConstraint.activate([
-            rendererView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            rendererView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            rendererView.topAnchor.constraint(equalTo: topAnchor),
-            rendererView.bottomAnchor.constraint(equalTo: bottomAnchor)
-        ])
-        rendererView.update(snapshot: pendingSnapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
-        self.rendererView = rendererView
-    }
-
-    private func configureStrokeLayer(_ strokeLayer: CAShapeLayer, opacity: CGFloat) {
-        strokeLayer.actions = [
-            "path": NSNull(),
-            "strokeColor": NSNull(),
-            "lineWidth": NSNull(),
-            "opacity": NSNull(),
-            "hidden": NSNull()
-        ]
-        strokeLayer.strokeColor = UIColor.black.withAlphaComponent(opacity).cgColor
-        strokeLayer.fillColor = UIColor.clear.cgColor
-        strokeLayer.lineWidth = 1.5
-        strokeLayer.lineCap = .round
-        strokeLayer.lineJoin = .round
-    }
-
     private func contentRect() -> CGRect {
-        if let rendererView {
-            return rendererView.contentRect(
-                for: bounds.size,
-                documentSize: documentSize,
-                viewportOffset: viewportOffset,
-                zoomScale: zoomScale
-            )
-        }
-
         let paperRect = bounds.insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
         let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledSize = CGSize(
-            width: fittedRect.width * zoomScale,
-            height: fittedRect.height * zoomScale
-        )
+        let scaledSize = CGSize(width: fittedRect.width * zoomScale, height: fittedRect.height * zoomScale)
         return CGRect(
             x: fittedRect.midX - (scaledSize.width / 2) + viewportOffset.width,
             y: fittedRect.midY - (scaledSize.height / 2) + viewportOffset.height,
@@ -434,10 +483,7 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
         let paperRect = bounds.insetBy(dx: 6, dy: 6)
         let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
         let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledSize = CGSize(
-            width: fittedRect.width * zoomScale,
-            height: fittedRect.height * zoomScale
-        )
+        let scaledSize = CGSize(width: fittedRect.width * zoomScale, height: fittedRect.height * zoomScale)
         let normalizedX = documentPoint.x / max(documentSize.width, 1)
         let normalizedY = documentPoint.y / max(documentSize.height, 1)
         let desiredOrigin = CGPoint(
@@ -449,10 +495,7 @@ final class PaintCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRec
             y: fittedRect.midY - (scaledSize.height / 2)
         )
         return clampedViewportOffset(
-            CGSize(
-                width: desiredOrigin.x - baseOrigin.x,
-                height: desiredOrigin.y - baseOrigin.y
-            ),
+            CGSize(width: desiredOrigin.x - baseOrigin.x, height: desiredOrigin.y - baseOrigin.y),
             zoomScale: zoomScale
         )
     }
@@ -484,19 +527,9 @@ private extension PreviewStrokeStyle {
 
         switch components.count {
         case 4:
-            return SIMD4(
-                Float(components[0]),
-                Float(components[1]),
-                Float(components[2]),
-                Float(components[3])
-            )
+            return SIMD4(Float(components[0]), Float(components[1]), Float(components[2]), Float(components[3]))
         case 2:
-            return SIMD4(
-                Float(components[0]),
-                Float(components[0]),
-                Float(components[0]),
-                Float(components[1])
-            )
+            return SIMD4(Float(components[0]), Float(components[0]), Float(components[0]), Float(components[1]))
         default:
             return SIMD4(0, 0, 0, 1)
         }

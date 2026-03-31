@@ -392,14 +392,21 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
+                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
-                return .none
+                if let update = paintDocumentClient.consumeDirtyUpdate() {
+                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                }
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 for sample in samples {
                     paintDocumentClient.appendStroke(sample)
                 }
-                return .none
+                if let update = paintDocumentClient.consumeDirtyUpdate() {
+                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                }
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()

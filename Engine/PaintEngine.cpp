@@ -89,11 +89,13 @@ void PaintDocument::setActiveLayerIndex(int index) {
 }
 
 int PaintDocument::addLayer(const std::string& name) {
+    pushHistorySnapshot();
     Layer layer;
     layer.name = name;
     layer.pixels.assign(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4U, 0U);
     layers_.push_back(std::move(layer));
     activeLayerIndex_ = layerCount() - 1;
+    markEntireDocumentDirty();
     compositeDirty_ = true;
     return activeLayerIndex_;
 }
@@ -102,7 +104,9 @@ void PaintDocument::clearLayer(int index) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
+    pushHistorySnapshot();
     std::fill(layers_[index].pixels.begin(), layers_[index].pixels.end(), 0U);
+    markEntireDocumentDirty();
     compositeDirty_ = true;
 }
 
@@ -110,7 +114,12 @@ void PaintDocument::setLayerVisibility(int index, bool visible) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
+    if (layers_[index].visible == visible) {
+        return;
+    }
+    pushHistorySnapshot();
     layers_[index].visible = visible;
+    markEntireDocumentDirty();
     compositeDirty_ = true;
 }
 
@@ -118,7 +127,13 @@ void PaintDocument::setLayerOpacity(int index, float opacity) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
-    layers_[index].opacity = clamp01(opacity);
+    const float clamped = clamp01(opacity);
+    if (layers_[index].opacity == clamped) {
+        return;
+    }
+    pushHistorySnapshot();
+    layers_[index].opacity = clamped;
+    markEntireDocumentDirty();
     compositeDirty_ = true;
 }
 
@@ -127,6 +142,10 @@ const Layer& PaintDocument::layer(int index) const {
 }
 
 void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
+    if (strokeInFlight_) {
+        return;
+    }
+    pushHistorySnapshot();
     activeBrush_ = brush;
     previousPoint_ = point;
     strokeInFlight_ = true;
@@ -173,6 +192,57 @@ void PaintDocument::endStroke() {
     strokeInFlight_ = false;
 }
 
+bool PaintDocument::canUndo() const noexcept {
+    return !undoStack_.empty() && !strokeInFlight_;
+}
+
+bool PaintDocument::canRedo() const noexcept {
+    return !redoStack_.empty() && !strokeInFlight_;
+}
+
+bool PaintDocument::undo() {
+    if (!canUndo()) {
+        return false;
+    }
+
+    HistorySnapshot current;
+    current.activeLayerIndex = activeLayerIndex_;
+    current.layers = layers_;
+    redoStack_.push_back(std::move(current));
+
+    HistorySnapshot snapshot = std::move(undoStack_.back());
+    undoStack_.pop_back();
+    layers_ = std::move(snapshot.layers);
+    activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
+    strokeInFlight_ = false;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
+bool PaintDocument::redo() {
+    if (!canRedo()) {
+        return false;
+    }
+
+    HistorySnapshot current;
+    current.activeLayerIndex = activeLayerIndex_;
+    current.layers = layers_;
+    undoStack_.push_back(std::move(current));
+    if (undoStack_.size() > kMaxHistoryDepth) {
+        undoStack_.erase(undoStack_.begin());
+    }
+
+    HistorySnapshot snapshot = std::move(redoStack_.back());
+    redoStack_.pop_back();
+    layers_ = std::move(snapshot.layers);
+    activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
+    strokeInFlight_ = false;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
 DirtyRect PaintDocument::consumeDirtyRect() noexcept {
     DirtyRect result = dirtyRect_;
     dirtyRect_.reset();
@@ -202,6 +272,25 @@ std::span<const uint8_t> PaintDocument::composite() const noexcept {
         compositeDirty_ = false;
     }
     return compositeBuffer_;
+}
+
+void PaintDocument::pushHistorySnapshot() {
+    if (strokeInFlight_) {
+        return;
+    }
+
+    HistorySnapshot snapshot;
+    snapshot.activeLayerIndex = activeLayerIndex_;
+    snapshot.layers = layers_;
+    undoStack_.push_back(std::move(snapshot));
+    if (undoStack_.size() > kMaxHistoryDepth) {
+        undoStack_.erase(undoStack_.begin());
+    }
+    redoStack_.clear();
+}
+
+void PaintDocument::markEntireDocumentDirty() noexcept {
+    dirtyRect_.expand(0, 0, width_ - 1, height_ - 1);
 }
 
 void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {

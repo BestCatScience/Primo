@@ -86,7 +86,8 @@ final class InputHandler {
     private func normalizedPressure(for touch: UITouch) -> Float {
         guard touch.type == .pencil || touch.maximumPossibleForce > 0 else { return 0.65 }
         guard touch.maximumPossibleForce > 0 else { return 0.65 }
-        return Float(touch.force / touch.maximumPossibleForce)
+        let normalized = Float(touch.force / touch.maximumPossibleForce)
+        return max(0.08, min(normalized, 1.0))
     }
 
     private func appendFilteredPoints(from touches: [UITouch], to stroke: inout Stroke, in view: UIView, isFinishingStroke: Bool) {

@@ -170,6 +170,22 @@
     _document->endStroke();
 }
 
+- (BOOL)canUndo {
+    return _document->canUndo();
+}
+
+- (BOOL)canRedo {
+    return _document->canRedo();
+}
+
+- (BOOL)undo {
+    return _document->undo();
+}
+
+- (BOOL)redo {
+    return _document->redo();
+}
+
 - (CGImageRef)createCompositeImage {
     const auto composite = _document->composite();
     NSData *data = [NSData dataWithBytes:composite.data() length:composite.size()];

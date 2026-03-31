@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -97,6 +98,10 @@ public:
     void beginStroke(const BrushSettings& brush, StrokePoint point);
     void appendStroke(StrokePoint point);
     void endStroke();
+    bool canUndo() const noexcept;
+    bool canRedo() const noexcept;
+    bool undo();
+    bool redo();
 
     DirtyRect consumeDirtyRect() noexcept;
     std::vector<uint8_t> pixelDataForRect(int layerIndex, const DirtyRect& rect) const;
@@ -104,6 +109,13 @@ public:
     std::span<const uint8_t> composite() const noexcept;
 
 private:
+    struct HistorySnapshot {
+        int activeLayerIndex = 0;
+        std::vector<Layer> layers;
+    };
+
+    static constexpr size_t kMaxHistoryDepth = 24;
+
     int width_ = 0;
     int height_ = 0;
     int activeLayerIndex_ = 0;
@@ -112,9 +124,13 @@ private:
     bool strokeInFlight_ = false;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;
+    std::vector<HistorySnapshot> undoStack_;
+    std::vector<HistorySnapshot> redoStack_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
 
+    void pushHistorySnapshot();
+    void markEntireDocumentDirty() noexcept;
     void stampDab(Layer& layer, const StrokePoint& point);
     void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha);
     void rebuildComposite() const;
