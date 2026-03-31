@@ -1,5 +1,6 @@
 import AVFoundation
 import ComposableArchitecture
+import QuartzCore
 import SwiftUI
 import UIKit
 import simd
@@ -42,8 +43,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var currentTool: StudioToolKind = .brush
     private var panStartLocation: CGPoint?
     private var panStartOffset: CGSize = .zero
+    private var panDidMove = false
+    private var isCanvasPanGestureActive = false
     private var pinchStartScale: CGFloat = 1.0
     private var pinchAnchorDocumentPoint: CGPoint?
+    private var isPinchGestureActive = false
+    private var lastNavigationGestureEndedAt: CFTimeInterval = 0
 
     private var cachedRevision: Int = -1
     private var cachedCompositeImage: UIImage?
@@ -97,6 +102,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         undoTapRecognizer.numberOfTapsRequired = 1
         undoTapRecognizer.cancelsTouchesInView = false
         undoTapRecognizer.delegate = self
+        undoTapRecognizer.require(toFail: pinchRecognizer)
         addGestureRecognizer(undoTapRecognizer)
 
         let redoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleThreeFingerRedoTap(_:)))
@@ -104,6 +110,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         redoTapRecognizer.numberOfTapsRequired = 1
         redoTapRecognizer.cancelsTouchesInView = false
         redoTapRecognizer.delegate = self
+        redoTapRecognizer.require(toFail: pinchRecognizer)
         addGestureRecognizer(redoTapRecognizer)
 
         addInteraction(UIPencilInteraction())
@@ -515,6 +522,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         guard currentTool == .move, let touch = touches.first else {
             if phase == .ended || phase == .cancelled {
                 panStartLocation = nil
+                panDidMove = false
+                isCanvasPanGestureActive = false
             }
             return false
         }
@@ -524,18 +533,37 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         case .began:
             panStartLocation = location
             panStartOffset = viewportOffset
+            panDidMove = false
+            isCanvasPanGestureActive = true
         case .moved:
             guard let panStartLocation else { return true }
+            let deltaX = location.x - panStartLocation.x
+            let deltaY = location.y - panStartLocation.y
+            if hypot(deltaX, deltaY) > 3.0 {
+                panDidMove = true
+            }
             let nextOffset = CGSize(
-                width: panStartOffset.width + (location.x - panStartLocation.x),
-                height: panStartOffset.height + (location.y - panStartLocation.y)
+                width: panStartOffset.width + deltaX,
+                height: panStartOffset.height + deltaY
             )
             let clampedOffset = clampedViewportOffset(nextOffset)
             sendAction?(.viewportOffsetChanged(clampedOffset))
         case .ended, .cancelled:
+            if panDidMove {
+                lastNavigationGestureEndedAt = CACurrentMediaTime()
+            }
             panStartLocation = nil
+            panDidMove = false
+            isCanvasPanGestureActive = false
         }
         return true
+    }
+
+    private func shouldSuppressHistoryTap() -> Bool {
+        if isPinchGestureActive || isCanvasPanGestureActive || pinchAnchorDocumentPoint != nil {
+            return true
+        }
+        return (CACurrentMediaTime() - lastNavigationGestureEndedAt) < 0.22
     }
 
     private func clampedViewportOffset(_ proposedOffset: CGSize) -> CGSize {
@@ -555,12 +583,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     @objc
     private func handleTwoFingerUndoTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
+        guard !shouldSuppressHistoryTap() else { return }
         sendAction?(.requestLocalUndo)
     }
 
     @objc
     private func handleThreeFingerRedoTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
+        guard !shouldSuppressHistoryTap() else { return }
         sendAction?(.requestLocalRedo)
     }
 
@@ -571,6 +601,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let location = recognizer.location(in: self)
         switch recognizer.state {
         case .began:
+            isPinchGestureActive = true
             pinchStartScale = zoomScale
             pinchAnchorDocumentPoint = documentPoint(at: location, in: contentRect())
 
@@ -586,6 +617,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             sendAction?(.viewportOffsetChanged(newOffset))
 
         case .ended, .cancelled, .failed:
+            if isPinchGestureActive {
+                lastNavigationGestureEndedAt = CACurrentMediaTime()
+            }
+            isPinchGestureActive = false
             pinchAnchorDocumentPoint = nil
 
         default:
