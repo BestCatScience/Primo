@@ -42,7 +42,10 @@ struct ContentView: View {
             }
         )
         .safeAreaInset(edge: .top, spacing: 0) {
-            menuBar
+            VStack(spacing: 0) {
+                menuBar
+                undoRedoBar
+            }
                 .zIndex(1000)
         }
         .ignoresSafeArea(edges: [.horizontal, .bottom])
@@ -115,16 +118,6 @@ struct ContentView: View {
             }
 
             menuBarMenu("編集") {
-                Button("取り消す") {
-                    store.send(.undoRequested)
-                }
-
-                Button("やり直す") {
-                    store.send(.redoRequested)
-                }
-
-                Divider()
-
                 Button("アクティブレイヤーをクリア") {
                     store.send(.clearActiveLayerButtonTapped)
                 }
@@ -199,6 +192,70 @@ struct ContentView: View {
         .contentShape(Rectangle())
         .compositingGroup()
         .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
+    }
+
+    private var undoRedoBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                store.send(.undoRequested)
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(StudioTheme.Palette.textPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+            }
+
+            Button {
+                store.send(.redoRequested)
+            } label: {
+                Image(systemName: "arrow.uturn.forward")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(StudioTheme.Palette.textPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 7)
+        .background(
+            ZStack {
+                StudioTheme.Palette.overlayBlack.opacity(0.95)
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.04),
+                        StudioTheme.Palette.cardFill.opacity(0.14)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+        )
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(StudioTheme.Palette.cardBorder.opacity(0.95))
+                .frame(height: 1)
+        }
     }
 
     private func menuBarMenu<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

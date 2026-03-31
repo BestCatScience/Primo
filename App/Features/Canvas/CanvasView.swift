@@ -90,6 +90,20 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         pinchRecognizer.cancelsTouchesInView = false
         addGestureRecognizer(pinchRecognizer)
 
+        let undoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerUndoTap(_:)))
+        undoTapRecognizer.numberOfTouchesRequired = 2
+        undoTapRecognizer.numberOfTapsRequired = 1
+        undoTapRecognizer.cancelsTouchesInView = false
+        undoTapRecognizer.delegate = self
+        addGestureRecognizer(undoTapRecognizer)
+
+        let redoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleThreeFingerRedoTap(_:)))
+        redoTapRecognizer.numberOfTouchesRequired = 3
+        redoTapRecognizer.numberOfTapsRequired = 1
+        redoTapRecognizer.cancelsTouchesInView = false
+        redoTapRecognizer.delegate = self
+        addGestureRecognizer(redoTapRecognizer)
+
         addInteraction(UIPencilInteraction())
     }
 
@@ -485,6 +499,18 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
             height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
         )
+    }
+
+    @objc
+    private func handleTwoFingerUndoTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        sendAction?(.requestLocalUndo)
+    }
+
+    @objc
+    private func handleThreeFingerRedoTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+        sendAction?(.requestLocalRedo)
     }
 
     @objc
