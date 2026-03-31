@@ -7,11 +7,11 @@ import UIKit
 struct BrushPaletteFeature {
     @ObservableState
     struct State: Equatable {
-        var brushRadius: Double = 3.0
-        var brushOpacity: Double = 0.9
-        var brushHardness: Double = 0.82
-        var brushPressureSensitivity: Double = 0.4
-        var brushColor: Color = Color(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0)
+        var brushRadius: Double = BrushPreset.defaultPencil.radius
+        var brushOpacity: Double = BrushPreset.defaultPencil.opacity
+        var brushHardness: Double = BrushPreset.defaultPencil.hardness
+        var brushPressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
+        var brushColor: Color = BrushPreset.defaultPencil.color
         var selectedBrush: BrushPreset? = .defaultPencil
         let presets: [BrushPreset] = BrushPreset.defaults
 
@@ -49,7 +49,11 @@ struct BrushPaletteFeature {
         BindingReducer()
         Reduce { state, action in
             switch action {
-            case .binding(\.brushColor):
+            case .binding(\.brushColor),
+                 .binding(\.brushRadius),
+                 .binding(\.brushOpacity),
+                 .binding(\.brushHardness),
+                 .binding(\.brushPressureSensitivity):
                 state.selectedBrush = nil
                 return .none
             case .binding:
@@ -57,6 +61,10 @@ struct BrushPaletteFeature {
             case let .selectPreset(preset):
                 state.selectedBrush = preset
                 state.brushColor = preset.color
+                state.brushRadius = preset.radius
+                state.brushOpacity = preset.opacity
+                state.brushHardness = preset.hardness
+                state.brushPressureSensitivity = preset.pressureSensitivity
                 return .none
             case .clearActiveLayerButtonTapped:
                 return .send(.delegate(.clearActiveLayer))

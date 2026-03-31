@@ -57,6 +57,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var currentPreviewStyle = PreviewStrokeStyle(
         radius: 3.0,
         opacity: 0.9,
+        hardness: 0.82,
+        pressureSensitivity: 0.4,
         color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
     )
 
@@ -284,7 +286,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                 points: points,
                 baseRadius: max(0.6, style.radius),
                 in: stampCG,
-                includesLeadingPoint: includesLeadingPoint
+                includesLeadingPoint: includesLeadingPoint,
+                fillColor: opaqueColor,
+                hardness: style.hardness,
+                pressureSensitivity: style.pressureSensitivity
             )
         }
 
@@ -330,7 +335,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         points: [PreviewStrokePoint],
         baseRadius: CGFloat,
         in cg: CGContext,
-        includesLeadingPoint: Bool
+        includesLeadingPoint: Bool,
+        fillColor: CGColor,
+        hardness: CGFloat,
+        pressureSensitivity: CGFloat
     ) {
         guard !points.isEmpty else { return }
 
@@ -338,29 +346,72 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             min(max(pressure, 0.08), 1.0)
         }
 
+        let clampedSensitivity = min(max(pressureSensitivity, 0.0), 1.0)
+        func pressureScale(_ pressure: CGFloat) -> CGFloat {
+            let p = clampedPressure(pressure)
+            return (1.0 - clampedSensitivity) + (p * clampedSensitivity)
+        }
+
+        let clampedHardness = min(max(hardness, 0.0), 1.0)
+        // Make low-hardness values much softer (airbrush-like) by applying a stronger curve.
+        let effectiveHardness = pow(clampedHardness, 3.2)
+        let usesSoftEdge = clampedHardness < 0.995
+        let fill = UIColor(cgColor: fillColor)
+        let gradientStart = fill.withAlphaComponent(1.0).cgColor
+        let gradientEnd = fill.withAlphaComponent(0.0).cgColor
+        let gradient: CGGradient? = {
+            guard usesSoftEdge else { return nil }
+            return CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: [
+                    gradientStart,
+                    gradientEnd
+                ] as CFArray,
+                locations: [effectiveHardness, 1.0]
+            )
+        }()
+
         func drawDab(at point: CGPoint, radius: CGFloat) {
             let r = max(0.4, radius)
-            cg.fillEllipse(in: CGRect(x: point.x - r, y: point.y - r, width: r * 2.0, height: r * 2.0))
+            let rect = CGRect(x: point.x - r, y: point.y - r, width: r * 2.0, height: r * 2.0)
+            guard let gradient else {
+                cg.fillEllipse(in: rect)
+                return
+            }
+            cg.saveGState()
+            cg.addEllipse(in: rect)
+            cg.clip()
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let startRadius = r * effectiveHardness
+            cg.drawRadialGradient(
+                gradient,
+                startCenter: center,
+                startRadius: startRadius,
+                endCenter: center,
+                endRadius: r,
+                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+            )
+            cg.restoreGState()
         }
 
         if points.count == 1 {
             guard includesLeadingPoint else { return }
             let p = points[0]
-            drawDab(at: p.point, radius: baseRadius * clampedPressure(p.pressure))
+            drawDab(at: p.point, radius: baseRadius * pressureScale(p.pressure))
             return
         }
 
         if includesLeadingPoint {
             let p = points[0]
-            drawDab(at: p.point, radius: baseRadius * clampedPressure(p.pressure))
+            drawDab(at: p.point, radius: baseRadius * pressureScale(p.pressure))
         }
 
         for index in 1..<points.count {
             let from = points[index - 1]
             let to = points[index]
 
-            let fromRadius = baseRadius * clampedPressure(from.pressure)
-            let toRadius = baseRadius * clampedPressure(to.pressure)
+            let fromRadius = baseRadius * pressureScale(from.pressure)
+            let toRadius = baseRadius * pressureScale(to.pressure)
             let dx = to.point.x - from.point.x
             let dy = to.point.y - from.point.y
             let distance = hypot(dx, dy)

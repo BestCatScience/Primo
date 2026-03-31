@@ -26,6 +26,8 @@ struct CanvasFeature {
         var previewStyle = PreviewStrokeStyle(
             radius: 3.0,
             opacity: 0.9,
+            hardness: 0.82,
+            pressureSensitivity: 0.4,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var pendingIncrementalUpdate: IncrementalLayerUpdate?
