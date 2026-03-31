@@ -233,6 +233,26 @@ struct ContentView: View {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
             }
+            
+            Button {
+                store.send(.clearActiveLayerButtonTapped)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(StudioTheme.Palette.textPrimary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+            }
+            .disabled(activeLayer == nil)
 
             Spacer(minLength: 0)
         }

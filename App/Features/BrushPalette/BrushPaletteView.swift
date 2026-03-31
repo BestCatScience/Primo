@@ -158,18 +158,6 @@ struct BrushPaletteView: View {
                         .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
 
-                Button("Clear Active Layer") {
-                    store.send(.clearActiveLayerButtonTapped)
-                }
-                .buttonStyle(.plain)
-                .font(StudioTheme.Typography.label(13))
-                .foregroundStyle(.white.opacity(0.92))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 15, style: .continuous)
-                        .fill(StudioTheme.Palette.accent)
-                )
             }
             .padding(.bottom, 10)
         }

@@ -33,6 +33,7 @@ struct CanvasFeature {
         var pendingIncrementalUpdate: IncrementalLayerUpdate?
         var localUndoTicket: Int = 0
         var localRedoTicket: Int = 0
+        var rasterResetTicket: Int = 0
     }
 
     enum Action: Equatable {

@@ -23,6 +23,7 @@ struct CanvasView: UIViewRepresentable {
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,
+            rasterResetTicket: store.rasterResetTicket,
             undoTicket: store.localUndoTicket,
             redoTicket: store.localRedoTicket
         )
@@ -59,6 +60,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let maxHistoryDepth = 80
     private var appliedUndoTicket: Int = -1
     private var appliedRedoTicket: Int = -1
+    private var appliedRasterResetTicket: Int = -1
     private var currentPreviewStyle = PreviewStrokeStyle(
         radius: 3.0,
         opacity: 0.9,
@@ -135,6 +137,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         currentTool: StudioToolKind,
         viewportOffset: CGSize,
         zoomScale: CGFloat,
+        rasterResetTicket: Int,
         undoTicket: Int,
         redoTicket: Int
     ) {
@@ -167,6 +170,15 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             if committedRasterImage == nil {
                 committedRasterImage = cachedCompositeImage
             }
+        }
+        if appliedRasterResetTicket != rasterResetTicket {
+            appliedRasterResetTicket = rasterResetTicket
+            committedRasterImage = cachedCompositeImage ?? renderCompositeImage(from: snapshot)
+            committedImageView.image = committedRasterImage
+            inFlightRasterImage = nil
+            inFlightImageView.image = nil
+            undoStack.removeAll(keepingCapacity: true)
+            redoStack.removeAll(keepingCapacity: true)
         }
         imageView.image = nil
         committedImageView.image = committedRasterImage

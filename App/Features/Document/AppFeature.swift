@@ -349,6 +349,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                     state.canvas.localBufferRevision += 1
                 }
+                state.canvas.rasterResetTicket &+= 1
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
