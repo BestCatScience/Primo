@@ -133,6 +133,11 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func replaceLayerPixels(index: Int, data: Data) {
+        bridge.replaceLayerPixels(at: index, data: data)
+        captureTimelapseFrame()
+    }
+
     func clearLayer(index: Int) {
         bridge.clearLayer(at: index)
         captureTimelapseFrame()

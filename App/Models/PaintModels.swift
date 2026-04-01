@@ -64,6 +64,41 @@ enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     }
 }
 
+enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case lasso
+    case auto
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .lasso:
+            return "Lasso"
+        case .auto:
+            return "Auto"
+        }
+    }
+}
+
+enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case replace
+    case add
+    case subtract
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .replace:
+            return "Replace"
+        case .add:
+            return "Add"
+        case .subtract:
+            return "Subtract"
+        }
+    }
+}
+
 struct BrushPreset: Identifiable, Equatable {
     var id: String { name }
     let name: String
@@ -319,5 +354,17 @@ struct IncrementalLayerUpdate: Equatable, Identifiable {
 
     static func == (lhs: IncrementalLayerUpdate, rhs: IncrementalLayerUpdate) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+struct CanvasSelection: Equatable {
+    let bounds: CGRect
+    let maskWidth: Int
+    let maskHeight: Int
+    let maskData: Data
+    let mode: SelectionToolMode
+
+    var isEmpty: Bool {
+        maskWidth <= 0 || maskHeight <= 0 || maskData.isEmpty || bounds.isNull || bounds.isEmpty
     }
 }

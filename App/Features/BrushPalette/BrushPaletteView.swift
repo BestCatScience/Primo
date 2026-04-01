@@ -4,6 +4,8 @@ import SwiftUI
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
     let currentTool: StudioToolKind
+    let hasSelection: Bool
+    let transformPreviewOffset: CGSize
     var showsTitle = true
     private let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
@@ -11,13 +13,13 @@ struct BrushPaletteView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 if showsTitle {
-                    Text(currentTool == .fill ? "Fill" : "Brush")
+                    Text(panelTitle)
                         .font(StudioTheme.Typography.title(26))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    sectionLabel(currentTool == .fill ? "Fill Engine" : "Brush Engine")
+                    sectionLabel(sectionTitle)
 
                     if currentTool == .fill {
                         HStack(spacing: 12) {
@@ -47,6 +49,70 @@ struct BrushPaletteView: View {
                                 )
                                 metricRow("Expansion", value: "\(Int(store.fillExpansion)) px")
                                 metricRow("Color", value: store.selectedBrush?.name ?? "Custom Mix")
+                            }
+                        }
+                    } else if currentTool == .select {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            StudioTheme.Palette.accent.opacity(0.95),
+                                            StudioTheme.Palette.coolGlow.opacity(0.42)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 72, height: 72)
+                                .overlay(
+                                    Image(systemName: store.selectionToolMode == .lasso ? "lasso" : "wand.and.stars")
+                                        .font(.system(size: 24, weight: .bold))
+                                        .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                metricRow("Mode", value: store.selectionToolMode.title)
+                                metricRow("Combine", value: store.selectionCombineMode.title)
+                                if store.selectionToolMode == .auto {
+                                    metricRow("Threshold", value: store.selectionThresholdMode.title)
+                                    metricRow(
+                                        "Match",
+                                        value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%"
+                                    )
+                                    metricRow("Expansion", value: "\(Int(store.selectionExpansion)) px")
+                                } else {
+                                    metricRow("Gesture", value: "Freehand")
+                                    metricRow("Behavior", value: "Close Path")
+                                    metricRow("Scope", value: "Active Layer")
+                                }
+                            }
+                        }
+                    } else if currentTool == .move {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            StudioTheme.Palette.coolGlow.opacity(0.9),
+                                            StudioTheme.Palette.accent.opacity(0.45)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 72, height: 72)
+                                .overlay(
+                                    Image(systemName: hasSelection ? "selection.pin.in.out" : "square.stack.3d.up")
+                                        .font(.system(size: 24, weight: .bold))
+                                        .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                metricRow("Target", value: hasSelection ? "Selection" : "Layer")
+                                metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
+                                metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
+                                metricRow("State", value: transformPreviewOffset == .zero ? "Idle" : "Pending")
                             }
                         }
                     } else {
@@ -84,35 +150,16 @@ struct BrushPaletteView: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     if currentTool == .fill {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Threshold Mode")
-                                .font(StudioTheme.Typography.title(12))
-                                .foregroundStyle(.white.opacity(0.88))
-                            HStack(spacing: 8) {
+                        segmentedModeRow(
+                            title: "Threshold Mode",
+                            selectedTitle: store.fillThresholdMode.title
+                        ) {
+                            Picker("Threshold Mode", selection: $store.fillThresholdMode) {
                                 ForEach(FillThresholdMode.allCases) { mode in
-                                    let isSelected = store.fillThresholdMode == mode
-                                    Button {
-                                        store.send(.binding(.set(\.fillThresholdMode, mode)))
-                                    } label: {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .fill(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
-
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(isSelected ? Color.white.opacity(0.18) : StudioTheme.Palette.cardBorder, lineWidth: 1)
-
-                                            Text(mode.title)
-                                                .font(StudioTheme.Typography.label(12))
-                                                .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.72))
-                                                .padding(.horizontal, 12)
-                                        }
-                                        .frame(maxWidth: .infinity, minHeight: 46)
-                                        .contentShape(Rectangle())
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .buttonStyle(.plain)
+                                    Text(mode.title).tag(mode)
                                 }
                             }
+                            .pickerStyle(.segmented)
                         }
                         sliderRow(
                             title: store.fillThresholdMode == .opacity ? "Opacity Threshold" : "Color Threshold",
@@ -130,6 +177,133 @@ struct BrushPaletteView: View {
                             value: "\(Int(store.fillExpansion)) px",
                             slider: Slider(value: $store.fillExpansion, in: 0...24, step: 1)
                         )
+                    } else if currentTool == .select {
+                        segmentedModeRow(
+                            title: "Selection Action",
+                            selectedTitle: store.selectionCombineMode.title
+                        ) {
+                            Picker("Selection Action", selection: $store.selectionCombineMode) {
+                                ForEach(SelectionCombineMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        segmentedModeRow(
+                            title: "Selection Mode",
+                            selectedTitle: store.selectionToolMode.title
+                        ) {
+                            Picker("Selection Mode", selection: $store.selectionToolMode) {
+                                ForEach(SelectionToolMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        if store.selectionToolMode == .auto {
+                            segmentedModeRow(
+                                title: "Threshold Mode",
+                                selectedTitle: store.selectionThresholdMode.title
+                            ) {
+                                Picker("Selection Threshold Mode", selection: $store.selectionThresholdMode) {
+                                    ForEach(FillThresholdMode.allCases) { mode in
+                                        Text(mode.title).tag(mode)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            }
+                            sliderRow(
+                                title: store.selectionThresholdMode == .opacity ? "Opacity Threshold" : "Color Threshold",
+                                value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%",
+                                slider: Group {
+                                    if store.selectionThresholdMode == .opacity {
+                                        Slider(value: $store.selectionOpacityTolerance, in: 0.0...1.0)
+                                    } else {
+                                        Slider(value: $store.selectionColorTolerance, in: 0.0...1.0)
+                                    }
+                                }
+                            )
+                            sliderRow(
+                                title: "Expansion",
+                                value: "\(Int(store.selectionExpansion)) px",
+                                slider: Slider(value: $store.selectionExpansion, in: 0...24, step: 1)
+                            )
+                        }
+                        Button {
+                            store.send(.clearSelectionButtonTapped)
+                        } label: {
+                            HStack {
+                                Image(systemName: "xmark.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text("Clear Selection")
+                                    .font(StudioTheme.Typography.label(12))
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(.white.opacity(0.88))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(StudioTheme.Palette.cardFillStrong)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    } else if currentTool == .move {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(hasSelection ? "Move the selected area with Pencil. Nothing is committed until you apply." : "Move the active layer with Pencil. Nothing is committed until you apply.")
+                                .font(StudioTheme.Typography.body(11))
+                                .foregroundStyle(.white.opacity(0.62))
+
+                            HStack(spacing: 8) {
+                                Button {
+                                    store.send(.applyTransformButtonTapped)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "checkmark.circle")
+                                            .font(.system(size: 12, weight: .semibold))
+                                        Text("Apply")
+                                            .font(StudioTheme.Typography.label(12))
+                                        Spacer(minLength: 0)
+                                    }
+                                    .foregroundStyle(.white.opacity(0.92))
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 38)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(StudioTheme.Palette.accent)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    store.send(.cancelTransformButtonTapped)
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "xmark.circle")
+                                            .font(.system(size: 12, weight: .semibold))
+                                        Text("Cancel")
+                                            .font(StudioTheme.Typography.label(12))
+                                        Spacer(minLength: 0)
+                                    }
+                                    .foregroundStyle(.white.opacity(0.88))
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 38)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(StudioTheme.Palette.cardFillStrong)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     } else {
                         sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
                         sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
@@ -143,7 +317,8 @@ struct BrushPaletteView: View {
                         .fill(StudioTheme.Palette.cardFill)
                 )
 
-                VStack(alignment: .leading, spacing: 12) {
+                if currentTool != .select && currentTool != .move {
+                    VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center, spacing: 10) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -208,11 +383,81 @@ struct BrushPaletteView: View {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .center, spacing: 10) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                StudioTheme.Palette.accent,
+                                                StudioTheme.Palette.coolGlow
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+
+                                Image(systemName: "selection.pin.in.out")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.92))
+                            }
+                            .frame(width: 38, height: 38)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Selection")
+                                    .font(StudioTheme.Typography.title(14))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                Text(store.selectionToolMode == .lasso ? "Trace with Pencil, then use Move to transform" : "Tap to sample, then use Move to transform")
+                                    .font(StudioTheme.Typography.body(11))
+                                    .foregroundStyle(.white.opacity(0.52))
+                            }
+
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(StudioTheme.Palette.cardFill)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    )
+                }
 
             }
             .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var panelTitle: String {
+        switch currentTool {
+        case .fill:
+            return "Fill"
+        case .select:
+            return "Select"
+        case .move:
+            return "Move"
+        default:
+            return "Brush"
+        }
+    }
+
+    private var sectionTitle: String {
+        switch currentTool {
+        case .fill:
+            return "Fill Engine"
+        case .select:
+            return "Selection"
+        case .move:
+            return "Transform"
+        default:
+            return "Brush Engine"
+        }
     }
 
     private func sectionLabel(_ title: String) -> some View {
@@ -248,6 +493,26 @@ struct BrushPaletteView: View {
                 .tint(StudioTheme.Palette.accentBright)
                 .frame(minHeight: 38)
                 .contentShape(Rectangle())
+        }
+    }
+
+    private func segmentedModeRow<Content: View>(
+        title: String,
+        selectedTitle: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(StudioTheme.Typography.title(12))
+                    .foregroundStyle(.white.opacity(0.88))
+                Spacer()
+                Text(selectedTitle)
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            content()
+                .frame(minHeight: 32)
         }
     }
 

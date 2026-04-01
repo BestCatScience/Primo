@@ -21,6 +21,11 @@ struct CanvasFeature {
         var isStrokeActive = false
         var isAwaitingCommittedRender = false
         var currentTool: StudioToolKind = .brush
+        var selectionMode: SelectionToolMode = .lasso
+        var selection: CanvasSelection?
+        var selectionPreviewPoints: [CGPoint] = []
+        var transformPreviewOffset: CGSize = .zero
+        var transformGestureBaseOffset: CGSize = .zero
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
         var previewStyle = PreviewStrokeStyle(
@@ -37,6 +42,14 @@ struct CanvasFeature {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
         case fillRequested(StylusSample)
+        case selectionPreviewUpdated([CGPoint])
+        case selectionPathEnded([CGPoint])
+        case autoSelectionRequested(StylusSample)
+        case selectionUpdated(CanvasSelection?)
+        case transformGestureBegan
+        case transformPreviewChanged(CGSize)
+        case transformEnded(CGSize)
+        case transformPreviewCleared
         case applyIncrementalUpdate(IncrementalLayerUpdate)
         case requestLocalUndo
         case requestLocalRedo
@@ -51,6 +64,9 @@ struct CanvasFeature {
         case endStroke
         case commitStroke([StylusSample])
         case fill(StylusSample)
+        case lassoSelect([CGPoint])
+        case autoSelect(StylusSample)
+        case applyTransform(CGSize)
         case requestUndo
         case requestRedo
     }
@@ -65,6 +81,49 @@ struct CanvasFeature {
             case let .fillRequested(sample):
                 state.pendingIncrementalUpdate = nil
                 return .send(.delegate(.fill(sample)))
+
+            case let .selectionPreviewUpdated(points):
+                state.selectionPreviewPoints = points
+                return .none
+
+            case let .selectionPathEnded(points):
+                state.selectionPreviewPoints = []
+                return .send(.delegate(.lassoSelect(points)))
+
+            case let .autoSelectionRequested(sample):
+                state.selectionPreviewPoints = []
+                return .send(.delegate(.autoSelect(sample)))
+
+            case let .selectionUpdated(selection):
+                state.selection = selection
+                state.selectionPreviewPoints = []
+                state.transformPreviewOffset = .zero
+                state.transformGestureBaseOffset = .zero
+                return .none
+
+            case .transformGestureBegan:
+                state.transformGestureBaseOffset = state.transformPreviewOffset
+                return .none
+
+            case let .transformPreviewChanged(offset):
+                state.transformPreviewOffset = CGSize(
+                    width: state.transformGestureBaseOffset.width + offset.width,
+                    height: state.transformGestureBaseOffset.height + offset.height
+                )
+                return .none
+
+            case let .transformEnded(offset):
+                state.transformPreviewOffset = CGSize(
+                    width: state.transformGestureBaseOffset.width + offset.width,
+                    height: state.transformGestureBaseOffset.height + offset.height
+                )
+                state.transformGestureBaseOffset = state.transformPreviewOffset
+                return .none
+
+            case .transformPreviewCleared:
+                state.transformPreviewOffset = .zero
+                state.transformGestureBaseOffset = .zero
+                return .none
 
             case .requestLocalUndo:
                 return .send(.delegate(.requestUndo))

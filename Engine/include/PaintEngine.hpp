@@ -97,6 +97,7 @@ public:
     void clearLayer(int index);
     void setLayerVisibility(int index, bool visible);
     void setLayerOpacity(int index, float opacity);
+    void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
     const Layer& layer(int index) const;
 
     void beginStroke(const BrushSettings& brush, StrokePoint point);

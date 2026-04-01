@@ -26,36 +26,6 @@ float hash2D(float x, float y) {
     return fract(std::sin((x * 127.1F) + (y * 311.7F)) * 43758.5453F);
 }
 
-float smoothNoise(float x, float y) {
-    const float x0 = std::floor(x);
-    const float y0 = std::floor(y);
-    const float tx = x - x0;
-    const float ty = y - y0;
-
-    const float a = hash2D(x0, y0);
-    const float b = hash2D(x0 + 1.0F, y0);
-    const float c = hash2D(x0, y0 + 1.0F);
-    const float d = hash2D(x0 + 1.0F, y0 + 1.0F);
-
-    const float ux = tx * tx * (3.0F - (2.0F * tx));
-    const float uy = ty * ty * (3.0F - (2.0F * ty));
-
-    return lerp(lerp(a, b, ux), lerp(c, d, ux), uy);
-}
-
-float evaluatePressureCurve(float pressure, float sensitivity) {
-    const float t = clamp01(pressure);
-    return std::pow(t, std::max(0.05F, sensitivity));
-}
-
-float smoothstep(float edge0, float edge1, float value) {
-    if (edge0 == edge1) {
-        return value < edge0 ? 0.0F : 1.0F;
-    }
-    const float t = clamp01((value - edge0) / (edge1 - edge0));
-    return t * t * (3.0F - (2.0F * t));
-}
-
 }  // namespace
 
 PaintDocument::PaintDocument(int width, int height)
@@ -135,6 +105,20 @@ void PaintDocument::setLayerOpacity(int index, float opacity) {
     }
     pushHistorySnapshot();
     layers_[index].opacity = clamped;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+}
+
+void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixels) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    auto& layer = layers_[index];
+    if (pixels.size() != layer.pixels.size()) {
+        return;
+    }
+    pushHistorySnapshot();
+    std::copy(pixels.begin(), pixels.end(), layer.pixels.begin());
     markEntireDocumentDirty();
     compositeDirty_ = true;
 }
@@ -452,7 +436,6 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
             const float clampedHardness = clamp01(activeBrush_.hardness);
             float falloff = 1.0F;
             if (clampedHardness < 0.995F) {
-                const float edge = 1.0F - distance;
                 const float effectiveHardness = std::pow(clampedHardness, 3.2F);
                 if (distance <= effectiveHardness) {
                     falloff = 1.0F;

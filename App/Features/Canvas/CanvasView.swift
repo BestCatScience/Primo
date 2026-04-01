@@ -18,9 +18,14 @@ struct CanvasView: UIViewRepresentable {
         uiView.documentSize = store.canvasSize
         uiView.update(
             snapshot: store.renderSnapshot,
+            activeLayerIndex: store.activeLayerIndex,
             incrementalUpdate: store.pendingIncrementalUpdate,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
+            selectionMode: store.selectionMode,
+            selection: store.selection,
+            selectionPreviewPoints: store.selectionPreviewPoints,
+            transformPreviewOffset: store.transformPreviewOffset,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,
         )
@@ -32,11 +37,16 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
     private let metalCanvasView = MetalCanvasView()
+    private let selectionOverlayView = UIImageView()
+    private let compositePreviewImageView = UIImageView()
     private let inputHandler = InputHandler()
+    private let selectionOutlineLayer = CAShapeLayer()
+    private let selectionPreviewLayer = CAShapeLayer()
 
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
     private var currentTool: StudioToolKind = .brush
+    private var transformPreviewOffset: CGSize = .zero
     private var panStartLocation: CGPoint?
     private var panStartOffset: CGSize = .zero
     private var panDidMove = false
@@ -61,6 +71,28 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         metalCanvasView.isUserInteractionEnabled = false
         addSubview(metalCanvasView)
+
+        selectionOverlayView.isUserInteractionEnabled = false
+        selectionOverlayView.contentMode = .scaleToFill
+        selectionOverlayView.alpha = 0.55
+        addSubview(selectionOverlayView)
+
+        compositePreviewImageView.isUserInteractionEnabled = false
+        compositePreviewImageView.contentMode = .scaleToFill
+        compositePreviewImageView.alpha = 1.0
+        addSubview(compositePreviewImageView)
+
+        selectionOutlineLayer.strokeColor = UIColor.white.withAlphaComponent(0.92).cgColor
+        selectionOutlineLayer.fillColor = UIColor.clear.cgColor
+        selectionOutlineLayer.lineWidth = 1.5
+        selectionOutlineLayer.lineDashPattern = [6, 4]
+        layer.addSublayer(selectionOutlineLayer)
+
+        selectionPreviewLayer.strokeColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        selectionPreviewLayer.fillColor = UIColor.clear.cgColor
+        selectionPreviewLayer.lineWidth = 1.25
+        selectionPreviewLayer.lineDashPattern = [4, 4]
+        layer.addSublayer(selectionPreviewLayer)
 
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchRecognizer.delegate = self
@@ -94,17 +126,25 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     override func layoutSubviews() {
         super.layoutSubviews()
         metalCanvasView.frame = bounds
+        selectionOutlineLayer.frame = bounds
+        selectionPreviewLayer.frame = bounds
     }
 
     func update(
         snapshot: MetalDocumentSnapshot?,
+        activeLayerIndex: Int,
         incrementalUpdate: IncrementalLayerUpdate?,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
+        selectionMode: SelectionToolMode,
+        selection: CanvasSelection?,
+        selectionPreviewPoints: [CGPoint],
+        transformPreviewOffset: CGSize,
         viewportOffset: CGSize,
         zoomScale: CGFloat
     ) {
         self.currentTool = currentTool
+        self.transformPreviewOffset = transformPreviewOffset
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         metalCanvasView.updateDocumentSize(documentSize)
@@ -113,8 +153,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
         }
         inputHandler.tool = currentTool
+        inputHandler.selectionMode = selectionMode
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
+        updateSelectionOverlay(selection)
+        updateSelectionPreview(selectionPreviewPoints)
+        updateTransformPreview(snapshot: snapshot, activeLayerIndex: activeLayerIndex, selection: selection)
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -149,6 +193,30 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         sendAction?(.fillRequested(sample))
     }
 
+    func didUpdateSelectionPath(_ points: [CGPoint]) {
+        sendAction?(.selectionPreviewUpdated(points))
+    }
+
+    func didEndSelectionPath(_ points: [CGPoint]) {
+        sendAction?(.selectionPathEnded(points))
+    }
+
+    func didRequestAutoSelection(at sample: StylusSample) {
+        sendAction?(.autoSelectionRequested(sample))
+    }
+
+    func didBeginTransform() {
+        sendAction?(.transformGestureBegan)
+    }
+
+    func didUpdateTransform(translation: CGSize) {
+        sendAction?(.transformPreviewChanged(translation))
+    }
+
+    func didEndTransform(translation: CGSize) {
+        sendAction?(.transformEnded(translation))
+    }
+
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
         let fitted = contentRect()
         guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
@@ -176,6 +244,306 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         )
     }
 
+    private func updateSelectionOverlay(_ selection: CanvasSelection?) {
+        guard
+            currentTool == .select || currentTool == .move,
+            let selection,
+            !selection.isEmpty,
+            let image = makeSelectionOverlayImage(selection)
+        else {
+            selectionOverlayView.image = nil
+            selectionOverlayView.frame = .zero
+            selectionOutlineLayer.path = nil
+            return
+        }
+
+        var rect = viewRect(forDocumentRect: selection.bounds)
+        if currentTool == .move {
+            let translatedOrigin = viewPoint(
+                fromDocumentPoint: CGPoint(
+                    x: selection.bounds.minX + transformPreviewOffset.width,
+                    y: selection.bounds.minY + transformPreviewOffset.height
+                )
+            )
+            rect.origin = translatedOrigin
+        }
+        selectionOverlayView.image = image
+        selectionOverlayView.frame = rect
+        selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
+    }
+
+    private func updateTransformPreview(snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, selection: CanvasSelection?) {
+        guard
+            currentTool == .move,
+            transformPreviewOffset != .zero,
+            let snapshot,
+            let image = makeCompositePreviewImage(snapshot: snapshot, activeLayerIndex: activeLayerIndex, selection: selection)
+        else {
+            compositePreviewImageView.image = nil
+            compositePreviewImageView.frame = .zero
+            metalCanvasView.isHidden = false
+            return
+        }
+
+        compositePreviewImageView.image = image
+        compositePreviewImageView.frame = contentRect()
+        metalCanvasView.isHidden = true
+    }
+
+    private func updateSelectionPreview(_ points: [CGPoint]) {
+        guard currentTool == .select, points.count >= 2 else {
+            selectionPreviewLayer.path = nil
+            return
+        }
+
+        let path = UIBezierPath()
+        for (index, point) in points.enumerated() {
+            let mapped = viewPoint(fromDocumentPoint: point)
+            if index == 0 {
+                path.move(to: mapped)
+            } else {
+                path.addLine(to: mapped)
+            }
+        }
+        selectionPreviewLayer.path = path.cgPath
+    }
+
+    private func viewRect(forDocumentRect rect: CGRect) -> CGRect {
+        let fitted = contentRect()
+        guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
+        let minPoint = viewPoint(fromDocumentPoint: rect.origin)
+        let maxPoint = viewPoint(fromDocumentPoint: CGPoint(x: rect.maxX, y: rect.maxY))
+        return CGRect(
+            x: minPoint.x,
+            y: minPoint.y,
+            width: max(1, maxPoint.x - minPoint.x),
+            height: max(1, maxPoint.y - minPoint.y)
+        )
+    }
+
+    private func viewPoint(fromDocumentPoint point: CGPoint) -> CGPoint {
+        let fitted = contentRect()
+        guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
+        return CGPoint(
+            x: fitted.minX + ((point.x / documentSize.width) * fitted.width),
+            y: fitted.minY + ((point.y / documentSize.height) * fitted.height)
+        )
+    }
+
+    private func makeSelectionOverlayImage(_ selection: CanvasSelection) -> UIImage? {
+        let width = selection.maskWidth
+        let height = selection.maskHeight
+        guard width > 0, height > 0 else { return nil }
+        let expectedCount = width * height
+        guard selection.maskData.count == expectedCount else { return nil }
+
+        var rgba = Data(count: expectedCount * 4)
+        rgba.withUnsafeMutableBytes { destinationBytes in
+            selection.maskData.withUnsafeBytes { sourceBytes in
+                guard
+                    let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+
+                for index in 0..<expectedCount {
+                    let alpha = sourceBase[index]
+                    let destinationIndex = index * 4
+                    destinationBase[destinationIndex] = 91
+                    destinationBase[destinationIndex + 1] = 181
+                    destinationBase[destinationIndex + 2] = 255
+                    destinationBase[destinationIndex + 3] = UInt8((Float(alpha) / 255.0) * 96.0)
+                }
+            }
+        }
+
+        guard let provider = CGDataProvider(data: rgba as CFData) else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+        return UIImage(cgImage: image)
+    }
+
+    private func makeCompositePreviewImage(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        selection: CanvasSelection?
+    ) -> UIImage? {
+        guard let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
+            return nil
+        }
+
+        guard let transformedLayerData = makeTransformedLayerPreview(
+            layerData: activeLayer.pixelData,
+            canvasWidth: snapshot.width,
+            canvasHeight: snapshot.height,
+            selection: selection
+        ) else {
+            return nil
+        }
+
+        var composite = Data(count: snapshot.width * snapshot.height * 4)
+        composite.withUnsafeMutableBytes { destinationBytes in
+            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
+                let sourceData = layer.index == activeLayerIndex ? transformedLayerData : layer.pixelData
+                sourceData.withUnsafeBytes { sourceBytes in
+                    guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                    for pixelIndex in 0..<(snapshot.width * snapshot.height) {
+                        let offset = pixelIndex * 4
+                        blendPixel(
+                            destination: destination + offset,
+                            source: source + offset,
+                            opacity: CGFloat(layer.opacity)
+                        )
+                    }
+                }
+            }
+        }
+
+        return makeLayerImage(pixelData: composite, width: snapshot.width, height: snapshot.height)
+    }
+
+    private func makeLayerImage(pixelData: Data, width: Int, height: Int) -> UIImage? {
+        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
+        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+        return UIImage(cgImage: image)
+    }
+
+    private func makeTransformedLayerPreview(
+        layerData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selection: CanvasSelection?
+    ) -> Data? {
+        guard layerData.count == canvasWidth * canvasHeight * 4 else { return nil }
+        let source = [UInt8](layerData)
+        var destination = source
+        let dx = Int(transformPreviewOffset.width.rounded())
+        let dy = Int(transformPreviewOffset.height.rounded())
+        guard dx != 0 || dy != 0 else { return layerData }
+
+        if let selection {
+            let mask = expandedMask(for: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+            for index in 0..<(canvasWidth * canvasHeight) where mask[index] != 0 {
+                let offset = index * 4
+                guard source[offset + 3] != 0 else { continue }
+                destination[offset] = 0
+                destination[offset + 1] = 0
+                destination[offset + 2] = 0
+                destination[offset + 3] = 0
+            }
+
+            for y in 0..<canvasHeight {
+                for x in 0..<canvasWidth {
+                    let sourceIndex = (y * canvasWidth) + x
+                    guard mask[sourceIndex] != 0 else { continue }
+                    let sourceOffset = sourceIndex * 4
+                    guard source[sourceOffset + 3] != 0 else { continue }
+                    let destinationX = x + dx
+                    let destinationY = y + dy
+                    guard destinationX >= 0, destinationX < canvasWidth, destinationY >= 0, destinationY < canvasHeight else { continue }
+                    let destinationOffset = ((destinationY * canvasWidth) + destinationX) * 4
+                    destination[destinationOffset] = source[sourceOffset]
+                    destination[destinationOffset + 1] = source[sourceOffset + 1]
+                    destination[destinationOffset + 2] = source[sourceOffset + 2]
+                    destination[destinationOffset + 3] = source[sourceOffset + 3]
+                }
+            }
+        } else {
+            destination = [UInt8](repeating: 0, count: source.count)
+            for y in 0..<canvasHeight {
+                for x in 0..<canvasWidth {
+                    let sourceOffset = ((y * canvasWidth) + x) * 4
+                    guard source[sourceOffset + 3] != 0 else { continue }
+                    let destinationX = x + dx
+                    let destinationY = y + dy
+                    guard destinationX >= 0, destinationX < canvasWidth, destinationY >= 0, destinationY < canvasHeight else { continue }
+                    let destinationOffset = ((destinationY * canvasWidth) + destinationX) * 4
+                    destination[destinationOffset] = source[sourceOffset]
+                    destination[destinationOffset + 1] = source[sourceOffset + 1]
+                    destination[destinationOffset + 2] = source[sourceOffset + 2]
+                    destination[destinationOffset + 3] = source[sourceOffset + 3]
+                }
+            }
+        }
+
+        return Data(destination)
+    }
+
+    private func expandedMask(for selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
+        var result = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
+        let originX = max(Int(selection.bounds.minX.rounded(.down)), 0)
+        let originY = max(Int(selection.bounds.minY.rounded(.down)), 0)
+        let width = min(selection.maskWidth, canvasWidth - originX)
+        let height = min(selection.maskHeight, canvasHeight - originY)
+        guard width > 0, height > 0 else { return result }
+
+        selection.maskData.withUnsafeBytes { bytes in
+            guard let source = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for y in 0..<height {
+                for x in 0..<width {
+                    let sourceIndex = (y * selection.maskWidth) + x
+                    let destinationIndex = ((originY + y) * canvasWidth) + (originX + x)
+                    result[destinationIndex] = source[sourceIndex]
+                }
+            }
+        }
+        return result
+    }
+
+    private func blendPixel(destination: UnsafeMutablePointer<UInt8>, source: UnsafePointer<UInt8>, opacity: CGFloat) {
+        let srcAlpha = (CGFloat(source[3]) / 255.0) * opacity
+        guard srcAlpha > 0.001 else { return }
+        let dstAlpha = CGFloat(destination[3]) / 255.0
+        let outAlpha = srcAlpha + (dstAlpha * (1 - srcAlpha))
+        guard outAlpha > 0.001 else { return }
+
+        let srcR = CGFloat(source[0]) / 255.0
+        let srcG = CGFloat(source[1]) / 255.0
+        let srcB = CGFloat(source[2]) / 255.0
+        let dstR = CGFloat(destination[0]) / 255.0
+        let dstG = CGFloat(destination[1]) / 255.0
+        let dstB = CGFloat(destination[2]) / 255.0
+
+        let outR = ((srcR * srcAlpha) + (dstR * dstAlpha * (1 - srcAlpha))) / outAlpha
+        let outG = ((srcG * srcAlpha) + (dstG * dstAlpha * (1 - srcAlpha))) / outAlpha
+        let outB = ((srcB * srcAlpha) + (dstB * dstAlpha * (1 - srcAlpha))) / outAlpha
+
+        destination[0] = UInt8(max(0, min(255, Int((outR * 255.0).rounded()))))
+        destination[1] = UInt8(max(0, min(255, Int((outG * 255.0).rounded()))))
+        destination[2] = UInt8(max(0, min(255, Int((outB * 255.0).rounded()))))
+        destination[3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+    }
+
     private enum PanPhase {
         case began
         case moved
@@ -184,7 +552,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     private func handlePanTouchesIfNeeded(_ touches: Set<UITouch>, phase: PanPhase) -> Bool {
-        guard currentTool == .move, let touch = touches.first else {
+        guard currentTool == .move, let touch = touches.first, touch.type != .pencil else {
             if phase == .ended || phase == .cancelled {
                 panStartLocation = nil
                 panDidMove = false

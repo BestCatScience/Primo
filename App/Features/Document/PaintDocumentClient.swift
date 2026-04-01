@@ -17,6 +17,7 @@ struct PaintDocumentClient: Sendable {
     var addLayer: @Sendable (String) -> Void
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
+    var replaceLayerPixels: @Sendable (Int, Data) -> Void
     var clearLayer: @Sendable (Int) -> Void
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
@@ -38,6 +39,7 @@ struct PaintDocumentClient: Sendable {
             addLayer: { name in sessionBox.session.addLayer(name: name) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
+            replaceLayerPixels: { index, data in sessionBox.session.replaceLayerPixels(index: index, data: data) },
             clearLayer: { index in sessionBox.session.clearLayer(index: index) },
             consumeDirtyUpdate: { sessionBox.session.consumeDirtyUpdate() }
         )

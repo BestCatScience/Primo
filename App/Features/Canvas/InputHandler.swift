@@ -5,24 +5,41 @@ protocol InputHandlerDelegate: AnyObject {
     func didUpdateStroke(_ stroke: Stroke)
     func didEndStroke(_ stroke: Stroke)
     func didRequestFill(at sample: StylusSample)
+    func didUpdateSelectionPath(_ points: [CGPoint])
+    func didEndSelectionPath(_ points: [CGPoint])
+    func didRequestAutoSelection(at sample: StylusSample)
+    func didBeginTransform()
+    func didUpdateTransform(translation: CGSize)
+    func didEndTransform(translation: CGSize)
 }
 
 final class InputHandler {
     weak var delegate: InputHandlerDelegate?
 
     var tool: StudioToolKind = .brush
+    var selectionMode: SelectionToolMode = .lasso
     var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     var brushSize: Float = 4.0
     var pointMapper: ((CGPoint, UIView) -> SIMD2<Float>)?
 
     private var currentStroke: Stroke?
     private var shapeStartPoint: StrokePoint?
+    private var currentSelectionPoints: [CGPoint] = []
+    private var transformStartPoint: CGPoint?
 
     func handleTouches(_ touches: Set<UITouch>, with event: UIEvent?, in view: UIView) {
         guard let touch = touches.first,
               touch.type == .pencil else { return }
 
-        guard tool != .select && tool != .move else { return }
+        if tool == .select {
+            handleSelectionTouches(touch, with: event, in: view)
+            return
+        }
+
+        if tool == .move {
+            handleTransformTouches(touch, in: view)
+            return
+        }
 
         if tool == .fill {
             guard touch.phase == .began else { return }
@@ -71,6 +88,80 @@ final class InputHandler {
             }
             currentStroke = nil
             shapeStartPoint = nil
+
+        default:
+            break
+        }
+    }
+
+    private func handleSelectionTouches(_ touch: UITouch, with event: UIEvent?, in view: UIView) {
+        if selectionMode == .auto {
+            guard touch.phase == .began else { return }
+            delegate?.didRequestAutoSelection(at: makePoint(touch, in: view, predicted: false).stylusSample)
+            currentSelectionPoints.removeAll()
+            return
+        }
+
+        switch touch.phase {
+        case .began:
+            currentSelectionPoints = [makePoint(touch, in: view, predicted: false).cgPoint]
+            delegate?.didUpdateSelectionPath(currentSelectionPoints)
+
+        case .moved, .stationary:
+            let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
+            for candidateTouch in coalescedTouches {
+                let point = makePoint(candidateTouch, in: view, predicted: false).cgPoint
+                guard shouldAppendSelectionPoint(point) else { continue }
+                currentSelectionPoints.append(point)
+            }
+            delegate?.didUpdateSelectionPath(currentSelectionPoints)
+
+        case .ended, .cancelled:
+            let finishingTouches = event?.coalescedTouches(for: touch) ?? [touch]
+            for candidateTouch in finishingTouches {
+                let point = makePoint(candidateTouch, in: view, predicted: false).cgPoint
+                guard shouldAppendSelectionPoint(point) else { continue }
+                currentSelectionPoints.append(point)
+            }
+            delegate?.didEndSelectionPath(currentSelectionPoints)
+            currentSelectionPoints.removeAll()
+
+        default:
+            break
+        }
+    }
+
+    private func shouldAppendSelectionPoint(_ point: CGPoint) -> Bool {
+        guard let previous = currentSelectionPoints.last else { return true }
+        return hypot(point.x - previous.x, point.y - previous.y) >= 2.0
+    }
+
+    private func handleTransformTouches(_ touch: UITouch, in view: UIView) {
+        let point = makePoint(touch, in: view, predicted: false).cgPoint
+        switch touch.phase {
+        case .began:
+            transformStartPoint = point
+            delegate?.didBeginTransform()
+            delegate?.didUpdateTransform(translation: .zero)
+
+        case .moved, .stationary:
+            guard let transformStartPoint else { return }
+            delegate?.didUpdateTransform(
+                translation: CGSize(
+                    width: point.x - transformStartPoint.x,
+                    height: point.y - transformStartPoint.y
+                )
+            )
+
+        case .ended, .cancelled:
+            guard let transformStartPoint else { return }
+            delegate?.didEndTransform(
+                translation: CGSize(
+                    width: point.x - transformStartPoint.x,
+                    height: point.y - transformStartPoint.y
+                )
+            )
+            self.transformStartPoint = nil
 
         default:
             break

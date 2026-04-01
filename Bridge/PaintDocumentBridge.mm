@@ -110,6 +110,14 @@
     return [NSData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
 }
 
+- (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data {
+    const auto *bytes = static_cast<const uint8_t *>(data.bytes);
+    if (bytes == nullptr) {
+        return;
+    }
+    _document->replaceLayerPixels((int)index, std::span<const uint8_t>(bytes, data.length));
+}
+
 - (NSInteger)activeLayerIndex {
     return _document->activeLayerIndex();
 }

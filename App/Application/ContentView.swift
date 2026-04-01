@@ -459,6 +459,8 @@ struct ContentView: View {
                         action: \.brushPalette
                     ),
                     currentTool: store.canvas.currentTool,
+                    hasSelection: store.canvas.selection != nil,
+                    transformPreviewOffset: store.canvas.transformPreviewOffset,
                     showsTitle: false
                 )
             case .layers:
