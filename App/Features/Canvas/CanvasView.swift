@@ -224,10 +224,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let local = convert(location, from: view)
         let x = ((local.x - fitted.minX) / fitted.width) * documentSize.width
         let y = ((local.y - fitted.minY) / fitted.height) * documentSize.height
-        return CGPoint(
-            x: min(max(0, x), documentSize.width - 1),
-            y: min(max(0, y), documentSize.height - 1)
-        )
+        return CGPoint(x: x, y: y)
     }
 
     private func contentRect() -> CGRect {

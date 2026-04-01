@@ -131,6 +131,9 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     if (strokeInFlight_) {
         return;
     }
+    if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
+        return;
+    }
     pushHistorySnapshot();
     activeBrush_ = brush;
     previousPoint_ = point;
@@ -417,6 +420,9 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float clampedSensitivity = clamp01(activeBrush_.pressureSensitivity);
     const float pressureScale = (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
     const float radius = std::max(0.4F, activeBrush_.radius * pressureScale);
+    if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
+        return;
+    }
     const float effectiveOpacity = clamp01(activeBrush_.opacity);
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - radius - 1.0F)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + radius + 1.0F)));
