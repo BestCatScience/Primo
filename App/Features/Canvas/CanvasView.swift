@@ -19,14 +19,10 @@ struct CanvasView: UIViewRepresentable {
         uiView.update(
             snapshot: store.renderSnapshot,
             incrementalUpdate: store.pendingIncrementalUpdate,
-            activeStroke: store.activeStroke,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,
-            rasterResetTicket: store.rasterResetTicket,
-            undoTicket: store.localUndoTicket,
-            redoTicket: store.localRedoTicket
         )
     }
 }
@@ -36,9 +32,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
     private let metalCanvasView = MetalCanvasView()
-    private let imageView = UIImageView()
-    private let committedImageView = UIImageView()
-    private let inFlightImageView = UIImageView()
     private let inputHandler = InputHandler()
 
     private var viewportOffset: CGSize = .zero
@@ -52,24 +45,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var pinchAnchorDocumentPoint: CGPoint?
     private var isPinchGestureActive = false
     private var lastNavigationGestureEndedAt: CFTimeInterval = 0
-
-    private var cachedRevision: Int = -1
-    private var cachedCompositeImage: UIImage?
-    private var committedRasterImage: UIImage?
-    private var inFlightRasterImage: UIImage?
-    private var undoStack: [UIImage?] = []
-    private var redoStack: [UIImage?] = []
-    private let maxHistoryDepth = 80
-    private var appliedUndoTicket: Int = -1
-    private var appliedRedoTicket: Int = -1
-    private var appliedRasterResetTicket: Int = -1
-    private var currentPreviewStyle = PreviewStrokeStyle(
-        radius: 3.0,
-        opacity: 0.9,
-        hardness: 0.82,
-        pressureSensitivity: 0.4,
-        color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
-    )
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -86,21 +61,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         metalCanvasView.isUserInteractionEnabled = false
         addSubview(metalCanvasView)
-
-        imageView.contentMode = .scaleToFill
-        imageView.isUserInteractionEnabled = false
-        imageView.isHidden = true
-        addSubview(imageView)
-
-        committedImageView.contentMode = .scaleToFill
-        committedImageView.isUserInteractionEnabled = false
-        committedImageView.isHidden = true
-        addSubview(committedImageView)
-
-        inFlightImageView.contentMode = .scaleToFill
-        inFlightImageView.isUserInteractionEnabled = false
-        inFlightImageView.isHidden = true
-        addSubview(inFlightImageView)
 
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchRecognizer.delegate = self
@@ -134,72 +94,27 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     override func layoutSubviews() {
         super.layoutSubviews()
         metalCanvasView.frame = bounds
-        imageView.frame = contentRect()
-        committedImageView.frame = contentRect()
-        inFlightImageView.frame = contentRect()
     }
 
     func update(
         snapshot: MetalDocumentSnapshot?,
         incrementalUpdate: IncrementalLayerUpdate?,
-        activeStroke: Stroke?,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         viewportOffset: CGSize,
-        zoomScale: CGFloat,
-        rasterResetTicket: Int,
-        undoTicket: Int,
-        redoTicket: Int
+        zoomScale: CGFloat
     ) {
         self.currentTool = currentTool
-        self.currentPreviewStyle = previewStyle
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
-        applyUndoRedoTickets(undoTicket: undoTicket, redoTicket: redoTicket)
         metalCanvasView.updateDocumentSize(documentSize)
         metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
         if let incrementalUpdate {
             metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
         }
-
-        let frame = contentRect()
-        imageView.frame = frame
-        committedImageView.frame = frame
-        inFlightImageView.frame = frame
         inputHandler.tool = currentTool
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
-        if activeStroke == nil, inFlightRasterImage != nil {
-            inFlightRasterImage = nil
-            inFlightImageView.image = nil
-        }
-
-        guard let snapshot else {
-            committedImageView.image = committedRasterImage
-            return
-        }
-
-        if snapshot.revision != cachedRevision {
-            cachedRevision = snapshot.revision
-            cachedCompositeImage = renderCompositeImage(from: snapshot)
-            if committedRasterImage == nil || snapshotContainsVisibleInk(snapshot) {
-                committedRasterImage = cachedCompositeImage
-                committedImageView.image = committedRasterImage
-                inFlightRasterImage = nil
-                inFlightImageView.image = nil
-            }
-        }
-        if appliedRasterResetTicket != rasterResetTicket {
-            appliedRasterResetTicket = rasterResetTicket
-            committedRasterImage = cachedCompositeImage ?? renderCompositeImage(from: snapshot)
-            committedImageView.image = committedRasterImage
-            inFlightRasterImage = nil
-            inFlightImageView.image = nil
-            undoStack.removeAll(keepingCapacity: true)
-            redoStack.removeAll(keepingCapacity: true)
-        }
-        imageView.image = nil
-        committedImageView.image = committedRasterImage
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -228,271 +143,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     func didEndStroke(_ stroke: Stroke) {
         sendAction?(.strokeEnded(stroke))
-    }
-
-    private func applyUndoRedoTickets(undoTicket: Int, redoTicket: Int) {
-        if appliedUndoTicket != undoTicket {
-            appliedUndoTicket = undoTicket
-            performLocalUndo()
-        }
-        if appliedRedoTicket != redoTicket {
-            appliedRedoTicket = redoTicket
-            performLocalRedo()
-        }
-    }
-
-    private func performLocalUndo() {
-        guard !undoStack.isEmpty else { return }
-        redoStack.append(committedRasterImage)
-        committedRasterImage = undoStack.removeLast()
-        committedImageView.image = committedRasterImage
-    }
-
-    private func performLocalRedo() {
-        guard !redoStack.isEmpty else { return }
-        undoStack.append(committedRasterImage)
-        committedRasterImage = redoStack.removeLast()
-        committedImageView.image = committedRasterImage
-    }
-
-    private func pushUndoSnapshot() {
-        undoStack.append(committedRasterImage)
-        if undoStack.count > maxHistoryDepth {
-            undoStack.removeFirst(undoStack.count - maxHistoryDepth)
-        }
-    }
-
-    private func rasterizedStrokeSegment(
-        points: [PreviewStrokePoint],
-        style: PreviewStrokeStyle,
-        onto base: UIImage?,
-        documentSize: CGSize,
-        includesLeadingPoint: Bool
-    ) -> UIImage? {
-        let pixelWidth = max(1, Int(documentSize.width))
-        let pixelHeight = max(1, Int(documentSize.height))
-        let bounds = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
-
-        let format = UIGraphicsImageRendererFormat()
-        format.opaque = false
-        format.scale = 1.0
-        let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
-
-        let strokeAlpha = min(max(style.opacity, 0.0), 1.0)
-        let strokeStamp = UIGraphicsImageRenderer(size: bounds.size, format: format).image { stampContext in
-            let stampCG = stampContext.cgContext
-            let opaqueColor = UIColor(cgColor: style.color).withAlphaComponent(1.0).cgColor
-            stampCG.setFillColor(opaqueColor)
-            drawPressureSensitiveDabs(
-                points: points,
-                baseRadius: max(0.6, style.radius),
-                in: stampCG,
-                includesLeadingPoint: includesLeadingPoint,
-                fillColor: opaqueColor,
-                hardness: style.hardness,
-                pressureSensitivity: style.pressureSensitivity
-            )
-        }
-
-        return renderer.image { context in
-            base?.draw(in: bounds)
-
-            strokeStamp.draw(in: bounds, blendMode: .normal, alpha: strokeAlpha)
-        }
-    }
-
-    private func rasterizedCommittedStroke(
-        points: [PreviewStrokePoint],
-        style: PreviewStrokeStyle,
-        onto base: UIImage?,
-        documentSize: CGSize
-    ) -> UIImage? {
-        rasterizedStrokeSegment(
-            points: points,
-            style: style,
-            onto: base,
-            documentSize: documentSize,
-            includesLeadingPoint: true
-        )
-    }
-
-    private func compositedRaster(base: UIImage?, overlay: UIImage, documentSize: CGSize) -> UIImage? {
-        let pixelWidth = max(1, Int(documentSize.width))
-        let pixelHeight = max(1, Int(documentSize.height))
-        let bounds = CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight)
-
-        let format = UIGraphicsImageRendererFormat()
-        format.opaque = false
-        format.scale = 1.0
-        let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
-
-        return renderer.image { _ in
-            base?.draw(in: bounds)
-            overlay.draw(in: bounds)
-        }
-    }
-
-    private func drawPressureSensitiveDabs(
-        points: [PreviewStrokePoint],
-        baseRadius: CGFloat,
-        in cg: CGContext,
-        includesLeadingPoint: Bool,
-        fillColor: CGColor,
-        hardness: CGFloat,
-        pressureSensitivity: CGFloat
-    ) {
-        guard !points.isEmpty else { return }
-
-        func clampedPressure(_ pressure: CGFloat) -> CGFloat {
-            min(max(pressure, 0.08), 1.0)
-        }
-
-        let clampedSensitivity = min(max(pressureSensitivity, 0.0), 1.0)
-        func pressureScale(_ pressure: CGFloat) -> CGFloat {
-            let p = clampedPressure(pressure)
-            return (1.0 - clampedSensitivity) + (p * clampedSensitivity)
-        }
-
-        let clampedHardness = min(max(hardness, 0.0), 1.0)
-        // Make low-hardness values much softer (airbrush-like) by applying a stronger curve.
-        let effectiveHardness = pow(clampedHardness, 3.2)
-        let usesSoftEdge = clampedHardness < 0.995
-        let fill = UIColor(cgColor: fillColor)
-        let gradientStart = fill.withAlphaComponent(1.0).cgColor
-        let gradientEnd = fill.withAlphaComponent(0.0).cgColor
-        let gradient: CGGradient? = {
-            guard usesSoftEdge else { return nil }
-            return CGGradient(
-                colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                colors: [
-                    gradientStart,
-                    gradientEnd
-                ] as CFArray,
-                locations: [effectiveHardness, 1.0]
-            )
-        }()
-
-        func drawDab(at point: CGPoint, radius: CGFloat) {
-            let r = max(0.4, radius)
-            let rect = CGRect(x: point.x - r, y: point.y - r, width: r * 2.0, height: r * 2.0)
-            guard let gradient else {
-                cg.fillEllipse(in: rect)
-                return
-            }
-            cg.saveGState()
-            cg.addEllipse(in: rect)
-            cg.clip()
-            let center = CGPoint(x: rect.midX, y: rect.midY)
-            let startRadius = r * effectiveHardness
-            cg.drawRadialGradient(
-                gradient,
-                startCenter: center,
-                startRadius: startRadius,
-                endCenter: center,
-                endRadius: r,
-                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
-            )
-            cg.restoreGState()
-        }
-
-        if points.count == 1 {
-            guard includesLeadingPoint else { return }
-            let p = points[0]
-            drawDab(at: p.point, radius: baseRadius * pressureScale(p.pressure))
-            return
-        }
-
-        if includesLeadingPoint {
-            let p = points[0]
-            drawDab(at: p.point, radius: baseRadius * pressureScale(p.pressure))
-        }
-
-        for index in 1..<points.count {
-            let from = points[index - 1]
-            let to = points[index]
-
-            let fromRadius = baseRadius * pressureScale(from.pressure)
-            let toRadius = baseRadius * pressureScale(to.pressure)
-            let dx = to.point.x - from.point.x
-            let dy = to.point.y - from.point.y
-            let distance = hypot(dx, dy)
-
-            let spacing = max(0.4, min(fromRadius, toRadius) * 0.45)
-            let steps = max(1, Int(ceil(distance / spacing)))
-            for step in 1...steps {
-                let t = CGFloat(step) / CGFloat(steps)
-                let point = CGPoint(x: from.point.x + dx * t, y: from.point.y + dy * t)
-                let radius = fromRadius + (toRadius - fromRadius) * t
-                drawDab(at: point, radius: radius)
-            }
-        }
-    }
-
-    private func renderCompositeImage(from snapshot: MetalDocumentSnapshot) -> UIImage? {
-        let width = snapshot.width
-        let height = snapshot.height
-        guard width > 0, height > 0 else { return nil }
-
-        guard let context = CGContext(
-            data: nil,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            return nil
-        }
-
-        context.setFillColor(UIColor(red: 0.93, green: 0.92, blue: 0.89, alpha: 1.0).cgColor)
-        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-
-        for layer in snapshot.layers where layer.visible {
-            guard let image = makeLayerImage(pixelData: layer.pixelData, width: width, height: height) else { continue }
-            context.saveGState()
-            context.setAlpha(CGFloat(layer.opacity))
-            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-            context.restoreGState()
-        }
-
-        guard let cgImage = context.makeImage() else { return nil }
-        return UIImage(cgImage: cgImage)
-    }
-
-    private func snapshotContainsVisibleInk(_ snapshot: MetalDocumentSnapshot) -> Bool {
-        snapshot.layers.contains { layer in
-            guard layer.visible else { return false }
-            return layer.pixelData.withUnsafeBytes { bytes in
-                guard let pixels = bytes.bindMemory(to: UInt8.self).baseAddress else { return false }
-                let count = layer.pixelData.count / 4
-                for index in 0..<count {
-                    let alpha = pixels[(index * 4) + 3]
-                    if alpha > 8 {
-                        return true
-                    }
-                }
-                return false
-            }
-        }
-    }
-
-    private func makeLayerImage(pixelData: Data, width: Int, height: Int) -> CGImage? {
-        guard pixelData.count == width * height * 4 else { return nil }
-        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
-        return CGImage(
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-        )
     }
 
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {

@@ -31,9 +31,6 @@ struct CanvasFeature {
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var pendingIncrementalUpdate: IncrementalLayerUpdate?
-        var localUndoTicket: Int = 0
-        var localRedoTicket: Int = 0
-        var rasterResetTicket: Int = 0
     }
 
     enum Action: Equatable {
