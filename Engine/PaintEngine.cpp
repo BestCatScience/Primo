@@ -26,6 +26,28 @@ float hash2D(float x, float y) {
     return fract(std::sin((x * 127.1F) + (y * 311.7F)) * 43758.5453F);
 }
 
+float computeBaseFalloff(float distance, float hardness) {
+    const float clampedHardness = clamp01(hardness);
+    if (clampedHardness >= 0.995F) {
+        return 1.0F;
+    }
+    const float effectiveHardness = std::pow(clampedHardness, 3.2F);
+    if (distance <= effectiveHardness) {
+        return 1.0F;
+    }
+    const float span = std::max(0.001F, 1.0F - effectiveHardness);
+    const float normalized = clamp01((distance - effectiveHardness) / span);
+    return 1.0F - normalized;
+}
+
+float rotatedX(float dx, float dy, float cosine, float sine) {
+    return (dx * cosine) + (dy * sine);
+}
+
+float rotatedY(float dx, float dy, float cosine, float sine) {
+    return (-dx * sine) + (dy * cosine);
+}
+
 }  // namespace
 
 PaintDocument::PaintDocument(int width, int height)
@@ -424,6 +446,13 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         return;
     }
     const float effectiveOpacity = clamp01(activeBrush_.opacity);
+    const bool isPencil = activeBrush_.tipKind == "pencil";
+    const bool isInk = activeBrush_.tipKind == "ink";
+    const bool isOil = activeBrush_.tipKind == "oil";
+    const bool isAirbrush = activeBrush_.tipKind == "airbrush";
+    const float azimuthCos = std::cos(point.azimuth);
+    const float azimuthSin = std::sin(point.azimuth);
+    const float altitudeFactor = clamp01((1.5707963F - point.altitude) / 1.5707963F);
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - radius - 1.0F)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + radius + 1.0F)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - radius - 1.0F)));
@@ -434,22 +463,58 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         for (int x = minX; x <= maxX; ++x) {
             const float dx = (static_cast<float>(x) + 0.5F) - point.x;
             const float dy = (static_cast<float>(y) + 0.5F) - point.y;
-            const float distance = std::sqrt((dx * dx) + (dy * dy)) / radius;
-            if (distance >= 1.0F) {
+            const float along = rotatedX(dx, dy, azimuthCos, azimuthSin);
+            const float across = rotatedY(dx, dy, azimuthCos, azimuthSin);
+            float shapeDistance = std::sqrt((dx * dx) + (dy * dy)) / radius;
+
+            if (isPencil) {
+                const float majorRadius = radius * lerp(1.05F, 1.42F, altitudeFactor * 0.65F);
+                const float minorRadius = radius * lerp(0.95F, 0.72F, altitudeFactor * 0.55F);
+                shapeDistance = std::sqrt(
+                    std::pow(along / std::max(majorRadius, 0.001F), 2.0F) +
+                    std::pow(across / std::max(minorRadius, 0.001F), 2.0F)
+                );
+            } else if (isInk) {
+                const float majorRadius = radius * lerp(1.0F, 1.8F, altitudeFactor * 0.9F);
+                const float minorRadius = radius * lerp(0.92F, 0.44F, altitudeFactor);
+                shapeDistance = std::sqrt(
+                    std::pow(along / std::max(majorRadius, 0.001F), 2.0F) +
+                    std::pow(across / std::max(minorRadius, 0.001F), 2.0F)
+                );
+            } else if (isOil) {
+                const float majorRadius = radius * lerp(1.1F, 1.95F, 0.45F + (altitudeFactor * 0.55F));
+                const float minorRadius = radius * lerp(0.78F, 0.52F, altitudeFactor * 0.7F);
+                const float superellipse =
+                    std::pow(std::abs(along) / std::max(majorRadius, 0.001F), 4.0F) +
+                    std::pow(std::abs(across) / std::max(minorRadius, 0.001F), 4.0F);
+                shapeDistance = std::pow(superellipse, 0.25F);
+            }
+
+            if (shapeDistance >= 1.0F) {
                 continue;
             }
 
-            const float clampedHardness = clamp01(activeBrush_.hardness);
-            float falloff = 1.0F;
-            if (clampedHardness < 0.995F) {
-                const float effectiveHardness = std::pow(clampedHardness, 3.2F);
-                if (distance <= effectiveHardness) {
-                    falloff = 1.0F;
-                } else {
-                    const float span = std::max(0.001F, 1.0F - effectiveHardness);
-                    const float normalized = clamp01((distance - effectiveHardness) / span);
-                    falloff = 1.0F - normalized;
-                }
+            float falloff = computeBaseFalloff(shapeDistance, activeBrush_.hardness);
+            if (isPencil) {
+                const float tooth = 0.42F + (0.58F * hash2D((static_cast<float>(x) + 13.0F) * 1.7F, (static_cast<float>(y) - 5.0F) * 1.7F));
+                const float grain = 0.72F + (0.28F * hash2D((static_cast<float>(x) * 4.5F) + point.x, (static_cast<float>(y) * 4.5F) + point.y));
+                const float graphite = lerp(tooth, 1.0F, clampedPressure * 0.55F);
+                falloff *= graphite * grain * std::pow(1.0F - (shapeDistance * 0.12F), 1.35F);
+            } else if (isInk) {
+                falloff = std::pow(falloff, 0.55F);
+                falloff *= 0.96F + (0.04F * hash2D((static_cast<float>(x) * 0.9F) + point.timestamp, (static_cast<float>(y) * 0.9F) - point.timestamp));
+            } else if (isOil) {
+                const float alongNorm = along / std::max(radius, 0.001F);
+                const float acrossNorm = across / std::max(radius, 0.001F);
+                const float bristle = 0.48F + (0.52F * std::abs(std::sin((acrossNorm * 11.0F) + (alongNorm * 2.2F) + (point.timestamp * 0.6F))));
+                const float pigment = 0.82F + (0.18F * hash2D((static_cast<float>(x) * 1.1F) + point.x, (static_cast<float>(y) * 1.1F) + point.y));
+                const float edgeLoad = lerp(0.92F, 1.08F, clamp01(std::abs(acrossNorm) * 0.7F));
+                falloff *= bristle * pigment * edgeLoad;
+                falloff = std::pow(falloff, 0.82F);
+            } else if (isAirbrush) {
+                const float mist = std::exp(-(shapeDistance * shapeDistance) * 2.6F);
+                const float cloud = 0.74F + (0.26F * hash2D((static_cast<float>(x) + point.x) * 0.8F, (static_cast<float>(y) + point.y) * 0.8F));
+                falloff = mist * cloud;
             }
             const float alpha = clamp01(effectiveOpacity * falloff);
             auto* pixel = &layer.pixels[(static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U];

@@ -29,6 +29,7 @@ struct CanvasFeature {
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
         var previewStyle = PreviewStrokeStyle(
+            tipKind: .pencil,
             radius: 3.0,
             opacity: 0.9,
             hardness: 0.82,

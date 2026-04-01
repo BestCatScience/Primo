@@ -99,9 +99,45 @@ enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiab
     }
 }
 
+enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case pencil
+    case ink
+    case oil
+    case airbrush
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .pencil:
+            return "Pencil"
+        case .ink:
+            return "Ink"
+        case .oil:
+            return "Oil"
+        case .airbrush:
+            return "Airbrush"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .pencil:
+            return "pencil.tip"
+        case .ink:
+            return "paintbrush.pointed"
+        case .oil:
+            return "paintbrush"
+        case .airbrush:
+            return "aqi.low"
+        }
+    }
+}
+
 struct BrushPreset: Identifiable, Equatable {
     var id: String { name }
     let name: String
+    let tipKind: BrushTipKind
     let color: Color
     let radius: Double
     let opacity: Double
@@ -113,6 +149,7 @@ struct BrushPreset: Identifiable, Equatable {
 
     static func == (lhs: BrushPreset, rhs: BrushPreset) -> Bool {
         lhs.name == rhs.name &&
+        lhs.tipKind == rhs.tipKind &&
         lhs.radius == rhs.radius &&
         lhs.opacity == rhs.opacity &&
         lhs.hardness == rhs.hardness &&
@@ -125,6 +162,7 @@ struct BrushPreset: Identifiable, Equatable {
     static let defaults: [BrushPreset] = [
         BrushPreset(
             name: "6B Pencil",
+            tipKind: .pencil,
             color: Color(red: 0.12, green: 0.12, blue: 0.13),
             radius: 3.2,
             opacity: 0.92,
@@ -134,6 +172,7 @@ struct BrushPreset: Identifiable, Equatable {
         ),
         BrushPreset(
             name: "Fine Liner",
+            tipKind: .ink,
             color: Color(red: 0.07, green: 0.08, blue: 0.10),
             radius: 1.5,
             opacity: 0.98,
@@ -143,6 +182,7 @@ struct BrushPreset: Identifiable, Equatable {
         ),
         BrushPreset(
             name: "Indigo Ink",
+            tipKind: .ink,
             color: Color(red: 0.20, green: 0.24, blue: 0.42),
             radius: 2.8,
             opacity: 0.88,
@@ -152,6 +192,7 @@ struct BrushPreset: Identifiable, Equatable {
         ),
         BrushPreset(
             name: "Soft Airbrush",
+            tipKind: .airbrush,
             color: Color(red: 0.10, green: 0.10, blue: 0.11),
             radius: 8.5,
             opacity: 0.16,
@@ -161,6 +202,7 @@ struct BrushPreset: Identifiable, Equatable {
         ),
         BrushPreset(
             name: "Wash Airbrush",
+            tipKind: .airbrush,
             color: Color(red: 0.16, green: 0.19, blue: 0.26),
             radius: 11.0,
             opacity: 0.10,
@@ -170,12 +212,33 @@ struct BrushPreset: Identifiable, Equatable {
         ),
         BrushPreset(
             name: "Burnt Sienna",
+            tipKind: .oil,
             color: Color(red: 0.63, green: 0.31, blue: 0.20),
             radius: 3.8,
             opacity: 0.84,
             hardness: 0.66,
             pressureSensitivity: 0.40,
             red: 160, green: 79, blue: 51
+        ),
+        BrushPreset(
+            name: "Flat Oil",
+            tipKind: .oil,
+            color: Color(red: 0.18, green: 0.26, blue: 0.61),
+            radius: 6.0,
+            opacity: 0.80,
+            hardness: 0.72,
+            pressureSensitivity: 0.36,
+            red: 46, green: 66, blue: 156
+        ),
+        BrushPreset(
+            name: "HB Sketch",
+            tipKind: .pencil,
+            color: Color(red: 0.25, green: 0.25, blue: 0.27),
+            radius: 2.2,
+            opacity: 0.70,
+            hardness: 0.68,
+            pressureSensitivity: 0.82,
+            red: 64, green: 64, blue: 69
         )
     ]
 
@@ -280,6 +343,7 @@ struct PreviewStrokePoint: Identifiable, Equatable {
 }
 
 struct PreviewStrokeStyle: Equatable {
+    let tipKind: BrushTipKind
     let radius: CGFloat
     let opacity: CGFloat
     let hardness: CGFloat

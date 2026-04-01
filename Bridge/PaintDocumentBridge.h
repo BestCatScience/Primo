@@ -22,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface APBrushDescriptor : NSObject
 
+@property (nonatomic, copy) NSString *tipKind;
 @property (nonatomic) CGFloat radius;
 @property (nonatomic) CGFloat hardness;
 @property (nonatomic) CGFloat opacity;

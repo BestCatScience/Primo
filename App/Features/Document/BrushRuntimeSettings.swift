@@ -1,6 +1,7 @@
 import Foundation
 
 struct BrushRuntimeSettings: Equatable, Sendable {
+    var tipKind: BrushTipKind
     var radius: Double
     var opacity: Double
     var hardness: Double

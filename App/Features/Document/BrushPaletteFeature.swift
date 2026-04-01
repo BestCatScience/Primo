@@ -7,6 +7,7 @@ import UIKit
 struct BrushPaletteFeature {
     @ObservableState
     struct State: Equatable {
+        var brushTipKind: BrushTipKind = BrushPreset.defaultPencil.tipKind
         var brushRadius: Double = BrushPreset.defaultPencil.radius
         var brushOpacity: Double = BrushPreset.defaultPencil.opacity
         var brushHardness: Double = BrushPreset.defaultPencil.hardness
@@ -33,6 +34,7 @@ struct BrushPaletteFeature {
             var alpha: CGFloat = 0
             resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             return BrushRuntimeSettings(
+                tipKind: brushTipKind,
                 radius: brushRadius,
                 opacity: brushOpacity,
                 hardness: brushHardness,
@@ -70,6 +72,7 @@ struct BrushPaletteFeature {
         Reduce { state, action in
             switch action {
             case .binding(\.brushColor),
+                 .binding(\.brushTipKind),
                  .binding(\.brushRadius),
                  .binding(\.brushOpacity),
                  .binding(\.brushHardness),
@@ -91,6 +94,7 @@ struct BrushPaletteFeature {
             case let .selectPreset(preset):
                 state.selectedBrush = preset
                 state.brushColor = preset.color
+                state.brushTipKind = preset.tipKind
                 state.brushRadius = preset.radius
                 state.brushOpacity = preset.opacity
                 state.brushHardness = preset.hardness

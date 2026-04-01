@@ -255,12 +255,21 @@ struct ContentView: View {
         .padding(.vertical, 2)
         .background(
             ZStack {
-                StudioTheme.Palette.overlayBlack.opacity(0.98)
+                StudioTheme.Gradients.surface
+
+                LinearGradient(
+                    colors: [
+                        StudioTheme.Palette.accentBright.opacity(0.18),
+                        .clear
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
 
                 LinearGradient(
                     colors: [
                         Color.white.opacity(0.05),
-                        StudioTheme.Palette.cardFill.opacity(0.18)
+                        StudioTheme.Palette.toolbarHighlight
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -269,12 +278,12 @@ struct ContentView: View {
         )
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(StudioTheme.Palette.cardBorder.opacity(0.95))
+                .fill(StudioTheme.Palette.accentSoft.opacity(0.28))
                 .frame(height: 1)
         }
         .contentShape(Rectangle())
         .compositingGroup()
-        .shadow(color: .black.opacity(0.32), radius: 14, y: 6)
+        .shadow(color: StudioTheme.Palette.accentGlow.opacity(0.14), radius: 18, y: 8)
     }
 
     private var undoRedoBar: some View {
@@ -292,11 +301,11 @@ struct ContentView: View {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+                    .fill(StudioTheme.Palette.accent.opacity(0.18))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
             }
 
             Button {
@@ -312,11 +321,11 @@ struct ContentView: View {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+                    .fill(StudioTheme.Palette.accent.opacity(0.18))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
             }
             
             Button {
@@ -332,11 +341,11 @@ struct ContentView: View {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
+                    .fill(StudioTheme.Palette.accent.opacity(0.14))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.34), lineWidth: 1)
             }
             .disabled(activeLayer == nil)
 
@@ -346,11 +355,15 @@ struct ContentView: View {
         .padding(.vertical, 2)
         .background(
             ZStack {
-                StudioTheme.Palette.overlayBlack.opacity(0.95)
+                StudioTheme.Gradients.surface
+
+                StudioTheme.Gradients.accentBar
+                    .opacity(0.12)
+
                 LinearGradient(
                     colors: [
                         Color.white.opacity(0.04),
-                        StudioTheme.Palette.cardFill.opacity(0.14)
+                        StudioTheme.Palette.toolbarHighlight
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -359,7 +372,7 @@ struct ContentView: View {
         )
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(StudioTheme.Palette.cardBorder.opacity(0.95))
+                .fill(StudioTheme.Palette.accentSoft.opacity(0.24))
                 .frame(height: 1)
         }
     }
@@ -376,11 +389,11 @@ struct ContentView: View {
                 .minimumHitTarget(28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(StudioTheme.Palette.cardFillStrong.opacity(0.92))
+                        .fill(StudioTheme.Palette.toolbarFill)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .stroke(StudioTheme.Palette.cardBorder.opacity(0.8), lineWidth: 1)
+                        .stroke(StudioTheme.Palette.accentSoft.opacity(0.22), lineWidth: 1)
                 }
         }
     }

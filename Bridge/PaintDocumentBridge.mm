@@ -30,6 +30,7 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
+        _tipKind = @"pencil";
         _radius = 3.0;
         _hardness = 0.82;
         _opacity = 0.9;
@@ -141,6 +142,7 @@
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
+    settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;
     settings.grainScale = (float)brush.grainScale;
@@ -190,6 +192,7 @@
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
+    settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;
     settings.grainScale = (float)brush.grainScale;

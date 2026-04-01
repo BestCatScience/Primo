@@ -139,6 +139,7 @@ struct BrushPaletteView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
+                                metricRow("Tip", value: store.brushTipKind.title)
                                 metricRow("Radius", value: "\(Int(store.brushRadius)) px")
                                 metricRow("Opacity", value: "\(Int(store.brushOpacity * 100))%")
                                 metricRow("Hardness", value: "\(Int(store.brushHardness * 100))%")
@@ -305,6 +306,18 @@ struct BrushPaletteView: View {
                             }
                         }
                     } else {
+                        segmentedModeRow(
+                            title: "Brush Tip",
+                            selectedTitle: store.brushTipKind.title
+                        ) {
+                            VStack(spacing: 8) {
+                                ForEach(BrushTipKind.allCases) { tipKind in
+                                    brushTipButton(tipKind: tipKind, isSelected: store.brushTipKind == tipKind) {
+                                        store.brushTipKind = tipKind
+                                    }
+                                }
+                            }
+                        }
                         sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
                         sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
                         sliderRow(title: "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
@@ -340,10 +353,10 @@ struct BrushPaletteView: View {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(currentTool == .fill ? "Fill Color" : "Color Palette")
+                            Text(currentTool == .fill ? "Fill Color" : "Brushes & Color")
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(store.selectedBrush?.name ?? "Custom Mix")
+                            Text(currentTool == .fill ? (store.selectedBrush?.name ?? "Custom Mix") : (store.selectedBrush?.name ?? "\(store.brushTipKind.title) Custom"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -359,6 +372,22 @@ struct BrushPaletteView: View {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(StudioTheme.Palette.hairline)
                         )
+
+                    if currentTool != .fill {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(store.presets) { preset in
+                                    presetChip(
+                                        preset: preset,
+                                        isSelected: store.selectedBrush == preset
+                                    ) {
+                                        store.send(.selectPreset(preset))
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                    }
 
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
                         ForEach(store.presets) { preset in
@@ -533,6 +562,71 @@ struct BrushPaletteView: View {
         }
         .buttonStyle(.plain)
         .minimumHitTarget()
+    }
+
+    private func presetChip(preset: BrushPreset, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(preset.color.opacity(0.95))
+                    Image(systemName: preset.tipKind.systemImage)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.92))
+                }
+                .frame(width: 24, height: 24)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(preset.name)
+                        .font(StudioTheme.Typography.label(11))
+                        .foregroundStyle(.white.opacity(0.92))
+                    Text(preset.tipKind.title)
+                        .font(StudioTheme.Typography.mono(9))
+                        .foregroundStyle(.white.opacity(0.46))
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? StudioTheme.Palette.accent.opacity(0.28) : StudioTheme.Palette.hairline)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private extension BrushPaletteView {
+    func brushTipButton(tipKind: BrushTipKind, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: tipKind.systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 16)
+
+                Text(tipKind.title)
+                    .font(StudioTheme.Typography.label(11))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.82))
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? StudioTheme.Palette.accent.opacity(0.28) : StudioTheme.Palette.hairline)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardBorder, lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

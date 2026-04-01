@@ -140,10 +140,26 @@ private struct LayerThumbnailView: View {
                     }
 
                     let color = Color(cgColor: stroke.style.color).opacity(buffer.opacity * 0.9)
+                    let lineWidth: CGFloat
+                    let lineCap: CGLineCap
+                    switch stroke.style.tipKind {
+                    case .pencil:
+                        lineWidth = max(0.5, stroke.style.radius * 0.16)
+                        lineCap = .round
+                    case .ink:
+                        lineWidth = max(0.55, stroke.style.radius * 0.18)
+                        lineCap = .round
+                    case .oil:
+                        lineWidth = max(0.7, stroke.style.radius * 0.24)
+                        lineCap = .square
+                    case .airbrush:
+                        lineWidth = max(0.8, stroke.style.radius * 0.28)
+                        lineCap = .round
+                    }
                     context.stroke(
                         path,
                         with: .color(color),
-                        style: StrokeStyle(lineWidth: max(0.6, stroke.style.radius * 0.18), lineCap: .round, lineJoin: .round)
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: lineCap, lineJoin: .round)
                     )
                 }
             }

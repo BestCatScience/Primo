@@ -103,6 +103,7 @@ struct AppFeature {
         func previewStrokeStyle() -> PreviewStrokeStyle {
             if canvas.currentTool == .erase {
                 return PreviewStrokeStyle(
+                    tipKind: .ink,
                     radius: CGFloat(brushPalette.runtimeSettings.radius),
                     opacity: 0.78,
                     hardness: 0.95,
@@ -117,6 +118,7 @@ struct AppFeature {
             }
 
             return PreviewStrokeStyle(
+                tipKind: brushPalette.runtimeSettings.tipKind,
                 radius: CGFloat(brushPalette.runtimeSettings.radius),
                 opacity: CGFloat(brushPalette.runtimeSettings.opacity),
                 hardness: CGFloat(brushPalette.runtimeSettings.hardness),

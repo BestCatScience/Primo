@@ -177,6 +177,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     private func makeBrushDescriptor(from brush: BrushRuntimeSettings) -> APBrushDescriptor {
         let descriptor = APBrushDescriptor()
+        descriptor.tipKind = brush.tipKind.rawValue
         descriptor.radius = brush.radius
         descriptor.opacity = brush.opacity
         descriptor.hardness = brush.hardness
