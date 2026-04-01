@@ -7,17 +7,17 @@ struct LayerSidebarView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 if showsTitle {
                     Text("Layers")
-                        .font(StudioTheme.Typography.title(30))
+                        .font(StudioTheme.Typography.title(26))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
                         Text("\(store.layers.count) Layers")
-                            .font(StudioTheme.Typography.title(20))
+                            .font(StudioTheme.Typography.title(18))
                             .foregroundStyle(.white.opacity(0.9))
 
                         Spacer()
@@ -26,38 +26,39 @@ struct LayerSidebarView: View {
                             store.send(.addLayerButtonTapped)
                         } label: {
                             Label("Add", systemImage: "plus")
-                                .font(StudioTheme.Typography.label(13))
+                                .font(StudioTheme.Typography.label(12))
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                                         .fill(StudioTheme.Palette.accent)
                                 )
                         }
                         .buttonStyle(.plain)
+                        .minimumHitTarget()
                     }
 
                     ForEach(store.layers) { layer in
                         let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
-                        HStack(spacing: 14) {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(StudioTheme.Palette.cardFillStrong)
-                                .frame(width: 56, height: 56)
+                                .frame(width: 48, height: 48)
                                 .overlay {
                                     LayerThumbnailView(buffer: buffer)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 }
 
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(layer.name)
-                                    .font(StudioTheme.Typography.title(16))
+                                    .font(StudioTheme.Typography.title(15))
                                     .foregroundStyle(.white.opacity(0.92))
                                 Text("Opacity \(Int(layer.opacity * 100))%")
-                                    .font(StudioTheme.Typography.mono(11))
+                                    .font(StudioTheme.Typography.mono(10))
                                     .foregroundStyle(.white.opacity(0.48))
 
-                                HStack(spacing: 8) {
+                                HStack(spacing: 6) {
                                     capsuleTag(layer.visible ? "Visible" : "Hidden")
                                     capsuleTag(store.activeLayerIndex == layer.index ? "Active" : "Standby")
                                 }
@@ -69,26 +70,27 @@ struct LayerSidebarView: View {
                                 store.send(.visibilityButtonTapped(layer.index))
                             } label: {
                                 Image(systemName: layer.visible ? "eye.fill" : "eye.slash.fill")
-                                    .font(.system(size: 14, weight: .bold))
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(layer.visible ? .white.opacity(0.9) : .white.opacity(0.45))
-                                    .frame(width: 34, height: 34)
+                                    .frame(width: 30, height: 30)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                                             .fill(StudioTheme.Palette.cardFillStrong)
                                     )
                             }
                             .buttonStyle(.plain)
+                            .minimumHitTarget()
                         }
-                        .padding(14)
+                        .padding(12)
                         .background(
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 .fill(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
                                 .stroke(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder, lineWidth: 1)
                         )
-                        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .onTapGesture {
                             store.send(.layerTapped(layer.index))
                         }
@@ -102,10 +104,10 @@ struct LayerSidebarView: View {
 
     private func capsuleTag(_ title: String) -> some View {
         Text(title)
-            .font(StudioTheme.Typography.mono(10))
+            .font(StudioTheme.Typography.mono(9))
             .foregroundStyle(.white.opacity(0.56))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
             .background(
                 Capsule(style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong)

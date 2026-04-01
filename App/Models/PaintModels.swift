@@ -6,6 +6,7 @@ import simd
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
     case erase
+    case fill
     case select
     case move
     case shape
@@ -18,6 +19,8 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return "Brush"
         case .erase:
             return "Erase"
+        case .fill:
+            return "Fill"
         case .select:
             return "Select"
         case .move:
@@ -33,12 +36,30 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return "paintbrush.pointed"
         case .erase:
             return "eraser"
+        case .fill:
+            return "paintbrush.fill"
         case .select:
             return "lasso"
         case .move:
             return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
         case .shape:
             return "square.on.circle"
+        }
+    }
+}
+
+enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case opacity
+    case color
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .opacity:
+            return "Opacity"
+        case .color:
+            return "Color"
         }
     }
 }

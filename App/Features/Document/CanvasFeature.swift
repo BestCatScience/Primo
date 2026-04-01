@@ -36,6 +36,7 @@ struct CanvasFeature {
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
+        case fillRequested(StylusSample)
         case applyIncrementalUpdate(IncrementalLayerUpdate)
         case requestLocalUndo
         case requestLocalRedo
@@ -49,6 +50,7 @@ struct CanvasFeature {
         case appendSamples([StylusSample])
         case endStroke
         case commitStroke([StylusSample])
+        case fill(StylusSample)
         case requestUndo
         case requestRedo
     }
@@ -59,6 +61,10 @@ struct CanvasFeature {
             case let .applyIncrementalUpdate(update):
                 state.pendingIncrementalUpdate = update
                 return .none
+
+            case let .fillRequested(sample):
+                state.pendingIncrementalUpdate = nil
+                return .send(.delegate(.fill(sample)))
 
             case .requestLocalUndo:
                 return .send(.delegate(.requestUndo))

@@ -4,6 +4,7 @@ import simd
 protocol InputHandlerDelegate: AnyObject {
     func didUpdateStroke(_ stroke: Stroke)
     func didEndStroke(_ stroke: Stroke)
+    func didRequestFill(at sample: StylusSample)
 }
 
 final class InputHandler {
@@ -22,6 +23,14 @@ final class InputHandler {
               touch.type == .pencil else { return }
 
         guard tool != .select && tool != .move else { return }
+
+        if tool == .fill {
+            guard touch.phase == .began else { return }
+            delegate?.didRequestFill(at: makePoint(touch, in: view, predicted: false).stylusSample)
+            currentStroke = nil
+            shapeStartPoint = nil
+            return
+        }
 
         switch touch.phase {
         case .began:

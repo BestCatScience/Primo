@@ -72,14 +72,14 @@ struct ContentView: View {
     }
 
     private var menuBar: some View {
-        HStack(spacing: 18) {
-            HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(StudioTheme.Palette.accent)
-                    .frame(width: 10, height: 10)
+                    .frame(width: 6, height: 6)
 
                 Text("atelierprime")
-                    .font(StudioTheme.Typography.label(12))
+                    .font(StudioTheme.Typography.label(9))
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
             }
 
@@ -169,10 +169,10 @@ struct ContentView: View {
                 .disabled(activeLayer == nil)
             }
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 8)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
         .background(
             ZStack {
                 StudioTheme.Palette.overlayBlack.opacity(0.98)
@@ -198,23 +198,24 @@ struct ContentView: View {
     }
 
     private var undoRedoBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 4) {
             Button {
                 store.send(.undoRequested)
             } label: {
                 Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .minimumHitTarget(30)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
             }
 
@@ -222,18 +223,19 @@ struct ContentView: View {
                 store.send(.redoRequested)
             } label: {
                 Image(systemName: "arrow.uturn.forward")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .minimumHitTarget(30)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
             }
             
@@ -241,26 +243,27 @@ struct ContentView: View {
                 store.send(.clearActiveLayerButtonTapped)
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .minimumHitTarget(30)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong.opacity(0.94))
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .stroke(StudioTheme.Palette.cardBorder.opacity(0.9), lineWidth: 1)
             }
             .disabled(activeLayer == nil)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
         .background(
             ZStack {
                 StudioTheme.Palette.overlayBlack.opacity(0.95)
@@ -286,16 +289,17 @@ struct ContentView: View {
             content()
         } label: {
             Text(title)
-                .font(StudioTheme.Typography.label(12))
+                .font(StudioTheme.Typography.label(9))
                 .foregroundStyle(StudioTheme.Palette.textPrimary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .minimumHitTarget(28)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(StudioTheme.Palette.cardFillStrong.opacity(0.92))
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .stroke(StudioTheme.Palette.cardBorder.opacity(0.8), lineWidth: 1)
                 }
         }
@@ -375,7 +379,7 @@ struct ContentView: View {
             }
 
             VStack {
-                HStack(alignment: .top, spacing: 18) {
+                HStack(alignment: .top, spacing: 14) {
                     toolDock
 
                     ZStack {
@@ -387,7 +391,7 @@ struct ContentView: View {
                                 action: \.canvas
                             )
                         )
-                        .padding(18)
+                        .padding(14)
 
                         if store.isHydrating {
                             ProgressView()
@@ -397,10 +401,10 @@ struct ContentView: View {
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 38, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 8)
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
             }
         }
     }
@@ -413,21 +417,21 @@ struct ContentView: View {
             Color.clear
                 .frame(width: 0)
         } else {
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 ForEach(panels, id: \.self) { panel in
                     studioPanel(for: panel)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 14)
             .frame(width: railWidth(for: panels))
             .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
     private func railWidth(for panels: [StudioPanelKind]) -> CGFloat {
-        panels.contains { !panelState(for: $0).isCollapsed } ? 336 : 86
+        panels.contains { !panelState(for: $0).isCollapsed } ? 304 : 74
     }
 
     @ViewBuilder
@@ -454,6 +458,7 @@ struct ContentView: View {
                         state: \.brushPalette,
                         action: \.brushPalette
                     ),
+                    currentTool: store.canvas.currentTool,
                     showsTitle: false
                 )
             case .layers:
@@ -466,7 +471,7 @@ struct ContentView: View {
                 )
             }
         }
-        .frame(maxHeight: panelState.isCollapsed ? 74 : (isStacked ? 360 : .infinity), alignment: .top)
+        .frame(maxHeight: panelState.isCollapsed ? 68 : (isStacked ? 332 : .infinity), alignment: .top)
     }
 
     private func isStacked(_ panel: StudioPanelKind) -> Bool {
@@ -507,10 +512,10 @@ struct ContentView: View {
     }
 
     private var stageChrome: some View {
-        RoundedRectangle(cornerRadius: 38, style: .continuous)
+        RoundedRectangle(cornerRadius: 34, style: .continuous)
             .fill(StudioTheme.Gradients.surface)
             .overlay(
-                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .stroke(
                         LinearGradient(
                             colors: [
@@ -525,7 +530,7 @@ struct ContentView: View {
                     )
             )
             .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 38, style: .continuous)
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .fill(
                         LinearGradient(
                             colors: [
@@ -537,14 +542,14 @@ struct ContentView: View {
                         )
                     )
                     .mask(
-                        RoundedRectangle(cornerRadius: 38, style: .continuous)
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
                     )
             }
-            .shadow(color: .black.opacity(0.42), radius: 34, y: 22)
+            .shadow(color: .black.opacity(0.42), radius: 28, y: 18)
     }
 
     private var toolDock: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
             ForEach(studioTools) { tool in
                 let isActive = store.canvas.currentTool == tool
 
@@ -553,38 +558,55 @@ struct ContentView: View {
                 } label: {
                     VStack(spacing: 6) {
                         Image(systemName: tool.systemImage)
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                         Text(tool.title)
-                            .font(StudioTheme.Typography.label(10))
+                            .font(StudioTheme.Typography.label(9))
                     }
                     .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
-                    .frame(width: 64, height: 64)
+                    .frame(width: 56, height: 56)
                     .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
+                .minimumHitTarget()
             }
 
             Spacer()
         }
-        .padding(12)
-        .frame(width: 96)
+        .padding(10)
+        .frame(width: 82)
         .background(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .fill(StudioTheme.Palette.cardFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         )
     }
 
+}
+
+struct MinimumHitTargetModifier: ViewModifier {
+    let minSize: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .frame(minWidth: minSize, minHeight: minSize)
+            .contentShape(Rectangle())
+    }
+}
+
+extension View {
+    func minimumHitTarget(_ minSize: CGFloat = 44) -> some View {
+        modifier(MinimumHitTargetModifier(minSize: minSize))
+    }
 }
 
 private struct ShareSheet: UIViewControllerRepresentable {
@@ -660,7 +682,7 @@ private struct DiagonalStageLines: View {
     }
 }
 
-private let studioTools: [StudioToolKind] = [.brush, .erase, .select, .move, .shape]
+private let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .select, .move, .shape]
 
 private struct StudioPanelShell<Content: View>: View {
     let title: String
@@ -705,11 +727,11 @@ private struct StudioPanelShell<Content: View>: View {
             if !isCollapsed {
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(16)
+                    .padding(12)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(panelBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(panelBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .topTrailing) {
             if isDragging {
                 dragBadge
@@ -722,31 +744,31 @@ private struct StudioPanelShell<Content: View>: View {
             Capsule(style: .continuous)
                 .fill(StudioTheme.Gradients.accentBar)
                 .frame(width: isCollapsed ? 26 : 92, height: 5)
-                .padding(.top, 10)
+                .padding(.top, 8)
         }
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(StudioTheme.Palette.hairline, lineWidth: 1)
         )
         .offset(dragOffset)
         .scaleEffect(isDragging ? 1.015 : 1.0)
         .rotationEffect(.degrees(Double(dragOffset.width / 42)))
-        .shadow(color: Color.black.opacity(0.22), radius: 24, y: 14)
+        .shadow(color: Color.black.opacity(0.22), radius: 18, y: 10)
         .shadow(color: StudioTheme.Palette.accent.opacity(isDragging ? 0.18 : 0.0), radius: 20, y: 10)
         .animation(.spring(response: 0.28, dampingFraction: 0.84), value: dragOffset)
         .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isDragging)
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(StudioTheme.Palette.accent.opacity(0.9))
-                    .frame(width: 4, height: 30)
+                    .frame(width: 4, height: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(StudioTheme.Typography.title(22))
+                        .font(StudioTheme.Typography.title(19))
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
 
@@ -758,7 +780,7 @@ private struct StudioPanelShell<Content: View>: View {
             }
 
             if !isCollapsed {
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
 
                 HStack(spacing: 6) {
                     panelButton(systemName: isStacked ? "square.split.2x1" : "square.split.1x2", isActive: isStacked, action: onToggleStack)
@@ -770,8 +792,8 @@ private struct StudioPanelShell<Content: View>: View {
 
             panelButton(systemName: isCollapsed ? "chevron.right" : "chevron.left", isActive: false, action: onToggleCollapse)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
         .background(
             LinearGradient(
                 colors: [
@@ -818,9 +840,9 @@ private struct StudioPanelShell<Content: View>: View {
             Image(systemName: systemName)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(isActive ? .white : .white.opacity(0.68))
-                .frame(width: 30, height: 30)
+                .frame(width: 28, height: 28)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                 )
         }

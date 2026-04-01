@@ -9,6 +9,7 @@ struct PaintDocumentClient: Sendable {
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
+    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var canUndo: @Sendable () -> Bool
     var canRedo: @Sendable () -> Bool
     var undo: @Sendable () -> Bool
@@ -29,6 +30,7 @@ struct PaintDocumentClient: Sendable {
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
             endStroke: { sessionBox.session.endStroke() },
+            fill: { sample, brush in sessionBox.session.fill(sample: sample, brush: brush) },
             canUndo: { sessionBox.session.canUndo() },
             canRedo: { sessionBox.session.canRedo() },
             undo: { sessionBox.session.undo() },

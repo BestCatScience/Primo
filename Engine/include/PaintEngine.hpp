@@ -22,6 +22,10 @@ struct BrushSettings {
     float tiltInfluence = 0.75F;
     float maxDarkness = 0.95F;
     float pressureSensitivity = 0.4F;
+    int fillThresholdMode = 0;
+    float fillOpacityTolerance = 0.08F;
+    float fillColorTolerance = 0.12F;
+    int fillExpansion = 0;
     uint8_t red = 24;
     uint8_t green = 24;
     uint8_t blue = 24;
@@ -98,6 +102,7 @@ public:
     void beginStroke(const BrushSettings& brush, StrokePoint point);
     void appendStroke(StrokePoint point);
     void endStroke();
+    void fill(int x, int y, const BrushSettings& brush);
     bool canUndo() const noexcept;
     bool canRedo() const noexcept;
     bool undo();

@@ -85,6 +85,14 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
+        bridge.fill(
+            at: sample.point,
+            brush: makeBrushDescriptor(from: brush)
+        )
+        captureTimelapseFrame()
+    }
+
     func canUndo() -> Bool {
         bridge.canUndo()
     }
@@ -176,6 +184,10 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.tiltInfluence = 0.75
         descriptor.maxDarkness = 0.95
         descriptor.pressureSensitivity = brush.pressureSensitivity
+        descriptor.fillThresholdMode = brush.fillThresholdMode == .opacity ? 0 : 1
+        descriptor.fillOpacityTolerance = brush.fillOpacityTolerance
+        descriptor.fillColorTolerance = brush.fillColorTolerance
+        descriptor.fillExpansion = brush.fillExpansion
         descriptor.red = brush.red
         descriptor.green = brush.green
         descriptor.blue = brush.blue

@@ -11,6 +11,10 @@ struct BrushPaletteFeature {
         var brushOpacity: Double = BrushPreset.defaultPencil.opacity
         var brushHardness: Double = BrushPreset.defaultPencil.hardness
         var brushPressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
+        var fillThresholdMode: FillThresholdMode = .opacity
+        var fillOpacityTolerance: Double = 0.08
+        var fillColorTolerance: Double = 0.12
+        var fillExpansion: Double = 0
         var brushColor: Color = BrushPreset.defaultPencil.color
         var selectedBrush: BrushPreset? = .defaultPencil
         let presets: [BrushPreset] = BrushPreset.defaults
@@ -27,6 +31,10 @@ struct BrushPaletteFeature {
                 opacity: brushOpacity,
                 hardness: brushHardness,
                 pressureSensitivity: brushPressureSensitivity,
+                fillThresholdMode: fillThresholdMode,
+                fillOpacityTolerance: fillOpacityTolerance,
+                fillColorTolerance: fillColorTolerance,
+                fillExpansion: Int(fillExpansion.rounded()),
                 red: UInt8(min(max(Double(red) * 255.0, 0), 255)),
                 green: UInt8(min(max(Double(green) * 255.0, 0), 255)),
                 blue: UInt8(min(max(Double(blue) * 255.0, 0), 255))
@@ -53,7 +61,11 @@ struct BrushPaletteFeature {
                  .binding(\.brushRadius),
                  .binding(\.brushOpacity),
                  .binding(\.brushHardness),
-                 .binding(\.brushPressureSensitivity):
+                 .binding(\.brushPressureSensitivity),
+                 .binding(\.fillThresholdMode),
+                 .binding(\.fillOpacityTolerance),
+                 .binding(\.fillColorTolerance),
+                 .binding(\.fillExpansion):
                 state.selectedBrush = nil
                 return .none
             case .binding:

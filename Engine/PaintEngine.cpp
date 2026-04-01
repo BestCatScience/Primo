@@ -1,7 +1,9 @@
 #include "PaintEngine.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <queue>
 #include <stdexcept>
 
 namespace atelierprime {
@@ -190,6 +192,135 @@ void PaintDocument::appendStroke(StrokePoint point) {
 
 void PaintDocument::endStroke() {
     strokeInFlight_ = false;
+}
+
+void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
+    if (strokeInFlight_ || x < 0 || x >= width_ || y < 0 || y >= height_) {
+        return;
+    }
+
+    activeBrush_ = brush;
+    auto& layer = layers_[static_cast<size_t>(activeLayerIndex_)];
+    const size_t startOffset = (static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U;
+
+    const std::array<uint8_t, 4> target = {
+        layer.pixels[startOffset],
+        layer.pixels[startOffset + 1U],
+        layer.pixels[startOffset + 2U],
+        layer.pixels[startOffset + 3U]
+    };
+
+    const std::array<uint8_t, 4> replacement = brush.eraser
+        ? std::array<uint8_t, 4>{0U, 0U, 0U, 0U}
+        : std::array<uint8_t, 4>{brush.red, brush.green, brush.blue, static_cast<uint8_t>(clamp01(brush.opacity) * 255.0F)};
+
+    if (target == replacement) {
+        return;
+    }
+
+    pushHistorySnapshot();
+
+    std::queue<std::pair<int, int>> queue;
+    queue.push({x, y});
+    DirtyRect filledRect;
+    std::vector<uint8_t> filledMask(static_cast<size_t>(width_) * static_cast<size_t>(height_), 0U);
+
+    const auto alphaWithinTolerance = [&](uint8_t sampleAlpha) -> bool {
+        const float targetAlpha = static_cast<float>(target[3]) / 255.0F;
+        const float candidateAlpha = static_cast<float>(sampleAlpha) / 255.0F;
+        return std::abs(candidateAlpha - targetAlpha) <= clamp01(brush.fillOpacityTolerance);
+    };
+
+    const auto colorWithinTolerance = [&](uint8_t sampleR, uint8_t sampleG, uint8_t sampleB) -> bool {
+        const float dr = (static_cast<float>(sampleR) - static_cast<float>(target[0])) / 255.0F;
+        const float dg = (static_cast<float>(sampleG) - static_cast<float>(target[1])) / 255.0F;
+        const float db = (static_cast<float>(sampleB) - static_cast<float>(target[2])) / 255.0F;
+        const float distance = std::sqrt((dr * dr) + (dg * dg) + (db * db)) / std::sqrt(3.0F);
+        return distance <= clamp01(brush.fillColorTolerance);
+    };
+
+    auto matchesTarget = [&](int px, int py) -> bool {
+        const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
+        if (brush.fillThresholdMode == 1) {
+            return colorWithinTolerance(
+                layer.pixels[offset],
+                layer.pixels[offset + 1U],
+                layer.pixels[offset + 2U]
+            );
+        }
+        const bool sameColor =
+            layer.pixels[offset] == target[0] &&
+            layer.pixels[offset + 1U] == target[1] &&
+            layer.pixels[offset + 2U] == target[2];
+        return sameColor && alphaWithinTolerance(layer.pixels[offset + 3U]);
+    };
+
+    auto applyReplacement = [&](int px, int py) {
+        const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
+        layer.pixels[offset] = replacement[0];
+        layer.pixels[offset + 1U] = replacement[1];
+        layer.pixels[offset + 2U] = replacement[2];
+        layer.pixels[offset + 3U] = replacement[3];
+        filledMask[static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)] = 1U;
+        filledRect.expand(px, py, px, py);
+    };
+
+    while (!queue.empty()) {
+        const auto [px, py] = queue.front();
+        queue.pop();
+        if (px < 0 || px >= width_ || py < 0 || py >= height_) {
+            continue;
+        }
+        if (!matchesTarget(px, py)) {
+            continue;
+        }
+
+        applyReplacement(px, py);
+
+        queue.push({px - 1, py});
+        queue.push({px + 1, py});
+        queue.push({px, py - 1});
+        queue.push({px, py + 1});
+    }
+
+    const int expansion = std::max(0, brush.fillExpansion);
+    if (expansion > 0 && !filledRect.empty()) {
+        std::vector<std::pair<int, int>> seeds;
+        seeds.reserve(static_cast<size_t>(filledRect.width()) * static_cast<size_t>(filledRect.height()));
+        for (int py = filledRect.minY; py <= filledRect.maxY; ++py) {
+            for (int px = filledRect.minX; px <= filledRect.maxX; ++px) {
+                if (filledMask[static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)] != 0U) {
+                    seeds.push_back({px, py});
+                }
+            }
+        }
+
+        for (const auto& [seedX, seedY] : seeds) {
+            for (int dy = -expansion; dy <= expansion; ++dy) {
+                for (int dx = -expansion; dx <= expansion; ++dx) {
+                    if (std::abs(dx) + std::abs(dy) > expansion) {
+                        continue;
+                    }
+                    const int px = seedX + dx;
+                    const int py = seedY + dy;
+                    if (px < 0 || px >= width_ || py < 0 || py >= height_) {
+                        continue;
+                    }
+                    const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
+                    layer.pixels[offset] = replacement[0];
+                    layer.pixels[offset + 1U] = replacement[1];
+                    layer.pixels[offset + 2U] = replacement[2];
+                    layer.pixels[offset + 3U] = replacement[3];
+                    filledRect.expand(px, py, px, py);
+                }
+            }
+        }
+    }
+
+    if (!filledRect.empty()) {
+        dirtyRect_.expand(filledRect.minX, filledRect.minY, filledRect.maxX, filledRect.maxY);
+        compositeDirty_ = true;
+    }
 }
 
 bool PaintDocument::canUndo() const noexcept {

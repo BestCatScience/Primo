@@ -145,6 +145,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         sendAction?(.strokeEnded(stroke))
     }
 
+    func didRequestFill(at sample: StylusSample) {
+        sendAction?(.fillRequested(sample))
+    }
+
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
         let fitted = contentRect()
         guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }

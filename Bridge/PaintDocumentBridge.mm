@@ -3,6 +3,7 @@
 #import <UIKit/UIKit.h>
 
 #include "../Engine/include/PaintEngine.hpp"
+#include <cmath>
 #include <memory>
 
 @implementation APDirtyRect
@@ -41,6 +42,10 @@
         _tiltInfluence = 0.75;
         _maxDarkness = 0.95;
         _pressureSensitivity = 0.4;
+        _fillThresholdMode = 0;
+        _fillOpacityTolerance = 0.08;
+        _fillColorTolerance = 0.12;
+        _fillExpansion = 0;
         _eraser = NO;
     }
     return self;
@@ -139,6 +144,10 @@
     settings.tiltInfluence = (float)brush.tiltInfluence;
     settings.maxDarkness = (float)brush.maxDarkness;
     settings.pressureSensitivity = (float)brush.pressureSensitivity;
+    settings.fillThresholdMode = (int)brush.fillThresholdMode;
+    settings.fillOpacityTolerance = (float)brush.fillOpacityTolerance;
+    settings.fillColorTolerance = (float)brush.fillColorTolerance;
+    settings.fillExpansion = (int)brush.fillExpansion;
     settings.red = brush.red;
     settings.green = brush.green;
     settings.blue = brush.blue;
@@ -168,6 +177,32 @@
 
 - (void)endStroke {
     _document->endStroke();
+}
+
+- (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
+    atelierprime::BrushSettings settings;
+    settings.radius = (float)brush.radius;
+    settings.hardness = (float)brush.hardness;
+    settings.opacity = (float)brush.opacity;
+    settings.grainScale = (float)brush.grainScale;
+    settings.grainContrast = (float)brush.grainContrast;
+    settings.paperScale = (float)brush.paperScale;
+    settings.paperThreshold = (float)brush.paperThreshold;
+    settings.paperStrength = (float)brush.paperStrength;
+    settings.velocityInfluence = (float)brush.velocityInfluence;
+    settings.tiltInfluence = (float)brush.tiltInfluence;
+    settings.maxDarkness = (float)brush.maxDarkness;
+    settings.pressureSensitivity = (float)brush.pressureSensitivity;
+    settings.fillThresholdMode = (int)brush.fillThresholdMode;
+    settings.fillOpacityTolerance = (float)brush.fillOpacityTolerance;
+    settings.fillColorTolerance = (float)brush.fillColorTolerance;
+    settings.fillExpansion = (int)brush.fillExpansion;
+    settings.red = brush.red;
+    settings.green = brush.green;
+    settings.blue = brush.blue;
+    settings.eraser = brush.eraser;
+
+    _document->fill((int)std::lround(point.x), (int)std::lround(point.y), settings);
 }
 
 - (BOOL)canUndo {

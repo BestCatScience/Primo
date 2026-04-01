@@ -469,6 +469,14 @@ struct AppFeature {
                 paintDocumentClient.endStroke()
                 return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
+            case let .canvas(.delegate(.fill(sample))):
+                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
+                paintDocumentClient.fill(sample, state.resolvedBrushSettings())
+                if let update = paintDocumentClient.consumeDirtyUpdate() {
+                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                }
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+
             case .canvas(.delegate(.requestUndo)):
                 return .send(.undoRequested)
 

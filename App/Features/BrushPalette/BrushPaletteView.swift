@@ -3,99 +3,150 @@ import SwiftUI
 
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
+    let currentTool: StudioToolKind
     var showsTitle = true
-    private let paletteColumns = Array(repeating: GridItem(.fixed(24), spacing: 10), count: 5)
+    private let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 if showsTitle {
-                    Text("Brush")
-                        .font(StudioTheme.Typography.title(30))
+                    Text(currentTool == .fill ? "Fill" : "Brush")
+                        .font(StudioTheme.Typography.title(26))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
-                VStack(alignment: .leading, spacing: 14) {
-                    sectionLabel("Brush Engine")
+                VStack(alignment: .leading, spacing: 12) {
+                    sectionLabel(currentTool == .fill ? "Fill Engine" : "Brush Engine")
 
-                    HStack(spacing: 14) {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        store.brushColor.opacity(0.95),
-                                        store.brushColor.opacity(0.32)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 82, height: 82)
-                            .overlay(
-                                Circle()
-                                    .fill(StudioTheme.Palette.textPrimary)
-                                    .frame(
-                                        width: min(68, max(12, store.brushRadius * 4)),
-                                        height: min(68, max(12, store.brushRadius * 4))
+                    if currentTool == .fill {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            store.brushColor.opacity(0.95),
+                                            store.brushColor.opacity(0.32)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
-                            )
+                                )
+                                .frame(width: 72, height: 72)
+                                .overlay(
+                                    Image(systemName: "paintbrush.fill")
+                                        .font(.system(size: 26, weight: .bold))
+                                        .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                )
 
-                        VStack(alignment: .leading, spacing: 8) {
-                            metricRow("Radius", value: "\(Int(store.brushRadius)) px")
-                            metricRow("Opacity", value: "\(Int(store.brushOpacity * 100))%")
-                            metricRow("Hardness", value: "\(Int(store.brushHardness * 100))%")
-                            metricRow("Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium")
+                            VStack(alignment: .leading, spacing: 6) {
+                                metricRow("Threshold", value: store.fillThresholdMode.title)
+                                metricRow(
+                                    store.fillThresholdMode == .opacity ? "Opacity Match" : "Color Match",
+                                    value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%"
+                                )
+                                metricRow("Expansion", value: "\(Int(store.fillExpansion)) px")
+                                metricRow("Color", value: store.selectedBrush?.name ?? "Custom Mix")
+                            }
+                        }
+                    } else {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            store.brushColor.opacity(0.95),
+                                            store.brushColor.opacity(0.32)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 72, height: 72)
+                                .overlay(
+                                    Circle()
+                                        .fill(StudioTheme.Palette.textPrimary)
+                                        .frame(
+                                            width: min(58, max(10, store.brushRadius * 3.4)),
+                                            height: min(58, max(10, store.brushRadius * 3.4))
+                                        )
+                                )
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                metricRow("Radius", value: "\(Int(store.brushRadius)) px")
+                                metricRow("Opacity", value: "\(Int(store.brushOpacity * 100))%")
+                                metricRow("Hardness", value: "\(Int(store.brushHardness * 100))%")
+                                metricRow("Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium")
+                            }
                         }
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionLabel("Preset Library")
+                VStack(alignment: .leading, spacing: 10) {
+                    if currentTool == .fill {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Threshold Mode")
+                                .font(StudioTheme.Typography.title(12))
+                                .foregroundStyle(.white.opacity(0.88))
+                            HStack(spacing: 8) {
+                                ForEach(FillThresholdMode.allCases) { mode in
+                                    let isSelected = store.fillThresholdMode == mode
+                                    Button {
+                                        store.send(.binding(.set(\.fillThresholdMode, mode)))
+                                    } label: {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
 
-                    ForEach(store.presets) { preset in
-                        Button {
-                            store.send(.selectPreset(preset))
-                        } label: {
-                            HStack(spacing: 12) {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 18, height: 18)
-                                Text(preset.name)
-                                    .font(StudioTheme.Typography.title(15))
-                                Spacer()
-                                if store.selectedBrush == preset {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(StudioTheme.Palette.accentBright)
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .stroke(isSelected ? Color.white.opacity(0.18) : StudioTheme.Palette.cardBorder, lineWidth: 1)
+
+                                            Text(mode.title)
+                                                .font(StudioTheme.Typography.label(12))
+                                                .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.72))
+                                                .padding(.horizontal, 12)
+                                        }
+                                        .frame(maxWidth: .infinity, minHeight: 46)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .foregroundStyle(.white.opacity(0.88))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .fill(store.selectedBrush == preset ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
-                            )
                         }
-                        .buttonStyle(.plain)
+                        sliderRow(
+                            title: store.fillThresholdMode == .opacity ? "Opacity Threshold" : "Color Threshold",
+                            value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%",
+                            slider: Group {
+                                if store.fillThresholdMode == .opacity {
+                                    Slider(value: $store.fillOpacityTolerance, in: 0.0...1.0)
+                                } else {
+                                    Slider(value: $store.fillColorTolerance, in: 0.0...1.0)
+                                }
+                            }
+                        )
+                        sliderRow(
+                            title: "Expansion",
+                            value: "\(Int(store.fillExpansion)) px",
+                            slider: Slider(value: $store.fillExpansion, in: 0...24, step: 1)
+                        )
+                    } else {
+                        sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
+                        sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
+                        sliderRow(title: "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
+                        sliderRow(title: "Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium", slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
-                    sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
-                    sliderRow(title: "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
-                    sliderRow(title: "Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium", slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
-                }
-                .padding(16)
+                .padding(14)
                 .background(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(StudioTheme.Palette.cardFill)
                 )
 
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(
                                     LinearGradient(
                                         colors: [
@@ -107,18 +158,18 @@ struct BrushPaletteView: View {
                                     )
                                 )
 
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(store.brushColor)
-                                .padding(5)
+                                .padding(4)
                         }
-                        .frame(width: 42, height: 42)
+                        .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Color Palette")
-                                .font(StudioTheme.Typography.title(15))
+                            Text(currentTool == .fill ? "Fill Color" : "Color Palette")
+                                .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
                             Text(store.selectedBrush?.name ?? "Custom Mix")
-                                .font(StudioTheme.Typography.body(12))
+                                .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
 
@@ -127,14 +178,14 @@ struct BrushPaletteView: View {
 
                     ColorPicker("", selection: $store.brushColor, supportsOpacity: false)
                         .labelsHidden()
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
                         .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .fill(StudioTheme.Palette.hairline)
                         )
 
-                    LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 10) {
+                    LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
                         ForEach(store.presets) { preset in
                             colorSwatch(color: preset.color, isSelected: store.selectedBrush == preset) {
                                 store.send(.selectPreset(preset))
@@ -148,13 +199,13 @@ struct BrushPaletteView: View {
                         }
                     }
                 }
-                .padding(16)
+                .padding(14)
                 .background(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(StudioTheme.Palette.cardFill)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
 
@@ -166,18 +217,18 @@ struct BrushPaletteView: View {
 
     private func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(StudioTheme.Typography.mono(11))
+            .font(StudioTheme.Typography.mono(10))
             .foregroundStyle(.white.opacity(0.48))
     }
 
     private func metricRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(StudioTheme.Typography.mono(11))
+                .font(StudioTheme.Typography.mono(10))
                 .foregroundStyle(.white.opacity(0.48))
             Spacer()
             Text(value)
-                .font(StudioTheme.Typography.title(13))
+                .font(StudioTheme.Typography.title(12))
                 .foregroundStyle(.white.opacity(0.92))
         }
     }
@@ -190,11 +241,13 @@ struct BrushPaletteView: View {
                     .foregroundStyle(.white.opacity(0.88))
                 Spacer()
                 Text(value)
-                    .font(StudioTheme.Typography.mono(11))
+                    .font(StudioTheme.Typography.mono(10))
                     .foregroundStyle(.white.opacity(0.5))
             }
             slider
                 .tint(StudioTheme.Palette.accentBright)
+                .frame(minHeight: 38)
+                .contentShape(Rectangle())
         }
     }
 
@@ -202,7 +255,7 @@ struct BrushPaletteView: View {
         Button(action: action) {
             Circle()
                 .fill(color)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
                 .overlay(
                     Circle()
                         .stroke(Color.white.opacity(0.95), lineWidth: 1.5)
@@ -214,6 +267,7 @@ struct BrushPaletteView: View {
                 )
         }
         .buttonStyle(.plain)
+        .minimumHitTarget()
     }
 }
 

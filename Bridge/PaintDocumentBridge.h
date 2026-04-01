@@ -34,6 +34,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CGFloat tiltInfluence;
 @property (nonatomic) CGFloat maxDarkness;
 @property (nonatomic) CGFloat pressureSensitivity;
+@property (nonatomic) NSInteger fillThresholdMode;
+@property (nonatomic) CGFloat fillOpacityTolerance;
+@property (nonatomic) CGFloat fillColorTolerance;
+@property (nonatomic) NSInteger fillExpansion;
 @property (nonatomic) uint8_t red;
 @property (nonatomic) uint8_t green;
 @property (nonatomic) uint8_t blue;
@@ -85,6 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point NS_SWIFT_NAME(beginStroke(brush:point:));
 - (void)appendStroke:(APStrokePoint *)point NS_SWIFT_NAME(appendStroke(point:));
 - (void)endStroke NS_SWIFT_NAME(endStroke());
+- (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush NS_SWIFT_NAME(fill(at:brush:));
 - (BOOL)canUndo NS_SWIFT_NAME(canUndo());
 - (BOOL)canRedo NS_SWIFT_NAME(canRedo());
 - (BOOL)undo NS_SWIFT_NAME(undo());
