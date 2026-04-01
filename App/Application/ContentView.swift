@@ -4,6 +4,9 @@ import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
+    @State private var showsNewCanvasSheet = false
+    @State private var newCanvasWidthText = ""
+    @State private var newCanvasHeightText = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,6 +61,9 @@ struct ContentView: View {
         )) { export in
             ShareSheet(items: [export.url])
         }
+        .sheet(isPresented: $showsNewCanvasSheet) {
+            newCanvasSheet
+        }
         .overlay(alignment: .bottom) {
             if let bannerMessage = store.bannerMessage {
                 BannerToast(message: bannerMessage)
@@ -69,6 +75,67 @@ struct ContentView: View {
                     }
             }
         }
+    }
+
+    private var canvasSizePresets: [(label: String, width: Int, height: Int)] {
+        [
+            (
+                "現在のサイズ (\(max(Int(store.canvas.canvasSize.width.rounded()), 1)) × \(max(Int(store.canvas.canvasSize.height.rounded()), 1)))",
+                max(Int(store.canvas.canvasSize.width.rounded()), 1),
+                max(Int(store.canvas.canvasSize.height.rounded()), 1)
+            ),
+            ("768 × 1024", 768, 1024),
+            ("1024 × 1024", 1024, 1024),
+            ("1152 × 1536", 1152, 1536),
+            ("1536 × 2048", 1536, 2048),
+            ("2048 × 2048", 2048, 2048)
+        ]
+    }
+
+    private var newCanvasSheet: some View {
+        NavigationStack {
+            Form {
+                Section("サイズ") {
+                    TextField("幅", text: $newCanvasWidthText)
+                        .keyboardType(.numberPad)
+
+                    TextField("高さ", text: $newCanvasHeightText)
+                        .keyboardType(.numberPad)
+                }
+            }
+            .navigationTitle("新規キャンバス")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") {
+                        showsNewCanvasSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("作成") {
+                        guard
+                            let width = parsedCanvasDimension(from: newCanvasWidthText),
+                            let height = parsedCanvasDimension(from: newCanvasHeightText)
+                        else { return }
+                        store.send(.newCanvasRequested(width: width, height: height))
+                        showsNewCanvasSheet = false
+                    }
+                    .disabled(
+                        parsedCanvasDimension(from: newCanvasWidthText) == nil ||
+                        parsedCanvasDimension(from: newCanvasHeightText) == nil
+                    )
+                }
+            }
+        }
+        .presentationDetents([.height(340)])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func parsedCanvasDimension(from text: String) -> Int? {
+        let digits = text.filter(\.isNumber)
+        guard let value = Int(digits), (64...8192).contains(value) else { return nil }
+        return value
     }
 
     private var menuBar: some View {
@@ -105,8 +172,21 @@ struct ContentView: View {
             }
 
             menuBarMenu("ファイル") {
-                Button("新規キャンバス") {}
-                    .disabled(true)
+                Menu("新規キャンバス") {
+                    ForEach(canvasSizePresets, id: \.label) { preset in
+                        Button(preset.label) {
+                            store.send(.newCanvasRequested(width: preset.width, height: preset.height))
+                        }
+                    }
+
+                    Divider()
+
+                    Button("カスタムサイズ...") {
+                        newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+                        newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                        showsNewCanvasSheet = true
+                    }
+                }
                 Button("開く") {}
                     .disabled(true)
                 Button("保存") {

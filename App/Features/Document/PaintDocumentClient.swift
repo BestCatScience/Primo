@@ -6,6 +6,7 @@ struct PaintDocumentClient: Sendable {
     var presentation: @Sendable () -> PaintDocumentPresentation
     var compositePNGData: @Sendable () -> Data?
     var timelapseCapture: @Sendable () -> TimelapseCapture?
+    var newCanvas: @Sendable (Int, Int) -> Void
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
@@ -28,6 +29,9 @@ struct PaintDocumentClient: Sendable {
             presentation: { sessionBox.session.presentation() },
             compositePNGData: { sessionBox.session.compositePNGData() },
             timelapseCapture: { sessionBox.session.timelapseCapture() },
+            newCanvas: { width, height in
+                sessionBox.session = PaintDocumentSession(width: width, height: height)
+            },
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
             endStroke: { sessionBox.session.endStroke() },
@@ -47,7 +51,7 @@ struct PaintDocumentClient: Sendable {
 }
 
 private final class PaintDocumentSessionBox: @unchecked Sendable {
-    lazy var session = PaintDocumentSession()
+    var session = PaintDocumentSession()
 }
 
 private enum PaintDocumentClientKey: DependencyKey {

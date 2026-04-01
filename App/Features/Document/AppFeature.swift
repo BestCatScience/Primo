@@ -188,6 +188,7 @@ struct AppFeature {
         case loadPresentationAfterLaunch
         case deferredPresentationRefresh
         case refreshPresentationRequested
+        case newCanvasRequested(width: Int, height: Int)
         case undoRequested
         case redoRequested
         case saveDocumentRequested
@@ -270,6 +271,22 @@ struct AppFeature {
                 .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case .refreshPresentationRequested:
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .newCanvasRequested(width, height):
+                let width = max(width, 1)
+                let height = max(height, 1)
+                paintDocumentClient.newCanvas(width, height)
+                state.canvas = CanvasFeature.State()
+                state.canvas.canvasSize = CGSize(width: width, height: height)
+                state.layerSidebar = LayerSidebarFeature.State()
+                state.brushPalette = BrushPaletteFeature.State()
+                state.brushPanel = StudioPanelLayoutState(side: .leading)
+                state.layerPanel = StudioPanelLayoutState(side: .trailing)
+                state.stackedPanelOrder = [.brush, .layers]
+                state.exportSheet = nil
+                state.bannerMessage = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
