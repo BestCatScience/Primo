@@ -298,47 +298,40 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         return;
     }
 
-    const float curvedPressure = evaluatePressureCurve(point.pressure, activeBrush_.pressureSensitivity);
-    const float altitude = clamp01(std::sin(std::max(0.05F, point.altitude)));
-    const float tiltRatio = std::max(0.18F, altitude);
-    const float velocityFactor = std::exp(-point.speed * activeBrush_.velocityInfluence);
-    const float effectiveOpacity = clamp01(activeBrush_.opacity * (0.15F + (curvedPressure * 0.85F)) * velocityFactor * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence * 0.35F));
-    const float majorRadius = std::max(0.75F, activeBrush_.radius * (0.08F + (curvedPressure * 1.2F)) / lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
-    const float minorRadius = std::max(0.6F, majorRadius * lerp(1.0F, tiltRatio, activeBrush_.tiltInfluence));
-    const float maxRadius = std::max(majorRadius, minorRadius);
-    const int minX = std::max(0, static_cast<int>(std::floor(point.x - maxRadius - 1.0F)));
-    const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + maxRadius + 1.0F)));
-    const int minY = std::max(0, static_cast<int>(std::floor(point.y - maxRadius - 1.0F)));
-    const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + maxRadius + 1.0F)));
+    const float clampedPressure = std::clamp(point.pressure, 0.08F, 1.0F);
+    const float clampedSensitivity = clamp01(activeBrush_.pressureSensitivity);
+    const float pressureScale = (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
+    const float radius = std::max(0.4F, activeBrush_.radius * pressureScale);
+    const float effectiveOpacity = clamp01(activeBrush_.opacity);
+    const int minX = std::max(0, static_cast<int>(std::floor(point.x - radius - 1.0F)));
+    const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + radius + 1.0F)));
+    const int minY = std::max(0, static_cast<int>(std::floor(point.y - radius - 1.0F)));
+    const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + radius + 1.0F)));
     dirtyRect_.expand(minX, minY, maxX, maxY);
-    const float cosAngle = std::cos(point.azimuth);
-    const float sinAngle = std::sin(point.azimuth);
 
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
             const float dx = (static_cast<float>(x) + 0.5F) - point.x;
             const float dy = (static_cast<float>(y) + 0.5F) - point.y;
-            const float localX = (dx * cosAngle) + (dy * sinAngle);
-            const float localY = (-dx * sinAngle) + (dy * cosAngle);
-            const float ellipse = std::sqrt(((localX * localX) / (majorRadius * majorRadius)) +
-                                            ((localY * localY) / (minorRadius * minorRadius)));
-            const float distance = ellipse;
+            const float distance = std::sqrt((dx * dx) + (dy * dy)) / radius;
             if (distance >= 1.0F) {
                 continue;
             }
 
-            const float edge = 1.0F - distance;
-            const float softness = std::max(0.001F, 1.0F - activeBrush_.hardness);
-            const float falloff = std::pow(edge, 1.0F / softness);
-            const float grain = std::pow(smoothNoise(static_cast<float>(x) * activeBrush_.grainScale,
-                                                     static_cast<float>(y) * activeBrush_.grainScale),
-                                         activeBrush_.grainContrast);
-            const float paper = smoothNoise(static_cast<float>(x) * activeBrush_.paperScale,
-                                            static_cast<float>(y) * activeBrush_.paperScale);
-            const float paperMask = lerp(1.0F - activeBrush_.paperStrength,
-                                         1.0F,
-                                         smoothstep(activeBrush_.paperThreshold, 1.0F, paper));
-            const float alpha = clamp01(effectiveOpacity * falloff * lerp(0.65F, 1.0F, grain) * paperMask);
+            const float clampedHardness = clamp01(activeBrush_.hardness);
+            float falloff = 1.0F;
+            if (clampedHardness < 0.995F) {
+                const float edge = 1.0F - distance;
+                const float effectiveHardness = std::pow(clampedHardness, 3.2F);
+                if (distance <= effectiveHardness) {
+                    falloff = 1.0F;
+                } else {
+                    const float span = std::max(0.001F, 1.0F - effectiveHardness);
+                    const float normalized = clamp01((distance - effectiveHardness) / span);
+                    falloff = 1.0F - normalized;
+                }
+            }
+            const float alpha = clamp01(effectiveOpacity * falloff);
             auto* pixel = &layer.pixels[(static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U];
             blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha);
         }
@@ -393,11 +386,10 @@ void PaintDocument::rebuildComposite() const {
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
             const size_t offset = (static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U;
-            const float paper = smoothNoise(static_cast<float>(x) * 0.08F, static_cast<float>(y) * 0.08F);
-            const uint8_t tone = static_cast<uint8_t>(236.0F + (paper * 16.0F));
+            const uint8_t tone = 239U;
             compositeBuffer_[offset] = tone;
             compositeBuffer_[offset + 1U] = tone;
-            compositeBuffer_[offset + 2U] = static_cast<uint8_t>(tone - 3U);
+            compositeBuffer_[offset + 2U] = 236U;
             compositeBuffer_[offset + 3U] = 255U;
         }
     }

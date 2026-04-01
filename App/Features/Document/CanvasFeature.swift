@@ -52,6 +52,8 @@ struct CanvasFeature {
         case appendSamples([StylusSample])
         case endStroke
         case commitStroke([StylusSample])
+        case requestUndo
+        case requestRedo
     }
 
     var body: some ReducerOf<Self> {
@@ -62,12 +64,10 @@ struct CanvasFeature {
                 return .none
 
             case .requestLocalUndo:
-                state.localUndoTicket &+= 1
-                return .none
+                return .send(.delegate(.requestUndo))
 
             case .requestLocalRedo:
-                state.localRedoTicket &+= 1
-                return .none
+                return .send(.delegate(.requestRedo))
 
             case let .viewportOffsetChanged(offset):
                 state.viewportOffset = offset

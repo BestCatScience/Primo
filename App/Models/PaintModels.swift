@@ -260,6 +260,17 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
     }
 }
 
+struct TimelapseFrame: Equatable, Sendable {
+    let imageData: Data
+    let size: CGSize
+}
+
+struct TimelapseCapture: Equatable, Sendable {
+    let canvasSize: CGSize
+    let frames: [TimelapseFrame]
+    let framesPerSecond: Int
+}
+
 struct MetalDocumentSnapshot: Equatable {
     let width: Int
     let height: Int

@@ -18,6 +18,7 @@ struct CanvasView: UIViewRepresentable {
         uiView.documentSize = store.canvasSize
         uiView.update(
             snapshot: store.renderSnapshot,
+            incrementalUpdate: store.pendingIncrementalUpdate,
             activeStroke: store.activeStroke,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
@@ -34,6 +35,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
+    private let metalCanvasView = MetalCanvasView()
     private let imageView = UIImageView()
     private let committedImageView = UIImageView()
     private let inFlightImageView = UIImageView()
@@ -82,16 +84,22 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return SIMD2(Float(point.x), Float(point.y))
         }
 
+        metalCanvasView.isUserInteractionEnabled = false
+        addSubview(metalCanvasView)
+
         imageView.contentMode = .scaleToFill
         imageView.isUserInteractionEnabled = false
+        imageView.isHidden = true
         addSubview(imageView)
 
         committedImageView.contentMode = .scaleToFill
         committedImageView.isUserInteractionEnabled = false
+        committedImageView.isHidden = true
         addSubview(committedImageView)
 
         inFlightImageView.contentMode = .scaleToFill
         inFlightImageView.isUserInteractionEnabled = false
+        inFlightImageView.isHidden = true
         addSubview(inFlightImageView)
 
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
@@ -125,6 +133,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        metalCanvasView.frame = bounds
         imageView.frame = contentRect()
         committedImageView.frame = contentRect()
         inFlightImageView.frame = contentRect()
@@ -132,6 +141,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     func update(
         snapshot: MetalDocumentSnapshot?,
+        incrementalUpdate: IncrementalLayerUpdate?,
         activeStroke: Stroke?,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
@@ -146,6 +156,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         applyUndoRedoTickets(undoTicket: undoTicket, redoTicket: redoTicket)
+        metalCanvasView.updateDocumentSize(documentSize)
+        metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
+        if let incrementalUpdate {
+            metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
+        }
 
         let frame = contentRect()
         imageView.frame = frame
@@ -167,8 +182,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         if snapshot.revision != cachedRevision {
             cachedRevision = snapshot.revision
             cachedCompositeImage = renderCompositeImage(from: snapshot)
-            if committedRasterImage == nil {
+            if committedRasterImage == nil || snapshotContainsVisibleInk(snapshot) {
                 committedRasterImage = cachedCompositeImage
+                committedImageView.image = committedRasterImage
+                inFlightRasterImage = nil
+                inFlightImageView.image = nil
             }
         }
         if appliedRasterResetTicket != rasterResetTicket {
@@ -205,47 +223,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func didUpdateStroke(_ stroke: Stroke) {
-        let points = stroke.confirmedPreviewPoints
-        guard !points.isEmpty else { return }
-        guard documentSize.width > 0, documentSize.height > 0 else { return }
-        inFlightRasterImage = rasterizedStrokeSegment(
-            points: points,
-            style: currentPreviewStyle,
-            onto: nil,
-            documentSize: documentSize,
-            includesLeadingPoint: true
-        )
-        inFlightImageView.image = inFlightRasterImage
         sendAction?(.strokeUpdated(stroke))
     }
 
     func didEndStroke(_ stroke: Stroke) {
-        defer {
-            sendAction?(.strokeEnded(stroke))
-        }
-        defer {
-            inFlightRasterImage = nil
-            inFlightImageView.image = nil
-        }
-        guard documentSize.width > 0, documentSize.height > 0 else { return }
-
-        pushUndoSnapshot()
-        redoStack.removeAll(keepingCapacity: true)
-        if let inFlightRasterImage {
-            committedRasterImage = compositedRaster(
-                base: committedRasterImage,
-                overlay: inFlightRasterImage,
-                documentSize: documentSize
-            )
-        } else if !stroke.confirmedPreviewPoints.isEmpty {
-            committedRasterImage = rasterizedCommittedStroke(
-                points: stroke.confirmedPreviewPoints,
-                style: currentPreviewStyle,
-                onto: committedRasterImage,
-                documentSize: documentSize
-            )
-        }
-        committedImageView.image = committedRasterImage
+        sendAction?(.strokeEnded(stroke))
     }
 
     private func applyUndoRedoTickets(undoTicket: Int, redoTicket: Int) {
@@ -476,6 +458,23 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         guard let cgImage = context.makeImage() else { return nil }
         return UIImage(cgImage: cgImage)
+    }
+
+    private func snapshotContainsVisibleInk(_ snapshot: MetalDocumentSnapshot) -> Bool {
+        snapshot.layers.contains { layer in
+            guard layer.visible else { return false }
+            return layer.pixelData.withUnsafeBytes { bytes in
+                guard let pixels = bytes.bindMemory(to: UInt8.self).baseAddress else { return false }
+                let count = layer.pixelData.count / 4
+                for index in 0..<count {
+                    let alpha = pixels[(index * 4) + 3]
+                    if alpha > 8 {
+                        return true
+                    }
+                }
+                return false
+            }
+        }
     }
 
     private func makeLayerImage(pixelData: Data, width: Int, height: Int) -> CGImage? {

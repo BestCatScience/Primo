@@ -35,10 +35,10 @@ private enum MetalCanvasRendererCache {
 
             if let metalDevice {
                 self.vertexBuffer = metalDevice.makeBuffer(bytes: [
-                    MetalQuadVertex(position: SIMD2<Float>(0, 0), uv: SIMD2<Float>(0, 1)),
-                    MetalQuadVertex(position: SIMD2<Float>(1, 0), uv: SIMD2<Float>(1, 1)),
-                    MetalQuadVertex(position: SIMD2<Float>(0, 1), uv: SIMD2<Float>(0, 0)),
-                    MetalQuadVertex(position: SIMD2<Float>(1, 1), uv: SIMD2<Float>(1, 0))
+                    MetalQuadVertex(position: SIMD2<Float>(0, 0), uv: SIMD2<Float>(0, 0)),
+                    MetalQuadVertex(position: SIMD2<Float>(1, 0), uv: SIMD2<Float>(1, 0)),
+                    MetalQuadVertex(position: SIMD2<Float>(0, 1), uv: SIMD2<Float>(0, 1)),
+                    MetalQuadVertex(position: SIMD2<Float>(1, 1), uv: SIMD2<Float>(1, 1))
                 ], length: MemoryLayout<MetalQuadVertex>.stride * 4)
 
                 let library = metalDevice.makeDefaultLibrary()

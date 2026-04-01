@@ -37,16 +37,9 @@ vertex VertexOut canvasVertex(
     return out;
 }
 
-float noise(float2 st) {
-    return fract(sin(dot(st, float2(12.9898, 78.233))) * 43758.5453123);
-}
-
 fragment float4 paperFragment(VertexOut in [[stage_in]],
                               constant MetalQuadUniforms& uniforms [[buffer(0)]]) {
-    float coarse = noise((in.paperUV * 180.0) + uniforms.paperSeed);
-    float fine = noise((in.paperUV * 600.0) + 1.7);
-    float warm = 0.93 + (coarse * 0.05) + (fine * 0.015);
-    return float4(warm, warm * 0.992, warm * 0.972, 1.0);
+    return float4(0.93, 0.93, 0.91, 1.0);
 }
 
 fragment float4 layerFragment(VertexOut in [[stage_in]],

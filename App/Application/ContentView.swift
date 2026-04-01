@@ -115,6 +115,9 @@ struct ContentView: View {
                 Button("書き出し") {
                     store.send(.exportDocumentRequested)
                 }
+                Button("タイムラプスを書き出し") {
+                    store.send(.exportTimelapseRequested)
+                }
             }
 
             menuBarMenu("編集") {
