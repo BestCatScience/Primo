@@ -152,6 +152,9 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     func updateDocumentSize(_ size: CGSize) {
         if documentSize != size {
             documentSize = size
+            if let currentDevice = device, size.width > 0, size.height > 0 {
+                _ = ensureCompositeTexture(device: currentDevice)
+            }
             scheduleRedraw()
         }
     }

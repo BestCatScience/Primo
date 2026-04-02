@@ -286,7 +286,7 @@ void PaintDocument::clearLayer(int index) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(index);
     std::fill(layers_[index].pixels.begin(), layers_[index].pixels.end(), 0U);
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -299,7 +299,7 @@ void PaintDocument::setLayerVisibility(int index, bool visible) {
     if (layers_[index].visible == visible) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(index);
     layers_[index].visible = visible;
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -313,7 +313,7 @@ void PaintDocument::setLayerOpacity(int index, float opacity) {
     if (layers_[index].opacity == clamped) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(index);
     layers_[index].opacity = clamped;
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -326,7 +326,7 @@ void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
     if (layers_[index].blendMode == blendMode) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(index);
     layers_[index].blendMode = blendMode;
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -340,7 +340,7 @@ void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixel
     if (pixels.size() != layer.pixels.size()) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(index);
     std::copy(pixels.begin(), pixels.end(), layer.pixels.begin());
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -357,7 +357,7 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(activeLayerIndex_);
     activeBrush_ = brush;
     previousPoint_ = point;
     strokeInFlight_ = true;
@@ -428,7 +428,7 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
         return;
     }
 
-    pushHistorySnapshot();
+    pushLayerHistorySnapshot(activeLayerIndex_);
 
     std::queue<std::pair<int, int>> queue;
     queue.push({x, y});
@@ -548,12 +548,24 @@ bool PaintDocument::undo() {
 
     HistorySnapshot current;
     current.activeLayerIndex = activeLayerIndex_;
-    current.layers = layers_;
+    if (undoStack_.back().capturesEntireDocument) {
+        current.capturesEntireDocument = true;
+        current.layers = layers_;
+    } else {
+        current.layerIndex = undoStack_.back().layerIndex;
+        if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
+            current.layer = layers_[current.layerIndex];
+        }
+    }
     redoStack_.push_back(std::move(current));
 
     HistorySnapshot snapshot = std::move(undoStack_.back());
     undoStack_.pop_back();
-    layers_ = std::move(snapshot.layers);
+    if (snapshot.capturesEntireDocument) {
+        layers_ = std::move(snapshot.layers);
+    } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
+        layers_[snapshot.layerIndex] = std::move(snapshot.layer);
+    }
     activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
     strokeInFlight_ = false;
     markEntireDocumentDirty();
@@ -568,7 +580,15 @@ bool PaintDocument::redo() {
 
     HistorySnapshot current;
     current.activeLayerIndex = activeLayerIndex_;
-    current.layers = layers_;
+    if (redoStack_.back().capturesEntireDocument) {
+        current.capturesEntireDocument = true;
+        current.layers = layers_;
+    } else {
+        current.layerIndex = redoStack_.back().layerIndex;
+        if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
+            current.layer = layers_[current.layerIndex];
+        }
+    }
     undoStack_.push_back(std::move(current));
     if (undoStack_.size() > kMaxHistoryDepth) {
         undoStack_.erase(undoStack_.begin());
@@ -576,7 +596,11 @@ bool PaintDocument::redo() {
 
     HistorySnapshot snapshot = std::move(redoStack_.back());
     redoStack_.pop_back();
-    layers_ = std::move(snapshot.layers);
+    if (snapshot.capturesEntireDocument) {
+        layers_ = std::move(snapshot.layers);
+    } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
+        layers_[snapshot.layerIndex] = std::move(snapshot.layer);
+    }
     activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
     strokeInFlight_ = false;
     markEntireDocumentDirty();
@@ -638,8 +662,25 @@ void PaintDocument::pushHistorySnapshot() {
     }
 
     HistorySnapshot snapshot;
+    snapshot.capturesEntireDocument = true;
     snapshot.activeLayerIndex = activeLayerIndex_;
     snapshot.layers = layers_;
+    undoStack_.push_back(std::move(snapshot));
+    if (undoStack_.size() > kMaxHistoryDepth) {
+        undoStack_.erase(undoStack_.begin());
+    }
+    redoStack_.clear();
+}
+
+void PaintDocument::pushLayerHistorySnapshot(int layerIndex) {
+    if (strokeInFlight_ || layerIndex < 0 || layerIndex >= layerCount()) {
+        return;
+    }
+
+    HistorySnapshot snapshot;
+    snapshot.activeLayerIndex = activeLayerIndex_;
+    snapshot.layerIndex = layerIndex;
+    snapshot.layer = layers_[layerIndex];
     undoStack_.push_back(std::move(snapshot));
     if (undoStack_.size() > kMaxHistoryDepth) {
         undoStack_.erase(undoStack_.begin());

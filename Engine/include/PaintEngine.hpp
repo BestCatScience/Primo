@@ -152,7 +152,10 @@ public:
 
 private:
     struct HistorySnapshot {
+        bool capturesEntireDocument = false;
         int activeLayerIndex = 0;
+        int layerIndex = -1;
+        Layer layer;
         std::vector<Layer> layers;
     };
 
@@ -172,6 +175,7 @@ private:
     mutable bool compositeDirty_ = true;
 
     void pushHistorySnapshot();
+    void pushLayerHistorySnapshot(int layerIndex);
     void markEntireDocumentDirty() noexcept;
     void stampDab(Layer& layer, const StrokePoint& point);
     void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha);

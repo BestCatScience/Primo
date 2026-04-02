@@ -86,6 +86,10 @@ final class PaintDocumentSession: @unchecked Sendable {
         )
     }
 
+    func prewarmDrawingResources() {
+        _ = bridge.compositePixelData()
+    }
+
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
         activeStrokeLayerIndex = Int(bridge.activeLayerIndex)
         bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))

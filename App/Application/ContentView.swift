@@ -666,44 +666,41 @@ struct ContentView: View {
     }
 
     private var toolDock: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 8) {
             ForEach(studioTools) { tool in
                 let isActive = store.canvas.currentTool == tool
 
                 Button {
                     store.send(.toolSelected(tool))
                 } label: {
-                    VStack(spacing: 6) {
-                        Image(systemName: tool.systemImage)
-                            .font(.system(size: 16, weight: .bold))
-                        Text(tool.localizedTitle(language))
-                            .font(StudioTheme.Typography.label(9))
-                    }
+                    Image(systemName: tool.systemImage)
+                        .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 42, height: 42)
                     .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
                 .minimumHitTarget()
+                .accessibilityLabel(tool.localizedTitle(language))
             }
 
             Spacer()
         }
-        .padding(10)
-        .frame(width: 82)
+        .padding(8)
+        .frame(width: 60)
         .background(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(StudioTheme.Palette.cardFill)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         )
     }

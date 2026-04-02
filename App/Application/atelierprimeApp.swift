@@ -10,6 +10,7 @@ struct atelierprimeApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(store: store)
+                .statusBarHidden(true)
         }
     }
 }

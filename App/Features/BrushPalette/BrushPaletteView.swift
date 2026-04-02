@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
@@ -369,12 +370,11 @@ struct BrushPaletteView: View {
                         Spacer(minLength: 0)
                     }
 
-                    ColorPicker("", selection: $store.brushColor, supportsOpacity: false)
-                        .labelsHidden()
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                    SpectrumColorControl(color: $store.brushColor)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .fill(StudioTheme.Palette.hairline)
                         )
 
@@ -449,11 +449,15 @@ struct BrushPaletteView: View {
                     }
                     .tint(StudioTheme.Palette.accentBright)
 
-                    ColorPicker(language == .japanese ? "用紙の色" : "Paper Color", selection: $store.paperColor, supportsOpacity: false)
-                        .font(StudioTheme.Typography.title(12))
-                        .foregroundStyle(.white.opacity(0.88))
+                    SpectrumColorControl(color: $store.paperColor)
                         .disabled(store.transparentPaper)
                         .opacity(store.transparentPaper ? 0.45 : 1.0)
+                        .overlay {
+                            if store.transparentPaper {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(StudioTheme.Palette.overlayBlack.opacity(0.18))
+                            }
+                        }
                 }
                 .padding(14)
                 .background(
@@ -679,6 +683,186 @@ private extension BrushPaletteView {
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct SpectrumColorControl: View {
+    @Binding var color: Color
+    @State private var activeRegion: ActiveRegion?
+
+    private let ringWidth: CGFloat = 18
+    private let gap: CGFloat = 10
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = min(geometry.size.width, geometry.size.height)
+            let outerRect = CGRect(
+                x: (geometry.size.width - size) / 2,
+                y: (geometry.size.height - size) / 2,
+                width: size,
+                height: size
+            )
+            let squareSide = max(size - ((ringWidth + gap) * 2), 24)
+            let squareRect = CGRect(
+                x: outerRect.midX - (squareSide / 2),
+                y: outerRect.midY - (squareSide / 2),
+                width: squareSide,
+                height: squareSide
+            )
+            let hsb = ColorHSB(color: color)
+            let ringIndicator = ringIndicatorPoint(in: outerRect, hue: hsb.hue)
+            let squareIndicator = CGPoint(
+                x: squareRect.minX + (hsb.saturation * squareRect.width),
+                y: squareRect.minY + ((1 - hsb.brightness) * squareRect.height)
+            )
+
+            ZStack {
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                .red, .yellow, .green, .cyan, .blue, .purple, .red
+                            ]),
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
+                    )
+                    .frame(width: outerRect.width, height: outerRect.height)
+                    .position(x: outerRect.midX, y: outerRect.midY)
+
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(hue: hsb.hue, saturation: 1, brightness: 1))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white, .clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, .black],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                    }
+                    .frame(width: squareRect.width, height: squareRect.height)
+                    .position(x: squareRect.midX, y: squareRect.midY)
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.black.opacity(0.24), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                    .position(x: ringIndicator.x, y: ringIndicator.y)
+
+                Circle()
+                    .fill(color)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.95), lineWidth: 2)
+                    )
+                    .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                    .position(x: squareIndicator.x, y: squareIndicator.y)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if activeRegion == nil {
+                            activeRegion = hitRegion(at: value.location, outerRect: outerRect, squareRect: squareRect)
+                        }
+
+                        switch activeRegion {
+                        case .square:
+                            updateSquare(at: value.location, within: squareRect, hue: hsb.hue)
+                        case .ring:
+                            updateRing(at: value.location, within: outerRect, current: hsb)
+                        case .none:
+                            break
+                        }
+                    }
+                    .onEnded { _ in
+                        activeRegion = nil
+                    }
+            )
+        }
+        .frame(height: 176)
+    }
+
+    private func hitRegion(at point: CGPoint, outerRect: CGRect, squareRect: CGRect) -> ActiveRegion? {
+        if squareRect.contains(point) {
+            return .square
+        }
+
+        let dx = point.x - outerRect.midX
+        let dy = point.y - outerRect.midY
+        let distance = sqrt((dx * dx) + (dy * dy))
+        let outerRadius = outerRect.width / 2
+        let innerRadius = outerRadius - ringWidth
+        if distance >= innerRadius && distance <= outerRadius {
+            return .ring
+        }
+
+        return nil
+    }
+
+    private func updateRing(at point: CGPoint, within rect: CGRect, current: ColorHSB) {
+        let dx = point.x - rect.midX
+        let dy = point.y - rect.midY
+        let angle = atan2(dy, dx) + (.pi / 2)
+        let normalized = (angle < 0 ? angle + (.pi * 2) : angle) / (.pi * 2)
+        color = Color(hue: normalized, saturation: current.saturation, brightness: current.brightness)
+    }
+
+    private func updateSquare(at point: CGPoint, within rect: CGRect, hue: Double) {
+        let clampedX = min(max(point.x, rect.minX), rect.maxX)
+        let clampedY = min(max(point.y, rect.minY), rect.maxY)
+        let saturation = (clampedX - rect.minX) / rect.width
+        let brightness = 1 - ((clampedY - rect.minY) / rect.height)
+        color = Color(hue: hue, saturation: saturation, brightness: brightness)
+    }
+
+    private func ringIndicatorPoint(in rect: CGRect, hue: Double) -> CGPoint {
+        let angle = (hue * .pi * 2) - (.pi / 2)
+        let radius = (rect.width - ringWidth) / 2
+        return CGPoint(
+            x: rect.midX + (cos(angle) * radius),
+            y: rect.midY + (sin(angle) * radius)
+        )
+    }
+
+    private enum ActiveRegion {
+        case ring
+        case square
+    }
+}
+
+private struct ColorHSB {
+    let hue: Double
+    let saturation: Double
+    let brightness: Double
+
+    init(color: Color) {
+        let resolved = UIColor(color)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        resolved.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        self.hue = Double(hue)
+        self.saturation = Double(saturation)
+        self.brightness = Double(brightness)
     }
 }
 

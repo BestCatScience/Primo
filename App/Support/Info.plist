@@ -18,6 +18,10 @@
   <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>UIStatusBarHidden</key>
+  <true/>
+  <key>UIViewControllerBasedStatusBarAppearance</key>
+  <false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 		<key>UILaunchScreen</key>

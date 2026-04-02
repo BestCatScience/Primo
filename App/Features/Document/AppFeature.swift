@@ -41,6 +41,7 @@ struct AppFeature {
     private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
     private enum CancelID {
         case deferredPresentationRefresh
+        case startupPresentationLoad
     }
 
     @ObservableState
@@ -267,6 +268,7 @@ struct AppFeature {
                     let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
                     Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
                     await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                    paintDocumentClient.prewarmDrawingResources()
                     await send(.loadPresentationAfterLaunch)
                 }
 
@@ -279,7 +281,7 @@ struct AppFeature {
             case .loadPresentationAfterLaunch:
                 return .run { [paintDocumentClient] send in
                     let clock = ContinuousClock()
-                    try? await Task.sleep(for: .milliseconds(150))
+                    try? await Task.sleep(for: .milliseconds(600))
 
                     let presentationStart = clock.now
                     Self.startupLogger.debug("Loading full presentation after initial launch")
@@ -288,6 +290,7 @@ struct AppFeature {
                     Self.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
                     await send(.presentationLoaded(presentation))
                 }
+                .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
 
             case let .presentationLoaded(presentation):
                 state.applyPresentation(presentation)
@@ -314,6 +317,7 @@ struct AppFeature {
                 let width = max(width, 1)
                 let height = max(height, 1)
                 paintDocumentClient.newCanvas(width, height)
+                paintDocumentClient.prewarmDrawingResources()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.canvas = CanvasFeature.State()
                 state.canvas.canvasSize = CGSize(width: width, height: height)
@@ -544,9 +548,15 @@ struct AppFeature {
                 state.canvas.selection = nil
                 paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
                 if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                    return .concatenate(
+                        .cancel(id: CancelID.startupPresentationLoad),
+                        .send(.canvas(.applyIncrementalUpdate(update)))
+                    )
                 }
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 for sample in samples {
@@ -576,9 +586,15 @@ struct AppFeature {
                 paintDocumentClient.fill(sample, state.resolvedBrushSettings())
                 state.canvas.selection = nil
                 if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                    return .concatenate(
+                        .cancel(id: CancelID.startupPresentationLoad),
+                        .send(.canvas(.applyIncrementalUpdate(update)))
+                    )
                 }
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
 
             case let .canvas(.delegate(.lassoSelect(points))):
                 let incomingSelection = Self.makeLassoSelection(
