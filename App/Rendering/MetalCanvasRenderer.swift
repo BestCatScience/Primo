@@ -72,10 +72,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private let layerPipeline: MTLRenderPipelineState?
     private let paperPipeline: MTLRenderPipelineState?
     private let vertexBuffer: MTLBuffer?
-    private var layerTextures: [Int: MTLTexture] = [:]
-    private var layerOpacities: [Int: Float] = [:]
-    private var layerVisibilities: [Int: Bool] = [:]
-    private var layerOrder: [Int] = []
+    private var compositeTexture: MTLTexture?
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var appliedRevision: Int = -1
     private var viewportOffset: CGSize = .zero
@@ -130,18 +127,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
 
     func applyIncrementalUpdate(_ update: IncrementalLayerUpdate) {
         guard let currentDevice = device, !update.isEmpty else { return }
-        let texture = ensureLayerTexture(index: update.layerIndex, device: currentDevice)
+        let texture = ensureCompositeTexture(device: currentDevice)
         guard let texture else { return }
-        if !layerOrder.contains(update.layerIndex) {
-            layerOrder.append(update.layerIndex)
-            layerOrder.sort()
-        }
-        if layerOpacities[update.layerIndex] == nil {
-            layerOpacities[update.layerIndex] = 1.0
-        }
-        if layerVisibilities[update.layerIndex] == nil {
-            layerVisibilities[update.layerIndex] = true
-        }
 
         let maxWidth = max(0, texture.width - update.originX)
         let maxHeight = max(0, texture.height - update.originY)
@@ -225,7 +212,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
             encoder?.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        if !layerTextures.isEmpty, let layerPipeline {
+        if let compositeTexture, let layerPipeline {
             var layerUniforms = MetalQuadUniforms(
                 origin: SIMD2<Float>(Float(contentRect.minX * contentScaleFactor), Float(contentRect.minY * contentScaleFactor)),
                 size: SIMD2<Float>(Float(contentRect.width * contentScaleFactor), Float(contentRect.height * contentScaleFactor)),
@@ -237,16 +224,9 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
 
             encoder?.setRenderPipelineState(layerPipeline)
             encoder?.setVertexBytes(&layerUniforms, length: MemoryLayout<MetalQuadUniforms>.stride, index: 1)
-
-            for layerIndex in layerOrder {
-                guard layerVisibilities[layerIndex] ?? true else { continue }
-                guard let texture = layerTextures[layerIndex] else { continue }
-                var fragmentUniforms = layerUniforms
-                fragmentUniforms.opacity = layerOpacities[layerIndex] ?? 1.0
-                encoder?.setFragmentTexture(texture, index: 0)
-                encoder?.setFragmentBytes(&fragmentUniforms, length: MemoryLayout<MetalQuadUniforms>.stride, index: 0)
-                encoder?.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-            }
+            encoder?.setFragmentTexture(compositeTexture, index: 0)
+            encoder?.setFragmentBytes(&layerUniforms, length: MemoryLayout<MetalQuadUniforms>.stride, index: 0)
+            encoder?.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
         encoder?.endEncoding()
@@ -263,39 +243,26 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         let clock = ContinuousClock()
         let start = clock.now
 
-        layerOrder = snapshot.layers.map(\.index)
-        layerOpacities = [:]
-        layerVisibilities = [:]
-
-        for layer in snapshot.layers {
-            layerOpacities[layer.index] = layer.opacity
-            layerVisibilities[layer.index] = layer.visible
-
-            let texture = ensureLayerTexture(index: layer.index, device: device)
-            layer.pixelData.withUnsafeBytes { bytes in
-                if let baseAddress = bytes.baseAddress {
-                    texture?.replace(
-                        region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
-                        mipmapLevel: 0,
-                        withBytes: baseAddress,
-                        bytesPerRow: snapshot.width * 4
-                    )
-                }
+        let texture = ensureCompositeTexture(device: device)
+        snapshot.compositePixelData.withUnsafeBytes { bytes in
+            if let baseAddress = bytes.baseAddress {
+                texture?.replace(
+                    region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
+                    mipmapLevel: 0,
+                    withBytes: baseAddress,
+                    bytesPerRow: snapshot.width * 4
+                )
             }
         }
 
-        // Remove textures for layers that no longer exist
-        let validIndices = Set(snapshot.layers.map(\.index))
-        layerTextures = layerTextures.filter { validIndices.contains($0.key) }
-
         appliedRevision = snapshot.revision
         let duration = start.duration(to: clock.now)
-        let megabytes = snapshot.layers.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
-        Self.logger.debug("Applied snapshot revision \(snapshot.revision) with \(snapshot.layers.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
+        let megabytes = snapshot.compositePixelData.count / 1_048_576
+        Self.logger.debug("Applied composite snapshot revision \(snapshot.revision) with \(megabytes) MB in \(String(describing: duration), privacy: .public)")
     }
 
-    private func ensureLayerTexture(index: Int, device: MTLDevice) -> MTLTexture? {
-        if let existing = layerTextures[index] {
+    private func ensureCompositeTexture(device: MTLDevice) -> MTLTexture? {
+        if let existing = compositeTexture {
             let currentWidth = Int(documentSize.width)
             let currentHeight = Int(documentSize.height)
             if existing.width == currentWidth && existing.height == currentHeight {
@@ -325,7 +292,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
                     )
                 }
             }
-            layerTextures[index] = texture
+            compositeTexture = texture
         }
         return texture
     }

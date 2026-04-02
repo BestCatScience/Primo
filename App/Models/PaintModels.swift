@@ -14,19 +14,23 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     var id: String { rawValue }
 
     var title: String {
+        localizedTitle(.english)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .brush:
-            return "Brush"
+            return language == .japanese ? "ブラシ" : "Brush"
         case .erase:
-            return "Erase"
+            return language == .japanese ? "消しゴム" : "Erase"
         case .fill:
-            return "Fill"
+            return language == .japanese ? "塗りつぶし" : "Fill"
         case .select:
-            return "Select"
+            return language == .japanese ? "選択" : "Select"
         case .move:
-            return "Move"
+            return language == .japanese ? "移動" : "Move"
         case .shape:
-            return "Shape"
+            return language == .japanese ? "図形" : "Shape"
         }
     }
 
@@ -55,11 +59,15 @@ enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     var id: String { rawValue }
 
     var title: String {
+        localizedTitle(.english)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .opacity:
-            return "Opacity"
+            return language == .japanese ? "不透明度" : "Opacity"
         case .color:
-            return "Color"
+            return language == .japanese ? "色" : "Color"
         }
     }
 }
@@ -71,11 +79,15 @@ enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     var id: String { rawValue }
 
     var title: String {
+        localizedTitle(.english)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .lasso:
-            return "Lasso"
+            return language == .japanese ? "投げ縄" : "Lasso"
         case .auto:
-            return "Auto"
+            return language == .japanese ? "自動" : "Auto"
         }
     }
 }
@@ -88,13 +100,115 @@ enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiab
     var id: String { rawValue }
 
     var title: String {
+        localizedTitle(.english)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .replace:
-            return "Replace"
+            return language == .japanese ? "置換" : "Replace"
         case .add:
-            return "Add"
+            return language == .japanese ? "加算" : "Add"
         case .subtract:
-            return "Subtract"
+            return language == .japanese ? "減算" : "Subtract"
+        }
+    }
+}
+
+enum LayerBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case normal
+    case darken
+    case multiply
+    case colorBurn
+    case linearBurn
+    case subtract
+    case lighten
+    case screen
+    case colorDodge
+    case glowDodge
+    case overlay
+    case softLight
+    case hardLight
+    case difference
+    case vividLight
+    case linearLight
+    case pinLight
+    case hardMix
+    case exclusion
+    case darkerColor
+    case lighterColor
+    case divide
+    case hue
+    case saturation
+    case color
+    case add
+    case addGlow
+    case luminosity
+
+    var id: String { rawValue }
+
+    var title: String {
+        localizedTitle(.japanese)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .normal:
+            return language == .japanese ? "通常" : "Normal"
+        case .darken:
+            return language == .japanese ? "比較(暗)" : "Darken"
+        case .multiply:
+            return language == .japanese ? "乗算" : "Multiply"
+        case .colorBurn:
+            return language == .japanese ? "焼き込みカラー" : "Color Burn"
+        case .linearBurn:
+            return language == .japanese ? "焼き込み(リニア)" : "Linear Burn"
+        case .subtract:
+            return language == .japanese ? "減算" : "Subtract"
+        case .lighten:
+            return language == .japanese ? "比較(明)" : "Lighten"
+        case .screen:
+            return language == .japanese ? "スクリーン" : "Screen"
+        case .colorDodge:
+            return language == .japanese ? "覆い焼きカラー" : "Color Dodge"
+        case .glowDodge:
+            return language == .japanese ? "覆い焼き(発光)" : "Glow Dodge"
+        case .overlay:
+            return language == .japanese ? "オーバーレイ" : "Overlay"
+        case .softLight:
+            return language == .japanese ? "ソフトライト" : "Soft Light"
+        case .hardLight:
+            return language == .japanese ? "ハードライト" : "Hard Light"
+        case .difference:
+            return language == .japanese ? "差の絶対値" : "Difference"
+        case .vividLight:
+            return language == .japanese ? "ビビッドライト" : "Vivid Light"
+        case .linearLight:
+            return language == .japanese ? "リニアライト" : "Linear Light"
+        case .pinLight:
+            return language == .japanese ? "ピンライト" : "Pin Light"
+        case .hardMix:
+            return language == .japanese ? "ハードミックス" : "Hard Mix"
+        case .exclusion:
+            return language == .japanese ? "除外" : "Exclusion"
+        case .darkerColor:
+            return language == .japanese ? "カラー比較(暗)" : "Darker Color"
+        case .lighterColor:
+            return language == .japanese ? "カラー比較(明)" : "Lighter Color"
+        case .divide:
+            return language == .japanese ? "除算" : "Divide"
+        case .hue:
+            return language == .japanese ? "色相" : "Hue"
+        case .saturation:
+            return language == .japanese ? "彩度" : "Saturation"
+        case .color:
+            return language == .japanese ? "カラー" : "Color"
+        case .add:
+            return language == .japanese ? "加算" : "Add"
+        case .addGlow:
+            return language == .japanese ? "加算(発光)" : "Add Glow"
+        case .luminosity:
+            return language == .japanese ? "輝度" : "Luminosity"
         }
     }
 }
@@ -108,15 +222,19 @@ enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     var id: String { rawValue }
 
     var title: String {
+        localizedTitle(.english)
+    }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .pencil:
-            return "Pencil"
+            return language == .japanese ? "鉛筆" : "Pencil"
         case .ink:
-            return "Ink"
+            return language == .japanese ? "インク" : "Ink"
         case .oil:
-            return "Oil"
+            return language == .japanese ? "油彩" : "Oil"
         case .airbrush:
-            return "Airbrush"
+            return language == .japanese ? "エアブラシ" : "Airbrush"
         }
     }
 
@@ -267,12 +385,14 @@ struct LayerRowModel: Identifiable, Equatable {
     let name: String
     let visible: Bool
     let opacity: Double
+    let blendMode: LayerBlendMode
 
     static func == (lhs: LayerRowModel, rhs: LayerRowModel) -> Bool {
         lhs.index == rhs.index &&
         lhs.name == rhs.name &&
         lhs.visible == rhs.visible &&
-        lhs.opacity == rhs.opacity
+        lhs.opacity == rhs.opacity &&
+        lhs.blendMode == rhs.blendMode
     }
 }
 
@@ -282,6 +402,7 @@ struct LayerCanvasBuffer: Identifiable, Equatable {
     var name: String
     var visible: Bool
     var opacity: Double
+    var blendMode: LayerBlendMode = .normal
     var strokes: [PreviewStrokeTrack] = []
 }
 
@@ -387,6 +508,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
     let index: Int
     let opacity: Float
     let visible: Bool
+    let blendMode: LayerBlendMode
     let thumbnailData: Data?
     let pixelData: Data
 
@@ -394,6 +516,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
         lhs.index == rhs.index &&
         lhs.opacity == rhs.opacity &&
         lhs.visible == rhs.visible &&
+        lhs.blendMode == rhs.blendMode &&
         lhs.thumbnailData?.count == rhs.thumbnailData?.count &&
         lhs.pixelData.count == rhs.pixelData.count
     }
@@ -414,12 +537,14 @@ struct MetalDocumentSnapshot: Equatable {
     let width: Int
     let height: Int
     let revision: Int
+    let compositePixelData: Data
     let layers: [MetalLayerSnapshot]
 
     static func == (lhs: MetalDocumentSnapshot, rhs: MetalDocumentSnapshot) -> Bool {
         lhs.width == rhs.width &&
         lhs.height == rhs.height &&
         lhs.revision == rhs.revision &&
+        lhs.compositePixelData.count == rhs.compositePixelData.count &&
         lhs.layers.count == rhs.layers.count
     }
 }

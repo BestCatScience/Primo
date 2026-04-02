@@ -16,12 +16,12 @@ enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
 
-    var title: String {
+    func title(_ language: AppLanguage) -> String {
         switch self {
         case .brush:
-            return "Brush"
+            return language == .japanese ? "ブラシ" : "Brush"
         case .layers:
-            return "Layers"
+            return language == .japanese ? "レイヤー" : "Layers"
         }
     }
 }
@@ -54,6 +54,7 @@ struct AppFeature {
         var stackedPanelOrder: [StudioPanelKind] = [.brush, .layers]
         var exportSheet: ShareExport?
         var bannerMessage: String?
+        var appLanguage: AppLanguage = .load()
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
             canvas.canvasSize = presentation.canvasSize
@@ -66,11 +67,13 @@ struct AppFeature {
                     index: row.index,
                     name: row.name,
                     visible: row.visible,
-                    opacity: row.opacity
+                    opacity: row.opacity,
+                    blendMode: row.blendMode
                 )
                 buffer.name = row.name
                 buffer.visible = row.visible
                 buffer.opacity = row.opacity
+                buffer.blendMode = row.blendMode
                 nextBuffers.append(buffer)
             }
             canvas.layerBuffers = nextBuffers
@@ -218,6 +221,7 @@ struct AppFeature {
         case exportTimelapseRequested
         case exportSheetDismissed
         case bannerDismissed
+        case languageChanged(AppLanguage)
         case toolSelected(StudioToolKind)
         case clearActiveLayerButtonTapped
         case activeLayerVisibilityToggled
@@ -249,6 +253,7 @@ struct AppFeature {
             switch action {
             case .task:
                 state.isHydrating = true
+                state.appLanguage = .load()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 Self.startupLogger.debug("AppFeature.task started")
                 return .run { [paintDocumentClient] send in
@@ -298,6 +303,11 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case let .languageChanged(language):
+                state.appLanguage = language
+                language.persist()
+                return .none
+
             case let .newCanvasRequested(width, height):
                 let width = max(width, 1)
                 let height = max(height, 1)
@@ -317,7 +327,7 @@ struct AppFeature {
 
             case .undoRequested:
                 guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = "描画中は取り消しできません"
+                    state.bannerMessage = state.appLanguage == .japanese ? "描画中は取り消しできません" : "Undo is unavailable while drawing"
                     return .none
                 }
                 guard paintDocumentClient.undo() else {
@@ -329,7 +339,7 @@ struct AppFeature {
 
             case .redoRequested:
                 guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = "描画中はやり直しできません"
+                    state.bannerMessage = state.appLanguage == .japanese ? "描画中はやり直しできません" : "Redo is unavailable while drawing"
                     return .none
                 }
                 guard paintDocumentClient.redo() else {
@@ -341,33 +351,33 @@ struct AppFeature {
 
             case .saveDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = "保存に失敗しました"
+                    state.bannerMessage = state.appLanguage == .japanese ? "保存に失敗しました" : "Save failed"
                     return .none
                 }
                 do {
                     let url = try Self.writePNGToDocuments(data: pngData)
-                    state.bannerMessage = "保存しました: \(url.lastPathComponent)"
+                    state.bannerMessage = state.appLanguage == .japanese ? "保存しました: \(url.lastPathComponent)" : "Saved: \(url.lastPathComponent)"
                 } catch {
-                    state.bannerMessage = "保存に失敗しました"
+                    state.bannerMessage = state.appLanguage == .japanese ? "保存に失敗しました" : "Save failed"
                 }
                 return .none
 
             case .exportDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = "書き出しに失敗しました"
+                    state.bannerMessage = state.appLanguage == .japanese ? "書き出しに失敗しました" : "Export failed"
                     return .none
                 }
                 do {
                     let url = try Self.writePNGToTemporaryDirectory(data: pngData)
                     state.exportSheet = ShareExport(url: url)
                 } catch {
-                    state.bannerMessage = "書き出しに失敗しました"
+                    state.bannerMessage = state.appLanguage == .japanese ? "書き出しに失敗しました" : "Export failed"
                 }
                 return .none
 
             case .exportTimelapseRequested:
                 guard let capture = paintDocumentClient.timelapseCapture() else {
-                    state.bannerMessage = "タイムラプス用の描画履歴がまだ足りません"
+                    state.bannerMessage = state.appLanguage == .japanese ? "タイムラプス用の描画履歴がまだ足りません" : "Not enough drawing history for timelapse yet"
                     return .none
                 }
                 do {
@@ -377,7 +387,7 @@ struct AppFeature {
                     )
                     state.exportSheet = ShareExport(url: url)
                 } catch {
-                    state.bannerMessage = "タイムラプスの書き出しに失敗しました"
+                    state.bannerMessage = state.appLanguage == .japanese ? "タイムラプスの書き出しに失敗しました" : "Timelapse export failed"
                 }
                 return .none
 
@@ -514,6 +524,12 @@ struct AppFeature {
                     return .none
                 }
                 paintDocumentClient.setLayerVisibility(index, !layer.visible)
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.setBlendMode(index, blendMode))):
+                paintDocumentClient.setLayerBlendMode(index, blendMode)
                 state.canvas.selection = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none

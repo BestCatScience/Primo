@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var showsNewCanvasSheet = false
     @State private var newCanvasWidthText = ""
     @State private var newCanvasHeightText = ""
+    private var language: AppLanguage { store.appLanguage }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -96,24 +97,24 @@ struct ContentView: View {
         NavigationStack {
             Form {
                 Section("サイズ") {
-                    TextField("幅", text: $newCanvasWidthText)
+                    TextField(StudioStrings.width(language), text: $newCanvasWidthText)
                         .keyboardType(.numberPad)
 
-                    TextField("高さ", text: $newCanvasHeightText)
+                    TextField(StudioStrings.height(language), text: $newCanvasHeightText)
                         .keyboardType(.numberPad)
                 }
             }
-            .navigationTitle("新規キャンバス")
+            .navigationTitle(StudioStrings.newCanvas(language))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") {
+                    Button(StudioStrings.cancel(language)) {
                         showsNewCanvasSheet = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("作成") {
+                    Button(StudioStrings.create(language)) {
                         guard
                             let width = parsedCanvasDimension(from: newCanvasWidthText),
                             let height = parsedCanvasDimension(from: newCanvasHeightText)
@@ -145,34 +146,50 @@ struct ContentView: View {
                     .fill(StudioTheme.Palette.accent)
                     .frame(width: 6, height: 6)
 
-                Text("atelierprime")
+                Text(StudioStrings.appName(language))
                     .font(StudioTheme.Typography.label(9))
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
             }
 
-            menuBarMenu("設定") {
-                Button(store.brushPanel.isCollapsed ? "ブラシパネルを表示" : "ブラシパネルを隠す") {
+            menuBarMenu(StudioStrings.settingsMenu(language)) {
+                Menu(StudioStrings.languageMenu(language)) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Button {
+                            store.send(.languageChanged(option))
+                        } label: {
+                            if option == language {
+                                Label(option.title, systemImage: "checkmark")
+                            } else {
+                                Text(option.title)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button(store.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
                     store.send(.panelCollapseToggled(.brush))
                 }
 
-                Button(store.layerPanel.isCollapsed ? "レイヤーパネルを表示" : "レイヤーパネルを隠す") {
+                Button(store.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
                     store.send(.panelCollapseToggled(.layers))
                 }
 
                 Divider()
 
-                Button(isStacked(.brush) || isStacked(.layers) ? "パネルの重なりを解除" : "パネルを重ねる") {
+                Button(isStacked(.brush) || isStacked(.layers) ? StudioStrings.unstackPanels(language) : StudioStrings.stackPanels(language)) {
                     store.send(.panelStackToggled(.brush))
                 }
 
-                Button("スタック順を入れ替え") {
+                Button(StudioStrings.swapStackOrder(language)) {
                     store.send(.panelStackOrderSwapRequested)
                 }
                 .disabled(!isStacked(.brush) && !isStacked(.layers))
             }
 
-            menuBarMenu("ファイル") {
-                Menu("新規キャンバス") {
+            menuBarMenu(StudioStrings.fileMenu(language)) {
+                Menu(StudioStrings.newCanvas(language)) {
                     ForEach(canvasSizePresets, id: \.label) { preset in
                         Button(preset.label) {
                             store.send(.newCanvasRequested(width: preset.width, height: preset.height))
@@ -181,69 +198,69 @@ struct ContentView: View {
 
                     Divider()
 
-                    Button("カスタムサイズ...") {
+                    Button(StudioStrings.customSize(language)) {
                         newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
                         newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
                         showsNewCanvasSheet = true
                     }
                 }
-                Button("開く") {}
+                Button(StudioStrings.open(language)) {}
                     .disabled(true)
-                Button("保存") {
+                Button(StudioStrings.save(language)) {
                     store.send(.saveDocumentRequested)
                 }
-                Button("書き出し") {
+                Button(StudioStrings.export(language)) {
                     store.send(.exportDocumentRequested)
                 }
-                Button("タイムラプスを書き出し") {
+                Button(StudioStrings.exportTimelapse(language)) {
                     store.send(.exportTimelapseRequested)
                 }
             }
 
-            menuBarMenu("編集") {
-                Button("アクティブレイヤーをクリア") {
+            menuBarMenu(StudioStrings.editMenu(language)) {
+                Button(StudioStrings.clearActiveLayer(language)) {
                     store.send(.clearActiveLayerButtonTapped)
                 }
 
-                Button("表示を更新") {
+                Button(StudioStrings.refreshView(language)) {
                     store.send(.refreshPresentationRequested)
                 }
             }
 
-            menuBarMenu("ページ管理") {
-                Button("ページを追加") {}
+            menuBarMenu(StudioStrings.pageMenu(language)) {
+                Button(StudioStrings.pagesAdd(language)) {}
                     .disabled(true)
-                Button("ページを複製") {}
+                Button(StudioStrings.pagesDuplicate(language)) {}
                     .disabled(true)
-                Button("ページを削除") {}
+                Button(StudioStrings.pagesDelete(language)) {}
                     .disabled(true)
             }
 
-            menuBarMenu("レイヤー") {
-                Button("新規レイヤー") {
+            menuBarMenu(StudioStrings.layerMenu(language)) {
+                Button(StudioStrings.addLayer(language)) {
                     store.send(.layerSidebar(.addLayerButtonTapped))
                 }
 
-                Button(activeLayerIsVisible ? "アクティブレイヤーを非表示" : "アクティブレイヤーを表示") {
+                Button(activeLayerIsVisible ? StudioStrings.hideActiveLayer(language) : StudioStrings.showActiveLayer(language)) {
                     store.send(.activeLayerVisibilityToggled)
                 }
                 .disabled(activeLayer == nil)
 
                 Divider()
 
-                Button("ひとつ上のレイヤーを選択") {
+                Button(StudioStrings.selectUpperLayer(language)) {
                     store.send(.selectPreviousLayer)
                 }
                 .disabled(!canSelectPreviousLayer)
 
-                Button("ひとつ下のレイヤーを選択") {
+                Button(StudioStrings.selectLowerLayer(language)) {
                     store.send(.selectNextLayer)
                 }
                 .disabled(!canSelectNextLayer)
 
                 Divider()
 
-                Button("アクティブレイヤーをクリア") {
+                Button(StudioStrings.clearActiveLayer(language)) {
                     store.send(.clearActiveLayerButtonTapped)
                 }
                 .disabled(activeLayer == nil)
@@ -533,7 +550,8 @@ struct ContentView: View {
         let isStacked = isStacked(panel)
 
         StudioPanelShell(
-            title: panel.title,
+            title: panel.title(language),
+            language: language,
             side: panelState.side,
             isCollapsed: panelState.isCollapsed,
             isStacked: isStacked,
@@ -554,6 +572,7 @@ struct ContentView: View {
                     currentTool: store.canvas.currentTool,
                     hasSelection: store.canvas.selection != nil,
                     transformPreviewOffset: store.canvas.transformPreviewOffset,
+                    language: language,
                     showsTitle: false
                 )
             case .layers:
@@ -563,6 +582,7 @@ struct ContentView: View {
                         action: \.layerSidebar
                     ),
                     layerSnapshots: store.canvas.renderSnapshot?.layers ?? [],
+                    language: language,
                     showsTitle: false
                 )
             }
@@ -655,7 +675,7 @@ struct ContentView: View {
                     VStack(spacing: 6) {
                         Image(systemName: tool.systemImage)
                             .font(.system(size: 16, weight: .bold))
-                        Text(tool.title)
+                        Text(tool.localizedTitle(language))
                             .font(StudioTheme.Typography.label(9))
                     }
                     .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
@@ -782,6 +802,7 @@ private let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .select, .mo
 
 private struct StudioPanelShell<Content: View>: View {
     let title: String
+    let language: AppLanguage
     let side: StudioPanelSide
     let isCollapsed: Bool
     let isStacked: Bool
@@ -796,6 +817,7 @@ private struct StudioPanelShell<Content: View>: View {
 
     init(
         title: String,
+        language: AppLanguage,
         side: StudioPanelSide,
         isCollapsed: Bool,
         isStacked: Bool,
@@ -806,6 +828,7 @@ private struct StudioPanelShell<Content: View>: View {
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.language = language
         self.side = side
         self.isCollapsed = isCollapsed
         self.isStacked = isStacked
@@ -868,7 +891,11 @@ private struct StudioPanelShell<Content: View>: View {
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
 
-                    Text(isStacked ? "Drag sideways to move, up/down to reorder" : "Drag sideways to move")
+                    Text(
+                        language == .japanese
+                        ? (isStacked ? "左右ドラッグで移動、上下ドラッグで並び替え" : "左右ドラッグで移動")
+                        : (isStacked ? "Drag sideways to move, up/down to reorder" : "Drag sideways to move")
+                    )
                         .font(StudioTheme.Typography.mono(10))
                         .foregroundStyle(StudioTheme.Palette.textMuted)
                         .lineLimit(1)
@@ -909,7 +936,11 @@ private struct StudioPanelShell<Content: View>: View {
     }
 
     private var dragBadge: some View {
-        Text(side == .leading ? "Drop to right rail" : "Drop to left rail")
+        Text(
+            language == .japanese
+            ? (side == .leading ? "右レールへ移動" : "左レールへ移動")
+            : (side == .leading ? "Drop to right rail" : "Drop to left rail")
+        )
             .font(StudioTheme.Typography.mono(10))
             .foregroundStyle(.white.opacity(0.82))
             .padding(.horizontal, 10)

@@ -78,9 +78,41 @@ struct DirtyRect {
 };
 
 struct Layer {
+    enum class BlendMode {
+        Normal,
+        Darken,
+        Multiply,
+        ColorBurn,
+        LinearBurn,
+        Subtract,
+        Lighten,
+        Screen,
+        Add,
+        ColorDodge,
+        GlowDodge,
+        Overlay,
+        SoftLight,
+        HardLight,
+        Difference,
+        VividLight,
+        LinearLight,
+        PinLight,
+        HardMix,
+        Exclusion,
+        DarkerColor,
+        LighterColor,
+        Divide,
+        Hue,
+        Saturation,
+        Color,
+        AddGlow,
+        Luminosity,
+    };
+
     std::string name;
     bool visible = true;
     float opacity = 1.0F;
+    BlendMode blendMode = BlendMode::Normal;
     std::vector<uint8_t> pixels;
 };
 
@@ -99,6 +131,7 @@ public:
     void clearLayer(int index);
     void setLayerVisibility(int index, bool visible);
     void setLayerOpacity(int index, float opacity);
+    void setLayerBlendMode(int index, Layer::BlendMode blendMode);
     void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
     const Layer& layer(int index) const;
 
@@ -113,6 +146,7 @@ public:
 
     DirtyRect consumeDirtyRect() noexcept;
     std::vector<uint8_t> pixelDataForRect(int layerIndex, const DirtyRect& rect) const;
+    std::vector<uint8_t> compositePixelDataForRect(const DirtyRect& rect) const;
 
     std::span<const uint8_t> composite() const noexcept;
 

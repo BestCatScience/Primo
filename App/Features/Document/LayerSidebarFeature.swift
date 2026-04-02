@@ -14,6 +14,7 @@ struct LayerSidebarFeature {
         case addLayerButtonTapped
         case layerTapped(Int)
         case visibilityButtonTapped(Int)
+        case blendModeSelected(Int, LayerBlendMode)
         case delegate(Delegate)
     }
 
@@ -21,6 +22,7 @@ struct LayerSidebarFeature {
         case addLayer
         case selectLayer(Int)
         case toggleVisibility(Int)
+        case setBlendMode(Int, LayerBlendMode)
     }
 
     var body: some ReducerOf<Self> {
@@ -33,6 +35,8 @@ struct LayerSidebarFeature {
                 return .send(.delegate(.selectLayer(index)))
             case let .visibilityButtonTapped(index):
                 return .send(.delegate(.toggleVisibility(index)))
+            case let .blendModeSelected(index, blendMode):
+                return .send(.delegate(.setBlendMode(index, blendMode)))
             case .delegate:
                 return .none
             }

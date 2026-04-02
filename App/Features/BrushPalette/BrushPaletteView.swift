@@ -6,6 +6,7 @@ struct BrushPaletteView: View {
     let currentTool: StudioToolKind
     let hasSelection: Bool
     let transformPreviewOffset: CGSize
+    let language: AppLanguage
     var showsTitle = true
     private let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
@@ -42,13 +43,13 @@ struct BrushPaletteView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
-                                metricRow("Threshold", value: store.fillThresholdMode.title)
+                                metricRow(language == .japanese ? "しきい値" : "Threshold", value: store.fillThresholdMode.localizedTitle(language))
                                 metricRow(
-                                    store.fillThresholdMode == .opacity ? "Opacity Match" : "Color Match",
+                                    store.fillThresholdMode == .opacity ? (language == .japanese ? "不透明度一致" : "Opacity Match") : (language == .japanese ? "色一致" : "Color Match"),
                                     value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%"
                                 )
-                                metricRow("Expansion", value: "\(Int(store.fillExpansion)) px")
-                                metricRow("Color", value: store.selectedBrush?.name ?? "Custom Mix")
+                                metricRow(language == .japanese ? "拡張" : "Expansion", value: "\(Int(store.fillExpansion)) px")
+                                metricRow(language == .japanese ? "色" : "Color", value: store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix"))
                             }
                         }
                     } else if currentTool == .select {
@@ -72,19 +73,19 @@ struct BrushPaletteView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
-                                metricRow("Mode", value: store.selectionToolMode.title)
-                                metricRow("Combine", value: store.selectionCombineMode.title)
+                                metricRow(language == .japanese ? "モード" : "Mode", value: store.selectionToolMode.localizedTitle(language))
+                                metricRow(language == .japanese ? "合成" : "Combine", value: store.selectionCombineMode.localizedTitle(language))
                                 if store.selectionToolMode == .auto {
-                                    metricRow("Threshold", value: store.selectionThresholdMode.title)
+                                    metricRow(language == .japanese ? "しきい値" : "Threshold", value: store.selectionThresholdMode.localizedTitle(language))
                                     metricRow(
-                                        "Match",
+                                        language == .japanese ? "一致" : "Match",
                                         value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%"
                                     )
-                                    metricRow("Expansion", value: "\(Int(store.selectionExpansion)) px")
+                                    metricRow(language == .japanese ? "拡張" : "Expansion", value: "\(Int(store.selectionExpansion)) px")
                                 } else {
-                                    metricRow("Gesture", value: "Freehand")
-                                    metricRow("Behavior", value: "Close Path")
-                                    metricRow("Scope", value: "Active Layer")
+                                    metricRow(language == .japanese ? "入力" : "Gesture", value: language == .japanese ? "フリーハンド" : "Freehand")
+                                    metricRow(language == .japanese ? "動作" : "Behavior", value: language == .japanese ? "パスを閉じる" : "Close Path")
+                                    metricRow(language == .japanese ? "対象" : "Scope", value: language == .japanese ? "アクティブレイヤー" : "Active Layer")
                                 }
                             }
                         }
@@ -109,10 +110,10 @@ struct BrushPaletteView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
-                                metricRow("Target", value: hasSelection ? "Selection" : "Layer")
+                                metricRow(language == .japanese ? "対象" : "Target", value: hasSelection ? (language == .japanese ? "選択範囲" : "Selection") : (language == .japanese ? "レイヤー" : "Layer"))
                                 metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
                                 metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
-                                metricRow("State", value: transformPreviewOffset == .zero ? "Idle" : "Pending")
+                                metricRow(language == .japanese ? "状態" : "State", value: transformPreviewOffset == .zero ? (language == .japanese ? "待機" : "Idle") : (language == .japanese ? "未確定" : "Pending"))
                             }
                         }
                     } else {
@@ -139,11 +140,11 @@ struct BrushPaletteView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
-                                metricRow("Tip", value: store.brushTipKind.title)
-                                metricRow("Radius", value: "\(Int(store.brushRadius)) px")
-                                metricRow("Opacity", value: "\(Int(store.brushOpacity * 100))%")
-                                metricRow("Hardness", value: "\(Int(store.brushHardness * 100))%")
-                                metricRow("Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium")
+                                metricRow(language == .japanese ? "先端" : "Tip", value: store.brushTipKind.localizedTitle(language))
+                                metricRow(language == .japanese ? "半径" : "Radius", value: "\(Int(store.brushRadius)) px")
+                                metricRow(language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%")
+                                metricRow(language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%")
+                                metricRow(language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"))
                             }
                         }
                     }
@@ -152,18 +153,18 @@ struct BrushPaletteView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     if currentTool == .fill {
                         segmentedModeRow(
-                            title: "Threshold Mode",
-                            selectedTitle: store.fillThresholdMode.title
+                            title: language == .japanese ? "しきい値モード" : "Threshold Mode",
+                            selectedTitle: store.fillThresholdMode.localizedTitle(language)
                         ) {
-                            Picker("Threshold Mode", selection: $store.fillThresholdMode) {
+                            Picker(language == .japanese ? "しきい値モード" : "Threshold Mode", selection: $store.fillThresholdMode) {
                                 ForEach(FillThresholdMode.allCases) { mode in
-                                    Text(mode.title).tag(mode)
+                                    Text(mode.localizedTitle(language)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
                         }
                         sliderRow(
-                            title: store.fillThresholdMode == .opacity ? "Opacity Threshold" : "Color Threshold",
+                            title: store.fillThresholdMode == .opacity ? (language == .japanese ? "不透明度しきい値" : "Opacity Threshold") : (language == .japanese ? "色しきい値" : "Color Threshold"),
                             value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%",
                             slider: Group {
                                 if store.fillThresholdMode == .opacity {
@@ -174,47 +175,47 @@ struct BrushPaletteView: View {
                             }
                         )
                         sliderRow(
-                            title: "Expansion",
+                            title: language == .japanese ? "拡張" : "Expansion",
                             value: "\(Int(store.fillExpansion)) px",
                             slider: Slider(value: $store.fillExpansion, in: 0...24, step: 1)
                         )
                     } else if currentTool == .select {
                         segmentedModeRow(
-                            title: "Selection Action",
-                            selectedTitle: store.selectionCombineMode.title
+                            title: language == .japanese ? "選択アクション" : "Selection Action",
+                            selectedTitle: store.selectionCombineMode.localizedTitle(language)
                         ) {
-                            Picker("Selection Action", selection: $store.selectionCombineMode) {
+                            Picker(language == .japanese ? "選択アクション" : "Selection Action", selection: $store.selectionCombineMode) {
                                 ForEach(SelectionCombineMode.allCases) { mode in
-                                    Text(mode.title).tag(mode)
+                                    Text(mode.localizedTitle(language)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
                         }
                         segmentedModeRow(
-                            title: "Selection Mode",
-                            selectedTitle: store.selectionToolMode.title
+                            title: language == .japanese ? "選択モード" : "Selection Mode",
+                            selectedTitle: store.selectionToolMode.localizedTitle(language)
                         ) {
-                            Picker("Selection Mode", selection: $store.selectionToolMode) {
+                            Picker(language == .japanese ? "選択モード" : "Selection Mode", selection: $store.selectionToolMode) {
                                 ForEach(SelectionToolMode.allCases) { mode in
-                                    Text(mode.title).tag(mode)
+                                    Text(mode.localizedTitle(language)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
                         }
                         if store.selectionToolMode == .auto {
                             segmentedModeRow(
-                                title: "Threshold Mode",
-                                selectedTitle: store.selectionThresholdMode.title
+                                title: language == .japanese ? "しきい値モード" : "Threshold Mode",
+                                selectedTitle: store.selectionThresholdMode.localizedTitle(language)
                             ) {
-                                Picker("Selection Threshold Mode", selection: $store.selectionThresholdMode) {
+                                Picker(language == .japanese ? "選択しきい値モード" : "Selection Threshold Mode", selection: $store.selectionThresholdMode) {
                                     ForEach(FillThresholdMode.allCases) { mode in
-                                        Text(mode.title).tag(mode)
+                                        Text(mode.localizedTitle(language)).tag(mode)
                                     }
                                 }
                                 .pickerStyle(.segmented)
                             }
                             sliderRow(
-                                title: store.selectionThresholdMode == .opacity ? "Opacity Threshold" : "Color Threshold",
+                                title: store.selectionThresholdMode == .opacity ? (language == .japanese ? "不透明度しきい値" : "Opacity Threshold") : (language == .japanese ? "色しきい値" : "Color Threshold"),
                                 value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%",
                                 slider: Group {
                                     if store.selectionThresholdMode == .opacity {
@@ -225,7 +226,7 @@ struct BrushPaletteView: View {
                                 }
                             )
                             sliderRow(
-                                title: "Expansion",
+                                title: language == .japanese ? "拡張" : "Expansion",
                                 value: "\(Int(store.selectionExpansion)) px",
                                 slider: Slider(value: $store.selectionExpansion, in: 0...24, step: 1)
                             )
@@ -236,7 +237,7 @@ struct BrushPaletteView: View {
                             HStack {
                                 Image(systemName: "xmark.circle")
                                     .font(.system(size: 12, weight: .semibold))
-                                Text("Clear Selection")
+                                Text(language == .japanese ? "選択を解除" : "Clear Selection")
                                     .font(StudioTheme.Typography.label(12))
                                 Spacer(minLength: 0)
                             }
@@ -255,7 +256,7 @@ struct BrushPaletteView: View {
                         .buttonStyle(.plain)
                     } else if currentTool == .move {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text(hasSelection ? "Move the selected area with Pencil. Nothing is committed until you apply." : "Move the active layer with Pencil. Nothing is committed until you apply.")
+                            Text(hasSelection ? (language == .japanese ? "Apple Pencil で選択範囲を移動します。適用するまで確定されません。" : "Move the selected area with Pencil. Nothing is committed until you apply.") : (language == .japanese ? "Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。" : "Move the active layer with Pencil. Nothing is committed until you apply."))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.62))
 
@@ -266,7 +267,7 @@ struct BrushPaletteView: View {
                                     HStack {
                                         Image(systemName: "checkmark.circle")
                                             .font(.system(size: 12, weight: .semibold))
-                                        Text("Apply")
+                                        Text(language == .japanese ? "適用" : "Apply")
                                             .font(StudioTheme.Typography.label(12))
                                         Spacer(minLength: 0)
                                     }
@@ -286,7 +287,7 @@ struct BrushPaletteView: View {
                                     HStack {
                                         Image(systemName: "xmark.circle")
                                             .font(.system(size: 12, weight: .semibold))
-                                        Text("Cancel")
+                                        Text(language == .japanese ? "キャンセル" : "Cancel")
                                             .font(StudioTheme.Typography.label(12))
                                         Spacer(minLength: 0)
                                     }
@@ -307,8 +308,8 @@ struct BrushPaletteView: View {
                         }
                     } else {
                         segmentedModeRow(
-                            title: "Brush Tip",
-                            selectedTitle: store.brushTipKind.title
+                            title: language == .japanese ? "ブラシ先端" : "Brush Tip",
+                            selectedTitle: store.brushTipKind.localizedTitle(language)
                         ) {
                             VStack(spacing: 8) {
                                 ForEach(BrushTipKind.allCases) { tipKind in
@@ -318,10 +319,10 @@ struct BrushPaletteView: View {
                                 }
                             }
                         }
-                        sliderRow(title: "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
-                        sliderRow(title: "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
-                        sliderRow(title: "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
-                        sliderRow(title: "Pressure", value: store.brushPressureSensitivity < 0.6 ? "Soft" : store.brushPressureSensitivity > 1.2 ? "Hard" : "Medium", slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
+                        sliderRow(title: language == .japanese ? "サイズ" : "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
+                        sliderRow(title: language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
+                        sliderRow(title: language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
+                        sliderRow(title: language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"), slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
                     }
                 }
                 .padding(14)
@@ -353,10 +354,10 @@ struct BrushPaletteView: View {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(currentTool == .fill ? "Fill Color" : "Brushes & Color")
+                            Text(currentTool == .fill ? (language == .japanese ? "塗り色" : "Fill Color") : (language == .japanese ? "ブラシと色" : "Brushes & Color"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(currentTool == .fill ? (store.selectedBrush?.name ?? "Custom Mix") : (store.selectedBrush?.name ?? "\(store.brushTipKind.title) Custom"))
+                            Text(currentTool == .fill ? (store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix")) : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language == .japanese ? "カスタム" : "Custom")"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -426,10 +427,10 @@ struct BrushPaletteView: View {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Paper")
+                            Text(language == .japanese ? "用紙" : "Paper")
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(store.transparentPaper ? "Transparent background" : "Custom paper color")
+                            Text(store.transparentPaper ? (language == .japanese ? "透明背景" : "Transparent background") : (language == .japanese ? "カスタム用紙色" : "Custom paper color"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -438,13 +439,13 @@ struct BrushPaletteView: View {
                     }
 
                     Toggle(isOn: $store.transparentPaper) {
-                        Text("Transparent Paper")
+                        Text(language == .japanese ? "透明な用紙" : "Transparent Paper")
                             .font(StudioTheme.Typography.title(12))
                             .foregroundStyle(.white.opacity(0.88))
                     }
                     .tint(StudioTheme.Palette.accentBright)
 
-                    ColorPicker("Paper Color", selection: $store.paperColor, supportsOpacity: false)
+                    ColorPicker(language == .japanese ? "用紙の色" : "Paper Color", selection: $store.paperColor, supportsOpacity: false)
                         .font(StudioTheme.Typography.title(12))
                         .foregroundStyle(.white.opacity(0.88))
                         .disabled(store.transparentPaper)
@@ -482,10 +483,10 @@ struct BrushPaletteView: View {
                             .frame(width: 38, height: 38)
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Selection")
+                                Text(language == .japanese ? "選択" : "Selection")
                                     .font(StudioTheme.Typography.title(14))
                                     .foregroundStyle(.white.opacity(0.9))
-                                Text(store.selectionToolMode == .lasso ? "Trace with Pencil, then use Move to transform" : "Tap to sample, then use Move to transform")
+                                Text(store.selectionToolMode == .lasso ? (language == .japanese ? "Apple Pencil で囲んだあと、移動ツールで変形します" : "Trace with Pencil, then use Move to transform") : (language == .japanese ? "タップで選択したあと、移動ツールで変形します" : "Tap to sample, then use Move to transform"))
                                     .font(StudioTheme.Typography.body(11))
                                     .foregroundStyle(.white.opacity(0.52))
                             }
@@ -513,26 +514,26 @@ struct BrushPaletteView: View {
     private var panelTitle: String {
         switch currentTool {
         case .fill:
-            return "Fill"
+            return currentTool.localizedTitle(language)
         case .select:
-            return "Select"
+            return currentTool.localizedTitle(language)
         case .move:
-            return "Move"
+            return currentTool.localizedTitle(language)
         default:
-            return "Brush"
+            return StudioToolKind.brush.localizedTitle(language)
         }
     }
 
     private var sectionTitle: String {
         switch currentTool {
         case .fill:
-            return "Fill Engine"
+            return language == .japanese ? "塗りつぶし設定" : "Fill Engine"
         case .select:
-            return "Selection"
+            return language == .japanese ? "選択設定" : "Selection"
         case .move:
-            return "Transform"
+            return language == .japanese ? "変形" : "Transform"
         default:
-            return "Brush Engine"
+            return language == .japanese ? "ブラシ設定" : "Brush Engine"
         }
     }
 
@@ -627,7 +628,7 @@ struct BrushPaletteView: View {
                     Text(preset.name)
                         .font(StudioTheme.Typography.label(11))
                         .foregroundStyle(.white.opacity(0.92))
-                    Text(preset.tipKind.title)
+                    Text(preset.tipKind.localizedTitle(language))
                         .font(StudioTheme.Typography.mono(9))
                         .foregroundStyle(.white.opacity(0.46))
                 }
@@ -655,7 +656,7 @@ private extension BrushPaletteView {
                     .font(.system(size: 12, weight: .semibold))
                     .frame(width: 16)
 
-                Text(tipKind.title)
+                Text(tipKind.localizedTitle(language))
                     .font(StudioTheme.Typography.label(11))
 
                 Spacer(minLength: 0)

@@ -405,7 +405,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                         blendPixel(
                             destination: destination + offset,
                             source: source + offset,
-                            opacity: CGFloat(layer.opacity)
+                            opacity: CGFloat(layer.opacity),
+                            blendMode: layer.blendMode
                         )
                     }
                 }
@@ -519,7 +520,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         return result
     }
 
-    private func blendPixel(destination: UnsafeMutablePointer<UInt8>, source: UnsafePointer<UInt8>, opacity: CGFloat) {
+    private func blendPixel(
+        destination: UnsafeMutablePointer<UInt8>,
+        source: UnsafePointer<UInt8>,
+        opacity: CGFloat,
+        blendMode: LayerBlendMode
+    ) {
         let srcAlpha = (CGFloat(source[3]) / 255.0) * opacity
         guard srcAlpha > 0.001 else { return }
         let dstAlpha = CGFloat(destination[3]) / 255.0
@@ -532,15 +538,215 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let dstR = CGFloat(destination[0]) / 255.0
         let dstG = CGFloat(destination[1]) / 255.0
         let dstB = CGFloat(destination[2]) / 255.0
+        let blended = blendColor(backdrop: (dstR, dstG, dstB), source: (srcR, srcG, srcB), blendMode: blendMode)
 
-        let outR = ((srcR * srcAlpha) + (dstR * dstAlpha * (1 - srcAlpha))) / outAlpha
-        let outG = ((srcG * srcAlpha) + (dstG * dstAlpha * (1 - srcAlpha))) / outAlpha
-        let outB = ((srcB * srcAlpha) + (dstB * dstAlpha * (1 - srcAlpha))) / outAlpha
+        let outR = (
+            srcAlpha * ((1 - dstAlpha) * srcR + (dstAlpha * blended.r)) +
+            (dstAlpha * (1 - srcAlpha) * dstR)
+        ) / outAlpha
+        let outG = (
+            srcAlpha * ((1 - dstAlpha) * srcG + (dstAlpha * blended.g)) +
+            (dstAlpha * (1 - srcAlpha) * dstG)
+        ) / outAlpha
+        let outB = (
+            srcAlpha * ((1 - dstAlpha) * srcB + (dstAlpha * blended.b)) +
+            (dstAlpha * (1 - srcAlpha) * dstB)
+        ) / outAlpha
 
         destination[0] = UInt8(max(0, min(255, Int((outR * 255.0).rounded()))))
         destination[1] = UInt8(max(0, min(255, Int((outG * 255.0).rounded()))))
         destination[2] = UInt8(max(0, min(255, Int((outB * 255.0).rounded()))))
         destination[3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+    }
+
+    private func blendColor(
+        backdrop: (r: CGFloat, g: CGFloat, b: CGFloat),
+        source: (r: CGFloat, g: CGFloat, b: CGFloat),
+        blendMode: LayerBlendMode
+    ) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        if blendMode == .darkerColor {
+            return luminosity(source) < luminosity(backdrop) ? source : backdrop
+        }
+
+        if blendMode == .lighterColor {
+            return luminosity(source) > luminosity(backdrop) ? source : backdrop
+        }
+
+        if blendMode == .hue {
+            var output = source
+            output = setSaturation(output, saturation(backdrop))
+            output = setLuminosity(output, luminosity(backdrop))
+            return (
+                r: max(0, min(1, output.r)),
+                g: max(0, min(1, output.g)),
+                b: max(0, min(1, output.b))
+            )
+        }
+
+        if blendMode == .saturation {
+            var output = backdrop
+            output = setSaturation(output, saturation(source))
+            output = setLuminosity(output, luminosity(backdrop))
+            return (
+                r: max(0, min(1, output.r)),
+                g: max(0, min(1, output.g)),
+                b: max(0, min(1, output.b))
+            )
+        }
+
+        if blendMode == .color {
+            var output = source
+            output = setSaturation(output, saturation(source))
+            output = setLuminosity(output, luminosity(backdrop))
+            return (
+                r: max(0, min(1, output.r)),
+                g: max(0, min(1, output.g)),
+                b: max(0, min(1, output.b))
+            )
+        }
+
+        if blendMode == .luminosity {
+            var output = backdrop
+            output = setLuminosity(output, luminosity(source))
+            return (
+                r: max(0, min(1, output.r)),
+                g: max(0, min(1, output.g)),
+                b: max(0, min(1, output.b))
+            )
+        }
+
+        return (
+            r: max(0, min(1, blendChannel(backdrop: backdrop.r, source: source.r, blendMode: blendMode))),
+            g: max(0, min(1, blendChannel(backdrop: backdrop.g, source: source.g, blendMode: blendMode))),
+            b: max(0, min(1, blendChannel(backdrop: backdrop.b, source: source.b, blendMode: blendMode)))
+        )
+    }
+
+    private func blendChannel(backdrop: CGFloat, source: CGFloat, blendMode: LayerBlendMode) -> CGFloat {
+        switch blendMode {
+        case .normal:
+            return source
+        case .darken:
+            return min(backdrop, source)
+        case .multiply:
+            return backdrop * source
+        case .colorBurn:
+            return source <= 0 ? 0 : max(0, 1 - ((1 - backdrop) / max(0.001, source)))
+        case .linearBurn:
+            return max(0, backdrop + source - 1)
+        case .subtract:
+            return max(0, backdrop - source)
+        case .lighten:
+            return max(backdrop, source)
+        case .screen:
+            return 1 - ((1 - backdrop) * (1 - source))
+        case .add:
+            return min(1, backdrop + source)
+        case .colorDodge:
+            return source >= 1 ? 1 : min(1, backdrop / max(0.001, 1 - source))
+        case .glowDodge:
+            return source >= 1 ? 1 : min(1, backdrop / max(0.0005, 1 - (source * 0.92)))
+        case .overlay:
+            return backdrop <= 0.5 ? (2 * backdrop * source) : (1 - 2 * (1 - backdrop) * (1 - source))
+        case .softLight:
+            return source <= 0.5
+                ? (backdrop - ((1 - 2 * source) * backdrop * (1 - backdrop)))
+                : (backdrop + ((2 * source - 1) * ((backdrop <= 0.25)
+                    ? ((((16 * backdrop - 12) * backdrop) + 4) * backdrop)
+                    : sqrt(backdrop)) - backdrop))
+        case .hardLight:
+            return source <= 0.5 ? (2 * backdrop * source) : (1 - 2 * (1 - backdrop) * (1 - source))
+        case .difference:
+            return abs(backdrop - source)
+        case .vividLight:
+            return source <= 0.5
+                ? blendChannel(backdrop: backdrop, source: 2 * source, blendMode: .colorBurn)
+                : blendChannel(backdrop: backdrop, source: 2 * (source - 0.5), blendMode: .colorDodge)
+        case .linearLight:
+            return max(0, min(1, backdrop + 2 * source - 1))
+        case .pinLight:
+            return source <= 0.5 ? min(backdrop, 2 * source) : max(backdrop, 2 * (source - 0.5))
+        case .hardMix:
+            return blendChannel(backdrop: backdrop, source: source, blendMode: .vividLight) < 0.5 ? 0 : 1
+        case .exclusion:
+            return backdrop + source - (2 * backdrop * source)
+        case .darkerColor, .lighterColor, .hue, .saturation, .color, .luminosity:
+            return source
+        case .divide:
+            return min(1, backdrop / max(0.001, source))
+        case .addGlow:
+            return min(1, backdrop + source * 1.35)
+        }
+    }
+
+    private func luminosity(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> CGFloat {
+        (0.3 * color.r) + (0.59 * color.g) + (0.11 * color.b)
+    }
+
+    private func saturation(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> CGFloat {
+        max(color.r, color.g, color.b) - min(color.r, color.g, color.b)
+    }
+
+    private func clipColor(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        let lum = luminosity(color)
+        let minimum = min(color.r, color.g, color.b)
+        let maximum = max(color.r, color.g, color.b)
+        var output = color
+
+        if minimum < 0 {
+            let scale = lum / max(0.001, lum - minimum)
+            output = (
+                r: lum + ((output.r - lum) * scale),
+                g: lum + ((output.g - lum) * scale),
+                b: lum + ((output.b - lum) * scale)
+            )
+        }
+
+        if maximum > 1 {
+            let adjustedMaximum = max(output.r, output.g, output.b)
+            let scale = (1 - lum) / max(0.001, adjustedMaximum - lum)
+            output = (
+                r: lum + ((output.r - lum) * scale),
+                g: lum + ((output.g - lum) * scale),
+                b: lum + ((output.b - lum) * scale)
+            )
+        }
+
+        return output
+    }
+
+    private func setLuminosity(_ color: (r: CGFloat, g: CGFloat, b: CGFloat), _ lum: CGFloat) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        let delta = lum - luminosity(color)
+        return clipColor(
+            (
+                r: color.r + delta,
+                g: color.g + delta,
+                b: color.b + delta
+            )
+        )
+    }
+
+    private func setSaturation(_ color: (r: CGFloat, g: CGFloat, b: CGFloat), _ sat: CGFloat) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
+        let original = [color.r, color.g, color.b]
+        var components = original
+        var minIndex = 0
+        var midIndex = 1
+        var maxIndex = 2
+
+        if original[minIndex] > original[midIndex] { swap(&minIndex, &midIndex) }
+        if original[midIndex] > original[maxIndex] { swap(&midIndex, &maxIndex) }
+        if original[minIndex] > original[midIndex] { swap(&minIndex, &midIndex) }
+
+        if original[maxIndex] > original[minIndex] {
+            components[midIndex] = ((original[midIndex] - original[minIndex]) * sat) / (original[maxIndex] - original[minIndex])
+            components[maxIndex] = sat
+        } else {
+            components[midIndex] = 0
+            components[maxIndex] = 0
+        }
+        components[minIndex] = 0
+
+        return (r: components[0], g: components[1], b: components[2])
     }
 
     private enum PanPhase {

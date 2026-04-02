@@ -27,7 +27,13 @@ final class PaintDocumentSession: @unchecked Sendable {
         let start = clock.now
         let infos = bridge.layerInfos()
         let rows = Array(infos.enumerated().map { index, layer in
-            LayerRowModel(index: index, name: layer.name, visible: layer.visible, opacity: layer.opacity)
+            LayerRowModel(
+                index: index,
+                name: layer.name,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal
+            )
         }.reversed())
         let duration = start.duration(to: clock.now)
         Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
@@ -49,12 +55,19 @@ final class PaintDocumentSession: @unchecked Sendable {
                 index: index,
                 opacity: Float(info.opacity),
                 visible: info.visible,
+                blendMode: LayerBlendMode(rawValue: info.blendMode) ?? .normal,
                 thumbnailData: cachedLayerThumbnailData(index: index),
                 pixelData: bridge.pixelDataForLayer(at: index) as Data
             )
         }
         let rows = Array(infos.enumerated().map { index, layer in
-            LayerRowModel(index: index, name: layer.name, visible: layer.visible, opacity: layer.opacity)
+            LayerRowModel(
+                index: index,
+                name: layer.name,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal
+            )
         }.reversed())
         let duration = start.duration(to: clock.now)
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
@@ -67,6 +80,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 width: bridge.width,
                 height: bridge.height,
                 revision: revision,
+                compositePixelData: bridge.compositePixelData() as Data,
                 layers: snapshots
             )
         )
@@ -140,6 +154,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) {
+        bridge.setLayerBlendMode(blendMode.rawValue, at: index)
+        invalidateThumbnailCache(for: index)
+        captureTimelapseFrame()
+    }
+
     func replaceLayerPixels(index: Int, data: Data) {
         bridge.replaceLayerPixels(at: index, data: data)
         invalidateThumbnailCache(for: index)
@@ -173,11 +193,10 @@ final class PaintDocumentSession: @unchecked Sendable {
     func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
         let dirtyRect = bridge.consumeDirtyRect()
         guard !dirtyRect.empty else { return nil }
-        let layerIndex = activeStrokeLayerIndex ?? Int(bridge.activeLayerIndex)
-        let pixelData = bridge.pixelDataForLayer(at: layerIndex, in: dirtyRect) as Data
+        let pixelData = bridge.compositePixelData(in: dirtyRect) as Data
         guard !pixelData.isEmpty else { return nil }
         return IncrementalLayerUpdate(
-            layerIndex: layerIndex,
+            layerIndex: -1,
             originX: Int(dirtyRect.originX),
             originY: Int(dirtyRect.originY),
             width: Int(dirtyRect.width),

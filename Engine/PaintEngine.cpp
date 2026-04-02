@@ -48,6 +48,194 @@ float rotatedY(float dx, float dy, float cosine, float sine) {
     return (-dx * sine) + (dy * cosine);
 }
 
+float blendChannel(float backdrop, float source, Layer::BlendMode mode) {
+    switch (mode) {
+        case Layer::BlendMode::Normal:
+            return source;
+        case Layer::BlendMode::Darken:
+            return std::min(backdrop, source);
+        case Layer::BlendMode::Multiply:
+            return backdrop * source;
+        case Layer::BlendMode::ColorBurn:
+            return source <= 0.0F ? 0.0F : clamp01(1.0F - ((1.0F - backdrop) / std::max(0.001F, source)));
+        case Layer::BlendMode::LinearBurn:
+            return clamp01(backdrop + source - 1.0F);
+        case Layer::BlendMode::Subtract:
+            return clamp01(backdrop - source);
+        case Layer::BlendMode::Lighten:
+            return std::max(backdrop, source);
+        case Layer::BlendMode::Screen:
+            return 1.0F - ((1.0F - backdrop) * (1.0F - source));
+        case Layer::BlendMode::Add:
+            return clamp01(backdrop + source);
+        case Layer::BlendMode::ColorDodge:
+            return source >= 1.0F ? 1.0F : clamp01(backdrop / std::max(0.001F, 1.0F - source));
+        case Layer::BlendMode::GlowDodge:
+            return source >= 1.0F ? 1.0F : clamp01(backdrop / std::max(0.0005F, 1.0F - (source * 0.92F)));
+        case Layer::BlendMode::Overlay:
+            return backdrop <= 0.5F
+                ? (2.0F * backdrop * source)
+                : (1.0F - (2.0F * (1.0F - backdrop) * (1.0F - source)));
+        case Layer::BlendMode::SoftLight:
+            return source <= 0.5F
+                ? (backdrop - ((1.0F - (2.0F * source)) * backdrop * (1.0F - backdrop)))
+                : (backdrop + ((2.0F * source - 1.0F) * ((backdrop <= 0.25F)
+                    ? ((((16.0F * backdrop - 12.0F) * backdrop) + 4.0F) * backdrop)
+                    : std::sqrt(backdrop)) - backdrop));
+        case Layer::BlendMode::HardLight:
+            return source <= 0.5F
+                ? (2.0F * backdrop * source)
+                : (1.0F - (2.0F * (1.0F - backdrop) * (1.0F - source)));
+        case Layer::BlendMode::Difference:
+            return std::fabs(backdrop - source);
+        case Layer::BlendMode::VividLight:
+            return source <= 0.5F
+                ? blendChannel(backdrop, 2.0F * source, Layer::BlendMode::ColorBurn)
+                : blendChannel(backdrop, 2.0F * (source - 0.5F), Layer::BlendMode::ColorDodge);
+        case Layer::BlendMode::LinearLight:
+            return clamp01(backdrop + (2.0F * source) - 1.0F);
+        case Layer::BlendMode::PinLight:
+            return source <= 0.5F
+                ? std::min(backdrop, 2.0F * source)
+                : std::max(backdrop, 2.0F * (source - 0.5F));
+        case Layer::BlendMode::HardMix:
+            return blendChannel(backdrop, source, Layer::BlendMode::VividLight) < 0.5F ? 0.0F : 1.0F;
+        case Layer::BlendMode::Exclusion:
+            return backdrop + source - (2.0F * backdrop * source);
+        case Layer::BlendMode::DarkerColor:
+            return source;
+        case Layer::BlendMode::LighterColor:
+            return source;
+        case Layer::BlendMode::Divide:
+            return clamp01(backdrop / std::max(0.001F, source));
+        case Layer::BlendMode::Hue:
+            return source;
+        case Layer::BlendMode::Saturation:
+            return source;
+        case Layer::BlendMode::Color:
+            return source;
+        case Layer::BlendMode::AddGlow:
+            return clamp01(backdrop + (source * 1.35F));
+        case Layer::BlendMode::Luminosity:
+            return source;
+    }
+}
+
+float colorLum(float r, float g, float b) {
+    return (0.3F * r) + (0.59F * g) + (0.11F * b);
+}
+
+float colorSat(float r, float g, float b) {
+    return std::max({r, g, b}) - std::min({r, g, b});
+}
+
+void clipColor(float& r, float& g, float& b) {
+    const float lum = colorLum(r, g, b);
+    const float minimum = std::min({r, g, b});
+    const float maximum = std::max({r, g, b});
+
+    if (minimum < 0.0F) {
+        const float scale = lum / std::max(0.001F, lum - minimum);
+        r = lum + ((r - lum) * scale);
+        g = lum + ((g - lum) * scale);
+        b = lum + ((b - lum) * scale);
+    }
+
+    if (maximum > 1.0F) {
+        const float scale = (1.0F - lum) / std::max(0.001F, maximum - lum);
+        r = lum + ((r - lum) * scale);
+        g = lum + ((g - lum) * scale);
+        b = lum + ((b - lum) * scale);
+    }
+}
+
+void setLum(float& r, float& g, float& b, float lum) {
+    const float delta = lum - colorLum(r, g, b);
+    r += delta;
+    g += delta;
+    b += delta;
+    clipColor(r, g, b);
+}
+
+void setSat(float& r, float& g, float& b, float sat) {
+    float components[3] = { r, g, b };
+    int minIndex = 0;
+    int midIndex = 1;
+    int maxIndex = 2;
+
+    if (components[minIndex] > components[midIndex]) std::swap(minIndex, midIndex);
+    if (components[midIndex] > components[maxIndex]) std::swap(midIndex, maxIndex);
+    if (components[minIndex] > components[midIndex]) std::swap(minIndex, midIndex);
+
+    if (components[maxIndex] > components[minIndex]) {
+        components[midIndex] = ((components[midIndex] - components[minIndex]) * sat) / (components[maxIndex] - components[minIndex]);
+        components[maxIndex] = sat;
+    } else {
+        components[midIndex] = 0.0F;
+        components[maxIndex] = 0.0F;
+    }
+    components[minIndex] = 0.0F;
+
+    r = components[0];
+    g = components[1];
+    b = components[2];
+}
+
+std::array<float, 3> blendColorRGB(float dstR, float dstG, float dstB, float srcR, float srcG, float srcB, Layer::BlendMode mode) {
+    if (mode == Layer::BlendMode::DarkerColor) {
+        return colorLum(srcR, srcG, srcB) < colorLum(dstR, dstG, dstB)
+            ? std::array<float, 3>{ srcR, srcG, srcB }
+            : std::array<float, 3>{ dstR, dstG, dstB };
+    }
+
+    if (mode == Layer::BlendMode::LighterColor) {
+        return colorLum(srcR, srcG, srcB) > colorLum(dstR, dstG, dstB)
+            ? std::array<float, 3>{ srcR, srcG, srcB }
+            : std::array<float, 3>{ dstR, dstG, dstB };
+    }
+
+    if (mode == Layer::BlendMode::Hue) {
+        float outR = srcR;
+        float outG = srcG;
+        float outB = srcB;
+        setSat(outR, outG, outB, colorSat(dstR, dstG, dstB));
+        setLum(outR, outG, outB, colorLum(dstR, dstG, dstB));
+        return { clamp01(outR), clamp01(outG), clamp01(outB) };
+    }
+
+    if (mode == Layer::BlendMode::Saturation) {
+        float outR = dstR;
+        float outG = dstG;
+        float outB = dstB;
+        setSat(outR, outG, outB, colorSat(srcR, srcG, srcB));
+        setLum(outR, outG, outB, colorLum(dstR, dstG, dstB));
+        return { clamp01(outR), clamp01(outG), clamp01(outB) };
+    }
+
+    if (mode == Layer::BlendMode::Color) {
+        float outR = srcR;
+        float outG = srcG;
+        float outB = srcB;
+        setSat(outR, outG, outB, colorSat(srcR, srcG, srcB));
+        setLum(outR, outG, outB, colorLum(dstR, dstG, dstB));
+        return { clamp01(outR), clamp01(outG), clamp01(outB) };
+    }
+
+    if (mode == Layer::BlendMode::Luminosity) {
+        float outR = dstR;
+        float outG = dstG;
+        float outB = dstB;
+        setLum(outR, outG, outB, colorLum(srcR, srcG, srcB));
+        return { clamp01(outR), clamp01(outG), clamp01(outB) };
+    }
+
+    return {
+        clamp01(blendChannel(dstR, srcR, mode)),
+        clamp01(blendChannel(dstG, srcG, mode)),
+        clamp01(blendChannel(dstB, srcB, mode))
+    };
+}
+
 }  // namespace
 
 PaintDocument::PaintDocument(int width, int height)
@@ -127,6 +315,19 @@ void PaintDocument::setLayerOpacity(int index, float opacity) {
     }
     pushHistorySnapshot();
     layers_[index].opacity = clamped;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+}
+
+void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (layers_[index].blendMode == blendMode) {
+        return;
+    }
+    pushHistorySnapshot();
+    layers_[index].blendMode = blendMode;
     markEntireDocumentDirty();
     compositeDirty_ = true;
 }
@@ -406,6 +607,23 @@ std::vector<uint8_t> PaintDocument::pixelDataForRect(int layerIndex, const Dirty
     return result;
 }
 
+std::vector<uint8_t> PaintDocument::compositePixelDataForRect(const DirtyRect& rect) const {
+    if (rect.empty()) {
+        return {};
+    }
+    const auto currentComposite = composite();
+    const int rectWidth = rect.width();
+    const int rectHeight = rect.height();
+    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * 4U);
+    for (int row = 0; row < rectHeight; ++row) {
+        const int srcY = rect.minY + row;
+        const size_t srcOffset = (static_cast<size_t>(srcY) * static_cast<size_t>(width_) + static_cast<size_t>(rect.minX)) * 4U;
+        const size_t dstOffset = static_cast<size_t>(row) * static_cast<size_t>(rectWidth) * 4U;
+        std::copy_n(currentComposite.data() + srcOffset, static_cast<size_t>(rectWidth) * 4U, result.data() + dstOffset);
+    }
+    return result;
+}
+
 std::span<const uint8_t> PaintDocument::composite() const noexcept {
     if (compositeDirty_) {
         rebuildComposite();
@@ -584,12 +802,45 @@ void PaintDocument::rebuildComposite() const {
 
             const float dstA = static_cast<float>(compositeBuffer_[offset + 3U]) / 255.0F;
             const float outA = srcA + (dstA * (1.0F - srcA));
-            const float blend = outA <= 0.0F ? 0.0F : srcA / outA;
+            if (outA <= 0.0F) {
+                compositeBuffer_[offset] = 0U;
+                compositeBuffer_[offset + 1U] = 0U;
+                compositeBuffer_[offset + 2U] = 0U;
+                compositeBuffer_[offset + 3U] = 0U;
+                continue;
+            }
 
-            compositeBuffer_[offset] = static_cast<uint8_t>(std::lerp(static_cast<float>(compositeBuffer_[offset]), static_cast<float>(layer.pixels[offset]), blend));
-            compositeBuffer_[offset + 1U] = static_cast<uint8_t>(std::lerp(static_cast<float>(compositeBuffer_[offset + 1U]), static_cast<float>(layer.pixels[offset + 1U]), blend));
-            compositeBuffer_[offset + 2U] = static_cast<uint8_t>(std::lerp(static_cast<float>(compositeBuffer_[offset + 2U]), static_cast<float>(layer.pixels[offset + 2U]), blend));
-            compositeBuffer_[offset + 3U] = static_cast<uint8_t>(outA * 255.0F);
+            const float srcR = static_cast<float>(layer.pixels[offset]) / 255.0F;
+            const float srcG = static_cast<float>(layer.pixels[offset + 1U]) / 255.0F;
+            const float srcB = static_cast<float>(layer.pixels[offset + 2U]) / 255.0F;
+            const float dstR = static_cast<float>(compositeBuffer_[offset]) / 255.0F;
+            const float dstG = static_cast<float>(compositeBuffer_[offset + 1U]) / 255.0F;
+            const float dstB = static_cast<float>(compositeBuffer_[offset + 2U]) / 255.0F;
+
+            const auto blended = blendColorRGB(dstR, dstG, dstB, srcR, srcG, srcB, layer.blendMode);
+            const float outR = clamp01(
+                (
+                    srcA * ((1.0F - dstA) * srcR + (dstA * blended[0])) +
+                    (dstA * (1.0F - srcA) * dstR)
+                ) / outA
+            );
+            const float outG = clamp01(
+                (
+                    srcA * ((1.0F - dstA) * srcG + (dstA * blended[1])) +
+                    (dstA * (1.0F - srcA) * dstG)
+                ) / outA
+            );
+            const float outB = clamp01(
+                (
+                    srcA * ((1.0F - dstA) * srcB + (dstA * blended[2])) +
+                    (dstA * (1.0F - srcA) * dstB)
+                ) / outA
+            );
+
+            compositeBuffer_[offset] = static_cast<uint8_t>(outR * 255.0F);
+            compositeBuffer_[offset + 1U] = static_cast<uint8_t>(outG * 255.0F);
+            compositeBuffer_[offset + 2U] = static_cast<uint8_t>(outB * 255.0F);
+            compositeBuffer_[offset + 3U] = static_cast<uint8_t>(clamp01(outA) * 255.0F);
         }
     }
 }

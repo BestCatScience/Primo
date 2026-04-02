@@ -5,20 +5,21 @@ import UIKit
 struct LayerSidebarView: View {
     let store: StoreOf<LayerSidebarFeature>
     let layerSnapshots: [MetalLayerSnapshot]
+    var language: AppLanguage = .japanese
     var showsTitle = true
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 if showsTitle {
-                    Text("Layers")
+                    Text(StudioStrings.layersTitle(language))
                         .font(StudioTheme.Typography.title(26))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
-                        Text("\(store.layers.count) Layers")
+                        Text(StudioStrings.layers(store.layers.count, language))
                             .font(StudioTheme.Typography.title(18))
                             .foregroundStyle(.white.opacity(0.9))
 
@@ -27,7 +28,7 @@ struct LayerSidebarView: View {
                         Button {
                             store.send(.addLayerButtonTapped)
                         } label: {
-                            Label("Add", systemImage: "plus")
+                            Label(StudioStrings.addLayer(language), systemImage: "plus")
                                 .font(StudioTheme.Typography.label(12))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 12)
@@ -55,16 +56,48 @@ struct LayerSidebarView: View {
                                 }
 
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(layer.name)
-                                    .font(StudioTheme.Typography.title(15))
-                                    .foregroundStyle(.white.opacity(0.92))
-                                Text("Opacity \(Int(layer.opacity * 100))%")
-                                    .font(StudioTheme.Typography.mono(10))
-                                    .foregroundStyle(.white.opacity(0.48))
+                                HStack(spacing: 8) {
+                                    Text(layer.name)
+                                        .font(StudioTheme.Typography.title(15))
+                                        .foregroundStyle(.white.opacity(0.92))
 
-                                HStack(spacing: 6) {
-                                    capsuleTag(layer.visible ? "Visible" : "Hidden")
-                                    capsuleTag(store.activeLayerIndex == layer.index ? "Active" : "Standby")
+                                    Menu {
+                                        ForEach(LayerBlendMode.allCases) { blendMode in
+                                            Button {
+                                                store.send(.blendModeSelected(layer.index, blendMode))
+                                            } label: {
+                                                if blendMode == layer.blendMode {
+                                                    Label(blendMode.localizedTitle(language), systemImage: "checkmark")
+                                                } else {
+                                                    Text(blendMode.localizedTitle(language))
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Text(layer.blendMode.localizedTitle(language))
+                                            .font(StudioTheme.Typography.mono(9))
+                                            .foregroundStyle(.white.opacity(0.9))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 5)
+                                            .background(
+                                                Capsule(style: .continuous)
+                                                    .fill(StudioTheme.Palette.cardFillStrong)
+                                            )
+                                    }
+                                    .menuStyle(.button)
+                                    .buttonStyle(.plain)
+                                    .minimumHitTarget()
+
+                                    Spacer(minLength: 0)
+                                }
+
+                                HStack(spacing: 7) {
+                                    Text(StudioStrings.opacityValue(Int(layer.opacity * 100), language))
+                                        .font(StudioTheme.Typography.mono(10))
+                                        .foregroundStyle(.white.opacity(0.48))
+
+                                    capsuleTag(layer.visible ? StudioStrings.visible(language) : StudioStrings.hidden(language))
+                                    capsuleTag(store.activeLayerIndex == layer.index ? StudioStrings.active(language) : StudioStrings.standby(language))
                                 }
                             }
 

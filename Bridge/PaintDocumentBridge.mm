@@ -6,6 +6,156 @@
 #include <cmath>
 #include <memory>
 
+namespace {
+
+atelierprime::Layer::BlendMode APBlendModeFromString(NSString *blendMode) {
+    if ([blendMode isEqualToString:@"darken"]) {
+        return atelierprime::Layer::BlendMode::Darken;
+    }
+    if ([blendMode isEqualToString:@"multiply"]) {
+        return atelierprime::Layer::BlendMode::Multiply;
+    }
+    if ([blendMode isEqualToString:@"colorBurn"]) {
+        return atelierprime::Layer::BlendMode::ColorBurn;
+    }
+    if ([blendMode isEqualToString:@"linearBurn"]) {
+        return atelierprime::Layer::BlendMode::LinearBurn;
+    }
+    if ([blendMode isEqualToString:@"subtract"]) {
+        return atelierprime::Layer::BlendMode::Subtract;
+    }
+    if ([blendMode isEqualToString:@"lighten"]) {
+        return atelierprime::Layer::BlendMode::Lighten;
+    }
+    if ([blendMode isEqualToString:@"screen"]) {
+        return atelierprime::Layer::BlendMode::Screen;
+    }
+    if ([blendMode isEqualToString:@"add"]) {
+        return atelierprime::Layer::BlendMode::Add;
+    }
+    if ([blendMode isEqualToString:@"colorDodge"]) {
+        return atelierprime::Layer::BlendMode::ColorDodge;
+    }
+    if ([blendMode isEqualToString:@"glowDodge"]) {
+        return atelierprime::Layer::BlendMode::GlowDodge;
+    }
+    if ([blendMode isEqualToString:@"overlay"]) {
+        return atelierprime::Layer::BlendMode::Overlay;
+    }
+    if ([blendMode isEqualToString:@"softLight"]) {
+        return atelierprime::Layer::BlendMode::SoftLight;
+    }
+    if ([blendMode isEqualToString:@"hardLight"]) {
+        return atelierprime::Layer::BlendMode::HardLight;
+    }
+    if ([blendMode isEqualToString:@"difference"]) {
+        return atelierprime::Layer::BlendMode::Difference;
+    }
+    if ([blendMode isEqualToString:@"vividLight"]) {
+        return atelierprime::Layer::BlendMode::VividLight;
+    }
+    if ([blendMode isEqualToString:@"linearLight"]) {
+        return atelierprime::Layer::BlendMode::LinearLight;
+    }
+    if ([blendMode isEqualToString:@"pinLight"]) {
+        return atelierprime::Layer::BlendMode::PinLight;
+    }
+    if ([blendMode isEqualToString:@"hardMix"]) {
+        return atelierprime::Layer::BlendMode::HardMix;
+    }
+    if ([blendMode isEqualToString:@"exclusion"]) {
+        return atelierprime::Layer::BlendMode::Exclusion;
+    }
+    if ([blendMode isEqualToString:@"darkerColor"]) {
+        return atelierprime::Layer::BlendMode::DarkerColor;
+    }
+    if ([blendMode isEqualToString:@"lighterColor"]) {
+        return atelierprime::Layer::BlendMode::LighterColor;
+    }
+    if ([blendMode isEqualToString:@"divide"]) {
+        return atelierprime::Layer::BlendMode::Divide;
+    }
+    if ([blendMode isEqualToString:@"hue"]) {
+        return atelierprime::Layer::BlendMode::Hue;
+    }
+    if ([blendMode isEqualToString:@"saturation"]) {
+        return atelierprime::Layer::BlendMode::Saturation;
+    }
+    if ([blendMode isEqualToString:@"color"]) {
+        return atelierprime::Layer::BlendMode::Color;
+    }
+    if ([blendMode isEqualToString:@"addGlow"]) {
+        return atelierprime::Layer::BlendMode::AddGlow;
+    }
+    if ([blendMode isEqualToString:@"luminosity"]) {
+        return atelierprime::Layer::BlendMode::Luminosity;
+    }
+    return atelierprime::Layer::BlendMode::Normal;
+}
+
+NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
+    switch (blendMode) {
+        case atelierprime::Layer::BlendMode::Darken:
+            return @"darken";
+        case atelierprime::Layer::BlendMode::Multiply:
+            return @"multiply";
+        case atelierprime::Layer::BlendMode::ColorBurn:
+            return @"colorBurn";
+        case atelierprime::Layer::BlendMode::LinearBurn:
+            return @"linearBurn";
+        case atelierprime::Layer::BlendMode::Subtract:
+            return @"subtract";
+        case atelierprime::Layer::BlendMode::Lighten:
+            return @"lighten";
+        case atelierprime::Layer::BlendMode::Screen:
+            return @"screen";
+        case atelierprime::Layer::BlendMode::Add:
+            return @"add";
+        case atelierprime::Layer::BlendMode::ColorDodge:
+            return @"colorDodge";
+        case atelierprime::Layer::BlendMode::GlowDodge:
+            return @"glowDodge";
+        case atelierprime::Layer::BlendMode::Overlay:
+            return @"overlay";
+        case atelierprime::Layer::BlendMode::SoftLight:
+            return @"softLight";
+        case atelierprime::Layer::BlendMode::HardLight:
+            return @"hardLight";
+        case atelierprime::Layer::BlendMode::Difference:
+            return @"difference";
+        case atelierprime::Layer::BlendMode::VividLight:
+            return @"vividLight";
+        case atelierprime::Layer::BlendMode::LinearLight:
+            return @"linearLight";
+        case atelierprime::Layer::BlendMode::PinLight:
+            return @"pinLight";
+        case atelierprime::Layer::BlendMode::HardMix:
+            return @"hardMix";
+        case atelierprime::Layer::BlendMode::Exclusion:
+            return @"exclusion";
+        case atelierprime::Layer::BlendMode::DarkerColor:
+            return @"darkerColor";
+        case atelierprime::Layer::BlendMode::LighterColor:
+            return @"lighterColor";
+        case atelierprime::Layer::BlendMode::Divide:
+            return @"divide";
+        case atelierprime::Layer::BlendMode::Hue:
+            return @"hue";
+        case atelierprime::Layer::BlendMode::Saturation:
+            return @"saturation";
+        case atelierprime::Layer::BlendMode::Color:
+            return @"color";
+        case atelierprime::Layer::BlendMode::AddGlow:
+            return @"addGlow";
+        case atelierprime::Layer::BlendMode::Luminosity:
+            return @"luminosity";
+        case atelierprime::Layer::BlendMode::Normal:
+            return @"normal";
+    }
+}
+
+}  // namespace
+
 @implementation APDirtyRect
 
 - (instancetype)initWithOriginX:(NSInteger)originX
@@ -60,12 +210,14 @@
 
 - (instancetype)initWithName:(NSString *)name
                      visible:(BOOL)visible
-                     opacity:(CGFloat)opacity {
+                     opacity:(CGFloat)opacity
+                   blendMode:(NSString *)blendMode {
     self = [super init];
     if (self) {
         _name = [name copy];
         _visible = visible;
         _opacity = opacity;
+        _blendMode = [blendMode copy];
     }
     return self;
 }
@@ -100,7 +252,8 @@
         NSString *name = [NSString stringWithUTF8String:layer.name.c_str()];
         APPaintLayerInfo *info = [[APPaintLayerInfo alloc] initWithName:name
                                                                 visible:layer.visible
-                                                                opacity:layer.opacity];
+                                                                opacity:layer.opacity
+                                                              blendMode:APStringFromBlendMode(layer.blendMode)];
         [items addObject:info];
     }
     return items;
@@ -137,6 +290,10 @@
 
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index {
     _document->setLayerOpacity((int)index, (float)opacity);
+}
+
+- (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index {
+    _document->setLayerBlendMode((int)index, APBlendModeFromString(blendMode));
 }
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {
@@ -284,6 +441,11 @@
     return image;
 }
 
+- (NSData *)compositePixelData {
+    const auto composite = _document->composite();
+    return [NSData dataWithBytes:composite.data() length:composite.size()];
+}
+
 - (APDirtyRect *)consumeDirtyRect {
     auto rect = _document->consumeDirtyRect();
     if (rect.empty()) {
@@ -291,8 +453,18 @@
     }
     return [[APDirtyRect alloc] initWithOriginX:rect.minX
                                        originY:rect.minY
-                                         width:rect.width()
-                                        height:rect.height()];
+                                        width:rect.width()
+                                       height:rect.height()];
+}
+
+- (NSData *)compositePixelDataInRect:(APDirtyRect *)rect {
+    atelierprime::DirtyRect engineRect;
+    engineRect.minX = (int)rect.originX;
+    engineRect.minY = (int)rect.originY;
+    engineRect.maxX = (int)(rect.originX + rect.width - 1);
+    engineRect.maxY = (int)(rect.originY + rect.height - 1);
+    auto pixels = _document->compositePixelDataForRect(engineRect);
+    return [NSData dataWithBytes:pixels.data() length:pixels.size()];
 }
 
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect {

@@ -62,10 +62,12 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic) BOOL visible;
 @property (nonatomic) CGFloat opacity;
+@property (nonatomic, copy) NSString *blendMode;
 
 - (instancetype)initWithName:(NSString *)name
                      visible:(BOOL)visible
-                     opacity:(CGFloat)opacity NS_DESIGNATED_INITIALIZER;
+                     opacity:(CGFloat)opacity
+                   blendMode:(NSString *)blendMode NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
@@ -87,6 +89,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)clearLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(clearLayer(at:));
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerVisible(_:at:));
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerOpacity(_:at:));
+- (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerBlendMode(_:at:));
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point NS_SWIFT_NAME(beginStroke(brush:point:));
 - (void)appendStroke:(APStrokePoint *)point NS_SWIFT_NAME(appendStroke(point:));
@@ -100,7 +103,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (CGImageRef _Nullable)createCompositeImage CF_RETURNS_RETAINED NS_SWIFT_NAME(makeCompositeImage());
 - (CGImageRef _Nullable)createImageForLayerAtIndex:(NSInteger)index CF_RETURNS_RETAINED NS_SWIFT_NAME(makeImageForLayer(at:));
 
+- (NSData *)compositePixelData NS_SWIFT_NAME(compositePixelData());
 - (APDirtyRect *)consumeDirtyRect NS_SWIFT_NAME(consumeDirtyRect());
+- (NSData *)compositePixelDataInRect:(APDirtyRect *)rect NS_SWIFT_NAME(compositePixelData(in:));
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect NS_SWIFT_NAME(pixelDataForLayer(at:in:));
 
 @end
