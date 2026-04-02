@@ -4,6 +4,7 @@ import CoreGraphics
 import CoreVideo
 import Foundation
 import ImageIO
+import UIKit
 import os
 
 struct ShareExport: Equatable, Identifiable {
@@ -90,6 +91,7 @@ struct AppFeature {
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
             canvas.previewStyle = previewStrokeStyle()
             canvas.selectionMode = brushPalette.selectionToolMode
+            canvas.paperStyle = resolvedPaperStyle()
         }
 
         func resolvedBrushSettings() -> BrushRuntimeSettings {
@@ -131,6 +133,22 @@ struct AppFeature {
                     blue: CGFloat(brushPalette.runtimeSettings.blue) / 255.0,
                     alpha: 1.0
                 )
+            )
+        }
+
+        func resolvedPaperStyle() -> CanvasPaperStyle {
+            let resolved = UIColor(brushPalette.paperColor)
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 0
+            resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            return CanvasPaperStyle(
+                red: Float(red),
+                green: Float(green),
+                blue: Float(blue),
+                alpha: Float(alpha),
+                isTransparent: brushPalette.transparentPaper
             )
         }
 
@@ -231,6 +249,7 @@ struct AppFeature {
             switch action {
             case .task:
                 state.isHydrating = true
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 Self.startupLogger.debug("AppFeature.task started")
                 return .run { [paintDocumentClient] send in
                     let startupClock = ContinuousClock()
@@ -275,6 +294,7 @@ struct AppFeature {
                 .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
 
             case .refreshPresentationRequested:
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
@@ -282,6 +302,7 @@ struct AppFeature {
                 let width = max(width, 1)
                 let height = max(height, 1)
                 paintDocumentClient.newCanvas(width, height)
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.canvas = CanvasFeature.State()
                 state.canvas.canvasSize = CGSize(width: width, height: height)
                 state.layerSidebar = LayerSidebarFeature.State()
@@ -319,7 +340,7 @@ struct AppFeature {
                 return .none
 
             case .saveDocumentRequested:
-                guard let pngData = paintDocumentClient.compositePNGData() else {
+                guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
                     state.bannerMessage = "保存に失敗しました"
                     return .none
                 }
@@ -332,7 +353,7 @@ struct AppFeature {
                 return .none
 
             case .exportDocumentRequested:
-                guard let pngData = paintDocumentClient.compositePNGData() else {
+                guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
                     state.bannerMessage = "書き出しに失敗しました"
                     return .none
                 }
@@ -470,6 +491,8 @@ struct AppFeature {
             case .brushPalette:
                 state.canvas.selectionMode = state.brushPalette.selectionToolMode
                 state.canvas.previewStyle = state.previewStrokeStyle()
+                state.canvas.paperStyle = state.resolvedPaperStyle()
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):

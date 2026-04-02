@@ -20,6 +20,7 @@ struct CanvasView: UIViewRepresentable {
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
             incrementalUpdate: store.pendingIncrementalUpdate,
+            paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             selectionMode: store.selectionMode,
@@ -58,7 +59,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor(red: 0.96, green: 0.94, blue: 0.90, alpha: 1.0)
+        backgroundColor = .clear
         isMultipleTouchEnabled = true
         clipsToBounds = true
 
@@ -134,6 +135,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         incrementalUpdate: IncrementalLayerUpdate?,
+        paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         selectionMode: SelectionToolMode,
@@ -148,7 +150,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         metalCanvasView.updateDocumentSize(documentSize)
-        metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale)
+        metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale, paperStyle: paperStyle)
         if let incrementalUpdate {
             metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
         }

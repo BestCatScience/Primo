@@ -134,6 +134,22 @@ enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+struct CanvasPaperStyle: Equatable, Sendable {
+    var red: Float
+    var green: Float
+    var blue: Float
+    var alpha: Float
+    var isTransparent: Bool
+
+    static let `default` = CanvasPaperStyle(
+        red: 0.93,
+        green: 0.93,
+        blue: 0.91,
+        alpha: 1.0,
+        isTransparent: false
+    )
+}
+
 struct BrushPreset: Identifiable, Equatable {
     var id: String { name }
     let name: String

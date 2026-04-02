@@ -568,16 +568,7 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
 }
 
 void PaintDocument::rebuildComposite() const {
-    for (int y = 0; y < height_; ++y) {
-        for (int x = 0; x < width_; ++x) {
-            const size_t offset = (static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U;
-            const uint8_t tone = 239U;
-            compositeBuffer_[offset] = tone;
-            compositeBuffer_[offset + 1U] = tone;
-            compositeBuffer_[offset + 2U] = 236U;
-            compositeBuffer_[offset + 3U] = 255U;
-        }
-    }
+    std::fill(compositeBuffer_.begin(), compositeBuffer_.end(), 0U);
 
     for (size_t i = 0; i < layers_.size(); ++i) {
         const auto& layer = layers_[i];

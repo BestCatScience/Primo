@@ -28,6 +28,7 @@ struct CanvasFeature {
         var transformGestureBaseOffset: CGSize = .zero
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
+        var paperStyle: CanvasPaperStyle = .default
         var previewStyle = PreviewStrokeStyle(
             tipKind: .pencil,
             isEraser: false,

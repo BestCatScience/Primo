@@ -4,8 +4,9 @@ import Foundation
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     var presentation: @Sendable () -> PaintDocumentPresentation
-    var compositePNGData: @Sendable () -> Data?
+    var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
     var timelapseCapture: @Sendable () -> TimelapseCapture?
+    var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
     var newCanvas: @Sendable (Int, Int) -> Void
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
@@ -27,8 +28,9 @@ struct PaintDocumentClient: Sendable {
         return PaintDocumentClient(
             lightweightPresentation: { sessionBox.session.lightweightPresentation() },
             presentation: { sessionBox.session.presentation() },
-            compositePNGData: { sessionBox.session.compositePNGData() },
+            compositePNGData: { style in sessionBox.session.compositePNGData(paperStyle: style) },
             timelapseCapture: { sessionBox.session.timelapseCapture() },
+            setPaperStyle: { style in sessionBox.session.setPaperStyle(style) },
             newCanvas: { width, height in
                 sessionBox.session = PaintDocumentSession(width: width, height: height)
             },

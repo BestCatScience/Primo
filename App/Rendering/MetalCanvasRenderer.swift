@@ -15,7 +15,8 @@ private struct MetalQuadUniforms {
     var size: SIMD2<Float>
     var viewport: SIMD2<Float>
     var opacity: Float
-    var paperSeed: Float
+    var paperColor: SIMD4<Float>
+    var checkerboard: Float
 }
 
 private enum MetalCanvasRendererCache {
@@ -80,6 +81,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
     private var documentSize: CGSize = .zero
+    private var paperStyle: CanvasPaperStyle = .default
     private var needsRedraw = false
 
     init() {
@@ -95,8 +97,9 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         super.init(frame: .zero, device: metalDevice)
 
         framebufferOnly = false
+        isOpaque = false
         colorPixelFormat = .bgra8Unorm
-        clearColor = MTLClearColor(red: 0.84, green: 0.83, blue: 0.79, alpha: 1.0)
+        clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         preferredFramesPerSecond = 120
         enableSetNeedsDisplay = false
         isPaused = false
@@ -110,15 +113,17 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize, zoomScale: CGFloat) {
+    func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize, zoomScale: CGFloat, paperStyle: CanvasPaperStyle) {
         pendingSnapshot = snapshot
         if let snapshot {
             documentSize = CGSize(width: snapshot.width, height: snapshot.height)
         }
         let viewportChanged = self.viewportOffset != viewportOffset || self.zoomScale != zoomScale
+        let paperChanged = self.paperStyle != paperStyle
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
-        if snapshot != nil || viewportChanged {
+        self.paperStyle = paperStyle
+        if snapshot != nil || viewportChanged || paperChanged {
             scheduleRedraw()
         }
     }
@@ -211,7 +216,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
                 size: SIMD2<Float>(Float(contentRect.width * contentScaleFactor), Float(contentRect.height * contentScaleFactor)),
                 viewport: viewport,
                 opacity: 1.0,
-                paperSeed: 0.17
+                paperColor: SIMD4<Float>(paperStyle.red, paperStyle.green, paperStyle.blue, paperStyle.alpha),
+                checkerboard: paperStyle.isTransparent ? 1.0 : 0.0
             )
             encoder?.setRenderPipelineState(paperPipeline)
             encoder?.setVertexBytes(&paperUniforms, length: MemoryLayout<MetalQuadUniforms>.stride, index: 1)
@@ -225,7 +231,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
                 size: SIMD2<Float>(Float(contentRect.width * contentScaleFactor), Float(contentRect.height * contentScaleFactor)),
                 viewport: viewport,
                 opacity: 1.0,
-                paperSeed: 0.0
+                paperColor: SIMD4<Float>(0, 0, 0, 0),
+                checkerboard: 0.0
             )
 
             encoder?.setRenderPipelineState(layerPipeline)

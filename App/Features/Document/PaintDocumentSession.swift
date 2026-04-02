@@ -12,6 +12,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var activeStrokeLayerIndex: Int?
     private var timelapseFrames: [TimelapseFrame] = []
     private var layerThumbnailCache: [Int: Data] = [:]
+    private var paperStyle: CanvasPaperStyle = .default
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
@@ -151,11 +152,13 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
-    func compositePNGData() -> Data? {
-        guard let imageRef = bridge.makeCompositeImage() else {
-            return nil
-        }
-        return UIImage(cgImage: imageRef).pngData()
+    func setPaperStyle(_ style: CanvasPaperStyle) {
+        paperStyle = style
+    }
+
+    func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
+        self.paperStyle = paperStyle
+        return renderedCompositeImage(paperStyle: paperStyle)?.pngData()
     }
 
     func timelapseCapture() -> TimelapseCapture? {
@@ -230,8 +233,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     private func makeTimelapseThumbnail() -> UIImage? {
-        guard let imageRef = bridge.makeCompositeImage() else { return nil }
-        let sourceImage = UIImage(cgImage: imageRef)
+        guard let sourceImage = renderedCompositeImage(paperStyle: paperStyle) else { return nil }
         let targetSize = timelapseFrameSize(
             for: CGSize(width: bridge.width, height: bridge.height),
             maxDimension: 512
@@ -260,6 +262,28 @@ final class PaintDocumentSession: @unchecked Sendable {
         let width = max(2, Int((canvasSize.width * scale).rounded()))
         let height = max(2, Int((canvasSize.height * scale).rounded()))
         return CGSize(width: width, height: height)
+    }
+
+    private func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> UIImage? {
+        guard let imageRef = bridge.makeCompositeImage() else { return nil }
+        let compositeImage = UIImage(cgImage: imageRef)
+        let size = CGSize(width: bridge.width, height: bridge.height)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = !paperStyle.isTransparent
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { context in
+            if !paperStyle.isTransparent {
+                UIColor(
+                    red: CGFloat(paperStyle.red),
+                    green: CGFloat(paperStyle.green),
+                    blue: CGFloat(paperStyle.blue),
+                    alpha: CGFloat(paperStyle.alpha)
+                ).setFill()
+                context.fill(CGRect(origin: .zero, size: size))
+            }
+            compositeImage.draw(in: CGRect(origin: .zero, size: size))
+        }
     }
 
     private func cachedLayerThumbnailData(index: Int) -> Data? {

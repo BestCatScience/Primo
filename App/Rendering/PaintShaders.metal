@@ -11,7 +11,8 @@ struct MetalQuadUniforms {
     float2 size;
     float2 viewport;
     float opacity;
-    float paperSeed;
+    float4 paperColor;
+    float checkerboard;
 };
 
 struct VertexOut {
@@ -39,7 +40,15 @@ vertex VertexOut canvasVertex(
 
 fragment float4 paperFragment(VertexOut in [[stage_in]],
                               constant MetalQuadUniforms& uniforms [[buffer(0)]]) {
-    return float4(0.93, 0.93, 0.91, 1.0);
+    if (uniforms.checkerboard > 0.5) {
+        float2 grid = floor(in.paperUV * uniforms.viewport / 12.0);
+        float checker = fmod(grid.x + grid.y, 2.0);
+        float3 light = float3(0.94, 0.94, 0.94);
+        float3 dark = float3(0.82, 0.82, 0.82);
+        float3 color = mix(light, dark, checker);
+        return float4(color, 1.0);
+    }
+    return uniforms.paperColor;
 }
 
 fragment float4 layerFragment(VertexOut in [[stage_in]],

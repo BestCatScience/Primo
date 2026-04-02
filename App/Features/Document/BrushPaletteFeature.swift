@@ -23,6 +23,8 @@ struct BrushPaletteFeature {
         var fillColorTolerance: Double = 0.12
         var fillExpansion: Double = 0
         var brushColor: Color = BrushPreset.defaultPencil.color
+        var paperColor: Color = Color(red: 0.93, green: 0.93, blue: 0.91)
+        var transparentPaper = false
         var selectedBrush: BrushPreset? = .defaultPencil
         let presets: [BrushPreset] = BrushPreset.defaults
 
@@ -86,7 +88,9 @@ struct BrushPaletteFeature {
                  .binding(\.fillThresholdMode),
                  .binding(\.fillOpacityTolerance),
                  .binding(\.fillColorTolerance),
-                 .binding(\.fillExpansion):
+                 .binding(\.fillExpansion),
+                 .binding(\.paperColor),
+                 .binding(\.transparentPaper):
                 state.selectedBrush = nil
                 return .none
             case .binding:

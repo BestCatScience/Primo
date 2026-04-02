@@ -412,6 +412,53 @@ struct BrushPaletteView: View {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(store.transparentPaper ? StudioTheme.Palette.cardFillStrong : store.paperColor)
+
+                            Image(systemName: store.transparentPaper ? "square.dashed" : "doc.richtext")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                        .frame(width: 38, height: 38)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Paper")
+                                .font(StudioTheme.Typography.title(14))
+                                .foregroundStyle(.white.opacity(0.9))
+                            Text(store.transparentPaper ? "Transparent background" : "Custom paper color")
+                                .font(StudioTheme.Typography.body(11))
+                                .foregroundStyle(.white.opacity(0.52))
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    Toggle(isOn: $store.transparentPaper) {
+                        Text("Transparent Paper")
+                            .font(StudioTheme.Typography.title(12))
+                            .foregroundStyle(.white.opacity(0.88))
+                    }
+                    .tint(StudioTheme.Palette.accentBright)
+
+                    ColorPicker("Paper Color", selection: $store.paperColor, supportsOpacity: false)
+                        .font(StudioTheme.Typography.title(12))
+                        .foregroundStyle(.white.opacity(0.88))
+                        .disabled(store.transparentPaper)
+                        .opacity(store.transparentPaper ? 0.45 : 1.0)
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(StudioTheme.Palette.cardFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                )
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(alignment: .center, spacing: 10) {
