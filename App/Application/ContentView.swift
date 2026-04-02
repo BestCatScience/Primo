@@ -572,6 +572,7 @@ struct ContentView: View {
                     currentTool: store.canvas.currentTool,
                     hasSelection: store.canvas.selection != nil,
                     transformPreviewOffset: store.canvas.transformPreviewOffset,
+                    transformPreviewScale: store.canvas.transformPreviewScale,
                     language: language,
                     showsTitle: false
                 )

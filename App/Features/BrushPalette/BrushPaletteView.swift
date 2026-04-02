@@ -6,6 +6,7 @@ struct BrushPaletteView: View {
     let currentTool: StudioToolKind
     let hasSelection: Bool
     let transformPreviewOffset: CGSize
+    var transformPreviewScale: CGFloat = 1.0
     let language: AppLanguage
     var showsTitle = true
     private let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
@@ -113,6 +114,7 @@ struct BrushPaletteView: View {
                                 metricRow(language == .japanese ? "対象" : "Target", value: hasSelection ? (language == .japanese ? "選択範囲" : "Selection") : (language == .japanese ? "レイヤー" : "Layer"))
                                 metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
                                 metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
+                                metricRow(language == .japanese ? "拡大率" : "Scale", value: "\(Int((transformPreviewScale * 100).rounded()))%")
                                 metricRow(language == .japanese ? "状態" : "State", value: transformPreviewOffset == .zero ? (language == .japanese ? "待機" : "Idle") : (language == .japanese ? "未確定" : "Pending"))
                             }
                         }

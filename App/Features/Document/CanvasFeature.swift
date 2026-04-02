@@ -26,6 +26,8 @@ struct CanvasFeature {
         var selectionPreviewPoints: [CGPoint] = []
         var transformPreviewOffset: CGSize = .zero
         var transformGestureBaseOffset: CGSize = .zero
+        var transformPreviewScale: CGFloat = 1.0
+        var transformGestureBaseScale: CGFloat = 1.0
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
         var paperStyle: CanvasPaperStyle = .default
@@ -53,6 +55,9 @@ struct CanvasFeature {
         case transformGestureBegan
         case transformPreviewChanged(CGSize)
         case transformEnded(CGSize)
+        case transformScaleGestureBegan
+        case transformScaleChanged(CGFloat)
+        case transformScaleEnded(CGFloat)
         case transformPreviewCleared
         case applyIncrementalUpdate(IncrementalLayerUpdate)
         case requestLocalUndo
@@ -103,6 +108,8 @@ struct CanvasFeature {
                 state.selectionPreviewPoints = []
                 state.transformPreviewOffset = .zero
                 state.transformGestureBaseOffset = .zero
+                state.transformPreviewScale = 1.0
+                state.transformGestureBaseScale = 1.0
                 return .none
 
             case .transformGestureBegan:
@@ -124,9 +131,24 @@ struct CanvasFeature {
                 state.transformGestureBaseOffset = state.transformPreviewOffset
                 return .none
 
+            case .transformScaleGestureBegan:
+                state.transformGestureBaseScale = state.transformPreviewScale
+                return .none
+
+            case let .transformScaleChanged(scale):
+                state.transformPreviewScale = min(max(state.transformGestureBaseScale * scale, 0.2), 6.0)
+                return .none
+
+            case let .transformScaleEnded(scale):
+                state.transformPreviewScale = min(max(state.transformGestureBaseScale * scale, 0.2), 6.0)
+                state.transformGestureBaseScale = state.transformPreviewScale
+                return .none
+
             case .transformPreviewCleared:
                 state.transformPreviewOffset = .zero
                 state.transformGestureBaseOffset = .zero
+                state.transformPreviewScale = 1.0
+                state.transformGestureBaseScale = 1.0
                 return .none
 
             case .requestLocalUndo:

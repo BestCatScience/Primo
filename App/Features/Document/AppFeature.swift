@@ -406,6 +406,7 @@ struct AppFeature {
                 state.canvas.selectionMode = state.brushPalette.selectionToolMode
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
                 if tool != .select {
                     if tool != .move {
                         state.canvas.selection = nil
@@ -439,10 +440,12 @@ struct AppFeature {
                 state.canvas.selection = nil
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
                 return .none
 
             case .brushPalette(.delegate(.cancelTransform)):
                 state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
                 return .none
 
             case .brushPalette(.delegate(.applyTransform)):
@@ -627,12 +630,14 @@ private extension AppFeature {
             width: state.canvas.transformPreviewOffset.width.rounded(),
             height: state.canvas.transformPreviewOffset.height.rounded()
         )
-        guard translation != .zero else { return .none }
+        let scale = state.canvas.transformPreviewScale
+        guard translation != .zero || abs(scale - 1.0) > 0.001 else { return .none }
         guard
             let snapshot = state.canvas.renderSnapshot,
             let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
         else {
             state.canvas.transformPreviewOffset = .zero
+            state.canvas.transformPreviewScale = 1.0
             return .none
         }
         guard let transformed = Self.transformedLayerPixels(
@@ -640,9 +645,11 @@ private extension AppFeature {
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,
             selection: state.canvas.selection,
-            translation: translation
+            translation: translation,
+            scale: scale
         ) else {
             state.canvas.transformPreviewOffset = .zero
+            state.canvas.transformPreviewScale = 1.0
             return .none
         }
         paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, transformed)
@@ -650,14 +657,14 @@ private extension AppFeature {
             state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
             state.canvas.localBufferRevision += 1
         }
-        if let selection = state.canvas.selection {
-            state.canvas.selection = Self.translatedSelection(
-                selection,
-                translation: translation,
-                canvasSize: state.canvas.canvasSize
-            )
-        }
+        state.canvas.selection = Self.transformedSelection(
+            state.canvas.selection,
+            translation: translation,
+            scale: scale,
+            canvasSize: state.canvas.canvasSize
+        )
         state.canvas.transformPreviewOffset = .zero
+        state.canvas.transformPreviewScale = 1.0
         state.applyPresentation(paintDocumentClient.presentation())
         return .none
     }
@@ -725,115 +732,133 @@ private extension AppFeature {
         canvasWidth: Int,
         canvasHeight: Int,
         selection: CanvasSelection?,
-        translation: CGSize
+        translation: CGSize,
+        scale: CGFloat
     ) -> Data? {
         let dx = Int(translation.width.rounded())
         let dy = Int(translation.height.rounded())
-        guard dx != 0 || dy != 0 else { return nil }
+        let clampedScale = min(max(scale, 0.2), 6.0)
+        guard dx != 0 || dy != 0 || abs(clampedScale - 1.0) > 0.001 else { return nil }
 
         let expectedCount = canvasWidth * canvasHeight * 4
         guard source.count == expectedCount else { return nil }
 
         let sourceBytes = [UInt8](source)
+        let mask = selection.map { expandedMask(from: $0, canvasWidth: canvasWidth, canvasHeight: canvasHeight) }
+            ?? Self.alphaMask(from: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        guard let bounds = Self.transformationBounds(selection: selection, sourceBytes: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            return nil
+        }
+
         var destination = sourceBytes
+        for index in 0..<(canvasWidth * canvasHeight) where mask[index] != 0 {
+            let pixelOffset = index * 4
+            destination[pixelOffset] = 0
+            destination[pixelOffset + 1] = 0
+            destination[pixelOffset + 2] = 0
+            destination[pixelOffset + 3] = 0
+        }
 
-        if let selection {
-            let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
-
-            for index in 0..<(canvasWidth * canvasHeight) where mask[index] != 0 {
-                let pixelOffset = index * 4
-                guard sourceBytes[pixelOffset + 3] != 0 else { continue }
-                destination[pixelOffset] = 0
-                destination[pixelOffset + 1] = 0
-                destination[pixelOffset + 2] = 0
-                destination[pixelOffset + 3] = 0
-            }
-
-            for y in 0..<canvasHeight {
-                for x in 0..<canvasWidth {
-                    let sourceIndex = (y * canvasWidth) + x
-                    guard mask[sourceIndex] != 0 else { continue }
-
-                    let destinationX = x + dx
-                    let destinationY = y + dy
-                    guard destinationX >= 0, destinationX < canvasWidth, destinationY >= 0, destinationY < canvasHeight else {
-                        continue
-                    }
-
-                    let sourceOffset = sourceIndex * 4
-                    guard sourceBytes[sourceOffset + 3] != 0 else { continue }
-                    let destinationOffset = ((destinationY * canvasWidth) + destinationX) * 4
-                    destination[destinationOffset] = sourceBytes[sourceOffset]
-                    destination[destinationOffset + 1] = sourceBytes[sourceOffset + 1]
-                    destination[destinationOffset + 2] = sourceBytes[sourceOffset + 2]
-                    destination[destinationOffset + 3] = sourceBytes[sourceOffset + 3]
+        let anchor = CGPoint(x: bounds.midX, y: bounds.midY)
+        for y in 0..<canvasHeight {
+            for x in 0..<canvasWidth {
+                let destinationPoint = CGPoint(
+                    x: CGFloat(x) - translation.width,
+                    y: CGFloat(y) - translation.height
+                )
+                let sourceX = ((destinationPoint.x - anchor.x) / clampedScale) + anchor.x
+                let sourceY = ((destinationPoint.y - anchor.y) / clampedScale) + anchor.y
+                let sourcePixelX = Int(sourceX.rounded())
+                let sourcePixelY = Int(sourceY.rounded())
+                guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else {
+                    continue
                 }
-            }
-        } else {
-            destination = [UInt8](repeating: 0, count: expectedCount)
-            for y in 0..<canvasHeight {
-                for x in 0..<canvasWidth {
-                    let destinationX = x + dx
-                    let destinationY = y + dy
-                    guard destinationX >= 0, destinationX < canvasWidth, destinationY >= 0, destinationY < canvasHeight else {
-                        continue
-                    }
 
-                    let sourceOffset = ((y * canvasWidth) + x) * 4
-                    guard sourceBytes[sourceOffset + 3] != 0 else { continue }
-                    let destinationOffset = ((destinationY * canvasWidth) + destinationX) * 4
-                    destination[destinationOffset] = sourceBytes[sourceOffset]
-                    destination[destinationOffset + 1] = sourceBytes[sourceOffset + 1]
-                    destination[destinationOffset + 2] = sourceBytes[sourceOffset + 2]
-                    destination[destinationOffset + 3] = sourceBytes[sourceOffset + 3]
-                }
+                let sourceIndex = (sourcePixelY * canvasWidth) + sourcePixelX
+                guard mask[sourceIndex] != 0 else { continue }
+                let sourceOffset = sourceIndex * 4
+                guard sourceBytes[sourceOffset + 3] != 0 else { continue }
+
+                let destinationOffset = ((y * canvasWidth) + x) * 4
+                destination[destinationOffset] = sourceBytes[sourceOffset]
+                destination[destinationOffset + 1] = sourceBytes[sourceOffset + 1]
+                destination[destinationOffset + 2] = sourceBytes[sourceOffset + 2]
+                destination[destinationOffset + 3] = sourceBytes[sourceOffset + 3]
             }
         }
 
         return Data(destination)
     }
 
-    static func translatedSelection(_ selection: CanvasSelection, translation: CGSize, canvasSize: CGSize) -> CanvasSelection? {
-        let dx = translation.width.rounded()
-        let dy = translation.height.rounded()
-        let nextBounds = CGRect(
-            x: selection.bounds.minX + dx,
-            y: selection.bounds.minY + dy,
-            width: selection.bounds.width,
-            height: selection.bounds.height
-        )
-        let canvasRect = CGRect(origin: .zero, size: canvasSize)
-        let visibleBounds = nextBounds.intersection(canvasRect)
-        guard !visibleBounds.isNull, !visibleBounds.isEmpty else { return nil }
+    static func transformedSelection(_ selection: CanvasSelection?, translation: CGSize, scale: CGFloat, canvasSize: CGSize) -> CanvasSelection? {
+        guard let selection else { return nil }
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        let bounds = selection.bounds
+        let anchor = CGPoint(x: bounds.midX, y: bounds.midY)
+        let clampedScale = min(max(scale, 0.2), 6.0)
+        var transformed = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
 
-        let cropOffsetX = Int((visibleBounds.minX - nextBounds.minX).rounded())
-        let cropOffsetY = Int((visibleBounds.minY - nextBounds.minY).rounded())
-        let croppedWidth = Int(visibleBounds.width.rounded())
-        let croppedHeight = Int(visibleBounds.height.rounded())
-        guard croppedWidth > 0, croppedHeight > 0 else { return nil }
-
-        var croppedMask = Data(count: croppedWidth * croppedHeight)
-        croppedMask.withUnsafeMutableBytes { bytes in
-            guard let destination = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            selection.maskData.withUnsafeBytes { sourceBytes in
-                guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                for y in 0..<croppedHeight {
-                    for x in 0..<croppedWidth {
-                        let sourceIndex = ((cropOffsetY + y) * selection.maskWidth) + (cropOffsetX + x)
-                        let destinationIndex = (y * croppedWidth) + x
-                        destination[destinationIndex] = source[sourceIndex]
-                    }
+        for y in 0..<canvasHeight {
+            for x in 0..<canvasWidth {
+                let destinationPoint = CGPoint(
+                    x: CGFloat(x) - translation.width,
+                    y: CGFloat(y) - translation.height
+                )
+                let sourceX = ((destinationPoint.x - anchor.x) / clampedScale) + anchor.x
+                let sourceY = ((destinationPoint.y - anchor.y) / clampedScale) + anchor.y
+                let sourcePixelX = Int(sourceX.rounded())
+                let sourcePixelY = Int(sourceY.rounded())
+                guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else {
+                    continue
                 }
+
+                let sourceIndex = (sourcePixelY * canvasWidth) + sourcePixelX
+                guard mask[sourceIndex] != 0 else { continue }
+                transformed[(y * canvasWidth) + x] = 255
             }
         }
 
-        return CanvasSelection(
-            bounds: visibleBounds,
-            maskWidth: croppedWidth,
-            maskHeight: croppedHeight,
-            maskData: croppedMask,
-            mode: selection.mode
-        )
+        return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+    }
+
+    static func alphaMask(from sourceBytes: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
+        var mask = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
+        for index in 0..<(canvasWidth * canvasHeight) {
+            if sourceBytes[index * 4 + 3] != 0 {
+                mask[index] = 255
+            }
+        }
+        return mask
+    }
+
+    static func transformationBounds(
+        selection: CanvasSelection?,
+        sourceBytes: [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> CGRect? {
+        if let selection, !selection.isEmpty {
+            return selection.bounds
+        }
+
+        var minX = canvasWidth
+        var minY = canvasHeight
+        var maxX = -1
+        var maxY = -1
+        for y in 0..<canvasHeight {
+            for x in 0..<canvasWidth {
+                if sourceBytes[((y * canvasWidth) + x) * 4 + 3] == 0 { continue }
+                minX = min(minX, x)
+                minY = min(minY, y)
+                maxX = max(maxX, x)
+                maxY = max(maxY, y)
+            }
+        }
+
+        guard maxX >= minX, maxY >= minY else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
     static func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
