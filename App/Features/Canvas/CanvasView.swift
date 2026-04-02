@@ -158,6 +158,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         inputHandler.selectionMode = selectionMode
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
+        inputHandler.strokeStabilization = Float(previewStyle.stabilization)
         updateSelectionOverlay(selection)
         updateSelectionPreview(selectionPreviewPoints)
         updateTransformPreview(snapshot: snapshot, activeLayerIndex: activeLayerIndex, selection: selection)

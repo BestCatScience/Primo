@@ -12,6 +12,7 @@ struct BrushPaletteFeature {
         var brushOpacity: Double = BrushPreset.defaultPencil.opacity
         var brushHardness: Double = BrushPreset.defaultPencil.hardness
         var brushPressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
+        var brushStabilization: Double = 0.0
         var selectionToolMode: SelectionToolMode = .lasso
         var selectionCombineMode: SelectionCombineMode = .replace
         var selectionThresholdMode: FillThresholdMode = .color
@@ -41,6 +42,7 @@ struct BrushPaletteFeature {
                 opacity: brushOpacity,
                 hardness: brushHardness,
                 pressureSensitivity: brushPressureSensitivity,
+                stabilization: brushStabilization,
                 fillThresholdMode: fillThresholdMode,
                 fillOpacityTolerance: fillOpacityTolerance,
                 fillColorTolerance: fillColorTolerance,
@@ -79,6 +81,7 @@ struct BrushPaletteFeature {
                  .binding(\.brushOpacity),
                  .binding(\.brushHardness),
                  .binding(\.brushPressureSensitivity),
+                 .binding(\.brushStabilization),
                  .binding(\.selectionToolMode),
                  .binding(\.selectionCombineMode),
                  .binding(\.selectionThresholdMode),

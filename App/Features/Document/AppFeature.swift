@@ -114,6 +114,7 @@ struct AppFeature {
                     opacity: 0.78,
                     hardness: 0.95,
                     pressureSensitivity: CGFloat(brushPalette.runtimeSettings.pressureSensitivity),
+                    stabilization: CGFloat(brushPalette.runtimeSettings.stabilization),
                     color: CGColor(
                         red: 0.92,
                         green: 0.95,
@@ -130,6 +131,7 @@ struct AppFeature {
                 opacity: CGFloat(brushPalette.runtimeSettings.opacity),
                 hardness: CGFloat(brushPalette.runtimeSettings.hardness),
                 pressureSensitivity: CGFloat(brushPalette.runtimeSettings.pressureSensitivity),
+                stabilization: CGFloat(brushPalette.runtimeSettings.stabilization),
                 color: CGColor(
                     red: CGFloat(brushPalette.runtimeSettings.red) / 255.0,
                     green: CGFloat(brushPalette.runtimeSettings.green) / 255.0,

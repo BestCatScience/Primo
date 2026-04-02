@@ -20,6 +20,7 @@ final class InputHandler {
     var selectionMode: SelectionToolMode = .lasso
     var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     var brushSize: Float = 4.0
+    var strokeStabilization: Float = 0.0
     var pointMapper: ((CGPoint, UIView) -> SIMD2<Float>)?
 
     private var currentStroke: Stroke?
@@ -216,14 +217,18 @@ final class InputHandler {
                 continue
             }
 
+            candidate = stabilized(candidate, previous: previous, isFinishingStroke: isFinishingStroke)
+            let stabilizedDelta = candidate.position - previous.position
+            let stabilizedDistance = simd_length(stabilizedDelta)
+
             let interpolationSpacing = max(brushSize * 0.35, 1.5)
-            if distance > interpolationSpacing {
-                let steps = max(1, Int(ceil(distance / interpolationSpacing)))
+            if stabilizedDistance > interpolationSpacing {
+                let steps = max(1, Int(ceil(stabilizedDistance / interpolationSpacing)))
                 for step in 1...steps {
                     let t = Float(step) / Float(steps)
                     stroke.points.append(
                         StrokePoint(
-                            position: previous.position + (delta * t),
+                            position: previous.position + (stabilizedDelta * t),
                             pressure: previous.pressure + ((candidate.pressure - previous.pressure) * t),
                             altitude: previous.altitude + ((candidate.altitude - previous.altitude) * t),
                             azimuth: previous.azimuth + ((candidate.azimuth - previous.azimuth) * t),
@@ -236,6 +241,21 @@ final class InputHandler {
                 stroke.points.append(candidate)
             }
         }
+    }
+
+    private func stabilized(_ candidate: StrokePoint, previous: StrokePoint, isFinishingStroke: Bool) -> StrokePoint {
+        let strength = max(0, min(strokeStabilization, 1))
+        guard strength > 0.001 else { return candidate }
+
+        let baseResponse = 1 - (strength * 0.82)
+        let response = isFinishingStroke ? max(baseResponse, 0.62) : max(baseResponse, 0.08)
+
+        var smoothed = candidate
+        smoothed.position = previous.position + ((candidate.position - previous.position) * response)
+        smoothed.pressure = previous.pressure + ((candidate.pressure - previous.pressure) * max(response, 0.18))
+        smoothed.altitude = previous.altitude + ((candidate.altitude - previous.altitude) * max(response, 0.24))
+        smoothed.azimuth = previous.azimuth + ((candidate.azimuth - previous.azimuth) * max(response, 0.24))
+        return smoothed
     }
 
     private func shouldRejectFinishingJump(_ candidate: StrokePoint, previous: StrokePoint, distance: Float) -> Bool {

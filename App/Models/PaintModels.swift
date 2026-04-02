@@ -486,6 +486,7 @@ struct PreviewStrokeStyle: Equatable {
     let opacity: CGFloat
     let hardness: CGFloat
     let pressureSensitivity: CGFloat
+    let stabilization: CGFloat
     let color: CGColor
 }
 

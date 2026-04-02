@@ -36,6 +36,7 @@ struct CanvasFeature {
             opacity: 0.9,
             hardness: 0.82,
             pressureSensitivity: 0.4,
+            stabilization: 0.0,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var pendingIncrementalUpdate: IncrementalLayerUpdate?

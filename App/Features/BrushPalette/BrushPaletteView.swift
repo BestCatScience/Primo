@@ -145,6 +145,7 @@ struct BrushPaletteView: View {
                                 metricRow(language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%")
                                 metricRow(language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%")
                                 metricRow(language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"))
+                                metricRow(language == .japanese ? "手ぶれ補正" : "Stabilization", value: "\(Int(store.brushStabilization * 100))%")
                             }
                         }
                     }
@@ -323,6 +324,7 @@ struct BrushPaletteView: View {
                         sliderRow(title: language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
                         sliderRow(title: language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
                         sliderRow(title: language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"), slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
+                        sliderRow(title: language == .japanese ? "手ぶれ補正" : "Stabilization", value: "\(Int(store.brushStabilization * 100))%", slider: Slider(value: $store.brushStabilization, in: 0.0...1.0))
                     }
                 }
                 .padding(14)

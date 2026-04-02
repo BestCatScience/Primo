@@ -6,6 +6,7 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var opacity: Double
     var hardness: Double
     var pressureSensitivity: Double
+    var stabilization: Double = 0.0
     var fillThresholdMode: FillThresholdMode = .opacity
     var fillOpacityTolerance: Double = 0.0
     var fillColorTolerance: Double = 0.12
