@@ -98,6 +98,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)redo NS_SWIFT_NAME(redo());
 
 - (CGImageRef _Nullable)createCompositeImage CF_RETURNS_RETAINED NS_SWIFT_NAME(makeCompositeImage());
+- (CGImageRef _Nullable)createImageForLayerAtIndex:(NSInteger)index CF_RETURNS_RETAINED NS_SWIFT_NAME(makeImageForLayer(at:));
 
 - (APDirtyRect *)consumeDirtyRect NS_SWIFT_NAME(consumeDirtyRect());
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect NS_SWIFT_NAME(pixelDataForLayer(at:in:));

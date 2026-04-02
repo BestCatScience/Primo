@@ -256,6 +256,34 @@
     return image;
 }
 
+- (CGImageRef)createImageForLayerAtIndex:(NSInteger)index {
+    if (index < 0 || index >= _document->layerCount()) {
+        return nil;
+    }
+
+    const auto &layer = _document->layer((int)index);
+    NSData *data = [NSData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
+
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedLast;
+    CGImageRef image = CGImageCreate((size_t)_document->width(),
+                                     (size_t)_document->height(),
+                                     8,
+                                     32,
+                                     (size_t)_document->width() * 4U,
+                                     colorSpace,
+                                     bitmapInfo,
+                                     provider,
+                                     nullptr,
+                                     false,
+                                     kCGRenderingIntentDefault);
+
+    CGColorSpaceRelease(colorSpace);
+    CGDataProviderRelease(provider);
+    return image;
+}
+
 - (APDirtyRect *)consumeDirtyRect {
     auto rect = _document->consumeDirtyRect();
     if (rect.empty()) {

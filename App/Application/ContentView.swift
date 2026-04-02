@@ -562,6 +562,7 @@ struct ContentView: View {
                         state: \.layerSidebar,
                         action: \.layerSidebar
                     ),
+                    layerSnapshots: store.canvas.renderSnapshot?.layers ?? [],
                     showsTitle: false
                 )
             }

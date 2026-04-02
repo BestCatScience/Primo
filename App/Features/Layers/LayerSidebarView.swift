@@ -1,8 +1,10 @@
 import ComposableArchitecture
 import SwiftUI
+import UIKit
 
 struct LayerSidebarView: View {
     let store: StoreOf<LayerSidebarFeature>
+    let layerSnapshots: [MetalLayerSnapshot]
     var showsTitle = true
 
     var body: some View {
@@ -40,13 +42,15 @@ struct LayerSidebarView: View {
                     }
 
                     ForEach(store.layers) { layer in
-                        let buffer = store.layerBuffers.first(where: { $0.index == layer.index })
+                        let snapshot = layerSnapshots.first(where: { $0.index == layer.index })
                         HStack(spacing: 12) {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(StudioTheme.Palette.cardFillStrong)
                                 .frame(width: 48, height: 48)
                                 .overlay {
-                                    LayerThumbnailView(buffer: buffer)
+                                    LayerThumbnailView(
+                                        snapshot: snapshot
+                                    )
                                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 }
 
@@ -116,53 +120,28 @@ struct LayerSidebarView: View {
 }
 
 private struct LayerThumbnailView: View {
-    let buffer: LayerCanvasBuffer?
+    let snapshot: MetalLayerSnapshot?
 
     var body: some View {
-        GeometryReader { geometry in
-            Canvas { context, size in
-                guard let buffer else { return }
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color(red: 0.95, green: 0.94, blue: 0.90))
 
-                for stroke in buffer.strokes {
-                    guard stroke.points.count > 1 else { continue }
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
 
-                    var path = Path()
-                    for (index, point) in stroke.points.enumerated() {
-                        let mapped = CGPoint(
-                            x: (point.point.x / 1152.0) * size.width,
-                            y: (point.point.y / 1536.0) * size.height
-                        )
-                        if index == 0 {
-                            path.move(to: mapped)
-                        } else {
-                            path.addLine(to: mapped)
-                        }
-                    }
-
-                    let color = Color(cgColor: stroke.style.color).opacity(buffer.opacity * 0.9)
-                    let lineWidth: CGFloat
-                    let lineCap: CGLineCap
-                    switch stroke.style.tipKind {
-                    case .pencil:
-                        lineWidth = max(0.5, stroke.style.radius * 0.16)
-                        lineCap = .round
-                    case .ink:
-                        lineWidth = max(0.55, stroke.style.radius * 0.18)
-                        lineCap = .round
-                    case .oil:
-                        lineWidth = max(0.7, stroke.style.radius * 0.24)
-                        lineCap = .square
-                    case .airbrush:
-                        lineWidth = max(0.8, stroke.style.radius * 0.28)
-                        lineCap = .round
-                    }
-                    context.stroke(
-                        path,
-                        with: .color(color),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: lineCap, lineJoin: .round)
-                    )
-                }
+            if let thumbnail = thumbnailImage {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .padding(3)
             }
         }
+    }
+
+    private var thumbnailImage: UIImage? {
+        guard let data = snapshot?.thumbnailData else { return nil }
+        return UIImage(data: data)
     }
 }

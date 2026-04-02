@@ -11,12 +11,12 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var revision: Int = 0
     private var activeStrokeLayerIndex: Int?
     private var timelapseFrames: [TimelapseFrame] = []
+    private var layerThumbnailCache: [Int: Data] = [:]
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
         let start = clock.now
         self.bridge = APPaintDocumentBridge(width: width, height: height)
-        captureTimelapseFrame()
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
     }
@@ -48,6 +48,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 index: index,
                 opacity: Float(info.opacity),
                 visible: info.visible,
+                thumbnailData: cachedLayerThumbnailData(index: index),
                 pixelData: bridge.pixelDataForLayer(at: index) as Data
             )
         }
@@ -81,6 +82,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func endStroke() {
         bridge.endStroke()
+        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
         activeStrokeLayerIndex = nil
         captureTimelapseFrame()
     }
@@ -90,6 +92,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
         )
+        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
         captureTimelapseFrame()
     }
 
@@ -105,6 +108,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func undo() -> Bool {
         let didUndo = bridge.undo()
         if didUndo {
+            invalidateThumbnailCache()
             captureTimelapseFrame()
         }
         return didUndo
@@ -114,6 +118,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func redo() -> Bool {
         let didRedo = bridge.redo()
         if didRedo {
+            invalidateThumbnailCache()
             captureTimelapseFrame()
         }
         return didRedo
@@ -121,6 +126,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func addLayer(name: String) {
         bridge.activeLayerIndex = bridge.addLayer(name: name)
+        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
         captureTimelapseFrame()
     }
 
@@ -135,11 +141,13 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func replaceLayerPixels(index: Int, data: Data) {
         bridge.replaceLayerPixels(at: index, data: data)
+        invalidateThumbnailCache(for: index)
         captureTimelapseFrame()
     }
 
     func clearLayer(index: Int) {
         bridge.clearLayer(at: index)
+        invalidateThumbnailCache(for: index)
         captureTimelapseFrame()
     }
 
@@ -252,5 +260,36 @@ final class PaintDocumentSession: @unchecked Sendable {
         let width = max(2, Int((canvasSize.width * scale).rounded()))
         let height = max(2, Int((canvasSize.height * scale).rounded()))
         return CGSize(width: width, height: height)
+    }
+
+    private func cachedLayerThumbnailData(index: Int) -> Data? {
+        if let cached = layerThumbnailCache[index] {
+            return cached
+        }
+        let thumbnail = makeLayerThumbnailData(index: index)
+        layerThumbnailCache[index] = thumbnail
+        return thumbnail
+    }
+
+    private func makeLayerThumbnailData(index: Int) -> Data? {
+        guard let imageRef = bridge.makeImageForLayer(at: index) else { return nil }
+        let sourceImage = UIImage(cgImage: imageRef)
+        let targetSize = timelapseFrameSize(
+            for: CGSize(width: bridge.width, height: bridge.height),
+            maxDimension: 96
+        )
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let thumbnail = renderer.image { _ in
+            sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        return thumbnail.pngData()
+    }
+
+    private func invalidateThumbnailCache(for index: Int? = nil) {
+        if let index {
+            layerThumbnailCache.removeValue(forKey: index)
+        } else {
+            layerThumbnailCache.removeAll(keepingCapacity: true)
+        }
     }
 }

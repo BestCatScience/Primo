@@ -344,6 +344,7 @@ struct PreviewStrokePoint: Identifiable, Equatable {
 
 struct PreviewStrokeStyle: Equatable {
     let tipKind: BrushTipKind
+    let isEraser: Bool
     let radius: CGFloat
     let opacity: CGFloat
     let hardness: CGFloat
@@ -370,12 +371,14 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
     let index: Int
     let opacity: Float
     let visible: Bool
+    let thumbnailData: Data?
     let pixelData: Data
 
     static func == (lhs: MetalLayerSnapshot, rhs: MetalLayerSnapshot) -> Bool {
         lhs.index == rhs.index &&
         lhs.opacity == rhs.opacity &&
         lhs.visible == rhs.visible &&
+        lhs.thumbnailData?.count == rhs.thumbnailData?.count &&
         lhs.pixelData.count == rhs.pixelData.count
     }
 }
