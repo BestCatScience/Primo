@@ -18,6 +18,8 @@ struct PaintDocumentClient: Sendable {
     var undo: @Sendable () -> Bool
     var redo: @Sendable () -> Bool
     var addLayer: @Sendable (String) -> Void
+    var deleteLayer: @Sendable (Int) -> Bool
+    var moveLayer: @Sendable (Int, Int) -> Bool
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
@@ -46,6 +48,8 @@ struct PaintDocumentClient: Sendable {
             undo: { sessionBox.session.undo() },
             redo: { sessionBox.session.redo() },
             addLayer: { name in sessionBox.session.addLayer(name: name) },
+            deleteLayer: { index in sessionBox.session.deleteLayer(index: index) },
+            moveLayer: { index, destination in sessionBox.session.moveLayer(from: index, to: destination) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },

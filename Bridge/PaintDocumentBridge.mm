@@ -288,6 +288,14 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     return _document->addLayer(name.UTF8String);
 }
 
+- (BOOL)deleteLayerAtIndex:(NSInteger)index {
+    return _document->deleteLayer((int)index);
+}
+
+- (BOOL)moveLayerAtIndex:(NSInteger)index toIndex:(NSInteger)destinationIndex {
+    return _document->moveLayer((int)index, (int)destinationIndex);
+}
+
 - (NSArray<APPaintLayerInfo *> *)layers {
     NSMutableArray<APPaintLayerInfo *> *items = [NSMutableArray array];
     for (int index = 0; index < _document->layerCount(); ++index) {

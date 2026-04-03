@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 struct LayerSidebarView: View {
-    let store: StoreOf<LayerSidebarFeature>
+    @Bindable var store: StoreOf<LayerSidebarFeature>
     let layerSnapshots: [MetalLayerSnapshot]
     var language: AppLanguage = .japanese
     var showsTitle = true
@@ -19,7 +19,7 @@ struct LayerSidebarView: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
-                        Text(StudioStrings.layers(store.layers.count, language))
+                        Text(StudioStrings.layers(store.layers.count + 1, language))
                             .font(StudioTheme.Typography.title(18))
                             .foregroundStyle(.white.opacity(0.9))
 
@@ -99,6 +99,23 @@ struct LayerSidebarView: View {
                                     capsuleTag(layer.visible ? StudioStrings.visible(language) : StudioStrings.hidden(language))
                                     capsuleTag(store.activeLayerIndex == layer.index ? StudioStrings.active(language) : StudioStrings.standby(language))
                                 }
+
+                                HStack(spacing: 6) {
+                                    miniActionButton(systemImage: "arrow.up") {
+                                        store.send(.moveLayerUpButtonTapped(layer.index))
+                                    }
+                                    .disabled(isTopmostLayer(layer))
+
+                                    miniActionButton(systemImage: "arrow.down") {
+                                        store.send(.moveLayerDownButtonTapped(layer.index))
+                                    }
+                                    .disabled(isBottommostLayer(layer))
+
+                                    miniActionButton(systemImage: "trash") {
+                                        store.send(.deleteLayerButtonTapped(layer.index))
+                                    }
+                                    .disabled(store.layers.count <= 1)
+                                }
                             }
 
                             Spacer()
@@ -132,11 +149,101 @@ struct LayerSidebarView: View {
                             store.send(.layerTapped(layer.index))
                         }
                     }
+
+                    paperLayerRow
                 }
                 .padding(.bottom, 10)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var paperLayerRow: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(store.transparentPaper ? StudioTheme.Palette.cardFillStrong : store.paperColor)
+                .frame(width: 48, height: 48)
+                .overlay {
+                    ZStack {
+                        if store.transparentPaper {
+                            Image(systemName: "square.dashed")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.72))
+                        } else {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        }
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(language == .japanese ? "用紙" : "Paper")
+                        .font(StudioTheme.Typography.title(15))
+                        .foregroundStyle(.white.opacity(0.92))
+
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 7) {
+                    Text(store.transparentPaper ? (language == .japanese ? "透明背景" : "Transparent") : (language == .japanese ? "背景色" : "Paper Color"))
+                        .font(StudioTheme.Typography.mono(10))
+                        .foregroundStyle(.white.opacity(0.48))
+
+                    capsuleTag(store.transparentPaper ? (language == .japanese ? "透明" : "Transparent") : (language == .japanese ? "表示" : "Visible"))
+                    capsuleTag(language == .japanese ? "最背面" : "Backmost")
+                }
+            }
+
+            Spacer()
+
+            Button {
+                store.send(.binding(.set(\.transparentPaper, !store.transparentPaper)))
+            } label: {
+                Image(systemName: store.transparentPaper ? "eye.slash.fill" : "eye.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(store.transparentPaper ? .white.opacity(0.45) : .white.opacity(0.9))
+                    .frame(width: 30, height: 30)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(StudioTheme.Palette.cardFillStrong)
+                    )
+            }
+            .buttonStyle(.plain)
+            .minimumHitTarget()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(StudioTheme.Palette.cardFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onTapGesture {
+            store.send(.paperRowTapped)
+        }
+        .popover(
+            isPresented: Binding(
+                get: { store.showsPaperEditor },
+                set: { newValue in
+                    if !newValue {
+                        store.send(.paperEditorDismissed)
+                    }
+                }
+            ),
+            attachmentAnchor: .rect(.bounds),
+            arrowEdge: .trailing
+        ) {
+            PaperLayerEditor(
+                paperColor: $store.paperColor,
+                transparentPaper: $store.transparentPaper,
+                language: language
+            )
+            .presentationCompactAdaptation(.popover)
+        }
     }
 
     private func capsuleTag(_ title: String) -> some View {
@@ -149,6 +256,29 @@ struct LayerSidebarView: View {
                 Capsule(style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong)
             )
+    }
+
+    private func miniActionButton(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.84))
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(StudioTheme.Palette.cardFillStrong)
+                )
+        }
+        .buttonStyle(.plain)
+        .minimumHitTarget()
+    }
+
+    private func isTopmostLayer(_ layer: LayerRowModel) -> Bool {
+        store.layers.first?.index == layer.index
+    }
+
+    private func isBottommostLayer(_ layer: LayerRowModel) -> Bool {
+        store.layers.last?.index == layer.index
     }
 }
 
@@ -176,5 +306,76 @@ private struct LayerThumbnailView: View {
     private var thumbnailImage: UIImage? {
         guard let data = snapshot?.thumbnailData else { return nil }
         return UIImage(data: data)
+    }
+}
+
+private struct PaperLayerEditor: View {
+    @Binding var paperColor: Color
+    @Binding var transparentPaper: Bool
+    let language: AppLanguage
+
+    private let swatches: [Color] = [
+        Color(red: 0.93, green: 0.93, blue: 0.91),
+        Color(red: 0.98, green: 0.97, blue: 0.93),
+        Color(red: 0.90, green: 0.88, blue: 0.82),
+        Color(red: 0.84, green: 0.89, blue: 0.95),
+        Color(red: 0.95, green: 0.86, blue: 0.86),
+        Color(red: 0.86, green: 0.92, blue: 0.84)
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(language == .japanese ? "用紙" : "Paper")
+                .font(StudioTheme.Typography.title(18))
+                .foregroundStyle(.white.opacity(0.94))
+
+            Toggle(isOn: $transparentPaper) {
+                Text(language == .japanese ? "透明な用紙" : "Transparent Paper")
+                    .font(StudioTheme.Typography.title(12))
+                    .foregroundStyle(.white.opacity(0.88))
+            }
+            .tint(StudioTheme.Palette.accentBright)
+
+            ColorPicker(
+                language == .japanese ? "用紙色" : "Paper Color",
+                selection: $paperColor,
+                supportsOpacity: false
+            )
+            .disabled(transparentPaper)
+            .opacity(transparentPaper ? 0.45 : 1.0)
+            .font(StudioTheme.Typography.label(12))
+            .foregroundStyle(.white.opacity(0.88))
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 28), spacing: 8)], spacing: 8) {
+                ForEach(Array(swatches.enumerated()), id: \.offset) { entry in
+                    let color = entry.element
+                    Button {
+                        paperColor = color
+                        transparentPaper = false
+                    } label: {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.75), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .disabled(transparentPaper)
+            .opacity(transparentPaper ? 0.45 : 1.0)
+        }
+        .padding(16)
+        .frame(width: 260, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
     }
 }

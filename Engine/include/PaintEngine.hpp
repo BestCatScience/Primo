@@ -171,6 +171,8 @@ public:
     void setActiveLayerIndex(int index);
 
     int addLayer(const std::string& name);
+    bool deleteLayer(int index);
+    bool moveLayer(int fromIndex, int toIndex);
     void clearLayer(int index);
     void setLayerVisibility(int index, bool visible);
     void setLayerOpacity(int index, float opacity);

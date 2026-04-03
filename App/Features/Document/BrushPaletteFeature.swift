@@ -171,6 +171,9 @@ struct BrushPaletteFeature {
         BindingReducer()
         Reduce { state, action in
             switch action {
+            case .binding(\.paperColor),
+                 .binding(\.transparentPaper):
+                return .none
             case .binding(\.brushColor),
                  .binding(\.brushTipKind),
                  .binding(\.brushRadius),
@@ -232,9 +235,7 @@ struct BrushPaletteFeature {
                  .binding(\.fillThresholdMode),
                  .binding(\.fillOpacityTolerance),
                  .binding(\.fillColorTolerance),
-                 .binding(\.fillExpansion),
-                 .binding(\.paperColor),
-                 .binding(\.transparentPaper):
+                 .binding(\.fillExpansion):
                 state.selectedBrush = nil
                 return .none
             case .binding:

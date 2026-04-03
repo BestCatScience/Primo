@@ -93,6 +93,8 @@ struct AppFeature {
             layerSidebar.layers = presentation.layerRows
             layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
+            layerSidebar.paperColor = brushPalette.paperColor
+            layerSidebar.transparentPaper = brushPalette.transparentPaper
             canvas.previewStyle = previewStrokeStyle()
             canvas.selectionMode = brushPalette.selectionToolMode
             canvas.paperStyle = resolvedPaperStyle()
@@ -511,12 +513,42 @@ struct AppFeature {
                 state.canvas.selectionMode = state.brushPalette.selectionToolMode
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 state.canvas.paperStyle = state.resolvedPaperStyle()
+                state.layerSidebar.paperColor = state.brushPalette.paperColor
+                state.layerSidebar.transparentPaper = state.brushPalette.transparentPaper
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                return .none
+
+            case .layerSidebar(.binding(\.paperColor)):
+                state.brushPalette.paperColor = state.layerSidebar.paperColor
+                state.canvas.paperStyle = state.resolvedPaperStyle()
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                return .none
+
+            case .layerSidebar(.binding(\.transparentPaper)):
+                state.brushPalette.transparentPaper = state.layerSidebar.transparentPaper
+                state.canvas.paperStyle = state.resolvedPaperStyle()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
                 paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
                 state.canvas.activeLayerIndex = state.layerSidebar.layers.count
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.deleteLayer(index))):
+                guard paintDocumentClient.deleteLayer(index) else {
+                    return .none
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
+                guard paintDocumentClient.moveLayer(index, destinationIndex) else {
+                    return .none
+                }
                 state.canvas.selection = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none

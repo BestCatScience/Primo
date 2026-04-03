@@ -588,6 +588,44 @@ int PaintDocument::addLayer(const std::string& name) {
     return activeLayerIndex_;
 }
 
+bool PaintDocument::deleteLayer(int index) {
+    if (index < 0 || index >= layerCount() || layerCount() <= 1) {
+        return false;
+    }
+    pushHistorySnapshot();
+    layers_.erase(layers_.begin() + index);
+    if (activeLayerIndex_ > index) {
+        activeLayerIndex_ -= 1;
+    } else if (activeLayerIndex_ >= layerCount()) {
+        activeLayerIndex_ = layerCount() - 1;
+    }
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
+bool PaintDocument::moveLayer(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || fromIndex >= layerCount() || toIndex < 0 || toIndex >= layerCount() || fromIndex == toIndex) {
+        return false;
+    }
+    pushHistorySnapshot();
+    Layer movedLayer = std::move(layers_[static_cast<size_t>(fromIndex)]);
+    layers_.erase(layers_.begin() + fromIndex);
+    layers_.insert(layers_.begin() + toIndex, std::move(movedLayer));
+
+    if (activeLayerIndex_ == fromIndex) {
+        activeLayerIndex_ = toIndex;
+    } else if (fromIndex < activeLayerIndex_ && toIndex >= activeLayerIndex_) {
+        activeLayerIndex_ -= 1;
+    } else if (fromIndex > activeLayerIndex_ && toIndex <= activeLayerIndex_) {
+        activeLayerIndex_ += 1;
+    }
+
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
 void PaintDocument::clearLayer(int index) {
     if (index < 0 || index >= layerCount()) {
         return;

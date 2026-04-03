@@ -126,6 +126,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init NS_UNAVAILABLE;
 
 - (NSInteger)addLayerWithName:(NSString *)name NS_SWIFT_NAME(addLayer(name:));
+- (BOOL)deleteLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(deleteLayer(at:));
+- (BOOL)moveLayerAtIndex:(NSInteger)index toIndex:(NSInteger)destinationIndex NS_SWIFT_NAME(moveLayer(at:to:));
 - (NSArray<APPaintLayerInfo *> *)layers NS_SWIFT_NAME(layerInfos());
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(pixelDataForLayer(at:));
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:data:));

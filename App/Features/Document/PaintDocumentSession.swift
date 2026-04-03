@@ -149,6 +149,26 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    @discardableResult
+    func deleteLayer(index: Int) -> Bool {
+        let didDelete = bridge.deleteLayer(at: index)
+        if didDelete {
+            invalidateThumbnailCache()
+            captureTimelapseFrame()
+        }
+        return didDelete
+    }
+
+    @discardableResult
+    func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
+        let didMove = bridge.moveLayer(at: index, to: destinationIndex)
+        if didMove {
+            invalidateThumbnailCache()
+            captureTimelapseFrame()
+        }
+        return didMove
+    }
+
     func setActiveLayer(index: Int) {
         bridge.activeLayerIndex = index
     }

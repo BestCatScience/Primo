@@ -889,49 +889,6 @@ struct BrushPaletteView: View {
                 }
             }
 
-            cardContainer(showsChrome: showsChrome) {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .center, spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(store.transparentPaper ? StudioTheme.Palette.cardFillStrong : store.paperColor)
-
-                            Image(systemName: store.transparentPaper ? "square.dashed" : "doc.richtext")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
-                        .frame(width: 38, height: 38)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(language == .japanese ? "用紙" : "Paper")
-                                .font(StudioTheme.Typography.title(14))
-                                .foregroundStyle(.white.opacity(0.9))
-                            Text(store.transparentPaper ? (language == .japanese ? "透明背景" : "Transparent background") : (language == .japanese ? "カスタム用紙色" : "Custom paper color"))
-                                .font(StudioTheme.Typography.body(11))
-                                .foregroundStyle(.white.opacity(0.52))
-                        }
-
-                        Spacer(minLength: 0)
-                    }
-
-                    Toggle(isOn: $store.transparentPaper) {
-                        Text(language == .japanese ? "透明な用紙" : "Transparent Paper")
-                            .font(StudioTheme.Typography.title(12))
-                            .foregroundStyle(.white.opacity(0.88))
-                    }
-                    .tint(StudioTheme.Palette.accentBright)
-
-                    SpectrumColorControl(color: $store.paperColor)
-                        .disabled(store.transparentPaper)
-                        .opacity(store.transparentPaper ? 0.45 : 1.0)
-                        .overlay {
-                            if store.transparentPaper {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(StudioTheme.Palette.overlayBlack.opacity(0.18))
-                            }
-                        }
-                }
-            }
         } else {
             cardContainer(showsChrome: showsChrome) {
                 VStack(alignment: .leading, spacing: 10) {
