@@ -293,6 +293,41 @@ enum BrushTextureMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum BrushDualBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case multiply
+    case darker
+    case subtract
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .multiply:
+            return language == .japanese ? "乗算" : "Multiply"
+        case .darker:
+            return language == .japanese ? "暗い方" : "Darker"
+        case .subtract:
+            return language == .japanese ? "削る" : "Subtract"
+        }
+    }
+}
+
+enum BrushScatterMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case directional
+    case spray
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .directional:
+            return language == .japanese ? "方向散布" : "Directional"
+        case .spray:
+            return language == .japanese ? "スプレー" : "Spray"
+        }
+    }
+}
+
 struct CanvasPaperStyle: Equatable, Sendable {
     var red: Float
     var green: Float
@@ -315,16 +350,54 @@ struct BrushPreset: Identifiable, Equatable {
     let tipKind: BrushTipKind
     let color: Color
     let radius: Double
+    let sizeSpeedSensitivity: Double
     let opacity: Double
     let hardness: Double
     let roundness: Double
+    let roundnessPressureSensitivity: Double
+    let roundnessTiltSensitivity: Double
     let angle: Double
+    let anglePressureSensitivity: Double
+    let angleTiltSensitivity: Double
     let angleMode: BrushAngleMode
     let spacing: Double
+    let spacingJitter: Double
+    let scatterEnabled: Bool
+    let scatterMode: BrushScatterMode
     let scatterLateral: Double
     let scatterLinear: Double
+    let count: Int
+    let countJitter: Double
+    let countSizeJitter: Double
+    let countOpacityJitter: Double
+    let angleJitter: Double
+    let roundnessJitter: Double
     let textureMode: BrushTextureMode
     let textureStrength: Double
+    let flow: Double
+    let flowPressureSensitivity: Double
+    let flowJitter: Double
+    let wetness: Double
+    let wetnessPressureSensitivity: Double
+    let opacityPressureSensitivity: Double
+    let colorMixStrength: Double
+    let paintLoad: Double
+    let loadPressureSensitivity: Double
+    let dualBrushEnabled: Bool
+    let dualTipKind: BrushTipKind
+    let dualScale: Double
+    let dualSpacing: Double
+    let dualScatter: Double
+    let dualAngle: Double
+    let dualBlendMode: BrushDualBlendMode
+    let grainScale: Double
+    let grainContrast: Double
+    let paperScale: Double
+    let paperStrength: Double
+    let paperThreshold: Double
+    let flipX: Bool
+    let flipY: Bool
+    let customTip: BrushTipRaster?
     let pressureSensitivity: Double
     let red: UInt8
     let green: UInt8
@@ -334,20 +407,174 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.name == rhs.name &&
         lhs.tipKind == rhs.tipKind &&
         lhs.radius == rhs.radius &&
+        lhs.sizeSpeedSensitivity == rhs.sizeSpeedSensitivity &&
         lhs.opacity == rhs.opacity &&
         lhs.hardness == rhs.hardness &&
         lhs.roundness == rhs.roundness &&
+        lhs.roundnessPressureSensitivity == rhs.roundnessPressureSensitivity &&
+        lhs.roundnessTiltSensitivity == rhs.roundnessTiltSensitivity &&
         lhs.angle == rhs.angle &&
+        lhs.anglePressureSensitivity == rhs.anglePressureSensitivity &&
+        lhs.angleTiltSensitivity == rhs.angleTiltSensitivity &&
         lhs.angleMode == rhs.angleMode &&
         lhs.spacing == rhs.spacing &&
+        lhs.spacingJitter == rhs.spacingJitter &&
+        lhs.scatterEnabled == rhs.scatterEnabled &&
+        lhs.scatterMode == rhs.scatterMode &&
         lhs.scatterLateral == rhs.scatterLateral &&
         lhs.scatterLinear == rhs.scatterLinear &&
+        lhs.count == rhs.count &&
+        lhs.countJitter == rhs.countJitter &&
+        lhs.countSizeJitter == rhs.countSizeJitter &&
+        lhs.countOpacityJitter == rhs.countOpacityJitter &&
+        lhs.angleJitter == rhs.angleJitter &&
+        lhs.roundnessJitter == rhs.roundnessJitter &&
         lhs.textureMode == rhs.textureMode &&
         lhs.textureStrength == rhs.textureStrength &&
+        lhs.flow == rhs.flow &&
+        lhs.flowPressureSensitivity == rhs.flowPressureSensitivity &&
+        lhs.flowJitter == rhs.flowJitter &&
+        lhs.wetness == rhs.wetness &&
+        lhs.wetnessPressureSensitivity == rhs.wetnessPressureSensitivity &&
+        lhs.opacityPressureSensitivity == rhs.opacityPressureSensitivity &&
+        lhs.colorMixStrength == rhs.colorMixStrength &&
+        lhs.paintLoad == rhs.paintLoad &&
+        lhs.loadPressureSensitivity == rhs.loadPressureSensitivity &&
+        lhs.dualBrushEnabled == rhs.dualBrushEnabled &&
+        lhs.dualTipKind == rhs.dualTipKind &&
+        lhs.dualScale == rhs.dualScale &&
+        lhs.dualSpacing == rhs.dualSpacing &&
+        lhs.dualScatter == rhs.dualScatter &&
+        lhs.dualAngle == rhs.dualAngle &&
+        lhs.dualBlendMode == rhs.dualBlendMode &&
+        lhs.grainScale == rhs.grainScale &&
+        lhs.grainContrast == rhs.grainContrast &&
+        lhs.paperScale == rhs.paperScale &&
+        lhs.paperStrength == rhs.paperStrength &&
+        lhs.paperThreshold == rhs.paperThreshold &&
+        lhs.flipX == rhs.flipX &&
+        lhs.flipY == rhs.flipY &&
+        lhs.customTip == rhs.customTip &&
         lhs.pressureSensitivity == rhs.pressureSensitivity &&
         lhs.red == rhs.red &&
         lhs.green == rhs.green &&
         lhs.blue == rhs.blue
+    }
+
+    init(
+        name: String,
+        tipKind: BrushTipKind,
+        color: Color,
+        radius: Double,
+        sizeSpeedSensitivity: Double = 0.0,
+        opacity: Double,
+        hardness: Double,
+        roundness: Double,
+        roundnessPressureSensitivity: Double = 0.0,
+        roundnessTiltSensitivity: Double = 0.0,
+        angle: Double,
+        anglePressureSensitivity: Double = 0.0,
+        angleTiltSensitivity: Double = 0.0,
+        angleMode: BrushAngleMode,
+        spacing: Double,
+        spacingJitter: Double,
+        scatterEnabled: Bool = false,
+        scatterMode: BrushScatterMode = .directional,
+        scatterLateral: Double,
+        scatterLinear: Double,
+        count: Int,
+        countJitter: Double,
+        countSizeJitter: Double = 0.0,
+        countOpacityJitter: Double = 0.0,
+        angleJitter: Double,
+        roundnessJitter: Double,
+        textureMode: BrushTextureMode,
+        textureStrength: Double,
+        flow: Double,
+        flowPressureSensitivity: Double = 0.0,
+        flowJitter: Double = 0.0,
+        wetness: Double = 0.0,
+        wetnessPressureSensitivity: Double = 0.0,
+        opacityPressureSensitivity: Double = 0.0,
+        colorMixStrength: Double = 0.0,
+        paintLoad: Double = 1.0,
+        loadPressureSensitivity: Double = 0.0,
+        dualBrushEnabled: Bool = false,
+        dualTipKind: BrushTipKind = .ink,
+        dualScale: Double = 0.72,
+        dualSpacing: Double = 0.26,
+        dualScatter: Double = 0.18,
+        dualAngle: Double = 0.0,
+        dualBlendMode: BrushDualBlendMode = .multiply,
+        grainScale: Double = 1.35,
+        grainContrast: Double = 1.7,
+        paperScale: Double = 0.12,
+        paperStrength: Double = 0.32,
+        paperThreshold: Double = 0.42,
+        flipX: Bool,
+        flipY: Bool,
+        customTip: BrushTipRaster? = nil,
+        pressureSensitivity: Double,
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8
+    ) {
+        self.name = name
+        self.tipKind = tipKind
+        self.color = color
+        self.radius = radius
+        self.sizeSpeedSensitivity = sizeSpeedSensitivity
+        self.opacity = opacity
+        self.hardness = hardness
+        self.roundness = roundness
+        self.roundnessPressureSensitivity = roundnessPressureSensitivity
+        self.roundnessTiltSensitivity = roundnessTiltSensitivity
+        self.angle = angle
+        self.anglePressureSensitivity = anglePressureSensitivity
+        self.angleTiltSensitivity = angleTiltSensitivity
+        self.angleMode = angleMode
+        self.spacing = spacing
+        self.spacingJitter = spacingJitter
+        self.scatterEnabled = scatterEnabled
+        self.scatterMode = scatterMode
+        self.scatterLateral = scatterLateral
+        self.scatterLinear = scatterLinear
+        self.count = count
+        self.countJitter = countJitter
+        self.countSizeJitter = countSizeJitter
+        self.countOpacityJitter = countOpacityJitter
+        self.angleJitter = angleJitter
+        self.roundnessJitter = roundnessJitter
+        self.textureMode = textureMode
+        self.textureStrength = textureStrength
+        self.flow = flow
+        self.flowPressureSensitivity = flowPressureSensitivity
+        self.flowJitter = flowJitter
+        self.wetness = wetness
+        self.wetnessPressureSensitivity = wetnessPressureSensitivity
+        self.opacityPressureSensitivity = opacityPressureSensitivity
+        self.colorMixStrength = colorMixStrength
+        self.paintLoad = paintLoad
+        self.loadPressureSensitivity = loadPressureSensitivity
+        self.dualBrushEnabled = dualBrushEnabled
+        self.dualTipKind = dualTipKind
+        self.dualScale = dualScale
+        self.dualSpacing = dualSpacing
+        self.dualScatter = dualScatter
+        self.dualAngle = dualAngle
+        self.dualBlendMode = dualBlendMode
+        self.grainScale = grainScale
+        self.grainContrast = grainContrast
+        self.paperScale = paperScale
+        self.paperStrength = paperStrength
+        self.paperThreshold = paperThreshold
+        self.flipX = flipX
+        self.flipY = flipY
+        self.customTip = customTip
+        self.pressureSensitivity = pressureSensitivity
+        self.red = red
+        self.green = green
+        self.blue = blue
     }
 
     static let defaults: [BrushPreset] = [
@@ -356,16 +583,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .pencil,
             color: Color(red: 0.12, green: 0.12, blue: 0.13),
             radius: 3.2,
+            sizeSpeedSensitivity: 0.08,
             opacity: 0.92,
             hardness: 0.80,
             roundness: 0.86,
+            roundnessPressureSensitivity: 0.12,
+            roundnessTiltSensitivity: 0.22,
             angle: 0.10,
+            anglePressureSensitivity: 0.04,
+            angleTiltSensitivity: 0.18,
             angleMode: .strokeDirection,
             spacing: 0.12,
+            spacingJitter: 0.0,
+            scatterEnabled: false,
+            scatterMode: .directional,
             scatterLateral: 0.03,
             scatterLinear: 0.01,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.02,
+            roundnessJitter: 0.03,
             textureMode: .eachTip,
             textureStrength: 0.88,
+            flow: 0.84,
+            flowPressureSensitivity: 0.20,
+            flowJitter: 0.04,
+            wetness: 0.10,
+            wetnessPressureSensitivity: 0.18,
+            opacityPressureSensitivity: 0.42,
+            colorMixStrength: 0.08,
+            paintLoad: 0.92,
+            loadPressureSensitivity: 0.10,
+            dualBrushEnabled: false,
+            dualTipKind: .pencil,
+            dualScale: 0.68,
+            dualSpacing: 0.18,
+            dualScatter: 0.06,
+            dualAngle: 0.10,
+            dualBlendMode: .multiply,
+            grainScale: 1.45,
+            grainContrast: 1.92,
+            paperScale: 0.16,
+            paperStrength: 0.48,
+            paperThreshold: 0.40,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.62,
             red: 31, green: 31, blue: 34
         ),
@@ -374,16 +638,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .ink,
             color: Color(red: 0.07, green: 0.08, blue: 0.10),
             radius: 1.5,
+            sizeSpeedSensitivity: 0.04,
             opacity: 0.98,
             hardness: 0.96,
             roundness: 0.34,
+            roundnessPressureSensitivity: 0.0,
+            roundnessTiltSensitivity: 0.08,
             angle: 0.0,
+            anglePressureSensitivity: 0.02,
+            angleTiltSensitivity: 0.22,
             angleMode: .strokeDirection,
             spacing: 0.10,
+            spacingJitter: 0.0,
+            scatterEnabled: false,
+            scatterMode: .directional,
             scatterLateral: 0.01,
             scatterLinear: 0.0,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
             textureMode: .strokeLocked,
             textureStrength: 0.10,
+            flow: 1.0,
+            flowPressureSensitivity: 0.08,
+            flowJitter: 0.0,
+            wetness: 0.0,
+            wetnessPressureSensitivity: 0.0,
+            opacityPressureSensitivity: 0.18,
+            colorMixStrength: 0.0,
+            paintLoad: 1.0,
+            loadPressureSensitivity: 0.0,
+            dualBrushEnabled: false,
+            dualTipKind: .ink,
+            dualScale: 0.72,
+            dualSpacing: 0.20,
+            dualScatter: 0.04,
+            dualAngle: 0.0,
+            dualBlendMode: .multiply,
+            grainScale: 1.08,
+            grainContrast: 1.45,
+            paperScale: 0.08,
+            paperStrength: 0.10,
+            paperThreshold: 0.44,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.32,
             red: 18, green: 21, blue: 26
         ),
@@ -392,16 +693,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .ink,
             color: Color(red: 0.20, green: 0.24, blue: 0.42),
             radius: 2.8,
+            sizeSpeedSensitivity: 0.06,
             opacity: 0.88,
             hardness: 0.72,
             roundness: 0.30,
+            roundnessPressureSensitivity: 0.04,
+            roundnessTiltSensitivity: 0.16,
             angle: 0.18,
+            anglePressureSensitivity: 0.04,
+            angleTiltSensitivity: 0.26,
             angleMode: .strokeDirection,
             spacing: 0.14,
+            spacingJitter: 0.02,
+            scatterEnabled: false,
+            scatterMode: .directional,
             scatterLateral: 0.03,
             scatterLinear: 0.01,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.03,
+            roundnessJitter: 0.02,
             textureMode: .eachTip,
             textureStrength: 0.26,
+            flow: 0.92,
+            flowPressureSensitivity: 0.12,
+            flowJitter: 0.02,
+            wetness: 0.04,
+            wetnessPressureSensitivity: 0.08,
+            opacityPressureSensitivity: 0.26,
+            colorMixStrength: 0.04,
+            paintLoad: 0.98,
+            loadPressureSensitivity: 0.04,
+            dualBrushEnabled: false,
+            dualTipKind: .ink,
+            dualScale: 0.76,
+            dualSpacing: 0.24,
+            dualScatter: 0.08,
+            dualAngle: 0.04,
+            dualBlendMode: .multiply,
+            grainScale: 1.12,
+            grainContrast: 1.54,
+            paperScale: 0.10,
+            paperStrength: 0.16,
+            paperThreshold: 0.42,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.44,
             red: 51, green: 61, blue: 107
         ),
@@ -410,16 +748,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .airbrush,
             color: Color(red: 0.10, green: 0.10, blue: 0.11),
             radius: 8.5,
+            sizeSpeedSensitivity: 0.14,
             opacity: 0.16,
             hardness: 0.10,
             roundness: 1.0,
+            roundnessPressureSensitivity: 0.0,
+            roundnessTiltSensitivity: 0.0,
             angle: 0.0,
+            anglePressureSensitivity: 0.0,
+            angleTiltSensitivity: 0.0,
             angleMode: .fixed,
             spacing: 0.34,
+            spacingJitter: 0.08,
+            scatterEnabled: true,
+            scatterMode: .spray,
             scatterLateral: 0.20,
             scatterLinear: 0.06,
+            count: 2,
+            countJitter: 0.25,
+            countSizeJitter: 0.32,
+            countOpacityJitter: 0.28,
+            angleJitter: 1.0,
+            roundnessJitter: 0.0,
             textureMode: .moving,
             textureStrength: 0.22,
+            flow: 0.62,
+            flowPressureSensitivity: 0.36,
+            flowJitter: 0.24,
+            wetness: 0.34,
+            wetnessPressureSensitivity: 0.46,
+            opacityPressureSensitivity: 0.62,
+            colorMixStrength: 0.22,
+            paintLoad: 0.72,
+            loadPressureSensitivity: 0.28,
+            dualBrushEnabled: true,
+            dualTipKind: .airbrush,
+            dualScale: 0.54,
+            dualSpacing: 0.42,
+            dualScatter: 0.34,
+            dualAngle: 0.0,
+            dualBlendMode: .multiply,
+            grainScale: 1.36,
+            grainContrast: 1.52,
+            paperScale: 0.09,
+            paperStrength: 0.22,
+            paperThreshold: 0.46,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.18,
             red: 25, green: 25, blue: 29
         ),
@@ -428,16 +803,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .airbrush,
             color: Color(red: 0.16, green: 0.19, blue: 0.26),
             radius: 11.0,
+            sizeSpeedSensitivity: 0.18,
             opacity: 0.10,
             hardness: 0.06,
             roundness: 1.0,
+            roundnessPressureSensitivity: 0.0,
+            roundnessTiltSensitivity: 0.0,
             angle: 0.0,
+            anglePressureSensitivity: 0.0,
+            angleTiltSensitivity: 0.0,
             angleMode: .fixed,
             spacing: 0.42,
+            spacingJitter: 0.12,
+            scatterEnabled: true,
+            scatterMode: .spray,
             scatterLateral: 0.28,
             scatterLinear: 0.10,
+            count: 2,
+            countJitter: 0.35,
+            countSizeJitter: 0.42,
+            countOpacityJitter: 0.36,
+            angleJitter: 1.2,
+            roundnessJitter: 0.0,
             textureMode: .moving,
             textureStrength: 0.34,
+            flow: 0.54,
+            flowPressureSensitivity: 0.42,
+            flowJitter: 0.32,
+            wetness: 0.52,
+            wetnessPressureSensitivity: 0.58,
+            opacityPressureSensitivity: 0.70,
+            colorMixStrength: 0.36,
+            paintLoad: 0.56,
+            loadPressureSensitivity: 0.34,
+            dualBrushEnabled: true,
+            dualTipKind: .airbrush,
+            dualScale: 0.58,
+            dualSpacing: 0.48,
+            dualScatter: 0.40,
+            dualAngle: 0.0,
+            dualBlendMode: .multiply,
+            grainScale: 1.42,
+            grainContrast: 1.64,
+            paperScale: 0.12,
+            paperStrength: 0.30,
+            paperThreshold: 0.44,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.10,
             red: 41, green: 49, blue: 66
         ),
@@ -446,16 +858,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .oil,
             color: Color(red: 0.63, green: 0.31, blue: 0.20),
             radius: 3.8,
+            sizeSpeedSensitivity: 0.10,
             opacity: 0.84,
             hardness: 0.66,
             roundness: 0.42,
+            roundnessPressureSensitivity: 0.10,
+            roundnessTiltSensitivity: 0.20,
             angle: 0.22,
+            anglePressureSensitivity: 0.06,
+            angleTiltSensitivity: 0.20,
             angleMode: .strokeDirection,
             spacing: 0.24,
+            spacingJitter: 0.04,
+            scatterEnabled: true,
+            scatterMode: .directional,
             scatterLateral: 0.08,
             scatterLinear: 0.03,
+            count: 2,
+            countJitter: 0.15,
+            countSizeJitter: 0.18,
+            countOpacityJitter: 0.14,
+            angleJitter: 0.08,
+            roundnessJitter: 0.05,
             textureMode: .eachTip,
             textureStrength: 0.78,
+            flow: 0.88,
+            flowPressureSensitivity: 0.14,
+            flowJitter: 0.10,
+            wetness: 0.36,
+            wetnessPressureSensitivity: 0.30,
+            opacityPressureSensitivity: 0.34,
+            colorMixStrength: 0.30,
+            paintLoad: 0.74,
+            loadPressureSensitivity: 0.24,
+            dualBrushEnabled: true,
+            dualTipKind: .oil,
+            dualScale: 0.66,
+            dualSpacing: 0.24,
+            dualScatter: 0.12,
+            dualAngle: 0.12,
+            dualBlendMode: .darker,
+            grainScale: 1.28,
+            grainContrast: 1.82,
+            paperScale: 0.14,
+            paperStrength: 0.28,
+            paperThreshold: 0.40,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.40,
             red: 160, green: 79, blue: 51
         ),
@@ -464,16 +913,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .oil,
             color: Color(red: 0.18, green: 0.26, blue: 0.61),
             radius: 6.0,
+            sizeSpeedSensitivity: 0.12,
             opacity: 0.80,
             hardness: 0.72,
             roundness: 0.36,
+            roundnessPressureSensitivity: 0.08,
+            roundnessTiltSensitivity: 0.18,
             angle: -0.14,
+            anglePressureSensitivity: 0.06,
+            angleTiltSensitivity: 0.18,
             angleMode: .strokeDirection,
             spacing: 0.22,
+            spacingJitter: 0.03,
+            scatterEnabled: true,
+            scatterMode: .directional,
             scatterLateral: 0.06,
             scatterLinear: 0.03,
+            count: 2,
+            countJitter: 0.12,
+            countSizeJitter: 0.16,
+            countOpacityJitter: 0.12,
+            angleJitter: 0.06,
+            roundnessJitter: 0.04,
             textureMode: .eachTip,
             textureStrength: 0.82,
+            flow: 0.86,
+            flowPressureSensitivity: 0.12,
+            flowJitter: 0.08,
+            wetness: 0.28,
+            wetnessPressureSensitivity: 0.22,
+            opacityPressureSensitivity: 0.30,
+            colorMixStrength: 0.24,
+            paintLoad: 0.78,
+            loadPressureSensitivity: 0.20,
+            dualBrushEnabled: true,
+            dualTipKind: .oil,
+            dualScale: 0.62,
+            dualSpacing: 0.22,
+            dualScatter: 0.10,
+            dualAngle: -0.08,
+            dualBlendMode: .darker,
+            grainScale: 1.24,
+            grainContrast: 1.88,
+            paperScale: 0.13,
+            paperStrength: 0.26,
+            paperThreshold: 0.40,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.36,
             red: 46, green: 66, blue: 156
         ),
@@ -482,16 +968,53 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .pencil,
             color: Color(red: 0.25, green: 0.25, blue: 0.27),
             radius: 2.2,
+            sizeSpeedSensitivity: 0.10,
             opacity: 0.70,
             hardness: 0.68,
             roundness: 0.88,
+            roundnessPressureSensitivity: 0.10,
+            roundnessTiltSensitivity: 0.20,
             angle: -0.08,
+            anglePressureSensitivity: 0.04,
+            angleTiltSensitivity: 0.16,
             angleMode: .strokeDirection,
             spacing: 0.13,
+            spacingJitter: 0.01,
+            scatterEnabled: false,
+            scatterMode: .directional,
             scatterLateral: 0.03,
             scatterLinear: 0.01,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.0,
+            countOpacityJitter: 0.0,
+            angleJitter: 0.03,
+            roundnessJitter: 0.04,
             textureMode: .eachTip,
             textureStrength: 0.82,
+            flow: 0.78,
+            flowPressureSensitivity: 0.18,
+            flowJitter: 0.06,
+            wetness: 0.14,
+            wetnessPressureSensitivity: 0.16,
+            opacityPressureSensitivity: 0.48,
+            colorMixStrength: 0.10,
+            paintLoad: 0.88,
+            loadPressureSensitivity: 0.12,
+            dualBrushEnabled: false,
+            dualTipKind: .pencil,
+            dualScale: 0.70,
+            dualSpacing: 0.18,
+            dualScatter: 0.06,
+            dualAngle: -0.06,
+            dualBlendMode: .multiply,
+            grainScale: 1.48,
+            grainContrast: 1.94,
+            paperScale: 0.15,
+            paperStrength: 0.44,
+            paperThreshold: 0.40,
+            flipX: false,
+            flipY: false,
             pressureSensitivity: 0.82,
             red: 64, green: 64, blue: 69
         )

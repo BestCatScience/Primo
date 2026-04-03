@@ -35,6 +35,9 @@
 		A00000000000000000000044 /* InputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000045 /* InputHandler.swift */; };
 		A00000000000000000000046 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000047 /* StudioTheme.swift */; };
 		A0000000000000000000004A /* StudioLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004B /* StudioLocalization.swift */; };
+		A0000000000000000000004C /* BrushTipFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004D /* BrushTipFile.swift */; };
+		A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004F /* PhotoshopBrushFile.swift */; };
+		A00000000000000000000094 /* BrushPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000095 /* BrushPresetStore.swift */; };
 		A00000000000000000000048 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000049 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -71,6 +74,9 @@
 		A00000000000000000000045 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
 		A00000000000000000000047 /* StudioTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioTheme.swift; sourceTree = "<group>"; };
 		A0000000000000000000004B /* StudioLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLocalization.swift; sourceTree = "<group>"; };
+		A0000000000000000000004D /* BrushTipFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushTipFile.swift; sourceTree = "<group>"; };
+		A0000000000000000000004F /* PhotoshopBrushFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoshopBrushFile.swift; sourceTree = "<group>"; };
+		A00000000000000000000095 /* BrushPresetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPresetStore.swift; sourceTree = "<group>"; };
 		A00000000000000000000049 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -205,6 +211,9 @@
 			children = (
 				A0000000000000000000000A /* atelierprime-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
+				A00000000000000000000095 /* BrushPresetStore.swift */,
+				A0000000000000000000004D /* BrushTipFile.swift */,
+				A0000000000000000000004F /* PhotoshopBrushFile.swift */,
 				A0000000000000000000004B /* StudioLocalization.swift */,
 				A00000000000000000000047 /* StudioTheme.swift */,
 			);
@@ -336,6 +345,9 @@
 				A00000000000000000000027 /* LayerSidebarView.swift in Sources */,
 				A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */,
 				A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */,
+				A00000000000000000000094 /* BrushPresetStore.swift in Sources */,
+				A0000000000000000000004C /* BrushTipFile.swift in Sources */,
+				A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */,
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,

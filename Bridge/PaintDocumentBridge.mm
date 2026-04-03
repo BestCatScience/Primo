@@ -182,16 +182,51 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     if (self) {
         _tipKind = @"pencil";
         _radius = 3.0;
+        _sizeSpeedSensitivity = 0.0;
         _hardness = 0.82;
         _opacity = 0.9;
         _roundness = 1.0;
+        _roundnessPressureSensitivity = 0.0;
+        _roundnessTiltSensitivity = 0.0;
         _angle = 0.0;
+        _anglePressureSensitivity = 0.0;
+        _angleTiltSensitivity = 0.0;
         _angleMode = 1;
         _stampSpacing = 0.28;
+        _spacingJitter = 0.0;
+        _scatterEnabled = NO;
+        _scatterMode = 0;
         _scatterLateral = 0.0;
         _scatterLinear = 0.0;
+        _count = 1;
+        _countJitter = 0.0;
+        _countSizeJitter = 0.0;
+        _countOpacityJitter = 0.0;
+        _angleJitter = 0.0;
+        _roundnessJitter = 0.0;
         _textureMode = 2;
         _textureStrength = 0.32;
+        _flow = 1.0;
+        _flowPressureSensitivity = 0.0;
+        _flowJitter = 0.0;
+        _wetness = 0.0;
+        _wetnessPressureSensitivity = 0.0;
+        _opacityPressureSensitivity = 0.0;
+        _colorMixStrength = 0.0;
+        _paintLoad = 1.0;
+        _loadPressureSensitivity = 0.0;
+        _dualBrushEnabled = NO;
+        _dualTipKind = @"ink";
+        _dualScale = 0.72;
+        _dualSpacing = 0.26;
+        _dualScatter = 0.18;
+        _dualAngle = 0.0;
+        _dualBlendMode = 0;
+        _flipX = NO;
+        _flipY = NO;
+        _tipMaskWidth = 0;
+        _tipMaskHeight = 0;
+        _tipMaskData = nil;
         _grainScale = 1.35;
         _grainContrast = 1.7;
         _paperScale = 0.12;
@@ -307,17 +342,55 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
+    settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
     settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;
     settings.roundness = (float)brush.roundness;
+    settings.roundnessPressureSensitivity = (float)brush.roundnessPressureSensitivity;
+    settings.roundnessTiltSensitivity = (float)brush.roundnessTiltSensitivity;
     settings.angle = (float)brush.angle;
+    settings.anglePressureSensitivity = (float)brush.anglePressureSensitivity;
+    settings.angleTiltSensitivity = (float)brush.angleTiltSensitivity;
     settings.angleMode = (int)brush.angleMode;
     settings.stampSpacing = (float)brush.stampSpacing;
+    settings.spacingJitter = (float)brush.spacingJitter;
+    settings.scatterEnabled = brush.scatterEnabled;
+    settings.scatterMode = (int)brush.scatterMode;
     settings.scatterLateral = (float)brush.scatterLateral;
     settings.scatterLinear = (float)brush.scatterLinear;
+    settings.count = (int)brush.count;
+    settings.countJitter = (float)brush.countJitter;
+    settings.countSizeJitter = (float)brush.countSizeJitter;
+    settings.countOpacityJitter = (float)brush.countOpacityJitter;
+    settings.angleJitter = (float)brush.angleJitter;
+    settings.roundnessJitter = (float)brush.roundnessJitter;
     settings.textureMode = (int)brush.textureMode;
     settings.textureStrength = (float)brush.textureStrength;
+    settings.flow = (float)brush.flow;
+    settings.flowPressureSensitivity = (float)brush.flowPressureSensitivity;
+    settings.flowJitter = (float)brush.flowJitter;
+    settings.wetness = (float)brush.wetness;
+    settings.wetnessPressureSensitivity = (float)brush.wetnessPressureSensitivity;
+    settings.opacityPressureSensitivity = (float)brush.opacityPressureSensitivity;
+    settings.colorMixStrength = (float)brush.colorMixStrength;
+    settings.paintLoad = (float)brush.paintLoad;
+    settings.loadPressureSensitivity = (float)brush.loadPressureSensitivity;
+    settings.dualBrushEnabled = brush.dualBrushEnabled;
+    settings.dualTipKind = std::string(brush.dualTipKind.UTF8String ?: "ink");
+    settings.dualScale = (float)brush.dualScale;
+    settings.dualSpacing = (float)brush.dualSpacing;
+    settings.dualScatter = (float)brush.dualScatter;
+    settings.dualAngle = (float)brush.dualAngle;
+    settings.dualBlendMode = (int)brush.dualBlendMode;
+    settings.flipX = brush.flipX;
+    settings.flipY = brush.flipY;
+    settings.tipMaskWidth = (int)brush.tipMaskWidth;
+    settings.tipMaskHeight = (int)brush.tipMaskHeight;
+    if (brush.tipMaskData.length > 0) {
+        const auto *bytes = static_cast<const uint8_t *>(brush.tipMaskData.bytes);
+        settings.tipMaskAlpha.assign(bytes, bytes + brush.tipMaskData.length);
+    }
     settings.grainScale = (float)brush.grainScale;
     settings.grainContrast = (float)brush.grainContrast;
     settings.paperScale = (float)brush.paperScale;
@@ -365,17 +438,55 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
+    settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
     settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;
     settings.roundness = (float)brush.roundness;
+    settings.roundnessPressureSensitivity = (float)brush.roundnessPressureSensitivity;
+    settings.roundnessTiltSensitivity = (float)brush.roundnessTiltSensitivity;
     settings.angle = (float)brush.angle;
+    settings.anglePressureSensitivity = (float)brush.anglePressureSensitivity;
+    settings.angleTiltSensitivity = (float)brush.angleTiltSensitivity;
     settings.angleMode = (int)brush.angleMode;
     settings.stampSpacing = (float)brush.stampSpacing;
+    settings.spacingJitter = (float)brush.spacingJitter;
+    settings.scatterEnabled = brush.scatterEnabled;
+    settings.scatterMode = (int)brush.scatterMode;
     settings.scatterLateral = (float)brush.scatterLateral;
     settings.scatterLinear = (float)brush.scatterLinear;
+    settings.count = (int)brush.count;
+    settings.countJitter = (float)brush.countJitter;
+    settings.countSizeJitter = (float)brush.countSizeJitter;
+    settings.countOpacityJitter = (float)brush.countOpacityJitter;
+    settings.angleJitter = (float)brush.angleJitter;
+    settings.roundnessJitter = (float)brush.roundnessJitter;
     settings.textureMode = (int)brush.textureMode;
     settings.textureStrength = (float)brush.textureStrength;
+    settings.flow = (float)brush.flow;
+    settings.flowPressureSensitivity = (float)brush.flowPressureSensitivity;
+    settings.flowJitter = (float)brush.flowJitter;
+    settings.wetness = (float)brush.wetness;
+    settings.wetnessPressureSensitivity = (float)brush.wetnessPressureSensitivity;
+    settings.opacityPressureSensitivity = (float)brush.opacityPressureSensitivity;
+    settings.colorMixStrength = (float)brush.colorMixStrength;
+    settings.paintLoad = (float)brush.paintLoad;
+    settings.loadPressureSensitivity = (float)brush.loadPressureSensitivity;
+    settings.dualBrushEnabled = brush.dualBrushEnabled;
+    settings.dualTipKind = std::string(brush.dualTipKind.UTF8String ?: "ink");
+    settings.dualScale = (float)brush.dualScale;
+    settings.dualSpacing = (float)brush.dualSpacing;
+    settings.dualScatter = (float)brush.dualScatter;
+    settings.dualAngle = (float)brush.dualAngle;
+    settings.dualBlendMode = (int)brush.dualBlendMode;
+    settings.flipX = brush.flipX;
+    settings.flipY = brush.flipY;
+    settings.tipMaskWidth = (int)brush.tipMaskWidth;
+    settings.tipMaskHeight = (int)brush.tipMaskHeight;
+    if (brush.tipMaskData.length > 0) {
+        const auto *bytes = static_cast<const uint8_t *>(brush.tipMaskData.bytes);
+        settings.tipMaskAlpha.assign(bytes, bytes + brush.tipMaskData.length);
+    }
     settings.grainScale = (float)brush.grainScale;
     settings.grainContrast = (float)brush.grainContrast;
     settings.paperScale = (float)brush.paperScale;
@@ -419,7 +530,8 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
 
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedLast;
+    // PaintEngine stores straight-alpha RGBA; exporting as premultiplied darkens semi-transparent inks.
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaLast;
     CGImageRef image = CGImageCreate((size_t)_document->width(),
                                      (size_t)_document->height(),
                                      8,
@@ -447,7 +559,7 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
 
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaPremultipliedLast;
+    CGBitmapInfo bitmapInfo = (CGBitmapInfo)kCGImageAlphaLast;
     CGImageRef image = CGImageCreate((size_t)_document->width(),
                                      (size_t)_document->height(),
                                      8,

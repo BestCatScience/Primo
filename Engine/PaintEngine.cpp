@@ -26,6 +26,17 @@ float hash2D(float x, float y) {
     return fract(std::sin((x * 127.1F) + (y * 311.7F)) * 43758.5453F);
 }
 
+float signedNoise(float x, float y) {
+    return (hash2D(x, y) * 2.0F) - 1.0F;
+}
+
+float softScatterNoise(float x, float y) {
+    const float a = signedNoise(x + 17.31F, y - 9.17F);
+    const float b = signedNoise(x - 23.77F, y + 14.61F);
+    const float c = signedNoise(x + 6.13F, y + 27.49F);
+    return (a + b + c) / 3.0F;
+}
+
 float computeBaseFalloff(float distance, float hardness) {
     const float clampedHardness = clamp01(hardness);
     if (clampedHardness >= 0.995F) {
@@ -72,6 +83,27 @@ float effectiveRoundness(const BrushSettings& brush, std::string_view tipKind, f
     return std::clamp(roundness, 0.12F, 1.0F);
 }
 
+float shapeExponentForTip(std::string_view tipKind) {
+    if (tipKind == "ink") {
+        return 5.5F;
+    }
+    if (tipKind == "oil") {
+        return 3.8F;
+    }
+    if (tipKind == "pencil") {
+        return 2.6F;
+    }
+    return 2.0F;
+}
+
+float shapeDistanceForTip(std::string_view tipKind, float normalizedAlong, float normalizedAcross) {
+    const float exponent = shapeExponentForTip(tipKind);
+    const float superellipse =
+        std::pow(std::abs(normalizedAlong), exponent) +
+        std::pow(std::abs(normalizedAcross), exponent);
+    return std::pow(superellipse, 1.0F / exponent);
+}
+
 float resolvedBrushAngle(
     const BrushSettings& brush,
     const StrokePoint& point,
@@ -98,6 +130,8 @@ float resolvedBrushAngle(
             baseAngle += point.azimuth * clamp01(brush.tiltInfluence) * altitudeFactor * 0.12F;
             break;
     }
+    baseAngle += brush.anglePressureSensitivity * remap(point.pressure, 0.08F, 1.0F, -0.35F, 0.35F);
+    baseAngle += brush.angleTiltSensitivity * point.azimuth * altitudeFactor * clamp01(brush.tiltInfluence);
     return baseAngle;
 }
 
@@ -112,7 +146,10 @@ float textureMaskForTip(
     float textureStrength,
     int textureMode,
     float grainScale,
+    float grainContrast,
     float paperScale,
+    float paperThreshold,
+    float paperStrength,
     float timestamp
 ) {
     const float clampedTexture = clamp01(textureStrength);
@@ -144,26 +181,37 @@ float textureMaskForTip(
 
     const float primaryNoise = hash2D(sampleX * grainFrequency, sampleY * grainFrequency);
     const float paperNoise = hash2D((sampleX - 19.0F) * paperFrequency, (sampleY + 7.0F) * paperFrequency);
+    const float grainResponse = std::pow(
+        std::clamp(primaryNoise, 0.001F, 1.0F),
+        std::max(0.35F, grainContrast)
+    );
+    const float paperCut = clamp01(remap(
+        paperNoise,
+        std::clamp(paperThreshold - 0.34F, 0.0F, 1.0F),
+        std::clamp(paperThreshold + 0.22F, 0.0F, 1.0F),
+        0.0F,
+        1.0F
+    ));
 
     float mask = 1.0F;
     if (tipKind == "pencil") {
-        const float tooth = remap(primaryNoise, 0.0F, 1.0F, 0.42F, 1.0F);
+        const float tooth = remap(grainResponse, 0.0F, 1.0F, 0.36F, 1.0F);
         const float streak = 0.84F + (0.16F * std::abs(std::sin((alongNorm * 8.0F) + (acrossNorm * 4.0F))));
-        mask = tooth * streak * remap(paperNoise, 0.0F, 1.0F, 0.75F, 1.0F);
+        mask = tooth * streak * lerp(1.0F, remap(paperCut, 0.0F, 1.0F, 0.68F, 1.0F), clamp01(paperStrength));
     } else if (tipKind == "ink") {
         const float edgeBreak = 0.90F + (0.10F * hash2D((pointX * 0.9F) + timestamp, (pointY * 0.9F) - timestamp));
         const float fiber = 0.92F + (0.08F * std::abs(std::sin((acrossNorm * 13.0F) + (alongNorm * 1.8F))));
-        mask = edgeBreak * fiber;
+        mask = edgeBreak * fiber * lerp(1.0F, remap(paperCut, 0.0F, 1.0F, 0.82F, 1.0F), clamp01(paperStrength * 0.55F));
     } else if (tipKind == "oil") {
         const float bristleBands = 0.46F + (0.54F * std::abs(std::sin((acrossNorm * 15.0F) + (alongNorm * 2.4F) + (timestamp * 0.4F))));
-        const float pigment = remap(primaryNoise, 0.0F, 1.0F, 0.78F, 1.0F);
-        mask = bristleBands * pigment;
+        const float pigment = remap(grainResponse, 0.0F, 1.0F, 0.72F, 1.0F);
+        mask = bristleBands * pigment * lerp(1.0F, remap(paperCut, 0.0F, 1.0F, 0.86F, 1.0F), clamp01(paperStrength * 0.4F));
     } else if (tipKind == "airbrush") {
-        const float cloud = remap(primaryNoise, 0.0F, 1.0F, 0.72F, 1.0F);
-        const float dust = remap(paperNoise, 0.0F, 1.0F, 0.86F, 1.0F);
+        const float cloud = remap(grainResponse, 0.0F, 1.0F, 0.70F, 1.0F);
+        const float dust = lerp(1.0F, remap(paperCut, 0.0F, 1.0F, 0.82F, 1.0F), clamp01(paperStrength * 0.65F));
         mask = cloud * dust;
     } else {
-        mask = remap(primaryNoise, 0.0F, 1.0F, 0.8F, 1.0F);
+        mask = remap(grainResponse, 0.0F, 1.0F, 0.8F, 1.0F);
     }
 
     return lerp(1.0F, std::clamp(mask, 0.0F, 1.0F), clampedTexture);
@@ -210,6 +258,100 @@ float pencilClusterMask(
     mask *= density * pepper;
     mask = std::max(mask, fringe * dust * 0.42F);
     return std::clamp(mask, 0.0F, 1.0F);
+}
+
+float sampleBrushTipAlpha(const BrushSettings& brush, float normalizedAlong, float normalizedAcross) {
+    if (brush.tipMaskWidth <= 0 || brush.tipMaskHeight <= 0 || brush.tipMaskAlpha.empty()) {
+        return 1.0F;
+    }
+
+    const float u = ((normalizedAlong + 1.0F) * 0.5F);
+    const float v = ((normalizedAcross + 1.0F) * 0.5F);
+    if (u < 0.0F || u > 1.0F || v < 0.0F || v > 1.0F) {
+        return 0.0F;
+    }
+
+    const float sampleX = u * static_cast<float>(brush.tipMaskWidth - 1);
+    const float sampleY = v * static_cast<float>(brush.tipMaskHeight - 1);
+    const int x0 = std::clamp(static_cast<int>(std::floor(sampleX)), 0, brush.tipMaskWidth - 1);
+    const int y0 = std::clamp(static_cast<int>(std::floor(sampleY)), 0, brush.tipMaskHeight - 1);
+    const int x1 = std::clamp(x0 + 1, 0, brush.tipMaskWidth - 1);
+    const int y1 = std::clamp(y0 + 1, 0, brush.tipMaskHeight - 1);
+    const float tx = sampleX - static_cast<float>(x0);
+    const float ty = sampleY - static_cast<float>(y0);
+
+    const auto alphaAt = [&](int x, int y) -> float {
+        const size_t index = static_cast<size_t>(y * brush.tipMaskWidth + x);
+        if (index >= brush.tipMaskAlpha.size()) {
+            return 0.0F;
+        }
+        return static_cast<float>(brush.tipMaskAlpha[index]) / 255.0F;
+    };
+
+    const float top = lerp(alphaAt(x0, y0), alphaAt(x1, y0), tx);
+    const float bottom = lerp(alphaAt(x0, y1), alphaAt(x1, y1), tx);
+    return lerp(top, bottom, ty);
+}
+
+float jitterValue(float seedA, float seedB, float amount) {
+    if (amount <= 0.001F) {
+        return 0.0F;
+    }
+    return ((hash2D(seedA, seedB) - 0.5F) * 2.0F) * amount;
+}
+
+float dualBrushMask(
+    const BrushSettings& brush,
+    float pointX,
+    float pointY,
+    float sampleX,
+    float sampleY,
+    float radius,
+    float dabAngle,
+    float baseRoundness,
+    float dabSeed,
+    float timestamp
+) {
+    if (!brush.dualBrushEnabled) {
+        return 1.0F;
+    }
+
+    const float dualScale = std::clamp(brush.dualScale, 0.2F, 2.2F);
+    const float dualRoundness = effectiveRoundness(brush, brush.dualTipKind, 0.0F);
+    const float dualMajorRadius = std::max(0.12F, radius * dualScale);
+    const float dualMinorRadius = std::max(0.12F, radius * dualScale * std::clamp(dualRoundness * lerp(0.9F, 1.15F, baseRoundness), 0.12F, 1.0F));
+    const float dualAngle = dabAngle + brush.dualAngle;
+    const float dualCos = std::cos(dualAngle);
+    const float dualSin = std::sin(dualAngle);
+    const float dualSpacingOffset = (hash2D(pointX + (dabSeed * 0.41F), pointY - (dabSeed * 0.23F)) - 0.5F) * 2.0F * brush.dualSpacing * radius;
+    const float dualScatterOffset = jitterValue(pointY + (dabSeed * 0.77F), pointX - (dabSeed * 0.59F), brush.dualScatter * radius);
+    const float dualCenterX = pointX + (std::cos(dualAngle) * dualSpacingOffset) - (std::sin(dualAngle) * dualScatterOffset);
+    const float dualCenterY = pointY + (std::sin(dualAngle) * dualSpacingOffset) + (std::cos(dualAngle) * dualScatterOffset);
+    const float dx = sampleX - dualCenterX;
+    const float dy = sampleY - dualCenterY;
+    const float along = rotatedX(dx, dy, dualCos, dualSin);
+    const float across = rotatedY(dx, dy, dualCos, dualSin);
+    const float normalizedAlong = along / std::max(dualMajorRadius, 0.001F);
+    const float normalizedAcross = across / std::max(dualMinorRadius, 0.001F);
+
+    const float dualShapeDistance = shapeDistanceForTip(brush.dualTipKind, normalizedAlong, normalizedAcross);
+    float mask = computeBaseFalloff(dualShapeDistance, std::clamp(brush.hardness * 0.94F, 0.16F, 0.99F));
+    if (brush.tipMaskWidth > 0 && brush.tipMaskHeight > 0 && !brush.tipMaskAlpha.empty()) {
+        mask *= sampleBrushTipAlpha(brush, normalizedAlong, normalizedAcross);
+    }
+
+    const float breakup = 0.78F + (0.22F * hash2D((sampleX * 1.9F) + timestamp + dabSeed, (sampleY * 1.9F) - timestamp - dabSeed));
+    mask = std::clamp(mask * breakup, 0.0F, 1.0F);
+
+    switch (brush.dualBlendMode) {
+        case 1:
+            return std::min(1.0F, mask);
+        case 2:
+            return clamp01(1.0F - (mask * 0.88F));
+        case 0:
+        default:
+            return std::clamp(mask, 0.0F, 1.0F);
+    }
 }
 
 float blendChannel(float backdrop, float source, Layer::BlendMode mode) {
@@ -541,15 +683,9 @@ void PaintDocument::appendStroke(StrokePoint point) {
     const float dx = point.x - previousPoint_.x;
     const float dy = point.y - previousPoint_.y;
     const float distance = std::sqrt((dx * dx) + (dy * dy));
-    const float spacing = brushSpacingDistance(activeBrush_);
+    const float jitteredSpacing = brushSpacingDistance(activeBrush_) * (1.0F + jitterValue(previousPoint_.x + point.x, previousPoint_.y + point.y, activeBrush_.spacingJitter));
+    const float spacing = std::max(0.2F, jitteredSpacing);
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacing)));
-    const float tangentX = distance > 0.001F ? (dx / distance) : std::cos(point.azimuth);
-    const float tangentY = distance > 0.001F ? (dy / distance) : std::sin(point.azimuth);
-    const float normalX = -tangentY;
-    const float normalY = tangentX;
-    const float scatterLateral = activeBrush_.scatterLateral * activeBrush_.radius;
-    const float scatterLinear = activeBrush_.scatterLinear * activeBrush_.radius;
-
     for (int step = 1; step <= steps; ++step) {
         const float t = static_cast<float>(step) / static_cast<float>(steps);
         StrokePoint interpolated;
@@ -559,13 +695,6 @@ void PaintDocument::appendStroke(StrokePoint point) {
         interpolated.altitude = previousPoint_.altitude + ((point.altitude - previousPoint_.altitude) * t);
         interpolated.azimuth = previousPoint_.azimuth + ((point.azimuth - previousPoint_.azimuth) * t);
         interpolated.timestamp = previousPoint_.timestamp + ((point.timestamp - previousPoint_.timestamp) * t);
-
-        if (scatterLateral > 0.001F || scatterLinear > 0.001F) {
-            const float spreadAcross = (hash2D(interpolated.x + (t * 37.0F), interpolated.y - (t * 11.0F)) - 0.5F) * 2.0F * scatterLateral;
-            const float spreadAlong = (hash2D(interpolated.y + (t * 23.0F), interpolated.x + (t * 17.0F)) - 0.5F) * 2.0F * scatterLinear;
-            interpolated.x += (normalX * spreadAcross) + (tangentX * spreadAlong);
-            interpolated.y += (normalY * spreadAcross) + (tangentY * spreadAlong);
-        }
 
         const float timeDelta = std::max(0.001F, interpolated.timestamp - previousPoint_.timestamp);
         const float traveled = std::sqrt(((interpolated.x - previousPoint_.x) * (interpolated.x - previousPoint_.x)) +
@@ -878,23 +1007,54 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float clampedPressure = std::clamp(point.pressure, 0.08F, 1.0F);
     const float clampedSensitivity = clamp01(activeBrush_.pressureSensitivity);
     const float pressureScale = (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
-    const float radius = std::max(0.4F, activeBrush_.radius * pressureScale);
+    const float speedFactor = clamp01(point.speed / std::max(12.0F, activeBrush_.radius * 18.0F));
+    const float speedScale = lerp(1.0F, remap(speedFactor, 0.0F, 1.0F, 1.0F, 0.58F), clamp01(activeBrush_.sizeSpeedSensitivity));
+    const float radius = std::max(0.4F, activeBrush_.radius * pressureScale * speedScale);
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
-    const float effectiveOpacity = clamp01(activeBrush_.opacity);
+    const float opacityPressure = lerp(
+        1.0F,
+        clampedPressure,
+        clamp01(activeBrush_.opacityPressureSensitivity)
+    );
+    const float flowJitter = 1.0F + jitterValue(
+        point.x + 41.0F,
+        point.y - 13.0F,
+        clamp01(activeBrush_.flowJitter)
+    );
+    const float flowPressure = lerp(
+        1.0F,
+        clampedPressure,
+        clamp01(activeBrush_.flowPressureSensitivity)
+    );
+    const float resolvedFlow = clamp01(activeBrush_.flow * flowPressure * flowJitter);
+    const float effectiveOpacity = clamp01(activeBrush_.opacity * std::max(0.05F, resolvedFlow) * opacityPressure);
     const bool isPencil = activeBrush_.tipKind == "pencil";
     const bool isInk = activeBrush_.tipKind == "ink";
     const bool isOil = activeBrush_.tipKind == "oil";
     const bool isAirbrush = activeBrush_.tipKind == "airbrush";
     const float altitudeFactor = clamp01((1.5707963F - point.altitude) / 1.5707963F);
-    const float baseAngle = resolvedBrushAngle(activeBrush_, point, previousPoint_, altitudeFactor);
-    const float angleCos = std::cos(baseAngle);
-    const float angleSin = std::sin(baseAngle);
-    const float roundness = effectiveRoundness(activeBrush_, activeBrush_.tipKind, altitudeFactor);
-    const float majorRadius = radius;
-    const float minorRadius = std::max(0.18F, radius * roundness);
-    const float boundRadius = std::max(majorRadius, minorRadius) + 1.5F;
+    const float strokeDX = point.x - previousPoint_.x;
+    const float strokeDY = point.y - previousPoint_.y;
+    const float strokeDistance = std::sqrt((strokeDX * strokeDX) + (strokeDY * strokeDY));
+    const float tangentX = strokeDistance > 0.001F ? (strokeDX / strokeDistance) : std::cos(point.azimuth);
+    const float tangentY = strokeDistance > 0.001F ? (strokeDY / strokeDistance) : std::sin(point.azimuth);
+    const float normalX = -tangentY;
+    const float normalY = tangentX;
+    const int resolvedCount = std::max(1, activeBrush_.count + static_cast<int>(std::round(jitterValue(point.x + 3.7F, point.y - 1.9F, activeBrush_.countJitter * static_cast<float>(std::max(activeBrush_.count, 1))))));
+    const float maxRoundnessJitter = activeBrush_.roundnessJitter;
+    const float maxAngleJitter = activeBrush_.angleJitter;
+    float baseRoundness = effectiveRoundness(activeBrush_, activeBrush_.tipKind, altitudeFactor);
+    baseRoundness = std::clamp(
+        baseRoundness +
+        (activeBrush_.roundnessPressureSensitivity * remap(clampedPressure, 0.08F, 1.0F, -0.22F, 0.18F)) +
+        (activeBrush_.roundnessTiltSensitivity * remap(altitudeFactor, 0.0F, 1.0F, 0.0F, -0.36F)),
+        0.12F,
+        1.0F
+    );
+    const float scatterExtent = activeBrush_.scatterEnabled ? std::max(activeBrush_.scatterLateral, activeBrush_.scatterLinear) : 0.0F;
+    const float boundRadius = radius + scatterExtent * radius + 2.5F;
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - boundRadius)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + boundRadius)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));
@@ -903,77 +1063,167 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
 
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
-            const float dx = (static_cast<float>(x) + 0.5F) - point.x;
-            const float dy = (static_cast<float>(y) + 0.5F) - point.y;
-            const float along = rotatedX(dx, dy, angleCos, angleSin);
-            const float across = rotatedY(dx, dy, angleCos, angleSin);
-            const float normalizedAlong = along / std::max(majorRadius, 0.001F);
-            const float normalizedAcross = across / std::max(minorRadius, 0.001F);
+            float accumulatedAlpha = 0.0F;
+            for (int dabIndex = 0; dabIndex < resolvedCount; ++dabIndex) {
+                const float dabSeed = point.timestamp + static_cast<float>(dabIndex) * 13.37F;
+                const float dabAngle = resolvedBrushAngle(activeBrush_, point, previousPoint_, altitudeFactor) + jitterValue(point.x + dabSeed, point.y + 99.0F, maxAngleJitter);
+                const float dabSizeScale = std::max(
+                    0.18F,
+                    1.0F + jitterValue(
+                        point.x - (dabSeed * 0.73F),
+                        point.y + (dabSeed * 0.29F),
+                        clamp01(activeBrush_.countSizeJitter) * 0.65F
+                    )
+                );
+                const float dabOpacityScale = std::max(
+                    0.12F,
+                    1.0F + jitterValue(
+                        point.x + (dabSeed * 0.19F),
+                        point.y - (dabSeed * 0.67F),
+                        clamp01(activeBrush_.countOpacityJitter) * 0.72F
+                    )
+                );
+                const float dabCos = std::cos(dabAngle);
+                const float dabSin = std::sin(dabAngle);
+                const float dabRoundness = std::clamp(baseRoundness + jitterValue(point.x - dabSeed, point.y + dabSeed, maxRoundnessJitter), 0.12F, 1.0F);
+                const float majorRadius = radius * dabSizeScale;
+                const float minorRadius = std::max(0.18F, radius * dabRoundness * dabSizeScale);
+                float dabOffsetAcross = 0.0F;
+                float dabOffsetAlong = 0.0F;
+                if (!activeBrush_.scatterEnabled) {
+                    dabOffsetAcross = 0.0F;
+                    dabOffsetAlong = 0.0F;
+                } else if (activeBrush_.scatterMode == 1) {
+                    const float sprayTheta = hash2D(point.x + (dabSeed * 0.41F), point.y - (dabSeed * 0.23F)) * 6.2831853F;
+                    const float sprayRadius = std::sqrt(hash2D(point.y + (dabSeed * 0.59F), point.x + (dabSeed * 0.31F)));
+                    dabOffsetAcross =
+                        std::cos(sprayTheta) *
+                        sprayRadius *
+                        activeBrush_.scatterLateral *
+                        majorRadius;
+                    dabOffsetAlong =
+                        std::sin(sprayTheta) *
+                        sprayRadius *
+                        activeBrush_.scatterLinear *
+                        majorRadius;
+                } else {
+                    const float scatterTheta = hash2D(point.x + (dabSeed * 0.41F), point.y - (dabSeed * 0.23F)) * 6.2831853F;
+                    const float scatterRadius = std::sqrt(hash2D(point.y + (dabSeed * 0.59F), point.x + (dabSeed * 0.31F)));
+                    dabOffsetAcross =
+                        std::cos(scatterTheta) *
+                        scatterRadius *
+                        activeBrush_.scatterLateral *
+                        majorRadius;
+                    dabOffsetAlong =
+                        (
+                            std::sin(scatterTheta) * scatterRadius * 0.65F +
+                            softScatterNoise(point.x + dabSeed, point.y - dabSeed) * 0.35F
+                        ) *
+                        activeBrush_.scatterLinear *
+                        majorRadius;
+                }
+                const float localX = point.x + (tangentX * dabOffsetAlong) + (normalX * dabOffsetAcross);
+                const float localY = point.y + (tangentY * dabOffsetAlong) + (normalY * dabOffsetAcross);
+                const float dx = (static_cast<float>(x) + 0.5F) - localX;
+                const float dy = (static_cast<float>(y) + 0.5F) - localY;
+                const float along = rotatedX(dx, dy, dabCos, dabSin);
+                const float across = rotatedY(dx, dy, dabCos, dabSin);
+                const float normalizedAlong = activeBrush_.flipX ? -(along / std::max(majorRadius, 0.001F)) : (along / std::max(majorRadius, 0.001F));
+                const float normalizedAcross = activeBrush_.flipY ? -(across / std::max(minorRadius, 0.001F)) : (across / std::max(minorRadius, 0.001F));
 
-            float exponent = 2.0F;
-            if (isInk) {
-                exponent = 5.5F;
-            } else if (isOil) {
-                exponent = 3.8F;
-            } else if (isPencil) {
-                exponent = 2.6F;
-            }
+                const float shapeDistance = shapeDistanceForTip(activeBrush_.tipKind, normalizedAlong, normalizedAcross);
 
-            const float superellipse =
-                std::pow(std::abs(normalizedAlong), exponent) +
-                std::pow(std::abs(normalizedAcross), exponent);
-            float shapeDistance = std::pow(superellipse, 1.0F / exponent);
+                const bool hasCustomTip = activeBrush_.tipMaskWidth > 0 &&
+                    activeBrush_.tipMaskHeight > 0 &&
+                    !activeBrush_.tipMaskAlpha.empty();
+                const float tipAlpha = hasCustomTip
+                    ? sampleBrushTipAlpha(activeBrush_, normalizedAlong, normalizedAcross)
+                    : 1.0F;
 
-            if (shapeDistance >= 1.0F) {
-                continue;
-            }
-
-            float falloff = computeBaseFalloff(shapeDistance, activeBrush_.hardness);
-            if (isPencil) {
-                const float clusterMask = pencilClusterMask(
+                if ((!hasCustomTip && shapeDistance >= 1.0F) || tipAlpha <= 0.001F) {
+                    continue;
+                }
+                float falloff = computeBaseFalloff(shapeDistance, activeBrush_.hardness);
+                if (isPencil) {
+                    const float clusterMask = pencilClusterMask(
+                        normalizedAlong,
+                        normalizedAcross,
+                        static_cast<float>(x),
+                        static_cast<float>(y),
+                        point.timestamp + (dabIndex * 0.11F),
+                        clampedPressure
+                    );
+                    if (clusterMask <= 0.001F) {
+                        continue;
+                    }
+                    const float core = 1.0F - (shapeDistance * 0.04F);
+                    const float edgeDust = 0.78F + (0.22F * hash2D((static_cast<float>(x) * 5.1F) + point.x, (static_cast<float>(y) * 5.1F) + point.y));
+                    falloff *= std::pow(core, 1.08F) * clusterMask * edgeDust;
+                } else if (isInk) {
+                    falloff = std::pow(falloff, 0.55F);
+                } else if (isOil) {
+                    falloff = std::pow(falloff, 0.82F);
+                } else if (isAirbrush) {
+                    const float mist = std::exp(-(shapeDistance * shapeDistance) * 2.6F);
+                    falloff = mist;
+                }
+                const float textureMask = textureMaskForTip(
+                    activeBrush_.tipKind,
                     normalizedAlong,
                     normalizedAcross,
                     static_cast<float>(x),
                     static_cast<float>(y),
-                    point.timestamp,
-                    clampedPressure
+                    activeBrush_.textureMode == 1 ? strokeOriginPoint_.x : point.x,
+                    activeBrush_.textureMode == 1 ? strokeOriginPoint_.y : point.y,
+                    activeBrush_.textureStrength,
+                    activeBrush_.textureMode,
+                    activeBrush_.grainScale,
+                    activeBrush_.grainContrast,
+                    activeBrush_.paperScale,
+                    activeBrush_.paperThreshold,
+                    activeBrush_.paperStrength,
+                    point.timestamp
                 );
-                if (clusterMask <= 0.001F) {
-                    continue;
+                float combinedMask = textureMask;
+                if (activeBrush_.dualBrushEnabled) {
+                    const float dualMask = dualBrushMask(
+                        activeBrush_,
+                        localX,
+                        localY,
+                        static_cast<float>(x) + 0.5F,
+                        static_cast<float>(y) + 0.5F,
+                        radius,
+                        dabAngle,
+                        baseRoundness,
+                        dabSeed,
+                        point.timestamp
+                    );
+                    switch (activeBrush_.dualBlendMode) {
+                        case 1:
+                            combinedMask = std::min(combinedMask, dualMask);
+                            break;
+                        case 2:
+                            combinedMask *= dualMask;
+                            break;
+                        case 0:
+                        default:
+                            combinedMask *= dualMask;
+                            break;
+                    }
                 }
-                const float core = 1.0F - (shapeDistance * 0.04F);
-                const float edgeDust = 0.78F + (0.22F * hash2D((static_cast<float>(x) * 5.1F) + point.x, (static_cast<float>(y) * 5.1F) + point.y));
-                falloff *= std::pow(core, 1.08F) * clusterMask * edgeDust;
-            } else if (isInk) {
-                falloff = std::pow(falloff, 0.55F);
-            } else if (isOil) {
-                falloff = std::pow(falloff, 0.82F);
-            } else if (isAirbrush) {
-                const float mist = std::exp(-(shapeDistance * shapeDistance) * 2.6F);
-                falloff = mist;
+                accumulatedAlpha += effectiveOpacity * dabOpacityScale * falloff * combinedMask * tipAlpha / static_cast<float>(resolvedCount);
             }
-            const float textureMask = textureMaskForTip(
-                activeBrush_.tipKind,
-                normalizedAlong,
-                normalizedAcross,
-                static_cast<float>(x),
-                static_cast<float>(y),
-                activeBrush_.textureMode == 1 ? strokeOriginPoint_.x : point.x,
-                activeBrush_.textureMode == 1 ? strokeOriginPoint_.y : point.y,
-                activeBrush_.textureStrength,
-                activeBrush_.textureMode,
-                activeBrush_.grainScale,
-                activeBrush_.paperScale,
-                point.timestamp
-            );
-            const float alpha = clamp01(effectiveOpacity * falloff * textureMask);
+            const float alpha = clamp01(accumulatedAlpha);
+            if (alpha <= 0.001F) {
+                continue;
+            }
             auto* pixel = &layer.pixels[(static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U];
-            blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha);
+            blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha, clampedPressure);
         }
     }
 }
 
-void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha) {
+void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure) {
     const float srcA = clamp01(alpha);
     const float dstA = static_cast<float>(dst[3]) / 255.0F;
 
@@ -991,9 +1241,31 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
     const float dstR = static_cast<float>(dst[0]) / 255.0F;
     const float dstG = static_cast<float>(dst[1]) / 255.0F;
     const float dstB = static_cast<float>(dst[2]) / 255.0F;
-    const float srcR = static_cast<float>(r) / 255.0F;
-    const float srcG = static_cast<float>(g) / 255.0F;
-    const float srcB = static_cast<float>(b) / 255.0F;
+    const float baseSrcR = static_cast<float>(r) / 255.0F;
+    const float baseSrcG = static_cast<float>(g) / 255.0F;
+    const float baseSrcB = static_cast<float>(b) / 255.0F;
+    const float clampedPressure = std::clamp(pressure, 0.08F, 1.0F);
+    const float wetness = clamp01(lerp(
+        activeBrush_.wetness,
+        activeBrush_.wetness * clampedPressure,
+        clamp01(activeBrush_.wetnessPressureSensitivity)
+    ));
+    const float wetPickup = wetness * dstA;
+    const float mixStrength = clamp01(activeBrush_.colorMixStrength) * wetPickup;
+    const float loadAmount = clamp01(lerp(
+        activeBrush_.paintLoad,
+        activeBrush_.paintLoad * clampedPressure,
+        clamp01(activeBrush_.loadPressureSensitivity)
+    ));
+    const float wettedDstR = lerp(baseSrcR, dstR, wetPickup);
+    const float wettedDstG = lerp(baseSrcG, dstG, wetPickup);
+    const float wettedDstB = lerp(baseSrcB, dstB, wetPickup);
+    const float mixedSourceR = lerp(wettedDstR, baseSrcR, loadAmount);
+    const float mixedSourceG = lerp(wettedDstG, baseSrcG, loadAmount);
+    const float mixedSourceB = lerp(wettedDstB, baseSrcB, loadAmount);
+    const float srcR = lerp(baseSrcR, mixedSourceR, mixStrength);
+    const float srcG = lerp(baseSrcG, mixedSourceG, mixStrength);
+    const float srcB = lerp(baseSrcB, mixedSourceB, mixStrength);
 
     const float outA = dstA + (srcA * (1.0F - dstA));
     if (outA <= 0.001F) {

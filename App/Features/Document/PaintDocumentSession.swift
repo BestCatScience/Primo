@@ -213,10 +213,15 @@ final class PaintDocumentSession: @unchecked Sendable {
         let descriptor = APBrushDescriptor()
         descriptor.tipKind = brush.tipKind.rawValue
         descriptor.radius = brush.radius
+        descriptor.sizeSpeedSensitivity = brush.sizeSpeedSensitivity
         descriptor.opacity = brush.opacity
         descriptor.hardness = brush.hardness
         descriptor.roundness = brush.roundness
+        descriptor.roundnessPressureSensitivity = brush.roundnessPressureSensitivity
+        descriptor.roundnessTiltSensitivity = brush.roundnessTiltSensitivity
         descriptor.angle = brush.angle
+        descriptor.anglePressureSensitivity = brush.anglePressureSensitivity
+        descriptor.angleTiltSensitivity = brush.angleTiltSensitivity
         descriptor.angleMode = {
             switch brush.angleMode {
             case .fixed: return 0
@@ -225,8 +230,17 @@ final class PaintDocumentSession: @unchecked Sendable {
             }
         }()
         descriptor.stampSpacing = brush.stampSpacing
+        descriptor.spacingJitter = brush.spacingJitter
+        descriptor.scatterEnabled = brush.scatterEnabled
+        descriptor.scatterMode = brush.scatterMode == .spray ? 1 : 0
         descriptor.scatterLateral = brush.scatterLateral
         descriptor.scatterLinear = brush.scatterLinear
+        descriptor.count = brush.count
+        descriptor.countJitter = brush.countJitter
+        descriptor.countSizeJitter = brush.countSizeJitter
+        descriptor.countOpacityJitter = brush.countOpacityJitter
+        descriptor.angleJitter = brush.angleJitter
+        descriptor.roundnessJitter = brush.roundnessJitter
         descriptor.textureMode = {
             switch brush.textureMode {
             case .off: return 0
@@ -236,11 +250,38 @@ final class PaintDocumentSession: @unchecked Sendable {
             }
         }()
         descriptor.textureStrength = brush.textureStrength
-        descriptor.grainScale = 1.35
-        descriptor.grainContrast = 1.7
-        descriptor.paperScale = 0.12
-        descriptor.paperThreshold = 0.42
-        descriptor.paperStrength = 0.32
+        descriptor.flow = brush.flow
+        descriptor.flowPressureSensitivity = brush.flowPressureSensitivity
+        descriptor.flowJitter = brush.flowJitter
+        descriptor.wetness = brush.wetness
+        descriptor.wetnessPressureSensitivity = brush.wetnessPressureSensitivity
+        descriptor.opacityPressureSensitivity = brush.opacityPressureSensitivity
+        descriptor.colorMixStrength = brush.colorMixStrength
+        descriptor.paintLoad = brush.paintLoad
+        descriptor.loadPressureSensitivity = brush.loadPressureSensitivity
+        descriptor.dualBrushEnabled = brush.dualBrushEnabled
+        descriptor.dualTipKind = brush.dualTipKind.rawValue
+        descriptor.dualScale = brush.dualScale
+        descriptor.dualSpacing = brush.dualSpacing
+        descriptor.dualScatter = brush.dualScatter
+        descriptor.dualAngle = brush.dualAngle
+        descriptor.dualBlendMode = {
+            switch brush.dualBlendMode {
+            case .multiply: return 0
+            case .darker: return 1
+            case .subtract: return 2
+            }
+        }()
+        descriptor.flipX = brush.flipX
+        descriptor.flipY = brush.flipY
+        descriptor.tipMaskWidth = brush.customTip?.width ?? 0
+        descriptor.tipMaskHeight = brush.customTip?.height ?? 0
+        descriptor.tipMaskData = brush.customTip?.alphaData
+        descriptor.grainScale = brush.grainScale
+        descriptor.grainContrast = brush.grainContrast
+        descriptor.paperScale = brush.paperScale
+        descriptor.paperThreshold = brush.paperThreshold
+        descriptor.paperStrength = brush.paperStrength
         descriptor.velocityInfluence = 0.012
         descriptor.tiltInfluence = 0.75
         descriptor.maxDarkness = 0.95

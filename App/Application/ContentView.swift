@@ -13,10 +13,13 @@ struct ContentView: View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 panelRail(for: .leading)
+                    .zIndex(20)
 
                 centerStage
+                    .zIndex(1)
 
                 panelRail(for: .trailing)
+                    .zIndex(20)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
