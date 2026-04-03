@@ -178,6 +178,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func setLayerOpacity(index: Int, opacity: Double) {
+        bridge.setLayerOpacity(CGFloat(opacity), at: index)
+        invalidateThumbnailCache(for: index)
+        captureTimelapseFrame()
+    }
+
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) {
         bridge.setLayerBlendMode(blendMode.rawValue, at: index)
         invalidateThumbnailCache(for: index)

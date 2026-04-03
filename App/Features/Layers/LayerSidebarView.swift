@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
 
 struct LayerSidebarView: View {
@@ -7,6 +8,8 @@ struct LayerSidebarView: View {
     let layerSnapshots: [MetalLayerSnapshot]
     var language: AppLanguage = .japanese
     var showsTitle = true
+    @State private var draggedLayerIndex: Int?
+    @State private var dropTargetLayerIndex: Int?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -40,6 +43,30 @@ struct LayerSidebarView: View {
                         }
                         .buttonStyle(.plain)
                         .minimumHitTarget()
+                    }
+
+                    if let activeLayer = store.layers.first(where: { $0.index == store.activeLayerIndex }) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(language == .japanese ? "レイヤー不透明度" : "Layer Opacity")
+                                    .font(StudioTheme.Typography.mono(10))
+                                    .foregroundStyle(.white.opacity(0.56))
+                                Spacer(minLength: 0)
+                                Text("\(Int(activeLayer.opacity * 100))%")
+                                    .font(StudioTheme.Typography.mono(10))
+                                    .foregroundStyle(.white.opacity(0.72))
+                            }
+
+                            Slider(
+                                value: Binding(
+                                    get: { activeLayer.opacity },
+                                    set: { store.send(.opacityChanged(activeLayer.index, $0)) }
+                                ),
+                                in: 0.0...1.0
+                            )
+                            .tint(StudioTheme.Palette.accentBright)
+                        }
+                        .padding(.horizontal, 2)
                     }
 
                     ForEach(store.layers) { layer in
@@ -95,22 +122,9 @@ struct LayerSidebarView: View {
                                     Text(StudioStrings.opacityValue(Int(layer.opacity * 100), language))
                                         .font(StudioTheme.Typography.mono(10))
                                         .foregroundStyle(.white.opacity(0.48))
-
-                                    capsuleTag(layer.visible ? StudioStrings.visible(language) : StudioStrings.hidden(language))
-                                    capsuleTag(store.activeLayerIndex == layer.index ? StudioStrings.active(language) : StudioStrings.standby(language))
                                 }
 
                                 HStack(spacing: 6) {
-                                    miniActionButton(systemImage: "arrow.up") {
-                                        store.send(.moveLayerUpButtonTapped(layer.index))
-                                    }
-                                    .disabled(isTopmostLayer(layer))
-
-                                    miniActionButton(systemImage: "arrow.down") {
-                                        store.send(.moveLayerDownButtonTapped(layer.index))
-                                    }
-                                    .disabled(isBottommostLayer(layer))
-
                                     miniActionButton(systemImage: "trash") {
                                         store.send(.deleteLayerButtonTapped(layer.index))
                                     }
@@ -138,16 +152,30 @@ struct LayerSidebarView: View {
                         .padding(12)
                         .background(
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
+                                .fill(backgroundFill(for: layer))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder, lineWidth: 1)
+                                .stroke(borderColor(for: layer), lineWidth: 1)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .onTapGesture {
                             store.send(.layerTapped(layer.index))
                         }
+                        .onDrag {
+                            draggedLayerIndex = layer.index
+                            return NSItemProvider(object: NSString(string: "\(layer.index)"))
+                        }
+                        .onDrop(
+                            of: [UTType.plainText.identifier],
+                            delegate: LayerReorderDropDelegate(
+                                targetLayerIndex: layer.index,
+                                draggedLayerIndex: $draggedLayerIndex,
+                                dropTargetLayerIndex: $dropTargetLayerIndex
+                            ) { sourceIndex, destinationIndex in
+                                store.send(.moveLayerRequested(sourceIndex, destinationIndex))
+                            }
+                        )
                     }
 
                     paperLayerRow
@@ -273,12 +301,18 @@ struct LayerSidebarView: View {
         .minimumHitTarget()
     }
 
-    private func isTopmostLayer(_ layer: LayerRowModel) -> Bool {
-        store.layers.first?.index == layer.index
+    private func backgroundFill(for layer: LayerRowModel) -> Color {
+        if dropTargetLayerIndex == layer.index {
+            return StudioTheme.Palette.accent.opacity(0.18)
+        }
+        return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill
     }
 
-    private func isBottommostLayer(_ layer: LayerRowModel) -> Bool {
-        store.layers.last?.index == layer.index
+    private func borderColor(for layer: LayerRowModel) -> Color {
+        if dropTargetLayerIndex == layer.index {
+            return StudioTheme.Palette.accentBright
+        }
+        return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder
     }
 }
 
@@ -377,5 +411,35 @@ private struct PaperLayerEditor: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
+    }
+}
+
+private struct LayerReorderDropDelegate: DropDelegate {
+    let targetLayerIndex: Int
+    @Binding var draggedLayerIndex: Int?
+    @Binding var dropTargetLayerIndex: Int?
+    let moveAction: (Int, Int) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedLayerIndex, draggedLayerIndex != targetLayerIndex else { return }
+        dropTargetLayerIndex = targetLayerIndex
+        moveAction(draggedLayerIndex, targetLayerIndex)
+        self.draggedLayerIndex = targetLayerIndex
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedLayerIndex = nil
+        dropTargetLayerIndex = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        if dropTargetLayerIndex == targetLayerIndex {
+            dropTargetLayerIndex = nil
+        }
     }
 }

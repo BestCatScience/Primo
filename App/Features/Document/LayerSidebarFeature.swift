@@ -19,10 +19,10 @@ struct LayerSidebarFeature {
         case addLayerButtonTapped
         case layerTapped(Int)
         case visibilityButtonTapped(Int)
+        case opacityChanged(Int, Double)
         case blendModeSelected(Int, LayerBlendMode)
         case deleteLayerButtonTapped(Int)
-        case moveLayerUpButtonTapped(Int)
-        case moveLayerDownButtonTapped(Int)
+        case moveLayerRequested(Int, Int)
         case paperRowTapped
         case paperEditorDismissed
         case delegate(Delegate)
@@ -32,6 +32,7 @@ struct LayerSidebarFeature {
         case addLayer
         case selectLayer(Int)
         case toggleVisibility(Int)
+        case setOpacity(Int, Double)
         case setBlendMode(Int, LayerBlendMode)
         case deleteLayer(Int)
         case moveLayer(Int, Int)
@@ -50,23 +51,17 @@ struct LayerSidebarFeature {
                 return .send(.delegate(.selectLayer(index)))
             case let .visibilityButtonTapped(index):
                 return .send(.delegate(.toggleVisibility(index)))
+            case let .opacityChanged(index, opacity):
+                return .send(.delegate(.setOpacity(index, opacity)))
             case let .blendModeSelected(index, blendMode):
                 return .send(.delegate(.setBlendMode(index, blendMode)))
             case let .deleteLayerButtonTapped(index):
                 return .send(.delegate(.deleteLayer(index)))
-            case let .moveLayerUpButtonTapped(index):
-                guard let position = state.layers.firstIndex(where: { $0.index == index }), position > 0 else {
+            case let .moveLayerRequested(sourceIndex, destinationIndex):
+                guard sourceIndex != destinationIndex else {
                     return .none
                 }
-                return .send(.delegate(.moveLayer(index, state.layers[position - 1].index)))
-            case let .moveLayerDownButtonTapped(index):
-                guard
-                    let position = state.layers.firstIndex(where: { $0.index == index }),
-                    position < state.layers.count - 1
-                else {
-                    return .none
-                }
-                return .send(.delegate(.moveLayer(index, state.layers[position + 1].index)))
+                return .send(.delegate(.moveLayer(sourceIndex, destinationIndex)))
             case .paperRowTapped:
                 state.showsPaperEditor = true
                 return .none

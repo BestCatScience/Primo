@@ -553,6 +553,12 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case let .layerSidebar(.delegate(.setOpacity(index, opacity))):
+                paintDocumentClient.setLayerOpacity(index, opacity)
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case let .layerSidebar(.delegate(.selectLayer(index))):
                 paintDocumentClient.setActiveLayer(index)
                 state.canvas.activeLayerIndex = index
