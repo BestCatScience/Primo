@@ -252,6 +252,47 @@ enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum BrushAngleMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case fixed
+    case strokeDirection
+    case stylusTilt
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .fixed:
+            return language == .japanese ? "固定" : "Fixed"
+        case .strokeDirection:
+            return language == .japanese ? "線方向" : "Direction"
+        case .stylusTilt:
+            return language == .japanese ? "傾き" : "Tilt"
+        }
+    }
+}
+
+enum BrushTextureMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case off
+    case strokeLocked
+    case eachTip
+    case moving
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .off:
+            return language == .japanese ? "なし" : "Off"
+        case .strokeLocked:
+            return language == .japanese ? "ストローク固定" : "Stroke"
+        case .eachTip:
+            return language == .japanese ? "先端ごと" : "Each Tip"
+        case .moving:
+            return language == .japanese ? "移動" : "Moving"
+        }
+    }
+}
+
 struct CanvasPaperStyle: Equatable, Sendable {
     var red: Float
     var green: Float
@@ -276,6 +317,14 @@ struct BrushPreset: Identifiable, Equatable {
     let radius: Double
     let opacity: Double
     let hardness: Double
+    let roundness: Double
+    let angle: Double
+    let angleMode: BrushAngleMode
+    let spacing: Double
+    let scatterLateral: Double
+    let scatterLinear: Double
+    let textureMode: BrushTextureMode
+    let textureStrength: Double
     let pressureSensitivity: Double
     let red: UInt8
     let green: UInt8
@@ -287,6 +336,14 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.radius == rhs.radius &&
         lhs.opacity == rhs.opacity &&
         lhs.hardness == rhs.hardness &&
+        lhs.roundness == rhs.roundness &&
+        lhs.angle == rhs.angle &&
+        lhs.angleMode == rhs.angleMode &&
+        lhs.spacing == rhs.spacing &&
+        lhs.scatterLateral == rhs.scatterLateral &&
+        lhs.scatterLinear == rhs.scatterLinear &&
+        lhs.textureMode == rhs.textureMode &&
+        lhs.textureStrength == rhs.textureStrength &&
         lhs.pressureSensitivity == rhs.pressureSensitivity &&
         lhs.red == rhs.red &&
         lhs.green == rhs.green &&
@@ -301,6 +358,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 3.2,
             opacity: 0.92,
             hardness: 0.80,
+            roundness: 0.86,
+            angle: 0.10,
+            angleMode: .strokeDirection,
+            spacing: 0.12,
+            scatterLateral: 0.03,
+            scatterLinear: 0.01,
+            textureMode: .eachTip,
+            textureStrength: 0.88,
             pressureSensitivity: 0.62,
             red: 31, green: 31, blue: 34
         ),
@@ -311,6 +376,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 1.5,
             opacity: 0.98,
             hardness: 0.96,
+            roundness: 0.34,
+            angle: 0.0,
+            angleMode: .strokeDirection,
+            spacing: 0.10,
+            scatterLateral: 0.01,
+            scatterLinear: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.10,
             pressureSensitivity: 0.32,
             red: 18, green: 21, blue: 26
         ),
@@ -321,6 +394,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 2.8,
             opacity: 0.88,
             hardness: 0.72,
+            roundness: 0.30,
+            angle: 0.18,
+            angleMode: .strokeDirection,
+            spacing: 0.14,
+            scatterLateral: 0.03,
+            scatterLinear: 0.01,
+            textureMode: .eachTip,
+            textureStrength: 0.26,
             pressureSensitivity: 0.44,
             red: 51, green: 61, blue: 107
         ),
@@ -331,6 +412,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 8.5,
             opacity: 0.16,
             hardness: 0.10,
+            roundness: 1.0,
+            angle: 0.0,
+            angleMode: .fixed,
+            spacing: 0.34,
+            scatterLateral: 0.20,
+            scatterLinear: 0.06,
+            textureMode: .moving,
+            textureStrength: 0.22,
             pressureSensitivity: 0.18,
             red: 25, green: 25, blue: 29
         ),
@@ -341,6 +430,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 11.0,
             opacity: 0.10,
             hardness: 0.06,
+            roundness: 1.0,
+            angle: 0.0,
+            angleMode: .fixed,
+            spacing: 0.42,
+            scatterLateral: 0.28,
+            scatterLinear: 0.10,
+            textureMode: .moving,
+            textureStrength: 0.34,
             pressureSensitivity: 0.10,
             red: 41, green: 49, blue: 66
         ),
@@ -351,6 +448,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 3.8,
             opacity: 0.84,
             hardness: 0.66,
+            roundness: 0.42,
+            angle: 0.22,
+            angleMode: .strokeDirection,
+            spacing: 0.24,
+            scatterLateral: 0.08,
+            scatterLinear: 0.03,
+            textureMode: .eachTip,
+            textureStrength: 0.78,
             pressureSensitivity: 0.40,
             red: 160, green: 79, blue: 51
         ),
@@ -361,6 +466,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 6.0,
             opacity: 0.80,
             hardness: 0.72,
+            roundness: 0.36,
+            angle: -0.14,
+            angleMode: .strokeDirection,
+            spacing: 0.22,
+            scatterLateral: 0.06,
+            scatterLinear: 0.03,
+            textureMode: .eachTip,
+            textureStrength: 0.82,
             pressureSensitivity: 0.36,
             red: 46, green: 66, blue: 156
         ),
@@ -371,6 +484,14 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 2.2,
             opacity: 0.70,
             hardness: 0.68,
+            roundness: 0.88,
+            angle: -0.08,
+            angleMode: .strokeDirection,
+            spacing: 0.13,
+            scatterLateral: 0.03,
+            scatterLinear: 0.01,
+            textureMode: .eachTip,
+            textureStrength: 0.82,
             pressureSensitivity: 0.82,
             red: 64, green: 64, blue: 69
         )

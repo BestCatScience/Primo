@@ -215,6 +215,27 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.radius = brush.radius
         descriptor.opacity = brush.opacity
         descriptor.hardness = brush.hardness
+        descriptor.roundness = brush.roundness
+        descriptor.angle = brush.angle
+        descriptor.angleMode = {
+            switch brush.angleMode {
+            case .fixed: return 0
+            case .strokeDirection: return 1
+            case .stylusTilt: return 2
+            }
+        }()
+        descriptor.stampSpacing = brush.stampSpacing
+        descriptor.scatterLateral = brush.scatterLateral
+        descriptor.scatterLinear = brush.scatterLinear
+        descriptor.textureMode = {
+            switch brush.textureMode {
+            case .off: return 0
+            case .strokeLocked: return 1
+            case .eachTip: return 2
+            case .moving: return 3
+            }
+        }()
+        descriptor.textureStrength = brush.textureStrength
         descriptor.grainScale = 1.35
         descriptor.grainContrast = 1.7
         descriptor.paperScale = 0.12

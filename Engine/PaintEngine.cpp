@@ -48,6 +48,170 @@ float rotatedY(float dx, float dy, float cosine, float sine) {
     return (-dx * sine) + (dy * cosine);
 }
 
+float remap(float value, float inMin, float inMax, float outMin, float outMax) {
+    if (std::abs(inMax - inMin) <= 0.0001F) {
+        return outMin;
+    }
+    const float t = clamp01((value - inMin) / (inMax - inMin));
+    return lerp(outMin, outMax, t);
+}
+
+float brushSpacingDistance(const BrushSettings& brush) {
+    return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
+}
+
+float effectiveRoundness(const BrushSettings& brush, std::string_view tipKind, float altitudeFactor) {
+    float roundness = std::clamp(brush.roundness, 0.18F, 1.0F);
+    if (tipKind == "ink") {
+        roundness *= lerp(0.74F, 0.38F, altitudeFactor);
+    } else if (tipKind == "oil") {
+        roundness *= 0.58F;
+    } else if (tipKind == "pencil") {
+        roundness *= lerp(0.92F, 0.62F, altitudeFactor * 0.75F);
+    }
+    return std::clamp(roundness, 0.12F, 1.0F);
+}
+
+float resolvedBrushAngle(
+    const BrushSettings& brush,
+    const StrokePoint& point,
+    const StrokePoint& previousPoint,
+    float altitudeFactor
+) {
+    float baseAngle = brush.angle;
+    switch (brush.angleMode) {
+        case 2:
+            baseAngle += point.azimuth * clamp01(brush.tiltInfluence);
+            break;
+        case 1: {
+            const float dx = point.x - previousPoint.x;
+            const float dy = point.y - previousPoint.y;
+            if (std::abs(dx) > 0.0001F || std::abs(dy) > 0.0001F) {
+                baseAngle += std::atan2(dy, dx);
+            } else {
+                baseAngle += point.azimuth * altitudeFactor * 0.35F;
+            }
+            break;
+        }
+        case 0:
+        default:
+            baseAngle += point.azimuth * clamp01(brush.tiltInfluence) * altitudeFactor * 0.12F;
+            break;
+    }
+    return baseAngle;
+}
+
+float textureMaskForTip(
+    std::string_view tipKind,
+    float alongNorm,
+    float acrossNorm,
+    float pointX,
+    float pointY,
+    float anchorX,
+    float anchorY,
+    float textureStrength,
+    int textureMode,
+    float grainScale,
+    float paperScale,
+    float timestamp
+) {
+    const float clampedTexture = clamp01(textureStrength);
+    if (clampedTexture <= 0.001F) {
+        return 1.0F;
+    }
+
+    const float grainFrequency = std::max(0.2F, grainScale * 2.8F);
+    const float paperFrequency = std::max(0.15F, paperScale * 24.0F);
+    float sampleX = pointX;
+    float sampleY = pointY;
+    switch (textureMode) {
+        case 1:
+            sampleX = anchorX + (alongNorm * 12.0F);
+            sampleY = anchorY + (acrossNorm * 12.0F);
+            break;
+        case 2:
+            sampleX = anchorX + (alongNorm * 17.0F);
+            sampleY = anchorY + (acrossNorm * 17.0F);
+            break;
+        case 3:
+            sampleX = (pointX - anchorX) + (alongNorm * 12.0F) + (timestamp * 0.8F);
+            sampleY = (pointY - anchorY) + (acrossNorm * 12.0F) + (timestamp * 0.3F);
+            break;
+        case 0:
+        default:
+            return 1.0F;
+    }
+
+    const float primaryNoise = hash2D(sampleX * grainFrequency, sampleY * grainFrequency);
+    const float paperNoise = hash2D((sampleX - 19.0F) * paperFrequency, (sampleY + 7.0F) * paperFrequency);
+
+    float mask = 1.0F;
+    if (tipKind == "pencil") {
+        const float tooth = remap(primaryNoise, 0.0F, 1.0F, 0.42F, 1.0F);
+        const float streak = 0.84F + (0.16F * std::abs(std::sin((alongNorm * 8.0F) + (acrossNorm * 4.0F))));
+        mask = tooth * streak * remap(paperNoise, 0.0F, 1.0F, 0.75F, 1.0F);
+    } else if (tipKind == "ink") {
+        const float edgeBreak = 0.90F + (0.10F * hash2D((pointX * 0.9F) + timestamp, (pointY * 0.9F) - timestamp));
+        const float fiber = 0.92F + (0.08F * std::abs(std::sin((acrossNorm * 13.0F) + (alongNorm * 1.8F))));
+        mask = edgeBreak * fiber;
+    } else if (tipKind == "oil") {
+        const float bristleBands = 0.46F + (0.54F * std::abs(std::sin((acrossNorm * 15.0F) + (alongNorm * 2.4F) + (timestamp * 0.4F))));
+        const float pigment = remap(primaryNoise, 0.0F, 1.0F, 0.78F, 1.0F);
+        mask = bristleBands * pigment;
+    } else if (tipKind == "airbrush") {
+        const float cloud = remap(primaryNoise, 0.0F, 1.0F, 0.72F, 1.0F);
+        const float dust = remap(paperNoise, 0.0F, 1.0F, 0.86F, 1.0F);
+        mask = cloud * dust;
+    } else {
+        mask = remap(primaryNoise, 0.0F, 1.0F, 0.8F, 1.0F);
+    }
+
+    return lerp(1.0F, std::clamp(mask, 0.0F, 1.0F), clampedTexture);
+}
+
+float pencilClusterMask(
+    float normalizedAlong,
+    float normalizedAcross,
+    float pointX,
+    float pointY,
+    float timestamp,
+    float pressure
+) {
+    const float radial = std::sqrt((normalizedAlong * normalizedAlong) + (normalizedAcross * normalizedAcross));
+    if (radial >= 1.0F) {
+        return 0.0F;
+    }
+
+    const float coarseNoise = hash2D((pointX * 0.33F) + (normalizedAlong * 9.0F), (pointY * 0.33F) + (normalizedAcross * 9.0F));
+    const float grainNoise = hash2D((pointX * 2.8F) + (normalizedAlong * 19.0F), (pointY * 2.8F) + (normalizedAcross * 19.0F));
+    const float speckleNoise = hash2D((pointX * 7.4F) + (timestamp * 0.5F), (pointY * 7.4F) - (timestamp * 0.3F));
+
+    const float lobeA = std::sqrt(std::pow((normalizedAlong + 0.18F) / 0.46F, 2.0F) + std::pow((normalizedAcross + 0.06F) / 0.34F, 2.0F));
+    const float lobeB = std::sqrt(std::pow((normalizedAlong - 0.22F) / 0.34F, 2.0F) + std::pow((normalizedAcross - 0.24F) / 0.26F, 2.0F));
+    const float lobeC = std::sqrt(std::pow((normalizedAlong - 0.06F) / 0.30F, 2.0F) + std::pow((normalizedAcross + 0.28F) / 0.22F, 2.0F));
+    const float body = std::max({1.0F - (radial * 1.08F), 1.0F - lobeA, 1.0F - lobeB, 1.0F - lobeC});
+
+    const float hollowA = std::sqrt(std::pow((normalizedAlong + 0.08F) / 0.18F, 2.0F) + std::pow((normalizedAcross + 0.30F) / 0.15F, 2.0F));
+    const float hollowB = std::sqrt(std::pow((normalizedAlong - 0.02F) / 0.16F, 2.0F) + std::pow((normalizedAcross - 0.02F) / 0.14F, 2.0F));
+    const float hollowC = std::sqrt(std::pow((normalizedAlong + 0.34F) / 0.15F, 2.0F) + std::pow((normalizedAcross - 0.10F) / 0.12F, 2.0F));
+    const float hollowD = std::sqrt(std::pow((normalizedAlong - 0.28F) / 0.18F, 2.0F) + std::pow((normalizedAcross + 0.18F) / 0.10F, 2.0F));
+
+    float mask = std::clamp(body, 0.0F, 1.0F);
+    if (hollowA < 1.0F) mask *= 0.10F + (0.90F * hollowA);
+    if (hollowB < 1.0F) mask *= 0.06F + (0.94F * hollowB);
+    if (hollowC < 1.0F) mask *= 0.18F + (0.82F * hollowC);
+    if (hollowD < 1.0F) mask *= 0.24F + (0.76F * hollowD);
+
+    const float density = remap(coarseNoise, 0.0F, 1.0F, 0.45F, 1.0F);
+    const float pepper = grainNoise > remap(pressure, 0.08F, 1.0F, 0.62F, 0.36F) ? 0.0F : 1.0F;
+    const float fringe = std::pow(std::max(0.0F, 1.0F - radial), 1.9F);
+    const float dust = remap(speckleNoise, 0.0F, 1.0F, 0.68F, 1.0F);
+
+    mask *= density * pepper;
+    mask = std::max(mask, fringe * dust * 0.42F);
+    return std::clamp(mask, 0.0F, 1.0F);
+}
+
 float blendChannel(float backdrop, float source, Layer::BlendMode mode) {
     switch (mode) {
         case Layer::BlendMode::Normal:
@@ -360,6 +524,7 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     pushLayerHistorySnapshot(activeLayerIndex_);
     activeBrush_ = brush;
     previousPoint_ = point;
+    strokeOriginPoint_ = point;
     strokeInFlight_ = true;
     dirtyRect_.reset();
     point.speed = 0.0F;
@@ -376,8 +541,14 @@ void PaintDocument::appendStroke(StrokePoint point) {
     const float dx = point.x - previousPoint_.x;
     const float dy = point.y - previousPoint_.y;
     const float distance = std::sqrt((dx * dx) + (dy * dy));
-    const float spacing = std::max(0.5F, activeBrush_.radius * 0.28F);
+    const float spacing = brushSpacingDistance(activeBrush_);
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacing)));
+    const float tangentX = distance > 0.001F ? (dx / distance) : std::cos(point.azimuth);
+    const float tangentY = distance > 0.001F ? (dy / distance) : std::sin(point.azimuth);
+    const float normalX = -tangentY;
+    const float normalY = tangentX;
+    const float scatterLateral = activeBrush_.scatterLateral * activeBrush_.radius;
+    const float scatterLinear = activeBrush_.scatterLinear * activeBrush_.radius;
 
     for (int step = 1; step <= steps; ++step) {
         const float t = static_cast<float>(step) / static_cast<float>(steps);
@@ -388,6 +559,13 @@ void PaintDocument::appendStroke(StrokePoint point) {
         interpolated.altitude = previousPoint_.altitude + ((point.altitude - previousPoint_.altitude) * t);
         interpolated.azimuth = previousPoint_.azimuth + ((point.azimuth - previousPoint_.azimuth) * t);
         interpolated.timestamp = previousPoint_.timestamp + ((point.timestamp - previousPoint_.timestamp) * t);
+
+        if (scatterLateral > 0.001F || scatterLinear > 0.001F) {
+            const float spreadAcross = (hash2D(interpolated.x + (t * 37.0F), interpolated.y - (t * 11.0F)) - 0.5F) * 2.0F * scatterLateral;
+            const float spreadAlong = (hash2D(interpolated.y + (t * 23.0F), interpolated.x + (t * 17.0F)) - 0.5F) * 2.0F * scatterLinear;
+            interpolated.x += (normalX * spreadAcross) + (tangentX * spreadAlong);
+            interpolated.y += (normalY * spreadAcross) + (tangentY * spreadAlong);
+        }
 
         const float timeDelta = std::max(0.001F, interpolated.timestamp - previousPoint_.timestamp);
         const float traveled = std::sqrt(((interpolated.x - previousPoint_.x) * (interpolated.x - previousPoint_.x)) +
@@ -709,45 +887,42 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const bool isInk = activeBrush_.tipKind == "ink";
     const bool isOil = activeBrush_.tipKind == "oil";
     const bool isAirbrush = activeBrush_.tipKind == "airbrush";
-    const float azimuthCos = std::cos(point.azimuth);
-    const float azimuthSin = std::sin(point.azimuth);
     const float altitudeFactor = clamp01((1.5707963F - point.altitude) / 1.5707963F);
-    const int minX = std::max(0, static_cast<int>(std::floor(point.x - radius - 1.0F)));
-    const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + radius + 1.0F)));
-    const int minY = std::max(0, static_cast<int>(std::floor(point.y - radius - 1.0F)));
-    const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + radius + 1.0F)));
+    const float baseAngle = resolvedBrushAngle(activeBrush_, point, previousPoint_, altitudeFactor);
+    const float angleCos = std::cos(baseAngle);
+    const float angleSin = std::sin(baseAngle);
+    const float roundness = effectiveRoundness(activeBrush_, activeBrush_.tipKind, altitudeFactor);
+    const float majorRadius = radius;
+    const float minorRadius = std::max(0.18F, radius * roundness);
+    const float boundRadius = std::max(majorRadius, minorRadius) + 1.5F;
+    const int minX = std::max(0, static_cast<int>(std::floor(point.x - boundRadius)));
+    const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + boundRadius)));
+    const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));
+    const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + boundRadius)));
     dirtyRect_.expand(minX, minY, maxX, maxY);
 
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
             const float dx = (static_cast<float>(x) + 0.5F) - point.x;
             const float dy = (static_cast<float>(y) + 0.5F) - point.y;
-            const float along = rotatedX(dx, dy, azimuthCos, azimuthSin);
-            const float across = rotatedY(dx, dy, azimuthCos, azimuthSin);
-            float shapeDistance = std::sqrt((dx * dx) + (dy * dy)) / radius;
+            const float along = rotatedX(dx, dy, angleCos, angleSin);
+            const float across = rotatedY(dx, dy, angleCos, angleSin);
+            const float normalizedAlong = along / std::max(majorRadius, 0.001F);
+            const float normalizedAcross = across / std::max(minorRadius, 0.001F);
 
-            if (isPencil) {
-                const float majorRadius = radius * lerp(1.05F, 1.42F, altitudeFactor * 0.65F);
-                const float minorRadius = radius * lerp(0.95F, 0.72F, altitudeFactor * 0.55F);
-                shapeDistance = std::sqrt(
-                    std::pow(along / std::max(majorRadius, 0.001F), 2.0F) +
-                    std::pow(across / std::max(minorRadius, 0.001F), 2.0F)
-                );
-            } else if (isInk) {
-                const float majorRadius = radius * lerp(1.0F, 1.8F, altitudeFactor * 0.9F);
-                const float minorRadius = radius * lerp(0.92F, 0.44F, altitudeFactor);
-                shapeDistance = std::sqrt(
-                    std::pow(along / std::max(majorRadius, 0.001F), 2.0F) +
-                    std::pow(across / std::max(minorRadius, 0.001F), 2.0F)
-                );
+            float exponent = 2.0F;
+            if (isInk) {
+                exponent = 5.5F;
             } else if (isOil) {
-                const float majorRadius = radius * lerp(1.1F, 1.95F, 0.45F + (altitudeFactor * 0.55F));
-                const float minorRadius = radius * lerp(0.78F, 0.52F, altitudeFactor * 0.7F);
-                const float superellipse =
-                    std::pow(std::abs(along) / std::max(majorRadius, 0.001F), 4.0F) +
-                    std::pow(std::abs(across) / std::max(minorRadius, 0.001F), 4.0F);
-                shapeDistance = std::pow(superellipse, 0.25F);
+                exponent = 3.8F;
+            } else if (isPencil) {
+                exponent = 2.6F;
             }
+
+            const float superellipse =
+                std::pow(std::abs(normalizedAlong), exponent) +
+                std::pow(std::abs(normalizedAcross), exponent);
+            float shapeDistance = std::pow(superellipse, 1.0F / exponent);
 
             if (shapeDistance >= 1.0F) {
                 continue;
@@ -755,27 +930,43 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
 
             float falloff = computeBaseFalloff(shapeDistance, activeBrush_.hardness);
             if (isPencil) {
-                const float tooth = 0.42F + (0.58F * hash2D((static_cast<float>(x) + 13.0F) * 1.7F, (static_cast<float>(y) - 5.0F) * 1.7F));
-                const float grain = 0.72F + (0.28F * hash2D((static_cast<float>(x) * 4.5F) + point.x, (static_cast<float>(y) * 4.5F) + point.y));
-                const float graphite = lerp(tooth, 1.0F, clampedPressure * 0.55F);
-                falloff *= graphite * grain * std::pow(1.0F - (shapeDistance * 0.12F), 1.35F);
+                const float clusterMask = pencilClusterMask(
+                    normalizedAlong,
+                    normalizedAcross,
+                    static_cast<float>(x),
+                    static_cast<float>(y),
+                    point.timestamp,
+                    clampedPressure
+                );
+                if (clusterMask <= 0.001F) {
+                    continue;
+                }
+                const float core = 1.0F - (shapeDistance * 0.04F);
+                const float edgeDust = 0.78F + (0.22F * hash2D((static_cast<float>(x) * 5.1F) + point.x, (static_cast<float>(y) * 5.1F) + point.y));
+                falloff *= std::pow(core, 1.08F) * clusterMask * edgeDust;
             } else if (isInk) {
                 falloff = std::pow(falloff, 0.55F);
-                falloff *= 0.96F + (0.04F * hash2D((static_cast<float>(x) * 0.9F) + point.timestamp, (static_cast<float>(y) * 0.9F) - point.timestamp));
             } else if (isOil) {
-                const float alongNorm = along / std::max(radius, 0.001F);
-                const float acrossNorm = across / std::max(radius, 0.001F);
-                const float bristle = 0.48F + (0.52F * std::abs(std::sin((acrossNorm * 11.0F) + (alongNorm * 2.2F) + (point.timestamp * 0.6F))));
-                const float pigment = 0.82F + (0.18F * hash2D((static_cast<float>(x) * 1.1F) + point.x, (static_cast<float>(y) * 1.1F) + point.y));
-                const float edgeLoad = lerp(0.92F, 1.08F, clamp01(std::abs(acrossNorm) * 0.7F));
-                falloff *= bristle * pigment * edgeLoad;
                 falloff = std::pow(falloff, 0.82F);
             } else if (isAirbrush) {
                 const float mist = std::exp(-(shapeDistance * shapeDistance) * 2.6F);
-                const float cloud = 0.74F + (0.26F * hash2D((static_cast<float>(x) + point.x) * 0.8F, (static_cast<float>(y) + point.y) * 0.8F));
-                falloff = mist * cloud;
+                falloff = mist;
             }
-            const float alpha = clamp01(effectiveOpacity * falloff);
+            const float textureMask = textureMaskForTip(
+                activeBrush_.tipKind,
+                normalizedAlong,
+                normalizedAcross,
+                static_cast<float>(x),
+                static_cast<float>(y),
+                activeBrush_.textureMode == 1 ? strokeOriginPoint_.x : point.x,
+                activeBrush_.textureMode == 1 ? strokeOriginPoint_.y : point.y,
+                activeBrush_.textureStrength,
+                activeBrush_.textureMode,
+                activeBrush_.grainScale,
+                activeBrush_.paperScale,
+                point.timestamp
+            );
+            const float alpha = clamp01(effectiveOpacity * falloff * textureMask);
             auto* pixel = &layer.pixels[(static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U];
             blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha);
         }

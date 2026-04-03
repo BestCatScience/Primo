@@ -15,6 +15,14 @@ struct BrushSettings {
     float radius = 3.0F;
     float hardness = 0.82F;
     float opacity = 0.9F;
+    float roundness = 1.0F;
+    float angle = 0.0F;
+    int angleMode = 1;
+    float stampSpacing = 0.28F;
+    float scatterLateral = 0.0F;
+    float scatterLinear = 0.0F;
+    int textureMode = 2;
+    float textureStrength = 0.32F;
     float grainScale = 1.35F;
     float grainContrast = 1.7F;
     float paperScale = 0.12F;
@@ -166,6 +174,7 @@ private:
     int activeLayerIndex_ = 0;
     BrushSettings activeBrush_;
     StrokePoint previousPoint_{};
+    StrokePoint strokeOriginPoint_{};
     bool strokeInFlight_ = false;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;

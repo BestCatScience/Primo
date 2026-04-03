@@ -134,21 +134,27 @@ struct BrushPaletteView: View {
                                 )
                                 .frame(width: 72, height: 72)
                                 .overlay(
-                                    Circle()
+                                    RoundedRectangle(cornerRadius: max(6, min(18, store.brushRadius * 0.95)), style: .continuous)
                                         .fill(StudioTheme.Palette.textPrimary)
                                         .frame(
                                             width: min(58, max(10, store.brushRadius * 3.4)),
-                                            height: min(58, max(10, store.brushRadius * 3.4))
+                                            height: min(58, max(8, store.brushRadius * 3.4 * max(store.brushRoundness, 0.22)))
                                         )
+                                        .rotationEffect(.radians(store.brushAngle))
                                 )
 
                             VStack(alignment: .leading, spacing: 6) {
                                 metricRow(language == .japanese ? "先端" : "Tip", value: store.brushTipKind.localizedTitle(language))
                                 metricRow(language == .japanese ? "半径" : "Radius", value: "\(Int(store.brushRadius)) px")
+                                metricRow(language == .japanese ? "形状" : "Shape", value: "\(Int(store.brushRoundness * 100))%")
+                                metricRow(language == .japanese ? "角度" : "Angle", value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°")
+                                metricRow(language == .japanese ? "回転" : "Rotation", value: store.brushAngleMode.localizedTitle(language))
                                 metricRow(language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%")
                                 metricRow(language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%")
-                                metricRow(language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"))
-                                metricRow(language == .japanese ? "手ぶれ補正" : "Stabilization", value: "\(Int(store.brushStabilization * 100))%")
+                                metricRow(language == .japanese ? "間隔" : "Spacing", value: "\(Int(store.brushSpacing * 100))%")
+                                metricRow(language == .japanese ? "横散布" : "Lateral", value: "\(Int(store.brushScatterLateral * 100))%")
+                                metricRow(language == .japanese ? "前後散布" : "Linear", value: "\(Int(store.brushScatterLinear * 100))%")
+                                metricRow(language == .japanese ? "テクスチャ" : "Texture", value: store.brushTextureMode.localizedTitle(language))
                             }
                         }
                     }
@@ -324,8 +330,36 @@ struct BrushPaletteView: View {
                             }
                         }
                         sliderRow(title: language == .japanese ? "サイズ" : "Size", value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
+                        sliderRow(title: language == .japanese ? "形状の細さ" : "Roundness", value: "\(Int(store.brushRoundness * 100))%", slider: Slider(value: $store.brushRoundness, in: 0.2...1.0))
+                        segmentedModeRow(
+                            title: language == .japanese ? "回転モード" : "Rotation Mode",
+                            selectedTitle: store.brushAngleMode.localizedTitle(language)
+                        ) {
+                            Picker(language == .japanese ? "回転モード" : "Rotation Mode", selection: $store.brushAngleMode) {
+                                ForEach(BrushAngleMode.allCases) { mode in
+                                    Text(mode.localizedTitle(language)).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        sliderRow(title: language == .japanese ? "角度" : "Angle", value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°", slider: Slider(value: $store.brushAngle, in: -.pi / 2 ... .pi / 2))
                         sliderRow(title: language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
                         sliderRow(title: language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
+                        sliderRow(title: language == .japanese ? "スタンプ間隔" : "Stamp Spacing", value: "\(Int(store.brushSpacing * 100))%", slider: Slider(value: $store.brushSpacing, in: 0.08...0.8))
+                        sliderRow(title: language == .japanese ? "横散布" : "Lateral Scatter", value: "\(Int(store.brushScatterLateral * 100))%", slider: Slider(value: $store.brushScatterLateral, in: 0.0...0.6))
+                        sliderRow(title: language == .japanese ? "前後散布" : "Linear Scatter", value: "\(Int(store.brushScatterLinear * 100))%", slider: Slider(value: $store.brushScatterLinear, in: 0.0...0.4))
+                        segmentedModeRow(
+                            title: language == .japanese ? "テクスチャ適用" : "Texture Apply",
+                            selectedTitle: store.brushTextureMode.localizedTitle(language)
+                        ) {
+                            Picker(language == .japanese ? "テクスチャ適用" : "Texture Apply", selection: $store.brushTextureMode) {
+                                ForEach(BrushTextureMode.allCases) { mode in
+                                    Text(mode.localizedTitle(language)).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        sliderRow(title: language == .japanese ? "先端テクスチャ" : "Tip Texture", value: "\(Int(store.brushTextureStrength * 100))%", slider: Slider(value: $store.brushTextureStrength, in: 0.0...1.0))
                         sliderRow(title: language == .japanese ? "筆圧" : "Pressure", value: store.brushPressureSensitivity < 0.6 ? (language == .japanese ? "弱め" : "Soft") : store.brushPressureSensitivity > 1.2 ? (language == .japanese ? "強め" : "Hard") : (language == .japanese ? "標準" : "Medium"), slider: Slider(value: $store.brushPressureSensitivity, in: 0.1...2.0))
                         sliderRow(title: language == .japanese ? "手ぶれ補正" : "Stabilization", value: "\(Int(store.brushStabilization * 100))%", slider: Slider(value: $store.brushStabilization, in: 0.0...1.0))
                     }

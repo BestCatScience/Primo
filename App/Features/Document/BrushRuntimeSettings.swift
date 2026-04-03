@@ -5,6 +5,14 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var radius: Double
     var opacity: Double
     var hardness: Double
+    var roundness: Double
+    var angle: Double
+    var angleMode: BrushAngleMode
+    var stampSpacing: Double
+    var scatterLateral: Double
+    var scatterLinear: Double
+    var textureMode: BrushTextureMode
+    var textureStrength: Double
     var pressureSensitivity: Double
     var stabilization: Double = 0.0
     var fillThresholdMode: FillThresholdMode = .opacity

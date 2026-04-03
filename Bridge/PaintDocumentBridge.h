@@ -26,6 +26,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CGFloat radius;
 @property (nonatomic) CGFloat hardness;
 @property (nonatomic) CGFloat opacity;
+@property (nonatomic) CGFloat roundness;
+@property (nonatomic) CGFloat angle;
+@property (nonatomic) NSInteger angleMode;
+@property (nonatomic) CGFloat stampSpacing;
+@property (nonatomic) CGFloat scatterLateral;
+@property (nonatomic) CGFloat scatterLinear;
+@property (nonatomic) NSInteger textureMode;
+@property (nonatomic) CGFloat textureStrength;
 @property (nonatomic) CGFloat grainScale;
 @property (nonatomic) CGFloat grainContrast;
 @property (nonatomic) CGFloat paperScale;

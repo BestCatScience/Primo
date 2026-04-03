@@ -11,6 +11,14 @@ struct BrushPaletteFeature {
         var brushRadius: Double = BrushPreset.defaultPencil.radius
         var brushOpacity: Double = BrushPreset.defaultPencil.opacity
         var brushHardness: Double = BrushPreset.defaultPencil.hardness
+        var brushRoundness: Double = BrushPreset.defaultPencil.roundness
+        var brushAngle: Double = BrushPreset.defaultPencil.angle
+        var brushAngleMode: BrushAngleMode = BrushPreset.defaultPencil.angleMode
+        var brushSpacing: Double = BrushPreset.defaultPencil.spacing
+        var brushScatterLateral: Double = BrushPreset.defaultPencil.scatterLateral
+        var brushScatterLinear: Double = BrushPreset.defaultPencil.scatterLinear
+        var brushTextureMode: BrushTextureMode = BrushPreset.defaultPencil.textureMode
+        var brushTextureStrength: Double = BrushPreset.defaultPencil.textureStrength
         var brushPressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
         var brushStabilization: Double = 0.0
         var selectionToolMode: SelectionToolMode = .lasso
@@ -41,6 +49,14 @@ struct BrushPaletteFeature {
                 radius: brushRadius,
                 opacity: brushOpacity,
                 hardness: brushHardness,
+                roundness: brushRoundness,
+                angle: brushAngle,
+                angleMode: brushAngleMode,
+                stampSpacing: brushSpacing,
+                scatterLateral: brushScatterLateral,
+                scatterLinear: brushScatterLinear,
+                textureMode: brushTextureMode,
+                textureStrength: brushTextureStrength,
                 pressureSensitivity: brushPressureSensitivity,
                 stabilization: brushStabilization,
                 fillThresholdMode: fillThresholdMode,
@@ -80,6 +96,14 @@ struct BrushPaletteFeature {
                  .binding(\.brushRadius),
                  .binding(\.brushOpacity),
                  .binding(\.brushHardness),
+                 .binding(\.brushRoundness),
+                 .binding(\.brushAngle),
+                 .binding(\.brushAngleMode),
+                 .binding(\.brushSpacing),
+                 .binding(\.brushScatterLateral),
+                 .binding(\.brushScatterLinear),
+                 .binding(\.brushTextureMode),
+                 .binding(\.brushTextureStrength),
                  .binding(\.brushPressureSensitivity),
                  .binding(\.brushStabilization),
                  .binding(\.selectionToolMode),
@@ -105,6 +129,14 @@ struct BrushPaletteFeature {
                 state.brushRadius = preset.radius
                 state.brushOpacity = preset.opacity
                 state.brushHardness = preset.hardness
+                state.brushRoundness = preset.roundness
+                state.brushAngle = preset.angle
+                state.brushAngleMode = preset.angleMode
+                state.brushSpacing = preset.spacing
+                state.brushScatterLateral = preset.scatterLateral
+                state.brushScatterLinear = preset.scatterLinear
+                state.brushTextureMode = preset.textureMode
+                state.brushTextureStrength = preset.textureStrength
                 state.brushPressureSensitivity = preset.pressureSensitivity
                 return .none
             case .clearActiveLayerButtonTapped:
