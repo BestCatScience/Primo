@@ -296,7 +296,6 @@ struct BrushPaletteFeature {
 private extension BrushPaletteFeature.State {
     mutating func applyPreset(_ preset: BrushPreset) {
         selectedBrush = preset
-        brushColor = preset.color
         brushTipKind = preset.tipKind
         brushRadius = preset.radius
         brushSizeSpeedSensitivity = preset.sizeSpeedSensitivity
@@ -351,17 +350,10 @@ private extension BrushPaletteFeature.State {
     }
 
     func makeCurrentPreset(named name: String) -> BrushPreset {
-        let resolved = UIColor(brushColor)
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-
         return BrushPreset(
             name: name,
             tipKind: brushTipKind,
-            color: brushColor,
+            color: .white,
             radius: brushRadius,
             sizeSpeedSensitivity: brushSizeSpeedSensitivity,
             opacity: brushOpacity,
@@ -412,9 +404,9 @@ private extension BrushPaletteFeature.State {
             flipY: brushFlipY,
             customTip: brushCustomTip,
             pressureSensitivity: brushPressureSensitivity,
-            red: UInt8(min(max(Double(red) * 255.0, 0), 255)),
-            green: UInt8(min(max(Double(green) * 255.0, 0), 255)),
-            blue: UInt8(min(max(Double(blue) * 255.0, 0), 255))
+            red: 255,
+            green: 255,
+            blue: 255
         )
     }
 

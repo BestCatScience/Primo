@@ -50,6 +50,176 @@ private enum BrushSettingsCategory: String, CaseIterable, Identifiable {
     }
 }
 
+private struct BrushPreviewStyle {
+    let color: Color
+    let radius: Double
+    let opacity: Double
+    let roundness: Double
+    let angle: Double
+    let spacing: Double
+    let scatterEnabled: Bool
+    let scatterMode: BrushScatterMode
+    let scatterLateral: Double
+    let scatterLinear: Double
+    let count: Int
+    let countSizeJitter: Double
+    let countOpacityJitter: Double
+    let textureStrength: Double
+    let flow: Double
+
+    init(
+        color: Color,
+        radius: Double,
+        opacity: Double,
+        roundness: Double,
+        angle: Double,
+        spacing: Double,
+        scatterEnabled: Bool,
+        scatterMode: BrushScatterMode,
+        scatterLateral: Double,
+        scatterLinear: Double,
+        count: Int,
+        countSizeJitter: Double,
+        countOpacityJitter: Double,
+        textureStrength: Double,
+        flow: Double
+    ) {
+        self.color = color
+        self.radius = radius
+        self.opacity = opacity
+        self.roundness = roundness
+        self.angle = angle
+        self.spacing = spacing
+        self.scatterEnabled = scatterEnabled
+        self.scatterMode = scatterMode
+        self.scatterLateral = scatterLateral
+        self.scatterLinear = scatterLinear
+        self.count = count
+        self.countSizeJitter = countSizeJitter
+        self.countOpacityJitter = countOpacityJitter
+        self.textureStrength = textureStrength
+        self.flow = flow
+    }
+
+    init(preset: BrushPreset) {
+        color = .white
+        radius = preset.radius
+        opacity = preset.opacity
+        roundness = preset.roundness
+        angle = preset.angle
+        spacing = preset.spacing
+        scatterEnabled = preset.scatterEnabled
+        scatterMode = preset.scatterMode
+        scatterLateral = preset.scatterLateral
+        scatterLinear = preset.scatterLinear
+        count = preset.count
+        countSizeJitter = preset.countSizeJitter
+        countOpacityJitter = preset.countOpacityJitter
+        textureStrength = preset.textureStrength
+        flow = preset.flow
+    }
+}
+
+private struct BrushStrokePreview: View {
+    let style: BrushPreviewStyle
+    var compact = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            Canvas { context, size in
+                let points = previewPoints(in: size)
+                let baseWidth = max(compact ? 2.2 : 3.8, min(size.width, size.height) * (compact ? 0.072 : 0.094) * style.radius / 6.0)
+                let baseAlpha = max(0.18, min(0.96, style.opacity * (0.7 + style.flow * 0.3)))
+
+                for index in 0..<points.count {
+                    let point = points[index]
+                    let pressure = previewPressure(at: index, total: points.count)
+                    let clusterCount = max(1, style.scatterEnabled ? style.count : 1)
+                    for clusterIndex in 0..<clusterCount {
+                        let jitterSeed = Double(index * 13 + clusterIndex * 31 + 7)
+                        let sizeJitter = 1.0 + signedNoise(jitterSeed * 0.17) * style.countSizeJitter * 0.55
+                        let opacityJitter = 1.0 + signedNoise(jitterSeed * 0.11 + 0.3) * style.countOpacityJitter * 0.65
+                        let scatter = scatterOffset(seed: jitterSeed, baseWidth: baseWidth)
+                        let pressureWidth = lerp(0.52, 1.0, pressure)
+                        let pressureOpacity = lerp(0.38, 1.0, pressure)
+                        let rect = CGRect(
+                            x: point.x + scatter.width - (baseWidth * sizeJitter * pressureWidth),
+                            y: point.y + scatter.height - (baseWidth * sizeJitter * pressureWidth * max(0.28, style.roundness)),
+                            width: baseWidth * 2.0 * sizeJitter * pressureWidth,
+                            height: baseWidth * 2.0 * sizeJitter * pressureWidth * max(0.28, style.roundness)
+                        )
+                        let rotation = Angle(radians: style.angle + signedNoise(jitterSeed * 0.07) * 0.18)
+                        let path = Path(roundedRect: rect, cornerRadius: min(rect.width, rect.height) * 0.55)
+                        let transformed = path.applying(CGAffineTransform(translationX: -rect.midX, y: -rect.midY))
+                            .applying(CGAffineTransform(rotationAngle: rotation.radians))
+                            .applying(CGAffineTransform(translationX: rect.midX, y: rect.midY))
+                        context.fill(
+                            transformed,
+                            with: .color(style.color.opacity(max(0.08, min(1.0, baseAlpha * pressureOpacity * opacityJitter))))
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func previewPoints(in size: CGSize) -> [CGPoint] {
+        let start = CGPoint(x: size.width * 0.08, y: size.height * 0.68)
+        let c1 = CGPoint(x: size.width * 0.28, y: size.height * 0.12)
+        let c2 = CGPoint(x: size.width * 0.62, y: size.height * 0.92)
+        let end = CGPoint(x: size.width * 0.92, y: size.height * 0.34)
+        let steps = compact ? 28 : 54
+        return (0...steps).map { step in
+            let t = CGFloat(step) / CGFloat(steps)
+            let spacingWarp = 1.0 + CGFloat(style.spacing * 0.45)
+            let warped = min(1.0, pow(t, 1.0 / spacingWarp))
+            return cubicPoint(start: start, c1: c1, c2: c2, end: end, t: warped)
+        }
+    }
+
+    private func cubicPoint(start: CGPoint, c1: CGPoint, c2: CGPoint, end: CGPoint, t: CGFloat) -> CGPoint {
+        let mt = 1 - t
+        let x =
+            mt * mt * mt * start.x +
+            3 * mt * mt * t * c1.x +
+            3 * mt * t * t * c2.x +
+            t * t * t * end.x
+        let y =
+            mt * mt * mt * start.y +
+            3 * mt * mt * t * c1.y +
+            3 * mt * t * t * c2.y +
+            t * t * t * end.y
+        return CGPoint(x: x, y: y)
+    }
+
+    private func scatterOffset(seed: Double, baseWidth: Double) -> CGSize {
+        guard style.scatterEnabled else { return .zero }
+        let lateral = signedNoise(seed * 0.23 + 0.2) * style.scatterLateral * baseWidth * 1.8
+        let linear = signedNoise(seed * 0.19 + 1.1) * style.scatterLinear * baseWidth * (style.scatterMode == .spray ? 1.8 : 1.0)
+        if style.scatterMode == .spray {
+            return CGSize(width: lateral, height: linear)
+        }
+        return CGSize(width: linear, height: lateral)
+    }
+
+    private func previewPressure(at index: Int, total: Int) -> Double {
+        guard total > 1 else { return 0.85 }
+        let t = Double(index) / Double(total - 1)
+        let envelope = sin(t * .pi)
+        let pulse = 0.72 + (0.28 * sin((t * .pi * 2.4) - 0.6))
+        return max(0.18, min(1.0, envelope * pulse + 0.18))
+    }
+
+    private func signedNoise(_ seed: Double) -> Double {
+        let value = sin(seed * 91.37 + 17.0) * 43758.5453
+        return (value - floor(value)) * 2.0 - 1.0
+    }
+
+    private func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double {
+        a + ((b - a) * t)
+    }
+}
+
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
     let currentTool: StudioToolKind
@@ -174,7 +344,7 @@ struct BrushPaletteView: View {
 
             if currentTool == .fill {
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -268,55 +438,43 @@ struct BrushPaletteView: View {
                     }
                 }
             } else {
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                VStack(alignment: .leading, spacing: 12) {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    store.brushColor.opacity(0.95),
-                                    store.brushColor.opacity(0.32)
+                                    store.brushColor.opacity(0.92),
+                                    store.brushColor.opacity(0.22)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 72, height: 72)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 122)
                         .overlay(
-                            RoundedRectangle(cornerRadius: max(6, min(18, store.brushRadius * 0.95)), style: .continuous)
-                                .fill(StudioTheme.Palette.textPrimary)
-                                .frame(
-                                    width: min(58, max(10, store.brushRadius * 3.4)),
-                                    height: min(58, max(8, store.brushRadius * 3.4 * max(store.brushRoundness, 0.22)))
-                                )
-                                .rotationEffect(.radians(store.brushAngle))
+                            BrushStrokePreview(style: currentBrushPreviewStyle)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
                         )
 
-                    VStack(alignment: .leading, spacing: 6) {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(minimum: 90), spacing: 10),
+                            GridItem(.flexible(minimum: 90), spacing: 10)
+                        ],
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
                         metricRow(language == .japanese ? "先端" : "Tip", value: store.brushTipKind.localizedTitle(language))
                         metricRow(language == .japanese ? "半径" : "Radius", value: "\(Int(store.brushRadius)) px")
-                        metricRow(language == .japanese ? "サイズ速度" : "Size Speed", value: "\(Int(store.brushSizeSpeedSensitivity * 100))%")
                         metricRow(language == .japanese ? "形状" : "Shape", value: "\(Int(store.brushRoundness * 100))%")
-                        metricRow(language == .japanese ? "形状筆圧" : "Shape Pen", value: "\(Int(store.brushRoundnessPressureSensitivity * 100))%")
-                        metricRow(language == .japanese ? "形状傾き" : "Shape Tilt", value: "\(Int(store.brushRoundnessTiltSensitivity * 100))%")
                         metricRow(language == .japanese ? "角度" : "Angle", value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°")
-                        metricRow(language == .japanese ? "角度筆圧" : "Angle Pen", value: "\(Int(store.brushAnglePressureSensitivity * 100))%")
-                        metricRow(language == .japanese ? "角度傾き" : "Angle Tilt", value: "\(Int(store.brushAngleTiltSensitivity * 100))%")
-                        metricRow(language == .japanese ? "回転" : "Rotation", value: store.brushAngleMode.localizedTitle(language))
                         metricRow(language == .japanese ? "不透明度" : "Opacity", value: "\(Int(store.brushOpacity * 100))%")
-                        metricRow(language == .japanese ? "硬さ" : "Hardness", value: "\(Int(store.brushHardness * 100))%")
                         metricRow(language == .japanese ? "間隔" : "Spacing", value: "\(Int(store.brushSpacing * 100))%")
                         metricRow(language == .japanese ? "散布" : "Scatter", value: store.brushScatterEnabled ? (language == .japanese ? "オン" : "On") : (language == .japanese ? "オフ" : "Off"))
-                        metricRow(language == .japanese ? "散布方式" : "Scatter Mode", value: store.brushScatterMode.localizedTitle(language))
-                        metricRow(language == .japanese ? "横散布" : "Lateral", value: "\(Int(store.brushScatterLateral * 100))%")
-                        metricRow(language == .japanese ? "前後散布" : "Linear", value: "\(Int(store.brushScatterLinear * 100))%")
                         metricRow(language == .japanese ? "テクスチャ" : "Texture", value: store.brushTextureMode.localizedTitle(language))
-                        metricRow(language == .japanese ? "ウェット" : "Wet", value: "\(Int(store.brushWetness * 100))%")
                         metricRow(language == .japanese ? "フロー" : "Flow", value: "\(Int(store.brushFlow * 100))%")
-                        metricRow(language == .japanese ? "フロージッター" : "Flow Jitter", value: "\(Int(store.brushFlowJitter * 100))%")
-                        metricRow(language == .japanese ? "不透明度筆圧" : "Opacity Pen", value: "\(Int(store.brushOpacityPressureSensitivity * 100))%")
-                        metricRow(language == .japanese ? "混色" : "Mix", value: "\(Int(store.brushColorMixStrength * 100))%")
-                        metricRow(language == .japanese ? "含み" : "Load", value: "\(Int(store.brushPaintLoad * 100))%")
-                        metricRow(language == .japanese ? "デュアル" : "Dual", value: store.brushDualEnabled ? store.brushDualBlendMode.localizedTitle(language) : (language == .japanese ? "オフ" : "Off"))
                         metricRow(language == .japanese ? "紙質" : "Paper", value: "\(Int(store.brushPaperStrength * 100))%")
                     }
                 }
@@ -702,7 +860,7 @@ struct BrushPaletteView: View {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(currentTool == .fill ? (language == .japanese ? "塗り色" : "Fill Color") : (language == .japanese ? "ブラシと色" : "Brushes & Color"))
+                            Text(currentTool == .fill ? (language == .japanese ? "塗り色" : "Fill Color") : (language == .japanese ? "色" : "Color"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
                             Text(currentTool == .fill ? (store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix")) : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language == .japanese ? "カスタム" : "Custom")"))
@@ -722,12 +880,6 @@ struct BrushPaletteView: View {
                         )
 
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
-                        ForEach(store.presets) { preset in
-                            colorSwatch(color: preset.color, isSelected: store.selectedBrush == preset) {
-                                store.send(.selectPreset(preset))
-                            }
-                        }
-
                         ForEach(PaletteSwatch.defaults) { swatch in
                             colorSwatch(color: swatch.color, isSelected: false) {
                                 store.send(.binding(.set(\.brushColor, swatch.color)))
@@ -830,6 +982,26 @@ struct BrushPaletteView: View {
         default:
             return StudioToolKind.brush.localizedTitle(language)
         }
+    }
+
+    private var currentBrushPreviewStyle: BrushPreviewStyle {
+        BrushPreviewStyle(
+            color: .white,
+            radius: store.brushRadius,
+            opacity: store.brushOpacity,
+            roundness: store.brushRoundness,
+            angle: store.brushAngle,
+            spacing: store.brushSpacing,
+            scatterEnabled: store.brushScatterEnabled,
+            scatterMode: store.brushScatterMode,
+            scatterLateral: store.brushScatterLateral,
+            scatterLinear: store.brushScatterLinear,
+            count: Int(store.brushCount.rounded()),
+            countSizeJitter: store.brushCountSizeJitter,
+            countOpacityJitter: store.brushCountOpacityJitter,
+            textureStrength: store.brushTextureStrength,
+            flow: store.brushFlow
+        )
     }
 
     private var sectionTitle: String {
@@ -1189,33 +1361,48 @@ struct BrushPaletteView: View {
 
     private func presetChip(preset: BrushPreset, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(preset.color.opacity(0.95))
-                    Image(systemName: preset.tipKind.systemImage)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.92))
-                }
-                .frame(width: 24, height: 24)
+            ZStack(alignment: .bottomTrailing) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.12),
+                                StudioTheme.Palette.overlayBlack.opacity(0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
-                VStack(alignment: .leading, spacing: 1) {
+                BrushStrokePreview(style: BrushPreviewStyle(preset: preset), compact: false)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+
+                VStack(alignment: .trailing, spacing: 2) {
                     Text(preset.name)
                         .font(StudioTheme.Typography.label(11))
-                        .foregroundStyle(.white.opacity(0.92))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .lineLimit(1)
                     Text(preset.tipKind.localizedTitle(language))
                         .font(StudioTheme.Typography.mono(9))
-                        .foregroundStyle(.white.opacity(0.46))
+                        .foregroundStyle(.white.opacity(0.58))
+                        .lineLimit(1)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(StudioTheme.Palette.overlayBlack.opacity(0.34))
+                )
+                .padding(8)
             }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 34)
+            .frame(maxWidth: .infinity, minHeight: 62)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(isSelected ? StudioTheme.Palette.accent.opacity(0.28) : StudioTheme.Palette.hairline)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardBorder, lineWidth: 1)
             )
         }
@@ -1278,9 +1465,12 @@ struct BrushPaletteView: View {
                         allowsDeletion: false
                     )
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 6)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
         .padding(.vertical, 4)
     }
@@ -1322,6 +1512,7 @@ struct BrushPaletteView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard(showsChrome: false)
                     controlsCard(showsChrome: false)
+                    detailCard(showsChrome: false)
                 }
                 .padding(.bottom, 6)
             }
@@ -1393,8 +1584,10 @@ struct BrushPaletteView: View {
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func deletableSavedPresetChip(preset: BrushPreset) -> some View {
@@ -1417,6 +1610,7 @@ struct BrushPaletteView: View {
                 .padding(.top, 6)
                 .padding(.trailing, 6)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func sidebarIconButton(
