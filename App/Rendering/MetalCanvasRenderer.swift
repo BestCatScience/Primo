@@ -80,6 +80,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var documentSize: CGSize = .zero
     private var paperStyle: CanvasPaperStyle = .default
     private var needsRedraw = false
+    private(set) var currentSnapshot: MetalDocumentSnapshot?
+    var currentActiveLayerIndex: Int = 0
 
     init() {
         let clock = ContinuousClock()
@@ -112,6 +114,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
 
     func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize, zoomScale: CGFloat, paperStyle: CanvasPaperStyle) {
         pendingSnapshot = snapshot
+        currentSnapshot = snapshot
         if let snapshot {
             documentSize = CGSize(width: snapshot.width, height: snapshot.height)
         }

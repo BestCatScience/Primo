@@ -300,6 +300,18 @@ float jitterValue(float seedA, float seedB, float amount) {
     return ((hash2D(seedA, seedB) - 0.5F) * 2.0F) * amount;
 }
 
+float nextBrushSpacingDistance(const BrushSettings& brush, const StrokePoint& point) {
+    const float baseSpacing = brushSpacingDistance(brush);
+    const float jitteredSpacing = baseSpacing * (
+        1.0F + jitterValue(
+            point.x + (point.timestamp * 0.37F),
+            point.y - (point.timestamp * 0.21F),
+            brush.spacingJitter
+        )
+    );
+    return std::max(0.2F, jitteredSpacing);
+}
+
 float dualBrushMask(
     const BrushSettings& brush,
     float pointX,
@@ -704,7 +716,9 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     pushLayerHistorySnapshot(activeLayerIndex_);
     activeBrush_ = brush;
     previousPoint_ = point;
+    lastDabPoint_ = point;
     strokeOriginPoint_ = point;
+    distanceUntilNextDab_ = nextBrushSpacingDistance(activeBrush_, point);
     strokeInFlight_ = true;
     dirtyRect_.reset();
     point.speed = 0.0F;
@@ -721,11 +735,16 @@ void PaintDocument::appendStroke(StrokePoint point) {
     const float dx = point.x - previousPoint_.x;
     const float dy = point.y - previousPoint_.y;
     const float distance = std::sqrt((dx * dx) + (dy * dy));
-    const float jitteredSpacing = brushSpacingDistance(activeBrush_) * (1.0F + jitterValue(previousPoint_.x + point.x, previousPoint_.y + point.y, activeBrush_.spacingJitter));
-    const float spacing = std::max(0.2F, jitteredSpacing);
-    const int steps = std::max(1, static_cast<int>(std::ceil(distance / spacing)));
-    for (int step = 1; step <= steps; ++step) {
-        const float t = static_cast<float>(step) / static_cast<float>(steps);
+    if (distance <= 0.0001F) {
+        previousPoint_ = point;
+        return;
+    }
+
+    float traveledAlongSegment = 0.0F;
+    float remainingToNextDab = std::max(0.0001F, distanceUntilNextDab_);
+    while (remainingToNextDab <= (distance - traveledAlongSegment)) {
+        traveledAlongSegment += remainingToNextDab;
+        const float t = traveledAlongSegment / distance;
         StrokePoint interpolated;
         interpolated.x = previousPoint_.x + (dx * t);
         interpolated.y = previousPoint_.y + (dy * t);
@@ -734,19 +753,23 @@ void PaintDocument::appendStroke(StrokePoint point) {
         interpolated.azimuth = previousPoint_.azimuth + ((point.azimuth - previousPoint_.azimuth) * t);
         interpolated.timestamp = previousPoint_.timestamp + ((point.timestamp - previousPoint_.timestamp) * t);
 
-        const float timeDelta = std::max(0.001F, interpolated.timestamp - previousPoint_.timestamp);
-        const float traveled = std::sqrt(((interpolated.x - previousPoint_.x) * (interpolated.x - previousPoint_.x)) +
-                                         ((interpolated.y - previousPoint_.y) * (interpolated.y - previousPoint_.y)));
+        const float timeDelta = std::max(0.001F, interpolated.timestamp - lastDabPoint_.timestamp);
+        const float traveled = std::sqrt(((interpolated.x - lastDabPoint_.x) * (interpolated.x - lastDabPoint_.x)) +
+                                         ((interpolated.y - lastDabPoint_.y) * (interpolated.y - lastDabPoint_.y)));
         interpolated.speed = traveled / timeDelta;
         stampDab(layer, interpolated);
+        lastDabPoint_ = interpolated;
+        remainingToNextDab = nextBrushSpacingDistance(activeBrush_, interpolated);
     }
 
+    distanceUntilNextDab_ = remainingToNextDab - (distance - traveledAlongSegment);
     previousPoint_ = point;
     compositeDirty_ = true;
 }
 
 void PaintDocument::endStroke() {
     strokeInFlight_ = false;
+    distanceUntilNextDab_ = 0.0F;
 }
 
 void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
@@ -1073,8 +1096,8 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const bool isOil = activeBrush_.tipKind == "oil";
     const bool isAirbrush = activeBrush_.tipKind == "airbrush";
     const float altitudeFactor = clamp01((1.5707963F - point.altitude) / 1.5707963F);
-    const float strokeDX = point.x - previousPoint_.x;
-    const float strokeDY = point.y - previousPoint_.y;
+    const float strokeDX = point.x - lastDabPoint_.x;
+    const float strokeDY = point.y - lastDabPoint_.y;
     const float strokeDistance = std::sqrt((strokeDX * strokeDX) + (strokeDY * strokeDY));
     const float tangentX = strokeDistance > 0.001F ? (strokeDX / strokeDistance) : std::cos(point.azimuth);
     const float tangentY = strokeDistance > 0.001F ? (strokeDY / strokeDistance) : std::sin(point.azimuth);

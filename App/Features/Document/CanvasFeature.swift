@@ -22,6 +22,7 @@ struct CanvasFeature {
         var isAwaitingCommittedRender = false
         var currentTool: StudioToolKind = .brush
         var selectionMode: SelectionToolMode = .lasso
+        var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
         var selection: CanvasSelection?
         var selectionPreviewPoints: [CGPoint] = []
         var transformPreviewOffset: CGSize = .zero
@@ -48,6 +49,7 @@ struct CanvasFeature {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
         case fillRequested(StylusSample)
+        case colorSampled(SampledColor)
         case selectionPreviewUpdated([CGPoint])
         case selectionPathEnded([CGPoint])
         case autoSelectionRequested(StylusSample)
@@ -90,6 +92,9 @@ struct CanvasFeature {
             case let .fillRequested(sample):
                 state.pendingIncrementalUpdate = nil
                 return .send(.delegate(.fill(sample)))
+
+            case .colorSampled:
+                return .none
 
             case let .selectionPreviewUpdated(points):
                 state.selectionPreviewPoints = points

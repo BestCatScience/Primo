@@ -12,6 +12,9 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
+                toolDockColumn
+                    .zIndex(30)
+
                 panelRail(for: .leading)
                     .zIndex(20)
 
@@ -501,34 +504,40 @@ struct ContentView: View {
             }
 
             VStack {
-                HStack(alignment: .top, spacing: 14) {
-                    toolDock
+                ZStack {
+                    stageChrome
 
-                    ZStack {
-                        stageChrome
-
-                        CanvasView(
-                            store: store.scope(
-                                state: \.canvas,
-                                action: \.canvas
-                            )
+                    CanvasView(
+                        store: store.scope(
+                            state: \.canvas,
+                            action: \.canvas
                         )
-                        .padding(14)
+                    )
+                    .padding(14)
 
-                        if store.isHydrating {
-                            ProgressView()
-                                .controlSize(.large)
+                    if store.isHydrating {
+                        ProgressView()
+                            .controlSize(.large)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 20)
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
                 .padding(.horizontal, 14)
                 .padding(.top, 6)
             }
         }
+    }
+
+    private var toolDockColumn: some View {
+        VStack {
+            toolDock
+                .padding(.leading, 10)
+                .padding(.top, 20)
+            Spacer(minLength: 0)
+        }
+        .frame(width: 74)
     }
 
     @ViewBuilder
@@ -861,7 +870,7 @@ private struct DiagonalStageLines: View {
     }
 }
 
-private let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .select, .move, .shape]
+private let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .eyedropper, .select, .move, .shape]
 
 private struct StudioPanelShell<Content: View>: View {
     let title: String

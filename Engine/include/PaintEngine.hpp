@@ -211,7 +211,9 @@ private:
     int activeLayerIndex_ = 0;
     BrushSettings activeBrush_;
     StrokePoint previousPoint_{};
+    StrokePoint lastDabPoint_{};
     StrokePoint strokeOriginPoint_{};
+    float distanceUntilNextDab_ = 0.0F;
     bool strokeInFlight_ = false;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;

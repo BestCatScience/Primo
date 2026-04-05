@@ -5,6 +5,7 @@ protocol InputHandlerDelegate: AnyObject {
     func didUpdateStroke(_ stroke: Stroke)
     func didEndStroke(_ stroke: Stroke)
     func didRequestFill(at sample: StylusSample)
+    func didRequestColorSample(at sample: StylusSample)
     func didUpdateSelectionPath(_ points: [CGPoint])
     func didEndSelectionPath(_ points: [CGPoint])
     func didRequestAutoSelection(at sample: StylusSample)
@@ -18,6 +19,7 @@ final class InputHandler {
 
     var tool: StudioToolKind = .brush
     var selectionMode: SelectionToolMode = .lasso
+    var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
     var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     var brushSize: Float = 4.0
     var strokeStabilization: Float = 0.0
@@ -47,6 +49,20 @@ final class InputHandler {
             delegate?.didRequestFill(at: makePoint(touch, in: view, predicted: false).stylusSample)
             currentStroke = nil
             shapeStartPoint = nil
+            return
+        }
+
+        if tool == .eyedropper {
+            switch touch.phase {
+            case .began, .moved, .stationary:
+                delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
+            case .ended, .cancelled:
+                delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
+                currentStroke = nil
+                shapeStartPoint = nil
+            default:
+                break
+            }
             return
         }
 

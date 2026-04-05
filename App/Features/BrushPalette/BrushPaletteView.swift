@@ -374,6 +374,33 @@ struct BrushPaletteView: View {
                         metricRow(language == .japanese ? "色" : "Color", value: store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix"))
                     }
                 }
+            } else if currentTool == .eyedropper {
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    store.brushColor.opacity(0.96),
+                                    StudioTheme.Palette.coolGlow.opacity(0.34)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 72, height: 72)
+                        .overlay(
+                            Image(systemName: "eyedropper")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(StudioTheme.Palette.textPrimary)
+                        )
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        metricRow(language == .japanese ? "取得元" : "Source", value: store.eyedropperSamplingSource.localizedTitle(language))
+                        metricRow(language == .japanese ? "現在色" : "Current Color", value: colorHexLabel)
+                        metricRow(language == .japanese ? "入力" : "Input", value: language == .japanese ? "Apple Pencil" : "Apple Pencil")
+                        metricRow(language == .japanese ? "動作" : "Behavior", value: language == .japanese ? "ドラッグで連続取得" : "Drag to sample continuously")
+                    }
+                }
             } else if currentTool == .select {
                 HStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -516,6 +543,22 @@ struct BrushPaletteView: View {
                     value: "\(Int(store.fillExpansion)) px",
                     slider: Slider(value: $store.fillExpansion, in: 0...24, step: 1)
                 )
+            } else if currentTool == .eyedropper {
+                segmentedModeRow(
+                    title: language == .japanese ? "取得元" : "Sampling Source",
+                    selectedTitle: store.eyedropperSamplingSource.localizedTitle(language)
+                ) {
+                    Picker(language == .japanese ? "取得元" : "Sampling Source", selection: $store.eyedropperSamplingSource) {
+                        ForEach(EyedropperSamplingSource.allCases) { source in
+                            Text(source.localizedTitle(language)).tag(source)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                Text(language == .japanese ? "Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。" : "Tap or drag with Apple Pencil to sample a color into the current paint color.")
+                    .font(StudioTheme.Typography.body(11))
+                    .foregroundStyle(.white.opacity(0.62))
             } else if currentTool == .select {
                 segmentedModeRow(
                     title: language == .japanese ? "選択アクション" : "Selection Action",
@@ -746,6 +789,16 @@ struct BrushPaletteView: View {
                         allowed: [.off, .pressure, .random]
                     )
                     sliderRow(title: language == .japanese ? "フロー量" : "Flow Amount", value: "\(Int(flowAmountBinding.wrappedValue * 100))%", slider: Slider(value: flowAmountBinding, in: 0.0...1.0))
+                    segmentedModeRow(
+                        title: language == .japanese ? "速度で濃さを変える" : "Speed Density",
+                        selectedTitle: store.brushVelocityInfluence > 0.001 ? (language == .japanese ? "オン" : "On") : (language == .japanese ? "オフ" : "Off")
+                    ) {
+                        Picker(language == .japanese ? "速度で濃さを変える" : "Speed Density", selection: velocityDensityControlBinding) {
+                            Text(language == .japanese ? "オフ" : "Off").tag(false)
+                            Text(language == .japanese ? "オン" : "On").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                    }
                     sliderRow(title: language == .japanese ? "手ぶれ補正" : "Stabilization", value: "\(Int(store.brushStabilization * 100))%", slider: Slider(value: $store.brushStabilization, in: 0.0...1.0))
 
                 case .texture:
@@ -862,10 +915,16 @@ struct BrushPaletteView: View {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(currentTool == .fill ? (language == .japanese ? "塗り色" : "Fill Color") : (language == .japanese ? "色" : "Color"))
+                            Text(currentTool == .fill ? (language == .japanese ? "塗り色" : "Fill Color") : (currentTool == .eyedropper ? (language == .japanese ? "取得色" : "Sampled Color") : (language == .japanese ? "色" : "Color")))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(currentTool == .fill ? (store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix")) : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language == .japanese ? "カスタム" : "Custom")"))
+                            Text(
+                                currentTool == .fill
+                                    ? (store.selectedBrush?.name ?? (language == .japanese ? "カスタム" : "Custom Mix"))
+                                    : (currentTool == .eyedropper
+                                        ? colorHexLabel
+                                        : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language == .japanese ? "カスタム" : "Custom")"))
+                            )
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -934,6 +993,8 @@ struct BrushPaletteView: View {
         switch currentTool {
         case .fill:
             return currentTool.localizedTitle(language)
+        case .eyedropper:
+            return currentTool.localizedTitle(language)
         case .select:
             return currentTool.localizedTitle(language)
         case .move:
@@ -967,6 +1028,8 @@ struct BrushPaletteView: View {
         switch currentTool {
         case .fill:
             return language == .japanese ? "塗りつぶし設定" : "Fill Engine"
+        case .eyedropper:
+            return language == .japanese ? "スポイト設定" : "Eyedropper"
         case .select:
             return language == .japanese ? "選択設定" : "Selection"
         case .move:
@@ -998,6 +1061,21 @@ struct BrushPaletteView: View {
                     break
                 }
             }
+        )
+    }
+
+    private var colorHexLabel: String {
+        let resolved = UIColor(store.brushColor)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        return String(
+            format: "#%02X%02X%02X",
+            Int((red * 255.0).rounded()),
+            Int((green * 255.0).rounded()),
+            Int((blue * 255.0).rounded())
         )
     }
 
@@ -1167,6 +1245,15 @@ struct BrushPaletteView: View {
                 case .random: store.brushFlowJitter = 1.0 - newValue
                 default: break
                 }
+            }
+        )
+    }
+
+    private var velocityDensityControlBinding: Binding<Bool> {
+        Binding(
+            get: { store.brushVelocityInfluence > 0.001 },
+            set: { enabled in
+                store.brushVelocityInfluence = enabled ? 0.012 : 0.0
             }
         )
     }

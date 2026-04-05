@@ -36,6 +36,7 @@ struct BrushPaletteFeature {
         var brushFlow: Double = BrushPreset.defaultPencil.flow
         var brushFlowPressureSensitivity: Double = BrushPreset.defaultPencil.flowPressureSensitivity
         var brushFlowJitter: Double = BrushPreset.defaultPencil.flowJitter
+        var brushVelocityInfluence: Double = BrushPreset.defaultPencil.velocityInfluence
         var brushWetness: Double = BrushPreset.defaultPencil.wetness
         var brushWetnessPressureSensitivity: Double = BrushPreset.defaultPencil.wetnessPressureSensitivity
         var brushOpacityPressureSensitivity: Double = BrushPreset.defaultPencil.opacityPressureSensitivity
@@ -69,6 +70,7 @@ struct BrushPaletteFeature {
         var fillOpacityTolerance: Double = 0.08
         var fillColorTolerance: Double = 0.12
         var fillExpansion: Double = 0
+        var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
         var brushColor: Color = BrushPreset.defaultPencil.color
         var paperColor: Color = Color(red: 0.93, green: 0.93, blue: 0.91)
         var transparentPaper = false
@@ -113,6 +115,7 @@ struct BrushPaletteFeature {
                 flow: brushFlow,
                 flowPressureSensitivity: brushFlowPressureSensitivity,
                 flowJitter: brushFlowJitter,
+                velocityInfluence: brushVelocityInfluence,
                 wetness: brushWetness,
                 wetnessPressureSensitivity: brushWetnessPressureSensitivity,
                 opacityPressureSensitivity: brushOpacityPressureSensitivity,
@@ -204,6 +207,7 @@ struct BrushPaletteFeature {
                  .binding(\.brushFlow),
                  .binding(\.brushFlowPressureSensitivity),
                  .binding(\.brushFlowJitter),
+                 .binding(\.brushVelocityInfluence),
                  .binding(\.brushWetness),
                  .binding(\.brushWetnessPressureSensitivity),
                  .binding(\.brushOpacityPressureSensitivity),
@@ -235,7 +239,8 @@ struct BrushPaletteFeature {
                  .binding(\.fillThresholdMode),
                  .binding(\.fillOpacityTolerance),
                  .binding(\.fillColorTolerance),
-                 .binding(\.fillExpansion):
+                 .binding(\.fillExpansion),
+                 .binding(\.eyedropperSamplingSource):
                 state.selectedBrush = nil
                 return .none
             case .binding:
@@ -326,6 +331,7 @@ private extension BrushPaletteFeature.State {
         brushFlow = preset.flow
         brushFlowPressureSensitivity = preset.flowPressureSensitivity
         brushFlowJitter = preset.flowJitter
+        brushVelocityInfluence = preset.velocityInfluence
         brushWetness = preset.wetness
         brushWetnessPressureSensitivity = preset.wetnessPressureSensitivity
         brushOpacityPressureSensitivity = preset.opacityPressureSensitivity
@@ -383,6 +389,7 @@ private extension BrushPaletteFeature.State {
             flow: brushFlow,
             flowPressureSensitivity: brushFlowPressureSensitivity,
             flowJitter: brushFlowJitter,
+            velocityInfluence: brushVelocityInfluence,
             wetness: brushWetness,
             wetnessPressureSensitivity: brushWetnessPressureSensitivity,
             opacityPressureSensitivity: brushOpacityPressureSensitivity,
@@ -456,6 +463,7 @@ private extension BrushPaletteFeature.State {
                 flow: preset.flow,
                 flowPressureSensitivity: preset.flowPressureSensitivity,
                 flowJitter: preset.flowJitter,
+                velocityInfluence: preset.velocityInfluence,
                 wetness: preset.wetness,
                 wetnessPressureSensitivity: preset.wetnessPressureSensitivity,
                 opacityPressureSensitivity: preset.opacityPressureSensitivity,

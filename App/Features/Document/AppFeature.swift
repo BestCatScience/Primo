@@ -4,6 +4,7 @@ import CoreGraphics
 import CoreVideo
 import Foundation
 import ImageIO
+import SwiftUI
 import UIKit
 import os
 
@@ -104,6 +105,7 @@ struct AppFeature {
             layerSidebar.transparentPaper = brushPalette.transparentPaper
             canvas.previewStyle = previewStrokeStyle()
             canvas.selectionMode = brushPalette.selectionToolMode
+            canvas.eyedropperSamplingSource = brushPalette.eyedropperSamplingSource
             canvas.paperStyle = resolvedPaperStyle()
         }
 
@@ -443,6 +445,7 @@ struct AppFeature {
             case let .toolSelected(tool):
                 state.canvas.currentTool = tool
                 state.canvas.selectionMode = state.brushPalette.selectionToolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
@@ -544,6 +547,7 @@ struct AppFeature {
 
             case .brushPalette:
                 state.canvas.selectionMode = state.brushPalette.selectionToolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 state.canvas.paperStyle = state.resolvedPaperStyle()
                 state.layerSidebar.paperColor = state.brushPalette.paperColor
@@ -704,6 +708,12 @@ struct AppFeature {
             case .canvas(.delegate(.requestRedo)):
                 return .send(.redoRequested)
 
+            case let .canvas(.colorSampled(sampledColor)):
+                state.brushPalette.brushColor = Self.color(from: sampledColor)
+                state.brushPalette.selectedBrush = nil
+                state.canvas.previewStyle = state.previewStrokeStyle()
+                return .none
+
             case .layerSidebar, .canvas:
                 return .none
             }
@@ -791,6 +801,15 @@ private extension AppFeature {
 
             return croppedSelection(from: baseMask, width: canvasWidth, height: canvasHeight, mode: incoming.mode)
         }
+    }
+
+    static func color(from sampledColor: SampledColor) -> Color {
+        Color(
+            red: Double(sampledColor.red) / 255.0,
+            green: Double(sampledColor.green) / 255.0,
+            blue: Double(sampledColor.blue) / 255.0,
+            opacity: Double(sampledColor.alpha) / 255.0
+        )
     }
 
     static func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8] {

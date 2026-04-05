@@ -148,6 +148,7 @@ private struct StoredBrushPreset: Codable {
     let flow: Double
     let flowPressureSensitivity: Double
     let flowJitter: Double
+    let velocityInfluence: Double
     let wetness: Double
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
@@ -205,6 +206,7 @@ private struct StoredBrushPreset: Codable {
         case flow
         case flowPressureSensitivity
         case flowJitter
+        case velocityInfluence
         case wetness
         case wetnessPressureSensitivity
         case opacityPressureSensitivity
@@ -263,6 +265,7 @@ private struct StoredBrushPreset: Codable {
         flow = preset.flow
         flowPressureSensitivity = preset.flowPressureSensitivity
         flowJitter = preset.flowJitter
+        velocityInfluence = preset.velocityInfluence
         wetness = preset.wetness
         wetnessPressureSensitivity = preset.wetnessPressureSensitivity
         opacityPressureSensitivity = preset.opacityPressureSensitivity
@@ -322,6 +325,7 @@ private struct StoredBrushPreset: Codable {
         flow = try container.decode(Double.self, forKey: .flow)
         flowPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .flowPressureSensitivity) ?? 0.0
         flowJitter = try container.decodeIfPresent(Double.self, forKey: .flowJitter) ?? 0.0
+        velocityInfluence = try container.decodeIfPresent(Double.self, forKey: .velocityInfluence) ?? 0.0
         wetness = try container.decodeIfPresent(Double.self, forKey: .wetness) ?? 0.0
         wetnessPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .wetnessPressureSensitivity) ?? 0.0
         opacityPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .opacityPressureSensitivity) ?? 0.0
@@ -396,6 +400,7 @@ private struct StoredBrushPreset: Codable {
             flow: flow,
             flowPressureSensitivity: flowPressureSensitivity,
             flowJitter: flowJitter,
+            velocityInfluence: velocityInfluence,
             wetness: wetness,
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,

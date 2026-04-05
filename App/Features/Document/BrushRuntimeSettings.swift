@@ -30,6 +30,7 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var flow: Double = 1.0
     var flowPressureSensitivity: Double = 0.0
     var flowJitter: Double = 0.0
+    var velocityInfluence: Double = 0.0
     var wetness: Double = 0.0
     var wetnessPressureSensitivity: Double = 0.0
     var opacityPressureSensitivity: Double = 0.0
@@ -99,6 +100,7 @@ struct BrushRuntimeSettings: Equatable, Sendable {
             flow: imported.preset.flow,
             flowPressureSensitivity: imported.preset.flowPressureSensitivity,
             flowJitter: imported.preset.flowJitter,
+            velocityInfluence: imported.preset.velocityInfluence,
             wetness: imported.preset.wetness,
             wetnessPressureSensitivity: imported.preset.wetnessPressureSensitivity,
             opacityPressureSensitivity: imported.preset.opacityPressureSensitivity,

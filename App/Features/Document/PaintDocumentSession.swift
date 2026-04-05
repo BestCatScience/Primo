@@ -287,6 +287,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.flow = brush.flow
         descriptor.flowPressureSensitivity = brush.flowPressureSensitivity
         descriptor.flowJitter = brush.flowJitter
+        descriptor.velocityInfluence = brush.velocityInfluence
         descriptor.wetness = brush.wetness
         descriptor.wetnessPressureSensitivity = brush.wetnessPressureSensitivity
         descriptor.opacityPressureSensitivity = brush.opacityPressureSensitivity
@@ -316,7 +317,6 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.paperScale = brush.paperScale
         descriptor.paperThreshold = brush.paperThreshold
         descriptor.paperStrength = brush.paperStrength
-        descriptor.velocityInfluence = 0.012
         descriptor.tiltInfluence = 0.75
         descriptor.maxDarkness = 0.95
         descriptor.pressureSensitivity = brush.pressureSensitivity

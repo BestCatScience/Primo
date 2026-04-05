@@ -7,6 +7,7 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
     case erase
     case fill
+    case eyedropper
     case select
     case move
     case shape
@@ -25,6 +26,8 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return language == .japanese ? "消しゴム" : "Erase"
         case .fill:
             return language == .japanese ? "塗りつぶし" : "Fill"
+        case .eyedropper:
+            return language == .japanese ? "スポイト" : "Eyedropper"
         case .select:
             return language == .japanese ? "選択" : "Select"
         case .move:
@@ -42,12 +45,30 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return "eraser"
         case .fill:
             return "paintbrush.fill"
+        case .eyedropper:
+            return "eyedropper"
         case .select:
             return "lasso"
         case .move:
             return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
         case .shape:
             return "square.on.circle"
+        }
+    }
+}
+
+enum EyedropperSamplingSource: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case activeLayer
+    case canvas
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .activeLayer:
+            return language == .japanese ? "アクティブレイヤー" : "Active Layer"
+        case .canvas:
+            return language == .japanese ? "キャンバス" : "Canvas"
         }
     }
 }
@@ -377,6 +398,7 @@ struct BrushPreset: Identifiable, Equatable {
     let flow: Double
     let flowPressureSensitivity: Double
     let flowJitter: Double
+    let velocityInfluence: Double
     let wetness: Double
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
@@ -434,6 +456,7 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.flow == rhs.flow &&
         lhs.flowPressureSensitivity == rhs.flowPressureSensitivity &&
         lhs.flowJitter == rhs.flowJitter &&
+        lhs.velocityInfluence == rhs.velocityInfluence &&
         lhs.wetness == rhs.wetness &&
         lhs.wetnessPressureSensitivity == rhs.wetnessPressureSensitivity &&
         lhs.opacityPressureSensitivity == rhs.opacityPressureSensitivity &&
@@ -493,6 +516,7 @@ struct BrushPreset: Identifiable, Equatable {
         flow: Double,
         flowPressureSensitivity: Double = 0.0,
         flowJitter: Double = 0.0,
+        velocityInfluence: Double = 0.0,
         wetness: Double = 0.0,
         wetnessPressureSensitivity: Double = 0.0,
         opacityPressureSensitivity: Double = 0.0,
@@ -550,6 +574,7 @@ struct BrushPreset: Identifiable, Equatable {
         self.flow = flow
         self.flowPressureSensitivity = flowPressureSensitivity
         self.flowJitter = flowJitter
+        self.velocityInfluence = velocityInfluence
         self.wetness = wetness
         self.wetnessPressureSensitivity = wetnessPressureSensitivity
         self.opacityPressureSensitivity = opacityPressureSensitivity
@@ -583,7 +608,7 @@ struct BrushPreset: Identifiable, Equatable {
             tipKind: .pencil,
             color: Color(red: 0.12, green: 0.12, blue: 0.13),
             radius: 3.2,
-            sizeSpeedSensitivity: 0.08,
+            sizeSpeedSensitivity: 0.0,
             opacity: 0.92,
             hardness: 0.80,
             roundness: 0.86,
@@ -1146,6 +1171,13 @@ struct PreviewStrokeTrack: Identifiable, Equatable {
         lhs.points == rhs.points &&
         lhs.style == rhs.style
     }
+}
+
+struct SampledColor: Equatable {
+    let red: UInt8
+    let green: UInt8
+    let blue: UInt8
+    let alpha: UInt8
 }
 
 struct MetalLayerSnapshot: Identifiable, Equatable {
