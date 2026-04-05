@@ -15,13 +15,13 @@ struct ContentView: View {
                 toolDockColumn
                     .zIndex(30)
 
-                panelRail(for: .leading)
+                panelRail(for: .brush)
                     .zIndex(20)
 
                 centerStage
                     .zIndex(1)
 
-                panelRail(for: .trailing)
+                panelRail(for: .layers)
                     .zIndex(20)
             }
         }
@@ -190,17 +190,6 @@ struct ContentView: View {
                 Button(store.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
                     store.send(.panelCollapseToggled(.layers))
                 }
-
-                Divider()
-
-                Button(isStacked(.brush) || isStacked(.layers) ? StudioStrings.unstackPanels(language) : StudioStrings.stackPanels(language)) {
-                    store.send(.panelStackToggled(.brush))
-                }
-
-                Button(StudioStrings.swapStackOrder(language)) {
-                    store.send(.panelStackOrderSwapRequested)
-                }
-                .disabled(!isStacked(.brush) && !isStacked(.layers))
             }
 
             menuBarMenu(StudioStrings.fileMenu(language)) {
@@ -540,48 +529,27 @@ struct ContentView: View {
         .frame(width: 74)
     }
 
-    @ViewBuilder
-    private func panelRail(for side: StudioPanelSide) -> some View {
-        let panels = panels(on: side)
+    private func panelRail(for panel: StudioPanelKind) -> some View {
+        let panelState = panelState(for: panel)
 
-        if panels.isEmpty {
-            Color.clear
-                .frame(width: 0)
-        } else {
-            VStack(spacing: 12) {
-                ForEach(panels, id: \.self) { panel in
-                    studioPanel(for: panel)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 14)
-            .frame(width: railWidth(for: panels))
-            .frame(maxHeight: .infinity, alignment: .top)
+        return VStack(spacing: 12) {
+            studioPanel(for: panel)
+            Spacer(minLength: 0)
         }
-    }
-
-    private func railWidth(for panels: [StudioPanelKind]) -> CGFloat {
-        panels.contains { !panelState(for: $0).isCollapsed } ? 304 : 74
+        .padding(.horizontal, 10)
+        .padding(.vertical, 14)
+        .frame(width: panelState.isCollapsed ? 74 : 304)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
     private func studioPanel(for panel: StudioPanelKind) -> some View {
         let panelState = panelState(for: panel)
-        let isStacked = isStacked(panel)
 
         StudioPanelShell(
             title: panel.title(language),
-            language: language,
-            side: panelState.side,
             isCollapsed: panelState.isCollapsed,
-            isStacked: isStacked,
-            onToggleCollapse: { store.send(.panelCollapseToggled(panel)) },
-            onToggleStack: { store.send(.panelStackToggled(panel)) },
-            onSwapStackOrder: { store.send(.panelStackOrderSwapRequested) },
-            onDragEnded: { translation in
-                handlePanelDragEnded(panel, translation: translation)
-            }
+            onToggleCollapse: { store.send(.panelCollapseToggled(panel)) }
         ) {
             switch panel {
             case .brush:
@@ -609,12 +577,7 @@ struct ContentView: View {
                 )
             }
         }
-        .frame(maxHeight: panelState.isCollapsed ? 68 : (isStacked ? 332 : .infinity), alignment: .top)
-    }
-
-    private func isStacked(_ panel: StudioPanelKind) -> Bool {
-        let companion = panel == .brush ? StudioPanelKind.layers : .brush
-        return panelState(for: panel).side == panelState(for: companion).side
+        .frame(maxHeight: panelState.isCollapsed ? 68 : .infinity, alignment: .top)
     }
 
     private func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
@@ -623,29 +586,6 @@ struct ContentView: View {
             return store.brushPanel
         case .layers:
             return store.layerPanel
-        }
-    }
-
-    private func panels(on side: StudioPanelSide) -> [StudioPanelKind] {
-        store.stackedPanelOrder.filter { panelState(for: $0).side == side }
-    }
-
-    private func handlePanelDragEnded(_ panel: StudioPanelKind, translation: CGSize) {
-        let horizontalThreshold: CGFloat = 70
-        let verticalThreshold: CGFloat = 42
-
-        if translation.width > horizontalThreshold {
-            store.send(.panelMoved(panel, .trailing))
-            return
-        }
-
-        if translation.width < -horizontalThreshold {
-            store.send(.panelMoved(panel, .leading))
-            return
-        }
-
-        if isStacked(panel), abs(translation.height) > verticalThreshold {
-            store.send(.panelStackOrderSwapRequested)
         }
     }
 

@@ -32,13 +32,7 @@ enum StudioPanelKind: String, CaseIterable, Equatable {
     }
 }
 
-enum StudioPanelSide: String, Equatable {
-    case leading
-    case trailing
-}
-
 struct StudioPanelLayoutState: Equatable {
-    var side: StudioPanelSide
     var isCollapsed: Bool = false
 }
 
@@ -57,9 +51,8 @@ struct AppFeature {
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
         var canvas = CanvasFeature.State()
-        var brushPanel = StudioPanelLayoutState(side: .leading)
-        var layerPanel = StudioPanelLayoutState(side: .trailing)
-        var stackedPanelOrder: [StudioPanelKind] = [.brush, .layers]
+        var brushPanel = StudioPanelLayoutState()
+        var layerPanel = StudioPanelLayoutState()
         var exportSheet: ShareExport?
         var bannerMessage: String?
         var timelapseExportPreview: TimelapseExportPreview?
@@ -192,32 +185,6 @@ struct AppFeature {
             current.isCollapsed.toggle()
             setPanelState(current, for: panel)
         }
-
-        mutating func movePanel(_ panel: StudioPanelKind, to side: StudioPanelSide) {
-            var current = panelState(for: panel)
-            current.side = side
-            current.isCollapsed = false
-            setPanelState(current, for: panel)
-        }
-
-        mutating func movePanelIntoStack(_ panel: StudioPanelKind) {
-            let companion = panel == .brush ? StudioPanelKind.layers : .brush
-            movePanel(panel, to: panelState(for: companion).side)
-        }
-
-        mutating func unstackPanel(_ panel: StudioPanelKind) {
-            let defaultSide: StudioPanelSide = panel == .brush ? .leading : .trailing
-            movePanel(panel, to: defaultSide)
-        }
-
-        mutating func swapStackOrder() {
-            guard stackedPanelOrder.count == 2 else { return }
-            stackedPanelOrder.swapAt(0, 1)
-        }
-
-        func panels(on side: StudioPanelSide) -> [StudioPanelKind] {
-            stackedPanelOrder.filter { panelState(for: $0).side == side }
-        }
     }
 
     enum Action: Equatable {
@@ -245,9 +212,6 @@ struct AppFeature {
         case selectPreviousLayer
         case selectNextLayer
         case panelCollapseToggled(StudioPanelKind)
-        case panelMoved(StudioPanelKind, StudioPanelSide)
-        case panelStackToggled(StudioPanelKind)
-        case panelStackOrderSwapRequested
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
@@ -337,9 +301,8 @@ struct AppFeature {
                 state.canvas.canvasSize = CGSize(width: width, height: height)
                 state.layerSidebar = LayerSidebarFeature.State()
                 state.brushPalette = BrushPaletteFeature.State()
-                state.brushPanel = StudioPanelLayoutState(side: .leading)
-                state.layerPanel = StudioPanelLayoutState(side: .trailing)
-                state.stackedPanelOrder = [.brush, .layers]
+                state.brushPanel = StudioPanelLayoutState()
+                state.layerPanel = StudioPanelLayoutState()
                 state.exportSheet = nil
                 state.bannerMessage = nil
                 state.applyPresentation(paintDocumentClient.presentation())
@@ -459,23 +422,6 @@ struct AppFeature {
 
             case let .panelCollapseToggled(panel):
                 state.toggleCollapse(for: panel)
-                return .none
-
-            case let .panelMoved(panel, side):
-                state.movePanel(panel, to: side)
-                return .none
-
-            case let .panelStackToggled(panel):
-                let companion = panel == .brush ? StudioPanelKind.layers : .brush
-                if state.panelState(for: panel).side == state.panelState(for: companion).side {
-                    state.unstackPanel(panel)
-                } else {
-                    state.movePanelIntoStack(panel)
-                }
-                return .none
-
-            case .panelStackOrderSwapRequested:
-                state.swapStackOrder()
                 return .none
 
             case .brushPalette(.delegate(.clearSelection)):

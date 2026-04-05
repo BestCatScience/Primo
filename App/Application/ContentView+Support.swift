@@ -147,40 +147,19 @@ let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .eyedropper, .select
 
 struct StudioPanelShell<Content: View>: View {
     let title: String
-    let language: AppLanguage
-    let side: StudioPanelSide
     let isCollapsed: Bool
-    let isStacked: Bool
     let onToggleCollapse: () -> Void
-    let onToggleStack: () -> Void
-    let onSwapStackOrder: () -> Void
-    let onDragEnded: (CGSize) -> Void
     let content: Content
-
-    @State private var dragOffset: CGSize = .zero
-    @GestureState private var isDragging = false
 
     init(
         title: String,
-        language: AppLanguage,
-        side: StudioPanelSide,
         isCollapsed: Bool,
-        isStacked: Bool,
         onToggleCollapse: @escaping () -> Void,
-        onToggleStack: @escaping () -> Void,
-        onSwapStackOrder: @escaping () -> Void,
-        onDragEnded: @escaping (CGSize) -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
-        self.language = language
-        self.side = side
         self.isCollapsed = isCollapsed
-        self.isStacked = isStacked
         self.onToggleCollapse = onToggleCollapse
-        self.onToggleStack = onToggleStack
-        self.onSwapStackOrder = onSwapStackOrder
-        self.onDragEnded = onDragEnded
         self.content = content()
     }
 
@@ -196,14 +175,6 @@ struct StudioPanelShell<Content: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(panelBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            if isDragging {
-                dragBadge
-                    .padding(.top, 12)
-                    .padding(.trailing, 12)
-                    .transition(.scale.combined(with: .opacity))
-            }
-        }
         .overlay(alignment: .top) {
             Capsule(style: .continuous)
                 .fill(StudioTheme.Gradients.accentBar)
@@ -214,13 +185,7 @@ struct StudioPanelShell<Content: View>: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(StudioTheme.Palette.hairline, lineWidth: 1)
         )
-        .offset(dragOffset)
-        .scaleEffect(isDragging ? 1.015 : 1.0)
-        .rotationEffect(.degrees(Double(dragOffset.width / 42)))
         .shadow(color: Color.black.opacity(0.22), radius: 18, y: 10)
-        .shadow(color: StudioTheme.Palette.accent.opacity(isDragging ? 0.18 : 0.0), radius: 20, y: 10)
-        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: dragOffset)
-        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: isDragging)
     }
 
     private var header: some View {
@@ -235,28 +200,10 @@ struct StudioPanelShell<Content: View>: View {
                         .font(StudioTheme.Typography.title(19))
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
-
-                    Text(
-                        isStacked
-                        ? language.localized("Drag sideways to move, up/down to reorder")
-                        : language.localized("Drag sideways to move")
-                    )
-                    .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(StudioTheme.Palette.textMuted)
-                    .lineLimit(1)
                 }
             }
 
-            if !isCollapsed {
-                Spacer(minLength: 6)
-
-                HStack(spacing: 6) {
-                    panelButton(systemName: isStacked ? "square.split.2x1" : "square.split.1x2", isActive: isStacked, action: onToggleStack)
-                    if isStacked {
-                        panelButton(systemName: "arrow.up.arrow.down", isActive: false, action: onSwapStackOrder)
-                    }
-                }
-            }
+            Spacer(minLength: 6)
 
             panelButton(systemName: isCollapsed ? "chevron.right" : "chevron.left", isActive: false, action: onToggleCollapse)
         }
@@ -273,38 +220,10 @@ struct StudioPanelShell<Content: View>: View {
             )
         )
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .gesture(panelDragGesture)
     }
 
     private var panelBackground: LinearGradient {
         StudioTheme.Gradients.panel
-    }
-
-    private var dragBadge: some View {
-        Text(
-            side == .leading
-            ? language.localized("Drop to right rail")
-            : language.localized("Drop to left rail")
-        )
-        .font(StudioTheme.Typography.mono(10))
-        .foregroundStyle(.white.opacity(0.82))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-    }
-
-    private var panelDragGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .updating($isDragging) { _, state, _ in
-                state = true
-            }
-            .onChanged { value in
-                dragOffset = value.translation
-            }
-            .onEnded { value in
-                dragOffset = .zero
-                onDragEnded(value.translation)
-            }
     }
 
     private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
