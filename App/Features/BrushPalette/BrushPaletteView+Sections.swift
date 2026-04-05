@@ -6,7 +6,7 @@ extension BrushPaletteView {
         currentTool == .brush || currentTool == .erase
     }
 
-    func settingsPanelContent(showHeaderTitle: Bool) -> some View {
+    func settingsPanelContent(proxy: GeometryProxy, showHeaderTitle: Bool) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
                 if showHeaderTitle {
@@ -16,7 +16,7 @@ extension BrushPaletteView {
                 }
 
                 headerCard(showsChrome: true)
-                controlsCard(showsChrome: true)
+                controlsCard(proxy: proxy, showsChrome: true)
                 detailCard(showsChrome: true)
             }
             .padding(.bottom, 10)
@@ -197,7 +197,7 @@ extension BrushPaletteView {
         }
     }
 
-    func controlsCard(showsChrome: Bool) -> some View {
+    func controlsCard(proxy: GeometryProxy, showsChrome: Bool) -> some View {
         cardContainer(showsChrome: showsChrome) {
             VStack(alignment: .leading, spacing: 10) {
                 if currentTool == .fill {
@@ -394,7 +394,7 @@ extension BrushPaletteView {
                                 }
                             }
                         }
-                        sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100), isFullHeight: true)
+                        sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100), isFullHeight: true, proxy: proxy)
                         dynamicControlMenuRow(
                             title: language.localized("サイズコントロール"),
                             selection: sizeControlBinding,
@@ -460,7 +460,7 @@ extension BrushPaletteView {
 
                     case .stroke:
                         sectionLabel("Transfer")
-                        sliderRow(title: language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0), isFullHeight: true)
+                        sliderRow(title: language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0), isFullHeight: true, proxy: proxy)
                         dynamicControlMenuRow(
                             title: language.localized("不透明度コントロール"),
                             selection: opacityControlBinding,
@@ -735,7 +735,7 @@ extension BrushPaletteView {
         }
     }
 
-    func sliderRow<SliderView: View>(title: String, value: String, slider: SliderView, isFullHeight: Bool = false) -> some View {
+    func sliderRow<SliderView: View>(title: String, value: String, slider: SliderView, isFullHeight: Bool = false, proxy: GeometryProxy? = nil) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
@@ -750,10 +750,10 @@ extension BrushPaletteView {
                 GeometryReader { geometry in
                     slider
                         .tint(StudioTheme.Palette.accentBright)
-                        .frame(height: geometry.size.height)
+                        .frame(height: proxy?.size.height ?? geometry.size.height)
                         .contentShape(Rectangle())
                 }
-                .frame(height: 200) // Minimum height to ensure visibility
+                .frame(height: proxy?.size.height ?? 200) // Use proxy height if available, else minimum height
             } else {
                 slider
                     .tint(StudioTheme.Palette.accentBright)
@@ -1023,7 +1023,7 @@ extension BrushPaletteView {
         .padding(.vertical, 4)
     }
 
-    var floatingBrushSettingsPanel: some View {
+    func floatingBrushSettingsPanel(proxy: GeometryProxy) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
@@ -1059,7 +1059,7 @@ extension BrushPaletteView {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     headerCard(showsChrome: false)
-                    controlsCard(showsChrome: false)
+                    controlsCard(proxy: proxy, showsChrome: false)
                     detailCard(showsChrome: false)
                 }
                 .padding(.bottom, 6)

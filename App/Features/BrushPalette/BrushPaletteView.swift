@@ -26,7 +26,7 @@ struct BrushPaletteView: View {
                         .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
                         .overlay(alignment: .topLeading) {
                             if showsBrushSettingsPopover {
-                                floatingBrushSettingsPanel
+                                floatingBrushSettingsPanel(proxy: proxy)
                                     .frame(width: min(proxy.size.width * 0.48, 420))
                                     .offset(x: 210, y: 0)
                                     .transition(.move(edge: .leading).combined(with: .opacity))
@@ -35,7 +35,7 @@ struct BrushPaletteView: View {
                         }
                         .zIndex(1)
                 } else {
-                    settingsPanelContent(showHeaderTitle: showsTitle)
+                    settingsPanelContent(proxy: proxy, showHeaderTitle: showsTitle)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
