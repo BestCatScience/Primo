@@ -394,7 +394,7 @@ extension BrushPaletteView {
                                 }
                             }
                         }
-                        sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
+                        sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100), isFullHeight: true)
                         dynamicControlMenuRow(
                             title: language.localized("サイズコントロール"),
                             selection: sizeControlBinding,
@@ -460,7 +460,7 @@ extension BrushPaletteView {
 
                     case .stroke:
                         sectionLabel("Transfer")
-                        sliderRow(title: language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
+                        sliderRow(title: language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0), isFullHeight: true)
                         dynamicControlMenuRow(
                             title: language.localized("不透明度コントロール"),
                             selection: opacityControlBinding,
@@ -735,7 +735,7 @@ extension BrushPaletteView {
         }
     }
 
-    func sliderRow<SliderView: View>(title: String, value: String, slider: SliderView) -> some View {
+    func sliderRow<SliderView: View>(title: String, value: String, slider: SliderView, isFullHeight: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
@@ -746,10 +746,20 @@ extension BrushPaletteView {
                     .font(StudioTheme.Typography.mono(10))
                     .foregroundStyle(.white.opacity(0.5))
             }
-            slider
-                .tint(StudioTheme.Palette.accentBright)
-                .frame(minHeight: 38)
-                .contentShape(Rectangle())
+            if isFullHeight {
+                GeometryReader { geometry in
+                    slider
+                        .tint(StudioTheme.Palette.accentBright)
+                        .frame(height: geometry.size.height)
+                        .contentShape(Rectangle())
+                }
+                .frame(height: 200) // Minimum height to ensure visibility
+            } else {
+                slider
+                    .tint(StudioTheme.Palette.accentBright)
+                    .frame(minHeight: 38)
+                    .contentShape(Rectangle())
+            }
         }
     }
 
