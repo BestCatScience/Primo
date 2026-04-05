@@ -23,7 +23,7 @@ struct BrushPaletteView: View {
             HStack(alignment: .top, spacing: 14) {
                 if showsBrushLibrarySidebar {
                     brushLibrarySidebar
-                        .frame(width: 196, alignment: .topLeading)
+                        .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
                         .overlay(alignment: .topLeading) {
                             if showsBrushSettingsPopover {
                                 floatingBrushSettingsPanel

@@ -21,6 +21,7 @@ extension BrushPaletteView {
             }
             .padding(.bottom, 10)
         }
+        .frame(maxWidth: .infinity)
     }
 
     func headerCard(showsChrome: Bool) -> some View {
