@@ -236,26 +236,28 @@ struct BrushPaletteView: View {
     private let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            if showsBrushLibrarySidebar {
-                brushLibrarySidebar
-                    .frame(width: 196, alignment: .topLeading)
-                    .overlay(alignment: .topLeading) {
-                        if showsBrushSettingsPopover {
-                            floatingBrushSettingsPanel
-                                .frame(width: min(UIScreen.main.bounds.width * 0.48, 420))
-                                .offset(x: 210, y: 0)
-                                .transition(.move(edge: .leading).combined(with: .opacity))
-                                .zIndex(10)
+        GeometryReader { proxy in
+            HStack(alignment: .top, spacing: 14) {
+                if showsBrushLibrarySidebar {
+                    brushLibrarySidebar
+                        .frame(width: 196, alignment: .topLeading)
+                        .overlay(alignment: .topLeading) {
+                            if showsBrushSettingsPopover {
+                                floatingBrushSettingsPanel
+                                    .frame(width: min(proxy.size.width * 0.48, 420))
+                                    .offset(x: 210, y: 0)
+                                    .transition(.move(edge: .leading).combined(with: .opacity))
+                                    .zIndex(10)
+                            }
                         }
-                    }
-                    .zIndex(1)
-            } else {
-                settingsPanelContent(showHeaderTitle: showsTitle)
+                        .zIndex(1)
+                } else {
+                    settingsPanelContent(showHeaderTitle: showsTitle)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.9), value: showsBrushSettingsPopover)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .fileImporter(
             isPresented: $isImportingBrush,
             allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],
@@ -1367,69 +1369,113 @@ struct BrushPaletteView: View {
     }
 
     private var brushLibrarySidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if showsTitle {
-                Text(language == .japanese ? "ブラシライブラリ" : "Brush Library")
-                    .font(StudioTheme.Typography.title(18))
-                    .foregroundStyle(.white.opacity(0.94))
-            }
-
-            HStack(spacing: 8) {
-                sidebarIconButton(
-                    title: language == .japanese ? "設定" : "Settings",
-                    systemImage: "slider.horizontal.3",
-                    isActive: showsBrushSettingsPopover
-                ) {
-                    showsBrushSettingsPopover.toggle()
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
+                if showsTitle {
+                    Text(language == .japanese ? "ブラシライブラリ" : "Brush Library")
+                        .font(StudioTheme.Typography.title(18))
+                        .foregroundStyle(.white.opacity(0.94))
                 }
 
-                sidebarIconButton(
-                    title: language == .japanese ? "保存" : "Save",
-                    systemImage: "square.and.arrow.down.on.square"
-                ) {
-                    store.send(.saveCurrentBrushButtonTapped)
+                HStack(spacing: 8) {
+                    sidebarIconButton(
+                        title: language == .japanese ? "設定" : "Settings",
+                        systemImage: "slider.horizontal.3",
+                        isActive: showsBrushSettingsPopover
+                    ) {
+                        showsBrushSettingsPopover.toggle()
+                    }
+
+                    sidebarIconButton(
+                        title: language == .japanese ? "保存" : "Save",
+                        systemImage: "square.and.arrow.down.on.square"
+                    ) {
+                        store.send(.saveCurrentBrushButtonTapped)
+                    }
+
+                    sidebarIconButton(
+                        title: language == .japanese ? "管理" : "Manage",
+                        systemImage: "trash",
+                        isActive: showsSavedBrushDeleteMode
+                    ) {
+                        showsSavedBrushDeleteMode.toggle()
+                    }
+
+                    sidebarIconButton(
+                        title: language == .japanese ? "読込" : "Import",
+                        systemImage: "square.and.arrow.down"
+                    ) {
+                        isImportingBrush = true
+                    }
                 }
 
-                sidebarIconButton(
-                    title: language == .japanese ? "管理" : "Manage",
-                    systemImage: "trash",
-                    isActive: showsSavedBrushDeleteMode
-                ) {
-                    showsSavedBrushDeleteMode.toggle()
-                }
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        brushLibrarySection(
+                            title: language == .japanese ? "保存済み" : "Saved",
+                            presets: store.savedPresets,
+                            emptyMessage: language == .japanese ? "保存したブラシがここに並びます。" : "Saved brushes appear here.",
+                            allowsDeletion: true
+                        )
 
-                sidebarIconButton(
-                    title: language == .japanese ? "読込" : "Import",
-                    systemImage: "square.and.arrow.down"
-                ) {
-                    isImportingBrush = true
-                }
-            }
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 14) {
-                    brushLibrarySection(
-                        title: language == .japanese ? "保存済み" : "Saved",
-                        presets: store.savedPresets,
-                        emptyMessage: language == .japanese ? "保存したブラシがここに並びます。" : "Saved brushes appear here.",
-                        allowsDeletion: true
-                    )
-
-                    brushLibrarySection(
-                        title: language == .japanese ? "プリセット" : "Presets",
-                        presets: store.presets,
-                        emptyMessage: language == .japanese ? "まだプリセットがありません。" : "No presets yet.",
-                        allowsDeletion: false
-                    )
+                        brushLibrarySection(
+                            title: language == .japanese ? "プリセット" : "Presets",
+                            presets: store.presets,
+                            emptyMessage: language == .japanese ? "まだプリセットがありません。" : "No presets yet.",
+                            allowsDeletion: false
+                        )
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 6)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.bottom, 6)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 10) {
+                verticalBrushSlider(
+                    title: language == .japanese ? "サイズ" : "Size",
+                    valueText: "\(Int(store.brushRadius.rounded()))",
+                    normalizedValue: Binding(
+                        get: { min(max((store.brushRadius - 1.0) / 99.0, 0.0), 1.0) },
+                        set: { store.brushRadius = 1.0 + ($0 * 99.0) }
+                    )
+                )
+
+                verticalBrushSlider(
+                    title: language == .japanese ? "不透明" : "Opacity",
+                    valueText: "\(Int((store.brushOpacity * 100).rounded()))%",
+                    normalizedValue: $store.brushOpacity
+                )
+            }
+            .frame(width: 34)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)
         .padding(.vertical, 4)
+    }
+
+    private func verticalBrushSlider(
+        title: String,
+        valueText: String,
+        normalizedValue: Binding<Double>
+    ) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(StudioTheme.Typography.mono(8))
+                .foregroundStyle(.white.opacity(0.46))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            VerticalValueSlider(value: normalizedValue)
+                .frame(width: 30, height: 132)
+
+            Text(valueText)
+                .font(StudioTheme.Typography.mono(8))
+                .foregroundStyle(.white.opacity(0.68))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
     }
 
     private var floatingBrushSettingsPanel: some View {
@@ -1800,6 +1846,46 @@ private struct SpectrumColorControl: View {
     private enum ActiveRegion {
         case ring
         case square
+    }
+}
+
+private struct VerticalValueSlider: View {
+    @Binding var value: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            let normalized = min(max(value, 0.0), 1.0)
+            let knobSize: CGFloat = 18
+            let trackWidth: CGFloat = 6
+            let travel = max(0, geometry.size.height - knobSize)
+            let knobY = travel * CGFloat(1.0 - normalized)
+
+            ZStack(alignment: .top) {
+                Capsule(style: .continuous)
+                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .frame(width: trackWidth)
+
+                Capsule(style: .continuous)
+                    .fill(StudioTheme.Palette.accentBright.opacity(0.95))
+                    .frame(width: trackWidth, height: max(trackWidth, geometry.size.height - knobY - (knobSize / 2)))
+                    .offset(y: knobY + (knobSize / 2))
+
+                Circle()
+                    .fill(Color.white.opacity(0.96))
+                    .frame(width: knobSize, height: knobSize)
+                    .shadow(color: .black.opacity(0.24), radius: 5, y: 2)
+                    .offset(y: knobY)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let clampedY = min(max(gesture.location.y - (knobSize / 2), 0), travel)
+                        value = Double(1.0 - (clampedY / max(travel, 1)))
+                    }
+            )
+        }
     }
 }
 

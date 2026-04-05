@@ -18,6 +18,26 @@
   <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeDescription</key>
+      <string>Atelierprime Brush Tip</string>
+      <key>UTTypeIdentifier</key>
+      <string>com.bestcatscience.atelierprime.brush-tip</string>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>aptip</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
   <key>UIStatusBarHidden</key>
   <true/>
   <key>UIViewControllerBasedStatusBarAppearance</key>

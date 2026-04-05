@@ -1168,7 +1168,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
 }
 
 struct TimelapseFrame: Equatable, Sendable {
-    let imageData: Data
+    let imageURL: URL
     let size: CGSize
 }
 

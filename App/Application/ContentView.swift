@@ -79,6 +79,15 @@ struct ContentView: View {
                     }
             }
         }
+        .overlay {
+            if let preview = store.timelapseExportPreview {
+                TimelapseExportHUD(
+                    previewImageData: preview.previewImageData,
+                    progress: preview.progress,
+                    language: language
+                )
+            }
+        }
     }
 
     private var canvasSizePresets: [(label: String, width: Int, height: Int)] {
@@ -708,6 +717,59 @@ struct ContentView: View {
         )
     }
 
+}
+
+private struct TimelapseExportHUD: View {
+    let previewImageData: Data?
+    let progress: Double
+    let language: AppLanguage
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let image = previewImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .frame(width: 220, height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(language == .japanese ? "タイムラプスを書き出し中…" : "Exporting timelapse...")
+                    .font(StudioTheme.Typography.title(16))
+                    .foregroundStyle(.white.opacity(0.94))
+
+                ProgressView(value: progress, total: 1.0)
+                    .tint(StudioTheme.Palette.accentBright)
+
+                Text("\(Int((progress * 100).rounded()))%")
+                    .font(StudioTheme.Typography.mono(11))
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+            .frame(width: 220, alignment: .leading)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.3), radius: 24, y: 16)
+        .allowsHitTesting(false)
+    }
+
+    private var previewImage: UIImage? {
+        guard let previewImageData else { return nil }
+        return UIImage(data: previewImageData)
+    }
 }
 
 struct MinimumHitTargetModifier: ViewModifier {

@@ -12,6 +12,11 @@ struct ShareExport: Equatable, Identifiable {
     let url: URL
 }
 
+struct TimelapseExportPreview: Equatable {
+    var progress: Double
+    var previewImageData: Data?
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -42,6 +47,7 @@ struct AppFeature {
     private enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
+        case timelapseExport
     }
 
     @ObservableState
@@ -55,6 +61,7 @@ struct AppFeature {
         var stackedPanelOrder: [StudioPanelKind] = [.brush, .layers]
         var exportSheet: ShareExport?
         var bannerMessage: String?
+        var timelapseExportPreview: TimelapseExportPreview?
         var appLanguage: AppLanguage = .load()
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
@@ -224,6 +231,9 @@ struct AppFeature {
         case saveDocumentRequested
         case exportDocumentRequested
         case exportTimelapseRequested
+        case timelapseExportProgressUpdated(Double, Data?)
+        case timelapseExportSucceeded(URL)
+        case timelapseExportFailed(String)
         case exportSheetDismissed
         case bannerDismissed
         case languageChanged(AppLanguage)
@@ -388,15 +398,38 @@ struct AppFeature {
                     state.bannerMessage = state.appLanguage == .japanese ? "タイムラプス用の描画履歴がまだ足りません" : "Not enough drawing history for timelapse yet"
                     return .none
                 }
-                do {
-                    let url = try TimelapseExporter.exportVideo(
-                        from: capture,
-                        to: Self.timelapseTemporaryDirectory()
-                    )
-                    state.exportSheet = ShareExport(url: url)
-                } catch {
-                    state.bannerMessage = state.appLanguage == .japanese ? "タイムラプスの書き出しに失敗しました" : "Timelapse export failed"
+                state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.frames.last.flatMap { try? Data(contentsOf: $0.imageURL) })
+                let failureMessage = state.appLanguage == .japanese ? "タイムラプスの書き出しに失敗しました" : "Timelapse export failed"
+                return .run { send in
+                    do {
+                        let url = try TimelapseExporter.exportVideo(
+                            from: capture,
+                            to: Self.timelapseTemporaryDirectory()
+                        ) { progress, previewURL in
+                            let previewData = try? Data(contentsOf: previewURL)
+                            Task {
+                                await send(.timelapseExportProgressUpdated(progress, previewData))
+                            }
+                        }
+                        await send(.timelapseExportSucceeded(url))
+                    } catch {
+                        await send(.timelapseExportFailed(failureMessage))
+                    }
                 }
+                .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
+
+            case let .timelapseExportProgressUpdated(progress, previewData):
+                state.timelapseExportPreview = TimelapseExportPreview(progress: progress, previewImageData: previewData ?? state.timelapseExportPreview?.previewImageData)
+                return .none
+
+            case let .timelapseExportSucceeded(url):
+                state.timelapseExportPreview = nil
+                state.exportSheet = ShareExport(url: url)
+                return .none
+
+            case let .timelapseExportFailed(message):
+                state.timelapseExportPreview = nil
+                state.bannerMessage = message
                 return .none
 
             case .exportSheetDismissed:
@@ -1167,7 +1200,11 @@ private extension AppFeature {
 }
 
 private enum TimelapseExporter {
-    static func exportVideo(from capture: TimelapseCapture, to directory: URL) throws -> URL {
+    static func exportVideo(
+        from capture: TimelapseCapture,
+        to directory: URL,
+        progress: ((Double, URL) -> Void)? = nil
+    ) throws -> URL {
         guard capture.frames.count >= 2 else {
             throw TimelapseExportError.insufficientFrames
         }
@@ -1219,12 +1256,14 @@ private enum TimelapseExporter {
         }
 
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
+        let holdFrameCount = max(capture.framesPerSecond * 2, 1)
+        let totalFrameCount = capture.frames.count + holdFrameCount
         for (index, frame) in capture.frames.enumerated() {
             while !input.isReadyForMoreMediaData {
                 Thread.sleep(forTimeInterval: 0.002)
             }
 
-            guard let image = decodedImage(from: frame.imageData) else {
+            guard let image = decodedImage(from: frame.imageURL) else {
                 throw TimelapseExportError.invalidFrameData
             }
 
@@ -1242,6 +1281,36 @@ private enum TimelapseExporter {
             guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
                 throw writer.error ?? TimelapseExportError.exportFailed
             }
+            progress?(Double(index + 1) / Double(totalFrameCount), frame.imageURL)
+        }
+
+        guard let finalFrame = capture.frames.last,
+              let finalImage = decodedImage(from: finalFrame.imageURL) else {
+            throw TimelapseExportError.invalidFrameData
+        }
+        for holdIndex in 1...holdFrameCount {
+            while !input.isReadyForMoreMediaData {
+                Thread.sleep(forTimeInterval: 0.002)
+            }
+
+            var maybeBuffer: CVPixelBuffer?
+            let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &maybeBuffer)
+            guard creationStatus == kCVReturnSuccess, let buffer = maybeBuffer else {
+                throw TimelapseExportError.exportFailed
+            }
+
+            guard render(image: finalImage, into: buffer, targetSize: targetSize) else {
+                throw TimelapseExportError.exportFailed
+            }
+
+            let presentationTime = CMTimeMultiply(
+                frameDuration,
+                multiplier: Int32(capture.frames.count - 1 + holdIndex)
+            )
+            guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
+                throw writer.error ?? TimelapseExportError.exportFailed
+            }
+            progress?(Double(capture.frames.count + holdIndex) / Double(totalFrameCount), finalFrame.imageURL)
         }
 
         input.markAsFinished()
@@ -1263,8 +1332,8 @@ private enum TimelapseExporter {
         return outputURL
     }
 
-    private static func decodedImage(from data: Data) -> CGImage? {
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
+    private static func decodedImage(from url: URL) -> CGImage? {
+        guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else {
             return nil
         }
         return CGImageSourceCreateImageAtIndex(imageSource, 0, nil)

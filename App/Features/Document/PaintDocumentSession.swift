@@ -13,13 +13,21 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var timelapseFrames: [TimelapseFrame] = []
     private var layerThumbnailCache: [Int: Data] = [:]
     private var paperStyle: CanvasPaperStyle = .default
+    private let timelapseDirectoryURL: URL
+    private var nextTimelapseFrameID: Int = 0
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
         let start = clock.now
         self.bridge = APPaintDocumentBridge(width: width, height: height)
+        self.timelapseDirectoryURL = Self.makeTimelapseDirectoryURL()
+        try? FileManager.default.createDirectory(at: timelapseDirectoryURL, withIntermediateDirectories: true)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
+    }
+
+    deinit {
+        try? FileManager.default.removeItem(at: timelapseDirectoryURL)
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {
@@ -357,12 +365,27 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     private func appendTimelapseFrame(image: UIImage) {
         guard let jpegData = image.jpegData(compressionQuality: 0.72) else { return }
+        let frameURL = timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", nextTimelapseFrameID))
+        nextTimelapseFrameID += 1
+        do {
+            try jpegData.write(to: frameURL, options: .atomic)
+        } catch {
+            Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
+            return
+        }
 
-        let frame = TimelapseFrame(imageData: jpegData, size: image.size)
+        let frame = TimelapseFrame(imageURL: frameURL, size: image.size)
         timelapseFrames.append(frame)
         if timelapseFrames.count > Self.maxTimelapseFrames {
-            timelapseFrames.remove(at: 1)
+            let removed = timelapseFrames.remove(at: 1)
+            try? FileManager.default.removeItem(at: removed.imageURL)
         }
+    }
+
+    private static func makeTimelapseDirectoryURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("atelierprime-timelapse", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
     }
 
     private func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
