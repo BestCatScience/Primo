@@ -30,6 +30,15 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
     func persist() {
         UserDefaults.standard.set(rawValue, forKey: Self.storageKey)
     }
+
+    func localized(japanese: String, english: String) -> String {
+        switch self {
+        case .english:
+            return english
+        case .japanese:
+            return japanese
+        }
+    }
 }
 
 enum StudioStrings {
@@ -319,6 +328,76 @@ enum StudioStrings {
         switch language {
         case .english: return "Opacity \(value)%"
         case .japanese: return "不透明度 \(value)%"
+        }
+    }
+
+    static func exportingTimelapse(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Exporting timelapse..."
+        case .japanese: return "タイムラプスを書き出し中…"
+        }
+    }
+
+    static func dynamicControlOff(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Off"
+        case .japanese: return "なし"
+        }
+    }
+
+    static func dynamicControlPressure(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Pressure"
+        case .japanese: return "筆圧"
+        }
+    }
+
+    static func dynamicControlTilt(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Tilt"
+        case .japanese: return "傾き"
+        }
+    }
+
+    static func dynamicControlSpeed(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Speed"
+        case .japanese: return "速度"
+        }
+    }
+
+    static func dynamicControlRandom(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Random"
+        case .japanese: return "ランダム"
+        }
+    }
+
+    static func brushSettingsCategoryTip(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Tip"
+        case .japanese: return "先端"
+        }
+    }
+
+    static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Scatter"
+        case .japanese: return "散布"
+        }
+    }
+
+    static func brushSettingsCategoryStroke(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Stroke"
+        case .japanese: return "描画"
+        }
+    }
+
+    static func brushSettingsCategoryTexture(_ language: AppLanguage) -> String {
+        switch language {
+        case .english: return "Texture"
+        case .japanese: return "質感"
         }
     }
 }

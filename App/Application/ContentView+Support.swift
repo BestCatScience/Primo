@@ -22,7 +22,7 @@ struct TimelapseExportHUD: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(language == .japanese ? "タイムラプスを書き出し中…" : "Exporting timelapse...")
+                Text(StudioStrings.exportingTimelapse(language))
                     .font(StudioTheme.Typography.title(16))
                     .foregroundStyle(.white.opacity(0.94))
 
@@ -237,9 +237,9 @@ struct StudioPanelShell<Content: View>: View {
                         .lineLimit(1)
 
                     Text(
-                        language == .japanese
-                        ? (isStacked ? "左右ドラッグで移動、上下ドラッグで並び替え" : "左右ドラッグで移動")
-                        : (isStacked ? "Drag sideways to move, up/down to reorder" : "Drag sideways to move")
+                        isStacked
+                        ? language.localized(japanese: "左右ドラッグで移動、上下ドラッグで並び替え", english: "Drag sideways to move, up/down to reorder")
+                        : language.localized(japanese: "左右ドラッグで移動", english: "Drag sideways to move")
                     )
                     .font(StudioTheme.Typography.mono(10))
                     .foregroundStyle(StudioTheme.Palette.textMuted)
@@ -282,9 +282,9 @@ struct StudioPanelShell<Content: View>: View {
 
     private var dragBadge: some View {
         Text(
-            language == .japanese
-            ? (side == .leading ? "右レールへ移動" : "左レールへ移動")
-            : (side == .leading ? "Drop to right rail" : "Drop to left rail")
+            side == .leading
+            ? language.localized(japanese: "右レールへ移動", english: "Drop to right rail")
+            : language.localized(japanese: "左レールへ移動", english: "Drop to left rail")
         )
         .font(StudioTheme.Typography.mono(10))
         .foregroundStyle(.white.opacity(0.82))

@@ -12,15 +12,15 @@ enum PhotoshopDynamicControl: String, CaseIterable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .off:
-            return language == .japanese ? "なし" : "Off"
+            return StudioStrings.dynamicControlOff(language)
         case .pressure:
-            return language == .japanese ? "筆圧" : "Pressure"
+            return StudioStrings.dynamicControlPressure(language)
         case .tilt:
-            return language == .japanese ? "傾き" : "Tilt"
+            return StudioStrings.dynamicControlTilt(language)
         case .speed:
-            return language == .japanese ? "速度" : "Speed"
+            return StudioStrings.dynamicControlSpeed(language)
         case .random:
-            return language == .japanese ? "ランダム" : "Random"
+            return StudioStrings.dynamicControlRandom(language)
         }
     }
 }
@@ -36,13 +36,13 @@ enum BrushSettingsCategory: String, CaseIterable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .tip:
-            return language == .japanese ? "先端" : "Tip"
+            return StudioStrings.brushSettingsCategoryTip(language)
         case .scatter:
-            return language == .japanese ? "散布" : "Scatter"
+            return StudioStrings.brushSettingsCategoryScatter(language)
         case .stroke:
-            return language == .japanese ? "描画" : "Stroke"
+            return StudioStrings.brushSettingsCategoryStroke(language)
         case .texture:
-            return language == .japanese ? "質感" : "Texture"
+            return StudioStrings.brushSettingsCategoryTexture(language)
         }
     }
 }

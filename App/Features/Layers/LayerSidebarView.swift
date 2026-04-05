@@ -48,7 +48,7 @@ struct LayerSidebarView: View {
                     if let activeLayer = store.layers.first(where: { $0.index == store.activeLayerIndex }) {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text(language == .japanese ? "レイヤー不透明度" : "Layer Opacity")
+                                Text(language.localized(japanese: "レイヤー不透明度", english: "Layer Opacity"))
                                     .font(StudioTheme.Typography.mono(10))
                                     .foregroundStyle(.white.opacity(0.56))
                                 Spacer(minLength: 0)
@@ -206,7 +206,7 @@ struct LayerSidebarView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
-                    Text(language == .japanese ? "用紙" : "Paper")
+                    Text(language.localized(japanese: "用紙", english: "Paper"))
                         .font(StudioTheme.Typography.title(15))
                         .foregroundStyle(.white.opacity(0.92))
 
@@ -214,12 +214,12 @@ struct LayerSidebarView: View {
                 }
 
                 HStack(spacing: 7) {
-                    Text(store.transparentPaper ? (language == .japanese ? "透明背景" : "Transparent") : (language == .japanese ? "背景色" : "Paper Color"))
+                    Text(store.transparentPaper ? (language.localized(japanese: "透明背景", english: "Transparent")) : (language.localized(japanese: "背景色", english: "Paper Color")))
                         .font(StudioTheme.Typography.mono(10))
                         .foregroundStyle(.white.opacity(0.48))
 
-                    capsuleTag(store.transparentPaper ? (language == .japanese ? "透明" : "Transparent") : (language == .japanese ? "表示" : "Visible"))
-                    capsuleTag(language == .japanese ? "最背面" : "Backmost")
+                    capsuleTag(store.transparentPaper ? (language.localized(japanese: "透明", english: "Transparent")) : (language.localized(japanese: "表示", english: "Visible")))
+                    capsuleTag(language.localized(japanese: "最背面", english: "Backmost"))
                 }
             }
 
@@ -359,19 +359,19 @@ private struct PaperLayerEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(language == .japanese ? "用紙" : "Paper")
+            Text(language.localized(japanese: "用紙", english: "Paper"))
                 .font(StudioTheme.Typography.title(18))
                 .foregroundStyle(.white.opacity(0.94))
 
             Toggle(isOn: $transparentPaper) {
-                Text(language == .japanese ? "透明な用紙" : "Transparent Paper")
+                Text(language.localized(japanese: "透明な用紙", english: "Transparent Paper"))
                     .font(StudioTheme.Typography.title(12))
                     .foregroundStyle(.white.opacity(0.88))
             }
             .tint(StudioTheme.Palette.accentBright)
 
             ColorPicker(
-                language == .japanese ? "用紙色" : "Paper Color",
+                language.localized(japanese: "用紙色", english: "Paper Color"),
                 selection: $paperColor,
                 supportsOpacity: false
             )
