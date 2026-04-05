@@ -31,373 +31,331 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
         UserDefaults.standard.set(rawValue, forKey: Self.storageKey)
     }
 
-    func localized(japanese: String, english: String) -> String {
+    func localized(_ english: String) -> String {
         switch self {
+        case .english:
+            return english
+        case .japanese:
+            return StudioStrings.japaneseCatalog[english] ?? english
+        }
+    }
+
+}
+
+enum StudioStrings {
+    static let japaneseCatalog: [String: String] = [
+        "Active Layer": "アクティブレイヤー",
+        "Add": "加算",
+        "Add Glow": "加算(発光)",
+        "Airbrush": "エアブラシ",
+        "Angle": "角度",
+        "Angle Amount": "角度量",
+        "Angle Control": "角度コントロール",
+        "Apply": "適用",
+        "Auto": "自動",
+        "Backmost": "最背面",
+        "Behavior": "動作",
+        "Blend": "合成",
+        "Brush": "ブラシ",
+        "Brush Engine": "ブラシ設定",
+        "Brush Library": "ブラシライブラリ",
+        "Brush Settings": "ブラシ設定",
+        "Brush Tip": "ブラシ先端",
+        "Brush Tip Shape": "先端形状",
+        "Cancel": "キャンセル",
+        "Canvas": "キャンバス",
+        "Clear Selection": "選択を解除",
+        "Close Path": "パスを閉じる",
+        "Color": "色",
+        "Color Burn": "焼き込みカラー",
+        "Color Dodge": "覆い焼きカラー",
+        "Color Match": "色一致",
+        "Color Threshold": "色しきい値",
+        "Combine": "合成",
+        "Could Not Import Brush": "ブラシを読み込めませんでした",
+        "Count": "散布数",
+        "Count Jitter": "数ジッター",
+        "Current Color": "現在色",
+        "Custom": "カスタム",
+        "Custom Brush": "カスタムブラシ",
+        "Custom Mix": "カスタム",
+        "Darken": "比較(暗)",
+        "Darker": "暗い方",
+        "Darker Color": "カラー比較(暗)",
+        "Difference": "差の絶対値",
+        "Direction": "線方向",
+        "Directional": "方向散布",
+        "Divide": "除算",
+        "Drag sideways to move": "左右ドラッグで移動",
+        "Drag sideways to move, up/down to reorder": "左右ドラッグで移動、上下ドラッグで並び替え",
+        "Drag to sample continuously": "ドラッグで連続取得",
+        "Drop to left rail": "左レールへ移動",
+        "Drop to right rail": "右レールへ移動",
+        "Dual Angle": "デュアル角度",
+        "Dual Brush": "デュアルブラシ",
+        "Dual Scale": "デュアルサイズ",
+        "Dual Scatter": "デュアル散布",
+        "Dual Spacing": "デュアル間隔",
+        "Dual Tip": "デュアル先端",
+        "Each Tip": "先端ごと",
+        "Enable Scatter": "散布を有効にする",
+        "Enable dual brush": "デュアルブラシを使う",
+        "Erase": "消しゴム",
+        "Exclusion": "除外",
+        "Expansion": "拡張",
+        "Export failed": "書き出しに失敗しました",
+        "Eyedropper": "スポイト設定",
+        "Fill": "塗りつぶし",
+        "Fill Color": "塗り色",
+        "Fill Engine": "塗りつぶし設定",
+        "Fixed": "固定",
+        "Flow": "フロー",
+        "Flow Amount": "フロー量",
+        "Flow Control": "フローコントロール",
+        "Freehand": "フリーハンド",
+        "Gesture": "入力",
+        "Glow Dodge": "覆い焼き(発光)",
+        "Grain Contrast": "粒コントラスト",
+        "Grain Scale": "粒状感",
+        "Hard Light": "ハードライト",
+        "Hard Mix": "ハードミックス",
+        "Hardness": "硬さ",
+        "Hue": "色相",
+        "Idle": "待機",
+        "Import": "読込",
+        "Ink": "インク",
+        "Input": "入力",
+        "Lasso": "投げ縄",
+        "Layer": "レイヤー",
+        "Layer Opacity": "レイヤー不透明度",
+        "Layers": "レイヤー",
+        "Lighten": "比較(明)",
+        "Lighter Color": "カラー比較(明)",
+        "Linear Burn": "焼き込み(リニア)",
+        "Linear Light": "リニアライト",
+        "Load Amount": "含み量",
+        "Load Control": "含みコントロール",
+        "Luminosity": "輝度",
+        "Manage": "管理",
+        "Match": "一致",
+        "Mix Strength": "混色量",
+        "Mixer Brush": "ミキサーブラシ",
+        "Mode": "モード",
+        "Move": "移動",
+        "Move the active layer with Pencil. Nothing is committed until you apply.": "Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。",
+        "Move the selected area with Pencil. Nothing is committed until you apply.": "Apple Pencil で選択範囲を移動します。適用するまで確定されません。",
+        "Moving": "移動",
+        "Multiply": "乗算",
+        "No presets yet.": "まだプリセットがありません。",
+        "No supported sampled brushes were found.": "対応している先端が見つかりませんでした。",
+        "Normal": "通常",
+        "Not enough drawing history for timelapse yet": "タイムラプス用の描画履歴がまだ足りません",
+        "Off": "オフ",
+        "Oil": "油彩",
+        "On": "オン",
+        "Opacity": "不透明",
+        "Opacity Amount": "不透明度量",
+        "Opacity Control": "不透明度コントロール",
+        "Opacity Match": "不透明度一致",
+        "Opacity Threshold": "不透明度しきい値",
+        "Overlay": "オーバーレイ",
+        "Paint Load": "色の含み",
+        "Paper": "紙質",
+        "Paper Color": "用紙色",
+        "Paper Scale": "紙目スケール",
+        "Paper Strength": "紙質の強さ",
+        "Paper Texture": "紙質テクスチャ",
+        "Paper Threshold": "紙目しきい値",
+        "Particle Opacity": "粒濃度ばらつき",
+        "Particle Size": "粒サイズばらつき",
+        "Pencil": "鉛筆",
+        "Pending": "未確定",
+        "Pin Light": "ピンライト",
+        "Presets": "プリセット",
+        "Radius": "半径",
+        "Redo is unavailable while drawing": "描画中はやり直しできません",
+        "Replace": "置換",
+        "Rotation Mode": "回転モード",
+        "Roundness": "形状の細さ",
+        "Roundness Amount": "形状量",
+        "Roundness Control": "形状コントロール",
+        "Sampled Color": "取得色",
+        "Sampling Source": "取得元",
+        "Saturation": "彩度",
+        "Save": "保存",
+        "Save failed": "保存に失敗しました",
+        "Saved": "保存済み",
+        "Saved brushes appear here.": "保存したブラシがここに並びます。",
+        "Scale": "拡大率",
+        "Scatter": "散布",
+        "Scatter Mode": "散布方式",
+        "Scatter X": "横散布",
+        "Scatter Y": "前後散布",
+        "Scope": "対象",
+        "Screen": "スクリーン",
+        "Select": "選択",
+        "Selection": "選択設定",
+        "Selection Action": "選択アクション",
+        "Selection Mode": "選択モード",
+        "Selection Threshold Mode": "選択しきい値モード",
+        "Settings": "設定",
+        "Shape": "形状",
+        "Size": "サイズ",
+        "Size Amount": "サイズ量",
+        "Size Control": "サイズコントロール",
+        "Soft Light": "ソフトライト",
+        "Source": "取得元",
+        "Spacing": "スタンプ間隔",
+        "Spacing Jitter": "間隔ジッター",
+        "Speed Density": "速度で濃さを変える",
+        "Spray": "スプレー",
+        "Stabilization": "手ぶれ補正",
+        "State": "状態",
+        "Stroke": "ストローク固定",
+        "Subtract": "削る",
+        "Tap or drag with Apple Pencil to sample a color into the current paint color.": "Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。",
+        "Tap to sample, then use Move to transform": "タップで選択したあと、移動ツールで変形します",
+        "Target": "対象",
+        "Texture": "テクスチャ",
+        "Texture Apply": "テクスチャ適用",
+        "Threshold": "しきい値",
+        "Threshold Mode": "しきい値モード",
+        "Tilt": "傾き",
+        "Timelapse export failed": "タイムラプスの書き出しに失敗しました",
+        "Tip": "先端",
+        "Tip Texture": "先端テクスチャ",
+        "Trace with Pencil, then use Move to transform": "Apple Pencil で囲んだあと、移動ツールで変形します",
+        "Transform": "変形",
+        "Transparent": "透明",
+        "Transparent Paper": "透明な用紙",
+        "Undo is unavailable while drawing": "描画中は取り消しできません",
+        "Visible": "表示",
+        "Vivid Light": "ビビッドライト",
+        "Wet": "ウェット",
+        "Wet Amount": "ウェット量",
+        "Wet Control": "ウェットコントロール",
+        "File": "ファイル",
+        "Edit": "編集",
+        "Pages": "ページ管理",
+        "Language": "言語",
+        "New Canvas": "新規キャンバス",
+        "Custom Size...": "カスタムサイズ...",
+        "Open": "開く",
+        "Export": "書き出し",
+        "Export Timelapse": "タイムラプスを書き出し",
+        "Refresh View": "表示を更新",
+        "New Layer": "新規レイヤー",
+        "Clear Active Layer": "アクティブレイヤーをクリア",
+        "Show Brush Panel": "ブラシパネルを表示",
+        "Hide Brush Panel": "ブラシパネルを隠す",
+        "Show Layer Panel": "レイヤーパネルを表示",
+        "Hide Layer Panel": "レイヤーパネルを隠す",
+        "Stack Panels": "パネルを重ねる",
+        "Unstack Panels": "パネルの重なりを解除",
+        "Swap Stack Order": "スタック順を入れ替え",
+        "Show Active Layer": "アクティブレイヤーを表示",
+        "Hide Active Layer": "アクティブレイヤーを非表示",
+        "Select Layer Above": "ひとつ上のレイヤーを選択",
+        "Select Layer Below": "ひとつ下のレイヤーを選択",
+        "Add Page": "ページを追加",
+        "Duplicate Page": "ページを複製",
+        "Delete Page": "ページを削除",
+        "Width": "幅",
+        "Height": "高さ",
+        "Create": "作成",
+        "Hidden": "非表示",
+        "Active": "選択中",
+        "Standby": "待機",
+        "Exporting timelapse...": "タイムラプスを書き出し中…",
+        "Pressure": "筆圧",
+        "Speed": "速度",
+        "Random": "ランダム",
+    ]
+
+    static func appName(_ language: AppLanguage) -> String { "atelierprime" }
+
+    private static func localized(_ language: AppLanguage, english: String, japanese: String) -> String {
+        switch language {
         case .english:
             return english
         case .japanese:
             return japanese
         }
     }
-}
 
-enum StudioStrings {
-    static func appName(_ language: AppLanguage) -> String { "atelierprime" }
-
-    static func settingsMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Settings"
-        case .japanese: return "設定"
-        }
+    static func savedDocument(_ filename: String, _ language: AppLanguage) -> String {
+        localized(language, english: "Saved: \(filename)", japanese: "保存しました: \(filename)")
     }
 
-    static func fileMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "File"
-        case .japanese: return "ファイル"
-        }
-    }
+    static func settingsMenu(_ language: AppLanguage) -> String { language.localized("Settings") }
+    static func fileMenu(_ language: AppLanguage) -> String { language.localized("File") }
+    static func editMenu(_ language: AppLanguage) -> String { language.localized("Edit") }
+    static func pageMenu(_ language: AppLanguage) -> String { language.localized("Pages") }
+    static func layerMenu(_ language: AppLanguage) -> String { language.localized("Layer") }
+    static func languageMenu(_ language: AppLanguage) -> String { language.localized("Language") }
+    static func newCanvas(_ language: AppLanguage) -> String { language.localized("New Canvas") }
+    static func customSize(_ language: AppLanguage) -> String { language.localized("Custom Size...") }
+    static func open(_ language: AppLanguage) -> String { language.localized("Open") }
+    static func save(_ language: AppLanguage) -> String { language.localized("Save") }
+    static func export(_ language: AppLanguage) -> String { language.localized("Export") }
+    static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("Export Timelapse") }
+    static func refreshView(_ language: AppLanguage) -> String { language.localized("Refresh View") }
 
-    static func editMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Edit"
-        case .japanese: return "編集"
-        }
-    }
-
-    static func pageMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Pages"
-        case .japanese: return "ページ管理"
-        }
-    }
-
-    static func layerMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Layer"
-        case .japanese: return "レイヤー"
-        }
-    }
-
-    static func languageMenu(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Language"
-        case .japanese: return "言語"
-        }
-    }
-
-    static func newCanvas(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "New Canvas"
-        case .japanese: return "新規キャンバス"
-        }
-    }
-
-    static func customSize(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Custom Size..."
-        case .japanese: return "カスタムサイズ..."
-        }
-    }
-
-    static func open(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Open"
-        case .japanese: return "開く"
-        }
-    }
-
-    static func save(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Save"
-        case .japanese: return "保存"
-        }
-    }
-
-    static func export(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Export"
-        case .japanese: return "書き出し"
-        }
-    }
-
-    static func exportTimelapse(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Export Timelapse"
-        case .japanese: return "タイムラプスを書き出し"
-        }
-    }
-
-    static func refreshView(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Refresh View"
-        case .japanese: return "表示を更新"
-        }
-    }
-
-    static func addLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "New Layer"
-        case .japanese: return "新規レイヤー"
-        }
-    }
-
-    static func clearActiveLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Clear Active Layer"
-        case .japanese: return "アクティブレイヤーをクリア"
-        }
-    }
-
-    static func showBrushPanel(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Show Brush Panel"
-        case .japanese: return "ブラシパネルを表示"
-        }
-    }
-
-    static func hideBrushPanel(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Hide Brush Panel"
-        case .japanese: return "ブラシパネルを隠す"
-        }
-    }
-
-    static func showLayerPanel(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Show Layer Panel"
-        case .japanese: return "レイヤーパネルを表示"
-        }
-    }
-
-    static func hideLayerPanel(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Hide Layer Panel"
-        case .japanese: return "レイヤーパネルを隠す"
-        }
-    }
-
-    static func stackPanels(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Stack Panels"
-        case .japanese: return "パネルを重ねる"
-        }
-    }
-
-    static func unstackPanels(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Unstack Panels"
-        case .japanese: return "パネルの重なりを解除"
-        }
-    }
-
-    static func swapStackOrder(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Swap Stack Order"
-        case .japanese: return "スタック順を入れ替え"
-        }
-    }
-
-    static func showActiveLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Show Active Layer"
-        case .japanese: return "アクティブレイヤーを表示"
-        }
-    }
-
-    static func hideActiveLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Hide Active Layer"
-        case .japanese: return "アクティブレイヤーを非表示"
-        }
-    }
-
-    static func selectUpperLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Select Layer Above"
-        case .japanese: return "ひとつ上のレイヤーを選択"
-        }
-    }
-
-    static func selectLowerLayer(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Select Layer Below"
-        case .japanese: return "ひとつ下のレイヤーを選択"
-        }
-    }
-
-    static func pagesAdd(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Add Page"
-        case .japanese: return "ページを追加"
-        }
-    }
-
-    static func pagesDuplicate(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Duplicate Page"
-        case .japanese: return "ページを複製"
-        }
-    }
-
-    static func pagesDelete(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Delete Page"
-        case .japanese: return "ページを削除"
-        }
-    }
-
-    static func size(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Size"
-        case .japanese: return "サイズ"
-        }
-    }
-
-    static func width(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Width"
-        case .japanese: return "幅"
-        }
-    }
-
-    static func height(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Height"
-        case .japanese: return "高さ"
-        }
-    }
-
-    static func cancel(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Cancel"
-        case .japanese: return "キャンセル"
-        }
-    }
-
-    static func create(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Create"
-        case .japanese: return "作成"
-        }
-    }
+    static func addLayer(_ language: AppLanguage) -> String { language.localized("New Layer") }
+    static func clearActiveLayer(_ language: AppLanguage) -> String { language.localized("Clear Active Layer") }
+    static func showBrushPanel(_ language: AppLanguage) -> String { language.localized("Show Brush Panel") }
+    static func hideBrushPanel(_ language: AppLanguage) -> String { language.localized("Hide Brush Panel") }
+    static func showLayerPanel(_ language: AppLanguage) -> String { language.localized("Show Layer Panel") }
+    static func hideLayerPanel(_ language: AppLanguage) -> String { language.localized("Hide Layer Panel") }
+    static func stackPanels(_ language: AppLanguage) -> String { language.localized("Stack Panels") }
+    static func unstackPanels(_ language: AppLanguage) -> String { language.localized("Unstack Panels") }
+    static func swapStackOrder(_ language: AppLanguage) -> String { language.localized("Swap Stack Order") }
+    static func showActiveLayer(_ language: AppLanguage) -> String { language.localized("Show Active Layer") }
+    static func hideActiveLayer(_ language: AppLanguage) -> String { language.localized("Hide Active Layer") }
+    static func selectUpperLayer(_ language: AppLanguage) -> String { language.localized("Select Layer Above") }
+    static func selectLowerLayer(_ language: AppLanguage) -> String { language.localized("Select Layer Below") }
+    static func pagesAdd(_ language: AppLanguage) -> String { language.localized("Add Page") }
+    static func pagesDuplicate(_ language: AppLanguage) -> String { language.localized("Duplicate Page") }
+    static func pagesDelete(_ language: AppLanguage) -> String { language.localized("Delete Page") }
+    static func size(_ language: AppLanguage) -> String { language.localized("Size") }
+    static func width(_ language: AppLanguage) -> String { language.localized("Width") }
+    static func height(_ language: AppLanguage) -> String { language.localized("Height") }
+    static func cancel(_ language: AppLanguage) -> String { language.localized("Cancel") }
+    static func create(_ language: AppLanguage) -> String { language.localized("Create") }
 
     static func layers(_ count: Int, _ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "\(count) Layers"
-        case .japanese: return "\(count) レイヤー"
-        }
+        localized(language, english: "\(count) Layers", japanese: "\(count) レイヤー")
     }
 
-    static func layersTitle(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Layers"
-        case .japanese: return "レイヤー"
-        }
-    }
-
-    static func visible(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Visible"
-        case .japanese: return "表示"
-        }
-    }
-
-    static func hidden(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Hidden"
-        case .japanese: return "非表示"
-        }
-    }
-
-    static func active(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Active"
-        case .japanese: return "選択中"
-        }
-    }
-
-    static func standby(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Standby"
-        case .japanese: return "待機"
-        }
-    }
+    static func layersTitle(_ language: AppLanguage) -> String { language.localized("Layers") }
+    static func visible(_ language: AppLanguage) -> String { language.localized("Visible") }
+    static func hidden(_ language: AppLanguage) -> String { language.localized("Hidden") }
+    static func active(_ language: AppLanguage) -> String { language.localized("Active") }
+    static func standby(_ language: AppLanguage) -> String { language.localized("Standby") }
 
     static func opacityValue(_ value: Int, _ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Opacity \(value)%"
-        case .japanese: return "不透明度 \(value)%"
-        }
+        localized(language, english: "Opacity \(value)%", japanese: "不透明度 \(value)%")
     }
 
-    static func exportingTimelapse(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Exporting timelapse..."
-        case .japanese: return "タイムラプスを書き出し中…"
-        }
-    }
+    static func exportingTimelapse(_ language: AppLanguage) -> String { language.localized("Exporting timelapse...") }
 
     static func dynamicControlOff(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Off"
-        case .japanese: return "なし"
-        }
+        localized(language, english: "Off", japanese: "なし")
     }
 
-    static func dynamicControlPressure(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Pressure"
-        case .japanese: return "筆圧"
-        }
-    }
+    static func dynamicControlPressure(_ language: AppLanguage) -> String { language.localized("Pressure") }
+    static func dynamicControlTilt(_ language: AppLanguage) -> String { language.localized("Tilt") }
+    static func dynamicControlSpeed(_ language: AppLanguage) -> String { language.localized("Speed") }
+    static func dynamicControlRandom(_ language: AppLanguage) -> String { language.localized("Random") }
 
-    static func dynamicControlTilt(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Tilt"
-        case .japanese: return "傾き"
-        }
-    }
-
-    static func dynamicControlSpeed(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Speed"
-        case .japanese: return "速度"
-        }
-    }
-
-    static func dynamicControlRandom(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Random"
-        case .japanese: return "ランダム"
-        }
-    }
-
-    static func brushSettingsCategoryTip(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Tip"
-        case .japanese: return "先端"
-        }
-    }
-
-    static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Scatter"
-        case .japanese: return "散布"
-        }
-    }
+    static func brushSettingsCategoryTip(_ language: AppLanguage) -> String { language.localized("Tip") }
+    static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String { language.localized("Scatter") }
 
     static func brushSettingsCategoryStroke(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Stroke"
-        case .japanese: return "描画"
-        }
+        localized(language, english: "Stroke", japanese: "描画")
     }
 
     static func brushSettingsCategoryTexture(_ language: AppLanguage) -> String {
-        switch language {
-        case .english: return "Texture"
-        case .japanese: return "質感"
-        }
+        localized(language, english: "Texture", japanese: "質感")
     }
 }

@@ -238,8 +238,8 @@ struct StudioPanelShell<Content: View>: View {
 
                     Text(
                         isStacked
-                        ? language.localized(japanese: "左右ドラッグで移動、上下ドラッグで並び替え", english: "Drag sideways to move, up/down to reorder")
-                        : language.localized(japanese: "左右ドラッグで移動", english: "Drag sideways to move")
+                        ? language.localized("Drag sideways to move, up/down to reorder")
+                        : language.localized("Drag sideways to move")
                     )
                     .font(StudioTheme.Typography.mono(10))
                     .foregroundStyle(StudioTheme.Palette.textMuted)
@@ -283,8 +283,8 @@ struct StudioPanelShell<Content: View>: View {
     private var dragBadge: some View {
         Text(
             side == .leading
-            ? language.localized(japanese: "右レールへ移動", english: "Drop to right rail")
-            : language.localized(japanese: "左レールへ移動", english: "Drop to left rail")
+            ? language.localized("Drop to right rail")
+            : language.localized("Drop to left rail")
         )
         .font(StudioTheme.Typography.mono(10))
         .foregroundStyle(.white.opacity(0.82))

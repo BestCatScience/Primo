@@ -55,7 +55,7 @@ struct BrushPaletteView: View {
                         do {
                             let brushes = try BrushTipLibrary.importPhotoshopBrushes(from: url).map(\.preset)
                             if brushes.isEmpty {
-                                failures.append("\(url.lastPathComponent): \(language.localized(japanese: "対応している先端が見つかりませんでした。", english: "No supported sampled brushes were found."))")
+                                failures.append("\(url.lastPathComponent): \(language.localized("No supported sampled brushes were found."))")
                             } else {
                                 imported.append(contentsOf: brushes)
                             }
@@ -81,7 +81,7 @@ struct BrushPaletteView: View {
             }
         }
         .alert(
-            language.localized(japanese: "ブラシを読み込めませんでした", english: "Could Not Import Brush"),
+            language.localized("Could Not Import Brush"),
             isPresented: Binding(
                 get: { importErrorMessage != nil },
                 set: { newValue in

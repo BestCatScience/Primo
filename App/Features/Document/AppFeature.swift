@@ -25,9 +25,9 @@ enum StudioPanelKind: String, CaseIterable, Equatable {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .brush:
-            return language.localized(japanese: "ブラシ", english: "Brush")
+            return language.localized("Brush")
         case .layers:
-            return language.localized(japanese: "レイヤー", english: "Layers")
+            return language.localized("Layers")
         }
     }
 }
@@ -347,7 +347,7 @@ struct AppFeature {
 
             case .undoRequested:
                 guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "描画中は取り消しできません", english: "Undo is unavailable while drawing")
+                    state.bannerMessage = state.appLanguage.localized("Undo is unavailable while drawing")
                     return .none
                 }
                 guard paintDocumentClient.undo() else {
@@ -359,7 +359,7 @@ struct AppFeature {
 
             case .redoRequested:
                 guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "描画中はやり直しできません", english: "Redo is unavailable while drawing")
+                    state.bannerMessage = state.appLanguage.localized("Redo is unavailable while drawing")
                     return .none
                 }
                 guard paintDocumentClient.redo() else {
@@ -371,37 +371,37 @@ struct AppFeature {
 
             case .saveDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "保存に失敗しました", english: "Save failed")
+                    state.bannerMessage = state.appLanguage.localized("Save failed")
                     return .none
                 }
                 do {
                     let url = try Self.writePNGToDocuments(data: pngData)
-                    state.bannerMessage = state.appLanguage.localized(japanese: "保存しました: \(url.lastPathComponent)", english: "Saved: \(url.lastPathComponent)")
+                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
                 } catch {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "保存に失敗しました", english: "Save failed")
+                    state.bannerMessage = state.appLanguage.localized("Save failed")
                 }
                 return .none
 
             case .exportDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "書き出しに失敗しました", english: "Export failed")
+                    state.bannerMessage = state.appLanguage.localized("Export failed")
                     return .none
                 }
                 do {
                     let url = try Self.writePNGToTemporaryDirectory(data: pngData)
                     state.exportSheet = ShareExport(url: url)
                 } catch {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "書き出しに失敗しました", english: "Export failed")
+                    state.bannerMessage = state.appLanguage.localized("Export failed")
                 }
                 return .none
 
             case .exportTimelapseRequested:
                 guard let capture = paintDocumentClient.timelapseCapture() else {
-                    state.bannerMessage = state.appLanguage.localized(japanese: "タイムラプス用の描画履歴がまだ足りません", english: "Not enough drawing history for timelapse yet")
+                    state.bannerMessage = state.appLanguage.localized("Not enough drawing history for timelapse yet")
                     return .none
                 }
                 state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.frames.last.flatMap { try? Data(contentsOf: $0.imageURL) })
-                let failureMessage = state.appLanguage.localized(japanese: "タイムラプスの書き出しに失敗しました", english: "Timelapse export failed")
+                let failureMessage = state.appLanguage.localized("Timelapse export failed")
                 return .run { send in
                     do {
                         let url = try TimelapseExporter.exportVideo(

@@ -21,19 +21,19 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .brush:
-            return language.localized(japanese: "ブラシ", english: "Brush")
+            return language.localized("Brush")
         case .erase:
-            return language.localized(japanese: "消しゴム", english: "Erase")
+            return language.localized("Erase")
         case .fill:
-            return language.localized(japanese: "塗りつぶし", english: "Fill")
+            return language.localized("Fill")
         case .eyedropper:
-            return language.localized(japanese: "スポイト", english: "Eyedropper")
+            return language.localized("Eyedropper")
         case .select:
-            return language.localized(japanese: "選択", english: "Select")
+            return language.localized("Select")
         case .move:
-            return language.localized(japanese: "移動", english: "Move")
+            return language.localized("Move")
         case .shape:
-            return language.localized(japanese: "図形", english: "Shape")
+            return language.localized("Shape")
         }
     }
 
@@ -66,9 +66,9 @@ enum EyedropperSamplingSource: String, CaseIterable, Equatable, Sendable, Identi
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .activeLayer:
-            return language.localized(japanese: "アクティブレイヤー", english: "Active Layer")
+            return language.localized("Active Layer")
         case .canvas:
-            return language.localized(japanese: "キャンバス", english: "Canvas")
+            return language.localized("Canvas")
         }
     }
 }
@@ -86,9 +86,9 @@ enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .opacity:
-            return language.localized(japanese: "不透明度", english: "Opacity")
+            return language.localized("Opacity")
         case .color:
-            return language.localized(japanese: "色", english: "Color")
+            return language.localized("Color")
         }
     }
 }
@@ -106,9 +106,9 @@ enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .lasso:
-            return language.localized(japanese: "投げ縄", english: "Lasso")
+            return language.localized("Lasso")
         case .auto:
-            return language.localized(japanese: "自動", english: "Auto")
+            return language.localized("Auto")
         }
     }
 }
@@ -127,11 +127,11 @@ enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiab
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .replace:
-            return language.localized(japanese: "置換", english: "Replace")
+            return language.localized("Replace")
         case .add:
-            return language.localized(japanese: "加算", english: "Add")
+            return language.localized("Add")
         case .subtract:
-            return language.localized(japanese: "減算", english: "Subtract")
+            return language.localized("Subtract")
         }
     }
 }
@@ -175,61 +175,61 @@ enum LayerBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .normal:
-            return language.localized(japanese: "通常", english: "Normal")
+            return language.localized("Normal")
         case .darken:
-            return language.localized(japanese: "比較(暗)", english: "Darken")
+            return language.localized("Darken")
         case .multiply:
-            return language.localized(japanese: "乗算", english: "Multiply")
+            return language.localized("Multiply")
         case .colorBurn:
-            return language.localized(japanese: "焼き込みカラー", english: "Color Burn")
+            return language.localized("Color Burn")
         case .linearBurn:
-            return language.localized(japanese: "焼き込み(リニア)", english: "Linear Burn")
+            return language.localized("Linear Burn")
         case .subtract:
-            return language.localized(japanese: "減算", english: "Subtract")
+            return language.localized("Subtract")
         case .lighten:
-            return language.localized(japanese: "比較(明)", english: "Lighten")
+            return language.localized("Lighten")
         case .screen:
-            return language.localized(japanese: "スクリーン", english: "Screen")
+            return language.localized("Screen")
         case .colorDodge:
-            return language.localized(japanese: "覆い焼きカラー", english: "Color Dodge")
+            return language.localized("Color Dodge")
         case .glowDodge:
-            return language.localized(japanese: "覆い焼き(発光)", english: "Glow Dodge")
+            return language.localized("Glow Dodge")
         case .overlay:
-            return language.localized(japanese: "オーバーレイ", english: "Overlay")
+            return language.localized("Overlay")
         case .softLight:
-            return language.localized(japanese: "ソフトライト", english: "Soft Light")
+            return language.localized("Soft Light")
         case .hardLight:
-            return language.localized(japanese: "ハードライト", english: "Hard Light")
+            return language.localized("Hard Light")
         case .difference:
-            return language.localized(japanese: "差の絶対値", english: "Difference")
+            return language.localized("Difference")
         case .vividLight:
-            return language.localized(japanese: "ビビッドライト", english: "Vivid Light")
+            return language.localized("Vivid Light")
         case .linearLight:
-            return language.localized(japanese: "リニアライト", english: "Linear Light")
+            return language.localized("Linear Light")
         case .pinLight:
-            return language.localized(japanese: "ピンライト", english: "Pin Light")
+            return language.localized("Pin Light")
         case .hardMix:
-            return language.localized(japanese: "ハードミックス", english: "Hard Mix")
+            return language.localized("Hard Mix")
         case .exclusion:
-            return language.localized(japanese: "除外", english: "Exclusion")
+            return language.localized("Exclusion")
         case .darkerColor:
-            return language.localized(japanese: "カラー比較(暗)", english: "Darker Color")
+            return language.localized("Darker Color")
         case .lighterColor:
-            return language.localized(japanese: "カラー比較(明)", english: "Lighter Color")
+            return language.localized("Lighter Color")
         case .divide:
-            return language.localized(japanese: "除算", english: "Divide")
+            return language.localized("Divide")
         case .hue:
-            return language.localized(japanese: "色相", english: "Hue")
+            return language.localized("Hue")
         case .saturation:
-            return language.localized(japanese: "彩度", english: "Saturation")
+            return language.localized("Saturation")
         case .color:
-            return language.localized(japanese: "カラー", english: "Color")
+            return language.localized("Color")
         case .add:
-            return language.localized(japanese: "加算", english: "Add")
+            return language.localized("Add")
         case .addGlow:
-            return language.localized(japanese: "加算(発光)", english: "Add Glow")
+            return language.localized("Add Glow")
         case .luminosity:
-            return language.localized(japanese: "輝度", english: "Luminosity")
+            return language.localized("Luminosity")
         }
     }
 }
@@ -249,13 +249,13 @@ enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .pencil:
-            return language.localized(japanese: "鉛筆", english: "Pencil")
+            return language.localized("Pencil")
         case .ink:
-            return language.localized(japanese: "インク", english: "Ink")
+            return language.localized("Ink")
         case .oil:
-            return language.localized(japanese: "油彩", english: "Oil")
+            return language.localized("Oil")
         case .airbrush:
-            return language.localized(japanese: "エアブラシ", english: "Airbrush")
+            return language.localized("Airbrush")
         }
     }
 
@@ -283,11 +283,11 @@ enum BrushAngleMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .fixed:
-            return language.localized(japanese: "固定", english: "Fixed")
+            return language.localized("Fixed")
         case .strokeDirection:
-            return language.localized(japanese: "線方向", english: "Direction")
+            return language.localized("Direction")
         case .stylusTilt:
-            return language.localized(japanese: "傾き", english: "Tilt")
+            return language.localized("Tilt")
         }
     }
 }
@@ -303,13 +303,13 @@ enum BrushTextureMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .off:
-            return language.localized(japanese: "なし", english: "Off")
+            return language.localized("Off")
         case .strokeLocked:
-            return language.localized(japanese: "ストローク固定", english: "Stroke")
+            return language.localized("Stroke")
         case .eachTip:
-            return language.localized(japanese: "先端ごと", english: "Each Tip")
+            return language.localized("Each Tip")
         case .moving:
-            return language.localized(japanese: "移動", english: "Moving")
+            return language.localized("Moving")
         }
     }
 }
@@ -324,11 +324,11 @@ enum BrushDualBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .multiply:
-            return language.localized(japanese: "乗算", english: "Multiply")
+            return language.localized("Multiply")
         case .darker:
-            return language.localized(japanese: "暗い方", english: "Darker")
+            return language.localized("Darker")
         case .subtract:
-            return language.localized(japanese: "削る", english: "Subtract")
+            return language.localized("Subtract")
         }
     }
 }
@@ -342,9 +342,9 @@ enum BrushScatterMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .directional:
-            return language.localized(japanese: "方向散布", english: "Directional")
+            return language.localized("Directional")
         case .spray:
-            return language.localized(japanese: "スプレー", english: "Spray")
+            return language.localized("Spray")
         }
     }
 }
