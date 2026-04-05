@@ -2,7 +2,7 @@ import ComposableArchitecture
 import SwiftUI
 
 @main
-struct atelierprimeApp: App {
+struct AtelierPrimeApp: App {
     let store = Store(initialState: AppFeature.State()) {
         AppFeature()
     }

@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A00000000000000000000021 /* atelierprimeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* atelierprimeApp.swift */; };
+		A00000000000000000000021 /* AtelierPrimeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000001 /* AtelierPrimeApp.swift */; };
 		A00000000000000000000022 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000002 /* ContentView.swift */; };
 		A00000000000000000000023 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AppFeature.swift */; };
 		A00000000000000000000024 /* PaintModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* PaintModels.swift */; };
@@ -51,7 +51,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A00000000000000000000001 /* atelierprimeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = atelierprimeApp.swift; sourceTree = "<group>"; };
+		A00000000000000000000001 /* AtelierPrimeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtelierPrimeApp.swift; sourceTree = "<group>"; };
 		A00000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A00000000000000000000003 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A00000000000000000000004 /* PaintModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintModels.swift; sourceTree = "<group>"; };
@@ -190,7 +190,7 @@
 		A00000000000000000000057 /* Application */ = {
 			isa = PBXGroup;
 			children = (
-				A00000000000000000000001 /* atelierprimeApp.swift */,
+				A00000000000000000000001 /* AtelierPrimeApp.swift */,
 				A00000000000000000000002 /* ContentView.swift */,
 				A00000000000000000000097 /* ContentView+Support.swift */,
 				A00000000000000000000099 /* ContentView+Previews.swift */,
@@ -394,7 +394,7 @@
 				A00000000000000000000023 /* AppFeature.swift in Sources */,
 				A00000000000000000000024 /* PaintModels.swift in Sources */,
 				A000000000000000000000A6 /* TimelapseExporter.swift in Sources */,
-				A00000000000000000000021 /* atelierprimeApp.swift in Sources */,
+				A00000000000000000000021 /* AtelierPrimeApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
