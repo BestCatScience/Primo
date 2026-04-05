@@ -91,6 +91,31 @@ extension ContentView {
 
     func panelRail(for panel: StudioPanelKind) -> some View {
         let panelState = panelState(for: panel)
+        let dragThreshold: CGFloat = 80
+
+        let panelDragGesture = DragGesture(minimumDistance: 12)
+            .onEnded { value in
+                let translation = value.translation.width
+
+                switch panel {
+                case .brush:
+                    if panelState.isCollapsed {
+                        if translation > dragThreshold {
+                            store.send(.panelCollapseToggled(panel))
+                        }
+                    } else if translation < -dragThreshold {
+                        store.send(.panelCollapseToggled(panel))
+                    }
+                case .layers:
+                    if panelState.isCollapsed {
+                        if translation < -dragThreshold {
+                            store.send(.panelCollapseToggled(panel))
+                        }
+                    } else if translation > dragThreshold {
+                        store.send(.panelCollapseToggled(panel))
+                    }
+                }
+            }
 
         return VStack(spacing: 12) {
             studioPanel(for: panel)
@@ -100,6 +125,18 @@ extension ContentView {
         .padding(.vertical, 14)
         .frame(width: panelState.isCollapsed ? 74 : 304)
         .frame(maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: panel == .brush ? .trailing : .leading) {
+            Rectangle()
+                .fill(Color.clear)
+                .contentShape(Rectangle())
+                .frame(width: 18)
+                .gesture(panelDragGesture)
+                .onTapGesture {
+                    if panelState.isCollapsed {
+                        store.send(.panelCollapseToggled(panel))
+                    }
+                }
+        }
     }
 
     @ViewBuilder
