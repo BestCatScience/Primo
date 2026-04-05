@@ -25,9 +25,9 @@ enum StudioPanelKind: String, CaseIterable, Equatable {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .brush:
-            return language.localized("Brush")
+            return language.localized("ブラシ")
         case .layers:
-            return language.localized("Layers")
+            return language.localized("レイヤー")
         }
     }
 }

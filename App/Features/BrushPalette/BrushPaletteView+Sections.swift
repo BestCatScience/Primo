@@ -50,13 +50,13 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("Threshold"), value: store.fillThresholdMode.localizedTitle(language))
+                            metricRow(language.localized("しきい値"), value: store.fillThresholdMode.localizedTitle(language))
                             metricRow(
-                                store.fillThresholdMode == .opacity ? (language.localized("Opacity Match")) : (language.localized("Color Match")),
+                                store.fillThresholdMode == .opacity ? (language.localized("不透明度一致")) : (language.localized("色一致")),
                                 value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%"
                             )
-                            metricRow(language.localized("Expansion"), value: "\(Int(store.fillExpansion)) px")
-                            metricRow(language.localized("Color"), value: store.selectedBrush?.name ?? (language.localized("Custom Mix")))
+                            metricRow(language.localized("拡張"), value: "\(Int(store.fillExpansion)) px")
+                            metricRow(language.localized("色"), value: store.selectedBrush?.name ?? (language.localized("カスタム")))
                         }
                     }
                 } else if currentTool == .eyedropper {
@@ -80,10 +80,10 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("Source"), value: store.eyedropperSamplingSource.localizedTitle(language))
-                            metricRow(language.localized("Current Color"), value: colorHexLabel)
-                            metricRow(language.localized("Input"), value: "Apple Pencil")
-                            metricRow(language.localized("Behavior"), value: language.localized("Drag to sample continuously"))
+                            metricRow(language.localized("取得元"), value: store.eyedropperSamplingSource.localizedTitle(language))
+                            metricRow(language.localized("現在色"), value: colorHexLabel)
+                            metricRow(language.localized("入力"), value: "Apple Pencil")
+                            metricRow(language.localized("動作"), value: language.localized("ドラッグで連続取得"))
                         }
                     }
                 } else if currentTool == .select {
@@ -107,19 +107,19 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("Mode"), value: store.selectionToolMode.localizedTitle(language))
-                            metricRow(language.localized("Combine"), value: store.selectionCombineMode.localizedTitle(language))
+                            metricRow(language.localized("モード"), value: store.selectionToolMode.localizedTitle(language))
+                            metricRow(language.localized("合成"), value: store.selectionCombineMode.localizedTitle(language))
                             if store.selectionToolMode == .auto {
-                                metricRow(language.localized("Threshold"), value: store.selectionThresholdMode.localizedTitle(language))
+                                metricRow(language.localized("しきい値"), value: store.selectionThresholdMode.localizedTitle(language))
                                 metricRow(
-                                    language.localized("Match"),
+                                    language.localized("一致"),
                                     value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%"
                                 )
-                                metricRow(language.localized("Expansion"), value: "\(Int(store.selectionExpansion)) px")
+                                metricRow(language.localized("拡張"), value: "\(Int(store.selectionExpansion)) px")
                             } else {
-                                metricRow(language.localized("Gesture"), value: language.localized("Freehand"))
-                                metricRow(language.localized("Behavior"), value: language.localized("Close Path"))
-                                metricRow(language.localized("Scope"), value: language.localized("Active Layer"))
+                                metricRow(language.localized("入力"), value: language.localized("フリーハンド"))
+                                metricRow(language.localized("動作"), value: language.localized("パスを閉じる"))
+                                metricRow(language.localized("対象"), value: language.localized("アクティブレイヤー"))
                             }
                         }
                     }
@@ -144,11 +144,11 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("Target"), value: hasSelection ? (language.localized("Selection")) : (language.localized("Layer")))
+                            metricRow(language.localized("対象"), value: hasSelection ? (language.localized("選択設定")) : (language.localized("レイヤー")))
                             metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
                             metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
-                            metricRow(language.localized("Scale"), value: "\(Int((transformPreviewScale * 100).rounded()))%")
-                            metricRow(language.localized("State"), value: transformPreviewOffset == .zero ? (language.localized("Idle")) : (language.localized("Pending")))
+                            metricRow(language.localized("拡大率"), value: "\(Int((transformPreviewScale * 100).rounded()))%")
+                            metricRow(language.localized("状態"), value: transformPreviewOffset == .zero ? (language.localized("待機")) : (language.localized("未確定")))
                         }
                     }
                 } else {
@@ -180,16 +180,16 @@ extension BrushPaletteView {
                             alignment: .leading,
                             spacing: 8
                         ) {
-                            metricRow(language.localized("Tip"), value: store.brushTipKind.localizedTitle(language))
-                            metricRow(language.localized("Radius"), value: "\(Int(store.brushRadius)) px")
-                            metricRow(language.localized("Shape"), value: "\(Int(store.brushRoundness * 100))%")
-                            metricRow(language.localized("Angle"), value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°")
-                            metricRow(language.localized("Opacity"), value: "\(Int(store.brushOpacity * 100))%")
-                            metricRow(language.localized("Spacing"), value: "\(Int(store.brushSpacing * 100))%")
-                            metricRow(language.localized("Scatter"), value: store.brushScatterEnabled ? (language.localized("On")) : (language.localized("Off")))
-                            metricRow(language.localized("Texture"), value: store.brushTextureMode.localizedTitle(language))
-                            metricRow(language.localized("Flow"), value: "\(Int(store.brushFlow * 100))%")
-                            metricRow(language.localized("Paper"), value: "\(Int(store.brushPaperStrength * 100))%")
+                            metricRow(language.localized("先端"), value: store.brushTipKind.localizedTitle(language))
+                            metricRow(language.localized("半径"), value: "\(Int(store.brushRadius)) px")
+                            metricRow(language.localized("形状"), value: "\(Int(store.brushRoundness * 100))%")
+                            metricRow(language.localized("角度"), value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°")
+                            metricRow(language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%")
+                            metricRow(language.localized("スタンプ間隔"), value: "\(Int(store.brushSpacing * 100))%")
+                            metricRow(language.localized("散布"), value: store.brushScatterEnabled ? (language.localized("オン")) : (language.localized("オフ")))
+                            metricRow(language.localized("テクスチャ"), value: store.brushTextureMode.localizedTitle(language))
+                            metricRow(language.localized("フロー"), value: "\(Int(store.brushFlow * 100))%")
+                            metricRow(language.localized("紙質"), value: "\(Int(store.brushPaperStrength * 100))%")
                         }
                     }
                 }
@@ -202,10 +202,10 @@ extension BrushPaletteView {
             VStack(alignment: .leading, spacing: 10) {
                 if currentTool == .fill {
                     segmentedModeRow(
-                        title: language.localized("Threshold Mode"),
+                        title: language.localized("しきい値モード"),
                         selectedTitle: store.fillThresholdMode.localizedTitle(language)
                     ) {
-                        Picker(language.localized("Threshold Mode"), selection: $store.fillThresholdMode) {
+                        Picker(language.localized("しきい値モード"), selection: $store.fillThresholdMode) {
                             ForEach(FillThresholdMode.allCases) { mode in
                                 Text(mode.localizedTitle(language)).tag(mode)
                             }
@@ -213,7 +213,7 @@ extension BrushPaletteView {
                         .pickerStyle(.segmented)
                     }
                     sliderRow(
-                        title: store.fillThresholdMode == .opacity ? (language.localized("Opacity Threshold")) : (language.localized("Color Threshold")),
+                        title: store.fillThresholdMode == .opacity ? (language.localized("不透明度しきい値")) : (language.localized("色しきい値")),
                         value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%",
                         slider: Group {
                             if store.fillThresholdMode == .opacity {
@@ -224,16 +224,16 @@ extension BrushPaletteView {
                         }
                     )
                     sliderRow(
-                        title: language.localized("Expansion"),
+                        title: language.localized("拡張"),
                         value: "\(Int(store.fillExpansion)) px",
                         slider: Slider(value: $store.fillExpansion, in: 0...24, step: 1)
                     )
                 } else if currentTool == .eyedropper {
                     segmentedModeRow(
-                        title: language.localized("Sampling Source"),
+                        title: language.localized("取得元"),
                         selectedTitle: store.eyedropperSamplingSource.localizedTitle(language)
                     ) {
-                        Picker(language.localized("Sampling Source"), selection: $store.eyedropperSamplingSource) {
+                        Picker(language.localized("取得元"), selection: $store.eyedropperSamplingSource) {
                             ForEach(EyedropperSamplingSource.allCases) { source in
                                 Text(source.localizedTitle(language)).tag(source)
                             }
@@ -241,15 +241,15 @@ extension BrushPaletteView {
                         .pickerStyle(.segmented)
                     }
 
-                    Text(language.localized("Tap or drag with Apple Pencil to sample a color into the current paint color."))
+                    Text(language.localized("Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(.white.opacity(0.62))
                 } else if currentTool == .select {
                     segmentedModeRow(
-                        title: language.localized("Selection Action"),
+                        title: language.localized("選択アクション"),
                         selectedTitle: store.selectionCombineMode.localizedTitle(language)
                     ) {
-                        Picker(language.localized("Selection Action"), selection: $store.selectionCombineMode) {
+                        Picker(language.localized("選択アクション"), selection: $store.selectionCombineMode) {
                             ForEach(SelectionCombineMode.allCases) { mode in
                                 Text(mode.localizedTitle(language)).tag(mode)
                             }
@@ -257,10 +257,10 @@ extension BrushPaletteView {
                         .pickerStyle(.segmented)
                     }
                     segmentedModeRow(
-                        title: language.localized("Selection Mode"),
+                        title: language.localized("選択モード"),
                         selectedTitle: store.selectionToolMode.localizedTitle(language)
                     ) {
-                        Picker(language.localized("Selection Mode"), selection: $store.selectionToolMode) {
+                        Picker(language.localized("選択モード"), selection: $store.selectionToolMode) {
                             ForEach(SelectionToolMode.allCases) { mode in
                                 Text(mode.localizedTitle(language)).tag(mode)
                             }
@@ -269,10 +269,10 @@ extension BrushPaletteView {
                     }
                     if store.selectionToolMode == .auto {
                         segmentedModeRow(
-                            title: language.localized("Threshold Mode"),
+                            title: language.localized("しきい値モード"),
                             selectedTitle: store.selectionThresholdMode.localizedTitle(language)
                         ) {
-                            Picker(language.localized("Selection Threshold Mode"), selection: $store.selectionThresholdMode) {
+                            Picker(language.localized("選択しきい値モード"), selection: $store.selectionThresholdMode) {
                                 ForEach(FillThresholdMode.allCases) { mode in
                                     Text(mode.localizedTitle(language)).tag(mode)
                                 }
@@ -280,7 +280,7 @@ extension BrushPaletteView {
                             .pickerStyle(.segmented)
                         }
                         sliderRow(
-                            title: store.selectionThresholdMode == .opacity ? (language.localized("Opacity Threshold")) : (language.localized("Color Threshold")),
+                            title: store.selectionThresholdMode == .opacity ? (language.localized("不透明度しきい値")) : (language.localized("色しきい値")),
                             value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%",
                             slider: Group {
                                 if store.selectionThresholdMode == .opacity {
@@ -291,7 +291,7 @@ extension BrushPaletteView {
                             }
                         )
                         sliderRow(
-                            title: language.localized("Expansion"),
+                            title: language.localized("拡張"),
                             value: "\(Int(store.selectionExpansion)) px",
                             slider: Slider(value: $store.selectionExpansion, in: 0...24, step: 1)
                         )
@@ -302,7 +302,7 @@ extension BrushPaletteView {
                         HStack {
                             Image(systemName: "xmark.circle")
                                 .font(.system(size: 12, weight: .semibold))
-                            Text(language.localized("Clear Selection"))
+                            Text(language.localized("選択を解除"))
                                 .font(StudioTheme.Typography.label(12))
                             Spacer(minLength: 0)
                         }
@@ -321,7 +321,7 @@ extension BrushPaletteView {
                     .buttonStyle(.plain)
                 } else if currentTool == .move {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(hasSelection ? (language.localized("Move the selected area with Pencil. Nothing is committed until you apply.")) : (language.localized("Move the active layer with Pencil. Nothing is committed until you apply.")))
+                        Text(hasSelection ? (language.localized("Apple Pencil で選択範囲を移動します。適用するまで確定されません。")) : (language.localized("Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。")))
                             .font(StudioTheme.Typography.body(11))
                             .foregroundStyle(.white.opacity(0.62))
 
@@ -332,7 +332,7 @@ extension BrushPaletteView {
                                 HStack {
                                     Image(systemName: "checkmark.circle")
                                         .font(.system(size: 12, weight: .semibold))
-                                    Text(language.localized("Apply"))
+                                    Text(language.localized("適用"))
                                         .font(StudioTheme.Typography.label(12))
                                     Spacer(minLength: 0)
                                 }
@@ -352,7 +352,7 @@ extension BrushPaletteView {
                                 HStack {
                                     Image(systemName: "xmark.circle")
                                         .font(.system(size: 12, weight: .semibold))
-                                    Text(language.localized("Cancel"))
+                                    Text(language.localized("キャンセル"))
                                         .font(StudioTheme.Typography.label(12))
                                     Spacer(minLength: 0)
                                 }
@@ -381,9 +381,9 @@ extension BrushPaletteView {
 
                     switch selectedBrushSettingsCategory {
                     case .tip:
-                        sectionLabel(language.localized("Brush Tip Shape"))
+                        sectionLabel(language.localized("先端形状"))
                         segmentedModeRow(
-                            title: language.localized("Brush Tip"),
+                            title: language.localized("ブラシ先端"),
                             selectedTitle: store.brushTipKind.localizedTitle(language)
                         ) {
                             VStack(spacing: 8) {
@@ -394,178 +394,178 @@ extension BrushPaletteView {
                                 }
                             }
                         }
-                        sliderRow(title: language.localized("Size"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
+                        sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brushRadius)) px", slider: Slider(value: $store.brushRadius, in: 1...100))
                         dynamicControlMenuRow(
-                            title: language.localized("Size Control"),
+                            title: language.localized("サイズコントロール"),
                             selection: sizeControlBinding,
                             allowed: [.off, .pressure, .speed]
                         )
-                        sliderRow(title: language.localized("Size Amount"), value: "\(Int(sizeAmountBinding.wrappedValue * 100))%", slider: Slider(value: sizeAmountBinding, in: 0.0...1.0))
-                        sliderRow(title: language.localized("Roundness"), value: "\(Int(store.brushRoundness * 100))%", slider: Slider(value: $store.brushRoundness, in: 0.2...1.0))
+                        sliderRow(title: language.localized("サイズ量"), value: "\(Int(sizeAmountBinding.wrappedValue * 100))%", slider: Slider(value: sizeAmountBinding, in: 0.0...1.0))
+                        sliderRow(title: language.localized("形状の細さ"), value: "\(Int(store.brushRoundness * 100))%", slider: Slider(value: $store.brushRoundness, in: 0.2...1.0))
                         dynamicControlMenuRow(
-                            title: language.localized("Roundness Control"),
+                            title: language.localized("形状コントロール"),
                             selection: roundnessControlBinding,
                             allowed: [.off, .pressure, .tilt, .random]
                         )
-                        sliderRow(title: language.localized("Roundness Amount"), value: "\(Int(roundnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: roundnessAmountBinding, in: 0.0...1.0))
+                        sliderRow(title: language.localized("形状量"), value: "\(Int(roundnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: roundnessAmountBinding, in: 0.0...1.0))
                         segmentedModeRow(
-                            title: language.localized("Rotation Mode"),
+                            title: language.localized("回転モード"),
                             selectedTitle: store.brushAngleMode.localizedTitle(language)
                         ) {
-                            Picker(language.localized("Rotation Mode"), selection: $store.brushAngleMode) {
+                            Picker(language.localized("回転モード"), selection: $store.brushAngleMode) {
                                 ForEach(BrushAngleMode.allCases) { mode in
                                     Text(mode.localizedTitle(language)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
                         }
-                        sliderRow(title: language.localized("Angle"), value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°", slider: Slider(value: $store.brushAngle, in: -.pi / 2 ... .pi / 2))
+                        sliderRow(title: language.localized("角度"), value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°", slider: Slider(value: $store.brushAngle, in: -.pi / 2 ... .pi / 2))
                         dynamicControlMenuRow(
-                            title: language.localized("Angle Control"),
+                            title: language.localized("角度コントロール"),
                             selection: angleControlBinding,
                             allowed: [.off, .pressure, .tilt, .random]
                         )
-                        sliderRow(title: language.localized("Angle Amount"), value: "\(Int(angleAmountBinding.wrappedValue * 100))%", slider: Slider(value: angleAmountBinding, in: 0.0...1.0))
-                        sliderRow(title: language.localized("Hardness"), value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
+                        sliderRow(title: language.localized("角度量"), value: "\(Int(angleAmountBinding.wrappedValue * 100))%", slider: Slider(value: angleAmountBinding, in: 0.0...1.0))
+                        sliderRow(title: language.localized("硬さ"), value: "\(Int(store.brushHardness * 100))%", slider: Slider(value: $store.brushHardness, in: 0.2...0.98))
 
                     case .scatter:
                         sectionLabel("Scattering")
                         Toggle(isOn: $store.brushScatterEnabled) {
-                            Text(language.localized("Enable Scatter"))
+                            Text(language.localized("散布を有効にする"))
                                 .font(StudioTheme.Typography.title(12))
                                 .foregroundStyle(.white.opacity(0.88))
                         }
                         .tint(StudioTheme.Palette.accentBright)
-                        sliderRow(title: language.localized("Spacing"), value: "\(Int(store.brushSpacing * 100))%", slider: Slider(value: $store.brushSpacing, in: 0.08...0.8))
+                        sliderRow(title: language.localized("スタンプ間隔"), value: "\(Int(store.brushSpacing * 100))%", slider: Slider(value: $store.brushSpacing, in: 0.08...0.8))
                         if store.brushScatterEnabled {
-                            sliderRow(title: language.localized("Spacing Jitter"), value: "\(Int(store.brushSpacingJitter * 100))%", slider: Slider(value: $store.brushSpacingJitter, in: 0.0...0.5))
+                            sliderRow(title: language.localized("間隔ジッター"), value: "\(Int(store.brushSpacingJitter * 100))%", slider: Slider(value: $store.brushSpacingJitter, in: 0.0...0.5))
                             segmentedModeRow(
-                                title: language.localized("Scatter Mode"),
+                                title: language.localized("散布方式"),
                                 selectedTitle: store.brushScatterMode.localizedTitle(language)
                             ) {
-                                Picker(language.localized("Scatter Mode"), selection: $store.brushScatterMode) {
+                                Picker(language.localized("散布方式"), selection: $store.brushScatterMode) {
                                     ForEach(BrushScatterMode.allCases) { mode in
                                         Text(mode.localizedTitle(language)).tag(mode)
                                     }
                                 }
                                 .pickerStyle(.segmented)
                             }
-                            sliderRow(title: language.localized("Scatter X"), value: "\(Int(store.brushScatterLateral * 100))%", slider: Slider(value: $store.brushScatterLateral, in: 0.0...0.6))
-                            sliderRow(title: language.localized("Scatter Y"), value: "\(Int(store.brushScatterLinear * 100))%", slider: Slider(value: $store.brushScatterLinear, in: 0.0...0.4))
-                            sliderRow(title: language.localized("Count"), value: "\(Int(store.brushCount.rounded()))", slider: Slider(value: $store.brushCount, in: 1...4, step: 1))
-                            sliderRow(title: language.localized("Count Jitter"), value: "\(Int(store.brushCountJitter * 100))%", slider: Slider(value: $store.brushCountJitter, in: 0.0...1.0))
-                            sliderRow(title: language.localized("Particle Size"), value: "\(Int(store.brushCountSizeJitter * 100))%", slider: Slider(value: $store.brushCountSizeJitter, in: 0.0...1.0))
-                            sliderRow(title: language.localized("Particle Opacity"), value: "\(Int(store.brushCountOpacityJitter * 100))%", slider: Slider(value: $store.brushCountOpacityJitter, in: 0.0...1.0))
+                            sliderRow(title: language.localized("横散布"), value: "\(Int(store.brushScatterLateral * 100))%", slider: Slider(value: $store.brushScatterLateral, in: 0.0...0.6))
+                            sliderRow(title: language.localized("前後散布"), value: "\(Int(store.brushScatterLinear * 100))%", slider: Slider(value: $store.brushScatterLinear, in: 0.0...0.4))
+                            sliderRow(title: language.localized("散布数"), value: "\(Int(store.brushCount.rounded()))", slider: Slider(value: $store.brushCount, in: 1...4, step: 1))
+                            sliderRow(title: language.localized("数ジッター"), value: "\(Int(store.brushCountJitter * 100))%", slider: Slider(value: $store.brushCountJitter, in: 0.0...1.0))
+                            sliderRow(title: language.localized("粒サイズばらつき"), value: "\(Int(store.brushCountSizeJitter * 100))%", slider: Slider(value: $store.brushCountSizeJitter, in: 0.0...1.0))
+                            sliderRow(title: language.localized("粒濃度ばらつき"), value: "\(Int(store.brushCountOpacityJitter * 100))%", slider: Slider(value: $store.brushCountOpacityJitter, in: 0.0...1.0))
                         }
 
                     case .stroke:
                         sectionLabel("Transfer")
-                        sliderRow(title: language.localized("Opacity"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
+                        sliderRow(title: language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%", slider: Slider(value: $store.brushOpacity, in: 0.1...1.0))
                         dynamicControlMenuRow(
-                            title: language.localized("Opacity Control"),
+                            title: language.localized("不透明度コントロール"),
                             selection: opacityControlBinding,
                             allowed: [.off, .pressure]
                         )
-                        sliderRow(title: language.localized("Opacity Amount"), value: "\(Int(opacityAmountBinding.wrappedValue * 100))%", slider: Slider(value: opacityAmountBinding, in: 0.0...1.0))
-                        sliderRow(title: language.localized("Flow"), value: "\(Int(store.brushFlow * 100))%", slider: Slider(value: $store.brushFlow, in: 0.05...1.0))
+                        sliderRow(title: language.localized("不透明度量"), value: "\(Int(opacityAmountBinding.wrappedValue * 100))%", slider: Slider(value: opacityAmountBinding, in: 0.0...1.0))
+                        sliderRow(title: language.localized("フロー"), value: "\(Int(store.brushFlow * 100))%", slider: Slider(value: $store.brushFlow, in: 0.05...1.0))
                         dynamicControlMenuRow(
-                            title: language.localized("Flow Control"),
+                            title: language.localized("フローコントロール"),
                             selection: flowControlBinding,
                             allowed: [.off, .pressure, .random]
                         )
-                        sliderRow(title: language.localized("Flow Amount"), value: "\(Int(flowAmountBinding.wrappedValue * 100))%", slider: Slider(value: flowAmountBinding, in: 0.0...1.0))
+                        sliderRow(title: language.localized("フロー量"), value: "\(Int(flowAmountBinding.wrappedValue * 100))%", slider: Slider(value: flowAmountBinding, in: 0.0...1.0))
                         segmentedModeRow(
-                            title: language.localized("Speed Density"),
-                            selectedTitle: store.brushVelocityInfluence > 0.001 ? (language.localized("On")) : (language.localized("Off"))
+                            title: language.localized("速度で濃さを変える"),
+                            selectedTitle: store.brushVelocityInfluence > 0.001 ? (language.localized("オン")) : (language.localized("オフ"))
                         ) {
-                            Picker(language.localized("Speed Density"), selection: velocityDensityControlBinding) {
-                                Text(language.localized("Off")).tag(false)
-                                Text(language.localized("On")).tag(true)
+                            Picker(language.localized("速度で濃さを変える"), selection: velocityDensityControlBinding) {
+                                Text(language.localized("オフ")).tag(false)
+                                Text(language.localized("オン")).tag(true)
                             }
                             .pickerStyle(.segmented)
                         }
-                        sliderRow(title: language.localized("Stabilization"), value: "\(Int(store.brushStabilization * 100))%", slider: Slider(value: $store.brushStabilization, in: 0.0...1.0))
+                        sliderRow(title: language.localized("手ぶれ補正"), value: "\(Int(store.brushStabilization * 100))%", slider: Slider(value: $store.brushStabilization, in: 0.0...1.0))
 
                     case .texture:
                         sectionLabel("Texture")
                         segmentedModeRow(
-                            title: language.localized("Texture Apply"),
+                            title: language.localized("テクスチャ適用"),
                             selectedTitle: store.brushTextureMode.localizedTitle(language)
                         ) {
-                            Picker(language.localized("Texture Apply"), selection: $store.brushTextureMode) {
+                            Picker(language.localized("テクスチャ適用"), selection: $store.brushTextureMode) {
                                 ForEach(BrushTextureMode.allCases) { mode in
                                     Text(mode.localizedTitle(language)).tag(mode)
                                 }
                             }
                             .pickerStyle(.segmented)
                         }
-                        sliderRow(title: language.localized("Tip Texture"), value: "\(Int(store.brushTextureStrength * 100))%", slider: Slider(value: $store.brushTextureStrength, in: 0.0...1.0))
+                        sliderRow(title: language.localized("先端テクスチャ"), value: "\(Int(store.brushTextureStrength * 100))%", slider: Slider(value: $store.brushTextureStrength, in: 0.0...1.0))
                         segmentedModeRow(
-                            title: language.localized("Mixer Brush"),
+                            title: language.localized("ミキサーブラシ"),
                             selectedTitle: "Wet / Load / Mix / Flow"
                         ) {
                             VStack(alignment: .leading, spacing: 10) {
-                                sliderRow(title: language.localized("Wet"), value: "\(Int(store.brushWetness * 100))%", slider: Slider(value: $store.brushWetness, in: 0.0...1.0))
+                                sliderRow(title: language.localized("ウェット"), value: "\(Int(store.brushWetness * 100))%", slider: Slider(value: $store.brushWetness, in: 0.0...1.0))
                                 dynamicControlMenuRow(
-                                    title: language.localized("Wet Control"),
+                                    title: language.localized("ウェットコントロール"),
                                     selection: wetnessControlBinding,
                                     allowed: [.off, .pressure]
                                 )
-                                sliderRow(title: language.localized("Wet Amount"), value: "\(Int(wetnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: wetnessAmountBinding, in: 0.0...1.0))
-                                sliderRow(title: language.localized("Mix Strength"), value: "\(Int(store.brushColorMixStrength * 100))%", slider: Slider(value: $store.brushColorMixStrength, in: 0.0...1.0))
-                                sliderRow(title: language.localized("Paint Load"), value: "\(Int(store.brushPaintLoad * 100))%", slider: Slider(value: $store.brushPaintLoad, in: 0.0...1.0))
+                                sliderRow(title: language.localized("ウェット量"), value: "\(Int(wetnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: wetnessAmountBinding, in: 0.0...1.0))
+                                sliderRow(title: language.localized("混色量"), value: "\(Int(store.brushColorMixStrength * 100))%", slider: Slider(value: $store.brushColorMixStrength, in: 0.0...1.0))
+                                sliderRow(title: language.localized("色の含み"), value: "\(Int(store.brushPaintLoad * 100))%", slider: Slider(value: $store.brushPaintLoad, in: 0.0...1.0))
                                 dynamicControlMenuRow(
-                                    title: language.localized("Load Control"),
+                                    title: language.localized("含みコントロール"),
                                     selection: loadControlBinding,
                                     allowed: [.off, .pressure]
                                 )
-                                sliderRow(title: language.localized("Load Amount"), value: "\(Int(loadAmountBinding.wrappedValue * 100))%", slider: Slider(value: loadAmountBinding, in: 0.0...1.0))
+                                sliderRow(title: language.localized("含み量"), value: "\(Int(loadAmountBinding.wrappedValue * 100))%", slider: Slider(value: loadAmountBinding, in: 0.0...1.0))
                             }
                         }
                         segmentedModeRow(
-                            title: language.localized("Dual Brush"),
-                            selectedTitle: store.brushDualEnabled ? store.brushDualBlendMode.localizedTitle(language) : (language.localized("Off"))
+                            title: language.localized("デュアルブラシ"),
+                            selectedTitle: store.brushDualEnabled ? store.brushDualBlendMode.localizedTitle(language) : (language.localized("オフ"))
                         ) {
                             VStack(alignment: .leading, spacing: 10) {
                                 Toggle(isOn: $store.brushDualEnabled) {
-                                    Text(language.localized("Enable dual brush"))
+                                    Text(language.localized("デュアルブラシを使う"))
                                         .font(StudioTheme.Typography.label(11))
                                         .foregroundStyle(.white.opacity(0.86))
                                 }
                                 .toggleStyle(.switch)
 
                                 if store.brushDualEnabled {
-                                    Picker(language.localized("Dual Tip"), selection: $store.brushDualTipKind) {
+                                    Picker(language.localized("デュアル先端"), selection: $store.brushDualTipKind) {
                                         ForEach(BrushTipKind.allCases) { tipKind in
                                             Text(tipKind.localizedTitle(language)).tag(tipKind)
                                         }
                                     }
                                     .pickerStyle(.segmented)
 
-                                    Picker(language.localized("Blend"), selection: $store.brushDualBlendMode) {
+                                    Picker(language.localized("合成"), selection: $store.brushDualBlendMode) {
                                         ForEach(BrushDualBlendMode.allCases) { mode in
                                             Text(mode.localizedTitle(language)).tag(mode)
                                         }
                                     }
                                     .pickerStyle(.segmented)
 
-                                    sliderRow(title: language.localized("Dual Scale"), value: "\(Int(store.brushDualScale * 100))%", slider: Slider(value: $store.brushDualScale, in: 0.25...1.5))
-                                    sliderRow(title: language.localized("Dual Spacing"), value: "\(Int(store.brushDualSpacing * 100))%", slider: Slider(value: $store.brushDualSpacing, in: 0.0...0.8))
-                                    sliderRow(title: language.localized("Dual Scatter"), value: "\(Int(store.brushDualScatter * 100))%", slider: Slider(value: $store.brushDualScatter, in: 0.0...0.8))
-                                    sliderRow(title: language.localized("Dual Angle"), value: "\(Int((store.brushDualAngle * 180 / .pi).rounded()))°", slider: Slider(value: $store.brushDualAngle, in: -.pi / 2 ... .pi / 2))
+                                    sliderRow(title: language.localized("デュアルサイズ"), value: "\(Int(store.brushDualScale * 100))%", slider: Slider(value: $store.brushDualScale, in: 0.25...1.5))
+                                    sliderRow(title: language.localized("デュアル間隔"), value: "\(Int(store.brushDualSpacing * 100))%", slider: Slider(value: $store.brushDualSpacing, in: 0.0...0.8))
+                                    sliderRow(title: language.localized("デュアル散布"), value: "\(Int(store.brushDualScatter * 100))%", slider: Slider(value: $store.brushDualScatter, in: 0.0...0.8))
+                                    sliderRow(title: language.localized("デュアル角度"), value: "\(Int((store.brushDualAngle * 180 / .pi).rounded()))°", slider: Slider(value: $store.brushDualAngle, in: -.pi / 2 ... .pi / 2))
                                 }
                             }
                         }
                         segmentedModeRow(
-                            title: language.localized("Paper Texture"),
+                            title: language.localized("紙質テクスチャ"),
                             selectedTitle: "\(Int(store.brushPaperStrength * 100))%"
                         ) {
                             VStack(alignment: .leading, spacing: 10) {
-                                sliderRow(title: language.localized("Paper Strength"), value: "\(Int(store.brushPaperStrength * 100))%", slider: Slider(value: $store.brushPaperStrength, in: 0.0...1.0))
-                                sliderRow(title: language.localized("Paper Scale"), value: String(format: "%.2f", store.brushPaperScale), slider: Slider(value: $store.brushPaperScale, in: 0.04...0.30))
-                                sliderRow(title: language.localized("Paper Threshold"), value: "\(Int(store.brushPaperThreshold * 100))%", slider: Slider(value: $store.brushPaperThreshold, in: 0.15...0.75))
-                                sliderRow(title: language.localized("Grain Scale"), value: String(format: "%.2f", store.brushGrainScale), slider: Slider(value: $store.brushGrainScale, in: 0.6...2.8))
-                                sliderRow(title: language.localized("Grain Contrast"), value: String(format: "%.2f", store.brushGrainContrast), slider: Slider(value: $store.brushGrainContrast, in: 0.8...2.8))
+                                sliderRow(title: language.localized("紙質の強さ"), value: "\(Int(store.brushPaperStrength * 100))%", slider: Slider(value: $store.brushPaperStrength, in: 0.0...1.0))
+                                sliderRow(title: language.localized("紙目スケール"), value: String(format: "%.2f", store.brushPaperScale), slider: Slider(value: $store.brushPaperScale, in: 0.04...0.30))
+                                sliderRow(title: language.localized("紙目しきい値"), value: "\(Int(store.brushPaperThreshold * 100))%", slider: Slider(value: $store.brushPaperThreshold, in: 0.15...0.75))
+                                sliderRow(title: language.localized("粒状感"), value: String(format: "%.2f", store.brushGrainScale), slider: Slider(value: $store.brushGrainScale, in: 0.6...2.8))
+                                sliderRow(title: language.localized("粒コントラスト"), value: String(format: "%.2f", store.brushGrainContrast), slider: Slider(value: $store.brushGrainContrast, in: 0.8...2.8))
                             }
                         }
                     }
@@ -600,15 +600,15 @@ extension BrushPaletteView {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(currentTool == .fill ? (language.localized("Fill Color")) : (currentTool == .eyedropper ? (language.localized("Sampled Color")) : (language.localized("Color"))))
+                            Text(currentTool == .fill ? (language.localized("塗り色")) : (currentTool == .eyedropper ? (language.localized("取得色")) : (language.localized("色"))))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
                             Text(
                                 currentTool == .fill
-                                    ? (store.selectedBrush?.name ?? (language.localized("Custom Mix")))
+                                    ? (store.selectedBrush?.name ?? (language.localized("カスタム")))
                                     : (currentTool == .eyedropper
                                         ? colorHexLabel
-                                        : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language.localized("Custom"))"))
+                                        : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language.localized("カスタム"))"))
                             )
                             .font(StudioTheme.Typography.body(11))
                             .foregroundStyle(.white.opacity(0.52))
@@ -658,10 +658,10 @@ extension BrushPaletteView {
                         .frame(width: 38, height: 38)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(language.localized("Selection"))
+                            Text(language.localized("選択設定"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(store.selectionToolMode == .lasso ? (language.localized("Trace with Pencil, then use Move to transform")) : (language.localized("Tap to sample, then use Move to transform")))
+                            Text(store.selectionToolMode == .lasso ? (language.localized("Apple Pencil で囲んだあと、移動ツールで変形します")) : (language.localized("タップで選択したあと、移動ツールで変形します")))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -705,15 +705,15 @@ extension BrushPaletteView {
     var sectionTitle: String {
         switch currentTool {
         case .fill:
-            return language.localized("Fill Engine")
+            return language.localized("塗りつぶし設定")
         case .eyedropper:
-            return language.localized("Eyedropper")
+            return language.localized("スポイト設定")
         case .select:
-            return language.localized("Selection")
+            return language.localized("選択設定")
         case .move:
-            return language.localized("Transform")
+            return language.localized("変形")
         default:
-            return language.localized("Brush Engine")
+            return language.localized("ブラシ設定")
         }
     }
 
@@ -930,14 +930,14 @@ extension BrushPaletteView {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
                 if showsTitle {
-                    Text(language.localized("Brush Library"))
+                    Text(language.localized("ブラシライブラリ"))
                         .font(StudioTheme.Typography.title(18))
                         .foregroundStyle(.white.opacity(0.94))
                 }
 
                 HStack(spacing: 8) {
                     sidebarIconButton(
-                        title: language.localized("Settings"),
+                        title: language.localized("設定"),
                         systemImage: "slider.horizontal.3",
                         isActive: showsBrushSettingsPopover
                     ) {
@@ -945,14 +945,14 @@ extension BrushPaletteView {
                     }
 
                     sidebarIconButton(
-                        title: language.localized("Save"),
+                        title: language.localized("保存"),
                         systemImage: "square.and.arrow.down.on.square"
                     ) {
                         store.send(.saveCurrentBrushButtonTapped)
                     }
 
                     sidebarIconButton(
-                        title: language.localized("Manage"),
+                        title: language.localized("管理"),
                         systemImage: "trash",
                         isActive: showsSavedBrushDeleteMode
                     ) {
@@ -960,7 +960,7 @@ extension BrushPaletteView {
                     }
 
                     sidebarIconButton(
-                        title: language.localized("Import"),
+                        title: language.localized("読込"),
                         systemImage: "square.and.arrow.down"
                     ) {
                         isImportingBrush = true
@@ -970,16 +970,16 @@ extension BrushPaletteView {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 14) {
                         brushLibrarySection(
-                            title: language.localized("Saved"),
+                            title: language.localized("保存済み"),
                             presets: store.savedPresets,
-                            emptyMessage: language.localized("Saved brushes appear here."),
+                            emptyMessage: language.localized("保存したブラシがここに並びます。"),
                             allowsDeletion: true
                         )
 
                         brushLibrarySection(
-                            title: language.localized("Presets"),
+                            title: language.localized("プリセット"),
                             presets: store.presets,
-                            emptyMessage: language.localized("No presets yet."),
+                            emptyMessage: language.localized("まだプリセットがありません。"),
                             allowsDeletion: false
                         )
                     }
@@ -992,7 +992,7 @@ extension BrushPaletteView {
 
             VStack(spacing: 10) {
                 verticalBrushSlider(
-                    title: language.localized("Size"),
+                    title: language.localized("サイズ"),
                     valueText: "\(Int(store.brushRadius.rounded()))",
                     normalizedValue: Binding(
                         get: { min(max((store.brushRadius - 1.0) / 99.0, 0.0), 1.0) },
@@ -1001,7 +1001,7 @@ extension BrushPaletteView {
                 )
 
                 verticalBrushSlider(
-                    title: language.localized("Opacity"),
+                    title: language.localized("不透明"),
                     valueText: "\(Int((store.brushOpacity * 100).rounded()))%",
                     normalizedValue: $store.brushOpacity
                 )
@@ -1021,10 +1021,10 @@ extension BrushPaletteView {
                     .foregroundStyle(.white.opacity(0.9))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(language.localized("Brush Settings"))
+                    Text(language.localized("ブラシ設定"))
                         .font(StudioTheme.Typography.title(15))
                         .foregroundStyle(.white.opacity(0.92))
-                    Text(store.selectedBrush?.name ?? (language.localized("Custom Brush")))
+                    Text(store.selectedBrush?.name ?? (language.localized("カスタムブラシ")))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(.white.opacity(0.48))
                 }

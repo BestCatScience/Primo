@@ -31,12 +31,12 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
         UserDefaults.standard.set(rawValue, forKey: Self.storageKey)
     }
 
-    func localized(_ english: String) -> String {
+    func localized(_ text: String) -> String {
         switch self {
         case .english:
-            return english
+            return StudioStrings.englishCatalog[text] ?? text
         case .japanese:
-            return StudioStrings.japaneseCatalog[english] ?? english
+            return StudioStrings.japaneseCatalog[text] ?? text
         }
     }
 
@@ -271,6 +271,13 @@ enum StudioStrings {
         "Speed": "速度",
         "Random": "ランダム",
     ]
+    static let englishCatalog: [String: String] = {
+        var map: [String: String] = [:]
+        for (english, japanese) in japaneseCatalog {
+            map[japanese] = english
+        }
+        return map
+    }()
 
     static func appName(_ language: AppLanguage) -> String { "atelierprime" }
 
@@ -287,69 +294,69 @@ enum StudioStrings {
         localized(language, english: "Saved: \(filename)", japanese: "保存しました: \(filename)")
     }
 
-    static func settingsMenu(_ language: AppLanguage) -> String { language.localized("Settings") }
-    static func fileMenu(_ language: AppLanguage) -> String { language.localized("File") }
-    static func editMenu(_ language: AppLanguage) -> String { language.localized("Edit") }
-    static func pageMenu(_ language: AppLanguage) -> String { language.localized("Pages") }
-    static func layerMenu(_ language: AppLanguage) -> String { language.localized("Layer") }
-    static func languageMenu(_ language: AppLanguage) -> String { language.localized("Language") }
-    static func newCanvas(_ language: AppLanguage) -> String { language.localized("New Canvas") }
-    static func customSize(_ language: AppLanguage) -> String { language.localized("Custom Size...") }
-    static func open(_ language: AppLanguage) -> String { language.localized("Open") }
-    static func save(_ language: AppLanguage) -> String { language.localized("Save") }
-    static func export(_ language: AppLanguage) -> String { language.localized("Export") }
-    static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("Export Timelapse") }
-    static func refreshView(_ language: AppLanguage) -> String { language.localized("Refresh View") }
+    static func settingsMenu(_ language: AppLanguage) -> String { language.localized("設定") }
+    static func fileMenu(_ language: AppLanguage) -> String { language.localized("ファイル") }
+    static func editMenu(_ language: AppLanguage) -> String { language.localized("編集") }
+    static func pageMenu(_ language: AppLanguage) -> String { language.localized("ページ管理") }
+    static func layerMenu(_ language: AppLanguage) -> String { language.localized("レイヤー") }
+    static func languageMenu(_ language: AppLanguage) -> String { language.localized("言語") }
+    static func newCanvas(_ language: AppLanguage) -> String { language.localized("新規キャンバス") }
+    static func customSize(_ language: AppLanguage) -> String { language.localized("カスタムサイズ...") }
+    static func open(_ language: AppLanguage) -> String { language.localized("開く") }
+    static func save(_ language: AppLanguage) -> String { language.localized("保存") }
+    static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
+    static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
+    static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }
 
-    static func addLayer(_ language: AppLanguage) -> String { language.localized("New Layer") }
-    static func clearActiveLayer(_ language: AppLanguage) -> String { language.localized("Clear Active Layer") }
-    static func showBrushPanel(_ language: AppLanguage) -> String { language.localized("Show Brush Panel") }
-    static func hideBrushPanel(_ language: AppLanguage) -> String { language.localized("Hide Brush Panel") }
-    static func showLayerPanel(_ language: AppLanguage) -> String { language.localized("Show Layer Panel") }
-    static func hideLayerPanel(_ language: AppLanguage) -> String { language.localized("Hide Layer Panel") }
-    static func stackPanels(_ language: AppLanguage) -> String { language.localized("Stack Panels") }
-    static func unstackPanels(_ language: AppLanguage) -> String { language.localized("Unstack Panels") }
-    static func swapStackOrder(_ language: AppLanguage) -> String { language.localized("Swap Stack Order") }
-    static func showActiveLayer(_ language: AppLanguage) -> String { language.localized("Show Active Layer") }
-    static func hideActiveLayer(_ language: AppLanguage) -> String { language.localized("Hide Active Layer") }
-    static func selectUpperLayer(_ language: AppLanguage) -> String { language.localized("Select Layer Above") }
-    static func selectLowerLayer(_ language: AppLanguage) -> String { language.localized("Select Layer Below") }
-    static func pagesAdd(_ language: AppLanguage) -> String { language.localized("Add Page") }
-    static func pagesDuplicate(_ language: AppLanguage) -> String { language.localized("Duplicate Page") }
-    static func pagesDelete(_ language: AppLanguage) -> String { language.localized("Delete Page") }
-    static func size(_ language: AppLanguage) -> String { language.localized("Size") }
-    static func width(_ language: AppLanguage) -> String { language.localized("Width") }
-    static func height(_ language: AppLanguage) -> String { language.localized("Height") }
-    static func cancel(_ language: AppLanguage) -> String { language.localized("Cancel") }
-    static func create(_ language: AppLanguage) -> String { language.localized("Create") }
+    static func addLayer(_ language: AppLanguage) -> String { language.localized("新規レイヤー") }
+    static func clearActiveLayer(_ language: AppLanguage) -> String { language.localized("アクティブレイヤーをクリア") }
+    static func showBrushPanel(_ language: AppLanguage) -> String { language.localized("ブラシパネルを表示") }
+    static func hideBrushPanel(_ language: AppLanguage) -> String { language.localized("ブラシパネルを隠す") }
+    static func showLayerPanel(_ language: AppLanguage) -> String { language.localized("レイヤーパネルを表示") }
+    static func hideLayerPanel(_ language: AppLanguage) -> String { language.localized("レイヤーパネルを隠す") }
+    static func stackPanels(_ language: AppLanguage) -> String { language.localized("パネルを重ねる") }
+    static func unstackPanels(_ language: AppLanguage) -> String { language.localized("パネルの重なりを解除") }
+    static func swapStackOrder(_ language: AppLanguage) -> String { language.localized("スタック順を入れ替え") }
+    static func showActiveLayer(_ language: AppLanguage) -> String { language.localized("アクティブレイヤーを表示") }
+    static func hideActiveLayer(_ language: AppLanguage) -> String { language.localized("アクティブレイヤーを非表示") }
+    static func selectUpperLayer(_ language: AppLanguage) -> String { language.localized("ひとつ上のレイヤーを選択") }
+    static func selectLowerLayer(_ language: AppLanguage) -> String { language.localized("ひとつ下のレイヤーを選択") }
+    static func pagesAdd(_ language: AppLanguage) -> String { language.localized("ページを追加") }
+    static func pagesDuplicate(_ language: AppLanguage) -> String { language.localized("ページを複製") }
+    static func pagesDelete(_ language: AppLanguage) -> String { language.localized("ページを削除") }
+    static func size(_ language: AppLanguage) -> String { language.localized("サイズ") }
+    static func width(_ language: AppLanguage) -> String { language.localized("幅") }
+    static func height(_ language: AppLanguage) -> String { language.localized("高さ") }
+    static func cancel(_ language: AppLanguage) -> String { language.localized("キャンセル") }
+    static func create(_ language: AppLanguage) -> String { language.localized("作成") }
 
     static func layers(_ count: Int, _ language: AppLanguage) -> String {
         localized(language, english: "\(count) Layers", japanese: "\(count) レイヤー")
     }
 
-    static func layersTitle(_ language: AppLanguage) -> String { language.localized("Layers") }
-    static func visible(_ language: AppLanguage) -> String { language.localized("Visible") }
-    static func hidden(_ language: AppLanguage) -> String { language.localized("Hidden") }
-    static func active(_ language: AppLanguage) -> String { language.localized("Active") }
-    static func standby(_ language: AppLanguage) -> String { language.localized("Standby") }
+    static func layersTitle(_ language: AppLanguage) -> String { language.localized("レイヤー") }
+    static func visible(_ language: AppLanguage) -> String { language.localized("表示") }
+    static func hidden(_ language: AppLanguage) -> String { language.localized("非表示") }
+    static func active(_ language: AppLanguage) -> String { language.localized("選択中") }
+    static func standby(_ language: AppLanguage) -> String { language.localized("待機") }
 
     static func opacityValue(_ value: Int, _ language: AppLanguage) -> String {
         localized(language, english: "Opacity \(value)%", japanese: "不透明度 \(value)%")
     }
 
-    static func exportingTimelapse(_ language: AppLanguage) -> String { language.localized("Exporting timelapse...") }
+    static func exportingTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し中…") }
 
     static func dynamicControlOff(_ language: AppLanguage) -> String {
         localized(language, english: "Off", japanese: "なし")
     }
 
-    static func dynamicControlPressure(_ language: AppLanguage) -> String { language.localized("Pressure") }
-    static func dynamicControlTilt(_ language: AppLanguage) -> String { language.localized("Tilt") }
-    static func dynamicControlSpeed(_ language: AppLanguage) -> String { language.localized("Speed") }
-    static func dynamicControlRandom(_ language: AppLanguage) -> String { language.localized("Random") }
+    static func dynamicControlPressure(_ language: AppLanguage) -> String { language.localized("筆圧") }
+    static func dynamicControlTilt(_ language: AppLanguage) -> String { language.localized("傾き") }
+    static func dynamicControlSpeed(_ language: AppLanguage) -> String { language.localized("速度") }
+    static func dynamicControlRandom(_ language: AppLanguage) -> String { language.localized("ランダム") }
 
-    static func brushSettingsCategoryTip(_ language: AppLanguage) -> String { language.localized("Tip") }
-    static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String { language.localized("Scatter") }
+    static func brushSettingsCategoryTip(_ language: AppLanguage) -> String { language.localized("先端") }
+    static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String { language.localized("散布") }
 
     static func brushSettingsCategoryStroke(_ language: AppLanguage) -> String {
         localized(language, english: "Stroke", japanese: "描画")
