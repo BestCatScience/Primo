@@ -30,6 +30,8 @@ extension LayerSidebarView {
         let snapshot = layerSnapshots.first(where: { $0.index == layer.index })
 
         return HStack(spacing: 10) {
+            layerDragHandle(for: layer, snapshot: snapshot)
+
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(StudioTheme.Palette.cardFillStrong)
                 .frame(width: 40, height: 40)
@@ -132,8 +134,15 @@ extension LayerSidebarView {
                 .fill(backgroundFill(for: layer))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(borderColor(for: layer), lineWidth: 1)
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(borderColor(for: layer), lineWidth: 1)
+
+                if showsInsertionIndicator(for: layer) {
+                    layerInsertionIndicator
+                        .offset(y: -7)
+                }
+            }
         }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture {
@@ -148,7 +157,10 @@ extension LayerSidebarView {
         }
         .onDrag {
             draggedLayerIndex = layer.index
+            dropTargetLayerIndex = layer.index
             return NSItemProvider(object: NSString(string: "\(layer.index)"))
+        } preview: {
+            layerRowDragPreview(for: layer, snapshot: snapshot)
         }
         .onDrop(
             of: [UTType.plainText.identifier],
@@ -277,16 +289,98 @@ extension LayerSidebarView {
         .minimumHitTarget()
     }
 
+    func layerRowDragPreview(for layer: LayerRowModel, snapshot: MetalLayerSnapshot?) -> some View {
+        HStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(StudioTheme.Palette.cardFillStrong)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    LayerThumbnailView(snapshot: snapshot)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(layer.name)
+                    .font(StudioTheme.Typography.title(14))
+                    .foregroundStyle(.white.opacity(0.94))
+                    .lineLimit(1)
+
+                Text(layer.blendMode.localizedTitle(language))
+                    .font(StudioTheme.Typography.mono(9))
+                    .foregroundStyle(.white.opacity(0.54))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(width: 240, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(StudioTheme.Palette.accent.opacity(0.55), lineWidth: 1)
+        }
+    }
+
+    var layerInsertionIndicator: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(StudioTheme.Palette.accentBright)
+                .frame(width: 10, height: 10)
+
+            Capsule(style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            StudioTheme.Palette.accentBright.opacity(0.92),
+                            StudioTheme.Palette.accent.opacity(0.72)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(height: 5)
+
+            Circle()
+                .fill(StudioTheme.Palette.accentBright)
+                .frame(width: 10, height: 10)
+        }
+        .padding(.horizontal, 12)
+        .shadow(color: StudioTheme.Palette.accentGlow.opacity(0.42), radius: 10, x: 0, y: 0)
+    }
+
+    func layerDragHandle(for layer: LayerRowModel, snapshot: MetalLayerSnapshot?) -> some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.34))
+            .frame(width: 14, height: 32)
+            .contentShape(Rectangle())
+            .onDrag {
+                draggedLayerIndex = layer.index
+                dropTargetLayerIndex = layer.index
+                return NSItemProvider(object: NSString(string: "\(layer.index)"))
+            } preview: {
+                layerRowDragPreview(for: layer, snapshot: snapshot)
+            }
+    }
+
+    func showsInsertionIndicator(for layer: LayerRowModel) -> Bool {
+        dropTargetLayerIndex == layer.index && draggedLayerIndex != layer.index
+    }
+
     func backgroundFill(for layer: LayerRowModel) -> Color {
-        if dropTargetLayerIndex == layer.index {
-            return StudioTheme.Palette.accent.opacity(0.18)
+        if showsInsertionIndicator(for: layer) {
+            return StudioTheme.Palette.accent.opacity(0.10)
         }
         return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill
     }
 
     func borderColor(for layer: LayerRowModel) -> Color {
-        if dropTargetLayerIndex == layer.index {
-            return StudioTheme.Palette.accentBright
+        if showsInsertionIndicator(for: layer) {
+            return StudioTheme.Palette.accent.opacity(0.55)
         }
         return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder
     }

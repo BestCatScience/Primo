@@ -48,7 +48,7 @@ extension BrushPaletteView {
 
                     Text(language.localized("Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。"))
                         .font(StudioTheme.Typography.body(11))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .select {
                     segmentedModeRow(
                         title: language.localized("選択アクション"),
@@ -111,16 +111,16 @@ extension BrushPaletteView {
                                 .font(StudioTheme.Typography.label(12))
                             Spacer(minLength: 0)
                         }
-                        .foregroundStyle(.white.opacity(0.88))
+                        .foregroundStyle(panelPrimaryTextStyle)
                         .padding(.horizontal, 12)
                         .frame(minHeight: 38)
                         .background(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(StudioTheme.Palette.cardFillStrong)
+                                .fill(panelCardFillStrong)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                                .stroke(panelCardBorder, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -128,7 +128,7 @@ extension BrushPaletteView {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(hasSelection ? language.localized("Apple Pencil で選択範囲を移動します。適用するまで確定されません。") : language.localized("Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。"))
                             .font(StudioTheme.Typography.body(11))
-                            .foregroundStyle(.white.opacity(0.62))
+                            .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
 
                         HStack(spacing: 8) {
                             Button {
@@ -161,16 +161,16 @@ extension BrushPaletteView {
                                         .font(StudioTheme.Typography.label(12))
                                     Spacer(minLength: 0)
                                 }
-                                .foregroundStyle(.white.opacity(0.88))
+                                .foregroundStyle(panelPrimaryTextStyle)
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: 38)
                                 .background(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(StudioTheme.Palette.cardFillStrong)
+                                        .fill(panelCardFillStrong)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                                        .stroke(panelCardBorder, lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -263,7 +263,7 @@ extension BrushPaletteView {
             Toggle(isOn: $store.brush.scatterEnabled) {
                 Text(language.localized("散布を有効にする"))
                     .font(StudioTheme.Typography.title(12))
-                    .foregroundStyle(.white.opacity(0.88))
+                    .foregroundStyle(panelPrimaryTextStyle)
             }
             .tint(StudioTheme.Palette.accentBright)
             sliderRow(title: language.localized("スタンプ間隔"), value: "\(Int(store.brush.spacing * 100))%", slider: Slider(value: $store.brush.spacing, in: 0.08...0.8))
@@ -366,7 +366,7 @@ extension BrushPaletteView {
                     Toggle(isOn: $store.brush.dualEnabled) {
                         Text(language.localized("デュアルブラシを使う"))
                             .font(StudioTheme.Typography.label(11))
-                            .foregroundStyle(.white.opacity(0.86))
+                            .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.8) : .white.opacity(0.86))
                     }
                     .toggleStyle(.switch)
 

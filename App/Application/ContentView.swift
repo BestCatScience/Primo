@@ -71,6 +71,44 @@ struct ContentView: View {
         .sheet(isPresented: $showsNewCanvasSheet) {
             newCanvasSheet
         }
+        .overlay(alignment: .topLeading) {
+            if store.brushPalette.ui.showsBrushSettingsPopover {
+                GeometryReader { proxy in
+                    let panelWidth = min(max(proxy.size.width * 0.58, 520), 760)
+                    let panelHeight = min(max(proxy.size.height - 128, 520), 760)
+                    let panelX = min(max(proxy.size.width * 0.18, 156), 278)
+                    let panelY = min(max(proxy.size.height * 0.08, 72), 92)
+
+                    ZStack(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.001))
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                dismissBrushSettingsPopover()
+                            }
+
+                        BrushPaletteView(
+                            store: store.scope(
+                                state: \.brushPalette,
+                                action: \.brushPalette
+                            ),
+                            currentTool: store.canvas.currentTool,
+                            hasSelection: store.canvas.selection != nil,
+                            transformPreviewOffset: store.canvas.transformPreviewOffset,
+                            transformPreviewScale: store.canvas.transformPreviewScale,
+                            language: language,
+                            showsTitle: false,
+                            rendersFloatingPanelOnly: true
+                        )
+                        .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
+                        .offset(x: panelX, y: panelY)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                }
+                .zIndex(500)
+            }
+        }
         .overlay(alignment: .bottom) {
             if let bannerMessage = store.bannerMessage {
                 BannerToast(message: bannerMessage)

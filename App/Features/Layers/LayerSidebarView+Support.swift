@@ -107,6 +107,7 @@ struct LayerReorderDropDelegate: DropDelegate {
 
     func dropEntered(info: DropInfo) {
         guard let draggedLayerIndex, draggedLayerIndex != targetLayerIndex else { return }
+        guard dropTargetLayerIndex != targetLayerIndex else { return }
         dropTargetLayerIndex = targetLayerIndex
         moveAction(draggedLayerIndex, targetLayerIndex)
         self.draggedLayerIndex = targetLayerIndex

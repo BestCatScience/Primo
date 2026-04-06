@@ -37,6 +37,7 @@ extension BrushPaletteView {
                 .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.18), radius: 28, x: 0, y: 18)
+        .environment(\.colorScheme, .light)
     }
 
     var floatingPanelIsWide: Bool {

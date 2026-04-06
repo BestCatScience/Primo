@@ -12,7 +12,7 @@ extension BrushPaletteView {
                 if showHeaderTitle {
                     Text(panelTitle)
                         .font(StudioTheme.Typography.title(26))
-                        .foregroundStyle(.white.opacity(0.94))
+                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.8) : .white.opacity(0.94))
                 }
 
                 headerCard(showsChrome: true)
@@ -225,7 +225,7 @@ extension BrushPaletteView {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(currentTool == .fill ? language.localized("塗り色") : (currentTool == .eyedropper ? language.localized("取得色") : language.localized("色")))
                                 .font(StudioTheme.Typography.title(14))
-                                .foregroundStyle(.white.opacity(0.9))
+                                .foregroundStyle(panelStrongTextStyle)
                             Text(
                                 currentTool == .fill
                                     ? (store.library.selectedBrush?.name ?? language.localized("カスタム"))
@@ -234,7 +234,7 @@ extension BrushPaletteView {
                                         : (store.library.selectedBrush?.name ?? "\(store.brush.tipKind.localizedTitle(language)) \(language.localized("カスタム"))"))
                             )
                             .font(StudioTheme.Typography.body(11))
-                            .foregroundStyle(.white.opacity(0.52))
+                            .foregroundStyle(panelSecondaryTextStyle)
                         }
 
                         Spacer(minLength: 0)
@@ -245,7 +245,7 @@ extension BrushPaletteView {
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(StudioTheme.Palette.hairline)
+                                .fill(panelHairlineFill)
                         )
 
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
@@ -283,10 +283,10 @@ extension BrushPaletteView {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(language.localized("選択設定"))
                                 .font(StudioTheme.Typography.title(14))
-                                .foregroundStyle(.white.opacity(0.9))
+                                .foregroundStyle(panelStrongTextStyle)
                             Text(store.selection.toolMode == .lasso ? language.localized("Apple Pencil で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
                                 .font(StudioTheme.Typography.body(11))
-                                .foregroundStyle(.white.opacity(0.52))
+                                .foregroundStyle(panelSecondaryTextStyle)
                         }
 
                         Spacer(minLength: 0)

@@ -2,21 +2,57 @@ import SwiftUI
 import UIKit
 
 extension BrushPaletteView {
+    var usesLightPanelTheme: Bool {
+        rendersFloatingPanelOnly
+    }
+
+    var panelPrimaryTextStyle: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.78) : .white.opacity(0.88)
+    }
+
+    var panelSecondaryTextStyle: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.52) : .white.opacity(0.5)
+    }
+
+    var panelTertiaryTextStyle: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.4) : .white.opacity(0.48)
+    }
+
+    var panelStrongTextStyle: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.9) : .white.opacity(0.92)
+    }
+
+    var panelCardFill: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.03) : StudioTheme.Palette.cardFill
+    }
+
+    var panelCardFillStrong: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.05) : StudioTheme.Palette.cardFillStrong
+    }
+
+    var panelCardBorder: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.08) : StudioTheme.Palette.cardBorder
+    }
+
+    var panelHairlineFill: Color {
+        usesLightPanelTheme ? Color.black.opacity(0.04) : StudioTheme.Palette.hairline
+    }
+
     func sectionLabel(_ title: String) -> some View {
         Text(title.uppercased())
             .font(StudioTheme.Typography.mono(10))
-            .foregroundStyle(.white.opacity(0.48))
+            .foregroundStyle(panelTertiaryTextStyle)
     }
 
     func metricRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
                 .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(.white.opacity(0.48))
+                .foregroundStyle(panelTertiaryTextStyle)
             Spacer()
             Text(value)
                 .font(StudioTheme.Typography.title(12))
-                .foregroundStyle(.white.opacity(0.92))
+                .foregroundStyle(panelStrongTextStyle)
         }
     }
 
@@ -25,20 +61,27 @@ extension BrushPaletteView {
             HStack {
                 Text(title)
                     .font(StudioTheme.Typography.title(12))
-                    .foregroundStyle(.white.opacity(0.88))
+                    .foregroundStyle(panelPrimaryTextStyle)
                 Spacer()
                 Text(value)
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(panelSecondaryTextStyle)
             }
             if isFullHeight {
-                GeometryReader { geometry in
+                if usesLightPanelTheme {
                     slider
                         .tint(StudioTheme.Palette.accentBright)
-                        .frame(height: proxy?.size.height ?? geometry.size.height)
+                        .frame(minHeight: 36)
                         .contentShape(Rectangle())
+                } else {
+                    GeometryReader { geometry in
+                        slider
+                            .tint(StudioTheme.Palette.accentBright)
+                            .frame(height: proxy?.size.height ?? geometry.size.height)
+                            .contentShape(Rectangle())
+                    }
+                    .frame(height: proxy?.size.height ?? 200)
                 }
-                .frame(height: proxy?.size.height ?? 200)
             } else {
                 slider
                     .tint(StudioTheme.Palette.accentBright)
@@ -57,11 +100,11 @@ extension BrushPaletteView {
             HStack {
                 Text(title)
                     .font(StudioTheme.Typography.title(12))
-                    .foregroundStyle(.white.opacity(0.88))
+                    .foregroundStyle(panelPrimaryTextStyle)
                 Spacer()
                 Text(selectedTitle)
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(panelSecondaryTextStyle)
             }
             content()
                 .frame(minHeight: 32)
@@ -87,21 +130,21 @@ extension BrushPaletteView {
                 HStack(spacing: 8) {
                     Text(selection.wrappedValue.localizedTitle(language))
                         .font(StudioTheme.Typography.label(11))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.84) : .white.opacity(0.9))
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.48))
+                        .foregroundStyle(panelTertiaryTextStyle)
                 }
                 .padding(.horizontal, 12)
                 .frame(minHeight: 36)
                 .background(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(StudioTheme.Palette.cardFillStrong)
+                        .fill(panelCardFillStrong)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                        .stroke(panelCardBorder, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -189,7 +232,7 @@ extension BrushPaletteView {
         VStack(spacing: 6) {
             Text(title)
                 .font(StudioTheme.Typography.mono(8))
-                .foregroundStyle(.white.opacity(0.46))
+                .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.42) : .white.opacity(0.46))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
@@ -199,7 +242,7 @@ extension BrushPaletteView {
 
             Text(valueText)
                 .font(StudioTheme.Typography.mono(8))
-                .foregroundStyle(.white.opacity(0.68))
+                .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.62) : .white.opacity(0.68))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -216,7 +259,7 @@ extension BrushPaletteView {
                 Group {
                     if showsChrome {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(StudioTheme.Palette.cardFill)
+                            .fill(panelCardFill)
                     }
                 }
             )
@@ -224,7 +267,7 @@ extension BrushPaletteView {
                 Group {
                     if showsChrome {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                            .stroke(panelCardBorder, lineWidth: 1)
                     }
                 }
             )
@@ -460,16 +503,20 @@ extension BrushPaletteView {
 
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.82))
+            .foregroundStyle(
+                usesLightPanelTheme
+                    ? Color.black.opacity(isSelected ? 0.86 : 0.72)
+                    : .white.opacity(isSelected ? 0.96 : 0.82)
+            )
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? StudioTheme.Palette.accent.opacity(0.28) : StudioTheme.Palette.hairline)
+                    .fill(isSelected ? StudioTheme.Palette.accent.opacity(0.18) : panelHairlineFill)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? StudioTheme.Palette.accent : StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    .stroke(isSelected ? StudioTheme.Palette.accent.opacity(0.75) : panelCardBorder, lineWidth: 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }

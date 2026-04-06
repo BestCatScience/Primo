@@ -16,39 +16,26 @@ struct BrushPaletteView: View {
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
     @State var importErrorMessage: String?
+    var rendersFloatingPanelOnly = false
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {
         GeometryReader { proxy in
-            HStack(alignment: .top, spacing: 14) {
-                if showsBrushLibrarySidebar {
-                    brushLibrarySidebar
-                        .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
-                        .zIndex(1)
-                } else {
-                    settingsPanelContent(proxy: proxy, showHeaderTitle: showsTitle)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .overlay(alignment: .topLeading) {
-                if store.ui.showsBrushSettingsPopover && showsBrushLibrarySidebar {
-                    let panelWidth = floatingPanelWidth(in: proxy)
-                    ZStack(alignment: .topLeading) {
-                        Rectangle()
-                            .fill(Color.black.opacity(0.001))
-                            .contentShape(Rectangle())
-                            .ignoresSafeArea()
-                            .onTapGesture {
-                                store.ui.showsBrushSettingsPopover = false
-                            }
-
-                        floatingBrushSettingsPanel(proxy: proxy)
-                            .frame(width: panelWidth)
-                            .offset(x: floatingPanelXOffset, y: 0)
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                            .zIndex(10)
+            if rendersFloatingPanelOnly {
+                floatingBrushSettingsPanel(proxy: proxy)
+                    .frame(width: floatingPanelWidth(in: proxy))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                HStack(alignment: .top, spacing: 14) {
+                    if showsBrushLibrarySidebar {
+                        brushLibrarySidebar
+                            .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
+                            .zIndex(1)
+                    } else {
+                        settingsPanelContent(proxy: proxy, showHeaderTitle: showsTitle)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.ui.showsBrushSettingsPopover)
