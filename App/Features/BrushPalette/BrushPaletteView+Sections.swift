@@ -197,7 +197,7 @@ extension BrushPaletteView {
         }
     }
 
-    func controlsCard(proxy: GeometryProxy, showsChrome: Bool) -> some View {
+    func controlsCard(proxy: GeometryProxy, showsChrome: Bool, showsCategoryPicker: Bool = true) -> some View {
         cardContainer(showsChrome: showsChrome) {
             VStack(alignment: .leading, spacing: 10) {
                 if currentTool == .fill {
@@ -372,12 +372,14 @@ extension BrushPaletteView {
                         }
                     }
                 } else {
-                    Picker("", selection: $selectedBrushSettingsCategory) {
-                        ForEach(BrushSettingsCategory.allCases) { category in
-                            Text(category.localizedTitle(language)).tag(category)
+                    if showsCategoryPicker {
+                        Picker("", selection: $selectedBrushSettingsCategory) {
+                            ForEach(BrushSettingsCategory.allCases) { category in
+                                Text(category.localizedTitle(language)).tag(category)
+                            }
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
 
                     switch selectedBrushSettingsCategory {
                     case .tip:
@@ -684,7 +686,7 @@ extension BrushPaletteView {
 
     var currentBrushPreviewStyle: BrushPreviewStyle {
         BrushPreviewStyle(
-            color: .white,
+            color: currentDetailPreviewColor,
             radius: store.brushRadius,
             opacity: store.brushOpacity,
             roundness: store.brushRoundness,
@@ -700,6 +702,30 @@ extension BrushPaletteView {
             textureStrength: store.brushTextureStrength,
             flow: store.brushFlow
         )
+    }
+
+    var currentDetailPreviewColor: Color {
+        let resolved = UIColor(store.brushColor)
+        var white: CGFloat = 0
+        var alpha: CGFloat = 0
+        if resolved.getWhite(&white, alpha: &alpha), white > 0.9 {
+            return Color.black.opacity(0.88)
+        }
+
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+        if luminance > 0.82 {
+            return Color(
+                red: Double(red * 0.28),
+                green: Double(green * 0.28),
+                blue: Double(blue * 0.28)
+            )
+        }
+
+        return store.brushColor
     }
 
     var sectionTitle: String {
@@ -1024,57 +1050,251 @@ extension BrushPaletteView {
     }
 
     func floatingBrushSettingsPanel(proxy: GeometryProxy) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
+        VStack(spacing: 0) {
+            floatingPanelHeader
+                .padding(.horizontal, floatingPanelHorizontalPadding)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(language.localized("ブラシ設定"))
-                        .font(StudioTheme.Typography.title(15))
-                        .foregroundStyle(.white.opacity(0.92))
-                    Text(store.selectedBrush?.name ?? (language.localized("カスタムブラシ")))
-                        .font(StudioTheme.Typography.body(11))
-                        .foregroundStyle(.white.opacity(0.48))
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    floatingPanelTopSection
+                    floatingPanelCategoryStrip
+                    floatingPanelCategoryContent(proxy: proxy)
                 }
+                .padding(.horizontal, floatingPanelHorizontalPadding)
+                .padding(.bottom, 24)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.98),
+                            Color(red: 0.97, green: 0.97, blue: 0.96)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 28, x: 0, y: 18)
+    }
 
-                Spacer(minLength: 0)
+    var floatingPanelIsWide: Bool {
+        UIScreen.main.bounds.width >= 900
+    }
 
+    var floatingPanelHorizontalPadding: CGFloat {
+        floatingPanelIsWide ? 24 : 18
+    }
+
+    var floatingPanelHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                showsBrushSettingsPopover = false
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.black.opacity(0.62))
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.04))
+                    )
+            }
+            .buttonStyle(.plain)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(store.selectedBrush?.name ?? currentTool.localizedTitle(language))
+                    .font(StudioTheme.Typography.title(16))
+                    .foregroundStyle(Color.black.opacity(0.72))
+                Text(language.localized("ブラシの詳細設定"))
+                    .font(StudioTheme.Typography.body(11))
+                    .foregroundStyle(Color.black.opacity(0.38))
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    @ViewBuilder
+    var floatingPanelTopSection: some View {
+        if floatingPanelIsWide {
+            HStack(alignment: .top, spacing: 18) {
+                floatingPanelPreviewCard
+                    .frame(maxWidth: .infinity)
+                floatingPanelPrimaryControls
+                    .frame(width: 240)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                floatingPanelPreviewCard
+                floatingPanelPrimaryControls
+            }
+        }
+    }
+
+    var floatingPanelPreviewCard: some View {
+        RoundedRectangle(cornerRadius: 26, style: .continuous)
+            .fill(Color.white)
+            .frame(height: floatingPanelIsWide ? 186 : 150)
+            .overlay(
+                BrushStrokePreview(style: currentBrushPreviewStyle)
+                    .padding(.horizontal, floatingPanelIsWide ? 24 : 18)
+                    .padding(.vertical, floatingPanelIsWide ? 18 : 14)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 8)
+    }
+
+    var floatingPanelPrimaryControls: some View {
+        VStack(spacing: 14) {
+            heroSliderRow(
+                title: language.localized("ブラシサイズ"),
+                value: String(format: "%.1f", store.brushRadius),
+                slider: Slider(value: $store.brushRadius, in: 1...100)
+            )
+
+            heroSliderRow(
+                title: language.localized("不透明度"),
+                value: "\(Int((store.brushOpacity * 100).rounded()))",
+                slider: Slider(value: $store.brushOpacity, in: 0.1...1.0)
+            )
+
+            Button {
+                store.send(.resetCurrentBrushSettingsButtonTapped)
+            } label: {
+                Text(language.localized("設定をリセット"))
+                    .font(StudioTheme.Typography.title(14))
+                    .foregroundStyle(Color.black.opacity(0.52))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.black.opacity(0.06))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, floatingPanelIsWide ? 4 : 0)
+        .padding(.vertical, floatingPanelIsWide ? 8 : 0)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.black.opacity(floatingPanelIsWide ? 0.03 : 0.0))
+        )
+    }
+
+    var floatingPanelCategoryStrip: some View {
+        HStack(spacing: 12) {
+            ForEach(BrushSettingsCategory.allCases) { category in
+                let isSelected = selectedBrushSettingsCategory == category
                 Button {
-                    showsBrushSettingsPopover = false
+                    selectedBrushSettingsCategory = category
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.88))
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(StudioTheme.Palette.hairline)
-                        )
+                    VStack(spacing: 6) {
+                        Image(systemName: category.systemImage)
+                            .font(.system(size: 15, weight: .semibold))
+                        Text(category.localizedTitle(language))
+                            .font(StudioTheme.Typography.mono(9))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(isSelected ? Color.white : Color.black.opacity(0.52))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: floatingPanelIsWide ? 60 : 54)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(isSelected ? StudioTheme.Palette.accent : Color.black.opacity(0.05))
+                    )
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    headerCard(showsChrome: false)
-                    controlsCard(proxy: proxy, showsChrome: false)
-                    detailCard(showsChrome: false)
-                }
-                .padding(.bottom, 6)
+    @ViewBuilder
+    func floatingPanelCategoryContent(proxy: GeometryProxy) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            categorySummaryPills
+            controlsCard(proxy: proxy, showsChrome: true, showsCategoryPicker: false)
+            if selectedBrushSettingsCategory == .texture {
+                detailCard(showsChrome: true)
             }
         }
-        .padding(14)
+        .padding(.top, 2)
+    }
+
+    var categorySummaryPills: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                summaryPill(
+                    title: language.localized("先端"),
+                    value: store.brushTipKind.localizedTitle(language)
+                )
+                summaryPill(
+                    title: language.localized("硬さ"),
+                    value: "\(Int((store.brushHardness * 100).rounded()))%"
+                )
+                summaryPill(
+                    title: language.localized("フロー"),
+                    value: "\(Int((store.brushFlow * 100).rounded()))%"
+                )
+                summaryPill(
+                    title: language.localized("散布"),
+                    value: store.brushScatterEnabled ? language.localized("オン") : language.localized("オフ")
+                )
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    func summaryPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(StudioTheme.Typography.mono(9))
+                .foregroundStyle(Color.black.opacity(0.35))
+            Text(value)
+                .font(StudioTheme.Typography.title(12))
+                .foregroundStyle(Color.black.opacity(0.68))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+            Capsule(style: .continuous)
+                .fill(Color.black.opacity(0.05))
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.26), radius: 18, x: 0, y: 16)
+    }
+
+    func heroSliderRow<SliderView: View>(title: String, value: String, slider: SliderView) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(StudioTheme.Typography.title(floatingPanelIsWide ? 16 : 15))
+                    .foregroundStyle(Color.black.opacity(0.72))
+
+                slider
+                    .tint(Color.black.opacity(0.55))
+                    .frame(minHeight: floatingPanelIsWide ? 36 : 32)
+            }
+
+            Text(value)
+                .font(StudioTheme.Typography.title(floatingPanelIsWide ? 16 : 15))
+                .foregroundStyle(Color.black.opacity(0.64))
+                .frame(minWidth: floatingPanelIsWide ? 84 : 74)
+                .frame(height: floatingPanelIsWide ? 46 : 42)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.black.opacity(0.07))
+                )
+        }
     }
 
     func brushLibrarySection(

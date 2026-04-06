@@ -155,6 +155,7 @@ struct BrushPaletteFeature {
         case selectPreset(BrushPreset)
         case importedPresets([BrushPreset])
         case saveCurrentBrushButtonTapped
+        case resetCurrentBrushSettingsButtonTapped
         case deleteSavedPresetButtonTapped(String)
         case clearActiveLayerButtonTapped
         case clearSelectionButtonTapped
@@ -272,6 +273,9 @@ struct BrushPaletteFeature {
                         state.applyPreset(preset)
                     }
                 }
+                return .none
+            case .resetCurrentBrushSettingsButtonTapped:
+                state.applyPreset(state.selectedBrush ?? .defaultPencil)
                 return .none
             case let .deleteSavedPresetButtonTapped(name):
                 if let saved = try? BrushPresetStore.deletePreset(named: name) {

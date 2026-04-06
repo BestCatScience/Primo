@@ -26,9 +26,10 @@ struct BrushPaletteView: View {
                         .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
                         .overlay(alignment: .topLeading) {
                             if showsBrushSettingsPopover {
+                                let panelWidth = floatingPanelWidth
                                 floatingBrushSettingsPanel(proxy: proxy)
-                                    .frame(width: min(proxy.size.width * 0.48, 420))
-                                    .offset(x: 210, y: 0)
+                                    .frame(width: panelWidth)
+                                    .offset(x: floatingPanelXOffset, y: 0)
                                     .transition(.move(edge: .leading).combined(with: .opacity))
                                     .zIndex(10)
                             }
@@ -99,5 +100,14 @@ struct BrushPaletteView: View {
                 Text(importErrorMessage ?? "")
             }
         )
+    }
+
+    private var floatingPanelWidth: CGFloat {
+        let screenWidth = UIScreen.main.bounds.width
+        return min(max(screenWidth * 0.42, 520), 720)
+    }
+
+    private var floatingPanelXOffset: CGFloat {
+        208
     }
 }

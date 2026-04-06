@@ -45,6 +45,19 @@ enum BrushSettingsCategory: String, CaseIterable, Identifiable {
             return StudioStrings.brushSettingsCategoryTexture(language)
         }
     }
+
+    var systemImage: String {
+        switch self {
+        case .tip:
+            return "pencil.tip"
+        case .scatter:
+            return "sparkles"
+        case .stroke:
+            return "slider.horizontal.3"
+        case .texture:
+            return "square.grid.3x3.fill"
+        }
+    }
 }
 
 struct BrushPreviewStyle {
