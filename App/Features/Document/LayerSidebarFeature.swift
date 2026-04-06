@@ -21,6 +21,7 @@ struct LayerSidebarFeature {
         case visibilityButtonTapped(Int)
         case opacityChanged(Int, Double)
         case blendModeSelected(Int, LayerBlendMode)
+        case renameLayerCommitted(Int, String)
         case deleteLayerButtonTapped(Int)
         case moveLayerRequested(Int, Int)
         case paperRowTapped
@@ -34,6 +35,7 @@ struct LayerSidebarFeature {
         case toggleVisibility(Int)
         case setOpacity(Int, Double)
         case setBlendMode(Int, LayerBlendMode)
+        case renameLayer(Int, String)
         case deleteLayer(Int)
         case moveLayer(Int, Int)
     }
@@ -55,6 +57,12 @@ struct LayerSidebarFeature {
                 return .send(.delegate(.setOpacity(index, opacity)))
             case let .blendModeSelected(index, blendMode):
                 return .send(.delegate(.setBlendMode(index, blendMode)))
+            case let .renameLayerCommitted(index, name):
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else {
+                    return .none
+                }
+                return .send(.delegate(.renameLayer(index, trimmed)))
             case let .deleteLayerButtonTapped(index):
                 return .send(.delegate(.deleteLayer(index)))
             case let .moveLayerRequested(sourceIndex, destinationIndex):

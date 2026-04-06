@@ -8,6 +8,9 @@ struct LayerSidebarView: View {
     var showsTitle = true
     @State var draggedLayerIndex: Int?
     @State var dropTargetLayerIndex: Int?
+    @State var editingLayerIndex: Int?
+    @State var editingLayerName = ""
+    @FocusState var focusedLayerEditorIndex: Int?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -57,5 +60,14 @@ struct LayerSidebarView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: editingLayerIndex) { _, newValue in
+            guard let newValue else {
+                focusedLayerEditorIndex = nil
+                return
+            }
+            DispatchQueue.main.async {
+                focusedLayerEditorIndex = newValue
+            }
+        }
     }
 }

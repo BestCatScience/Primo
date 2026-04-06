@@ -21,6 +21,7 @@ struct PaintDocumentClient: Sendable {
     var deleteLayer: @Sendable (Int) -> Bool
     var moveLayer: @Sendable (Int, Int) -> Bool
     var setActiveLayer: @Sendable (Int) -> Void
+    var setLayerName: @Sendable (Int, String) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
@@ -52,6 +53,7 @@ struct PaintDocumentClient: Sendable {
             deleteLayer: { index in sessionBox.session.deleteLayer(index: index) },
             moveLayer: { index, destination in sessionBox.session.moveLayer(from: index, to: destination) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
+            setLayerName: { index, name in sessionBox.session.setLayerName(index: index, name: name) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },

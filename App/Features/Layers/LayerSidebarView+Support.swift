@@ -44,7 +44,7 @@ struct PaperLayerEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(language.localized("紙質"))
+            Text(language.localized("用紙"))
                 .font(StudioTheme.Typography.title(18))
                 .foregroundStyle(.white.opacity(0.94))
 

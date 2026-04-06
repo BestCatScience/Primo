@@ -174,6 +174,7 @@ public:
     bool deleteLayer(int index);
     bool moveLayer(int fromIndex, int toIndex);
     void clearLayer(int index);
+    void setLayerName(int index, std::string name);
     void setLayerVisibility(int index, bool visible);
     void setLayerOpacity(int index, float opacity);
     void setLayerBlendMode(int index, Layer::BlendMode blendMode);

@@ -189,7 +189,7 @@ extension BrushPaletteView {
                             metricRow(language.localized("散布"), value: store.brush.scatterEnabled ? language.localized("オン") : language.localized("オフ"))
                             metricRow(language.localized("テクスチャ"), value: store.brush.textureMode.localizedTitle(language))
                             metricRow(language.localized("フロー"), value: "\(Int(store.brush.flow * 100))%")
-                            metricRow(language.localized("紙質"), value: "\(Int(store.brush.paperStrength * 100))%")
+                            metricRow(language.localized("用紙"), value: "\(Int(store.brush.paperStrength * 100))%")
                         }
                     }
                 }

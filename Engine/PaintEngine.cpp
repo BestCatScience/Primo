@@ -648,6 +648,17 @@ void PaintDocument::clearLayer(int index) {
     compositeDirty_ = true;
 }
 
+void PaintDocument::setLayerName(int index, std::string name) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (name.empty() || layers_[index].name == name) {
+        return;
+    }
+    pushLayerHistorySnapshot(index);
+    layers_[index].name = std::move(name);
+}
+
 void PaintDocument::setLayerVisibility(int index, bool visible) {
     if (index < 0 || index >= layerCount()) {
         return;

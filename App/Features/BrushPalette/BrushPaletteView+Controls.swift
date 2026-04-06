@@ -393,11 +393,11 @@ extension BrushPaletteView {
                 }
             }
             segmentedModeRow(
-                title: language.localized("紙質テクスチャ"),
+                title: language.localized("用紙テクスチャ"),
                 selectedTitle: "\(Int(store.brush.paperStrength * 100))%"
             ) {
                 VStack(alignment: .leading, spacing: 10) {
-                    sliderRow(title: language.localized("紙質の強さ"), value: "\(Int(store.brush.paperStrength * 100))%", slider: Slider(value: $store.brush.paperStrength, in: 0.0...1.0))
+                    sliderRow(title: language.localized("用紙の強さ"), value: "\(Int(store.brush.paperStrength * 100))%", slider: Slider(value: $store.brush.paperStrength, in: 0.0...1.0))
                     sliderRow(title: language.localized("紙目スケール"), value: String(format: "%.2f", store.brush.paperScale), slider: Slider(value: $store.brush.paperScale, in: 0.04...0.30))
                     sliderRow(title: language.localized("紙目しきい値"), value: "\(Int(store.brush.paperThreshold * 100))%", slider: Slider(value: $store.brush.paperThreshold, in: 0.15...0.75))
                     sliderRow(title: language.localized("粒状感"), value: String(format: "%.2f", store.brush.grainScale), slider: Slider(value: $store.brush.grainScale, in: 0.6...2.8))

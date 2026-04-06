@@ -584,6 +584,11 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case let .layerSidebar(.delegate(.renameLayer(index, name))):
+                paintDocumentClient.setLayerName(index, name)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case let .canvas(.delegate(.beginStroke(sample))):
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil

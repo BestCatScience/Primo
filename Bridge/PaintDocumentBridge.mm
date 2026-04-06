@@ -335,6 +335,10 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     _document->clearLayer((int)index);
 }
 
+- (void)setLayerName:(NSString *)name atIndex:(NSInteger)index {
+    _document->setLayerName((int)index, name.UTF8String);
+}
+
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index {
     _document->setLayerVisibility((int)index, visible);
 }

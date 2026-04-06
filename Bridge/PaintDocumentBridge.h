@@ -132,6 +132,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(pixelDataForLayer(at:));
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:data:));
 - (void)clearLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(clearLayer(at:));
+- (void)setLayerName:(NSString *)name atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerName(_:at:));
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerVisible(_:at:));
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerOpacity(_:at:));
 - (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerBlendMode(_:at:));

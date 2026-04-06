@@ -181,6 +181,10 @@ final class PaintDocumentSession: @unchecked Sendable {
         bridge.activeLayerIndex = index
     }
 
+    func setLayerName(index: Int, name: String) {
+        bridge.setLayerName(name, at: index)
+    }
+
     func setLayerVisibility(index: Int, isVisible: Bool) {
         bridge.setLayerVisible(isVisible, at: index)
         captureTimelapseFrame()
