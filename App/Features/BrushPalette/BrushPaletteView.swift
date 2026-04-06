@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 struct BrushPaletteView: View {
     @Bindable var store: StoreOf<BrushPaletteFeature>
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     let currentTool: StudioToolKind
     let hasSelection: Bool
     let transformPreviewOffset: CGSize
@@ -12,7 +13,6 @@ struct BrushPaletteView: View {
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
-    @State var showsBrushSettingsPopover = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
     @State var importErrorMessage: String?
@@ -24,24 +24,34 @@ struct BrushPaletteView: View {
                 if showsBrushLibrarySidebar {
                     brushLibrarySidebar
                         .frame(minWidth: 196, maxWidth: .infinity, alignment: .topLeading)
-                        .overlay(alignment: .topLeading) {
-                            if showsBrushSettingsPopover {
-                                let panelWidth = floatingPanelWidth
-                                floatingBrushSettingsPanel(proxy: proxy)
-                                    .frame(width: panelWidth)
-                                    .offset(x: floatingPanelXOffset, y: 0)
-                                    .transition(.move(edge: .leading).combined(with: .opacity))
-                                    .zIndex(10)
-                            }
-                        }
                         .zIndex(1)
                 } else {
                     settingsPanelContent(proxy: proxy, showHeaderTitle: showsTitle)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .overlay(alignment: .topLeading) {
+                if store.showsBrushSettingsPopover && showsBrushLibrarySidebar {
+                    let panelWidth = floatingPanelWidth(in: proxy)
+                    ZStack(alignment: .topLeading) {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.001))
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                store.showsBrushSettingsPopover = false
+                            }
+
+                        floatingBrushSettingsPanel(proxy: proxy)
+                            .frame(width: panelWidth)
+                            .offset(x: floatingPanelXOffset, y: 0)
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                            .zIndex(10)
+                    }
+                }
+            }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: showsBrushSettingsPopover)
+        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.showsBrushSettingsPopover)
         .fileImporter(
             isPresented: $isImportingBrush,
             allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],
@@ -102,9 +112,12 @@ struct BrushPaletteView: View {
         )
     }
 
-    private var floatingPanelWidth: CGFloat {
-        let screenWidth = UIScreen.main.bounds.width
-        return min(max(screenWidth * 0.42, 520), 720)
+    private func floatingPanelWidth(in proxy: GeometryProxy) -> CGFloat {
+        let availableWidth = proxy.size.width + floatingPanelXOffset + 80
+        if horizontalSizeClass == .regular {
+            return min(max(availableWidth * 0.72, 560), 720)
+        }
+        return min(max(availableWidth * 0.9, 360), 460)
     }
 
     private var floatingPanelXOffset: CGFloat {

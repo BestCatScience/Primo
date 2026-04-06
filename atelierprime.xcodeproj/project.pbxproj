@@ -44,11 +44,13 @@
 		A0000000000000000000009C /* BrushPaletteControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009D /* BrushPaletteControls.swift */; };
 		A0000000000000000000009E /* BrushPaletteView+Bindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009F /* BrushPaletteView+Bindings.swift */; };
 		A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A1 /* BrushPaletteView+Sections.swift */; };
-		A000000000000000000000A2 /* BrushPaletteView+Previews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A3 /* BrushPaletteView+Previews.swift */; };
 		A000000000000000000000A4 /* AppFeature+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A5 /* AppFeature+Helpers.swift */; };
 		A000000000000000000000A6 /* TimelapseExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A7 /* TimelapseExporter.swift */; };
 		A000000000000000000000A8 /* ContentView+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A9 /* ContentView+Menus.swift */; };
 		A000000000000000000000AA /* ContentView+Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AB /* ContentView+Workspace.swift */; };
+		A000000000000000000000AC /* BrushPaletteView+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AD /* BrushPaletteView+Controls.swift */; };
+		A000000000000000000000AE /* BrushPaletteView+FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AF /* BrushPaletteView+FloatingPanel.swift */; };
+		A000000000000000000000B0 /* BrushPaletteView+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B1 /* BrushPaletteView+Components.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -94,10 +96,12 @@
 		A0000000000000000000009D /* BrushPaletteControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteControls.swift; sourceTree = "<group>"; };
 		A0000000000000000000009F /* BrushPaletteView+Bindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Bindings.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A1 /* BrushPaletteView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Sections.swift"; sourceTree = "<group>"; };
-		A000000000000000000000A3 /* BrushPaletteView+Previews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Previews.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A5 /* AppFeature+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+Helpers.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* TimelapseExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseExporter.swift; sourceTree = "<group>"; };
 		A000000000000000000000AB /* ContentView+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Workspace.swift"; sourceTree = "<group>"; };
+		A000000000000000000000AD /* BrushPaletteView+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Controls.swift"; sourceTree = "<group>"; };
+		A000000000000000000000AF /* BrushPaletteView+FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+FloatingPanel.swift"; sourceTree = "<group>"; };
+		A000000000000000000000B1 /* BrushPaletteView+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Components.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -250,7 +254,9 @@
 				A0000000000000000000009D /* BrushPaletteControls.swift */,
 				A00000000000000000000006 /* BrushPaletteView.swift */,
 				A0000000000000000000009F /* BrushPaletteView+Bindings.swift */,
-				A000000000000000000000A3 /* BrushPaletteView+Previews.swift */,
+				A000000000000000000000AD /* BrushPaletteView+Controls.swift */,
+				A000000000000000000000B1 /* BrushPaletteView+Components.swift */,
+				A000000000000000000000AF /* BrushPaletteView+FloatingPanel.swift */,
 				A000000000000000000000A1 /* BrushPaletteView+Sections.swift */,
 			);
 			path = BrushPalette;
@@ -371,7 +377,9 @@
 				A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */,
 				A00000000000000000000026 /* BrushPaletteView.swift in Sources */,
 				A0000000000000000000009E /* BrushPaletteView+Bindings.swift in Sources */,
-				A000000000000000000000A2 /* BrushPaletteView+Previews.swift in Sources */,
+				A000000000000000000000AC /* BrushPaletteView+Controls.swift in Sources */,
+				A000000000000000000000B0 /* BrushPaletteView+Components.swift in Sources */,
+				A000000000000000000000AE /* BrushPaletteView+FloatingPanel.swift in Sources */,
 				A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */,
 				A00000000000000000000043 /* CanvasFeature.swift in Sources */,
 				A00000000000000000000025 /* CanvasView.swift in Sources */,

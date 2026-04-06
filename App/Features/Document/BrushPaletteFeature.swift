@@ -74,6 +74,7 @@ struct BrushPaletteFeature {
         var brushColor: Color = BrushPreset.defaultPencil.color
         var paperColor: Color = Color(red: 0.93, green: 0.93, blue: 0.91)
         var transparentPaper = false
+        var showsBrushSettingsPopover = false
         var selectedBrush: BrushPreset? = .defaultPencil
         var presets: [BrushPreset] = BrushPreset.defaults
         var savedPresets: [BrushPreset] = BrushPresetStore.loadSavedPresets()

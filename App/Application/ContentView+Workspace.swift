@@ -1,6 +1,12 @@
 import SwiftUI
 
 extension ContentView {
+    func dismissBrushSettingsPopover() {
+        if store.brushPalette.showsBrushSettingsPopover {
+            store.send(.brushPalette(.binding(.set(\.showsBrushSettingsPopover, false))))
+        }
+    }
+
     var centerStage: some View {
         ZStack {
             ZStack {
@@ -77,6 +83,11 @@ extension ContentView {
                 .padding(.top, 6)
             }
         }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                dismissBrushSettingsPopover()
+            }
+        )
     }
 
     var toolDockColumn: some View {
@@ -137,6 +148,13 @@ extension ContentView {
                     }
                 }
         }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                if panel != .brush {
+                    dismissBrushSettingsPopover()
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -175,6 +193,10 @@ extension ContentView {
             }
         }
         .frame(maxHeight: panelState.isCollapsed ? 68 : .infinity, alignment: .top)
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .onTapGesture(count: 2) {
+            store.send(.panelCollapseToggled(panel))
+        }
     }
 
     func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
@@ -228,23 +250,7 @@ extension ContentView {
             ForEach(studioTools) { tool in
                 let isActive = store.canvas.currentTool == tool
 
-                Button {
-                    store.send(.toolSelected(tool))
-                } label: {
-                    Image(systemName: tool.systemImage)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
-                        .frame(width: 42, height: 42)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
-                        )
-                }
-                .buttonStyle(.plain)
+                toolDockItem(tool: tool, isActive: isActive)
                 .minimumHitTarget()
                 .accessibilityLabel(tool.localizedTitle(language))
             }
@@ -261,5 +267,34 @@ extension ContentView {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         )
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                dismissBrushSettingsPopover()
+            }
+        )
+    }
+
+    func toolDockItem(tool: StudioToolKind, isActive: Bool) -> some View {
+        Image(systemName: tool.systemImage)
+            .font(.system(size: 15, weight: .bold))
+            .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
+            .frame(width: 42, height: 42)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onTapGesture {
+                store.send(.toolSelected(tool))
+            }
+            .onLongPressGesture(minimumDuration: 0.45) {
+                if tool == .brush {
+                    store.send(.toolLongPressed(tool))
+                }
+            }
     }
 }

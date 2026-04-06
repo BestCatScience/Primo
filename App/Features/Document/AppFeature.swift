@@ -207,6 +207,7 @@ struct AppFeature {
         case bannerDismissed
         case languageChanged(AppLanguage)
         case toolSelected(StudioToolKind)
+        case toolLongPressed(StudioToolKind)
         case clearActiveLayerButtonTapped
         case activeLayerVisibilityToggled
         case selectPreviousLayer
@@ -416,6 +417,25 @@ struct AppFeature {
                     if tool != .move {
                         state.canvas.selection = nil
                     }
+                }
+                state.canvas.previewStyle = state.previewStrokeStyle()
+                return .none
+
+            case let .toolLongPressed(tool):
+                state.canvas.currentTool = tool
+                state.canvas.selectionMode = state.brushPalette.selectionToolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                if tool != .select {
+                    if tool != .move {
+                        state.canvas.selection = nil
+                    }
+                }
+                if tool == .brush {
+                    state.brushPanel.isCollapsed = false
+                    state.brushPalette.showsBrushSettingsPopover = true
                 }
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
