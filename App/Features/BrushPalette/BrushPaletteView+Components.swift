@@ -194,7 +194,8 @@ extension BrushPaletteView {
                 .minimumScaleFactor(0.7)
 
             VerticalValueSlider(value: normalizedValue)
-                .frame(width: 30, height: 132)
+                .frame(width: 30)
+                .frame(minHeight: 132, maxHeight: .infinity)
 
             Text(valueText)
                 .font(StudioTheme.Typography.mono(8))
@@ -202,6 +203,7 @@ extension BrushPaletteView {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
+        .frame(maxHeight: .infinity)
     }
 
     func cardContainer<Content: View>(
@@ -301,14 +303,17 @@ extension BrushPaletteView {
                         set: { store.brush.radius = 1.0 + ($0 * 99.0) }
                     )
                 )
+                .frame(maxHeight: .infinity)
 
                 verticalBrushSlider(
                     title: language.localized("不透明"),
                     valueText: "\(Int((store.brush.opacity * 100).rounded()))%",
                     normalizedValue: $store.brush.opacity
                 )
+                .frame(maxHeight: .infinity)
             }
             .frame(width: 34)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 2)

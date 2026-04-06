@@ -51,6 +51,8 @@
 		A000000000000000000000AC /* BrushPaletteView+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AD /* BrushPaletteView+Controls.swift */; };
 		A000000000000000000000AE /* BrushPaletteView+FloatingPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AF /* BrushPaletteView+FloatingPanel.swift */; };
 		A000000000000000000000B0 /* BrushPaletteView+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B1 /* BrushPaletteView+Components.swift */; };
+		A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B3 /* LayerSidebarView+Rows.swift */; };
+		A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B5 /* LayerSidebarView+Support.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -102,6 +104,8 @@
 		A000000000000000000000AD /* BrushPaletteView+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Controls.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AF /* BrushPaletteView+FloatingPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+FloatingPanel.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B1 /* BrushPaletteView+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Components.swift"; sourceTree = "<group>"; };
+		A000000000000000000000B3 /* LayerSidebarView+Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Rows.swift"; sourceTree = "<group>"; };
+		A000000000000000000000B5 /* LayerSidebarView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Support.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -292,6 +296,8 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000007 /* LayerSidebarView.swift */,
+				A000000000000000000000B3 /* LayerSidebarView+Rows.swift */,
+				A000000000000000000000B5 /* LayerSidebarView+Support.swift */,
 			);
 			path = Layers;
 			sourceTree = "<group>";
@@ -388,6 +394,8 @@
 				A00000000000000000000044 /* InputHandler.swift in Sources */,
 				A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */,
 				A00000000000000000000027 /* LayerSidebarView.swift in Sources */,
+				A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */,
+				A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */,
 				A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */,
 				A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */,
 				A00000000000000000000094 /* BrushPresetStore.swift in Sources */,
