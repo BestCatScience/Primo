@@ -213,8 +213,7 @@ struct ColorHSB {
         var hue: CGFloat = 0
         var saturation: CGFloat = 0
         var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        resolved.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        resolved.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: nil)
         self.hue = Double(hue)
         self.saturation = Double(saturation)
         self.brightness = Double(brightness)

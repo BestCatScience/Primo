@@ -94,11 +94,11 @@ struct AppFeature {
             layerSidebar.layers = presentation.layerRows
             layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
-            layerSidebar.paperColor = brushPalette.paperColor
-            layerSidebar.transparentPaper = brushPalette.transparentPaper
+            layerSidebar.paperColor = brushPalette.paper.color
+            layerSidebar.transparentPaper = brushPalette.paper.isTransparent
             canvas.previewStyle = previewStrokeStyle()
-            canvas.selectionMode = brushPalette.selectionToolMode
-            canvas.eyedropperSamplingSource = brushPalette.eyedropperSamplingSource
+            canvas.selectionMode = brushPalette.selection.toolMode
+            canvas.eyedropperSamplingSource = brushPalette.sampling.eyedropperSource
             canvas.paperStyle = resolvedPaperStyle()
         }
 
@@ -147,7 +147,7 @@ struct AppFeature {
         }
 
         func resolvedPaperStyle() -> CanvasPaperStyle {
-            let resolved = UIColor(brushPalette.paperColor)
+            let resolved = UIColor(brushPalette.paper.color)
             var red: CGFloat = 0
             var green: CGFloat = 0
             var blue: CGFloat = 0
@@ -158,7 +158,7 @@ struct AppFeature {
                 green: Float(green),
                 blue: Float(blue),
                 alpha: Float(alpha),
-                isTransparent: brushPalette.transparentPaper
+                isTransparent: brushPalette.paper.isTransparent
             )
         }
 
@@ -408,8 +408,8 @@ struct AppFeature {
 
             case let .toolSelected(tool):
                 state.canvas.currentTool = tool
-                state.canvas.selectionMode = state.brushPalette.selectionToolMode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
+                state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
@@ -423,8 +423,8 @@ struct AppFeature {
 
             case let .toolLongPressed(tool):
                 state.canvas.currentTool = tool
-                state.canvas.selectionMode = state.brushPalette.selectionToolMode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
+                state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
@@ -435,7 +435,7 @@ struct AppFeature {
                 }
                 if tool == .brush {
                     state.brushPanel.isCollapsed = false
-                    state.brushPalette.showsBrushSettingsPopover = true
+                    state.brushPalette.ui.showsBrushSettingsPopover = true
                 }
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
@@ -512,23 +512,23 @@ struct AppFeature {
                 return .none
 
             case .brushPalette:
-                state.canvas.selectionMode = state.brushPalette.selectionToolMode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.eyedropperSamplingSource
+                state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 state.canvas.paperStyle = state.resolvedPaperStyle()
-                state.layerSidebar.paperColor = state.brushPalette.paperColor
-                state.layerSidebar.transparentPaper = state.brushPalette.transparentPaper
+                state.layerSidebar.paperColor = state.brushPalette.paper.color
+                state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 return .none
 
             case .layerSidebar(.binding(\.paperColor)):
-                state.brushPalette.paperColor = state.layerSidebar.paperColor
+                state.brushPalette.paper.color = state.layerSidebar.paperColor
                 state.canvas.paperStyle = state.resolvedPaperStyle()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 return .none
 
             case .layerSidebar(.binding(\.transparentPaper)):
-                state.brushPalette.transparentPaper = state.layerSidebar.transparentPaper
+                state.brushPalette.paper.isTransparent = state.layerSidebar.transparentPaper
                 state.canvas.paperStyle = state.resolvedPaperStyle()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 return .none
@@ -645,7 +645,7 @@ struct AppFeature {
                 let selection = Self.combinedSelection(
                     existing: state.canvas.selection,
                     incoming: incomingSelection,
-                    mode: state.brushPalette.selectionCombineMode,
+                    mode: state.brushPalette.selection.combineMode,
                     canvasSize: state.canvas.canvasSize
                 )
                 return .send(.canvas(.selectionUpdated(selection)))
@@ -655,15 +655,15 @@ struct AppFeature {
                     at: sample.point,
                     snapshot: state.canvas.renderSnapshot,
                     layerIndex: state.canvas.activeLayerIndex,
-                    thresholdMode: state.brushPalette.selectionThresholdMode,
-                    opacityTolerance: state.brushPalette.selectionOpacityTolerance,
-                    colorTolerance: state.brushPalette.selectionColorTolerance,
-                    expansion: Int(state.brushPalette.selectionExpansion.rounded())
+                    thresholdMode: state.brushPalette.selection.thresholdMode,
+                    opacityTolerance: state.brushPalette.selection.opacityTolerance,
+                    colorTolerance: state.brushPalette.selection.colorTolerance,
+                    expansion: Int(state.brushPalette.selection.expansion.rounded())
                 )
                 let selection = Self.combinedSelection(
                     existing: state.canvas.selection,
                     incoming: incomingSelection,
-                    mode: state.brushPalette.selectionCombineMode,
+                    mode: state.brushPalette.selection.combineMode,
                     canvasSize: state.canvas.canvasSize
                 )
                 return .send(.canvas(.selectionUpdated(selection)))
@@ -675,8 +675,8 @@ struct AppFeature {
                 return .send(.redoRequested)
 
             case let .canvas(.colorSampled(sampledColor)):
-                state.brushPalette.brushColor = Self.color(from: sampledColor)
-                state.brushPalette.selectedBrush = nil
+                state.brushPalette.brush.color = Self.color(from: sampledColor)
+                state.brushPalette.library.selectedBrush = nil
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
 

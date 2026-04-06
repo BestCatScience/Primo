@@ -241,9 +241,9 @@ extension BrushPaletteView {
                     sidebarIconButton(
                         title: language.localized("設定"),
                         systemImage: "slider.horizontal.3",
-                        isActive: store.showsBrushSettingsPopover
+                        isActive: store.ui.showsBrushSettingsPopover
                     ) {
-                        store.showsBrushSettingsPopover.toggle()
+                        store.ui.showsBrushSettingsPopover.toggle()
                     }
 
                     sidebarIconButton(
@@ -273,14 +273,14 @@ extension BrushPaletteView {
                     VStack(alignment: .leading, spacing: 14) {
                         brushLibrarySection(
                             title: language.localized("保存済み"),
-                            presets: store.savedPresets,
+                            presets: store.library.savedPresets,
                             emptyMessage: language.localized("保存したブラシがここに並びます。"),
                             allowsDeletion: true
                         )
 
                         brushLibrarySection(
                             title: language.localized("プリセット"),
-                            presets: store.presets,
+                            presets: store.library.presets,
                             emptyMessage: language.localized("まだプリセットがありません。"),
                             allowsDeletion: false
                         )
@@ -295,17 +295,17 @@ extension BrushPaletteView {
             VStack(spacing: 10) {
                 verticalBrushSlider(
                     title: language.localized("サイズ"),
-                    valueText: "\(Int(store.brushRadius.rounded()))",
+                    valueText: "\(Int(store.brush.radius.rounded()))",
                     normalizedValue: Binding(
-                        get: { min(max((store.brushRadius - 1.0) / 99.0, 0.0), 1.0) },
-                        set: { store.brushRadius = 1.0 + ($0 * 99.0) }
+                        get: { min(max((store.brush.radius - 1.0) / 99.0, 0.0), 1.0) },
+                        set: { store.brush.radius = 1.0 + ($0 * 99.0) }
                     )
                 )
 
                 verticalBrushSlider(
                     title: language.localized("不透明"),
-                    valueText: "\(Int((store.brushOpacity * 100).rounded()))%",
-                    normalizedValue: $store.brushOpacity
+                    valueText: "\(Int((store.brush.opacity * 100).rounded()))%",
+                    normalizedValue: $store.brush.opacity
                 )
             }
             .frame(width: 34)
@@ -363,13 +363,13 @@ extension BrushPaletteView {
                         } else {
                             presetChip(
                                 preset: preset,
-                                isSelected: store.selectedBrush == preset,
+                                isSelected: store.library.selectedBrush == preset,
                                 action: {
                                     store.send(.selectPreset(preset))
                                 },
                                 longPressAction: {
                                     store.send(.selectPreset(preset))
-                                    store.showsBrushSettingsPopover = true
+                                    store.ui.showsBrushSettingsPopover = true
                                 }
                             )
                         }
@@ -385,7 +385,7 @@ extension BrushPaletteView {
         ZStack(alignment: .topTrailing) {
             presetChip(
                 preset: preset,
-                isSelected: store.selectedBrush == preset
+                isSelected: store.library.selectedBrush == preset
             ) {
                 store.send(.deleteSavedPresetButtonTapped(preset.name))
             }

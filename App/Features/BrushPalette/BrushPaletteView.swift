@@ -31,7 +31,7 @@ struct BrushPaletteView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .overlay(alignment: .topLeading) {
-                if store.showsBrushSettingsPopover && showsBrushLibrarySidebar {
+                if store.ui.showsBrushSettingsPopover && showsBrushLibrarySidebar {
                     let panelWidth = floatingPanelWidth(in: proxy)
                     ZStack(alignment: .topLeading) {
                         Rectangle()
@@ -39,7 +39,7 @@ struct BrushPaletteView: View {
                             .contentShape(Rectangle())
                             .ignoresSafeArea()
                             .onTapGesture {
-                                store.showsBrushSettingsPopover = false
+                                store.ui.showsBrushSettingsPopover = false
                             }
 
                         floatingBrushSettingsPanel(proxy: proxy)
@@ -51,7 +51,7 @@ struct BrushPaletteView: View {
                 }
             }
         }
-        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.showsBrushSettingsPopover)
+        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.ui.showsBrushSettingsPopover)
         .fileImporter(
             isPresented: $isImportingBrush,
             allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],

@@ -2,8 +2,8 @@ import SwiftUI
 
 extension ContentView {
     func dismissBrushSettingsPopover() {
-        if store.brushPalette.showsBrushSettingsPopover {
-            store.send(.brushPalette(.binding(.set(\.showsBrushSettingsPopover, false))))
+        if store.brushPalette.ui.showsBrushSettingsPopover {
+            store.send(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false))))
         }
     }
 

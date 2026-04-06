@@ -50,7 +50,7 @@ extension BrushPaletteView {
     var floatingPanelHeader: some View {
         HStack(spacing: 12) {
             Button {
-                store.showsBrushSettingsPopover = false
+                store.ui.showsBrushSettingsPopover = false
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
@@ -64,7 +64,7 @@ extension BrushPaletteView {
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(store.selectedBrush?.name ?? currentTool.localizedTitle(language))
+                Text(store.library.selectedBrush?.name ?? currentTool.localizedTitle(language))
                     .font(StudioTheme.Typography.title(16))
                     .foregroundStyle(Color.black.opacity(0.72))
                 Text(language.localized("ブラシの詳細設定"))
@@ -113,14 +113,14 @@ extension BrushPaletteView {
         VStack(spacing: 14) {
             heroSliderRow(
                 title: language.localized("ブラシサイズ"),
-                value: String(format: "%.1f", store.brushRadius),
-                slider: Slider(value: $store.brushRadius, in: 1...100)
+                value: String(format: "%.1f", store.brush.radius),
+                slider: Slider(value: $store.brush.radius, in: 1...100)
             )
 
             heroSliderRow(
                 title: language.localized("不透明度"),
-                value: "\(Int((store.brushOpacity * 100).rounded()))",
-                slider: Slider(value: $store.brushOpacity, in: 0.1...1.0)
+                value: "\(Int((store.brush.opacity * 100).rounded()))",
+                slider: Slider(value: $store.brush.opacity, in: 0.1...1.0)
             )
 
             Button {
@@ -190,19 +190,19 @@ extension BrushPaletteView {
             HStack(spacing: 8) {
                 summaryPill(
                     title: language.localized("先端"),
-                    value: store.brushTipKind.localizedTitle(language)
+                    value: store.brush.tipKind.localizedTitle(language)
                 )
                 summaryPill(
                     title: language.localized("硬さ"),
-                    value: "\(Int((store.brushHardness * 100).rounded()))%"
+                    value: "\(Int((store.brush.hardness * 100).rounded()))%"
                 )
                 summaryPill(
                     title: language.localized("フロー"),
-                    value: "\(Int((store.brushFlow * 100).rounded()))%"
+                    value: "\(Int((store.brush.flow * 100).rounded()))%"
                 )
                 summaryPill(
                     title: language.localized("散布"),
-                    value: store.brushScatterEnabled ? language.localized("オン") : language.localized("オフ")
+                    value: store.brush.scatterEnabled ? language.localized("オン") : language.localized("オフ")
                 )
             }
             .padding(.vertical, 2)

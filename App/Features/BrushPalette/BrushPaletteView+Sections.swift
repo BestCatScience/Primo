@@ -35,8 +35,8 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brushColor.opacity(0.95),
-                                        store.brushColor.opacity(0.32)
+                                        store.brush.color.opacity(0.95),
+                                        store.brush.color.opacity(0.32)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -50,13 +50,13 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("しきい値"), value: store.fillThresholdMode.localizedTitle(language))
+                            metricRow(language.localized("しきい値"), value: store.fill.thresholdMode.localizedTitle(language))
                             metricRow(
-                                store.fillThresholdMode == .opacity ? language.localized("不透明度一致") : language.localized("色一致"),
-                                value: "\(Int((store.fillThresholdMode == .opacity ? store.fillOpacityTolerance : store.fillColorTolerance) * 100))%"
+                                store.fill.thresholdMode == .opacity ? language.localized("不透明度一致") : language.localized("色一致"),
+                                value: "\(Int((store.fill.thresholdMode == .opacity ? store.fill.opacityTolerance : store.fill.colorTolerance) * 100))%"
                             )
-                            metricRow(language.localized("拡張"), value: "\(Int(store.fillExpansion)) px")
-                            metricRow(language.localized("色"), value: store.selectedBrush?.name ?? language.localized("カスタム"))
+                            metricRow(language.localized("拡張"), value: "\(Int(store.fill.expansion)) px")
+                            metricRow(language.localized("色"), value: store.library.selectedBrush?.name ?? language.localized("カスタム"))
                         }
                     }
                 } else if currentTool == .eyedropper {
@@ -65,7 +65,7 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brushColor.opacity(0.96),
+                                        store.brush.color.opacity(0.96),
                                         StudioTheme.Palette.coolGlow.opacity(0.34)
                                     ],
                                     startPoint: .topLeading,
@@ -80,7 +80,7 @@ extension BrushPaletteView {
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("取得元"), value: store.eyedropperSamplingSource.localizedTitle(language))
+                            metricRow(language.localized("取得元"), value: store.sampling.eyedropperSource.localizedTitle(language))
                             metricRow(language.localized("現在色"), value: colorHexLabel)
                             metricRow(language.localized("入力"), value: "Apple Pencil")
                             metricRow(language.localized("動作"), value: language.localized("ドラッグで連続取得"))
@@ -101,21 +101,21 @@ extension BrushPaletteView {
                             )
                             .frame(width: 72, height: 72)
                             .overlay(
-                                Image(systemName: store.selectionToolMode == .lasso ? "lasso" : "wand.and.stars")
+                                Image(systemName: store.selection.toolMode == .lasso ? "lasso" : "wand.and.stars")
                                     .font(.system(size: 24, weight: .bold))
                                     .foregroundStyle(StudioTheme.Palette.textPrimary)
                             )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            metricRow(language.localized("モード"), value: store.selectionToolMode.localizedTitle(language))
-                            metricRow(language.localized("合成"), value: store.selectionCombineMode.localizedTitle(language))
-                            if store.selectionToolMode == .auto {
-                                metricRow(language.localized("しきい値"), value: store.selectionThresholdMode.localizedTitle(language))
+                            metricRow(language.localized("モード"), value: store.selection.toolMode.localizedTitle(language))
+                            metricRow(language.localized("合成"), value: store.selection.combineMode.localizedTitle(language))
+                            if store.selection.toolMode == .auto {
+                                metricRow(language.localized("しきい値"), value: store.selection.thresholdMode.localizedTitle(language))
                                 metricRow(
                                     language.localized("一致"),
-                                    value: "\(Int((store.selectionThresholdMode == .opacity ? store.selectionOpacityTolerance : store.selectionColorTolerance) * 100))%"
+                                    value: "\(Int((store.selection.thresholdMode == .opacity ? store.selection.opacityTolerance : store.selection.colorTolerance) * 100))%"
                                 )
-                                metricRow(language.localized("拡張"), value: "\(Int(store.selectionExpansion)) px")
+                                metricRow(language.localized("拡張"), value: "\(Int(store.selection.expansion)) px")
                             } else {
                                 metricRow(language.localized("入力"), value: language.localized("フリーハンド"))
                                 metricRow(language.localized("動作"), value: language.localized("パスを閉じる"))
@@ -157,8 +157,8 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brushColor.opacity(0.92),
-                                        store.brushColor.opacity(0.22)
+                                        store.brush.color.opacity(0.92),
+                                        store.brush.color.opacity(0.22)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -180,16 +180,16 @@ extension BrushPaletteView {
                             alignment: .leading,
                             spacing: 8
                         ) {
-                            metricRow(language.localized("先端"), value: store.brushTipKind.localizedTitle(language))
-                            metricRow(language.localized("半径"), value: "\(Int(store.brushRadius)) px")
-                            metricRow(language.localized("形状"), value: "\(Int(store.brushRoundness * 100))%")
-                            metricRow(language.localized("角度"), value: "\(Int((store.brushAngle * 180 / .pi).rounded()))°")
-                            metricRow(language.localized("不透明"), value: "\(Int(store.brushOpacity * 100))%")
-                            metricRow(language.localized("スタンプ間隔"), value: "\(Int(store.brushSpacing * 100))%")
-                            metricRow(language.localized("散布"), value: store.brushScatterEnabled ? language.localized("オン") : language.localized("オフ"))
-                            metricRow(language.localized("テクスチャ"), value: store.brushTextureMode.localizedTitle(language))
-                            metricRow(language.localized("フロー"), value: "\(Int(store.brushFlow * 100))%")
-                            metricRow(language.localized("紙質"), value: "\(Int(store.brushPaperStrength * 100))%")
+                            metricRow(language.localized("先端"), value: store.brush.tipKind.localizedTitle(language))
+                            metricRow(language.localized("半径"), value: "\(Int(store.brush.radius)) px")
+                            metricRow(language.localized("形状"), value: "\(Int(store.brush.roundness * 100))%")
+                            metricRow(language.localized("角度"), value: "\(Int((store.brush.angle * 180 / .pi).rounded()))°")
+                            metricRow(language.localized("不透明"), value: "\(Int(store.brush.opacity * 100))%")
+                            metricRow(language.localized("スタンプ間隔"), value: "\(Int(store.brush.spacing * 100))%")
+                            metricRow(language.localized("散布"), value: store.brush.scatterEnabled ? language.localized("オン") : language.localized("オフ"))
+                            metricRow(language.localized("テクスチャ"), value: store.brush.textureMode.localizedTitle(language))
+                            metricRow(language.localized("フロー"), value: "\(Int(store.brush.flow * 100))%")
+                            metricRow(language.localized("紙質"), value: "\(Int(store.brush.paperStrength * 100))%")
                         }
                     }
                 }
@@ -217,7 +217,7 @@ extension BrushPaletteView {
                                 )
 
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(store.brushColor)
+                                .fill(store.brush.color)
                                 .padding(4)
                         }
                         .frame(width: 38, height: 38)
@@ -228,10 +228,10 @@ extension BrushPaletteView {
                                 .foregroundStyle(.white.opacity(0.9))
                             Text(
                                 currentTool == .fill
-                                    ? (store.selectedBrush?.name ?? language.localized("カスタム"))
+                                    ? (store.library.selectedBrush?.name ?? language.localized("カスタム"))
                                     : (currentTool == .eyedropper
                                         ? colorHexLabel
-                                        : (store.selectedBrush?.name ?? "\(store.brushTipKind.localizedTitle(language)) \(language.localized("カスタム"))"))
+                                        : (store.library.selectedBrush?.name ?? "\(store.brush.tipKind.localizedTitle(language)) \(language.localized("カスタム"))"))
                             )
                             .font(StudioTheme.Typography.body(11))
                             .foregroundStyle(.white.opacity(0.52))
@@ -240,7 +240,7 @@ extension BrushPaletteView {
                         Spacer(minLength: 0)
                     }
 
-                    SpectrumColorControl(color: $store.brushColor)
+                    SpectrumColorControl(color: $store.brush.color)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 4)
                         .background(
@@ -251,7 +251,7 @@ extension BrushPaletteView {
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
                         ForEach(PaletteSwatch.defaults) { swatch in
                             colorSwatch(color: swatch.color, isSelected: false) {
-                                store.send(.binding(.set(\.brushColor, swatch.color)))
+                                store.send(.binding(.set(\.brush.color, swatch.color)))
                             }
                         }
                     }
@@ -284,7 +284,7 @@ extension BrushPaletteView {
                             Text(language.localized("選択設定"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(.white.opacity(0.9))
-                            Text(store.selectionToolMode == .lasso ? language.localized("Apple Pencil で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
+                            Text(store.selection.toolMode == .lasso ? language.localized("Apple Pencil で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(.white.opacity(0.52))
                         }
@@ -308,35 +308,34 @@ extension BrushPaletteView {
     var currentBrushPreviewStyle: BrushPreviewStyle {
         BrushPreviewStyle(
             color: currentDetailPreviewColor,
-            radius: store.brushRadius,
-            opacity: store.brushOpacity,
-            roundness: store.brushRoundness,
-            angle: store.brushAngle,
-            spacing: store.brushSpacing,
-            scatterEnabled: store.brushScatterEnabled,
-            scatterMode: store.brushScatterMode,
-            scatterLateral: store.brushScatterLateral,
-            scatterLinear: store.brushScatterLinear,
-            count: Int(store.brushCount.rounded()),
-            countSizeJitter: store.brushCountSizeJitter,
-            countOpacityJitter: store.brushCountOpacityJitter,
-            textureStrength: store.brushTextureStrength,
-            flow: store.brushFlow
+            radius: store.brush.radius,
+            opacity: store.brush.opacity,
+            roundness: store.brush.roundness,
+            angle: store.brush.angle,
+            spacing: store.brush.spacing,
+            scatterEnabled: store.brush.scatterEnabled,
+            scatterMode: store.brush.scatterMode,
+            scatterLateral: store.brush.scatterLateral,
+            scatterLinear: store.brush.scatterLinear,
+            count: Int(store.brush.count.rounded()),
+            countSizeJitter: store.brush.countSizeJitter,
+            countOpacityJitter: store.brush.countOpacityJitter,
+            textureStrength: store.brush.textureStrength,
+            flow: store.brush.flow
         )
     }
 
     var currentDetailPreviewColor: Color {
-        let resolved = UIColor(store.brushColor)
+        let resolved = UIColor(store.brush.color)
         var white: CGFloat = 0
-        var alpha: CGFloat = 0
-        if resolved.getWhite(&white, alpha: &alpha), white > 0.9 {
+        if resolved.getWhite(&white, alpha: nil), white > 0.9 {
             return Color.black.opacity(0.88)
         }
 
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
-        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
         let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
         if luminance > 0.82 {
             return Color(
@@ -346,7 +345,7 @@ extension BrushPaletteView {
             )
         }
 
-        return store.brushColor
+        return store.brush.color
     }
 
     var sectionTitle: String {
