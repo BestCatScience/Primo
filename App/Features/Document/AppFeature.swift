@@ -310,8 +310,12 @@ struct AppFeature {
                 state.layerPanel = StudioPanelLayoutState()
                 state.exportSheet = nil
                 state.bannerMessage = nil
+                state.isHydrating = false
                 state.applyPresentation(paintDocumentClient.presentation())
-                return .none
+                return .merge(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .cancel(id: CancelID.deferredPresentationRefresh)
+                )
 
             case .undoRequested:
                 guard !state.canvas.isStrokeActive else {
@@ -354,6 +358,7 @@ struct AppFeature {
                 do {
                     let url = try Self.projectURLInDocuments()
                     try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
+                    state.exportSheet = ShareExport(url: url)
                     state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
                 } catch {
                     state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
