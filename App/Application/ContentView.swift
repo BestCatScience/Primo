@@ -149,9 +149,7 @@ struct ContentView: View {
                             .fill(Color.black.opacity(0.001))
                             .contentShape(Rectangle())
                             .ignoresSafeArea()
-                            .onTapGesture {
-                                dismissBrushSettingsPopover()
-                            }
+                            .allowsHitTesting(false)
 
                         BrushPaletteView(
                             store: store.scope(

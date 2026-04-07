@@ -39,44 +39,14 @@ struct BrushPaletteView: View {
             }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.ui.showsBrushSettingsPopover)
-        .fileImporter(
-            isPresented: $isImportingBrush,
-            allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],
-            allowsMultipleSelection: true
-        ) { result in
-            guard case let .success(urls) = result else { return }
-            var imported: [BrushPreset] = []
-            var failures: [String] = []
-            for url in urls {
-                withSecurityScopedAccess(to: url) {
-                    if url.pathExtension.lowercased() == "abr" {
-                        do {
-                            let brushes = try BrushTipLibrary.importPhotoshopBrushes(from: url).map(\.preset)
-                            if brushes.isEmpty {
-                                failures.append("\(url.lastPathComponent): \(language.localized("対応している先端が見つかりませんでした。"))")
-                            } else {
-                                imported.append(contentsOf: brushes)
-                            }
-                        } catch {
-                            failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                        }
-                        return
-                    }
-                    let brushName = url.deletingPathExtension().lastPathComponent
-                    do {
-                        let tip = try BrushTipLibrary.loadRaster(from: url)
-                        imported.append(BrushPreset.photoshopImported(name: brushName, tip: tip))
-                    } catch {
-                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                    }
-                }
-            }
-            if !imported.isEmpty {
-                store.send(.importedPresets(imported))
-            }
-            if !failures.isEmpty {
-                importErrorMessage = failures.joined(separator: "\n")
-            }
+        .sheet(isPresented: $isImportingBrush) {
+            BrushImportDocumentPicker(
+                allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],
+                allowsMultipleSelection: true,
+                onPick: importBrushes,
+                onCancel: { isImportingBrush = false }
+            )
+            .ignoresSafeArea()
         }
         .alert(
             language.localized("ブラシを読み込めませんでした"),
@@ -109,5 +79,82 @@ struct BrushPaletteView: View {
 
     private var floatingPanelXOffset: CGFloat {
         208
+    }
+
+    private func importBrushes(_ urls: [URL]) {
+        isImportingBrush = false
+        var imported: [BrushPreset] = []
+        var failures: [String] = []
+
+        for url in urls {
+            withSecurityScopedAccess(to: url) {
+                if url.pathExtension.lowercased() == "abr" {
+                    do {
+                        let brushes = try BrushTipLibrary.importPhotoshopBrushes(from: url).map(\.preset)
+                        if brushes.isEmpty {
+                            failures.append("\(url.lastPathComponent): \(language.localized("対応している先端が見つかりませんでした。"))")
+                        } else {
+                            imported.append(contentsOf: brushes)
+                        }
+                    } catch {
+                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                    }
+                    return
+                }
+
+                let brushName = url.deletingPathExtension().lastPathComponent
+                do {
+                    let tip = try BrushTipLibrary.loadRaster(from: url)
+                    imported.append(BrushPreset.photoshopImported(name: brushName, tip: tip))
+                } catch {
+                    failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        if !imported.isEmpty {
+            store.send(.importedPresets(imported))
+        }
+        if !failures.isEmpty {
+            importErrorMessage = failures.joined(separator: "\n")
+        }
+    }
+}
+
+private struct BrushImportDocumentPicker: UIViewControllerRepresentable {
+    let allowedContentTypes: [UTType]
+    let allowsMultipleSelection: Bool
+    let onPick: ([URL]) -> Void
+    let onCancel: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onPick: onPick, onCancel: onCancel)
+    }
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let controller = UIDocumentPickerViewController(forOpeningContentTypes: allowedContentTypes)
+        controller.delegate = context.coordinator
+        controller.allowsMultipleSelection = allowsMultipleSelection
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        private let onPick: ([URL]) -> Void
+        private let onCancel: () -> Void
+
+        init(onPick: @escaping ([URL]) -> Void, onCancel: @escaping () -> Void) {
+            self.onPick = onPick
+            self.onCancel = onCancel
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            onPick(urls)
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            onCancel()
+        }
     }
 }
