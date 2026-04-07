@@ -1,9 +1,11 @@
 import ComposableArchitecture
+import Foundation
 import SwiftUI
 import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
+    @State var showsOpenDocumentImporter = false
     @State var showsNewCanvasSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
@@ -71,6 +73,15 @@ struct ContentView: View {
         .sheet(isPresented: $showsNewCanvasSheet) {
             newCanvasSheet
         }
+        .fileImporter(
+            isPresented: $showsOpenDocumentImporter,
+            allowedContentTypes: [.atelierDocument],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case let .success(urls) = result, let sourceURL = urls.first else { return }
+            guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
+            store.send(.openDocumentSelected(stagedURL))
+        }
         .overlay(alignment: .topLeading) {
             if store.brushPalette.ui.showsBrushSettingsPopover {
                 GeometryReader { proxy in
@@ -129,5 +140,37 @@ struct ContentView: View {
                 )
             }
         }
+    }
+
+    private func stageImportedDocument(from sourceURL: URL) -> URL? {
+        withSecurityScopedAccess(to: sourceURL) {
+            let fileManager = FileManager.default
+            let stagingRoot = fileManager.temporaryDirectory
+                .appendingPathComponent("atelierprime-open", isDirectory: true)
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            let destinationURL = stagingRoot.appendingPathComponent(sourceURL.lastPathComponent, isDirectory: true)
+
+            do {
+                try fileManager.createDirectory(at: stagingRoot, withIntermediateDirectories: true)
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    try fileManager.removeItem(at: destinationURL)
+                }
+                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                return destinationURL
+            } catch {
+                store.send(.openDocumentFailed(error.localizedDescription))
+                return nil
+            }
+        }
+    }
+
+    private func withSecurityScopedAccess<T>(to url: URL, _ work: () -> T) -> T {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return work()
     }
 }

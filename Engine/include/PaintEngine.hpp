@@ -208,6 +208,7 @@ public:
     bool canRedo() const noexcept;
     bool undo();
     bool redo();
+    void clearHistory() noexcept;
 
     DirtyRect consumeDirtyRect() noexcept;
     std::vector<uint8_t> pixelDataForRect(int layerIndex, const DirtyRect& rect) const;

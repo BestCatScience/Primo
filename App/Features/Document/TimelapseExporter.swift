@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
+import UIKit
 
 enum TimelapseExporter {
     private static let maxExportFrameCount = 90000
@@ -11,18 +12,38 @@ enum TimelapseExporter {
         to directory: URL,
         progress: ((Double, URL) -> Void)? = nil
     ) throws -> URL {
-        let exportFrames = sampledFrames(from: capture.frames)
-        guard exportFrames.count >= 2 else {
-            throw TimelapseExportError.insufficientFrames
-        }
-
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let outputURL = directory.appendingPathComponent(exportFilename())
         if FileManager.default.fileExists(atPath: outputURL.path) {
             try FileManager.default.removeItem(at: outputURL)
         }
 
-        let targetSize = videoDimensions(for: capture, exportFrames: exportFrames)
+        let previewURL = directory.appendingPathComponent("timelapse-preview.jpg")
+        if FileManager.default.fileExists(atPath: previewURL.path) {
+            try FileManager.default.removeItem(at: previewURL)
+        }
+
+        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
+        let holdFrameCount = max(capture.framesPerSecond * 2, 1)
+        let targetSize: CGSize
+        let totalFrameCount: Int
+        switch capture.source {
+        case let .frames(frames):
+            let exportFrames = sampledFrames(from: frames)
+            guard exportFrames.count >= 2 else {
+                throw TimelapseExportError.insufficientFrames
+            }
+            targetSize = videoDimensions(for: capture, exportFrames: exportFrames)
+            totalFrameCount = exportFrames.count + holdFrameCount
+        case let .operations(operations):
+            let exportOperations = sampledOperations(from: operations)
+            guard exportOperations.count >= 2 else {
+                throw TimelapseExportError.insufficientFrames
+            }
+            targetSize = videoDimensions(for: capture, exportFrames: [])
+            totalFrameCount = exportOperations.count + holdFrameCount
+        }
+
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         let settings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
@@ -62,62 +83,36 @@ enum TimelapseExporter {
             throw TimelapseExportError.exportFailed
         }
 
-        let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
-        let holdFrameCount = max(capture.framesPerSecond * 2, 1)
-        let totalFrameCount = exportFrames.count + holdFrameCount
-        for (index, frame) in exportFrames.enumerated() {
-            while !input.isReadyForMoreMediaData {
-                Thread.sleep(forTimeInterval: 0.002)
-            }
-
-            guard let image = decodedImage(from: frame.imageURL) else {
-                throw TimelapseExportError.invalidFrameData
-            }
-
-            var maybeBuffer: CVPixelBuffer?
-            let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &maybeBuffer)
-            guard creationStatus == kCVReturnSuccess, let buffer = maybeBuffer else {
-                throw TimelapseExportError.exportFailed
-            }
-
-            guard render(image: image, into: buffer, targetSize: targetSize) else {
-                throw TimelapseExportError.exportFailed
-            }
-
-            let presentationTime = CMTimeMultiply(frameDuration, multiplier: Int32(index))
-            guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
-                throw writer.error ?? TimelapseExportError.exportFailed
-            }
-            progress?(Double(index + 1) / Double(totalFrameCount), frame.imageURL)
-        }
-
-        guard let finalFrame = exportFrames.last,
-              let finalImage = decodedImage(from: finalFrame.imageURL) else {
-            throw TimelapseExportError.invalidFrameData
-        }
-        for holdIndex in 1...holdFrameCount {
-            while !input.isReadyForMoreMediaData {
-                Thread.sleep(forTimeInterval: 0.002)
-            }
-
-            var maybeBuffer: CVPixelBuffer?
-            let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &maybeBuffer)
-            guard creationStatus == kCVReturnSuccess, let buffer = maybeBuffer else {
-                throw TimelapseExportError.exportFailed
-            }
-
-            guard render(image: finalImage, into: buffer, targetSize: targetSize) else {
-                throw TimelapseExportError.exportFailed
-            }
-
-            let presentationTime = CMTimeMultiply(
-                frameDuration,
-                multiplier: Int32(exportFrames.count - 1 + holdIndex)
+        switch capture.source {
+        case let .frames(frames):
+            let exportFrames = sampledFrames(from: frames)
+            try appendFrameImages(
+                exportFrames.map(\.imageURL),
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration,
+                holdFrameCount: holdFrameCount,
+                totalFrameCount: totalFrameCount,
+                previewURL: previewURL,
+                progress: progress
             )
-            guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
-                throw writer.error ?? TimelapseExportError.exportFailed
-            }
-            progress?(Double(exportFrames.count + holdIndex) / Double(totalFrameCount), finalFrame.imageURL)
+        case let .operations(operations):
+            let exportOperations = sampledOperations(from: operations)
+            try appendOperationFrames(
+                exportOperations,
+                capture: capture,
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration,
+                holdFrameCount: holdFrameCount,
+                totalFrameCount: totalFrameCount,
+                previewURL: previewURL,
+                progress: progress
+            )
         }
 
         input.markAsFinished()
@@ -137,6 +132,142 @@ enum TimelapseExporter {
         }
 
         return outputURL
+    }
+
+    private static func appendFrameImages(
+        _ frameURLs: [URL],
+        targetSize: CGSize,
+        input: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        pixelBufferPool: CVPixelBufferPool,
+        frameDuration: CMTime,
+        holdFrameCount: Int,
+        totalFrameCount: Int,
+        previewURL: URL,
+        progress: ((Double, URL) -> Void)?
+    ) throws {
+        for (index, frameURL) in frameURLs.enumerated() {
+            guard let image = decodedImage(from: frameURL) else {
+                throw TimelapseExportError.invalidFrameData
+            }
+            try appendRenderedImage(
+                image,
+                at: index,
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration
+            )
+            try writePreview(image: image, to: previewURL)
+            progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
+        }
+
+        guard let finalFrameURL = frameURLs.last,
+              let finalImage = decodedImage(from: finalFrameURL) else {
+            throw TimelapseExportError.invalidFrameData
+        }
+
+        for holdIndex in 1...holdFrameCount {
+            try appendRenderedImage(
+                finalImage,
+                at: frameURLs.count - 1 + holdIndex,
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration
+            )
+            try writePreview(image: finalImage, to: previewURL)
+            progress?(Double(frameURLs.count + holdIndex) / Double(totalFrameCount), previewURL)
+        }
+    }
+
+    private static func appendOperationFrames(
+        _ operations: [TimelapseOperation],
+        capture: TimelapseCapture,
+        targetSize: CGSize,
+        input: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        pixelBufferPool: CVPixelBufferPool,
+        frameDuration: CMTime,
+        holdFrameCount: Int,
+        totalFrameCount: Int,
+        previewURL: URL,
+        progress: ((Double, URL) -> Void)?
+    ) throws {
+        let replaySession = PaintDocumentSession(
+            width: max(Int(capture.canvasSize.width.rounded()), 1),
+            height: max(Int(capture.canvasSize.height.rounded()), 1)
+        )
+        var folderIDMap: [Int: Int] = [:]
+        var finalImage: CGImage?
+
+        for (index, operation) in operations.enumerated() {
+            replaySession.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
+            guard let image = replaySession.timelapseCompositeImage()?.cgImage else {
+                throw TimelapseExportError.exportFailed
+            }
+            finalImage = image
+            try appendRenderedImage(
+                image,
+                at: index,
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration
+            )
+            try writePreview(image: image, to: previewURL)
+            progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
+        }
+
+        guard let finalImage else {
+            throw TimelapseExportError.insufficientFrames
+        }
+
+        for holdIndex in 1...holdFrameCount {
+            try appendRenderedImage(
+                finalImage,
+                at: operations.count - 1 + holdIndex,
+                targetSize: targetSize,
+                input: input,
+                adaptor: adaptor,
+                pixelBufferPool: pixelBufferPool,
+                frameDuration: frameDuration
+            )
+            try writePreview(image: finalImage, to: previewURL)
+            progress?(Double(operations.count + holdIndex) / Double(totalFrameCount), previewURL)
+        }
+    }
+
+    private static func appendRenderedImage(
+        _ image: CGImage,
+        at index: Int,
+        targetSize: CGSize,
+        input: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        pixelBufferPool: CVPixelBufferPool,
+        frameDuration: CMTime
+    ) throws {
+        while !input.isReadyForMoreMediaData {
+            Thread.sleep(forTimeInterval: 0.002)
+        }
+
+        var maybeBuffer: CVPixelBuffer?
+        let creationStatus = CVPixelBufferPoolCreatePixelBuffer(nil, pixelBufferPool, &maybeBuffer)
+        guard creationStatus == kCVReturnSuccess, let buffer = maybeBuffer else {
+            throw TimelapseExportError.exportFailed
+        }
+
+        guard render(image: image, into: buffer, targetSize: targetSize) else {
+            throw TimelapseExportError.exportFailed
+        }
+
+        let presentationTime = CMTimeMultiply(frameDuration, multiplier: Int32(index))
+        guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
+            throw TimelapseExportError.exportFailed
+        }
     }
 
     private static func decodedImage(from url: URL) -> CGImage? {
@@ -211,6 +342,37 @@ enum TimelapseExporter {
         }
 
         return sampled
+    }
+
+    private static func sampledOperations(from operations: [TimelapseOperation]) -> [TimelapseOperation] {
+        guard operations.count > maxExportFrameCount else {
+            return operations
+        }
+
+        let sampleCount = maxExportFrameCount - 1
+        let stride = Double(operations.count - 1) / Double(sampleCount)
+        var sampled: [TimelapseOperation] = []
+        sampled.reserveCapacity(maxExportFrameCount)
+
+        for index in 0..<sampleCount {
+            let sourceIndex = min(Int((Double(index) * stride).rounded()), operations.count - 1)
+            sampled.append(operations[sourceIndex])
+        }
+
+        if sampled.count < maxExportFrameCount, let last = operations.last {
+            sampled.append(last)
+        } else if let last = operations.last {
+            sampled[sampled.count - 1] = last
+        }
+
+        return sampled
+    }
+
+    private static func writePreview(image: CGImage, to url: URL) throws {
+        guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.72) else {
+            throw TimelapseExportError.exportFailed
+        }
+        try data.write(to: url, options: .atomic)
     }
 }
 

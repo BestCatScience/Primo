@@ -201,6 +201,9 @@ struct AppFeature {
         case saveDocumentRequested
         case exportDocumentRequested
         case exportTimelapseRequested
+        case openDocumentSelected(URL)
+        case openDocumentLoaded(LoadedPaintProject)
+        case openDocumentFailed(String)
         case timelapseExportProgressUpdated(Double, Data?)
         case timelapseExportSucceeded(URL)
         case timelapseExportFailed(String)
@@ -334,19 +337,6 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
-            case .saveDocumentRequested:
-                guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = state.appLanguage.localized("Save failed")
-                    return .none
-                }
-                do {
-                    let url = try Self.writePNGToDocuments(data: pngData)
-                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
-                } catch {
-                    state.bannerMessage = state.appLanguage.localized("Save failed")
-                }
-                return .none
-
             case .exportDocumentRequested:
                 guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
                     state.bannerMessage = state.appLanguage.localized("Export failed")
@@ -360,12 +350,22 @@ struct AppFeature {
                 }
                 return .none
 
+            case .saveDocumentRequested:
+                do {
+                    let url = try Self.projectURLInDocuments()
+                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
+                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
+                } catch {
+                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                }
+                return .none
+
             case .exportTimelapseRequested:
                 guard let capture = paintDocumentClient.timelapseCapture() else {
                     state.bannerMessage = state.appLanguage.localized("Not enough drawing history for timelapse yet")
                     return .none
                 }
-                state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.frames.last.flatMap { try? Data(contentsOf: $0.imageURL) })
+                state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.previewImageData)
                 let failureMessage = state.appLanguage.localized("Timelapse export failed")
                 return .run { send in
                     do {
@@ -405,6 +405,40 @@ struct AppFeature {
 
             case .bannerDismissed:
                 state.bannerMessage = nil
+                return .none
+
+            case let .openDocumentSelected(url):
+                state.isHydrating = true
+                return .run { [paintDocumentClient] send in
+                    do {
+                        let loaded = try paintDocumentClient.loadProject(url)
+                        await send(.openDocumentLoaded(loaded))
+                    } catch {
+                        await send(.openDocumentFailed(error.localizedDescription))
+                    }
+                    try? FileManager.default.removeItem(at: url)
+                }
+
+            case let .openDocumentLoaded(loaded):
+                state.brushPalette.paper.color = Color(
+                    red: Double(loaded.paperStyle.red),
+                    green: Double(loaded.paperStyle.green),
+                    blue: Double(loaded.paperStyle.blue),
+                    opacity: Double(loaded.paperStyle.alpha)
+                )
+                state.brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
+                state.canvas.selection = nil
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.applyPresentation(loaded.presentation)
+                state.isHydrating = false
+                state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
+                return .none
+
+            case let .openDocumentFailed(message):
+                state.isHydrating = false
+                state.bannerMessage = message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
                 return .none
 
             case let .toolSelected(tool):

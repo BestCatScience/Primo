@@ -1105,7 +1105,7 @@ struct LayerCanvasBuffer: Identifiable, Equatable {
     var strokes: [PreviewStrokeTrack] = []
 }
 
-struct StylusSample: Equatable {
+struct StylusSample: Equatable, Sendable {
     let point: CGPoint
     let pressure: CGFloat
     let altitude: CGFloat
@@ -1234,9 +1234,16 @@ struct TimelapseFrame: Equatable, Sendable {
     let size: CGSize
 }
 
+enum TimelapseCaptureSource: Equatable, Sendable {
+    case frames([TimelapseFrame])
+    case operations([TimelapseOperation])
+}
+
 struct TimelapseCapture: Equatable, Sendable {
     let canvasSize: CGSize
-    let frames: [TimelapseFrame]
+    let paperStyle: CanvasPaperStyle
+    let previewImageData: Data?
+    let source: TimelapseCaptureSource
     let framesPerSecond: Int
 }
 

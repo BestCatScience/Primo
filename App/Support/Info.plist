@@ -18,12 +18,29 @@
   <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
-  <key>UTExportedTypeDeclarations</key>
-  <array>
-    <dict>
-      <key>UTTypeConformsTo</key>
-      <array>
-        <string>public.data</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>com.apple.package</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Atelierprime Document</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.bestcatscience.atelierprime.document</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>atelier</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
       </array>
       <key>UTTypeDescription</key>
       <string>Atelierprime Brush Tip</string>

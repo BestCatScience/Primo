@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 
 extension UTType {
     static let atelierBrushTip = UTType(exportedAs: "com.bestcatscience.atelierprime.brush-tip", conformingTo: .data)
+    static let atelierDocument = UTType(exportedAs: "com.bestcatscience.atelierprime.document", conformingTo: .package)
 }
 
 struct BrushTipRaster: Equatable, Sendable {

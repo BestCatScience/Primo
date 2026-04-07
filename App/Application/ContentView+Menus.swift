@@ -116,8 +116,9 @@ extension ContentView {
                         showsNewCanvasSheet = true
                     }
                 }
-                Button(StudioStrings.open(language)) {}
-                    .disabled(true)
+                Button(StudioStrings.open(language)) {
+                    showsOpenDocumentImporter = true
+                }
                 Button(StudioStrings.save(language)) {
                     store.send(.saveDocumentRequested)
                 }

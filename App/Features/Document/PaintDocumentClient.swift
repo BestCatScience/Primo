@@ -7,6 +7,8 @@ struct PaintDocumentClient: Sendable {
     var prewarmDrawingResources: @Sendable () -> Void
     var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
     var timelapseCapture: @Sendable () -> TimelapseCapture?
+    var saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
+    var loadProject: @Sendable (URL) throws -> LoadedPaintProject
     var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
     var newCanvas: @Sendable (Int, Int) -> Void
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
@@ -46,6 +48,18 @@ struct PaintDocumentClient: Sendable {
             prewarmDrawingResources: { sessionBox.session.prewarmDrawingResources() },
             compositePNGData: { style in sessionBox.session.compositePNGData(paperStyle: style) },
             timelapseCapture: { sessionBox.session.timelapseCapture() },
+            saveProject: { url, paperStyle in
+                sessionBox.session.setPaperStyle(paperStyle)
+                try sessionBox.session.saveProject(to: url)
+            },
+            loadProject: { url in
+                let session = try PaintDocumentSession.loadProject(from: url)
+                sessionBox.session = session
+                return LoadedPaintProject(
+                    presentation: session.presentation(),
+                    paperStyle: session.currentPaperStyle
+                )
+            },
             setPaperStyle: { style in sessionBox.session.setPaperStyle(style) },
             newCanvas: { width, height in
                 sessionBox.session = PaintDocumentSession(width: width, height: height)

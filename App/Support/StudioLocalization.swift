@@ -295,6 +295,14 @@ enum StudioStrings {
         localized(language, english: "Saved: \(filename)", japanese: "保存しました: \(filename)")
     }
 
+    static func openedDocument(_ layerCount: Int, _ language: AppLanguage) -> String {
+        localized(language, english: "Opened document with \(layerCount) layers", japanese: "\(layerCount)レイヤーの書類を開きました")
+    }
+
+    static func openFailed(_ language: AppLanguage) -> String {
+        localized(language, english: "Open failed", japanese: "開くことができませんでした")
+    }
+
     static func settingsMenu(_ language: AppLanguage) -> String { language.localized("設定") }
     static func fileMenu(_ language: AppLanguage) -> String { language.localized("ファイル") }
     static func editMenu(_ language: AppLanguage) -> String { language.localized("編集") }

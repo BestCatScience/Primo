@@ -1152,6 +1152,11 @@ bool PaintDocument::redo() {
     return true;
 }
 
+void PaintDocument::clearHistory() noexcept {
+    undoStack_.clear();
+    redoStack_.clear();
+}
+
 DirtyRect PaintDocument::consumeDirtyRect() noexcept {
     DirtyRect result = dirtyRect_;
     dirtyRect_.reset();

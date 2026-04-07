@@ -492,10 +492,24 @@ extension AppFeature {
             .appendingPathComponent("timelapse", isDirectory: true)
     }
 
+    static func projectURLInDocuments() throws -> URL {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let projectsDirectory = documentsDirectory.appendingPathComponent("atelierprime-projects", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectsDirectory, withIntermediateDirectories: true)
+        return projectsDirectory.appendingPathComponent(projectFilename(), isDirectory: true)
+    }
+
     static func exportFilename() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return "atelierprime-\(formatter.string(from: Date())).png"
+    }
+
+    static func projectFilename() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return "atelierprime-\(formatter.string(from: Date())).atelier"
     }
 }

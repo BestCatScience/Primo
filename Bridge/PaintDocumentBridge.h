@@ -173,6 +173,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)canRedo NS_SWIFT_NAME(canRedo());
 - (BOOL)undo NS_SWIFT_NAME(undo());
 - (BOOL)redo NS_SWIFT_NAME(redo());
+- (void)clearHistory NS_SWIFT_NAME(clearHistory());
 
 - (CGImageRef _Nullable)createCompositeImage CF_RETURNS_RETAINED NS_SWIFT_NAME(makeCompositeImage());
 - (CGImageRef _Nullable)createImageForLayerAtIndex:(NSInteger)index CF_RETURNS_RETAINED NS_SWIFT_NAME(makeImageForLayer(at:));

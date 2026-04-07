@@ -8,3 +8,8 @@ struct PaintDocumentPresentation: Equatable, Sendable {
     var layerSidebarRows: [LayerSidebarRowModel]
     var renderSnapshot: MetalDocumentSnapshot?
 }
+
+struct LoadedPaintProject: Equatable, Sendable {
+    var presentation: PaintDocumentPresentation
+    var paperStyle: CanvasPaperStyle
+}

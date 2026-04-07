@@ -606,6 +606,10 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     return _document->redo();
 }
 
+- (void)clearHistory {
+    _document->clearHistory();
+}
+
 - (CGImageRef)createCompositeImage {
     const auto composite = _document->composite();
     NSData *data = [NSData dataWithBytes:composite.data() length:composite.size()];
