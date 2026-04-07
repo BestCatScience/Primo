@@ -171,8 +171,9 @@ struct BrushPaletteFeature {
             }
 
             mutating func applyPreset(_ preset: BrushPreset) {
+                let preservedRadius = radius
                 tipKind = preset.tipKind
-                radius = preset.radius
+                radius = preservedRadius
                 sizeSpeedSensitivity = preset.sizeSpeedSensitivity
                 opacity = preset.opacity
                 hardness = preset.hardness
@@ -226,11 +227,13 @@ struct BrushPaletteFeature {
             }
 
             func makePreset(named name: String) -> BrushPreset {
-                BrushPreset(
+                let storedRadius = BrushPreset.defaults.first(where: { $0.tipKind == tipKind })?.radius ?? radius
+
+                return BrushPreset(
                     name: name,
                     tipKind: tipKind,
                     color: .white,
-                    radius: radius,
+                    radius: storedRadius,
                     sizeSpeedSensitivity: sizeSpeedSensitivity,
                     opacity: opacity,
                     hardness: hardness,
