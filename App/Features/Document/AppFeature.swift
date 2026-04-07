@@ -54,6 +54,34 @@ struct BrightnessContrastSettings: Equatable, Sendable {
     var contrast: Double = 1
 }
 
+struct LevelsAdjustmentSettings: Equatable, Sendable {
+    var inputBlack: Double = 0
+    var inputWhite: Double = 1
+    var gamma: Double = 1
+    var outputBlack: Double = 0
+    var outputWhite: Double = 1
+}
+
+struct ToneCurveSettings: Equatable, Sendable {
+    var shadows: Double = 0
+    var midtones: Double = 0
+    var highlights: Double = 0
+}
+
+struct ColorBalanceSettings: Equatable, Sendable {
+    var redCyan: Double = 0
+    var greenMagenta: Double = 0
+    var blueYellow: Double = 0
+}
+
+struct ThresholdSettings: Equatable, Sendable {
+    var threshold: Double = 0.5
+}
+
+struct PosterizeSettings: Equatable, Sendable {
+    var levels: Double = 6
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -254,6 +282,16 @@ struct AppFeature {
         case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
         case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
         case brightnessContrastApplied(BrightnessContrastSettings)
+        case levelsPreviewChanged(LevelsAdjustmentSettings?)
+        case levelsApplied(LevelsAdjustmentSettings)
+        case toneCurvePreviewChanged(ToneCurveSettings?)
+        case toneCurveApplied(ToneCurveSettings)
+        case colorBalancePreviewChanged(ColorBalanceSettings?)
+        case colorBalanceApplied(ColorBalanceSettings)
+        case thresholdPreviewChanged(ThresholdSettings?)
+        case thresholdApplied(ThresholdSettings)
+        case posterizePreviewChanged(PosterizeSettings?)
+        case posterizeApplied(PosterizeSettings)
         case activeLayerVisibilityToggled
         case selectPreviousLayer
         case selectNextLayer
@@ -461,6 +499,186 @@ struct AppFeature {
                     let snapshot = state.canvas.renderSnapshot,
                     let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
                     let adjusted = Self.brightnessContrastAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .levelsPreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.levelsAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .levelsApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.levelsAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .toneCurvePreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.toneCurveAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .toneCurveApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.toneCurveAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .colorBalancePreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.colorBalanceAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .colorBalanceApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.colorBalanceAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .thresholdPreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.thresholdAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .thresholdApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.thresholdAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .posterizePreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.posterizedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .posterizeApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.posterizedLayerPixels(source: layer.pixelData, settings: settings)
                 else {
                     state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
                     return .none

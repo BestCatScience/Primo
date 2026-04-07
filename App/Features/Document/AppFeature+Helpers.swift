@@ -188,6 +188,119 @@ extension AppFeature {
         return Data(output)
     }
 
+    static func levelsAdjustedLayerPixels(source: Data, settings: LevelsAdjustmentSettings) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        let inputBlack = min(max(settings.inputBlack, 0), 1)
+        let inputWhite = max(min(settings.inputWhite, 1), inputBlack + 0.001)
+        let gamma = max(settings.gamma, 0.01)
+        let outputBlack = min(max(settings.outputBlack, 0), 1)
+        let outputWhite = max(min(settings.outputWhite, 1), outputBlack)
+        var output = [UInt8](source)
+
+        func map(_ value: Double) -> UInt8 {
+            let normalized = min(max((value - inputBlack) / (inputWhite - inputBlack), 0), 1)
+            let gammaCorrected = pow(normalized, 1.0 / gamma)
+            let remapped = outputBlack + ((outputWhite - outputBlack) * gammaCorrected)
+            return UInt8(max(0, min(255, Int((remapped * 255.0).rounded()))))
+        }
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            guard output[pixelOffset + 3] > 0 else { continue }
+            output[pixelOffset] = map(Double(output[pixelOffset]) / 255.0)
+            output[pixelOffset + 1] = map(Double(output[pixelOffset + 1]) / 255.0)
+            output[pixelOffset + 2] = map(Double(output[pixelOffset + 2]) / 255.0)
+        }
+
+        return Data(output)
+    }
+
+    static func toneCurveAdjustedLayerPixels(source: Data, settings: ToneCurveSettings) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        var output = [UInt8](source)
+
+        func map(_ value: Double) -> UInt8 {
+            let shadowWeight = pow(1.0 - value, 2.0)
+            let highlightWeight = pow(value, 2.0)
+            let midtoneWeight = max(0, 1.0 - abs((value * 2.0) - 1.0))
+            let offset = (settings.shadows * shadowWeight) + (settings.midtones * midtoneWeight) + (settings.highlights * highlightWeight)
+            let adjusted = min(max(value + (offset * 0.35), 0), 1)
+            return UInt8(max(0, min(255, Int((adjusted * 255.0).rounded()))))
+        }
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            guard output[pixelOffset + 3] > 0 else { continue }
+            output[pixelOffset] = map(Double(output[pixelOffset]) / 255.0)
+            output[pixelOffset + 1] = map(Double(output[pixelOffset + 1]) / 255.0)
+            output[pixelOffset + 2] = map(Double(output[pixelOffset + 2]) / 255.0)
+        }
+
+        return Data(output)
+    }
+
+    static func colorBalanceAdjustedLayerPixels(source: Data, settings: ColorBalanceSettings) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        var output = [UInt8](source)
+        let redOffset = settings.redCyan * 0.4
+        let greenOffset = settings.greenMagenta * 0.4
+        let blueOffset = settings.blueYellow * 0.4
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            guard output[pixelOffset + 3] > 0 else { continue }
+
+            let red = min(max((Double(output[pixelOffset]) / 255.0) + redOffset, 0), 1)
+            let green = min(max((Double(output[pixelOffset + 1]) / 255.0) + greenOffset, 0), 1)
+            let blue = min(max((Double(output[pixelOffset + 2]) / 255.0) + blueOffset, 0), 1)
+
+            output[pixelOffset] = UInt8((red * 255.0).rounded())
+            output[pixelOffset + 1] = UInt8((green * 255.0).rounded())
+            output[pixelOffset + 2] = UInt8((blue * 255.0).rounded())
+        }
+
+        return Data(output)
+    }
+
+    static func thresholdAdjustedLayerPixels(source: Data, settings: ThresholdSettings) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        let threshold = min(max(settings.threshold, 0), 1)
+        var output = [UInt8](source)
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            guard output[pixelOffset + 3] > 0 else { continue }
+            let red = Double(output[pixelOffset]) / 255.0
+            let green = Double(output[pixelOffset + 1]) / 255.0
+            let blue = Double(output[pixelOffset + 2]) / 255.0
+            let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+            let mapped: UInt8 = luminance >= threshold ? 255 : 0
+            output[pixelOffset] = mapped
+            output[pixelOffset + 1] = mapped
+            output[pixelOffset + 2] = mapped
+        }
+
+        return Data(output)
+    }
+
+    static func posterizedLayerPixels(source: Data, settings: PosterizeSettings) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        let steps = max(Int(settings.levels.rounded()), 2)
+        let denominator = Double(steps - 1)
+        var output = [UInt8](source)
+
+        func map(_ value: UInt8) -> UInt8 {
+            let normalized = Double(value) / 255.0
+            let quantized = (normalized * denominator).rounded() / denominator
+            return UInt8(max(0, min(255, Int((quantized * 255.0).rounded()))))
+        }
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            guard output[pixelOffset + 3] > 0 else { continue }
+            output[pixelOffset] = map(output[pixelOffset])
+            output[pixelOffset + 1] = map(output[pixelOffset + 1])
+            output[pixelOffset + 2] = map(output[pixelOffset + 2])
+        }
+
+        return Data(output)
+    }
+
     static func compositedPreviewPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,

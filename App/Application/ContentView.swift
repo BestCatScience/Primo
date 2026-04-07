@@ -9,10 +9,20 @@ struct ContentView: View {
     @State var showsNewCanvasSheet = false
     @State var showsHSBSheet = false
     @State var showsBrightnessContrastSheet = false
+    @State var showsLevelsSheet = false
+    @State var showsToneCurveSheet = false
+    @State var showsColorBalanceSheet = false
+    @State var showsThresholdSheet = false
+    @State var showsPosterizeSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var hsbAdjustmentSettings = HueSaturationBrightnessSettings()
     @State var brightnessContrastSettings = BrightnessContrastSettings()
+    @State var levelsAdjustmentSettings = LevelsAdjustmentSettings()
+    @State var toneCurveSettings = ToneCurveSettings()
+    @State var colorBalanceSettings = ColorBalanceSettings()
+    @State var thresholdSettings = ThresholdSettings()
+    @State var posterizeSettings = PosterizeSettings()
     var language: AppLanguage { store.appLanguage }
 
     var body: some View {
@@ -82,6 +92,21 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsBrightnessContrastSheet) {
             brightnessContrastSheet
+        }
+        .sheet(isPresented: $showsLevelsSheet) {
+            levelsSheet
+        }
+        .sheet(isPresented: $showsToneCurveSheet) {
+            toneCurveSheet
+        }
+        .sheet(isPresented: $showsColorBalanceSheet) {
+            colorBalanceSheet
+        }
+        .sheet(isPresented: $showsThresholdSheet) {
+            thresholdSheet
+        }
+        .sheet(isPresented: $showsPosterizeSheet) {
+            posterizeSheet
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,

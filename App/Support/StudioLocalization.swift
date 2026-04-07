@@ -133,6 +133,23 @@ enum StudioStrings {
         "Lighter Color": "カラー比較(明)",
         "Linear Burn": "焼き込み(リニア)",
         "Linear Light": "リニアライト",
+        "Levels": "レベル補正",
+        "Tone Curve": "トーンカーブ",
+        "Color Balance": "カラーバランス",
+        "Threshold Adjustment": "2値化",
+        "Posterize": "階調化",
+        "Input Black": "入力(黒)",
+        "Input White": "入力(白)",
+        "Output Black": "出力(黒)",
+        "Output White": "出力(白)",
+        "Gamma": "ガンマ",
+        "Shadows": "シャドウ",
+        "Midtones": "中間調",
+        "Highlights": "ハイライト",
+        "Red/Cyan": "レッド/シアン",
+        "Green/Magenta": "グリーン/マゼンタ",
+        "Blue/Yellow": "ブルー/イエロー",
+        "Level Count": "階調数",
         "Load Amount": "含み量",
         "Load Control": "含みコントロール",
         "Luminosity": "輝度",
@@ -316,6 +333,11 @@ enum StudioStrings {
     static func colorCorrection(_ language: AppLanguage) -> String { language.localized("色補正") }
     static func hueSaturationBrightness(_ language: AppLanguage) -> String { language.localized("色相・彩度・明度") }
     static func brightnessContrast(_ language: AppLanguage) -> String { language.localized("明度・コントラスト") }
+    static func levels(_ language: AppLanguage) -> String { language.localized("レベル補正") }
+    static func toneCurve(_ language: AppLanguage) -> String { language.localized("トーンカーブ") }
+    static func colorBalance(_ language: AppLanguage) -> String { language.localized("カラーバランス") }
+    static func thresholdAdjustment(_ language: AppLanguage) -> String { language.localized("2値化") }
+    static func posterize(_ language: AppLanguage) -> String { language.localized("階調化") }
     static func gradientMap(_ language: AppLanguage) -> String { language.localized("グラデーションマップ") }
     static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
     static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
@@ -345,6 +367,19 @@ enum StudioStrings {
     static func saturation(_ language: AppLanguage) -> String { language.localized("彩度") }
     static func brightness(_ language: AppLanguage) -> String { language.localized("明度") }
     static func contrast(_ language: AppLanguage) -> String { language.localized("コントラスト") }
+    static func threshold(_ language: AppLanguage) -> String { language.localized("しきい値") }
+    static func inputBlack(_ language: AppLanguage) -> String { language.localized("入力(黒)") }
+    static func inputWhite(_ language: AppLanguage) -> String { language.localized("入力(白)") }
+    static func outputBlack(_ language: AppLanguage) -> String { language.localized("出力(黒)") }
+    static func outputWhite(_ language: AppLanguage) -> String { language.localized("出力(白)") }
+    static func gamma(_ language: AppLanguage) -> String { language.localized("ガンマ") }
+    static func shadows(_ language: AppLanguage) -> String { language.localized("シャドウ") }
+    static func midtones(_ language: AppLanguage) -> String { language.localized("中間調") }
+    static func highlights(_ language: AppLanguage) -> String { language.localized("ハイライト") }
+    static func redCyan(_ language: AppLanguage) -> String { language.localized("レッド/シアン") }
+    static func greenMagenta(_ language: AppLanguage) -> String { language.localized("グリーン/マゼンタ") }
+    static func blueYellow(_ language: AppLanguage) -> String { language.localized("ブルー/イエロー") }
+    static func levelCount(_ language: AppLanguage) -> String { language.localized("階調数") }
     static func height(_ language: AppLanguage) -> String { language.localized("高さ") }
     static func cancel(_ language: AppLanguage) -> String { language.localized("キャンセル") }
     static func create(_ language: AppLanguage) -> String { language.localized("作成") }

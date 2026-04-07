@@ -172,6 +172,269 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var levelsSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.levels(language)) {
+                    adjustmentSlider(
+                        title: StudioStrings.inputBlack(language),
+                        valueText: String(format: "%.2f", levelsAdjustmentSettings.inputBlack),
+                        value: $levelsAdjustmentSettings.inputBlack,
+                        range: 0...0.95
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.inputWhite(language),
+                        valueText: String(format: "%.2f", levelsAdjustmentSettings.inputWhite),
+                        value: $levelsAdjustmentSettings.inputWhite,
+                        range: 0.05...1
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.gamma(language),
+                        valueText: String(format: "%.2f", levelsAdjustmentSettings.gamma),
+                        value: $levelsAdjustmentSettings.gamma,
+                        range: 0.2...3
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.outputBlack(language),
+                        valueText: String(format: "%.2f", levelsAdjustmentSettings.outputBlack),
+                        value: $levelsAdjustmentSettings.outputBlack,
+                        range: 0...0.95
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.outputWhite(language),
+                        valueText: String(format: "%.2f", levelsAdjustmentSettings.outputWhite),
+                        value: $levelsAdjustmentSettings.outputWhite,
+                        range: 0.05...1
+                    )
+                }
+            }
+            .navigationTitle(StudioStrings.levels(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.levelsPreviewChanged(nil))
+                        showsLevelsSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.levelsApplied(normalizedLevelsSettings))
+                        showsLevelsSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: levelsAdjustmentSettings) { _, _ in
+            store.send(.levelsPreviewChanged(normalizedLevelsSettings))
+        }
+        .onDisappear {
+            store.send(.levelsPreviewChanged(nil))
+        }
+        .presentationDetents([.height(480)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var toneCurveSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.toneCurve(language)) {
+                    adjustmentSlider(
+                        title: StudioStrings.shadows(language),
+                        valueText: String(format: "%.2f", toneCurveSettings.shadows),
+                        value: $toneCurveSettings.shadows,
+                        range: -1...1
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.midtones(language),
+                        valueText: String(format: "%.2f", toneCurveSettings.midtones),
+                        value: $toneCurveSettings.midtones,
+                        range: -1...1
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.highlights(language),
+                        valueText: String(format: "%.2f", toneCurveSettings.highlights),
+                        value: $toneCurveSettings.highlights,
+                        range: -1...1
+                    )
+                }
+            }
+            .navigationTitle(StudioStrings.toneCurve(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.toneCurvePreviewChanged(nil))
+                        showsToneCurveSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.toneCurveApplied(toneCurveSettings))
+                        showsToneCurveSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: toneCurveSettings) { _, newValue in
+            store.send(.toneCurvePreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.toneCurvePreviewChanged(nil))
+        }
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var colorBalanceSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.colorBalance(language)) {
+                    adjustmentSlider(
+                        title: StudioStrings.redCyan(language),
+                        valueText: String(format: "%.2f", colorBalanceSettings.redCyan),
+                        value: $colorBalanceSettings.redCyan,
+                        range: -1...1
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.greenMagenta(language),
+                        valueText: String(format: "%.2f", colorBalanceSettings.greenMagenta),
+                        value: $colorBalanceSettings.greenMagenta,
+                        range: -1...1
+                    )
+                    adjustmentSlider(
+                        title: StudioStrings.blueYellow(language),
+                        valueText: String(format: "%.2f", colorBalanceSettings.blueYellow),
+                        value: $colorBalanceSettings.blueYellow,
+                        range: -1...1
+                    )
+                }
+            }
+            .navigationTitle(StudioStrings.colorBalance(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.colorBalancePreviewChanged(nil))
+                        showsColorBalanceSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.colorBalanceApplied(colorBalanceSettings))
+                        showsColorBalanceSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: colorBalanceSettings) { _, newValue in
+            store.send(.colorBalancePreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.colorBalancePreviewChanged(nil))
+        }
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var thresholdSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.thresholdAdjustment(language)) {
+                    adjustmentSlider(
+                        title: StudioStrings.threshold(language),
+                        valueText: String(format: "%.2f", thresholdSettings.threshold),
+                        value: $thresholdSettings.threshold,
+                        range: 0...1
+                    )
+                }
+            }
+            .navigationTitle(StudioStrings.thresholdAdjustment(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.thresholdPreviewChanged(nil))
+                        showsThresholdSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.thresholdApplied(thresholdSettings))
+                        showsThresholdSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: thresholdSettings) { _, newValue in
+            store.send(.thresholdPreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.thresholdPreviewChanged(nil))
+        }
+        .presentationDetents([.height(240)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var posterizeSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.posterize(language)) {
+                    adjustmentSlider(
+                        title: StudioStrings.levelCount(language),
+                        valueText: "\(Int(posterizeSettings.levels.rounded()))",
+                        value: $posterizeSettings.levels,
+                        range: 2...32,
+                        step: 1
+                    )
+                }
+            }
+            .navigationTitle(StudioStrings.posterize(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.posterizePreviewChanged(nil))
+                        showsPosterizeSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.posterizeApplied(posterizeSettings))
+                        showsPosterizeSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: posterizeSettings) { _, newValue in
+            store.send(.posterizePreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.posterizePreviewChanged(nil))
+        }
+        .presentationDetents([.height(240)])
+        .presentationDragIndicator(.visible)
+    }
+
+    @ViewBuilder
+    func adjustmentSlider(
+        title: String,
+        valueText: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double = 0.01
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(valueText)
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range, step: step)
+        }
+    }
+
     func parsedCanvasDimension(from text: String) -> Int? {
         let digits = text.filter(\.isNumber)
         guard let value = Int(digits), (64...8192).contains(value) else { return nil }
@@ -247,24 +510,50 @@ extension ContentView {
             }
 
             menuBarMenu(StudioStrings.editMenu(language)) {
-                Button(StudioStrings.hueSaturationBrightness(language)) {
-                    store.send(.brightnessContrastPreviewChanged(nil))
-                    hsbAdjustmentSettings = HueSaturationBrightnessSettings()
-                    showsHSBSheet = true
-                }
-                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+                Menu(StudioStrings.colorCorrection(language)) {
+                    Button(StudioStrings.hueSaturationBrightness(language)) {
+                        store.send(.brightnessContrastPreviewChanged(nil))
+                        hsbAdjustmentSettings = HueSaturationBrightnessSettings()
+                        showsHSBSheet = true
+                    }
 
-                Button(StudioStrings.brightnessContrast(language)) {
-                    store.send(.hueSaturationBrightnessPreviewChanged(nil))
-                    brightnessContrastSettings = BrightnessContrastSettings()
-                    showsBrightnessContrastSheet = true
-                }
-                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+                    Button(StudioStrings.brightnessContrast(language)) {
+                        store.send(.hueSaturationBrightnessPreviewChanged(nil))
+                        brightnessContrastSettings = BrightnessContrastSettings()
+                        showsBrightnessContrastSheet = true
+                    }
 
-                Menu(StudioStrings.gradientMap(language)) {
-                    ForEach(GradientMapPreset.allCases) { preset in
-                        Button(preset.localizedTitle(language)) {
-                            store.send(.gradientMapSelected(preset))
+                    Button(StudioStrings.levels(language)) {
+                        levelsAdjustmentSettings = LevelsAdjustmentSettings()
+                        store.send(.levelsPreviewChanged(normalizedLevelsSettings))
+                        showsLevelsSheet = true
+                    }
+
+                    Button(StudioStrings.toneCurve(language)) {
+                        toneCurveSettings = ToneCurveSettings()
+                        showsToneCurveSheet = true
+                    }
+
+                    Button(StudioStrings.colorBalance(language)) {
+                        colorBalanceSettings = ColorBalanceSettings()
+                        showsColorBalanceSheet = true
+                    }
+
+                    Button(StudioStrings.thresholdAdjustment(language)) {
+                        thresholdSettings = ThresholdSettings()
+                        showsThresholdSheet = true
+                    }
+
+                    Button(StudioStrings.posterize(language)) {
+                        posterizeSettings = PosterizeSettings()
+                        showsPosterizeSheet = true
+                    }
+
+                    Menu(StudioStrings.gradientMap(language)) {
+                        ForEach(GradientMapPreset.allCases) { preset in
+                            Button(preset.localizedTitle(language)) {
+                                store.send(.gradientMapSelected(preset))
+                            }
                         }
                     }
                 }
@@ -483,6 +772,16 @@ extension ContentView {
 
     var activeLayerPosition: Int? {
         store.layerSidebar.layers.firstIndex { $0.index == store.layerSidebar.activeLayerIndex }
+    }
+
+    var normalizedLevelsSettings: LevelsAdjustmentSettings {
+        var settings = levelsAdjustmentSettings
+        settings.inputBlack = min(settings.inputBlack, settings.inputWhite - 0.001)
+        settings.inputWhite = max(settings.inputWhite, settings.inputBlack + 0.001)
+        settings.outputBlack = min(settings.outputBlack, settings.outputWhite)
+        settings.outputWhite = max(settings.outputWhite, settings.outputBlack)
+        settings.gamma = max(settings.gamma, 0.01)
+        return settings
     }
 
     var canSelectPreviousLayer: Bool {
