@@ -369,6 +369,14 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     _document->replaceLayerPixels((int)index, std::span<const uint8_t>(bytes, data.length));
 }
 
+- (void)replaceLayerPixelsTransientAtIndex:(NSInteger)index data:(NSData *)data {
+    const auto *bytes = static_cast<const uint8_t *>(data.bytes);
+    if (bytes == nullptr) {
+        return;
+    }
+    _document->replaceLayerPixelsTransient((int)index, std::span<const uint8_t>(bytes, data.length));
+}
+
 - (NSInteger)activeLayerIndex {
     return _document->activeLayerIndex();
 }

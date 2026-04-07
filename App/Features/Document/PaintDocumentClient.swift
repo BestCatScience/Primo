@@ -12,6 +12,8 @@ struct PaintDocumentClient: Sendable {
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
+    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> Void
+    var endBlurStroke: @Sendable () -> Void
     var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var canUndo: @Sendable () -> Bool
     var canRedo: @Sendable () -> Bool
@@ -29,6 +31,7 @@ struct PaintDocumentClient: Sendable {
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerName: @Sendable (Int, String) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
+    var revealLayerForEditing: @Sendable (Int) -> Void
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
     var replaceLayerPixels: @Sendable (Int, Data) -> Void
@@ -50,6 +53,10 @@ struct PaintDocumentClient: Sendable {
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
             endStroke: { sessionBox.session.endStroke() },
+            blurStroke: { samples, brush, layerIndex, captureTimelapse in
+                sessionBox.session.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
+            },
+            endBlurStroke: { sessionBox.session.endBlurStroke() },
             fill: { sample, brush in sessionBox.session.fill(sample: sample, brush: brush) },
             canUndo: { sessionBox.session.canUndo() },
             canRedo: { sessionBox.session.canRedo() },
@@ -67,6 +74,7 @@ struct PaintDocumentClient: Sendable {
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerName: { index, name in sessionBox.session.setLayerName(index: index, name: name) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
+            revealLayerForEditing: { index in sessionBox.session.revealLayerForEditing(index: index) },
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
             replaceLayerPixels: { index, data in sessionBox.session.replaceLayerPixels(index: index, data: data) },

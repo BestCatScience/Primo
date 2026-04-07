@@ -143,7 +143,7 @@ struct DiagonalStageLines: View {
     }
 }
 
-let studioTools: [StudioToolKind] = [.brush, .erase, .fill, .eyedropper, .select, .move, .shape]
+let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .move, .shape]
 
 struct StudioPanelShell<Content: View>: View {
     let title: String

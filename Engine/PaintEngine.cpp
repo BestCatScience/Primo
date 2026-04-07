@@ -853,6 +853,19 @@ void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixel
     compositeDirty_ = true;
 }
 
+void PaintDocument::replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    auto& layer = layers_[index];
+    if (pixels.size() != layer.pixels.size()) {
+        return;
+    }
+    std::copy(pixels.begin(), pixels.end(), layer.pixels.begin());
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+}
+
 const Layer& PaintDocument::layer(int index) const {
     return layers_.at(static_cast<size_t>(index));
 }

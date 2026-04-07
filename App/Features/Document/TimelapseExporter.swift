@@ -4,12 +4,15 @@ import Foundation
 import ImageIO
 
 enum TimelapseExporter {
+    private static let maxExportFrameCount = 90000
+
     static func exportVideo(
         from capture: TimelapseCapture,
         to directory: URL,
         progress: ((Double, URL) -> Void)? = nil
     ) throws -> URL {
-        guard capture.frames.count >= 2 else {
+        let exportFrames = sampledFrames(from: capture.frames)
+        guard exportFrames.count >= 2 else {
             throw TimelapseExportError.insufficientFrames
         }
 
@@ -19,7 +22,7 @@ enum TimelapseExporter {
             try FileManager.default.removeItem(at: outputURL)
         }
 
-        let targetSize = videoDimensions(for: capture)
+        let targetSize = videoDimensions(for: capture, exportFrames: exportFrames)
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         let settings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
@@ -61,8 +64,8 @@ enum TimelapseExporter {
 
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
         let holdFrameCount = max(capture.framesPerSecond * 2, 1)
-        let totalFrameCount = capture.frames.count + holdFrameCount
-        for (index, frame) in capture.frames.enumerated() {
+        let totalFrameCount = exportFrames.count + holdFrameCount
+        for (index, frame) in exportFrames.enumerated() {
             while !input.isReadyForMoreMediaData {
                 Thread.sleep(forTimeInterval: 0.002)
             }
@@ -88,7 +91,7 @@ enum TimelapseExporter {
             progress?(Double(index + 1) / Double(totalFrameCount), frame.imageURL)
         }
 
-        guard let finalFrame = capture.frames.last,
+        guard let finalFrame = exportFrames.last,
               let finalImage = decodedImage(from: finalFrame.imageURL) else {
             throw TimelapseExportError.invalidFrameData
         }
@@ -109,12 +112,12 @@ enum TimelapseExporter {
 
             let presentationTime = CMTimeMultiply(
                 frameDuration,
-                multiplier: Int32(capture.frames.count - 1 + holdIndex)
+                multiplier: Int32(exportFrames.count - 1 + holdIndex)
             )
             guard adaptor.append(buffer, withPresentationTime: presentationTime) else {
                 throw writer.error ?? TimelapseExportError.exportFailed
             }
-            progress?(Double(capture.frames.count + holdIndex) / Double(totalFrameCount), finalFrame.imageURL)
+            progress?(Double(exportFrames.count + holdIndex) / Double(totalFrameCount), finalFrame.imageURL)
         }
 
         input.markAsFinished()
@@ -170,9 +173,10 @@ enum TimelapseExporter {
         return true
     }
 
-    private static func videoDimensions(for capture: TimelapseCapture) -> CGSize {
-        let width = max(Int(capture.canvasSize.width.rounded()), 2)
-        let height = max(Int(capture.canvasSize.height.rounded()), 2)
+    private static func videoDimensions(for capture: TimelapseCapture, exportFrames: [TimelapseFrame]) -> CGSize {
+        let sourceSize = exportFrames.last?.size ?? capture.canvasSize
+        let width = max(Int(sourceSize.width.rounded()), 2)
+        let height = max(Int(sourceSize.height.rounded()), 2)
         let evenWidth = width.isMultiple(of: 2) ? width : width + 1
         let evenHeight = height.isMultiple(of: 2) ? height : height + 1
         return CGSize(width: evenWidth, height: evenHeight)
@@ -183,6 +187,30 @@ enum TimelapseExporter {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return "atelierprime-timelapse-\(formatter.string(from: Date())).mp4"
+    }
+
+    private static func sampledFrames(from frames: [TimelapseFrame]) -> [TimelapseFrame] {
+        guard frames.count > maxExportFrameCount else {
+            return frames
+        }
+
+        let sampleCount = maxExportFrameCount - 1
+        let stride = Double(frames.count - 1) / Double(sampleCount)
+        var sampled: [TimelapseFrame] = []
+        sampled.reserveCapacity(maxExportFrameCount)
+
+        for index in 0..<sampleCount {
+            let sourceIndex = min(Int((Double(index) * stride).rounded()), frames.count - 1)
+            if sampled.last?.imageURL != frames[sourceIndex].imageURL {
+                sampled.append(frames[sourceIndex])
+            }
+        }
+
+        if sampled.last?.imageURL != frames.last?.imageURL, let last = frames.last {
+            sampled.append(last)
+        }
+
+        return sampled
     }
 }
 

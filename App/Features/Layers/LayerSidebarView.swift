@@ -7,6 +7,11 @@ struct LayerSidebarView: View {
         case folder(Int)
     }
 
+    enum DragTarget: Hashable {
+        case layer(Int)
+        case folder(Int)
+    }
+
     @Bindable var store: StoreOf<LayerSidebarFeature>
     let layerSnapshots: [MetalLayerSnapshot]
     var language: AppLanguage = .japanese
@@ -18,6 +23,7 @@ struct LayerSidebarView: View {
     @State var editingLayerName = ""
     @State var editingFolderID: Int?
     @State var editingFolderName = ""
+    @State var dragTargetFrames: [DragTarget: CGRect] = [:]
     @FocusState var focusedEditorTarget: EditTarget?
 
     var body: some View {
@@ -87,7 +93,9 @@ struct LayerSidebarView: View {
                 .padding(.bottom, 10)
             }
         }
+        .coordinateSpace(name: "layerSidebarGlobal")
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onPreferenceChange(LayerSidebarDragTargetPreferenceKey.self) { dragTargetFrames = $0 }
         .onChange(of: editingLayerIndex) { _, newValue in
             guard let newValue else {
                 if editingFolderID == nil {
@@ -110,14 +118,11 @@ struct LayerSidebarView: View {
                 focusedEditorTarget = .folder(newValue)
             }
         }
-        .onChange(of: store.rows) { _, _ in
+        .onChange(of: store.layers) { _, newLayers in
+            guard let draggedLayerIndex else { return }
+            guard !newLayers.contains(where: { $0.index == draggedLayerIndex }) else { return }
             isDraggingLayer = false
-            draggedLayerIndex = nil
-            dropTargetLayerIndex = nil
-        }
-        .onChange(of: store.layers) { _, _ in
-            isDraggingLayer = false
-            draggedLayerIndex = nil
+            self.draggedLayerIndex = nil
             dropTargetLayerIndex = nil
         }
     }

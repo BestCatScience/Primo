@@ -74,6 +74,8 @@ struct CanvasFeature {
         case appendSamples([StylusSample])
         case endStroke
         case commitStroke([StylusSample])
+        case blurSamples([StylusSample])
+        case endBlurStroke
         case fill(StylusSample)
         case lassoSelect([CGPoint])
         case autoSelect(StylusSample)
@@ -181,6 +183,12 @@ struct CanvasFeature {
                     return .none
                 }
 
+                if state.currentTool == .blur {
+                    let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
+                    guard !appendedSamples.isEmpty else { return .none }
+                    return .send(.delegate(.blurSamples(appendedSamples)))
+                }
+
                 let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
 
                 guard !appendedSamples.isEmpty else { return .none }
@@ -201,6 +209,11 @@ struct CanvasFeature {
             case let .strokeEnded(stroke):
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = true
+                if state.currentTool == .blur {
+                    state.activeStroke = nil
+                    state.pendingIncrementalUpdate = nil
+                    return .send(.delegate(.endBlurStroke))
+                }
                 if !stroke.points.isEmpty {
                     let track = PreviewStrokeTrack(
                         layerIndex: state.activeLayerIndex,

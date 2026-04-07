@@ -49,6 +49,32 @@ extension BrushPaletteView {
                     Text(language.localized("Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
+                } else if currentTool == .blur {
+                    sliderRow(
+                        title: language.localized("ぼかし半径"),
+                        value: "\(Int(store.brush.radius)) px",
+                        slider: Slider(value: $store.brush.radius, in: 2...96, step: 1)
+                    )
+                    sliderRow(
+                        title: language.localized("エッジの柔らかさ"),
+                        value: "\(Int((1.0 - store.brush.hardness) * 100))%",
+                        slider: Slider(
+                            value: Binding(
+                                get: { 1.0 - store.brush.hardness },
+                                set: { store.brush.hardness = 1.0 - $0 }
+                            ),
+                            in: 0.0...1.0
+                        )
+                    )
+                    sliderRow(
+                        title: language.localized("ぼかしの強さ"),
+                        value: "\(Int(store.brush.flow * 100))%",
+                        slider: Slider(value: $store.brush.flow, in: 0.1...1.0)
+                    )
+
+                    Text(language.localized("Apple Pencil でなぞった部分だけをぼかします。サイズは半径、強さはぼかしの効き方です。"))
+                        .font(StudioTheme.Typography.body(11))
+                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .select {
                     segmentedModeRow(
                         title: language.localized("選択アクション"),

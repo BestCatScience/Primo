@@ -685,6 +685,17 @@ struct AppFeature {
                 paintDocumentClient.endStroke()
                 return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
+            case let .canvas(.delegate(.blurSamples(samples))):
+                guard !samples.isEmpty else { return .none }
+                paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
+                paintDocumentClient.blurStroke(samples, state.resolvedBrushSettings(), state.canvas.activeLayerIndex, false)
+                state.canvas.selection = nil
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+
+            case .canvas(.delegate(.endBlurStroke)):
+                paintDocumentClient.endBlurStroke()
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+
             case let .canvas(.delegate(.fill(sample))):
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 paintDocumentClient.fill(sample, state.resolvedBrushSettings())

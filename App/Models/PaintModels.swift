@@ -6,6 +6,7 @@ import simd
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
     case erase
+    case blur
     case fill
     case eyedropper
     case select
@@ -24,6 +25,8 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return language.localized("ブラシ")
         case .erase:
             return language.localized("消しゴム")
+        case .blur:
+            return language.localized("ぼかし")
         case .fill:
             return language.localized("塗りつぶし")
         case .eyedropper:
@@ -43,6 +46,8 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return "paintbrush.pointed"
         case .erase:
             return "eraser"
+        case .blur:
+            return "drop"
         case .fill:
             return "paintbrush.fill"
         case .eyedropper:

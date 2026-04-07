@@ -197,6 +197,7 @@ public:
     void setLayerOpacity(int index, float opacity);
     void setLayerBlendMode(int index, Layer::BlendMode blendMode);
     void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
+    void replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels);
     const Layer& layer(int index) const;
 
     void beginStroke(const BrushSettings& brush, StrokePoint point);

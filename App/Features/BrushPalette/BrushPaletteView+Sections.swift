@@ -151,6 +151,33 @@ extension BrushPaletteView {
                             metricRow(language.localized("状態"), value: transformPreviewOffset == .zero ? language.localized("待機") : language.localized("未確定"))
                         }
                     }
+                } else if currentTool == .blur {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        StudioTheme.Palette.coolGlow.opacity(0.9),
+                                        Color.white.opacity(0.35)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 72, height: 72)
+                            .overlay(
+                                Image(systemName: "drop")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+                            )
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            metricRow(language.localized("半径"), value: "\(Int(store.brush.radius)) px")
+                            metricRow(language.localized("柔らかさ"), value: "\(Int((1.0 - store.brush.hardness) * 100))%")
+                            metricRow(language.localized("強さ"), value: "\(Int(store.brush.flow * 100))%")
+                            metricRow(language.localized("動作"), value: language.localized("なぞった範囲をぼかす"))
+                        }
+                    }
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -199,7 +226,62 @@ extension BrushPaletteView {
 
     @ViewBuilder
     func detailCard(showsChrome: Bool) -> some View {
-        if currentTool != .select && currentTool != .move {
+        if currentTool == .blur {
+            cardContainer(showsChrome: showsChrome) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            StudioTheme.Palette.coolGlow,
+                                            Color.white.opacity(0.7)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+
+                            Image(systemName: "drop")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                        .frame(width: 38, height: 38)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(language.localized("ぼかし"))
+                                .font(StudioTheme.Typography.title(14))
+                                .foregroundStyle(panelStrongTextStyle)
+                            Text(language.localized("Apple Pencil でなぞった部分にだけ局所的なぼかしを適用します。"))
+                                .font(StudioTheme.Typography.body(11))
+                                .foregroundStyle(panelSecondaryTextStyle)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.9),
+                                    StudioTheme.Palette.coolGlow.opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 88)
+                        .overlay(
+                            BrushStrokePreview(style: currentBrushPreviewStyle)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 10)
+                        )
+                }
+            }
+        } else if currentTool != .select && currentTool != .move {
             cardContainer(showsChrome: showsChrome) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center, spacing: 10) {
@@ -298,7 +380,7 @@ extension BrushPaletteView {
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .select, .move:
+        case .fill, .eyedropper, .select, .move, .blur:
             return currentTool.localizedTitle(language)
         default:
             return StudioToolKind.brush.localizedTitle(language)
@@ -326,6 +408,9 @@ extension BrushPaletteView {
     }
 
     var currentDetailPreviewColor: Color {
+        if currentTool == .blur {
+            return Color.white.opacity(0.92)
+        }
         let resolved = UIColor(store.brush.color)
         var white: CGFloat = 0
         if resolved.getWhite(&white, alpha: nil), white > 0.9 {
@@ -358,6 +443,8 @@ extension BrushPaletteView {
             return language.localized("選択設定")
         case .move:
             return language.localized("変形")
+        case .blur:
+            return language.localized("ぼかし設定")
         default:
             return language.localized("ブラシ設定")
         }

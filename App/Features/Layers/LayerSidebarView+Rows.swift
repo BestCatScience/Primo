@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 extension LayerSidebarView {
     func activeLayerOpacitySection(_ activeLayer: LayerRowModel) -> some View {
@@ -101,6 +100,14 @@ extension LayerSidebarView {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: LayerSidebarDragTargetPreferenceKey.self,
+                    value: [.folder(folder.id): proxy.frame(in: .global)]
+                )
+            }
+        )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture {
             isDraggingLayer = false
@@ -114,22 +121,6 @@ extension LayerSidebarView {
         }
         .onTapGesture(count: 2) {
             startEditingFolder(folder)
-        }
-        .onDrop(
-            of: [UTType.plainText.identifier],
-            isTargeted: nil
-        ) { providers in
-            guard let provider = providers.first else { return false }
-            provider.loadObject(ofClass: NSString.self) { object, _ in
-                guard let string = object as? NSString, let layerIndex = Int(string as String) else { return }
-                DispatchQueue.main.async {
-                    isDraggingLayer = false
-                    draggedLayerIndex = nil
-                    dropTargetLayerIndex = nil
-                    store.send(.moveLayerToFolderRequested(layerIndex, folder.id))
-                }
-            }
-            return true
         }
     }
 
@@ -259,6 +250,14 @@ extension LayerSidebarView {
                 }
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: LayerSidebarDragTargetPreferenceKey.self,
+                    value: [.layer(layer.index): proxy.frame(in: .global)]
+                )
+            }
+        )
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture {
             isDraggingLayer = false
@@ -273,17 +272,6 @@ extension LayerSidebarView {
         .onTapGesture(count: 2) {
             startEditingLayer(layer)
         }
-        .onDrop(
-            of: [UTType.plainText.identifier],
-            delegate: LayerReorderDropDelegate(
-                targetLayerIndex: layer.index,
-                isDraggingLayer: $isDraggingLayer,
-                draggedLayerIndex: $draggedLayerIndex,
-                dropTargetLayerIndex: $dropTargetLayerIndex
-            ) { sourceIndex, destinationIndex in
-                store.send(.moveLayerRequested(sourceIndex, destinationIndex))
-            }
-        )
     }
 
     var paperLayerRow: some View {
@@ -478,14 +466,15 @@ extension LayerSidebarView {
             .foregroundStyle(.white.opacity(0.34))
             .frame(width: 14, height: 32)
             .contentShape(Rectangle())
-            .onDrag {
-                isDraggingLayer = true
-                draggedLayerIndex = layer.index
-                dropTargetLayerIndex = layer.index
-                return NSItemProvider(object: NSString(string: "\(layer.index)"))
-            } preview: {
-                layerRowDragPreview(for: layer, snapshot: snapshot)
-            }
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    .onChanged { value in
+                        handleLayerDragChanged(for: layer, at: value.location)
+                    }
+                    .onEnded { value in
+                        finishLayerDrag(at: value.location)
+                    }
+            )
     }
 
     func showsInsertionIndicator(for layer: LayerRowModel) -> Bool {
@@ -558,5 +547,55 @@ extension LayerSidebarView {
         if let editingFolderID {
             commitFolderNameEdit(for: editingFolderID)
         }
+    }
+
+    func handleLayerDragChanged(for layer: LayerRowModel, at location: CGPoint) {
+        if !isDraggingLayer {
+            isDraggingLayer = true
+            draggedLayerIndex = layer.index
+            dropTargetLayerIndex = layer.index
+        }
+
+        guard let draggedLayerIndex else { return }
+
+        if let destinationIndex = layerIndex(at: location) {
+            guard destinationIndex != draggedLayerIndex else { return }
+            guard dropTargetLayerIndex != destinationIndex else { return }
+            dropTargetLayerIndex = destinationIndex
+            store.send(.moveLayerRequested(draggedLayerIndex, destinationIndex))
+            self.draggedLayerIndex = destinationIndex
+        }
+    }
+
+    func finishLayerDrag(at location: CGPoint) {
+        defer {
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
+        }
+
+        guard let draggedLayerIndex else { return }
+        guard let folderID = folderID(at: location) else { return }
+        store.send(.moveLayerToFolderRequested(draggedLayerIndex, folderID))
+    }
+
+    func layerIndex(at location: CGPoint) -> Int? {
+        dragTargetFrames
+            .compactMap { target, frame -> (Int, CGRect)? in
+                guard case let .layer(index) = target else { return nil }
+                return (index, frame)
+            }
+            .first(where: { $0.1.contains(location) })?
+            .0
+    }
+
+    func folderID(at location: CGPoint) -> Int? {
+        dragTargetFrames
+            .compactMap { target, frame -> (Int, CGRect)? in
+                guard case let .folder(id) = target else { return nil }
+                return (id, frame)
+            }
+            .first(where: { $0.1.contains(location) })?
+            .0
     }
 }

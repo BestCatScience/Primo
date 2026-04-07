@@ -1,6 +1,14 @@
 import SwiftUI
 import UIKit
 
+struct LayerSidebarDragTargetPreferenceKey: PreferenceKey {
+    static var defaultValue: [LayerSidebarView.DragTarget: CGRect] = [:]
+
+    static func reduce(value: inout [LayerSidebarView.DragTarget: CGRect], nextValue: () -> [LayerSidebarView.DragTarget: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 struct LayerThumbnailView: View {
     let snapshot: MetalLayerSnapshot?
 
@@ -96,38 +104,5 @@ struct PaperLayerEditor: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
-    }
-}
-
-struct LayerReorderDropDelegate: DropDelegate {
-    let targetLayerIndex: Int
-    @Binding var isDraggingLayer: Bool
-    @Binding var draggedLayerIndex: Int?
-    @Binding var dropTargetLayerIndex: Int?
-    let moveAction: (Int, Int) -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedLayerIndex, draggedLayerIndex != targetLayerIndex else { return }
-        guard dropTargetLayerIndex != targetLayerIndex else { return }
-        dropTargetLayerIndex = targetLayerIndex
-        moveAction(draggedLayerIndex, targetLayerIndex)
-        self.draggedLayerIndex = targetLayerIndex
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        isDraggingLayer = false
-        draggedLayerIndex = nil
-        dropTargetLayerIndex = nil
-        return true
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        if dropTargetLayerIndex == targetLayerIndex {
-            dropTargetLayerIndex = nil
-        }
     }
 }
