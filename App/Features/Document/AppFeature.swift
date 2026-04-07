@@ -18,6 +18,42 @@ struct TimelapseExportPreview: Equatable {
     var previewImageData: Data?
 }
 
+enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case graphite
+    case sepia
+    case ocean
+    case sunset
+    case toxic
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .graphite:
+            return language.localized("グラファイト")
+        case .sepia:
+            return language.localized("セピア")
+        case .ocean:
+            return language.localized("オーシャン")
+        case .sunset:
+            return language.localized("サンセット")
+        case .toxic:
+            return language.localized("トキシック")
+        }
+    }
+}
+
+struct HueSaturationBrightnessSettings: Equatable, Sendable {
+    var hueDegrees: Double = 0
+    var saturation: Double = 1
+    var brightness: Double = 0
+}
+
+struct BrightnessContrastSettings: Equatable, Sendable {
+    var brightness: Double = 0
+    var contrast: Double = 1
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -213,6 +249,11 @@ struct AppFeature {
         case toolSelected(StudioToolKind)
         case toolLongPressed(StudioToolKind)
         case clearActiveLayerButtonTapped
+        case gradientMapSelected(GradientMapPreset)
+        case hueSaturationBrightnessPreviewChanged(HueSaturationBrightnessSettings?)
+        case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
+        case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
+        case brightnessContrastApplied(BrightnessContrastSettings)
         case activeLayerVisibilityToggled
         case selectPreviousLayer
         case selectNextLayer
@@ -308,6 +349,7 @@ struct AppFeature {
                 state.brushPalette = BrushPaletteFeature.State()
                 state.brushPanel = StudioPanelLayoutState()
                 state.layerPanel = StudioPanelLayoutState()
+                state.canvas.adjustmentPreviewPixelData = nil
                 state.exportSheet = nil
                 state.bannerMessage = nil
                 state.isHydrating = false
@@ -336,6 +378,96 @@ struct AppFeature {
                 }
                 guard paintDocumentClient.redo() else {
                     return .none
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .gradientMapSelected(preset):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let remapped = Self.gradientMappedLayerPixels(source: layer.pixelData, preset: preset)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply gradient map")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, remapped)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .hueSaturationBrightnessPreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.hueSaturationBrightnessAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .hueSaturationBrightnessApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.hueSaturationBrightnessAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .brightnessContrastPreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.brightnessContrastAdjustedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .brightnessContrastApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.brightnessContrastAdjustedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
                 state.applyPresentation(paintDocumentClient.presentation())
@@ -436,6 +568,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.adjustmentPreviewPixelData = nil
                 state.applyPresentation(loaded.presentation)
                 state.isHydrating = false
                 state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)

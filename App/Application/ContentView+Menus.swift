@@ -56,6 +56,122 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var hueSaturationBrightnessSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.hueSaturationBrightness(language)) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(StudioStrings.hue(language))
+                            Spacer()
+                            Text("\(Int(hsbAdjustmentSettings.hueDegrees.rounded()))°")
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $hsbAdjustmentSettings.hueDegrees, in: -180...180, step: 1)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(StudioStrings.saturation(language))
+                            Spacer()
+                            Text(String(format: "%.2f", hsbAdjustmentSettings.saturation))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $hsbAdjustmentSettings.saturation, in: 0...2, step: 0.01)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(StudioStrings.brightness(language))
+                            Spacer()
+                            Text(String(format: "%.2f", hsbAdjustmentSettings.brightness))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $hsbAdjustmentSettings.brightness, in: -1...1, step: 0.01)
+                    }
+                }
+            }
+            .navigationTitle(StudioStrings.hueSaturationBrightness(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.hueSaturationBrightnessPreviewChanged(nil))
+                        showsHSBSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.hueSaturationBrightnessApplied(hsbAdjustmentSettings))
+                        showsHSBSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: hsbAdjustmentSettings) { _, newValue in
+            store.send(.hueSaturationBrightnessPreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.hueSaturationBrightnessPreviewChanged(nil))
+        }
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var brightnessContrastSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.brightnessContrast(language)) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(StudioStrings.brightness(language))
+                            Spacer()
+                            Text(String(format: "%.2f", brightnessContrastSettings.brightness))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $brightnessContrastSettings.brightness, in: -1...1, step: 0.01)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(StudioStrings.contrast(language))
+                            Spacer()
+                            Text(String(format: "%.2f", brightnessContrastSettings.contrast))
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $brightnessContrastSettings.contrast, in: 0...2, step: 0.01)
+                    }
+                }
+            }
+            .navigationTitle(StudioStrings.brightnessContrast(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.brightnessContrastPreviewChanged(nil))
+                        showsBrightnessContrastSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.brightnessContrastApplied(brightnessContrastSettings))
+                        showsBrightnessContrastSheet = false
+                    }
+                }
+            }
+        }
+        .onChange(of: brightnessContrastSettings) { _, newValue in
+            store.send(.brightnessContrastPreviewChanged(newValue))
+        }
+        .onDisappear {
+            store.send(.brightnessContrastPreviewChanged(nil))
+        }
+        .presentationDetents([.height(320)])
+        .presentationDragIndicator(.visible)
+    }
+
     func parsedCanvasDimension(from text: String) -> Int? {
         let digits = text.filter(\.isNumber)
         guard let value = Int(digits), (64...8192).contains(value) else { return nil }
@@ -131,6 +247,31 @@ extension ContentView {
             }
 
             menuBarMenu(StudioStrings.editMenu(language)) {
+                Button(StudioStrings.hueSaturationBrightness(language)) {
+                    store.send(.brightnessContrastPreviewChanged(nil))
+                    hsbAdjustmentSettings = HueSaturationBrightnessSettings()
+                    showsHSBSheet = true
+                }
+                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+
+                Button(StudioStrings.brightnessContrast(language)) {
+                    store.send(.hueSaturationBrightnessPreviewChanged(nil))
+                    brightnessContrastSettings = BrightnessContrastSettings()
+                    showsBrightnessContrastSheet = true
+                }
+                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+
+                Menu(StudioStrings.gradientMap(language)) {
+                    ForEach(GradientMapPreset.allCases) { preset in
+                        Button(preset.localizedTitle(language)) {
+                            store.send(.gradientMapSelected(preset))
+                        }
+                    }
+                }
+                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+
+                Divider()
+
                 Button(StudioStrings.clearActiveLayer(language)) {
                     store.send(.clearActiveLayerButtonTapped)
                 }

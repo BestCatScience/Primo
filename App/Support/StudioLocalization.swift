@@ -313,6 +313,10 @@ enum StudioStrings {
     static func customSize(_ language: AppLanguage) -> String { language.localized("カスタムサイズ...") }
     static func open(_ language: AppLanguage) -> String { language.localized("開く") }
     static func save(_ language: AppLanguage) -> String { language.localized("保存") }
+    static func colorCorrection(_ language: AppLanguage) -> String { language.localized("色補正") }
+    static func hueSaturationBrightness(_ language: AppLanguage) -> String { language.localized("色相・彩度・明度") }
+    static func brightnessContrast(_ language: AppLanguage) -> String { language.localized("明度・コントラスト") }
+    static func gradientMap(_ language: AppLanguage) -> String { language.localized("グラデーションマップ") }
     static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
     static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
     static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }
@@ -334,8 +338,13 @@ enum StudioStrings {
     static func pagesAdd(_ language: AppLanguage) -> String { language.localized("ページを追加") }
     static func pagesDuplicate(_ language: AppLanguage) -> String { language.localized("ページを複製") }
     static func pagesDelete(_ language: AppLanguage) -> String { language.localized("ページを削除") }
+    static func apply(_ language: AppLanguage) -> String { language.localized("適用") }
     static func size(_ language: AppLanguage) -> String { language.localized("サイズ") }
     static func width(_ language: AppLanguage) -> String { language.localized("幅") }
+    static func hue(_ language: AppLanguage) -> String { language.localized("色相") }
+    static func saturation(_ language: AppLanguage) -> String { language.localized("彩度") }
+    static func brightness(_ language: AppLanguage) -> String { language.localized("明度") }
+    static func contrast(_ language: AppLanguage) -> String { language.localized("コントラスト") }
     static func height(_ language: AppLanguage) -> String { language.localized("高さ") }
     static func cancel(_ language: AppLanguage) -> String { language.localized("キャンセル") }
     static func create(_ language: AppLanguage) -> String { language.localized("作成") }

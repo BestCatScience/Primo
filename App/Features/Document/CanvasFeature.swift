@@ -10,6 +10,7 @@ struct CanvasFeature {
     struct State: Equatable {
         var canvasSize: CGSize = CanvasFeature.defaultCanvasSize
         var renderSnapshot: MetalDocumentSnapshot?
+        var adjustmentPreviewPixelData: Data?
         var lastCommittedRenderRevision: Int = -1
         var localBufferRevision: Int = 0
         var lastRenderedLocalBufferRevision: Int = -1

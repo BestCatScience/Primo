@@ -20,6 +20,7 @@ struct CanvasView: UIViewRepresentable {
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
             incrementalUpdate: store.pendingIncrementalUpdate,
+            adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
@@ -138,6 +139,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         incrementalUpdate: IncrementalLayerUpdate?,
+        adjustmentPreviewPixelData: Data?,
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
@@ -172,6 +174,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         updateTransformPreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
+            adjustmentPreviewPixelData: adjustmentPreviewPixelData,
             selection: selection,
             paperStyle: paperStyle,
             transformPreviewScale: transformPreviewScale
@@ -292,19 +295,48 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
     }
 
-    private func updateTransformPreview(snapshot: MetalDocumentSnapshot?, activeLayerIndex: Int, selection: CanvasSelection?, paperStyle: CanvasPaperStyle, transformPreviewScale: CGFloat) {
+    private func updateTransformPreview(
+        snapshot: MetalDocumentSnapshot?,
+        activeLayerIndex: Int,
+        adjustmentPreviewPixelData: Data?,
+        selection: CanvasSelection?,
+        paperStyle: CanvasPaperStyle,
+        transformPreviewScale: CGFloat
+    ) {
         guard
             currentTool == .move,
             transformPreviewOffset != .zero || abs(transformPreviewScale - 1.0) > 0.001,
-            let snapshot,
-            let image = makeCompositePreviewImage(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                selection: selection,
-                paperStyle: paperStyle,
-                transformPreviewScale: transformPreviewScale
-            )
+            let snapshot
         else {
+            if
+                let snapshot,
+                let adjustmentPreviewPixelData,
+                let image = makeLayerImage(
+                    pixelData: adjustmentPreviewPixelData,
+                    width: snapshot.width,
+                    height: snapshot.height,
+                    paperStyle: paperStyle
+                )
+            {
+                compositePreviewImageView.image = image
+                compositePreviewImageView.frame = contentRect()
+                metalCanvasView.isHidden = true
+                return
+            }
+
+            compositePreviewImageView.image = nil
+            compositePreviewImageView.frame = .zero
+            metalCanvasView.isHidden = false
+            return
+        }
+
+        guard let image = makeCompositePreviewImage(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            selection: selection,
+            paperStyle: paperStyle,
+            transformPreviewScale: transformPreviewScale
+        ) else {
             compositePreviewImageView.image = nil
             compositePreviewImageView.frame = .zero
             metalCanvasView.isHidden = false

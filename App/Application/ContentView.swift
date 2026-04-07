@@ -7,8 +7,12 @@ struct ContentView: View {
     let store: StoreOf<AppFeature>
     @State var showsOpenDocumentImporter = false
     @State var showsNewCanvasSheet = false
+    @State var showsHSBSheet = false
+    @State var showsBrightnessContrastSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
+    @State var hsbAdjustmentSettings = HueSaturationBrightnessSettings()
+    @State var brightnessContrastSettings = BrightnessContrastSettings()
     var language: AppLanguage { store.appLanguage }
 
     var body: some View {
@@ -72,6 +76,12 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsNewCanvasSheet) {
             newCanvasSheet
+        }
+        .sheet(isPresented: $showsHSBSheet) {
+            hueSaturationBrightnessSheet
+        }
+        .sheet(isPresented: $showsBrightnessContrastSheet) {
+            brightnessContrastSheet
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,
