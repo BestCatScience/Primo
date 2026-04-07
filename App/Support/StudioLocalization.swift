@@ -245,6 +245,7 @@ enum StudioStrings {
         "Export Timelapse": "タイムラプスを書き出し",
         "Refresh View": "表示を更新",
         "New Layer": "新規レイヤー",
+        "New Folder": "新規フォルダ",
         "Clear Active Layer": "アクティブレイヤーをクリア",
         "Show Brush Panel": "ブラシパネルを表示",
         "Hide Brush Panel": "ブラシパネルを隠す",
@@ -309,6 +310,7 @@ enum StudioStrings {
     static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }
 
     static func addLayer(_ language: AppLanguage) -> String { language.localized("新規レイヤー") }
+    static func addFolder(_ language: AppLanguage) -> String { language.localized("新規フォルダ") }
     static func clearActiveLayer(_ language: AppLanguage) -> String { language.localized("アクティブレイヤーをクリア") }
     static func showBrushPanel(_ language: AppLanguage) -> String { language.localized("ブラシパネルを表示") }
     static func hideBrushPanel(_ language: AppLanguage) -> String { language.localized("ブラシパネルを隠す") }
@@ -332,6 +334,18 @@ enum StudioStrings {
 
     static func layers(_ count: Int, _ language: AppLanguage) -> String {
         localized(language, english: "\(count) Layers", japanese: "\(count) レイヤー")
+    }
+
+    static func folderName(_ count: Int, _ language: AppLanguage) -> String {
+        localized(language, english: "Folder \(count)", japanese: "フォルダ \(count)")
+    }
+
+    static func moveOutOfFolder(_ language: AppLanguage) -> String {
+        localized(language, english: "Move Out Of Folder", japanese: "フォルダ外へ戻す")
+    }
+
+    static func dropToMoveOutOfFolder(_ language: AppLanguage) -> String {
+        localized(language, english: "Drop here to move out of folder", japanese: "ここにドロップでフォルダ外へ戻す")
     }
 
     static func layersTitle(_ language: AppLanguage) -> String { language.localized("レイヤー") }

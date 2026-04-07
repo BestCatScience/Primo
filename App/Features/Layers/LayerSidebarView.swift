@@ -2,15 +2,23 @@ import ComposableArchitecture
 import SwiftUI
 
 struct LayerSidebarView: View {
+    enum EditTarget: Hashable {
+        case layer(Int)
+        case folder(Int)
+    }
+
     @Bindable var store: StoreOf<LayerSidebarFeature>
     let layerSnapshots: [MetalLayerSnapshot]
     var language: AppLanguage = .japanese
     var showsTitle = true
+    @State var isDraggingLayer = false
     @State var draggedLayerIndex: Int?
     @State var dropTargetLayerIndex: Int?
     @State var editingLayerIndex: Int?
     @State var editingLayerName = ""
-    @FocusState var focusedLayerEditorIndex: Int?
+    @State var editingFolderID: Int?
+    @State var editingFolderName = ""
+    @FocusState var focusedEditorTarget: EditTarget?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -28,6 +36,21 @@ struct LayerSidebarView: View {
                             .foregroundStyle(.white.opacity(0.9))
 
                         Spacer()
+
+                        Button {
+                            store.send(.addFolderButtonTapped)
+                        } label: {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(StudioTheme.Palette.cardFillStrong)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .minimumHitTarget()
 
                         Button {
                             store.send(.addLayerButtonTapped)
@@ -50,8 +73,13 @@ struct LayerSidebarView: View {
                         activeLayerOpacitySection(activeLayer)
                     }
 
-                    ForEach(store.layers) { layer in
-                        layerRow(for: layer)
+                    ForEach(store.rows) { row in
+                        switch row {
+                        case let .folder(folder):
+                            folderRow(for: folder)
+                        case let .layer(layer, depth):
+                            layerRow(for: layer, depth: depth)
+                        }
                     }
 
                     paperLayerRow
@@ -62,12 +90,36 @@ struct LayerSidebarView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onChange(of: editingLayerIndex) { _, newValue in
             guard let newValue else {
-                focusedLayerEditorIndex = nil
+                if editingFolderID == nil {
+                    focusedEditorTarget = nil
+                }
                 return
             }
             DispatchQueue.main.async {
-                focusedLayerEditorIndex = newValue
+                focusedEditorTarget = .layer(newValue)
             }
         }
+        .onChange(of: editingFolderID) { _, newValue in
+            guard let newValue else {
+                if editingLayerIndex == nil {
+                    focusedEditorTarget = nil
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                focusedEditorTarget = .folder(newValue)
+            }
+        }
+        .onChange(of: store.rows) { _, _ in
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
+        }
+        .onChange(of: store.layers) { _, _ in
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
+        }
     }
+
 }

@@ -101,6 +101,7 @@ struct PaperLayerEditor: View {
 
 struct LayerReorderDropDelegate: DropDelegate {
     let targetLayerIndex: Int
+    @Binding var isDraggingLayer: Bool
     @Binding var draggedLayerIndex: Int?
     @Binding var dropTargetLayerIndex: Int?
     let moveAction: (Int, Int) -> Void
@@ -114,6 +115,7 @@ struct LayerReorderDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
+        isDraggingLayer = false
         draggedLayerIndex = nil
         dropTargetLayerIndex = nil
         return true

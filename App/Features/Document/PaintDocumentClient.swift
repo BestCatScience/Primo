@@ -20,6 +20,12 @@ struct PaintDocumentClient: Sendable {
     var addLayer: @Sendable (String) -> Void
     var deleteLayer: @Sendable (Int) -> Bool
     var moveLayer: @Sendable (Int, Int) -> Bool
+    var createFolder: @Sendable (String, Int) -> Int
+    var deleteFolder: @Sendable (Int) -> Bool
+    var setFolderVisibility: @Sendable (Int, Bool) -> Void
+    var setFolderName: @Sendable (Int, String) -> Void
+    var setFolderExpanded: @Sendable (Int, Bool) -> Void
+    var assignLayerToFolder: @Sendable (Int, Int) -> Bool
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerName: @Sendable (Int, String) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
@@ -52,6 +58,12 @@ struct PaintDocumentClient: Sendable {
             addLayer: { name in sessionBox.session.addLayer(name: name) },
             deleteLayer: { index in sessionBox.session.deleteLayer(index: index) },
             moveLayer: { index, destination in sessionBox.session.moveLayer(from: index, to: destination) },
+            createFolder: { name, layerIndex in sessionBox.session.createFolder(name: name, layerIndex: layerIndex) },
+            deleteFolder: { folderID in sessionBox.session.deleteFolder(folderID: folderID) },
+            setFolderVisibility: { folderID, isVisible in sessionBox.session.setFolderVisibility(folderID: folderID, isVisible: isVisible) },
+            setFolderName: { folderID, name in sessionBox.session.setFolderName(folderID: folderID, name: name) },
+            setFolderExpanded: { folderID, isExpanded in sessionBox.session.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) },
+            assignLayerToFolder: { index, folderID in sessionBox.session.assignLayer(index: index, toFolder: folderID) },
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerName: { index, name in sessionBox.session.setLayerName(index: index, name: name) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },

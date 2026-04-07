@@ -594,6 +594,7 @@ int PaintDocument::addLayer(const std::string& name) {
     layer.name = name;
     layer.pixels.assign(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4U, 0U);
     layers_.push_back(std::move(layer));
+    layerFolderIDs_.push_back(-1);
     activeLayerIndex_ = layerCount() - 1;
     markEntireDocumentDirty();
     compositeDirty_ = true;
@@ -606,6 +607,14 @@ bool PaintDocument::deleteLayer(int index) {
     }
     pushHistorySnapshot();
     layers_.erase(layers_.begin() + index);
+    layerFolderIDs_.erase(layerFolderIDs_.begin() + index);
+    for (LayerFolder& folder : folders_) {
+        if (folder.anchorLayerIndex == index) {
+            folder.anchorLayerIndex = index > 0 ? index - 1 : -1;
+        } else if (folder.anchorLayerIndex > index) {
+            folder.anchorLayerIndex -= 1;
+        }
+    }
     if (activeLayerIndex_ > index) {
         activeLayerIndex_ -= 1;
     } else if (activeLayerIndex_ >= layerCount()) {
@@ -622,8 +631,24 @@ bool PaintDocument::moveLayer(int fromIndex, int toIndex) {
     }
     pushHistorySnapshot();
     Layer movedLayer = std::move(layers_[static_cast<size_t>(fromIndex)]);
+    const int movedLayerFolderID = layerFolderIDs_[static_cast<size_t>(fromIndex)];
     layers_.erase(layers_.begin() + fromIndex);
+    layerFolderIDs_.erase(layerFolderIDs_.begin() + fromIndex);
     layers_.insert(layers_.begin() + toIndex, std::move(movedLayer));
+    layerFolderIDs_.insert(layerFolderIDs_.begin() + toIndex, movedLayerFolderID);
+    for (LayerFolder& folder : folders_) {
+        const int anchor = folder.anchorLayerIndex;
+        if (anchor < 0) {
+            continue;
+        }
+        if (anchor == fromIndex) {
+            folder.anchorLayerIndex = toIndex;
+        } else if (fromIndex < toIndex && anchor > fromIndex && anchor <= toIndex) {
+            folder.anchorLayerIndex -= 1;
+        } else if (fromIndex > toIndex && anchor >= toIndex && anchor < fromIndex) {
+            folder.anchorLayerIndex += 1;
+        }
+    }
 
     if (activeLayerIndex_ == fromIndex) {
         activeLayerIndex_ = toIndex;
@@ -636,6 +661,121 @@ bool PaintDocument::moveLayer(int fromIndex, int toIndex) {
     markEntireDocumentDirty();
     compositeDirty_ = true;
     return true;
+}
+
+int PaintDocument::createFolder(const std::string& name, int layerIndex) {
+    pushHistorySnapshot();
+    LayerFolder folder;
+    folder.id = nextFolderID_++;
+    folder.name = name;
+    folder.anchorLayerIndex = layerIndex >= 0 && layerIndex < layerCount() ? layerIndex : -1;
+    folders_.push_back(folder);
+    return folder.id;
+}
+
+bool PaintDocument::deleteFolder(int folderID) {
+    auto it = std::find_if(folders_.begin(), folders_.end(), [folderID](const LayerFolder& folder) {
+        return folder.id == folderID;
+    });
+    if (it == folders_.end()) {
+        return false;
+    }
+    pushHistorySnapshot();
+    for (int& assignedFolderID : layerFolderIDs_) {
+        if (assignedFolderID == folderID) {
+            assignedFolderID = -1;
+        }
+    }
+    folders_.erase(it);
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
+void PaintDocument::setFolderName(int folderID, std::string name) {
+    if (name.empty()) {
+        return;
+    }
+    auto it = std::find_if(folders_.begin(), folders_.end(), [folderID](const LayerFolder& folder) {
+        return folder.id == folderID;
+    });
+    if (it == folders_.end() || it->name == name) {
+        return;
+    }
+    pushHistorySnapshot();
+    it->name = std::move(name);
+}
+
+void PaintDocument::setFolderVisibility(int folderID, bool visible) {
+    auto it = std::find_if(folders_.begin(), folders_.end(), [folderID](const LayerFolder& folder) {
+        return folder.id == folderID;
+    });
+    if (it == folders_.end() || it->visible == visible) {
+        return;
+    }
+    pushHistorySnapshot();
+    it->visible = visible;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+}
+
+void PaintDocument::setFolderExpanded(int folderID, bool expanded) {
+    auto it = std::find_if(folders_.begin(), folders_.end(), [folderID](const LayerFolder& folder) {
+        return folder.id == folderID;
+    });
+    if (it == folders_.end() || it->expanded == expanded) {
+        return;
+    }
+    pushHistorySnapshot();
+    it->expanded = expanded;
+}
+
+bool PaintDocument::setLayerFolder(int layerIndex, int folderID) {
+    if (layerIndex < 0 || layerIndex >= layerCount()) {
+        return false;
+    }
+    if (folderID >= 0 && folderByID(folderID) == nullptr) {
+        return false;
+    }
+    if (layerFolderIDs_[static_cast<size_t>(layerIndex)] == folderID) {
+        return true;
+    }
+    pushHistorySnapshot();
+    layerFolderIDs_[static_cast<size_t>(layerIndex)] = folderID;
+    markEntireDocumentDirty();
+    compositeDirty_ = true;
+    return true;
+}
+
+int PaintDocument::layerFolderID(int layerIndex) const noexcept {
+    if (layerIndex < 0 || layerIndex >= layerCount()) {
+        return -1;
+    }
+    return layerFolderIDs_[static_cast<size_t>(layerIndex)];
+}
+
+bool PaintDocument::isLayerVisibleEffective(int layerIndex) const noexcept {
+    if (layerIndex < 0 || layerIndex >= layerCount()) {
+        return false;
+    }
+    const Layer& layer = layers_[static_cast<size_t>(layerIndex)];
+    if (!layer.visible) {
+        return false;
+    }
+    const int folderID = layerFolderIDs_[static_cast<size_t>(layerIndex)];
+    if (folderID < 0) {
+        return true;
+    }
+    const LayerFolder* folder = folderByID(folderID);
+    return folder == nullptr ? true : folder->visible;
+}
+
+int PaintDocument::folderCount() const noexcept {
+    return static_cast<int>(folders_.size());
+}
+
+const LayerFolder& PaintDocument::folderAt(int position) const {
+    return folders_.at(static_cast<size_t>(position));
 }
 
 void PaintDocument::clearLayer(int index) {
@@ -930,6 +1070,9 @@ bool PaintDocument::undo() {
     if (undoStack_.back().capturesEntireDocument) {
         current.capturesEntireDocument = true;
         current.layers = layers_;
+        current.folders = folders_;
+        current.layerFolderIDs = layerFolderIDs_;
+        current.nextFolderID = nextFolderID_;
     } else {
         current.layerIndex = undoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
@@ -942,6 +1085,9 @@ bool PaintDocument::undo() {
     undoStack_.pop_back();
     if (snapshot.capturesEntireDocument) {
         layers_ = std::move(snapshot.layers);
+        folders_ = std::move(snapshot.folders);
+        layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
+        nextFolderID_ = snapshot.nextFolderID;
     } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
         layers_[snapshot.layerIndex] = std::move(snapshot.layer);
     }
@@ -962,6 +1108,9 @@ bool PaintDocument::redo() {
     if (redoStack_.back().capturesEntireDocument) {
         current.capturesEntireDocument = true;
         current.layers = layers_;
+        current.folders = folders_;
+        current.layerFolderIDs = layerFolderIDs_;
+        current.nextFolderID = nextFolderID_;
     } else {
         current.layerIndex = redoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
@@ -977,6 +1126,9 @@ bool PaintDocument::redo() {
     redoStack_.pop_back();
     if (snapshot.capturesEntireDocument) {
         layers_ = std::move(snapshot.layers);
+        folders_ = std::move(snapshot.folders);
+        layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
+        nextFolderID_ = snapshot.nextFolderID;
     } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
         layers_[snapshot.layerIndex] = std::move(snapshot.layer);
     }
@@ -1044,6 +1196,9 @@ void PaintDocument::pushHistorySnapshot() {
     snapshot.capturesEntireDocument = true;
     snapshot.activeLayerIndex = activeLayerIndex_;
     snapshot.layers = layers_;
+    snapshot.folders = folders_;
+    snapshot.layerFolderIDs = layerFolderIDs_;
+    snapshot.nextFolderID = nextFolderID_;
     undoStack_.push_back(std::move(snapshot));
     if (undoStack_.size() > kMaxHistoryDepth) {
         undoStack_.erase(undoStack_.begin());
@@ -1069,6 +1224,13 @@ void PaintDocument::pushLayerHistorySnapshot(int layerIndex) {
 
 void PaintDocument::markEntireDocumentDirty() noexcept {
     dirtyRect_.expand(0, 0, width_ - 1, height_ - 1);
+}
+
+const LayerFolder* PaintDocument::folderByID(int folderID) const noexcept {
+    auto it = std::find_if(folders_.begin(), folders_.end(), [folderID](const LayerFolder& folder) {
+        return folder.id == folderID;
+    });
+    return it == folders_.end() ? nullptr : &(*it);
 }
 
 void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
@@ -1366,7 +1528,7 @@ void PaintDocument::rebuildComposite() const {
 
     for (size_t i = 0; i < layers_.size(); ++i) {
         const auto& layer = layers_[i];
-        if (!layer.visible) {
+        if (!isLayerVisibleEffective(static_cast<int>(i))) {
             continue;
         }
 

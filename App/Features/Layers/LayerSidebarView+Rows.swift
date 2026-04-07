@@ -26,8 +26,116 @@ extension LayerSidebarView {
         .padding(.horizontal, 2)
     }
 
-    func layerRow(for layer: LayerRowModel) -> some View {
+    func folderRow(for folder: LayerFolderModel) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                store.send(.folderTapped(folder.id))
+            } label: {
+                Image(systemName: folder.isExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.52))
+                    .frame(width: 14, height: 24)
+            }
+            .buttonStyle(.plain)
+
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(StudioTheme.Palette.cardFillStrong)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Image(systemName: folder.isExpanded ? "folder.fill" : "folder")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(folder.visible ? Color(red: 0.95, green: 0.82, blue: 0.42) : .white.opacity(0.34))
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
+                if editingFolderID == folder.id {
+                    TextField("", text: $editingFolderName)
+                        .font(StudioTheme.Typography.title(14))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .textFieldStyle(.plain)
+                        .submitLabel(.done)
+                        .focused($focusedEditorTarget, equals: .folder(folder.id))
+                        .onSubmit {
+                            commitFolderNameEdit(for: folder.id)
+                        }
+                } else {
+                    Text(folder.name)
+                        .font(StudioTheme.Typography.title(14))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineLimit(1)
+                }
+
+                Text(StudioStrings.layers(folder.childLayerIndices.count, language))
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(.white.opacity(0.46))
+            }
+
+            Spacer(minLength: 0)
+
+            Button {
+                store.send(.folderVisibilityButtonTapped(folder.id))
+            } label: {
+                Image(systemName: folder.visible ? "eye.fill" : "eye.slash.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(folder.visible ? .white.opacity(0.9) : .white.opacity(0.45))
+                    .frame(width: 26, height: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(StudioTheme.Palette.cardFillStrong)
+                    )
+            }
+            .buttonStyle(.plain)
+            .minimumHitTarget()
+
+            miniActionButton(systemImage: "trash") {
+                store.send(.deleteFolderButtonTapped(folder.id))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(StudioTheme.Palette.cardFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture {
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
+            if editingFolderID == folder.id {
+                commitFolderNameEdit(for: folder.id)
+            } else {
+                store.send(.folderTapped(folder.id))
+            }
+        }
+        .onTapGesture(count: 2) {
+            startEditingFolder(folder)
+        }
+        .onDrop(
+            of: [UTType.plainText.identifier],
+            isTargeted: nil
+        ) { providers in
+            guard let provider = providers.first else { return false }
+            provider.loadObject(ofClass: NSString.self) { object, _ in
+                guard let string = object as? NSString, let layerIndex = Int(string as String) else { return }
+                DispatchQueue.main.async {
+                    isDraggingLayer = false
+                    draggedLayerIndex = nil
+                    dropTargetLayerIndex = nil
+                    store.send(.moveLayerToFolderRequested(layerIndex, folder.id))
+                }
+            }
+            return true
+        }
+    }
+
+    func layerRow(for layer: LayerRowModel, depth: Int = 0) -> some View {
         let snapshot = layerSnapshots.first(where: { $0.index == layer.index })
+        let childIndent = CGFloat(depth) * 28
 
         return HStack(spacing: 10) {
             layerDragHandle(for: layer, snapshot: snapshot)
@@ -48,16 +156,9 @@ extension LayerSidebarView {
                             .foregroundStyle(.white.opacity(0.96))
                             .textFieldStyle(.plain)
                             .submitLabel(.done)
-                            .focused($focusedLayerEditorIndex, equals: layer.index)
+                            .focused($focusedEditorTarget, equals: .layer(layer.index))
                             .onSubmit {
                                 commitLayerNameEdit(for: layer.index)
-                            }
-                            .onAppear {
-                                if focusedLayerEditorIndex != layer.index {
-                                    DispatchQueue.main.async {
-                                        focusedLayerEditorIndex = layer.index
-                                    }
-                                }
                             }
                     } else {
                         Text(layer.name)
@@ -104,6 +205,12 @@ extension LayerSidebarView {
                         .font(StudioTheme.Typography.mono(10))
                         .foregroundStyle(.white.opacity(0.48))
 
+                    if layer.folderID != nil {
+                        miniActionButton(systemImage: "arrow.uturn.left") {
+                            store.send(.removeLayerFromFolderButtonTapped(layer.index))
+                        }
+                    }
+
                     miniActionButton(systemImage: "trash") {
                         store.send(.deleteLayerButtonTapped(layer.index))
                     }
@@ -129,14 +236,22 @@ extension LayerSidebarView {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
+        .padding(.leading, childIndent)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(backgroundFill(for: layer))
         )
         .overlay {
-            ZStack(alignment: .top) {
+            ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(borderColor(for: layer), lineWidth: 1)
+
+                if depth > 0 {
+                    RoundedRectangle(cornerRadius: 999, style: .continuous)
+                        .fill(StudioTheme.Palette.accent.opacity(0.3))
+                        .frame(width: 3, height: 26)
+                        .offset(x: 12, y: 12)
+                }
 
                 if showsInsertionIndicator(for: layer) {
                     layerInsertionIndicator
@@ -146,6 +261,9 @@ extension LayerSidebarView {
         }
         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture {
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
             if editingLayerIndex == layer.index {
                 commitLayerNameEdit(for: layer.index)
             } else {
@@ -155,17 +273,11 @@ extension LayerSidebarView {
         .onTapGesture(count: 2) {
             startEditingLayer(layer)
         }
-        .onDrag {
-            draggedLayerIndex = layer.index
-            dropTargetLayerIndex = layer.index
-            return NSItemProvider(object: NSString(string: "\(layer.index)"))
-        } preview: {
-            layerRowDragPreview(for: layer, snapshot: snapshot)
-        }
         .onDrop(
             of: [UTType.plainText.identifier],
             delegate: LayerReorderDropDelegate(
                 targetLayerIndex: layer.index,
+                isDraggingLayer: $isDraggingLayer,
                 draggedLayerIndex: $draggedLayerIndex,
                 dropTargetLayerIndex: $dropTargetLayerIndex
             ) { sourceIndex, destinationIndex in
@@ -239,6 +351,9 @@ extension LayerSidebarView {
         }
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onTapGesture {
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
             store.send(.paperRowTapped)
         }
         .popover(
@@ -323,6 +438,11 @@ extension LayerSidebarView {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(StudioTheme.Palette.accent.opacity(0.55), lineWidth: 1)
         }
+        .onDisappear {
+            isDraggingLayer = false
+            draggedLayerIndex = nil
+            dropTargetLayerIndex = nil
+        }
     }
 
     var layerInsertionIndicator: some View {
@@ -359,6 +479,7 @@ extension LayerSidebarView {
             .frame(width: 14, height: 32)
             .contentShape(Rectangle())
             .onDrag {
+                isDraggingLayer = true
                 draggedLayerIndex = layer.index
                 dropTargetLayerIndex = layer.index
                 return NSItemProvider(object: NSString(string: "\(layer.index)"))
@@ -386,9 +507,17 @@ extension LayerSidebarView {
     }
 
     func startEditingLayer(_ layer: LayerRowModel) {
+        editingFolderID = nil
         editingLayerIndex = layer.index
         editingLayerName = layer.name
-        focusedLayerEditorIndex = layer.index
+        focusedEditorTarget = .layer(layer.index)
+    }
+
+    func startEditingFolder(_ folder: LayerFolderModel) {
+        editingLayerIndex = nil
+        editingFolderID = folder.id
+        editingFolderName = folder.name
+        focusedEditorTarget = .folder(folder.id)
     }
 
     func commitLayerNameEdit(for index: Int) {
@@ -399,6 +528,35 @@ extension LayerSidebarView {
             store.send(.renameLayerCommitted(index, trimmed))
         }
         editingLayerIndex = nil
-        focusedLayerEditorIndex = nil
+        if editingFolderID == nil {
+            focusedEditorTarget = nil
+        }
+    }
+
+    func commitFolderNameEdit(for folderID: Int) {
+        guard editingFolderID == folderID else { return }
+        let trimmed = editingFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentName = store.rows.compactMap { row -> LayerFolderModel? in
+            if case let .folder(folder) = row, folder.id == folderID {
+                return folder
+            }
+            return nil
+        }.first?.name ?? ""
+        if !trimmed.isEmpty && trimmed != currentName {
+            store.send(.renameFolderCommitted(folderID, trimmed))
+        }
+        editingFolderID = nil
+        if editingLayerIndex == nil {
+            focusedEditorTarget = nil
+        }
+    }
+
+    func commitCurrentNameEdit() {
+        if let editingLayerIndex {
+            commitLayerNameEdit(for: editingLayerIndex)
+        }
+        if let editingFolderID {
+            commitFolderNameEdit(for: editingFolderID)
+        }
     }
 }

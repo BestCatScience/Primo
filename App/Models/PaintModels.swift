@@ -1048,20 +1048,45 @@ struct BrushPreset: Identifiable, Equatable {
     static let defaultPencil = defaults[0]
 }
 
-struct LayerRowModel: Identifiable, Equatable {
+struct LayerRowModel: Identifiable, Equatable, Sendable {
     var id: Int { index }
     let index: Int
     let name: String
     let visible: Bool
     let opacity: Double
     let blendMode: LayerBlendMode
+    let folderID: Int?
 
     static func == (lhs: LayerRowModel, rhs: LayerRowModel) -> Bool {
         lhs.index == rhs.index &&
         lhs.name == rhs.name &&
         lhs.visible == rhs.visible &&
         lhs.opacity == rhs.opacity &&
-        lhs.blendMode == rhs.blendMode
+        lhs.blendMode == rhs.blendMode &&
+        lhs.folderID == rhs.folderID
+    }
+}
+
+struct LayerFolderModel: Identifiable, Equatable, Sendable {
+    let id: Int
+    let name: String
+    let visible: Bool
+    let isExpanded: Bool
+    let anchorLayerIndex: Int?
+    let childLayerIndices: [Int]
+}
+
+enum LayerSidebarRowModel: Identifiable, Equatable, Sendable {
+    case folder(LayerFolderModel)
+    case layer(LayerRowModel, depth: Int)
+
+    var id: String {
+        switch self {
+        case let .folder(folder):
+            return "folder-\(folder.id)"
+        case let .layer(layer, _):
+            return "layer-\(layer.index)"
+        }
     }
 }
 

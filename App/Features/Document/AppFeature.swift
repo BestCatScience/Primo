@@ -92,6 +92,7 @@ struct AppFeature {
                 }
             }
             layerSidebar.layers = presentation.layerRows
+            layerSidebar.rows = presentation.layerSidebarRows
             layerSidebar.layerBuffers = canvas.layerBuffers
             layerSidebar.activeLayerIndex = presentation.activeLayerIndex
             layerSidebar.paperColor = brushPalette.paper.color
@@ -540,6 +541,26 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case .layerSidebar(.delegate(.addFolder)):
+                let nextFolderNumber = state.layerSidebar.rows.reduce(into: 0) { partialResult, row in
+                    if case .folder = row {
+                        partialResult += 1
+                    }
+                } + 1
+                _ = paintDocumentClient.createFolder(
+                    StudioStrings.folderName(nextFolderNumber, state.appLanguage),
+                    state.layerSidebar.activeLayerIndex
+                )
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.deleteFolder(folderID))):
+                guard paintDocumentClient.deleteFolder(folderID) else {
+                    return .none
+                }
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case let .layerSidebar(.delegate(.deleteLayer(index))):
                 guard paintDocumentClient.deleteLayer(index) else {
                     return .none
@@ -553,6 +574,20 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
+                guard paintDocumentClient.assignLayerToFolder(index, folderID) else {
+                    return .none
+                }
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
+                guard paintDocumentClient.assignLayerToFolder(index, -1) else {
+                    return .none
+                }
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
@@ -575,6 +610,29 @@ struct AppFeature {
                 }
                 paintDocumentClient.setLayerVisibility(index, !layer.visible)
                 state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.setFolderExpanded(folderID, isExpanded))):
+                paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.toggleFolderVisibility(folderID))):
+                guard let folder = state.layerSidebar.rows.compactMap({ row -> LayerFolderModel? in
+                    if case let .folder(folder) = row, folder.id == folderID {
+                        return folder
+                    }
+                    return nil
+                }).first else {
+                    return .none
+                }
+                paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.renameFolder(folderID, name))):
+                paintDocumentClient.setFolderName(folderID, name)
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 

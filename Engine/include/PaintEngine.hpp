@@ -159,6 +159,14 @@ struct Layer {
     std::vector<uint8_t> pixels;
 };
 
+struct LayerFolder {
+    int id = -1;
+    std::string name;
+    bool visible = true;
+    bool expanded = true;
+    int anchorLayerIndex = -1;
+};
+
 class PaintDocument {
 public:
     PaintDocument(int width, int height);
@@ -173,6 +181,16 @@ public:
     int addLayer(const std::string& name);
     bool deleteLayer(int index);
     bool moveLayer(int fromIndex, int toIndex);
+    int createFolder(const std::string& name, int layerIndex);
+    bool deleteFolder(int folderID);
+    void setFolderName(int folderID, std::string name);
+    void setFolderVisibility(int folderID, bool visible);
+    void setFolderExpanded(int folderID, bool expanded);
+    bool setLayerFolder(int layerIndex, int folderID);
+    int layerFolderID(int layerIndex) const noexcept;
+    bool isLayerVisibleEffective(int layerIndex) const noexcept;
+    int folderCount() const noexcept;
+    const LayerFolder& folderAt(int position) const;
     void clearLayer(int index);
     void setLayerName(int index, std::string name);
     void setLayerVisibility(int index, bool visible);
@@ -203,6 +221,9 @@ private:
         int layerIndex = -1;
         Layer layer;
         std::vector<Layer> layers;
+        std::vector<LayerFolder> folders;
+        std::vector<int> layerFolderIDs;
+        int nextFolderID = 1;
     };
 
     static constexpr size_t kMaxHistoryDepth = 24;
@@ -218,14 +239,18 @@ private:
     bool strokeInFlight_ = false;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;
+    std::vector<LayerFolder> folders_;
+    std::vector<int> layerFolderIDs_;
     std::vector<HistorySnapshot> undoStack_;
     std::vector<HistorySnapshot> redoStack_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
+    int nextFolderID_ = 1;
 
     void pushHistorySnapshot();
     void pushLayerHistorySnapshot(int layerIndex);
     void markEntireDocumentDirty() noexcept;
+    const LayerFolder* folderByID(int folderID) const noexcept;
     void stampDab(Layer& layer, const StrokePoint& point);
     void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure);
     void rebuildComposite() const;

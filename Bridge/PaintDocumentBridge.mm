@@ -254,13 +254,35 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 - (instancetype)initWithName:(NSString *)name
                      visible:(BOOL)visible
                      opacity:(CGFloat)opacity
-                   blendMode:(NSString *)blendMode {
+                   blendMode:(NSString *)blendMode
+                    folderID:(NSInteger)folderID {
     self = [super init];
     if (self) {
         _name = [name copy];
         _visible = visible;
         _opacity = opacity;
         _blendMode = [blendMode copy];
+        _folderID = folderID;
+    }
+    return self;
+}
+
+@end
+
+@implementation APPaintFolderInfo
+
+- (instancetype)initWithFolderID:(NSInteger)folderID
+                            name:(NSString *)name
+                         visible:(BOOL)visible
+                        expanded:(BOOL)expanded
+                 anchorLayerIndex:(NSInteger)anchorLayerIndex {
+    self = [super init];
+    if (self) {
+        _folderID = folderID;
+        _name = [name copy];
+        _visible = visible;
+        _expanded = expanded;
+        _anchorLayerIndex = anchorLayerIndex;
     }
     return self;
 }
@@ -296,6 +318,14 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     return _document->moveLayer((int)index, (int)destinationIndex);
 }
 
+- (NSInteger)createFolderWithName:(NSString *)name layerIndex:(NSInteger)layerIndex {
+    return _document->createFolder(name.UTF8String, (int)layerIndex);
+}
+
+- (BOOL)deleteFolderWithID:(NSInteger)folderID {
+    return _document->deleteFolder((int)folderID);
+}
+
 - (NSArray<APPaintLayerInfo *> *)layers {
     NSMutableArray<APPaintLayerInfo *> *items = [NSMutableArray array];
     for (int index = 0; index < _document->layerCount(); ++index) {
@@ -304,7 +334,23 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
         APPaintLayerInfo *info = [[APPaintLayerInfo alloc] initWithName:name
                                                                 visible:layer.visible
                                                                 opacity:layer.opacity
-                                                              blendMode:APStringFromBlendMode(layer.blendMode)];
+                                                              blendMode:APStringFromBlendMode(layer.blendMode)
+                                                               folderID:_document->layerFolderID(index)];
+        [items addObject:info];
+    }
+    return items;
+}
+
+- (NSArray<APPaintFolderInfo *> *)folders {
+    NSMutableArray<APPaintFolderInfo *> *items = [NSMutableArray array];
+    for (int position = 0; position < _document->folderCount(); ++position) {
+        const auto &folder = _document->folderAt(position);
+        NSString *name = [NSString stringWithUTF8String:folder.name.c_str()];
+        APPaintFolderInfo *info = [[APPaintFolderInfo alloc] initWithFolderID:folder.id
+                                                                         name:name
+                                                                      visible:folder.visible
+                                                                     expanded:folder.expanded
+                                                              anchorLayerIndex:folder.anchorLayerIndex];
         [items addObject:info];
     }
     return items;
@@ -349,6 +395,22 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 
 - (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index {
     _document->setLayerBlendMode((int)index, APBlendModeFromString(blendMode));
+}
+
+- (void)setFolderVisible:(BOOL)visible folderID:(NSInteger)folderID {
+    _document->setFolderVisibility((int)folderID, visible);
+}
+
+- (void)setFolderName:(NSString *)name folderID:(NSInteger)folderID {
+    _document->setFolderName((int)folderID, name.UTF8String);
+}
+
+- (void)setFolderExpanded:(BOOL)expanded folderID:(NSInteger)folderID {
+    _document->setFolderExpanded((int)folderID, expanded);
+}
+
+- (BOOL)setLayerFolderAtIndex:(NSInteger)index folderID:(NSInteger)folderID {
+    return _document->setLayerFolder((int)index, (int)folderID);
 }
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {

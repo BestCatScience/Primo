@@ -106,11 +106,31 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL visible;
 @property (nonatomic) CGFloat opacity;
 @property (nonatomic, copy) NSString *blendMode;
+@property (nonatomic) NSInteger folderID;
 
 - (instancetype)initWithName:(NSString *)name
                      visible:(BOOL)visible
                      opacity:(CGFloat)opacity
-                   blendMode:(NSString *)blendMode NS_DESIGNATED_INITIALIZER;
+                   blendMode:(NSString *)blendMode
+                    folderID:(NSInteger)folderID NS_DESIGNATED_INITIALIZER;
+
+- (instancetype)init NS_UNAVAILABLE;
+
+@end
+
+@interface APPaintFolderInfo : NSObject
+
+@property (nonatomic) NSInteger folderID;
+@property (nonatomic, copy) NSString *name;
+@property (nonatomic) BOOL visible;
+@property (nonatomic) BOOL expanded;
+@property (nonatomic) NSInteger anchorLayerIndex;
+
+- (instancetype)initWithFolderID:(NSInteger)folderID
+                            name:(NSString *)name
+                         visible:(BOOL)visible
+                        expanded:(BOOL)expanded
+                 anchorLayerIndex:(NSInteger)anchorLayerIndex NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
@@ -128,7 +148,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSInteger)addLayerWithName:(NSString *)name NS_SWIFT_NAME(addLayer(name:));
 - (BOOL)deleteLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(deleteLayer(at:));
 - (BOOL)moveLayerAtIndex:(NSInteger)index toIndex:(NSInteger)destinationIndex NS_SWIFT_NAME(moveLayer(at:to:));
+- (NSInteger)createFolderWithName:(NSString *)name layerIndex:(NSInteger)layerIndex NS_SWIFT_NAME(createFolder(name:layerIndex:));
+- (BOOL)deleteFolderWithID:(NSInteger)folderID NS_SWIFT_NAME(deleteFolder(id:));
 - (NSArray<APPaintLayerInfo *> *)layers NS_SWIFT_NAME(layerInfos());
+- (NSArray<APPaintFolderInfo *> *)folders NS_SWIFT_NAME(folderInfos());
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(pixelDataForLayer(at:));
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:data:));
 - (void)clearLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(clearLayer(at:));
@@ -136,6 +159,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerVisible(_:at:));
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerOpacity(_:at:));
 - (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerBlendMode(_:at:));
+- (void)setFolderVisible:(BOOL)visible folderID:(NSInteger)folderID NS_SWIFT_NAME(setFolderVisible(_:folderID:));
+- (void)setFolderName:(NSString *)name folderID:(NSInteger)folderID NS_SWIFT_NAME(setFolderName(_:folderID:));
+- (void)setFolderExpanded:(BOOL)expanded folderID:(NSInteger)folderID NS_SWIFT_NAME(setFolderExpanded(_:folderID:));
+- (BOOL)setLayerFolderAtIndex:(NSInteger)index folderID:(NSInteger)folderID NS_SWIFT_NAME(setLayerFolder(at:folderID:));
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point NS_SWIFT_NAME(beginStroke(brush:point:));
 - (void)appendStroke:(APStrokePoint *)point NS_SWIFT_NAME(appendStroke(point:));

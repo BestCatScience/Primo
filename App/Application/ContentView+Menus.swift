@@ -153,6 +153,10 @@ extension ContentView {
                     store.send(.layerSidebar(.addLayerButtonTapped))
                 }
 
+                Button(StudioStrings.addFolder(language)) {
+                    store.send(.layerSidebar(.addFolderButtonTapped))
+                }
+
                 Button(activeLayerIsVisible ? StudioStrings.hideActiveLayer(language) : StudioStrings.showActiveLayer(language)) {
                     store.send(.activeLayerVisibilityToggled)
                 }

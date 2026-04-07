@@ -34,21 +34,15 @@ final class PaintDocumentSession: @unchecked Sendable {
         let clock = ContinuousClock()
         let start = clock.now
         let infos = bridge.layerInfos()
-        let rows = Array(infos.enumerated().map { index, layer in
-            LayerRowModel(
-                index: index,
-                name: layer.name,
-                visible: layer.visible,
-                opacity: layer.opacity,
-                blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal
-            )
-        }.reversed())
+        let folderInfos = bridge.folderInfos()
+        let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
             activeLayerIndex: bridge.activeLayerIndex,
             layerRows: rows,
+            layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: nil
         )
     }
@@ -58,25 +52,19 @@ final class PaintDocumentSession: @unchecked Sendable {
         let start = clock.now
         revision += 1
         let infos = bridge.layerInfos()
+        let folderInfos = bridge.folderInfos()
+        let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
         let snapshots = infos.enumerated().map { index, info in
             MetalLayerSnapshot(
                 index: index,
                 opacity: Float(info.opacity),
-                visible: info.visible,
+                visible: info.visible && (info.folderID < 0 || (folderVisibilityByID[Int(info.folderID)] ?? true)),
                 blendMode: LayerBlendMode(rawValue: info.blendMode) ?? .normal,
                 thumbnailData: cachedLayerThumbnailData(index: index),
                 pixelData: bridge.pixelDataForLayer(at: index) as Data
             )
         }
-        let rows = Array(infos.enumerated().map { index, layer in
-            LayerRowModel(
-                index: index,
-                name: layer.name,
-                visible: layer.visible,
-                opacity: layer.opacity,
-                blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal
-            )
-        }.reversed())
+        let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
         Self.logger.debug("presentation produced revision \(self.revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
@@ -84,6 +72,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
             activeLayerIndex: bridge.activeLayerIndex,
             layerRows: rows,
+            layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: MetalDocumentSnapshot(
                 width: bridge.width,
                 height: bridge.height,
@@ -177,6 +166,42 @@ final class PaintDocumentSession: @unchecked Sendable {
         return didMove
     }
 
+    @discardableResult
+    func createFolder(name: String, layerIndex: Int) -> Int {
+        bridge.createFolder(name: name, layerIndex: layerIndex)
+    }
+
+    @discardableResult
+    func deleteFolder(folderID: Int) -> Bool {
+        let didDelete = bridge.deleteFolder(id: folderID)
+        if didDelete {
+            captureTimelapseFrame()
+        }
+        return didDelete
+    }
+
+    func setFolderVisibility(folderID: Int, isVisible: Bool) {
+        bridge.setFolderVisible(isVisible, folderID: folderID)
+        captureTimelapseFrame()
+    }
+
+    func setFolderName(folderID: Int, name: String) {
+        bridge.setFolderName(name, folderID: folderID)
+    }
+
+    func setFolderExpanded(folderID: Int, isExpanded: Bool) {
+        bridge.setFolderExpanded(isExpanded, folderID: folderID)
+    }
+
+    @discardableResult
+    func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
+        let didAssign = bridge.setLayerFolder(at: index, folderID: folderID)
+        if didAssign {
+            captureTimelapseFrame()
+        }
+        return didAssign
+    }
+
     func setActiveLayer(index: Int) {
         bridge.activeLayerIndex = index
     }
@@ -216,6 +241,71 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func setPaperStyle(_ style: CanvasPaperStyle) {
         paperStyle = style
+    }
+
+    private func buildLayerRows(from infos: [APPaintLayerInfo]) -> [LayerRowModel] {
+        Array(infos.enumerated().map { index, layer in
+            LayerRowModel(
+                index: index,
+                name: layer.name,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
+                folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil
+            )
+        }.reversed())
+    }
+
+    private func buildSidebarRows(
+        layerInfos: [APPaintLayerInfo],
+        layerRows: [LayerRowModel],
+        folderInfos: [APPaintFolderInfo]
+    ) -> [LayerSidebarRowModel] {
+        let layerRowsByIndex = Dictionary(uniqueKeysWithValues: layerRows.map { ($0.index, $0) })
+        let orderedFolders = folderInfos.map { folderInfo in
+            let childIndices = layerInfos.enumerated().compactMap { index, layer in
+                Int(layer.folderID) == Int(folderInfo.folderID) ? index : nil
+            }.sorted(by: >)
+            return LayerFolderModel(
+                id: Int(folderInfo.folderID),
+                name: folderInfo.name,
+                visible: folderInfo.visible,
+                isExpanded: folderInfo.expanded,
+                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? Int(folderInfo.anchorLayerIndex) : nil,
+                childLayerIndices: childIndices
+            )
+        }
+        let folders = Dictionary(uniqueKeysWithValues: orderedFolders.map { ($0.id, $0) })
+
+        var emittedFolderIDs = Set<Int>()
+        var rows: [LayerSidebarRowModel] = []
+        for layer in layerRows {
+            for folder in orderedFolders where folder.anchorLayerIndex == layer.index && !emittedFolderIDs.contains(folder.id) {
+                rows.append(.folder(folder))
+                emittedFolderIDs.insert(folder.id)
+                if folder.isExpanded {
+                    for childIndex in folder.childLayerIndices {
+                        if let childLayer = layerRowsByIndex[childIndex] {
+                            rows.append(.layer(childLayer, depth: 1))
+                        }
+                    }
+                }
+            }
+
+            if let folderID = layer.folderID {
+                if folders[folderID] == nil {
+                    rows.append(.layer(layer, depth: 0))
+                }
+            } else {
+                rows.append(.layer(layer, depth: 0))
+            }
+        }
+
+        for folder in orderedFolders where !emittedFolderIDs.contains(folder.id) {
+            rows.append(.folder(folder))
+        }
+
+        return rows
     }
 
     func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
