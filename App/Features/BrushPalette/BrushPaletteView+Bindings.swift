@@ -2,8 +2,34 @@ import SwiftUI
 import UIKit
 
 extension BrushPaletteView {
+    var isTransparentBrushColorSelected: Bool {
+        store.brush.usesTransparentColor
+    }
+
+    var activeBrushColor: Color {
+        store.brush.activeColor
+    }
+
+    var activeBrushAccentColor: Color {
+        isTransparentBrushColorSelected ? Color.white.opacity(0.78) : store.brush.activeOpaqueColor
+    }
+
+    var editableBrushColorBinding: Binding<Color> {
+        Binding(
+            get: { store.brush.activeOpaqueColor },
+            set: { newColor in
+                let keyPath: WritableKeyPath<BrushPaletteFeature.State, Color> =
+                    store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color
+                store.send(.binding(.set(keyPath, newColor)))
+            }
+        )
+    }
+
     var colorHexLabel: String {
-        let resolved = UIColor(store.brush.color)
+        guard !isTransparentBrushColorSelected else {
+            return language.localized("透明")
+        }
+        let resolved = UIColor(activeBrushColor)
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0

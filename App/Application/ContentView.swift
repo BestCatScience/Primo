@@ -5,6 +5,7 @@ import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
+    private let studioUIScale: CGFloat = 0.5
     @State var showsOpenDocumentImporter = false
     @State var showsNewCanvasSheet = false
     @State var showsHSBSheet = false
@@ -26,6 +27,67 @@ struct ContentView: View {
     var language: AppLanguage { store.appLanguage }
 
     var body: some View {
+        GeometryReader { proxy in
+            scaledStudioInterface(in: proxy.size)
+        }
+        .ignoresSafeArea(edges: [.horizontal, .bottom])
+        .task {
+            store.send(.task)
+        }
+        .sheet(item: Binding(
+            get: { store.exportSheet },
+            set: { _ in store.send(.exportSheetDismissed) }
+        )) { export in
+            ShareSheet(items: [export.url])
+        }
+        .sheet(isPresented: $showsNewCanvasSheet) {
+            newCanvasSheet
+        }
+        .sheet(isPresented: $showsHSBSheet) {
+            hueSaturationBrightnessSheet
+        }
+        .sheet(isPresented: $showsBrightnessContrastSheet) {
+            brightnessContrastSheet
+        }
+        .sheet(isPresented: $showsLevelsSheet) {
+            levelsSheet
+        }
+        .sheet(isPresented: $showsToneCurveSheet) {
+            toneCurveSheet
+        }
+        .sheet(isPresented: $showsColorBalanceSheet) {
+            colorBalanceSheet
+        }
+        .sheet(isPresented: $showsThresholdSheet) {
+            thresholdSheet
+        }
+        .sheet(isPresented: $showsPosterizeSheet) {
+            posterizeSheet
+        }
+        .fileImporter(
+            isPresented: $showsOpenDocumentImporter,
+            allowedContentTypes: [.atelierDocument],
+            allowsMultipleSelection: false
+        ) { result in
+            guard case let .success(urls) = result, let sourceURL = urls.first else { return }
+            guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
+            store.send(.openDocumentSelected(stagedURL))
+        }
+    }
+
+    @ViewBuilder
+    private func scaledStudioInterface(in availableSize: CGSize) -> some View {
+        studioInterface
+            .frame(
+                width: max(availableSize.width / studioUIScale, availableSize.width),
+                height: max(availableSize.height / studioUIScale, availableSize.height),
+                alignment: .topLeading
+            )
+            .scaleEffect(studioUIScale, anchor: .topLeading)
+            .frame(width: availableSize.width, height: availableSize.height, alignment: .topLeading)
+    }
+
+    private var studioInterface: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 toolDockColumn
@@ -73,49 +135,6 @@ struct ContentView: View {
                 undoRedoBar
             }
                 .zIndex(1000)
-        }
-        .ignoresSafeArea(edges: [.horizontal, .bottom])
-        .task {
-            store.send(.task)
-        }
-        .sheet(item: Binding(
-            get: { store.exportSheet },
-            set: { _ in store.send(.exportSheetDismissed) }
-        )) { export in
-            ShareSheet(items: [export.url])
-        }
-        .sheet(isPresented: $showsNewCanvasSheet) {
-            newCanvasSheet
-        }
-        .sheet(isPresented: $showsHSBSheet) {
-            hueSaturationBrightnessSheet
-        }
-        .sheet(isPresented: $showsBrightnessContrastSheet) {
-            brightnessContrastSheet
-        }
-        .sheet(isPresented: $showsLevelsSheet) {
-            levelsSheet
-        }
-        .sheet(isPresented: $showsToneCurveSheet) {
-            toneCurveSheet
-        }
-        .sheet(isPresented: $showsColorBalanceSheet) {
-            colorBalanceSheet
-        }
-        .sheet(isPresented: $showsThresholdSheet) {
-            thresholdSheet
-        }
-        .sheet(isPresented: $showsPosterizeSheet) {
-            posterizeSheet
-        }
-        .fileImporter(
-            isPresented: $showsOpenDocumentImporter,
-            allowedContentTypes: [.atelierDocument],
-            allowsMultipleSelection: false
-        ) { result in
-            guard case let .success(urls) = result, let sourceURL = urls.first else { return }
-            guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
-            store.send(.openDocumentSelected(stagedURL))
         }
         .overlay(alignment: .topLeading) {
             if store.brushPalette.ui.showsBrushSettingsPopover {

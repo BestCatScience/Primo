@@ -163,6 +163,111 @@ struct SpectrumColorControl: View {
     }
 }
 
+struct SquareSliderColorPalette: View {
+    @Binding var color: Color
+    @State private var activeRegion: ActiveRegion?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let hsb = ColorHSB(color: color)
+            let sliderWidth: CGFloat = 18
+            let spacing: CGFloat = 12
+            let squareSide = min(geometry.size.height, max(96, geometry.size.width - sliderWidth - spacing))
+            let squareRect = CGRect(x: 0, y: 0, width: squareSide, height: squareSide)
+            let sliderRect = CGRect(x: squareSide + spacing, y: 0, width: sliderWidth, height: squareSide)
+            let squareIndicator = CGPoint(
+                x: squareRect.minX + (hsb.saturation * squareRect.width),
+                y: squareRect.minY + ((1 - hsb.brightness) * squareRect.height)
+            )
+            let hueIndicatorY = sliderRect.minY + ((1 - hsb.hue) * sliderRect.height)
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(hue: hsb.hue, saturation: 1, brightness: 1))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(LinearGradient(colors: [.white, .clear], startPoint: .leading, endPoint: .trailing))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom))
+                    }
+                    .frame(width: squareRect.width, height: squareRect.height)
+
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [.red, .yellow, .green, .cyan, .blue, .purple, .red],
+                            startPoint: .bottom,
+                            endPoint: .top
+                        )
+                    )
+                    .frame(width: sliderRect.width, height: sliderRect.height)
+                    .offset(x: sliderRect.minX, y: sliderRect.minY)
+
+                Circle()
+                    .fill(color)
+                    .frame(width: 16, height: 16)
+                    .overlay(Circle().stroke(Color.white.opacity(0.95), lineWidth: 2))
+                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+                    .position(x: squareIndicator.x, y: squareIndicator.y)
+
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color.white.opacity(0.96))
+                    .frame(width: sliderRect.width + 8, height: 10)
+                    .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                    .offset(x: sliderRect.minX - 4, y: hueIndicatorY - 5)
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if activeRegion == nil {
+                            activeRegion = hitRegion(at: value.location, squareRect: squareRect, sliderRect: sliderRect)
+                        }
+                        switch activeRegion {
+                        case .square:
+                            updateSquare(at: value.location, within: squareRect, hue: hsb.hue)
+                        case .slider:
+                            updateHue(at: value.location, within: sliderRect, current: hsb)
+                        case .none:
+                            break
+                        }
+                    }
+                    .onEnded { _ in
+                        activeRegion = nil
+                    }
+            )
+        }
+        .frame(height: 148)
+    }
+
+    private func hitRegion(at point: CGPoint, squareRect: CGRect, sliderRect: CGRect) -> ActiveRegion? {
+        if squareRect.contains(point) { return .square }
+        if sliderRect.insetBy(dx: -8, dy: -8).contains(point) { return .slider }
+        return nil
+    }
+
+    private func updateSquare(at point: CGPoint, within rect: CGRect, hue: Double) {
+        let clampedX = min(max(point.x, rect.minX), rect.maxX)
+        let clampedY = min(max(point.y, rect.minY), rect.maxY)
+        let saturation = (clampedX - rect.minX) / rect.width
+        let brightness = 1 - ((clampedY - rect.minY) / rect.height)
+        color = Color(hue: hue, saturation: saturation, brightness: brightness)
+    }
+
+    private func updateHue(at point: CGPoint, within rect: CGRect, current: ColorHSB) {
+        let clampedY = min(max(point.y, rect.minY), rect.maxY)
+        let hue = 1 - ((clampedY - rect.minY) / rect.height)
+        color = Color(hue: hue, saturation: current.saturation, brightness: current.brightness)
+    }
+
+    private enum ActiveRegion {
+        case square
+        case slider
+    }
+}
+
 struct VerticalValueSlider: View {
     @Binding var value: Double
 

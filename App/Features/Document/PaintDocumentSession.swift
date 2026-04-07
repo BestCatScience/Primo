@@ -67,8 +67,10 @@ final class PaintDocumentSession: @unchecked Sendable {
         let infos = bridge.layerInfos()
         let folderInfos = bridge.folderInfos()
         let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
-        let snapshots = infos.enumerated().map { index, info in
-            MetalLayerSnapshot(
+        let snapshots = infos.enumerated().map { element in
+            let index = element.offset
+            let info = element.element
+            return MetalLayerSnapshot(
                 index: index,
                 opacity: Float(info.opacity),
                 visible: info.visible && (info.folderID < 0 || (folderVisibilityByID[Int(info.folderID)] ?? true)),

@@ -169,14 +169,14 @@ struct AppFeature {
 
         func resolvedBrushSettings() -> BrushRuntimeSettings {
             var settings = brushPalette.runtimeSettings
-            if canvas.currentTool == .erase {
+            if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
                 settings.isEraser = true
             }
             return settings
         }
 
         func previewStrokeStyle() -> PreviewStrokeStyle {
-            if canvas.currentTool == .erase {
+            if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
                 return PreviewStrokeStyle(
                     tipKind: .ink,
                     isEraser: true,
@@ -1153,7 +1153,11 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.colorSampled(sampledColor)):
-                state.brushPalette.brush.color = Self.color(from: sampledColor)
+                let sampled = Self.color(from: sampledColor)
+                if state.brushPalette.brush.selectedColorSlot == .transparent {
+                    state.brushPalette.brush.selectedColorSlot = .primary
+                }
+                state.brushPalette.brush.setSelectedSlotColor(sampled)
                 state.brushPalette.library.selectedBrush = nil
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none

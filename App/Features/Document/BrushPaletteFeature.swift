@@ -62,9 +62,46 @@ struct BrushPaletteFeature {
             var pressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
             var stabilization: Double = 0.0
             var color: Color = BrushPreset.defaultPencil.color
+            var secondaryColor: Color = Color(red: 0.92, green: 0.94, blue: 0.98)
+            var selectedColorSlot: BrushColorSlot = .primary
+
+            var activeColor: Color {
+                switch selectedColorSlot {
+                case .primary:
+                    return color
+                case .secondary:
+                    return secondaryColor
+                case .transparent:
+                    return .clear
+                }
+            }
+
+            var activeOpaqueColor: Color {
+                switch selectedColorSlot {
+                case .primary, .transparent:
+                    return color
+                case .secondary:
+                    return secondaryColor
+                }
+            }
+
+            var usesTransparentColor: Bool {
+                selectedColorSlot == .transparent
+            }
+
+            mutating func setSelectedSlotColor(_ newColor: Color) {
+                switch selectedColorSlot {
+                case .primary:
+                    color = newColor
+                case .secondary:
+                    secondaryColor = newColor
+                case .transparent:
+                    break
+                }
+            }
 
             func runtimeSettings(fill: FillSettings) -> BrushRuntimeSettings {
-                let resolved = UIColor(color)
+                let resolved = UIColor(activeOpaqueColor)
                 var red: CGFloat = 0
                 var green: CGFloat = 0
                 var blue: CGFloat = 0
@@ -329,6 +366,8 @@ struct BrushPaletteFeature {
                 return .none
 
             case .binding(\.brush.color),
+                 .binding(\.brush.secondaryColor),
+                 .binding(\.brush.selectedColorSlot),
                  .binding(\.brush.tipKind),
                  .binding(\.brush.radius),
                  .binding(\.brush.sizeSpeedSensitivity),

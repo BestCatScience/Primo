@@ -334,6 +334,8 @@ extension BrushPaletteView {
                     .padding(.bottom, 6)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                brushColorSectionUnderPresets
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -448,6 +450,66 @@ extension BrushPaletteView {
                 )
                 .padding(.top, 6)
                 .padding(.trailing, 6)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    var brushColorSectionUnderPresets: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(language.localized("色").uppercased())
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(.white.opacity(0.48))
+                Spacer(minLength: 0)
+                Text(store.brush.selectedColorSlot.localizedTitle(language))
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(.white.opacity(0.58))
+            }
+
+            SpectrumColorControl(color: editableBrushColorBinding)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(panelHairlineFill)
+                )
+                .opacity(isTransparentBrushColorSelected ? 0.42 : 1.0)
+                .allowsHitTesting(!isTransparentBrushColorSelected)
+                .overlay {
+                    if isTransparentBrushColorSelected {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.black.opacity(0.24))
+                            .overlay {
+                                VStack(spacing: 6) {
+                                    Image(systemName: "eraser.fill")
+                                        .font(.system(size: 16, weight: .bold))
+                                    Text(language.localized("透明色で描画"))
+                                        .font(StudioTheme.Typography.mono(10))
+                                }
+                                .foregroundStyle(.white.opacity(0.88))
+                            }
+                    }
+                }
+
+            LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
+                ForEach(PaletteSwatch.defaults) { swatch in
+                    colorSwatch(
+                        color: swatch.color,
+                        isSelected: !isTransparentBrushColorSelected && editableBrushColorBinding.wrappedValue == swatch.color
+                    ) {
+                        store.send(
+                            .binding(
+                                .set(
+                                    store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color,
+                                    swatch.color
+                                )
+                            )
+                        )
+                    }
+                    .opacity(isTransparentBrushColorSelected ? 0.38 : 1.0)
+                    .allowsHitTesting(!isTransparentBrushColorSelected)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

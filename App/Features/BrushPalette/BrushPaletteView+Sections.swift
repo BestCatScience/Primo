@@ -35,8 +35,8 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brush.color.opacity(0.95),
-                                        store.brush.color.opacity(0.32)
+                                        activeBrushAccentColor.opacity(0.95),
+                                        activeBrushAccentColor.opacity(0.32)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -65,7 +65,7 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brush.color.opacity(0.96),
+                                        activeBrushAccentColor.opacity(0.96),
                                         StudioTheme.Palette.coolGlow.opacity(0.34)
                                     ],
                                     startPoint: .topLeading,
@@ -184,8 +184,8 @@ extension BrushPaletteView {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        store.brush.color.opacity(0.92),
-                                        store.brush.color.opacity(0.22)
+                                        activeBrushAccentColor.opacity(0.92),
+                                        activeBrushAccentColor.opacity(0.22)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -299,7 +299,7 @@ extension BrushPaletteView {
                                 )
 
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(store.brush.color)
+                                .fill(activeBrushAccentColor)
                                 .padding(4)
                         }
                         .frame(width: 38, height: 38)
@@ -322,19 +322,33 @@ extension BrushPaletteView {
                         Spacer(minLength: 0)
                     }
 
-                    SpectrumColorControl(color: $store.brush.color)
+                    SpectrumColorControl(color: editableBrushColorBinding)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 4)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
                                 .fill(panelHairlineFill)
                         )
+                        .opacity(isTransparentBrushColorSelected ? 0.42 : 1.0)
+                        .allowsHitTesting(!isTransparentBrushColorSelected)
 
                     LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
                         ForEach(PaletteSwatch.defaults) { swatch in
-                            colorSwatch(color: swatch.color, isSelected: false) {
-                                store.send(.binding(.set(\.brush.color, swatch.color)))
+                            colorSwatch(
+                                color: swatch.color,
+                                isSelected: !isTransparentBrushColorSelected && editableBrushColorBinding.wrappedValue == swatch.color
+                            ) {
+                                store.send(
+                                    .binding(
+                                        .set(
+                                            store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color,
+                                            swatch.color
+                                        )
+                                    )
+                                )
                             }
+                            .opacity(isTransparentBrushColorSelected ? 0.38 : 1.0)
+                            .allowsHitTesting(!isTransparentBrushColorSelected)
                         }
                     }
                 }
@@ -411,7 +425,10 @@ extension BrushPaletteView {
         if currentTool == .blur {
             return Color.white.opacity(0.92)
         }
-        let resolved = UIColor(store.brush.color)
+        if isTransparentBrushColorSelected {
+            return Color.white.opacity(0.82)
+        }
+        let resolved = UIColor(activeBrushColor)
         var white: CGFloat = 0
         if resolved.getWhite(&white, alpha: nil), white > 0.9 {
             return Color.black.opacity(0.88)
@@ -430,7 +447,7 @@ extension BrushPaletteView {
             )
         }
 
-        return store.brush.color
+        return activeBrushColor
     }
 
     var sectionTitle: String {

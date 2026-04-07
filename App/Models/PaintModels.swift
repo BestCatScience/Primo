@@ -62,6 +62,25 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum BrushColorSlot: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case primary
+    case secondary
+    case transparent
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .primary:
+            return language.localized("主色")
+        case .secondary:
+            return language.localized("補助色")
+        case .transparent:
+            return language.localized("透明色")
+        }
+    }
+}
+
 enum EyedropperSamplingSource: String, CaseIterable, Equatable, Sendable, Identifiable {
     case activeLayer
     case canvas
