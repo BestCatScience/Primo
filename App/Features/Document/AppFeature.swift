@@ -1138,6 +1138,20 @@ struct AppFeature {
             case .canvas(.delegate(.requestRedo)):
                 return .send(.redoRequested)
 
+            case .canvas(.delegate(.toggleBrushAndEraser)):
+                let nextTool: StudioToolKind = state.canvas.currentTool == .erase ? .brush : .erase
+                state.canvas.currentTool = nextTool
+                state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                if nextTool != .select && nextTool != .move {
+                    state.canvas.selection = nil
+                }
+                state.canvas.previewStyle = state.previewStrokeStyle()
+                return .none
+
             case let .canvas(.colorSampled(sampledColor)):
                 state.brushPalette.brush.color = Self.color(from: sampledColor)
                 state.brushPalette.library.selectedBrush = nil

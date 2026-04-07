@@ -36,7 +36,7 @@ struct CanvasView: UIViewRepresentable {
     }
 }
 
-final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate {
+final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate, UIPencilInteractionDelegate {
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
@@ -120,7 +120,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         redoTapRecognizer.require(toFail: pinchRecognizer)
         addGestureRecognizer(redoTapRecognizer)
 
-        addInteraction(UIPencilInteraction())
+        let pencilInteraction = UIPencilInteraction()
+        pencilInteraction.delegate = self
+        addInteraction(pencilInteraction)
     }
 
     @available(*, unavailable)
@@ -247,6 +249,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     func didEndTransform(translation: CGSize) {
         sendAction?(.transformEnded(translation))
+    }
+
+    func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
+        sendAction?(.pencilInteractionToggleRequested)
     }
 
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {

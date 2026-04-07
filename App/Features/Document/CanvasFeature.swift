@@ -49,6 +49,7 @@ struct CanvasFeature {
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
+        case pencilInteractionToggleRequested
         case fillRequested(StylusSample)
         case colorSampled(SampledColor)
         case selectionPreviewUpdated([CGPoint])
@@ -81,6 +82,7 @@ struct CanvasFeature {
         case lassoSelect([CGPoint])
         case autoSelect(StylusSample)
         case applyTransform(CGSize)
+        case toggleBrushAndEraser
         case requestUndo
         case requestRedo
     }
@@ -95,6 +97,9 @@ struct CanvasFeature {
             case let .fillRequested(sample):
                 state.pendingIncrementalUpdate = nil
                 return .send(.delegate(.fill(sample)))
+
+            case .pencilInteractionToggleRequested:
+                return .send(.delegate(.toggleBrushAndEraser))
 
             case .colorSampled:
                 return .none
