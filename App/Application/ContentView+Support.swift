@@ -80,6 +80,48 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
+struct WindowGestureShield: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> ShieldView {
+        let view = ShieldView()
+        view.addGestureRecognizer(context.coordinator.panRecognizer)
+        return view
+    }
+
+    func updateUIView(_ uiView: ShieldView, context: Context) {}
+
+    final class Coordinator: NSObject {
+        lazy var panRecognizer: UIPanGestureRecognizer = {
+            let recognizer = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
+            recognizer.cancelsTouchesInView = true
+            return recognizer
+        }()
+
+        @objc private func handlePan() {}
+    }
+
+    final class ShieldView: UIView {
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            backgroundColor = .clear
+            isOpaque = false
+            isUserInteractionEnabled = true
+            accessibilityElementsHidden = true
+        }
+
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            true
+        }
+    }
+}
+
 struct BannerToast: View {
     let message: String
 

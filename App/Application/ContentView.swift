@@ -134,7 +134,9 @@ struct ContentView: View {
                 menuBar
                 undoRedoBar
             }
-                .zIndex(1000)
+            .background(WindowGestureShield())
+            .contentShape(Rectangle())
+            .zIndex(1000)
         }
         .overlay(alignment: .topLeading) {
             if store.brushPalette.ui.showsBrushSettingsPopover {
