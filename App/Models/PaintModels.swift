@@ -258,6 +258,82 @@ enum LayerBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case graphite
+    case sepia
+    case ocean
+    case sunset
+    case toxic
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .graphite:
+            return language.localized("グラファイト")
+        case .sepia:
+            return language.localized("セピア")
+        case .ocean:
+            return language.localized("オーシャン")
+        case .sunset:
+            return language.localized("サンセット")
+        case .toxic:
+            return language.localized("トキシック")
+        }
+    }
+}
+
+struct HueSaturationBrightnessSettings: Equatable, Sendable {
+    var hueDegrees: Double = 0
+    var saturation: Double = 1
+    var brightness: Double = 0
+}
+
+struct BrightnessContrastSettings: Equatable, Sendable {
+    var brightness: Double = 0
+    var contrast: Double = 1
+}
+
+struct LevelsAdjustmentSettings: Equatable, Sendable {
+    var inputBlack: Double = 0
+    var inputWhite: Double = 1
+    var gamma: Double = 1
+    var outputBlack: Double = 0
+    var outputWhite: Double = 1
+}
+
+struct ToneCurveSettings: Equatable, Sendable {
+    var shadows: Double = 0
+    var midtones: Double = 0
+    var highlights: Double = 0
+}
+
+struct ColorBalanceSettings: Equatable, Sendable {
+    var redCyan: Double = 0
+    var greenMagenta: Double = 0
+    var blueYellow: Double = 0
+}
+
+struct ThresholdSettings: Equatable, Sendable {
+    var threshold: Double = 0.5
+}
+
+struct PosterizeSettings: Equatable, Sendable {
+    var levels: Double = 6
+}
+
+enum LayerProcessingRequest: Equatable, Sendable {
+    case gradientMap(GradientMapPreset)
+    case hueSaturationBrightness(HueSaturationBrightnessSettings)
+    case brightnessContrast(BrightnessContrastSettings)
+    case levels(LevelsAdjustmentSettings)
+    case toneCurve(ToneCurveSettings)
+    case colorBalance(ColorBalanceSettings)
+    case threshold(ThresholdSettings)
+    case posterize(PosterizeSettings)
+    case transform(translation: CGSize, scale: CGFloat, selection: CanvasSelection?)
+}
+
 enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case pencil
     case ink
@@ -1319,7 +1395,7 @@ struct IncrementalLayerUpdate: Equatable, Identifiable {
     }
 }
 
-struct CanvasSelection: Equatable {
+struct CanvasSelection: Equatable, Sendable {
     let bounds: CGRect
     let maskWidth: Int
     let maskHeight: Int

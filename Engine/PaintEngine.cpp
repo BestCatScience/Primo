@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <deque>
+#include <functional>
 #include <queue>
 #include <stdexcept>
 #include <variant>
@@ -570,6 +571,323 @@ std::array<float, 3> blendColorRGB(float dstR, float dstG, float dstB, float src
     };
 }
 
+struct GradientMapStop {
+    double position = 0.0;
+    uint8_t red = 0U;
+    uint8_t green = 0U;
+    uint8_t blue = 0U;
+};
+
+struct LayerProcessingContext {
+    int layerIndex = -1;
+    int width = 0;
+    int height = 0;
+};
+
+struct TransformBounds {
+    int minX = 0;
+    int minY = 0;
+    int maxX = -1;
+    int maxY = -1;
+
+    bool empty() const noexcept {
+        return maxX < minX || maxY < minY;
+    }
+
+    double midX() const noexcept {
+        return static_cast<double>(minX) + (static_cast<double>((maxX - minX) + 1) / 2.0);
+    }
+
+    double midY() const noexcept {
+        return static_cast<double>(minY) + (static_cast<double>((maxY - minY) + 1) / 2.0);
+    }
+};
+
+std::vector<GradientMapStop> gradientMapStopsForPreset(int preset) {
+    switch (preset) {
+        case 0:
+            return {
+                {0.0, 17U, 21U, 27U},
+                {0.38, 84U, 93U, 108U},
+                {1.0, 243U, 244U, 246U},
+            };
+        case 1:
+            return {
+                {0.0, 28U, 17U, 12U},
+                {0.42, 123U, 74U, 40U},
+                {1.0, 241U, 220U, 184U},
+            };
+        case 2:
+            return {
+                {0.0, 8U, 19U, 44U},
+                {0.45, 27U, 110U, 171U},
+                {1.0, 192U, 241U, 255U},
+            };
+        case 3:
+            return {
+                {0.0, 36U, 11U, 54U},
+                {0.4, 173U, 58U, 91U},
+                {0.72, 244U, 142U, 68U},
+                {1.0, 255U, 223U, 128U},
+            };
+        case 4:
+            return {
+                {0.0, 4U, 23U, 18U},
+                {0.44, 35U, 172U, 106U},
+                {1.0, 227U, 255U, 111U},
+            };
+        default:
+            return {};
+    }
+}
+
+std::array<uint8_t, 3> mappedGradientColor(double value, const std::vector<GradientMapStop>& stops) {
+    const double clampedValue = std::clamp(value, 0.0, 1.0);
+    const auto upper = std::find_if(stops.begin(), stops.end(), [clampedValue](const GradientMapStop& stop) {
+        return clampedValue <= stop.position;
+    });
+
+    if (upper == stops.end()) {
+        const GradientMapStop& last = stops.back();
+        return {last.red, last.green, last.blue};
+    }
+    if (upper == stops.begin()) {
+        return {upper->red, upper->green, upper->blue};
+    }
+
+    const GradientMapStop& lower = *std::prev(upper);
+    const double span = std::max(upper->position - lower.position, 0.0001);
+    const double t = (clampedValue - lower.position) / span;
+    const auto mix = [t](uint8_t a, uint8_t b) -> uint8_t {
+        return static_cast<uint8_t>(std::clamp(std::lround(static_cast<double>(a) + ((static_cast<double>(b) - static_cast<double>(a)) * t)), 0L, 255L));
+    };
+
+    return {
+        mix(lower.red, upper->red),
+        mix(lower.green, upper->green),
+        mix(lower.blue, upper->blue),
+    };
+}
+
+struct HSVColor {
+    double hue = 0.0;
+    double saturation = 0.0;
+    double value = 0.0;
+};
+
+HSVColor rgbToHSV(double red, double green, double blue) {
+    const double maxValue = std::max({red, green, blue});
+    const double minValue = std::min({red, green, blue});
+    const double delta = maxValue - minValue;
+
+    double hue = 0.0;
+    if (delta >= 0.000001) {
+        if (maxValue == red) {
+            hue = std::fmod((green - blue) / delta, 6.0) / 6.0;
+        } else if (maxValue == green) {
+            hue = (((blue - red) / delta) + 2.0) / 6.0;
+        } else {
+            hue = (((red - green) / delta) + 4.0) / 6.0;
+        }
+    }
+    if (hue < 0.0) {
+        hue += 1.0;
+    }
+
+    return HSVColor{
+        .hue = hue,
+        .saturation = maxValue <= 0.0 ? 0.0 : delta / maxValue,
+        .value = maxValue,
+    };
+}
+
+std::array<double, 3> hsvToRGB(double hue, double saturation, double value) {
+    if (saturation <= 0.000001) {
+        return {value, value, value};
+    }
+
+    const double scaledHue = std::fmod(hue - std::floor(hue), 1.0) * 6.0;
+    const int sector = static_cast<int>(std::floor(scaledHue));
+    const double fraction = scaledHue - static_cast<double>(sector);
+    const double p = value * (1.0 - saturation);
+    const double q = value * (1.0 - (saturation * fraction));
+    const double t = value * (1.0 - (saturation * (1.0 - fraction)));
+
+    switch (sector) {
+        case 0:
+            return {value, t, p};
+        case 1:
+            return {q, value, p};
+        case 2:
+            return {p, value, t};
+        case 3:
+            return {p, q, value};
+        case 4:
+            return {t, p, value};
+        default:
+            return {value, p, q};
+    }
+}
+
+std::optional<std::vector<uint8_t>> expandedSelectionMask(
+    const LayerProcessing& processing,
+    int canvasWidth,
+    int canvasHeight
+) {
+    if (processing.selectionWidth <= 0 ||
+        processing.selectionHeight <= 0 ||
+        processing.selectionMask.empty() ||
+        processing.selectionMask.size() != static_cast<size_t>(processing.selectionWidth) * static_cast<size_t>(processing.selectionHeight)) {
+        return std::nullopt;
+    }
+
+    const int originX = std::max(processing.selectionOriginX, 0);
+    const int originY = std::max(processing.selectionOriginY, 0);
+    const int copyWidth = std::min(processing.selectionWidth, canvasWidth - originX);
+    const int copyHeight = std::min(processing.selectionHeight, canvasHeight - originY);
+    if (copyWidth <= 0 || copyHeight <= 0) {
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> result(static_cast<size_t>(canvasWidth) * static_cast<size_t>(canvasHeight), 0U);
+    for (int y = 0; y < copyHeight; ++y) {
+        for (int x = 0; x < copyWidth; ++x) {
+            const size_t sourceIndex = static_cast<size_t>(y * processing.selectionWidth + x);
+            const size_t destinationIndex = static_cast<size_t>((originY + y) * canvasWidth + (originX + x));
+            result[destinationIndex] = processing.selectionMask[sourceIndex];
+        }
+    }
+    return result;
+}
+
+std::vector<uint8_t> alphaMask(std::span<const uint8_t> source, int canvasWidth, int canvasHeight) {
+    std::vector<uint8_t> result(static_cast<size_t>(canvasWidth) * static_cast<size_t>(canvasHeight), 0U);
+    for (int index = 0; index < canvasWidth * canvasHeight; ++index) {
+        if (source[static_cast<size_t>(index) * kPixelStride + 3U] != 0U) {
+            result[static_cast<size_t>(index)] = 255U;
+        }
+    }
+    return result;
+}
+
+std::optional<TransformBounds> transformationBounds(
+    const LayerProcessing& processing,
+    const std::optional<std::vector<uint8_t>>& selectionMask,
+    std::span<const uint8_t> source,
+    int canvasWidth,
+    int canvasHeight
+) {
+    if (selectionMask.has_value()) {
+        const int minX = std::clamp(processing.selectionOriginX, 0, std::max(canvasWidth - 1, 0));
+        const int minY = std::clamp(processing.selectionOriginY, 0, std::max(canvasHeight - 1, 0));
+        const int maxX = std::clamp(processing.selectionOriginX + processing.selectionWidth - 1, 0, std::max(canvasWidth - 1, 0));
+        const int maxY = std::clamp(processing.selectionOriginY + processing.selectionHeight - 1, 0, std::max(canvasHeight - 1, 0));
+        if (maxX >= minX && maxY >= minY) {
+            return TransformBounds{
+                .minX = minX,
+                .minY = minY,
+                .maxX = maxX,
+                .maxY = maxY,
+            };
+        }
+        return std::nullopt;
+    }
+
+    TransformBounds bounds{
+        .minX = canvasWidth,
+        .minY = canvasHeight,
+        .maxX = -1,
+        .maxY = -1,
+    };
+    for (int y = 0; y < canvasHeight; ++y) {
+        for (int x = 0; x < canvasWidth; ++x) {
+            if (source[(static_cast<size_t>(y * canvasWidth + x) * kPixelStride) + 3U] == 0U) {
+                continue;
+            }
+            bounds.minX = std::min(bounds.minX, x);
+            bounds.minY = std::min(bounds.minY, y);
+            bounds.maxX = std::max(bounds.maxX, x);
+            bounds.maxY = std::max(bounds.maxY, y);
+        }
+    }
+
+    if (bounds.empty()) {
+        return std::nullopt;
+    }
+    return bounds;
+}
+
+std::optional<std::vector<uint8_t>> transformedPixels(
+    const LayerProcessing& processing,
+    std::span<const uint8_t> source,
+    int canvasWidth,
+    int canvasHeight
+) {
+    const int dx = processing.transformTranslateX;
+    const int dy = processing.transformTranslateY;
+    const double clampedScale = std::clamp(processing.transformScale, 0.2, 6.0);
+    if ((dx == 0 && dy == 0) && std::abs(clampedScale - 1.0) <= 0.001) {
+        return std::nullopt;
+    }
+
+    if (source.size() != expectedLayerPixelCount(canvasWidth, canvasHeight)) {
+        return std::nullopt;
+    }
+
+    const auto selectionMask = expandedSelectionMask(processing, canvasWidth, canvasHeight);
+    const std::vector<uint8_t> mask = selectionMask.value_or(alphaMask(source, canvasWidth, canvasHeight));
+    const auto bounds = transformationBounds(processing, selectionMask, source, canvasWidth, canvasHeight);
+    if (!bounds.has_value()) {
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> destination(source.begin(), source.end());
+    for (int index = 0; index < canvasWidth * canvasHeight; ++index) {
+        if (mask[static_cast<size_t>(index)] == 0U) {
+            continue;
+        }
+        const size_t pixelOffset = static_cast<size_t>(index) * kPixelStride;
+        destination[pixelOffset] = 0U;
+        destination[pixelOffset + 1U] = 0U;
+        destination[pixelOffset + 2U] = 0U;
+        destination[pixelOffset + 3U] = 0U;
+    }
+
+    const double anchorX = bounds->midX();
+    const double anchorY = bounds->midY();
+    for (int y = 0; y < canvasHeight; ++y) {
+        for (int x = 0; x < canvasWidth; ++x) {
+            const double destinationPointX = static_cast<double>(x - dx);
+            const double destinationPointY = static_cast<double>(y - dy);
+            const double sourceX = ((destinationPointX - anchorX) / clampedScale) + anchorX;
+            const double sourceY = ((destinationPointY - anchorY) / clampedScale) + anchorY;
+            const int sourcePixelX = static_cast<int>(std::lround(sourceX));
+            const int sourcePixelY = static_cast<int>(std::lround(sourceY));
+            if (sourcePixelX < 0 || sourcePixelX >= canvasWidth || sourcePixelY < 0 || sourcePixelY >= canvasHeight) {
+                continue;
+            }
+
+            const size_t sourceIndex = static_cast<size_t>(sourcePixelY * canvasWidth + sourcePixelX);
+            if (mask[sourceIndex] == 0U) {
+                continue;
+            }
+
+            const size_t sourceOffset = sourceIndex * kPixelStride;
+            if (source[sourceOffset + 3U] == 0U) {
+                continue;
+            }
+
+            const size_t destinationOffset = static_cast<size_t>(y * canvasWidth + x) * kPixelStride;
+            destination[destinationOffset] = source[sourceOffset];
+            destination[destinationOffset + 1U] = source[sourceOffset + 1U];
+            destination[destinationOffset + 2U] = source[sourceOffset + 2U];
+            destination[destinationOffset + 3U] = source[sourceOffset + 3U];
+        }
+    }
+
+    return destination;
+}
+
 }  // namespace
 
 namespace {
@@ -720,6 +1038,323 @@ struct Stroke {
 };
 
 }  // namespace
+
+namespace {
+
+class PaintDocumentLayerProcessingVisitor {
+public:
+    virtual ~PaintDocumentLayerProcessingVisitor() = default;
+
+    virtual std::optional<std::vector<uint8_t>> process(
+        const LayerProcessingContext& context,
+        std::span<const uint8_t> source
+    ) const = 0;
+};
+
+class DescriptorLayerProcessingVisitor final : public PaintDocumentLayerProcessingVisitor {
+public:
+    explicit DescriptorLayerProcessingVisitor(LayerProcessing processing)
+        : processing_(std::move(processing)) {}
+
+    std::optional<std::vector<uint8_t>> process(
+        const LayerProcessingContext& context,
+        std::span<const uint8_t> source
+    ) const override {
+        if (source.size() != expectedLayerPixelCount(context.width, context.height)) {
+            return std::nullopt;
+        }
+
+        switch (processing_.kind) {
+            case LayerProcessingKind::ReplacePixels:
+                if (processing_.pixelData.size() != source.size()) {
+                    return std::nullopt;
+                }
+                return processing_.pixelData;
+
+            case LayerProcessingKind::Clear:
+                return std::vector<uint8_t>(source.size(), 0U);
+
+            case LayerProcessingKind::GradientMap: {
+                const std::vector<GradientMapStop> stops = gradientMapStopsForPreset(processing_.gradientMapPreset);
+                if (stops.size() < 2) {
+                    return std::nullopt;
+                }
+
+                std::vector<uint8_t> output(source.begin(), source.end());
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+
+                    const double red = static_cast<double>(output[offset]) / 255.0;
+                    const double green = static_cast<double>(output[offset + 1U]) / 255.0;
+                    const double blue = static_cast<double>(output[offset + 2U]) / 255.0;
+                    const double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+                    const auto mapped = mappedGradientColor(luminance, stops);
+                    output[offset] = mapped[0];
+                    output[offset + 1U] = mapped[1];
+                    output[offset + 2U] = mapped[2];
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::HueSaturationBrightness: {
+                std::vector<uint8_t> output(source.begin(), source.end());
+                const double hueShift = processing_.hueDegrees / 360.0;
+                const double saturationScale = std::max(processing_.saturation, 0.0);
+                const double brightnessOffset = processing_.brightness;
+
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+
+                    const double red = static_cast<double>(output[offset]) / 255.0;
+                    const double green = static_cast<double>(output[offset + 1U]) / 255.0;
+                    const double blue = static_cast<double>(output[offset + 2U]) / 255.0;
+                    HSVColor hsv = rgbToHSV(red, green, blue);
+                    hsv.hue += hueShift;
+                    if (hsv.hue < 0.0) {
+                        hsv.hue += 1.0;
+                    } else if (hsv.hue > 1.0) {
+                        hsv.hue -= std::floor(hsv.hue);
+                    }
+                    hsv.saturation = std::clamp(hsv.saturation * saturationScale, 0.0, 1.0);
+                    hsv.value = std::clamp(hsv.value + brightnessOffset, 0.0, 1.0);
+
+                    const auto rgb = hsvToRGB(hsv.hue, hsv.saturation, hsv.value);
+                    output[offset] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(rgb[0], 0.0, 1.0) * 255.0), 0L, 255L));
+                    output[offset + 1U] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(rgb[1], 0.0, 1.0) * 255.0), 0L, 255L));
+                    output[offset + 2U] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(rgb[2], 0.0, 1.0) * 255.0), 0L, 255L));
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::BrightnessContrast: {
+                std::vector<uint8_t> output(source.begin(), source.end());
+                const double contrast = std::max(processing_.contrast, 0.0);
+                const double brightnessOffset = processing_.brightness;
+
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+
+                    double red = static_cast<double>(output[offset]) / 255.0;
+                    double green = static_cast<double>(output[offset + 1U]) / 255.0;
+                    double blue = static_cast<double>(output[offset + 2U]) / 255.0;
+
+                    red = (((red - 0.5) * contrast) + 0.5) + brightnessOffset;
+                    green = (((green - 0.5) * contrast) + 0.5) + brightnessOffset;
+                    blue = (((blue - 0.5) * contrast) + 0.5) + brightnessOffset;
+
+                    output[offset] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(red, 0.0, 1.0) * 255.0), 0L, 255L));
+                    output[offset + 1U] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(green, 0.0, 1.0) * 255.0), 0L, 255L));
+                    output[offset + 2U] = static_cast<uint8_t>(std::clamp(std::lround(std::clamp(blue, 0.0, 1.0) * 255.0), 0L, 255L));
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::Levels: {
+                const double inputBlack = std::clamp(processing_.inputBlack, 0.0, 1.0);
+                const double inputWhite = std::max(std::clamp(processing_.inputWhite, 0.0, 1.0), inputBlack + 0.001);
+                const double gamma = std::max(processing_.gamma, 0.01);
+                const double outputBlack = std::clamp(processing_.outputBlack, 0.0, 1.0);
+                const double outputWhite = std::max(std::clamp(processing_.outputWhite, 0.0, 1.0), outputBlack);
+                auto map = [inputBlack, inputWhite, gamma, outputBlack, outputWhite](uint8_t value) -> uint8_t {
+                    const double normalized = std::clamp((static_cast<double>(value) / 255.0 - inputBlack) / (inputWhite - inputBlack), 0.0, 1.0);
+                    const double gammaCorrected = std::pow(normalized, 1.0 / gamma);
+                    const double remapped = outputBlack + ((outputWhite - outputBlack) * gammaCorrected);
+                    return static_cast<uint8_t>(std::clamp(std::lround(remapped * 255.0), 0L, 255L));
+                };
+
+                std::vector<uint8_t> output(source.begin(), source.end());
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+                    output[offset] = map(output[offset]);
+                    output[offset + 1U] = map(output[offset + 1U]);
+                    output[offset + 2U] = map(output[offset + 2U]);
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::ToneCurve: {
+                auto map = [this](uint8_t value) -> uint8_t {
+                    const double normalized = static_cast<double>(value) / 255.0;
+                    const double shadowWeight = std::pow(1.0 - normalized, 2.0);
+                    const double highlightWeight = std::pow(normalized, 2.0);
+                    const double midtoneWeight = std::max(0.0, 1.0 - std::abs((normalized * 2.0) - 1.0));
+                    const double offset = (processing_.shadows * shadowWeight) +
+                        (processing_.midtones * midtoneWeight) +
+                        (processing_.highlights * highlightWeight);
+                    const double adjusted = std::clamp(normalized + (offset * 0.35), 0.0, 1.0);
+                    return static_cast<uint8_t>(std::clamp(std::lround(adjusted * 255.0), 0L, 255L));
+                };
+
+                std::vector<uint8_t> output(source.begin(), source.end());
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+                    output[offset] = map(output[offset]);
+                    output[offset + 1U] = map(output[offset + 1U]);
+                    output[offset + 2U] = map(output[offset + 2U]);
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::ColorBalance: {
+                std::vector<uint8_t> output(source.begin(), source.end());
+                const double redOffset = processing_.redCyan * 0.4;
+                const double greenOffset = processing_.greenMagenta * 0.4;
+                const double blueOffset = processing_.blueYellow * 0.4;
+
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+
+                    const double red = std::clamp((static_cast<double>(output[offset]) / 255.0) + redOffset, 0.0, 1.0);
+                    const double green = std::clamp((static_cast<double>(output[offset + 1U]) / 255.0) + greenOffset, 0.0, 1.0);
+                    const double blue = std::clamp((static_cast<double>(output[offset + 2U]) / 255.0) + blueOffset, 0.0, 1.0);
+
+                    output[offset] = static_cast<uint8_t>(std::lround(red * 255.0));
+                    output[offset + 1U] = static_cast<uint8_t>(std::lround(green * 255.0));
+                    output[offset + 2U] = static_cast<uint8_t>(std::lround(blue * 255.0));
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::Threshold: {
+                std::vector<uint8_t> output(source.begin(), source.end());
+                const double threshold = std::clamp(processing_.threshold, 0.0, 1.0);
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+                    const double red = static_cast<double>(output[offset]) / 255.0;
+                    const double green = static_cast<double>(output[offset + 1U]) / 255.0;
+                    const double blue = static_cast<double>(output[offset + 2U]) / 255.0;
+                    const double luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+                    const uint8_t mapped = luminance >= threshold ? 255U : 0U;
+                    output[offset] = mapped;
+                    output[offset + 1U] = mapped;
+                    output[offset + 2U] = mapped;
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::Posterize: {
+                const int steps = std::max(static_cast<int>(std::lround(processing_.posterizeLevels)), 2);
+                const double denominator = static_cast<double>(steps - 1);
+                auto map = [denominator](uint8_t value) -> uint8_t {
+                    const double normalized = static_cast<double>(value) / 255.0;
+                    const double quantized = std::round(normalized * denominator) / denominator;
+                    return static_cast<uint8_t>(std::clamp(std::lround(quantized * 255.0), 0L, 255L));
+                };
+
+                std::vector<uint8_t> output(source.begin(), source.end());
+                for (size_t offset = 0; offset < output.size(); offset += kPixelStride) {
+                    if (output[offset + 3U] == 0U) {
+                        continue;
+                    }
+                    output[offset] = map(output[offset]);
+                    output[offset + 1U] = map(output[offset + 1U]);
+                    output[offset + 2U] = map(output[offset + 2U]);
+                }
+                return output;
+            }
+
+            case LayerProcessingKind::Transform:
+                return transformedPixels(processing_, source, context.width, context.height);
+        }
+
+        return std::nullopt;
+    }
+
+private:
+    LayerProcessing processing_;
+};
+
+}  // namespace
+
+class PaintDocumentProcessingApplicator {
+public:
+    PaintDocumentProcessingApplicator(PaintDocument& document, std::vector<int> targetLayerIndices)
+        : document_(document),
+          targetLayerIndices_(std::move(targetLayerIndices)),
+          useDocumentSnapshot_(targetLayerIndices_.size() != 1U) {}
+
+    bool applyVisitor(const PaintDocumentLayerProcessingVisitor& visitor) {
+        bool appliedAny = false;
+        for (int layerIndex : targetLayerIndices_) {
+            if (layerIndex < 0 || layerIndex >= document_.layerCount()) {
+                continue;
+            }
+
+            const Layer& sourceLayer = document_.layer(layerIndex);
+            const LayerProcessingContext context{
+                .layerIndex = layerIndex,
+                .width = document_.width_,
+                .height = document_.height_,
+            };
+
+            auto processed = visitor.process(context, sourceLayer.pixels);
+            if (!processed.has_value() || processed->size() != sourceLayer.pixels.size()) {
+                continue;
+            }
+            if (std::equal(processed->begin(), processed->end(), sourceLayer.pixels.begin())) {
+                continue;
+            }
+
+            ensureSnapshot();
+            document_.loadLayerPixels(document_.layers_[static_cast<size_t>(layerIndex)], *processed);
+            appliedAny = true;
+        }
+
+        changed_ = changed_ || appliedAny;
+        return appliedAny;
+    }
+
+    bool applyCommand(const std::function<bool(PaintDocument&)>& command) {
+        ensureSnapshot();
+        const bool changed = command(document_);
+        changed_ = changed_ || changed;
+        return changed;
+    }
+
+    bool end() {
+        if (!changed_) {
+            return false;
+        }
+
+        document_.markEntireDocumentDirty();
+        (void)document_.composite();
+        return true;
+    }
+
+private:
+    void ensureSnapshot() {
+        if (snapshotTaken_) {
+            return;
+        }
+
+        if (!useDocumentSnapshot_ && !targetLayerIndices_.empty()) {
+            document_.pushLayerHistorySnapshot(targetLayerIndices_.front());
+        } else {
+            document_.pushHistorySnapshot();
+        }
+        snapshotTaken_ = true;
+    }
+
+    PaintDocument& document_;
+    std::vector<int> targetLayerIndices_;
+    bool useDocumentSnapshot_ = false;
+    bool snapshotTaken_ = false;
+    bool changed_ = false;
+};
 
 class PaintDocument::StrokesQueue {
 public:
@@ -1075,14 +1710,9 @@ const LayerFolder& PaintDocument::folderAt(int position) const {
 }
 
 void PaintDocument::clearLayer(int index) {
-    if (index < 0 || index >= layerCount()) {
-        return;
-    }
-    pushLayerHistorySnapshot(index);
-    auto& layer = layers_[index];
-    std::fill(layer.tiles.begin(), layer.tiles.end(), 0U);
-    invalidateLayerPixelCache(layer);
-    markEntireDocumentDirty();
+    LayerProcessing processing;
+    processing.kind = LayerProcessingKind::Clear;
+    (void)applyLayerProcessing(index, processing);
 }
 
 void PaintDocument::setLayerName(int index, std::string name) {
@@ -1133,16 +1763,24 @@ void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
     markEntireDocumentDirty();
 }
 
+bool PaintDocument::applyLayerProcessing(int index, const LayerProcessing& processing) {
+    if (index < 0 || index >= layerCount() || strokeInFlight_ || activeQueuedStrokeID_.has_value()) {
+        return false;
+    }
+
+    PaintDocumentProcessingApplicator applicator(*this, {index});
+    const DescriptorLayerProcessingVisitor visitor(processing);
+    if (!applicator.applyVisitor(visitor)) {
+        return false;
+    }
+    return applicator.end();
+}
+
 void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixels) {
-    if (index < 0 || index >= layerCount()) {
-        return;
-    }
-    if (pixels.size() != expectedLayerPixelCount(width_, height_)) {
-        return;
-    }
-    pushLayerHistorySnapshot(index);
-    loadLayerPixels(layers_[index], pixels);
-    markEntireDocumentDirty();
+    LayerProcessing processing;
+    processing.kind = LayerProcessingKind::ReplacePixels;
+    processing.pixelData.assign(pixels.begin(), pixels.end());
+    (void)applyLayerProcessing(index, processing);
 }
 
 void PaintDocument::replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels) {

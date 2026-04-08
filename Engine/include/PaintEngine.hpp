@@ -175,6 +175,53 @@ struct LayerFolder {
     int anchorLayerIndex = -1;
 };
 
+enum class LayerProcessingKind {
+    ReplacePixels,
+    Clear,
+    GradientMap,
+    HueSaturationBrightness,
+    BrightnessContrast,
+    Levels,
+    ToneCurve,
+    ColorBalance,
+    Threshold,
+    Posterize,
+    Transform,
+};
+
+struct LayerProcessing {
+    LayerProcessingKind kind = LayerProcessingKind::ReplacePixels;
+    int gradientMapPreset = 0;
+    double hueDegrees = 0.0;
+    double saturation = 1.0;
+    double brightness = 0.0;
+    double contrast = 1.0;
+    double inputBlack = 0.0;
+    double inputWhite = 1.0;
+    double gamma = 1.0;
+    double outputBlack = 0.0;
+    double outputWhite = 1.0;
+    double shadows = 0.0;
+    double midtones = 0.0;
+    double highlights = 0.0;
+    double redCyan = 0.0;
+    double greenMagenta = 0.0;
+    double blueYellow = 0.0;
+    double threshold = 0.5;
+    double posterizeLevels = 6.0;
+    int transformTranslateX = 0;
+    int transformTranslateY = 0;
+    double transformScale = 1.0;
+    int selectionOriginX = 0;
+    int selectionOriginY = 0;
+    int selectionWidth = 0;
+    int selectionHeight = 0;
+    std::vector<uint8_t> selectionMask;
+    std::vector<uint8_t> pixelData;
+};
+
+class PaintDocumentProcessingApplicator;
+
 class PaintDocument {
 public:
     PaintDocument(int width, int height);
@@ -205,6 +252,7 @@ public:
     void setLayerVisibility(int index, bool visible);
     void setLayerOpacity(int index, float opacity);
     void setLayerBlendMode(int index, Layer::BlendMode blendMode);
+    bool applyLayerProcessing(int index, const LayerProcessing& processing);
     void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
     void replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels);
     const Layer& layer(int index) const;
@@ -265,6 +313,8 @@ private:
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
     int nextFolderID_ = 1;
+
+    friend class PaintDocumentProcessingApplicator;
 
     void pushHistorySnapshot();
     void pushLayerHistorySnapshot(int layerIndex);

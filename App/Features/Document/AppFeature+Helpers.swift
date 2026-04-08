@@ -18,27 +18,14 @@ extension AppFeature {
         )
         let scale = state.canvas.transformPreviewScale
         guard translation != .zero || abs(scale - 1.0) > 0.001 else { return .none }
-        guard
-            let snapshot = state.canvas.renderSnapshot,
-            let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
-        else {
-            state.canvas.transformPreviewOffset = .zero
-            state.canvas.transformPreviewScale = 1.0
-            return .none
-        }
-        guard let transformed = Self.transformedLayerPixels(
-            source: layer.pixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            selection: state.canvas.selection,
-            translation: translation,
-            scale: scale
+        guard paintDocumentClient.applyLayerProcessing(
+            state.canvas.activeLayerIndex,
+            .transform(translation: translation, scale: scale, selection: state.canvas.selection)
         ) else {
             state.canvas.transformPreviewOffset = .zero
             state.canvas.transformPreviewScale = 1.0
             return .none
         }
-        paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, transformed)
         if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
             state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
             state.canvas.localBufferRevision += 1

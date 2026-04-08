@@ -136,6 +136,61 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+typedef NS_ENUM(NSInteger, APPaintLayerProcessingKind) {
+    APPaintLayerProcessingKindReplacePixels = 0,
+    APPaintLayerProcessingKindClear = 1,
+    APPaintLayerProcessingKindGradientMap = 2,
+    APPaintLayerProcessingKindHueSaturationBrightness = 3,
+    APPaintLayerProcessingKindBrightnessContrast = 4,
+    APPaintLayerProcessingKindLevels = 5,
+    APPaintLayerProcessingKindToneCurve = 6,
+    APPaintLayerProcessingKindColorBalance = 7,
+    APPaintLayerProcessingKindThreshold = 8,
+    APPaintLayerProcessingKindPosterize = 9,
+    APPaintLayerProcessingKindTransform = 10,
+};
+
+typedef NS_ENUM(NSInteger, APPaintGradientMapPreset) {
+    APPaintGradientMapPresetGraphite = 0,
+    APPaintGradientMapPresetSepia = 1,
+    APPaintGradientMapPresetOcean = 2,
+    APPaintGradientMapPresetSunset = 3,
+    APPaintGradientMapPresetToxic = 4,
+};
+
+@interface APPaintLayerProcessingDescriptor : NSObject
+
+@property (nonatomic) APPaintLayerProcessingKind kind;
+@property (nonatomic) APPaintGradientMapPreset gradientMapPreset;
+@property (nonatomic) CGFloat hueDegrees;
+@property (nonatomic) CGFloat saturation;
+@property (nonatomic) CGFloat brightness;
+@property (nonatomic) CGFloat contrast;
+@property (nonatomic) CGFloat inputBlack;
+@property (nonatomic) CGFloat inputWhite;
+@property (nonatomic) CGFloat gamma;
+@property (nonatomic) CGFloat outputBlack;
+@property (nonatomic) CGFloat outputWhite;
+@property (nonatomic) CGFloat shadows;
+@property (nonatomic) CGFloat midtones;
+@property (nonatomic) CGFloat highlights;
+@property (nonatomic) CGFloat redCyan;
+@property (nonatomic) CGFloat greenMagenta;
+@property (nonatomic) CGFloat blueYellow;
+@property (nonatomic) CGFloat threshold;
+@property (nonatomic) CGFloat posterizeLevels;
+@property (nonatomic) NSInteger transformTranslateX;
+@property (nonatomic) NSInteger transformTranslateY;
+@property (nonatomic) CGFloat transformScale;
+@property (nonatomic) NSInteger selectionOriginX;
+@property (nonatomic) NSInteger selectionOriginY;
+@property (nonatomic) NSInteger selectionWidth;
+@property (nonatomic) NSInteger selectionHeight;
+@property (nonatomic, copy, nullable) NSData *selectionMaskData;
+@property (nonatomic, copy, nullable) NSData *pixelData;
+
+@end
+
 @interface APPaintDocumentBridge : NSObject
 
 @property (nonatomic, readonly) NSInteger width;
@@ -153,6 +208,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSArray<APPaintLayerInfo *> *)layers NS_SWIFT_NAME(layerInfos());
 - (NSArray<APPaintFolderInfo *> *)folders NS_SWIFT_NAME(folderInfos());
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(pixelDataForLayer(at:));
+- (BOOL)applyLayerProcessingAtIndex:(NSInteger)index descriptor:(APPaintLayerProcessingDescriptor *)descriptor NS_SWIFT_NAME(applyLayerProcessing(at:descriptor:));
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:data:));
 - (void)replaceLayerPixelsTransientAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixelsTransient(at:data:));
 - (void)clearLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(clearLayer(at:));

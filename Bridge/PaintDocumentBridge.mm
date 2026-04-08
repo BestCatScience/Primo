@@ -154,6 +154,76 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     }
 }
 
+atelierprime::LayerProcessingKind APProcessingKind(APPaintLayerProcessingKind kind) {
+    switch (kind) {
+        case APPaintLayerProcessingKindReplacePixels:
+            return atelierprime::LayerProcessingKind::ReplacePixels;
+        case APPaintLayerProcessingKindClear:
+            return atelierprime::LayerProcessingKind::Clear;
+        case APPaintLayerProcessingKindGradientMap:
+            return atelierprime::LayerProcessingKind::GradientMap;
+        case APPaintLayerProcessingKindHueSaturationBrightness:
+            return atelierprime::LayerProcessingKind::HueSaturationBrightness;
+        case APPaintLayerProcessingKindBrightnessContrast:
+            return atelierprime::LayerProcessingKind::BrightnessContrast;
+        case APPaintLayerProcessingKindLevels:
+            return atelierprime::LayerProcessingKind::Levels;
+        case APPaintLayerProcessingKindToneCurve:
+            return atelierprime::LayerProcessingKind::ToneCurve;
+        case APPaintLayerProcessingKindColorBalance:
+            return atelierprime::LayerProcessingKind::ColorBalance;
+        case APPaintLayerProcessingKindThreshold:
+            return atelierprime::LayerProcessingKind::Threshold;
+        case APPaintLayerProcessingKindPosterize:
+            return atelierprime::LayerProcessingKind::Posterize;
+        case APPaintLayerProcessingKindTransform:
+            return atelierprime::LayerProcessingKind::Transform;
+    }
+
+    return atelierprime::LayerProcessingKind::ReplacePixels;
+}
+
+atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescriptor *descriptor) {
+    atelierprime::LayerProcessing processing;
+    processing.kind = APProcessingKind(descriptor.kind);
+    processing.gradientMapPreset = (int)descriptor.gradientMapPreset;
+    processing.hueDegrees = descriptor.hueDegrees;
+    processing.saturation = descriptor.saturation;
+    processing.brightness = descriptor.brightness;
+    processing.contrast = descriptor.contrast;
+    processing.inputBlack = descriptor.inputBlack;
+    processing.inputWhite = descriptor.inputWhite;
+    processing.gamma = descriptor.gamma;
+    processing.outputBlack = descriptor.outputBlack;
+    processing.outputWhite = descriptor.outputWhite;
+    processing.shadows = descriptor.shadows;
+    processing.midtones = descriptor.midtones;
+    processing.highlights = descriptor.highlights;
+    processing.redCyan = descriptor.redCyan;
+    processing.greenMagenta = descriptor.greenMagenta;
+    processing.blueYellow = descriptor.blueYellow;
+    processing.threshold = descriptor.threshold;
+    processing.posterizeLevels = descriptor.posterizeLevels;
+    processing.transformTranslateX = (int)descriptor.transformTranslateX;
+    processing.transformTranslateY = (int)descriptor.transformTranslateY;
+    processing.transformScale = descriptor.transformScale;
+    processing.selectionOriginX = (int)descriptor.selectionOriginX;
+    processing.selectionOriginY = (int)descriptor.selectionOriginY;
+    processing.selectionWidth = (int)descriptor.selectionWidth;
+    processing.selectionHeight = (int)descriptor.selectionHeight;
+
+    if (descriptor.selectionMaskData.length > 0) {
+        const auto *bytes = static_cast<const uint8_t *>(descriptor.selectionMaskData.bytes);
+        processing.selectionMask.assign(bytes, bytes + descriptor.selectionMaskData.length);
+    }
+    if (descriptor.pixelData.length > 0) {
+        const auto *bytes = static_cast<const uint8_t *>(descriptor.pixelData.bytes);
+        processing.pixelData.assign(bytes, bytes + descriptor.pixelData.length);
+    }
+
+    return processing;
+}
+
 }  // namespace
 
 @implementation APDirtyRect
@@ -289,6 +359,27 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 
 @end
 
+@implementation APPaintLayerProcessingDescriptor
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _kind = APPaintLayerProcessingKindReplacePixels;
+        _gradientMapPreset = APPaintGradientMapPresetGraphite;
+        _saturation = 1.0;
+        _contrast = 1.0;
+        _inputWhite = 1.0;
+        _gamma = 1.0;
+        _outputWhite = 1.0;
+        _threshold = 0.5;
+        _posterizeLevels = 6.0;
+        _transformScale = 1.0;
+    }
+    return self;
+}
+
+@end
+
 @interface APPaintDocumentBridge () {
     std::unique_ptr<atelierprime::PaintDocument> _document;
 }
@@ -359,6 +450,10 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index {
     const auto &layer = _document->layer((int)index);
     return [NSData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
+}
+
+- (BOOL)applyLayerProcessingAtIndex:(NSInteger)index descriptor:(APPaintLayerProcessingDescriptor *)descriptor {
+    return _document->applyLayerProcessing((int)index, APProcessingFromDescriptor(descriptor));
 }
 
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data {

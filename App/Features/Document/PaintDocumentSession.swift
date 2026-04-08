@@ -327,18 +327,40 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    @discardableResult
+    func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
+        let descriptor = makeProcessingDescriptor(from: request)
+        let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
+        if didApply {
+            invalidateThumbnailCache(for: index)
+            let pixelData = bridge.pixelDataForLayer(at: index) as Data
+            timelapseEvents.append(.replaceLayerPixels(index: index, data: pixelData))
+            captureTimelapseFrame()
+        }
+        return didApply
+    }
+
     func replaceLayerPixels(index: Int, data: Data) {
-        bridge.replaceLayerPixels(at: index, data: data)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.replaceLayerPixels(index: index, data: data))
-        captureTimelapseFrame()
+        let descriptor = APPaintLayerProcessingDescriptor()
+        descriptor.kind = APPaintLayerProcessingKind.replacePixels
+        descriptor.pixelData = data
+        let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
+        if didApply {
+            invalidateThumbnailCache(for: index)
+            timelapseEvents.append(.replaceLayerPixels(index: index, data: data))
+            captureTimelapseFrame()
+        }
     }
 
     func clearLayer(index: Int) {
-        bridge.clearLayer(at: index)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.clearLayer(index: index))
-        captureTimelapseFrame()
+        let descriptor = APPaintLayerProcessingDescriptor()
+        descriptor.kind = APPaintLayerProcessingKind.clear
+        let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
+        if didApply {
+            invalidateThumbnailCache(for: index)
+            timelapseEvents.append(.clearLayer(index: index))
+            captureTimelapseFrame()
+        }
     }
 
     func setPaperStyle(_ style: CanvasPaperStyle) {
@@ -708,6 +730,79 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.green = brush.green
         descriptor.blue = brush.blue
         descriptor.eraser = brush.isEraser
+        return descriptor
+    }
+
+    private func makeProcessingDescriptor(from request: LayerProcessingRequest) -> APPaintLayerProcessingDescriptor {
+        let descriptor = APPaintLayerProcessingDescriptor()
+        switch request {
+        case let .gradientMap(preset):
+            descriptor.kind = APPaintLayerProcessingKind.gradientMap
+            switch preset {
+            case .graphite:
+                descriptor.gradientMapPreset = APPaintGradientMapPreset.graphite
+            case .sepia:
+                descriptor.gradientMapPreset = APPaintGradientMapPreset.sepia
+            case .ocean:
+                descriptor.gradientMapPreset = APPaintGradientMapPreset.ocean
+            case .sunset:
+                descriptor.gradientMapPreset = APPaintGradientMapPreset.sunset
+            case .toxic:
+                descriptor.gradientMapPreset = APPaintGradientMapPreset.toxic
+            }
+
+        case let .hueSaturationBrightness(settings):
+            descriptor.kind = APPaintLayerProcessingKind.hueSaturationBrightness
+            descriptor.hueDegrees = CGFloat(settings.hueDegrees)
+            descriptor.saturation = CGFloat(settings.saturation)
+            descriptor.brightness = CGFloat(settings.brightness)
+
+        case let .brightnessContrast(settings):
+            descriptor.kind = APPaintLayerProcessingKind.brightnessContrast
+            descriptor.brightness = CGFloat(settings.brightness)
+            descriptor.contrast = CGFloat(settings.contrast)
+
+        case let .levels(settings):
+            descriptor.kind = APPaintLayerProcessingKind.levels
+            descriptor.inputBlack = CGFloat(settings.inputBlack)
+            descriptor.inputWhite = CGFloat(settings.inputWhite)
+            descriptor.gamma = CGFloat(settings.gamma)
+            descriptor.outputBlack = CGFloat(settings.outputBlack)
+            descriptor.outputWhite = CGFloat(settings.outputWhite)
+
+        case let .toneCurve(settings):
+            descriptor.kind = APPaintLayerProcessingKind.toneCurve
+            descriptor.shadows = CGFloat(settings.shadows)
+            descriptor.midtones = CGFloat(settings.midtones)
+            descriptor.highlights = CGFloat(settings.highlights)
+
+        case let .colorBalance(settings):
+            descriptor.kind = APPaintLayerProcessingKind.colorBalance
+            descriptor.redCyan = CGFloat(settings.redCyan)
+            descriptor.greenMagenta = CGFloat(settings.greenMagenta)
+            descriptor.blueYellow = CGFloat(settings.blueYellow)
+
+        case let .threshold(settings):
+            descriptor.kind = APPaintLayerProcessingKind.threshold
+            descriptor.threshold = CGFloat(settings.threshold)
+
+        case let .posterize(settings):
+            descriptor.kind = APPaintLayerProcessingKind.posterize
+            descriptor.posterizeLevels = CGFloat(settings.levels)
+
+        case let .transform(translation, scale, selection):
+            descriptor.kind = APPaintLayerProcessingKind.transform
+            descriptor.transformTranslateX = Int(translation.width.rounded())
+            descriptor.transformTranslateY = Int(translation.height.rounded())
+            descriptor.transformScale = scale
+            if let selection, !selection.isEmpty {
+                descriptor.selectionOriginX = Int(selection.bounds.minX.rounded(.down))
+                descriptor.selectionOriginY = Int(selection.bounds.minY.rounded(.down))
+                descriptor.selectionWidth = selection.maskWidth
+                descriptor.selectionHeight = selection.maskHeight
+                descriptor.selectionMaskData = selection.maskData
+            }
+        }
         return descriptor
     }
 

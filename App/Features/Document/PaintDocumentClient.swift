@@ -37,6 +37,7 @@ struct PaintDocumentClient: Sendable {
     var revealLayerForEditing: @Sendable (Int) -> Void
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
+    var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
     var replaceLayerPixels: @Sendable (Int, Data) -> Void
     var clearLayer: @Sendable (Int) -> Void
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
@@ -93,6 +94,7 @@ struct PaintDocumentClient: Sendable {
             revealLayerForEditing: { index in sessionBox.session.revealLayerForEditing(index: index) },
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
+            applyLayerProcessing: { index, request in sessionBox.session.applyLayerProcessing(index: index, request: request) },
             replaceLayerPixels: { index, data in sessionBox.session.replaceLayerPixels(index: index, data: data) },
             clearLayer: { index in sessionBox.session.clearLayer(index: index) },
             consumeDirtyUpdate: { sessionBox.session.consumeDirtyUpdate() }
