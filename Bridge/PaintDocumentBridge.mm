@@ -517,6 +517,10 @@ NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
     _document->endStroke();
 }
 
+- (void)cancelStroke {
+    _document->cancelStroke();
+}
+
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;

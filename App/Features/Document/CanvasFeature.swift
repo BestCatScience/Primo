@@ -49,6 +49,7 @@ struct CanvasFeature {
     enum Action: Equatable {
         case strokeUpdated(Stroke)
         case strokeEnded(Stroke)
+        case strokeCancelled
         case pencilInteractionToggleRequested
         case fillRequested(StylusSample)
         case colorSampled(SampledColor)
@@ -75,6 +76,7 @@ struct CanvasFeature {
         case beginStroke(StylusSample)
         case appendSamples([StylusSample])
         case endStroke
+        case cancelStroke
         case commitStroke([StylusSample])
         case blurSamples([StylusSample])
         case endBlurStroke
@@ -247,6 +249,17 @@ struct CanvasFeature {
                     return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
                 }
                 return .send(.delegate(.endStroke))
+
+            case .strokeCancelled:
+                state.isStrokeActive = false
+                state.isAwaitingCommittedRender = false
+                state.activeStroke = nil
+                state.pendingIncrementalUpdate = nil
+                if state.currentTool == .blur {
+                    return .send(.delegate(.endBlurStroke))
+                }
+                return .send(.delegate(.cancelStroke))
+
             case .delegate:
                 return .none
             }

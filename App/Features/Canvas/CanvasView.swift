@@ -211,6 +211,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         sendAction?(.strokeEnded(stroke))
     }
 
+    func didCancelStroke() {
+        sendAction?(.strokeCancelled)
+    }
+
     func didRequestFill(at sample: StylusSample) {
         sendAction?(.fillRequested(sample))
     }

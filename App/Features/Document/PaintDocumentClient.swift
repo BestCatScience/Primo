@@ -14,6 +14,7 @@ struct PaintDocumentClient: Sendable {
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
+    var cancelStroke: @Sendable () -> Void
     var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> Void
     var endBlurStroke: @Sendable () -> Void
     var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
@@ -67,6 +68,7 @@ struct PaintDocumentClient: Sendable {
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
             endStroke: { sessionBox.session.endStroke() },
+            cancelStroke: { sessionBox.session.cancelStroke() },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
                 sessionBox.session.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
             },

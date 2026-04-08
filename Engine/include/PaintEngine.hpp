@@ -3,6 +3,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -176,6 +178,7 @@ struct LayerFolder {
 class PaintDocument {
 public:
     PaintDocument(int width, int height);
+    ~PaintDocument();
 
     int width() const noexcept;
     int height() const noexcept;
@@ -209,6 +212,7 @@ public:
     void beginStroke(const BrushSettings& brush, StrokePoint point);
     void appendStroke(StrokePoint point);
     void endStroke();
+    void cancelStroke();
     void fill(int x, int y, const BrushSettings& brush);
     bool canUndo() const noexcept;
     bool canRedo() const noexcept;
@@ -223,6 +227,8 @@ public:
     std::span<const uint8_t> composite() const noexcept;
 
 private:
+    class StrokesQueue;
+
     struct HistorySnapshot {
         bool capturesEntireDocument = false;
         int activeLayerIndex = 0;
@@ -247,12 +253,14 @@ private:
     StrokePoint strokeOriginPoint_{};
     float distanceUntilNextDab_ = 0.0F;
     bool strokeInFlight_ = false;
+    std::optional<uint64_t> activeQueuedStrokeID_;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;
     std::vector<LayerFolder> folders_;
     std::vector<int> layerFolderIDs_;
     std::vector<HistorySnapshot> undoStack_;
     std::vector<HistorySnapshot> redoStack_;
+    std::unique_ptr<StrokesQueue> strokesQueue_;
     mutable std::vector<uint8_t> dirtyTileFlags_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
@@ -260,6 +268,11 @@ private:
 
     void pushHistorySnapshot();
     void pushLayerHistorySnapshot(int layerIndex);
+    void beginStrokeImmediate(const BrushSettings& brush, StrokePoint point);
+    void appendStrokeImmediate(StrokePoint point);
+    void endStrokeImmediate();
+    void cancelStrokeImmediate();
+    void fillImmediate(int x, int y, const BrushSettings& brush);
     void initializeLayerStorage(Layer& layer);
     void invalidateLayerPixelCache(Layer& layer) noexcept;
     void ensureLayerPixelCache(const Layer& layer) const;

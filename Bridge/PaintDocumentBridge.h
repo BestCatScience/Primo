@@ -168,6 +168,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point NS_SWIFT_NAME(beginStroke(brush:point:));
 - (void)appendStroke:(APStrokePoint *)point NS_SWIFT_NAME(appendStroke(point:));
 - (void)endStroke NS_SWIFT_NAME(endStroke());
+- (void)cancelStroke NS_SWIFT_NAME(cancelStroke());
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush NS_SWIFT_NAME(fill(at:brush:));
 - (BOOL)canUndo NS_SWIFT_NAME(canUndo());
 - (BOOL)canRedo NS_SWIFT_NAME(canRedo());

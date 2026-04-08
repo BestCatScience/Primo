@@ -1065,6 +1065,19 @@ struct AppFeature {
                 paintDocumentClient.endStroke()
                 return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
+            case .canvas(.delegate(.cancelStroke)):
+                paintDocumentClient.cancelStroke()
+                if let update = paintDocumentClient.consumeDirtyUpdate() {
+                    return .concatenate(
+                        .cancel(id: CancelID.startupPresentationLoad),
+                        .send(.canvas(.applyIncrementalUpdate(update)))
+                    )
+                }
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
+
             case let .canvas(.delegate(.commitStroke(samples))):
                 guard let first = samples.first else { return .none }
                 state.canvas.selection = nil

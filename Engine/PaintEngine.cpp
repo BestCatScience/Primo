@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <deque>
 #include <queue>
 #include <stdexcept>
+#include <variant>
 
 namespace atelierprime {
 
@@ -570,6 +572,283 @@ std::array<float, 3> blendColorRGB(float dstR, float dstG, float dstB, float src
 
 }  // namespace
 
+namespace {
+
+enum class StrokeJobType {
+    Concurrent,
+    Sequential,
+    Barrier,
+};
+
+enum class StrokeJobKind {
+    Initialization,
+    Dab,
+    Finish,
+    Cancel,
+};
+
+enum class StrokeCommand {
+    BeginFreehand,
+    AppendFreehand,
+    EndFreehand,
+    CancelFreehand,
+    Fill,
+};
+
+struct FillPoint {
+    int x = 0;
+    int y = 0;
+};
+
+using StrokeJobPayload = std::variant<std::monostate, StrokePoint, FillPoint>;
+
+struct StrokeJobData {
+    StrokeJobPayload payload;
+};
+
+struct StrokeJob {
+    StrokeJobKind kind = StrokeJobKind::Dab;
+    StrokeJobType type = StrokeJobType::Sequential;
+    StrokeCommand command = StrokeCommand::AppendFreehand;
+    BrushSettings brush;
+    StrokeJobPayload payload;
+    bool exclusive = false;
+};
+
+class StrokeStrategy {
+public:
+    virtual ~StrokeStrategy() = default;
+
+    virtual std::string name() const = 0;
+    virtual bool isExclusive() const noexcept { return false; }
+    virtual StrokeJob createInitJob(const StrokeJobData& data) const = 0;
+    virtual StrokeJob createDabJob(const StrokeJobData& data) const = 0;
+    virtual std::optional<StrokeJob> createFinishJob() const { return std::nullopt; }
+    virtual std::optional<StrokeJob> createCancelJob() const { return std::nullopt; }
+};
+
+class FreehandStrokeStrategy final : public StrokeStrategy {
+public:
+    explicit FreehandStrokeStrategy(BrushSettings brush)
+        : brush_(std::move(brush)) {}
+
+    std::string name() const override {
+        return "Freehand Stroke";
+    }
+
+    StrokeJob createInitJob(const StrokeJobData& data) const override {
+        return StrokeJob{
+            .kind = StrokeJobKind::Initialization,
+            .type = StrokeJobType::Sequential,
+            .command = StrokeCommand::BeginFreehand,
+            .brush = brush_,
+            .payload = data.payload,
+            .exclusive = false,
+        };
+    }
+
+    StrokeJob createDabJob(const StrokeJobData& data) const override {
+        return StrokeJob{
+            .kind = StrokeJobKind::Dab,
+            .type = StrokeJobType::Sequential,
+            .command = StrokeCommand::AppendFreehand,
+            .payload = data.payload,
+            .exclusive = false,
+        };
+    }
+
+    std::optional<StrokeJob> createFinishJob() const override {
+        return StrokeJob{
+            .kind = StrokeJobKind::Finish,
+            .type = StrokeJobType::Barrier,
+            .command = StrokeCommand::EndFreehand,
+            .exclusive = false,
+        };
+    }
+
+    std::optional<StrokeJob> createCancelJob() const override {
+        return StrokeJob{
+            .kind = StrokeJobKind::Cancel,
+            .type = StrokeJobType::Barrier,
+            .command = StrokeCommand::CancelFreehand,
+            .exclusive = false,
+        };
+    }
+
+private:
+    BrushSettings brush_;
+};
+
+class FillStrokeStrategy final : public StrokeStrategy {
+public:
+    explicit FillStrokeStrategy(BrushSettings brush)
+        : brush_(std::move(brush)) {}
+
+    std::string name() const override {
+        return "Fill Stroke";
+    }
+
+    StrokeJob createInitJob(const StrokeJobData& data) const override {
+        return createDabJob(data);
+    }
+
+    StrokeJob createDabJob(const StrokeJobData& data) const override {
+        return StrokeJob{
+            .kind = StrokeJobKind::Dab,
+            .type = StrokeJobType::Sequential,
+            .command = StrokeCommand::Fill,
+            .brush = brush_,
+            .payload = data.payload,
+            .exclusive = false,
+        };
+    }
+
+private:
+    BrushSettings brush_;
+};
+
+struct Stroke {
+    uint64_t id = 0;
+    std::unique_ptr<StrokeStrategy> strategy;
+    std::deque<StrokeJob> jobs;
+    bool isEnded = false;
+    bool isCanceled = false;
+
+    [[nodiscard]] bool isOpen() const noexcept {
+        return !isEnded && !isCanceled;
+    }
+};
+
+}  // namespace
+
+class PaintDocument::StrokesQueue {
+public:
+    uint64_t startStroke(std::unique_ptr<StrokeStrategy> strategy) {
+        Stroke stroke;
+        stroke.id = nextStrokeID_++;
+        stroke.strategy = std::move(strategy);
+        strokes_.push_back(std::move(stroke));
+        return strokes_.back().id;
+    }
+
+    bool addInitJob(uint64_t strokeID, const StrokeJobData& data) {
+        Stroke* stroke = strokeByID(strokeID);
+        if (stroke == nullptr || !stroke->isOpen()) {
+            return false;
+        }
+        stroke->jobs.push_back(stroke->strategy->createInitJob(data));
+        return true;
+    }
+
+    bool addDabJob(uint64_t strokeID, const StrokeJobData& data) {
+        Stroke* stroke = strokeByID(strokeID);
+        if (stroke == nullptr || !stroke->isOpen()) {
+            return false;
+        }
+        stroke->jobs.push_back(stroke->strategy->createDabJob(data));
+        return true;
+    }
+
+    bool endStroke(uint64_t strokeID) {
+        Stroke* stroke = strokeByID(strokeID);
+        if (stroke == nullptr || !stroke->isOpen()) {
+            return false;
+        }
+        if (auto finishJob = stroke->strategy->createFinishJob()) {
+            stroke->jobs.push_back(std::move(*finishJob));
+        }
+        stroke->isEnded = true;
+        return true;
+    }
+
+    bool cancelStroke(uint64_t strokeID) {
+        Stroke* stroke = strokeByID(strokeID);
+        if (stroke == nullptr || !stroke->isOpen()) {
+            return false;
+        }
+        stroke->jobs.clear();
+        if (auto cancelJob = stroke->strategy->createCancelJob()) {
+            stroke->jobs.push_back(std::move(*cancelJob));
+        }
+        stroke->isCanceled = true;
+        stroke->isEnded = true;
+        return true;
+    }
+
+    void process(PaintDocument& document) {
+        while (!strokes_.empty()) {
+            Stroke& stroke = strokes_.front();
+
+            if (stroke.jobs.empty()) {
+                if (stroke.isOpen()) {
+                    break;
+                }
+                strokes_.pop_front();
+                continue;
+            }
+
+            const StrokeJobType nextType = stroke.jobs.front().type;
+            if (nextType == StrokeJobType::Barrier) {
+                (void)document.composite();
+            }
+
+            if (nextType == StrokeJobType::Concurrent) {
+                std::vector<StrokeJob> batch;
+                while (!stroke.jobs.empty() && stroke.jobs.front().type == StrokeJobType::Concurrent) {
+                    batch.push_back(std::move(stroke.jobs.front()));
+                    stroke.jobs.pop_front();
+                }
+                for (const StrokeJob& job : batch) {
+                    executeJob(document, job);
+                }
+            } else {
+                StrokeJob job = std::move(stroke.jobs.front());
+                stroke.jobs.pop_front();
+                executeJob(document, job);
+            }
+
+            if (!stroke.isOpen() && stroke.jobs.empty()) {
+                strokes_.pop_front();
+            }
+        }
+    }
+
+private:
+    Stroke* strokeByID(uint64_t strokeID) {
+        for (Stroke& stroke : strokes_) {
+            if (stroke.id == strokeID) {
+                return &stroke;
+            }
+        }
+        return nullptr;
+    }
+
+    static void executeJob(PaintDocument& document, const StrokeJob& job) {
+        switch (job.command) {
+            case StrokeCommand::BeginFreehand:
+                document.beginStrokeImmediate(job.brush, std::get<StrokePoint>(job.payload));
+                break;
+            case StrokeCommand::AppendFreehand:
+                document.appendStrokeImmediate(std::get<StrokePoint>(job.payload));
+                break;
+            case StrokeCommand::EndFreehand:
+                document.endStrokeImmediate();
+                break;
+            case StrokeCommand::CancelFreehand:
+                document.cancelStrokeImmediate();
+                break;
+            case StrokeCommand::Fill: {
+                const FillPoint point = std::get<FillPoint>(job.payload);
+                document.fillImmediate(point.x, point.y, job.brush);
+                break;
+            }
+        }
+    }
+
+    uint64_t nextStrokeID_ = 1;
+    std::deque<Stroke> strokes_;
+};
+
 PaintDocument::PaintDocument(int width, int height) {
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Document dimensions must be positive");
@@ -579,11 +858,14 @@ PaintDocument::PaintDocument(int width, int height) {
     height_ = height;
     tileColumns_ = tileCountForExtent(width_);
     tileRows_ = tileCountForExtent(height_);
+    strokesQueue_ = std::make_unique<StrokesQueue>();
     dirtyTileFlags_.assign(static_cast<size_t>(tileColumns_) * static_cast<size_t>(tileRows_), 1U);
     compositeBuffer_.assign(expectedLayerPixelCount(width_, height_), 0U);
 
     addLayer("Layer 1");
 }
+
+PaintDocument::~PaintDocument() = default;
 
 int PaintDocument::width() const noexcept {
     return width_;
@@ -881,6 +1163,78 @@ const Layer& PaintDocument::layer(int index) const {
 }
 
 void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
+    if (strokeInFlight_ || activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+        return;
+    }
+    if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
+        return;
+    }
+
+    activeQueuedStrokeID_ = strokesQueue_->startStroke(std::make_unique<FreehandStrokeStrategy>(brush));
+    const StrokeJobData jobData{ .payload = point };
+    if (!strokesQueue_->addInitJob(*activeQueuedStrokeID_, jobData)) {
+        activeQueuedStrokeID_.reset();
+        return;
+    }
+    strokesQueue_->process(*this);
+}
+
+void PaintDocument::appendStroke(StrokePoint point) {
+    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+        return;
+    }
+
+    const StrokeJobData jobData{ .payload = point };
+    if (!strokesQueue_->addDabJob(*activeQueuedStrokeID_, jobData)) {
+        return;
+    }
+    strokesQueue_->process(*this);
+}
+
+void PaintDocument::endStroke() {
+    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+        return;
+    }
+
+    const uint64_t strokeID = *activeQueuedStrokeID_;
+    activeQueuedStrokeID_.reset();
+    if (!strokesQueue_->endStroke(strokeID)) {
+        return;
+    }
+    strokesQueue_->process(*this);
+}
+
+void PaintDocument::cancelStroke() {
+    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+        return;
+    }
+
+    const uint64_t strokeID = *activeQueuedStrokeID_;
+    activeQueuedStrokeID_.reset();
+    if (!strokesQueue_->cancelStroke(strokeID)) {
+        return;
+    }
+    strokesQueue_->process(*this);
+}
+
+void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
+    if (strokeInFlight_ || activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+        return;
+    }
+    if (x < 0 || x >= width_ || y < 0 || y >= height_) {
+        return;
+    }
+
+    const uint64_t strokeID = strokesQueue_->startStroke(std::make_unique<FillStrokeStrategy>(brush));
+    const StrokeJobData jobData{ .payload = FillPoint{ .x = x, .y = y } };
+    if (!strokesQueue_->addDabJob(strokeID, jobData)) {
+        return;
+    }
+    (void)strokesQueue_->endStroke(strokeID);
+    strokesQueue_->process(*this);
+}
+
+void PaintDocument::beginStrokeImmediate(const BrushSettings& brush, StrokePoint point) {
     if (strokeInFlight_) {
         return;
     }
@@ -900,7 +1254,7 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     stampDab(layers_[static_cast<size_t>(activeLayerIndex_)], point);
 }
 
-void PaintDocument::appendStroke(StrokePoint point) {
+void PaintDocument::appendStrokeImmediate(StrokePoint point) {
     if (!strokeInFlight_) {
         return;
     }
@@ -940,12 +1294,36 @@ void PaintDocument::appendStroke(StrokePoint point) {
     previousPoint_ = point;
 }
 
-void PaintDocument::endStroke() {
+void PaintDocument::endStrokeImmediate() {
     strokeInFlight_ = false;
     distanceUntilNextDab_ = 0.0F;
 }
 
-void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
+void PaintDocument::cancelStrokeImmediate() {
+    if (!strokeInFlight_ || undoStack_.empty()) {
+        return;
+    }
+
+    HistorySnapshot snapshot = std::move(undoStack_.back());
+    undoStack_.pop_back();
+    redoStack_.clear();
+
+    if (snapshot.capturesEntireDocument) {
+        layers_ = std::move(snapshot.layers);
+        folders_ = std::move(snapshot.folders);
+        layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
+        nextFolderID_ = snapshot.nextFolderID;
+    } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
+        layers_[snapshot.layerIndex] = std::move(snapshot.layer);
+    }
+
+    activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
+    strokeInFlight_ = false;
+    distanceUntilNextDab_ = 0.0F;
+    markEntireDocumentDirty();
+}
+
+void PaintDocument::fillImmediate(int x, int y, const BrushSettings& brush) {
     if (strokeInFlight_ || x < 0 || x >= width_ || y < 0 || y >= height_) {
         return;
     }

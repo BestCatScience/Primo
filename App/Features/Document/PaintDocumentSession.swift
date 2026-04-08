@@ -134,6 +134,14 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func cancelStroke() {
+        bridge.cancelStroke()
+        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
+        activeStrokeLayerIndex = nil
+        activeStrokeBrush = nil
+        activeStrokeSamples.removeAll(keepingCapacity: true)
+    }
+
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
         let layerIndex = Int(bridge.activeLayerIndex)
         bridge.fill(

@@ -4,6 +4,7 @@ import simd
 protocol InputHandlerDelegate: AnyObject {
     func didUpdateStroke(_ stroke: Stroke)
     func didEndStroke(_ stroke: Stroke)
+    func didCancelStroke()
     func didRequestFill(at sample: StylusSample)
     func didRequestColorSample(at sample: StylusSample)
     func didUpdateSelectionPath(_ points: [CGPoint])
@@ -89,7 +90,7 @@ final class InputHandler {
             currentStroke = stroke
             delegate?.didUpdateStroke(stroke)
 
-        case .ended, .cancelled:
+        case .ended:
             if var stroke = currentStroke {
                 if tool == .shape, let shapeStartPoint {
                     let finalPoint = makePoint(touch, in: view, predicted: false)
@@ -105,6 +106,11 @@ final class InputHandler {
             }
             currentStroke = nil
             shapeStartPoint = nil
+
+        case .cancelled:
+            currentStroke = nil
+            shapeStartPoint = nil
+            delegate?.didCancelStroke()
 
         default:
             break
