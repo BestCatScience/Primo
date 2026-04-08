@@ -152,11 +152,17 @@ struct Layer {
         Luminosity,
     };
 
+    static constexpr int kTileSize = 64;
+
     std::string name;
     bool visible = true;
     float opacity = 1.0F;
     BlendMode blendMode = BlendMode::Normal;
-    std::vector<uint8_t> pixels;
+    int tileColumns = 0;
+    int tileRows = 0;
+    std::vector<uint8_t> tiles;
+    mutable std::vector<uint8_t> pixels;
+    mutable bool pixelsDirty = true;
 };
 
 struct LayerFolder {
@@ -232,6 +238,8 @@ private:
 
     int width_ = 0;
     int height_ = 0;
+    int tileColumns_ = 0;
+    int tileRows_ = 0;
     int activeLayerIndex_ = 0;
     BrushSettings activeBrush_;
     StrokePoint previousPoint_{};
@@ -245,13 +253,22 @@ private:
     std::vector<int> layerFolderIDs_;
     std::vector<HistorySnapshot> undoStack_;
     std::vector<HistorySnapshot> redoStack_;
+    mutable std::vector<uint8_t> dirtyTileFlags_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
     int nextFolderID_ = 1;
 
     void pushHistorySnapshot();
     void pushLayerHistorySnapshot(int layerIndex);
+    void initializeLayerStorage(Layer& layer);
+    void invalidateLayerPixelCache(Layer& layer) noexcept;
+    void ensureLayerPixelCache(const Layer& layer) const;
+    void loadLayerPixels(Layer& layer, std::span<const uint8_t> pixels);
+    size_t tileIndex(int tileX, int tileY) const noexcept;
+    void markDirtyRect(int minX, int minY, int maxX, int maxY) noexcept;
     void markEntireDocumentDirty() noexcept;
+    uint8_t* tilePixelPointer(Layer& layer, int x, int y) noexcept;
+    const uint8_t* tilePixelPointer(const Layer& layer, int x, int y) const noexcept;
     const LayerFolder* folderByID(int folderID) const noexcept;
     void stampDab(Layer& layer, const StrokePoint& point);
     void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure);

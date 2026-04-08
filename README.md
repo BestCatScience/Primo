@@ -30,14 +30,14 @@ open atelierprime.xcodeproj
 
 ## Architecture notes
 
-- Each layer owns its own premultiplied RGBA buffer in C++.
+- Each layer is stored in a tile-backed RGBA raster model in C++.
 - Strokes are rendered directly into the active layer with a dab-based brush.
-- Swift uploads layer buffers to Metal textures and composites them on the GPU for preview.
+- The painting core tracks dirty rects and dirty tiles so composite updates can be rebuilt incrementally.
+- Swift uploads composite pixel data to Metal textures for preview.
 - SwiftUI owns interaction state, while the drawing core remains platform-agnostic.
 
 ## Next steps
 
-- Tile-based renderer and dirty-rect updates
-- GPU presentation path with Metal textures
 - More realistic brush grain, tilt, and wet-mix dynamics
 - Undo/redo journal and persistent document serialization
+- Layer masks, selections, and non-destructive filters

@@ -67,6 +67,20 @@ float remap(float value, float inMin, float inMax, float outMin, float outMax) {
     return lerp(outMin, outMax, t);
 }
 
+constexpr size_t kPixelStride = 4U;
+constexpr size_t kTileByteCount =
+    static_cast<size_t>(Layer::kTileSize) *
+    static_cast<size_t>(Layer::kTileSize) *
+    kPixelStride;
+
+int tileCountForExtent(int extent) {
+    return std::max(1, (extent + Layer::kTileSize - 1) / Layer::kTileSize);
+}
+
+size_t expectedLayerPixelCount(int width, int height) {
+    return static_cast<size_t>(width) * static_cast<size_t>(height) * kPixelStride;
+}
+
 float brushSpacingDistance(const BrushSettings& brush) {
     return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
 }
@@ -556,11 +570,17 @@ std::array<float, 3> blendColorRGB(float dstR, float dstG, float dstB, float src
 
 }  // namespace
 
-PaintDocument::PaintDocument(int width, int height)
-    : width_(width), height_(height), compositeBuffer_(static_cast<size_t>(width) * static_cast<size_t>(height) * 4U, 255U) {
+PaintDocument::PaintDocument(int width, int height) {
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Document dimensions must be positive");
     }
+
+    width_ = width;
+    height_ = height;
+    tileColumns_ = tileCountForExtent(width_);
+    tileRows_ = tileCountForExtent(height_);
+    dirtyTileFlags_.assign(static_cast<size_t>(tileColumns_) * static_cast<size_t>(tileRows_), 1U);
+    compositeBuffer_.assign(expectedLayerPixelCount(width_, height_), 0U);
 
     addLayer("Layer 1");
 }
@@ -592,12 +612,11 @@ int PaintDocument::addLayer(const std::string& name) {
     pushHistorySnapshot();
     Layer layer;
     layer.name = name;
-    layer.pixels.assign(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4U, 0U);
+    initializeLayerStorage(layer);
     layers_.push_back(std::move(layer));
     layerFolderIDs_.push_back(-1);
     activeLayerIndex_ = layerCount() - 1;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
     return activeLayerIndex_;
 }
 
@@ -621,7 +640,6 @@ bool PaintDocument::deleteLayer(int index) {
         activeLayerIndex_ = layerCount() - 1;
     }
     markEntireDocumentDirty();
-    compositeDirty_ = true;
     return true;
 }
 
@@ -659,7 +677,6 @@ bool PaintDocument::moveLayer(int fromIndex, int toIndex) {
     }
 
     markEntireDocumentDirty();
-    compositeDirty_ = true;
     return true;
 }
 
@@ -688,7 +705,6 @@ bool PaintDocument::deleteFolder(int folderID) {
     }
     folders_.erase(it);
     markEntireDocumentDirty();
-    compositeDirty_ = true;
     return true;
 }
 
@@ -716,7 +732,6 @@ void PaintDocument::setFolderVisibility(int folderID, bool visible) {
     pushHistorySnapshot();
     it->visible = visible;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::setFolderExpanded(int folderID, bool expanded) {
@@ -743,7 +758,6 @@ bool PaintDocument::setLayerFolder(int layerIndex, int folderID) {
     pushHistorySnapshot();
     layerFolderIDs_[static_cast<size_t>(layerIndex)] = folderID;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
     return true;
 }
 
@@ -783,9 +797,10 @@ void PaintDocument::clearLayer(int index) {
         return;
     }
     pushLayerHistorySnapshot(index);
-    std::fill(layers_[index].pixels.begin(), layers_[index].pixels.end(), 0U);
+    auto& layer = layers_[index];
+    std::fill(layer.tiles.begin(), layer.tiles.end(), 0U);
+    invalidateLayerPixelCache(layer);
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::setLayerName(int index, std::string name) {
@@ -809,7 +824,6 @@ void PaintDocument::setLayerVisibility(int index, bool visible) {
     pushLayerHistorySnapshot(index);
     layers_[index].visible = visible;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::setLayerOpacity(int index, float opacity) {
@@ -823,7 +837,6 @@ void PaintDocument::setLayerOpacity(int index, float opacity) {
     pushLayerHistorySnapshot(index);
     layers_[index].opacity = clamped;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
@@ -836,38 +849,35 @@ void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
     pushLayerHistorySnapshot(index);
     layers_[index].blendMode = blendMode;
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixels) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
-    auto& layer = layers_[index];
-    if (pixels.size() != layer.pixels.size()) {
+    if (pixels.size() != expectedLayerPixelCount(width_, height_)) {
         return;
     }
     pushLayerHistorySnapshot(index);
-    std::copy(pixels.begin(), pixels.end(), layer.pixels.begin());
+    loadLayerPixels(layers_[index], pixels);
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 void PaintDocument::replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels) {
     if (index < 0 || index >= layerCount()) {
         return;
     }
-    auto& layer = layers_[index];
-    if (pixels.size() != layer.pixels.size()) {
+    if (pixels.size() != expectedLayerPixelCount(width_, height_)) {
         return;
     }
-    std::copy(pixels.begin(), pixels.end(), layer.pixels.begin());
+    loadLayerPixels(layers_[index], pixels);
     markEntireDocumentDirty();
-    compositeDirty_ = true;
 }
 
 const Layer& PaintDocument::layer(int index) const {
-    return layers_.at(static_cast<size_t>(index));
+    const Layer& layer = layers_.at(static_cast<size_t>(index));
+    ensureLayerPixelCache(layer);
+    return layer;
 }
 
 void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
@@ -879,6 +889,7 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     }
     pushLayerHistorySnapshot(activeLayerIndex_);
     activeBrush_ = brush;
+    invalidateLayerPixelCache(layers_[static_cast<size_t>(activeLayerIndex_)]);
     previousPoint_ = point;
     lastDabPoint_ = point;
     strokeOriginPoint_ = point;
@@ -887,7 +898,6 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     dirtyRect_.reset();
     point.speed = 0.0F;
     stampDab(layers_[static_cast<size_t>(activeLayerIndex_)], point);
-    compositeDirty_ = true;
 }
 
 void PaintDocument::appendStroke(StrokePoint point) {
@@ -928,7 +938,6 @@ void PaintDocument::appendStroke(StrokePoint point) {
 
     distanceUntilNextDab_ = remainingToNextDab - (distance - traveledAlongSegment);
     previousPoint_ = point;
-    compositeDirty_ = true;
 }
 
 void PaintDocument::endStroke() {
@@ -943,13 +952,13 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
 
     activeBrush_ = brush;
     auto& layer = layers_[static_cast<size_t>(activeLayerIndex_)];
-    const size_t startOffset = (static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U;
+    const uint8_t* startPixel = tilePixelPointer(layer, x, y);
 
     const std::array<uint8_t, 4> target = {
-        layer.pixels[startOffset],
-        layer.pixels[startOffset + 1U],
-        layer.pixels[startOffset + 2U],
-        layer.pixels[startOffset + 3U]
+        startPixel[0],
+        startPixel[1],
+        startPixel[2],
+        startPixel[3]
     };
 
     const std::array<uint8_t, 4> replacement = brush.eraser
@@ -961,6 +970,7 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
     }
 
     pushLayerHistorySnapshot(activeLayerIndex_);
+    invalidateLayerPixelCache(layer);
 
     std::queue<std::pair<int, int>> queue;
     queue.push({x, y});
@@ -982,27 +992,27 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
     };
 
     auto matchesTarget = [&](int px, int py) -> bool {
-        const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
+        const uint8_t* pixel = tilePixelPointer(layer, px, py);
         if (brush.fillThresholdMode == 1) {
             return colorWithinTolerance(
-                layer.pixels[offset],
-                layer.pixels[offset + 1U],
-                layer.pixels[offset + 2U]
+                pixel[0],
+                pixel[1],
+                pixel[2]
             );
         }
         const bool sameColor =
-            layer.pixels[offset] == target[0] &&
-            layer.pixels[offset + 1U] == target[1] &&
-            layer.pixels[offset + 2U] == target[2];
-        return sameColor && alphaWithinTolerance(layer.pixels[offset + 3U]);
+            pixel[0] == target[0] &&
+            pixel[1] == target[1] &&
+            pixel[2] == target[2];
+        return sameColor && alphaWithinTolerance(pixel[3]);
     };
 
     auto applyReplacement = [&](int px, int py) {
-        const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
-        layer.pixels[offset] = replacement[0];
-        layer.pixels[offset + 1U] = replacement[1];
-        layer.pixels[offset + 2U] = replacement[2];
-        layer.pixels[offset + 3U] = replacement[3];
+        uint8_t* pixel = tilePixelPointer(layer, px, py);
+        pixel[0] = replacement[0];
+        pixel[1] = replacement[1];
+        pixel[2] = replacement[2];
+        pixel[3] = replacement[3];
         filledMask[static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)] = 1U;
         filledRect.expand(px, py, px, py);
     };
@@ -1048,11 +1058,11 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
                     if (px < 0 || px >= width_ || py < 0 || py >= height_) {
                         continue;
                     }
-                    const size_t offset = (static_cast<size_t>(py) * static_cast<size_t>(width_) + static_cast<size_t>(px)) * 4U;
-                    layer.pixels[offset] = replacement[0];
-                    layer.pixels[offset + 1U] = replacement[1];
-                    layer.pixels[offset + 2U] = replacement[2];
-                    layer.pixels[offset + 3U] = replacement[3];
+                    uint8_t* pixel = tilePixelPointer(layer, px, py);
+                    pixel[0] = replacement[0];
+                    pixel[1] = replacement[1];
+                    pixel[2] = replacement[2];
+                    pixel[3] = replacement[3];
                     filledRect.expand(px, py, px, py);
                 }
             }
@@ -1060,8 +1070,7 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
     }
 
     if (!filledRect.empty()) {
-        dirtyRect_.expand(filledRect.minX, filledRect.minY, filledRect.maxX, filledRect.maxY);
-        compositeDirty_ = true;
+        markDirtyRect(filledRect.minX, filledRect.minY, filledRect.maxX, filledRect.maxY);
     }
 }
 
@@ -1083,6 +1092,10 @@ bool PaintDocument::undo() {
     if (undoStack_.back().capturesEntireDocument) {
         current.capturesEntireDocument = true;
         current.layers = layers_;
+        for (Layer& layer : current.layers) {
+            layer.pixels.clear();
+            layer.pixelsDirty = true;
+        }
         current.folders = folders_;
         current.layerFolderIDs = layerFolderIDs_;
         current.nextFolderID = nextFolderID_;
@@ -1090,6 +1103,8 @@ bool PaintDocument::undo() {
         current.layerIndex = undoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
             current.layer = layers_[current.layerIndex];
+            current.layer.pixels.clear();
+            current.layer.pixelsDirty = true;
         }
     }
     redoStack_.push_back(std::move(current));
@@ -1121,6 +1136,10 @@ bool PaintDocument::redo() {
     if (redoStack_.back().capturesEntireDocument) {
         current.capturesEntireDocument = true;
         current.layers = layers_;
+        for (Layer& layer : current.layers) {
+            layer.pixels.clear();
+            layer.pixelsDirty = true;
+        }
         current.folders = folders_;
         current.layerFolderIDs = layerFolderIDs_;
         current.nextFolderID = nextFolderID_;
@@ -1128,6 +1147,8 @@ bool PaintDocument::redo() {
         current.layerIndex = redoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
             current.layer = layers_[current.layerIndex];
+            current.layer.pixels.clear();
+            current.layer.pixelsDirty = true;
         }
     }
     undoStack_.push_back(std::move(current));
@@ -1170,12 +1191,16 @@ std::vector<uint8_t> PaintDocument::pixelDataForRect(int layerIndex, const Dirty
     const auto& layer = layers_[static_cast<size_t>(layerIndex)];
     const int rectWidth = rect.width();
     const int rectHeight = rect.height();
-    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * 4U);
+    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * kPixelStride);
     for (int row = 0; row < rectHeight; ++row) {
-        const int srcY = rect.minY + row;
-        const size_t srcOffset = (static_cast<size_t>(srcY) * static_cast<size_t>(width_) + static_cast<size_t>(rect.minX)) * 4U;
-        const size_t dstOffset = static_cast<size_t>(row) * static_cast<size_t>(rectWidth) * 4U;
-        std::copy_n(layer.pixels.data() + srcOffset, static_cast<size_t>(rectWidth) * 4U, result.data() + dstOffset);
+        for (int column = 0; column < rectWidth; ++column) {
+            const int srcX = rect.minX + column;
+            const int srcY = rect.minY + row;
+            const uint8_t* src = tilePixelPointer(layer, srcX, srcY);
+            const size_t dstOffset =
+                (static_cast<size_t>(row) * static_cast<size_t>(rectWidth) + static_cast<size_t>(column)) * kPixelStride;
+            std::copy_n(src, kPixelStride, result.data() + dstOffset);
+        }
     }
     return result;
 }
@@ -1187,12 +1212,16 @@ std::vector<uint8_t> PaintDocument::compositePixelDataForRect(const DirtyRect& r
     const auto currentComposite = composite();
     const int rectWidth = rect.width();
     const int rectHeight = rect.height();
-    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * 4U);
+    std::vector<uint8_t> result(static_cast<size_t>(rectWidth) * static_cast<size_t>(rectHeight) * kPixelStride);
     for (int row = 0; row < rectHeight; ++row) {
         const int srcY = rect.minY + row;
-        const size_t srcOffset = (static_cast<size_t>(srcY) * static_cast<size_t>(width_) + static_cast<size_t>(rect.minX)) * 4U;
-        const size_t dstOffset = static_cast<size_t>(row) * static_cast<size_t>(rectWidth) * 4U;
-        std::copy_n(currentComposite.data() + srcOffset, static_cast<size_t>(rectWidth) * 4U, result.data() + dstOffset);
+        const size_t srcOffset = (static_cast<size_t>(srcY) * static_cast<size_t>(width_) + static_cast<size_t>(rect.minX)) * kPixelStride;
+        const size_t dstOffset = static_cast<size_t>(row) * static_cast<size_t>(rectWidth) * kPixelStride;
+        std::copy_n(
+            currentComposite.data() + srcOffset,
+            static_cast<size_t>(rectWidth) * kPixelStride,
+            result.data() + dstOffset
+        );
     }
     return result;
 }
@@ -1205,6 +1234,109 @@ std::span<const uint8_t> PaintDocument::composite() const noexcept {
     return compositeBuffer_;
 }
 
+void PaintDocument::initializeLayerStorage(Layer& layer) {
+    layer.tileColumns = tileColumns_;
+    layer.tileRows = tileRows_;
+    layer.tiles.assign(static_cast<size_t>(tileColumns_) * static_cast<size_t>(tileRows_) * kTileByteCount, 0U);
+    invalidateLayerPixelCache(layer);
+}
+
+void PaintDocument::invalidateLayerPixelCache(Layer& layer) noexcept {
+    layer.pixels.clear();
+    layer.pixelsDirty = true;
+}
+
+void PaintDocument::ensureLayerPixelCache(const Layer& layer) const {
+    if (!layer.pixelsDirty && layer.pixels.size() == expectedLayerPixelCount(width_, height_)) {
+        return;
+    }
+
+    layer.pixels.assign(expectedLayerPixelCount(width_, height_), 0U);
+
+    for (int tileY = 0; tileY < tileRows_; ++tileY) {
+        const int originY = tileY * Layer::kTileSize;
+        const int copyHeight = std::min(Layer::kTileSize, height_ - originY);
+        for (int tileX = 0; tileX < tileColumns_; ++tileX) {
+            const int originX = tileX * Layer::kTileSize;
+            const int copyWidth = std::min(Layer::kTileSize, width_ - originX);
+            const size_t tileOffset = tileIndex(tileX, tileY) * kTileByteCount;
+            for (int localY = 0; localY < copyHeight; ++localY) {
+                const size_t srcOffset = tileOffset + (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) * kPixelStride);
+                const size_t dstOffset =
+                    (static_cast<size_t>(originY + localY) * static_cast<size_t>(width_) + static_cast<size_t>(originX)) *
+                    kPixelStride;
+                std::copy_n(
+                    layer.tiles.data() + srcOffset,
+                    static_cast<size_t>(copyWidth) * kPixelStride,
+                    layer.pixels.data() + dstOffset
+                );
+            }
+        }
+    }
+
+    layer.pixelsDirty = false;
+}
+
+void PaintDocument::loadLayerPixels(Layer& layer, std::span<const uint8_t> pixels) {
+    if (layer.tiles.size() != static_cast<size_t>(tileColumns_) * static_cast<size_t>(tileRows_) * kTileByteCount) {
+        initializeLayerStorage(layer);
+    } else {
+        std::fill(layer.tiles.begin(), layer.tiles.end(), 0U);
+        invalidateLayerPixelCache(layer);
+    }
+
+    for (int tileY = 0; tileY < tileRows_; ++tileY) {
+        const int originY = tileY * Layer::kTileSize;
+        const int copyHeight = std::min(Layer::kTileSize, height_ - originY);
+        for (int tileX = 0; tileX < tileColumns_; ++tileX) {
+            const int originX = tileX * Layer::kTileSize;
+            const int copyWidth = std::min(Layer::kTileSize, width_ - originX);
+            const size_t tileOffset = tileIndex(tileX, tileY) * kTileByteCount;
+            for (int localY = 0; localY < copyHeight; ++localY) {
+                const size_t srcOffset =
+                    (static_cast<size_t>(originY + localY) * static_cast<size_t>(width_) + static_cast<size_t>(originX)) *
+                    kPixelStride;
+                const size_t dstOffset = tileOffset + (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) * kPixelStride);
+                std::copy_n(
+                    pixels.data() + srcOffset,
+                    static_cast<size_t>(copyWidth) * kPixelStride,
+                    layer.tiles.data() + dstOffset
+                );
+            }
+        }
+    }
+}
+
+size_t PaintDocument::tileIndex(int tileX, int tileY) const noexcept {
+    return static_cast<size_t>(tileY * tileColumns_ + tileX);
+}
+
+void PaintDocument::markDirtyRect(int minX, int minY, int maxX, int maxY) noexcept {
+    if (width_ <= 0 || height_ <= 0) {
+        return;
+    }
+
+    minX = std::clamp(minX, 0, width_ - 1);
+    minY = std::clamp(minY, 0, height_ - 1);
+    maxX = std::clamp(maxX, 0, width_ - 1);
+    maxY = std::clamp(maxY, 0, height_ - 1);
+    if (maxX < minX || maxY < minY) {
+        return;
+    }
+
+    dirtyRect_.expand(minX, minY, maxX, maxY);
+    const int minTileX = minX / Layer::kTileSize;
+    const int minTileY = minY / Layer::kTileSize;
+    const int maxTileX = maxX / Layer::kTileSize;
+    const int maxTileY = maxY / Layer::kTileSize;
+    for (int tileY = minTileY; tileY <= maxTileY; ++tileY) {
+        for (int tileX = minTileX; tileX <= maxTileX; ++tileX) {
+            dirtyTileFlags_[tileIndex(tileX, tileY)] = 1U;
+        }
+    }
+    compositeDirty_ = true;
+}
+
 void PaintDocument::pushHistorySnapshot() {
     if (strokeInFlight_) {
         return;
@@ -1214,6 +1346,10 @@ void PaintDocument::pushHistorySnapshot() {
     snapshot.capturesEntireDocument = true;
     snapshot.activeLayerIndex = activeLayerIndex_;
     snapshot.layers = layers_;
+    for (Layer& layer : snapshot.layers) {
+        layer.pixels.clear();
+        layer.pixelsDirty = true;
+    }
     snapshot.folders = folders_;
     snapshot.layerFolderIDs = layerFolderIDs_;
     snapshot.nextFolderID = nextFolderID_;
@@ -1233,6 +1369,8 @@ void PaintDocument::pushLayerHistorySnapshot(int layerIndex) {
     snapshot.activeLayerIndex = activeLayerIndex_;
     snapshot.layerIndex = layerIndex;
     snapshot.layer = layers_[layerIndex];
+    snapshot.layer.pixels.clear();
+    snapshot.layer.pixelsDirty = true;
     undoStack_.push_back(std::move(snapshot));
     if (undoStack_.size() > kMaxHistoryDepth) {
         undoStack_.erase(undoStack_.begin());
@@ -1241,7 +1379,31 @@ void PaintDocument::pushLayerHistorySnapshot(int layerIndex) {
 }
 
 void PaintDocument::markEntireDocumentDirty() noexcept {
-    dirtyRect_.expand(0, 0, width_ - 1, height_ - 1);
+    markDirtyRect(0, 0, width_ - 1, height_ - 1);
+}
+
+uint8_t* PaintDocument::tilePixelPointer(Layer& layer, int x, int y) noexcept {
+    const int tileX = x / Layer::kTileSize;
+    const int tileY = y / Layer::kTileSize;
+    const int localX = x % Layer::kTileSize;
+    const int localY = y % Layer::kTileSize;
+    const size_t offset =
+        (tileIndex(tileX, tileY) * kTileByteCount) +
+        (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) + static_cast<size_t>(localX)) *
+            kPixelStride;
+    return layer.tiles.data() + offset;
+}
+
+const uint8_t* PaintDocument::tilePixelPointer(const Layer& layer, int x, int y) const noexcept {
+    const int tileX = x / Layer::kTileSize;
+    const int tileY = y / Layer::kTileSize;
+    const int localX = x % Layer::kTileSize;
+    const int localY = y % Layer::kTileSize;
+    const size_t offset =
+        (tileIndex(tileX, tileY) * kTileByteCount) +
+        (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) + static_cast<size_t>(localX)) *
+            kPixelStride;
+    return layer.tiles.data() + offset;
 }
 
 const LayerFolder* PaintDocument::folderByID(int folderID) const noexcept {
@@ -1311,7 +1473,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + boundRadius)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));
     const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + boundRadius)));
-    dirtyRect_.expand(minX, minY, maxX, maxY);
+    markDirtyRect(minX, minY, maxX, maxY);
 
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
@@ -1469,7 +1631,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
             if (alpha <= 0.001F) {
                 continue;
             }
-            auto* pixel = &layer.pixels[(static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x)) * 4U];
+            auto* pixel = tilePixelPointer(layer, x, y);
             blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha, clampedPressure);
         }
     }
@@ -1542,61 +1704,102 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
 }
 
 void PaintDocument::rebuildComposite() const {
-    std::fill(compositeBuffer_.begin(), compositeBuffer_.end(), 0U);
+    if (dirtyTileFlags_.empty()) {
+        return;
+    }
 
-    for (size_t i = 0; i < layers_.size(); ++i) {
-        const auto& layer = layers_[i];
-        if (!isLayerVisibleEffective(static_cast<int>(i))) {
-            continue;
-        }
-
-        for (size_t offset = 0; offset < layer.pixels.size(); offset += 4U) {
-            const float srcA = (static_cast<float>(layer.pixels[offset + 3U]) / 255.0F) * layer.opacity;
-            if (srcA <= 0.0F) {
+    for (int tileY = 0; tileY < tileRows_; ++tileY) {
+        for (int tileX = 0; tileX < tileColumns_; ++tileX) {
+            const size_t dirtyIndex = tileIndex(tileX, tileY);
+            if (dirtyTileFlags_[dirtyIndex] == 0U) {
                 continue;
             }
 
-            const float dstA = static_cast<float>(compositeBuffer_[offset + 3U]) / 255.0F;
-            const float outA = srcA + (dstA * (1.0F - srcA));
-            if (outA <= 0.0F) {
-                compositeBuffer_[offset] = 0U;
-                compositeBuffer_[offset + 1U] = 0U;
-                compositeBuffer_[offset + 2U] = 0U;
-                compositeBuffer_[offset + 3U] = 0U;
-                continue;
+            const int originX = tileX * Layer::kTileSize;
+            const int originY = tileY * Layer::kTileSize;
+            const int copyWidth = std::min(Layer::kTileSize, width_ - originX);
+            const int copyHeight = std::min(Layer::kTileSize, height_ - originY);
+
+            for (int localY = 0; localY < copyHeight; ++localY) {
+                const size_t rowOffset =
+                    (static_cast<size_t>(originY + localY) * static_cast<size_t>(width_) + static_cast<size_t>(originX)) *
+                    kPixelStride;
+                std::fill_n(
+                    compositeBuffer_.begin() + static_cast<std::ptrdiff_t>(rowOffset),
+                    static_cast<size_t>(copyWidth) * kPixelStride,
+                    0U
+                );
             }
 
-            const float srcR = static_cast<float>(layer.pixels[offset]) / 255.0F;
-            const float srcG = static_cast<float>(layer.pixels[offset + 1U]) / 255.0F;
-            const float srcB = static_cast<float>(layer.pixels[offset + 2U]) / 255.0F;
-            const float dstR = static_cast<float>(compositeBuffer_[offset]) / 255.0F;
-            const float dstG = static_cast<float>(compositeBuffer_[offset + 1U]) / 255.0F;
-            const float dstB = static_cast<float>(compositeBuffer_[offset + 2U]) / 255.0F;
+            for (size_t layerIndexValue = 0; layerIndexValue < layers_.size(); ++layerIndexValue) {
+                const auto& layer = layers_[layerIndexValue];
+                if (!isLayerVisibleEffective(static_cast<int>(layerIndexValue)) || layer.opacity <= 0.0F) {
+                    continue;
+                }
 
-            const auto blended = blendColorRGB(dstR, dstG, dstB, srcR, srcG, srcB, layer.blendMode);
-            const float outR = clamp01(
-                (
-                    srcA * ((1.0F - dstA) * srcR + (dstA * blended[0])) +
-                    (dstA * (1.0F - srcA) * dstR)
-                ) / outA
-            );
-            const float outG = clamp01(
-                (
-                    srcA * ((1.0F - dstA) * srcG + (dstA * blended[1])) +
-                    (dstA * (1.0F - srcA) * dstG)
-                ) / outA
-            );
-            const float outB = clamp01(
-                (
-                    srcA * ((1.0F - dstA) * srcB + (dstA * blended[2])) +
-                    (dstA * (1.0F - srcA) * dstB)
-                ) / outA
-            );
+                const size_t tileOffset = dirtyIndex * kTileByteCount;
+                for (int localY = 0; localY < copyHeight; ++localY) {
+                    const int imageY = originY + localY;
+                    for (int localX = 0; localX < copyWidth; ++localX) {
+                        const int imageX = originX + localX;
+                        const size_t srcOffset =
+                            tileOffset +
+                            (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) + static_cast<size_t>(localX)) *
+                                kPixelStride;
+                        const float srcA = (static_cast<float>(layer.tiles[srcOffset + 3U]) / 255.0F) * layer.opacity;
+                        if (srcA <= 0.0F) {
+                            continue;
+                        }
 
-            compositeBuffer_[offset] = static_cast<uint8_t>(outR * 255.0F);
-            compositeBuffer_[offset + 1U] = static_cast<uint8_t>(outG * 255.0F);
-            compositeBuffer_[offset + 2U] = static_cast<uint8_t>(outB * 255.0F);
-            compositeBuffer_[offset + 3U] = static_cast<uint8_t>(clamp01(outA) * 255.0F);
+                        const size_t dstOffset =
+                            (static_cast<size_t>(imageY) * static_cast<size_t>(width_) + static_cast<size_t>(imageX)) *
+                            kPixelStride;
+                        const float dstA = static_cast<float>(compositeBuffer_[dstOffset + 3U]) / 255.0F;
+                        const float outA = srcA + (dstA * (1.0F - srcA));
+                        if (outA <= 0.0F) {
+                            compositeBuffer_[dstOffset] = 0U;
+                            compositeBuffer_[dstOffset + 1U] = 0U;
+                            compositeBuffer_[dstOffset + 2U] = 0U;
+                            compositeBuffer_[dstOffset + 3U] = 0U;
+                            continue;
+                        }
+
+                        const float srcR = static_cast<float>(layer.tiles[srcOffset]) / 255.0F;
+                        const float srcG = static_cast<float>(layer.tiles[srcOffset + 1U]) / 255.0F;
+                        const float srcB = static_cast<float>(layer.tiles[srcOffset + 2U]) / 255.0F;
+                        const float dstR = static_cast<float>(compositeBuffer_[dstOffset]) / 255.0F;
+                        const float dstG = static_cast<float>(compositeBuffer_[dstOffset + 1U]) / 255.0F;
+                        const float dstB = static_cast<float>(compositeBuffer_[dstOffset + 2U]) / 255.0F;
+
+                        const auto blended = blendColorRGB(dstR, dstG, dstB, srcR, srcG, srcB, layer.blendMode);
+                        const float outR = clamp01(
+                            (
+                                srcA * ((1.0F - dstA) * srcR + (dstA * blended[0])) +
+                                (dstA * (1.0F - srcA) * dstR)
+                            ) / outA
+                        );
+                        const float outG = clamp01(
+                            (
+                                srcA * ((1.0F - dstA) * srcG + (dstA * blended[1])) +
+                                (dstA * (1.0F - srcA) * dstG)
+                            ) / outA
+                        );
+                        const float outB = clamp01(
+                            (
+                                srcA * ((1.0F - dstA) * srcB + (dstA * blended[2])) +
+                                (dstA * (1.0F - srcA) * dstB)
+                            ) / outA
+                        );
+
+                        compositeBuffer_[dstOffset] = static_cast<uint8_t>(outR * 255.0F);
+                        compositeBuffer_[dstOffset + 1U] = static_cast<uint8_t>(outG * 255.0F);
+                        compositeBuffer_[dstOffset + 2U] = static_cast<uint8_t>(outB * 255.0F);
+                        compositeBuffer_[dstOffset + 3U] = static_cast<uint8_t>(clamp01(outA) * 255.0F);
+                    }
+                }
+            }
+
+            dirtyTileFlags_[dirtyIndex] = 0U;
         }
     }
 }
