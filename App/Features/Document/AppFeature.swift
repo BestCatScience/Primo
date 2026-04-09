@@ -99,6 +99,7 @@ struct AppFeature {
             layerSidebar.transparentPaper = brushPalette.paper.isTransparent
             canvas.previewStyle = previewStrokeStyle()
             canvas.selectionMode = brushPalette.selection.toolMode
+            canvas.shapeMode = brushPalette.shape.mode
             canvas.eyedropperSamplingSource = brushPalette.sampling.eyedropperSource
             canvas.paperStyle = resolvedPaperStyle()
         }
@@ -129,9 +130,14 @@ struct AppFeature {
                     isEraser: true,
                     radius: CGFloat(resolvedRuntimeSettings.radius),
                     opacity: 0.78,
+                    flow: CGFloat(resolvedRuntimeSettings.flow),
                     hardness: 0.95,
+                    roundness: CGFloat(resolvedRuntimeSettings.roundness),
+                    angle: CGFloat(resolvedRuntimeSettings.angle),
+                    followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
                     pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
                     stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
+                    customTip: resolvedRuntimeSettings.customTip,
                     color: CGColor(
                         red: 0.92,
                         green: 0.95,
@@ -146,9 +152,14 @@ struct AppFeature {
                 isEraser: false,
                 radius: CGFloat(resolvedRuntimeSettings.radius),
                 opacity: CGFloat(resolvedRuntimeSettings.opacity),
+                flow: CGFloat(resolvedRuntimeSettings.flow),
                 hardness: CGFloat(resolvedRuntimeSettings.hardness),
+                roundness: CGFloat(resolvedRuntimeSettings.roundness),
+                angle: CGFloat(resolvedRuntimeSettings.angle),
+                followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
                 pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
                 stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
+                customTip: resolvedRuntimeSettings.customTip,
                 color: CGColor(
                     red: CGFloat(resolvedRuntimeSettings.red) / 255.0,
                     green: CGFloat(resolvedRuntimeSettings.green) / 255.0,
@@ -745,6 +756,7 @@ struct AppFeature {
             case let .toolSelected(tool):
                 state.canvas.currentTool = tool
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.shapeMode = state.brushPalette.shape.mode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
@@ -849,6 +861,7 @@ struct AppFeature {
 
             case .brushPalette:
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
+                state.canvas.shapeMode = state.brushPalette.shape.mode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 state.canvas.paperStyle = state.resolvedPaperStyle()
@@ -1005,6 +1018,30 @@ struct AppFeature {
                     return .send(.canvas(.applyIncrementalUpdate(update)))
                 }
                 return .none
+
+            case let .canvas(.delegate(.previewShapeStroke(samples))):
+                guard let first = samples.first else { return .none }
+                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
+                state.canvas.selection = nil
+                paintDocumentClient.cancelStroke()
+                paintDocumentClient.beginStroke(first, state.resolvedBrushSettings())
+                for sample in samples.dropFirst() {
+                    paintDocumentClient.appendStroke(sample)
+                }
+                if let update = paintDocumentClient.consumeDirtyUpdate() {
+                    return .concatenate(
+                        .cancel(id: CancelID.startupPresentationLoad),
+                        .send(.canvas(.applyIncrementalUpdate(update)))
+                    )
+                }
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                )
+
+            case .canvas(.delegate(.commitPreviewShapeStroke)):
+                paintDocumentClient.endStroke()
+                return .send(.presentationLoaded(paintDocumentClient.presentation()))
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()

@@ -20,6 +20,7 @@ final class InputHandler {
 
     var tool: StudioToolKind = .brush
     var selectionMode: SelectionToolMode = .lasso
+    var shapeMode: ShapeToolMode = .line
     var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
     var brushTipKind: BrushTipKind = .pencil
     var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
@@ -80,7 +81,7 @@ final class InputHandler {
 
             if tool == .shape, let shapeStartPoint {
                 let currentPoint = makePoint(touch, in: view, predicted: false)
-                stroke.points = interpolatedPoints(from: shapeStartPoint, to: currentPoint, predicted: false)
+                stroke.points = shapePoints(from: shapeStartPoint, to: currentPoint, predicted: false)
                 stroke.predictedPoints.removeAll()
             } else {
                 let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
@@ -95,7 +96,7 @@ final class InputHandler {
             if var stroke = currentStroke {
                 if tool == .shape, let shapeStartPoint {
                     let finalPoint = makePoint(touch, in: view, predicted: false)
-                    stroke.points = interpolatedPoints(from: shapeStartPoint, to: finalPoint, predicted: false)
+                    stroke.points = shapePoints(from: shapeStartPoint, to: finalPoint, predicted: false)
                 } else {
                     let finishingTouches = event?.coalescedTouches(for: touch) ?? [touch]
                     appendFilteredPoints(from: finishingTouches, to: &stroke, in: view, isFinishingStroke: true)
@@ -377,5 +378,137 @@ final class InputHandler {
                 isPredicted: predicted
             )
         }
+    }
+
+    private func shapePoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {
+        switch shapeMode {
+        case .line:
+            return interpolatedPoints(from: start, to: end, predicted: predicted)
+        case .rectangle:
+            let vertices = rectangleVertices(from: start.position, to: end.position)
+            return strokedPathPoints(vertices: vertices, closed: true, start: start, end: end, predicted: predicted)
+        case .ellipse:
+            return ellipsePoints(from: start, to: end, predicted: predicted)
+        case .triangle:
+            let vertices = regularPolygonVertices(sides: 3, from: start.position, to: end.position)
+            return strokedPathPoints(vertices: vertices, closed: true, start: start, end: end, predicted: predicted)
+        case .pentagon:
+            let vertices = regularPolygonVertices(sides: 5, from: start.position, to: end.position)
+            return strokedPathPoints(vertices: vertices, closed: true, start: start, end: end, predicted: predicted)
+        case .hexagon:
+            let vertices = regularPolygonVertices(sides: 6, from: start.position, to: end.position)
+            return strokedPathPoints(vertices: vertices, closed: true, start: start, end: end, predicted: predicted)
+        }
+    }
+
+    private func rectangleVertices(from start: SIMD2<Float>, to end: SIMD2<Float>) -> [SIMD2<Float>] {
+        let minX = min(start.x, end.x)
+        let maxX = max(start.x, end.x)
+        let minY = min(start.y, end.y)
+        let maxY = max(start.y, end.y)
+
+        return [
+            SIMD2(minX, minY),
+            SIMD2(maxX, minY),
+            SIMD2(maxX, maxY),
+            SIMD2(minX, maxY)
+        ]
+    }
+
+    private func regularPolygonVertices(sides: Int, from start: SIMD2<Float>, to end: SIMD2<Float>) -> [SIMD2<Float>] {
+        let minX = min(start.x, end.x)
+        let maxX = max(start.x, end.x)
+        let minY = min(start.y, end.y)
+        let maxY = max(start.y, end.y)
+        let center = SIMD2<Float>((minX + maxX) * 0.5, (minY + maxY) * 0.5)
+        let radiusX = max((maxX - minX) * 0.5, 0.5)
+        let radiusY = max((maxY - minY) * 0.5, 0.5)
+
+        return (0..<sides).map { index in
+            let angle = Float(index) * (2.0 * .pi / Float(sides)) - (.pi / 2)
+            return SIMD2<Float>(
+                center.x + cos(angle) * radiusX,
+                center.y + sin(angle) * radiusY
+            )
+        }
+    }
+
+    private func ellipsePoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {
+        let minX = min(start.position.x, end.position.x)
+        let maxX = max(start.position.x, end.position.x)
+        let minY = min(start.position.y, end.position.y)
+        let maxY = max(start.position.y, end.position.y)
+        let center = SIMD2<Float>((minX + maxX) * 0.5, (minY + maxY) * 0.5)
+        let radiusX = max((maxX - minX) * 0.5, 0.5)
+        let radiusY = max((maxY - minY) * 0.5, 0.5)
+        let perimeterEstimate = 2.0 * Float.pi * sqrt(max((radiusX * radiusX + radiusY * radiusY) * 0.5, 0.25))
+        let count = max(24, Int(ceil(perimeterEstimate / max(brushSize * 0.28, 1.0))))
+
+        let vertices = (0..<count).map { index -> SIMD2<Float> in
+            let angle = Float(index) * (2.0 * .pi / Float(count)) - (.pi / 2)
+            return SIMD2<Float>(
+                center.x + cos(angle) * radiusX,
+                center.y + sin(angle) * radiusY
+            )
+        }
+
+        return strokedPathPoints(vertices: vertices, closed: true, start: start, end: end, predicted: predicted)
+    }
+
+    private func strokedPathPoints(
+        vertices: [SIMD2<Float>],
+        closed: Bool,
+        start: StrokePoint,
+        end: StrokePoint,
+        predicted: Bool
+    ) -> [StrokePoint] {
+        guard !vertices.isEmpty else { return [start, end] }
+        if vertices.count == 1 {
+            return [strokePoint(at: vertices[0], progress: 1, start: start, end: end, predicted: predicted)]
+        }
+
+        var path = vertices
+        if closed, let first = vertices.first {
+            path.append(first)
+        }
+
+        let segments = max(path.count - 1, 1)
+        var result: [StrokePoint] = []
+
+        for segmentIndex in 0..<segments {
+            let segmentStart = path[segmentIndex]
+            let segmentEnd = path[segmentIndex + 1]
+            let distance = simd_length(segmentEnd - segmentStart)
+            let steps = max(1, Int(ceil(distance / max(brushSize * 0.35, 1.0))))
+
+            for step in 0...steps {
+                if segmentIndex > 0 && step == 0 { continue }
+                let t = Float(step) / Float(steps)
+                let progress = (Float(segmentIndex) + t) / Float(segments)
+                let position = segmentStart + ((segmentEnd - segmentStart) * t)
+                result.append(
+                    strokePoint(at: position, progress: progress, start: start, end: end, predicted: predicted)
+                )
+            }
+        }
+
+        return result
+    }
+
+    private func strokePoint(
+        at position: SIMD2<Float>,
+        progress: Float,
+        start: StrokePoint,
+        end: StrokePoint,
+        predicted: Bool
+    ) -> StrokePoint {
+        StrokePoint(
+            position: position,
+            pressure: start.pressure + ((end.pressure - start.pressure) * progress),
+            altitude: start.altitude + ((end.altitude - start.altitude) * progress),
+            azimuth: start.azimuth + ((end.azimuth - start.azimuth) * progress),
+            timestamp: start.timestamp + Double(Float(end.timestamp - start.timestamp) * progress),
+            isPredicted: predicted
+        )
     }
 }

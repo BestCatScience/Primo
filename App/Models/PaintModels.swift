@@ -137,6 +137,51 @@ enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     }
 }
 
+enum ShapeToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case line
+    case rectangle
+    case ellipse
+    case triangle
+    case pentagon
+    case hexagon
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .line:
+            return language.localized("直線")
+        case .rectangle:
+            return language.localized("四角")
+        case .ellipse:
+            return language.localized("丸")
+        case .triangle:
+            return language.localized("三角形")
+        case .pentagon:
+            return language.localized("五角形")
+        case .hexagon:
+            return language.localized("六角形")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .line:
+            return "line.diagonal"
+        case .rectangle:
+            return "square"
+        case .ellipse:
+            return "circle"
+        case .triangle:
+            return "triangle"
+        case .pentagon:
+            return "pentagon"
+        case .hexagon:
+            return "hexagon"
+        }
+    }
+}
+
 enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case replace
     case add
@@ -881,6 +926,92 @@ struct BrushPreset: Identifiable, Equatable {
             blue: 24
         ),
         studioPreset(
+            name: "Block Marker",
+            tipKind: .ink,
+            color: Color(red: 0.06, green: 0.07, blue: 0.09),
+            radius: 7.6,
+            sizeSpeedSensitivity: 0.02,
+            opacity: 1.0,
+            hardness: 0.96,
+            roundness: 0.82,
+            angle: 0.0,
+            angleMode: .fixed,
+            spacing: 0.11,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 1.0,
+            opacityPressureSensitivity: 0.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            pressureSensitivity: 0.04,
+            red: 16,
+            green: 18,
+            blue: 24,
+            customTip: BuiltInBrushTipFactory.block
+        ),
+        studioPreset(
+            name: "Chisel Marker",
+            tipKind: .ink,
+            color: Color(red: 0.07, green: 0.08, blue: 0.10),
+            radius: 7.0,
+            sizeSpeedSensitivity: 0.03,
+            opacity: 1.0,
+            hardness: 0.94,
+            roundness: 0.56,
+            roundnessPressureSensitivity: 0.08,
+            angle: .pi / 8,
+            angleTiltSensitivity: 0.10,
+            angleMode: .strokeDirection,
+            spacing: 0.10,
+            scatterLateral: 0.01,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 1.0,
+            opacityPressureSensitivity: 0.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            pressureSensitivity: 0.12,
+            red: 18,
+            green: 20,
+            blue: 27,
+            customTip: BuiltInBrushTipFactory.ribbon
+        ),
+        studioPreset(
+            name: "Diamond Nib",
+            tipKind: .ink,
+            color: Color(red: 0.08, green: 0.09, blue: 0.11),
+            radius: 6.4,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 1.0,
+            hardness: 0.95,
+            roundness: 0.68,
+            angle: .pi / 4,
+            angleMode: .fixed,
+            spacing: 0.12,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 1.0,
+            opacityPressureSensitivity: 0.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            pressureSensitivity: 0.06,
+            red: 20,
+            green: 23,
+            blue: 29,
+            customTip: BuiltInBrushTipFactory.diamond
+        ),
+        studioPreset(
             name: "Soft Airbrush",
             tipKind: .airbrush,
             color: Color(red: 0.10, green: 0.10, blue: 0.11),
@@ -971,6 +1102,50 @@ struct BrushPreset: Identifiable, Equatable {
             red: 35,
             green: 38,
             blue: 46
+        ),
+        studioPreset(
+            name: "Petal Spray",
+            tipKind: .airbrush,
+            color: Color(red: 0.18, green: 0.19, blue: 0.22),
+            radius: 10.0,
+            sizeSpeedSensitivity: 0.10,
+            opacity: 0.22,
+            hardness: 0.22,
+            roundness: 1.0,
+            angleMode: .strokeDirection,
+            spacing: 0.28,
+            spacingJitter: 0.08,
+            scatterEnabled: true,
+            scatterMode: .spray,
+            scatterLateral: 0.16,
+            scatterLinear: 0.08,
+            count: 2,
+            countJitter: 0.18,
+            countSizeJitter: 0.26,
+            countOpacityJitter: 0.18,
+            angleJitter: 0.5,
+            roundnessJitter: 0.0,
+            textureMode: .moving,
+            textureStrength: 0.10,
+            flow: 0.66,
+            flowPressureSensitivity: 0.20,
+            flowJitter: 0.12,
+            wetness: 0.08,
+            wetnessPressureSensitivity: 0.10,
+            opacityPressureSensitivity: 0.44,
+            colorMixStrength: 0.10,
+            paintLoad: 0.88,
+            loadPressureSensitivity: 0.12,
+            grainScale: 1.10,
+            grainContrast: 1.16,
+            paperScale: 0.06,
+            paperStrength: 0.04,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.10,
+            red: 38,
+            green: 40,
+            blue: 46,
+            customTip: BuiltInBrushTipFactory.petal
         ),
         studioPreset(
             name: "Paint Brush",
@@ -1081,6 +1256,76 @@ struct BrushPreset: Identifiable, Equatable {
             red: 41,
             green: 43,
             blue: 46
+        ),
+        studioPreset(
+            name: "Rake Brush",
+            tipKind: .oil,
+            color: Color(red: 0.18, green: 0.20, blue: 0.23),
+            radius: 8.4,
+            sizeSpeedSensitivity: 0.08,
+            opacity: 0.90,
+            hardness: 0.80,
+            roundness: 0.74,
+            angleMode: .strokeDirection,
+            spacing: 0.09,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.16,
+            flow: 0.94,
+            flowPressureSensitivity: 0.08,
+            wetness: 0.12,
+            wetnessPressureSensitivity: 0.08,
+            opacityPressureSensitivity: 0.10,
+            colorMixStrength: 0.10,
+            paintLoad: 0.92,
+            loadPressureSensitivity: 0.06,
+            grainScale: 1.08,
+            grainContrast: 1.24,
+            paperScale: 0.08,
+            paperStrength: 0.06,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.16,
+            red: 46,
+            green: 50,
+            blue: 58,
+            customTip: BuiltInBrushTipFactory.rake
+        ),
+        studioPreset(
+            name: "Star Stamp",
+            tipKind: .ink,
+            color: Color(red: 0.08, green: 0.09, blue: 0.11),
+            radius: 8.0,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 1.0,
+            hardness: 0.92,
+            roundness: 1.0,
+            angleMode: .fixed,
+            spacing: 0.38,
+            spacingJitter: 0.04,
+            scatterEnabled: true,
+            scatterMode: .spray,
+            scatterLateral: 0.06,
+            scatterLinear: 0.02,
+            count: 1,
+            countJitter: 0.0,
+            countSizeJitter: 0.10,
+            countOpacityJitter: 0.06,
+            angleJitter: 0.9,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 1.0,
+            opacityPressureSensitivity: 0.0,
+            paperScale: 0.05,
+            paperStrength: 0.0,
+            pressureSensitivity: 0.0,
+            red: 20,
+            green: 22,
+            blue: 28,
+            customTip: BuiltInBrushTipFactory.star
         )
     ]
 
@@ -1139,7 +1384,8 @@ struct BrushPreset: Identifiable, Equatable {
         pressureSensitivity: Double,
         red: UInt8,
         green: UInt8,
-        blue: UInt8
+        blue: UInt8,
+        customTip: BrushTipRaster? = nil
     ) -> BrushPreset {
         BrushPreset(
             name: name,
@@ -1193,11 +1439,186 @@ struct BrushPreset: Identifiable, Equatable {
             paperThreshold: paperThreshold,
             flipX: false,
             flipY: false,
+            customTip: customTip,
             pressureSensitivity: pressureSensitivity,
             red: red,
             green: green,
             blue: blue
         )
+    }
+}
+
+private enum BuiltInBrushTipFactory {
+    static let block = roundedSquare(size: 96, inset: 12, cornerRadius: 16)
+    static let diamond = diamond(size: 96, inset: 12)
+    static let ribbon = ribbon(size: 96, inset: 14, angle: .pi / 6)
+    static let petal = petal(size: 96, inset: 8)
+    static let rake = rake(size: 96, inset: 10, toothCount: 4)
+    static let star = star(size: 96, points: 5, innerRadiusRatio: 0.44, outerInset: 10)
+
+    private static func roundedSquare(size: Int, inset: CGFloat, cornerRadius: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let square = rect.insetBy(dx: inset, dy: inset)
+            let path = CGPath(
+                roundedRect: square,
+                cornerWidth: cornerRadius,
+                cornerHeight: cornerRadius,
+                transform: nil
+            )
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func diamond(size: Int, inset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset)
+            let center = CGPoint(x: box.midX, y: box.midY)
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: center.x, y: box.minY))
+            path.addLine(to: CGPoint(x: box.maxX, y: center.y))
+            path.addLine(to: CGPoint(x: center.x, y: box.maxY))
+            path.addLine(to: CGPoint(x: box.minX, y: center.y))
+            path.closeSubpath()
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func ribbon(size: Int, inset: CGFloat, angle: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset * 1.6)
+            context.saveGState()
+            context.translateBy(x: rect.midX, y: rect.midY)
+            context.rotate(by: angle)
+            let ribbonRect = CGRect(
+                x: -box.width * 0.5,
+                y: -box.height * 0.22,
+                width: box.width,
+                height: box.height * 0.44
+            )
+            let path = CGPath(
+                roundedRect: ribbonRect,
+                cornerWidth: ribbonRect.height * 0.45,
+                cornerHeight: ribbonRect.height * 0.45,
+                transform: nil
+            )
+            context.addPath(path)
+            context.fillPath()
+            context.restoreGState()
+        }
+    }
+
+    private static func petal(size: Int, inset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let petalWidth = rect.width * 0.24
+            let petalHeight = rect.height * 0.50
+            let distance = rect.width * 0.12
+
+            for index in 0..<4 {
+                context.saveGState()
+                context.translateBy(x: center.x, y: center.y)
+                context.rotate(by: CGFloat(index) * (.pi / 2))
+                let petalRect = CGRect(
+                    x: -petalWidth * 0.5,
+                    y: -(petalHeight - distance),
+                    width: petalWidth,
+                    height: petalHeight
+                ).insetBy(dx: inset * 0.05, dy: inset * 0.02)
+                context.fillEllipse(in: petalRect)
+                context.restoreGState()
+            }
+
+            context.fillEllipse(
+                in: CGRect(
+                    x: center.x - rect.width * 0.10,
+                    y: center.y - rect.height * 0.10,
+                    width: rect.width * 0.20,
+                    height: rect.height * 0.20
+                )
+            )
+        }
+    }
+
+    private static func rake(size: Int, inset: CGFloat, toothCount: Int) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let box = rect.insetBy(dx: inset, dy: inset)
+            let gap = box.width * 0.06
+            let toothWidth = (box.width - gap * CGFloat(toothCount - 1)) / CGFloat(toothCount)
+            let topOffsets: [CGFloat] = [0.12, 0.0, 0.08, 0.18]
+
+            for index in 0..<toothCount {
+                let topOffset = box.height * topOffsets[min(index, topOffsets.count - 1)]
+                let toothRect = CGRect(
+                    x: box.minX + CGFloat(index) * (toothWidth + gap),
+                    y: box.minY + topOffset,
+                    width: toothWidth,
+                    height: box.height - topOffset
+                )
+                let path = CGPath(
+                    roundedRect: toothRect,
+                    cornerWidth: toothWidth * 0.34,
+                    cornerHeight: toothWidth * 0.34,
+                    transform: nil
+                )
+                context.addPath(path)
+                context.fillPath()
+            }
+        }
+    }
+
+    private static func star(size: Int, points: Int, innerRadiusRatio: CGFloat, outerInset: CGFloat) -> BrushTipRaster {
+        raster(size: size) { context, rect in
+            let center = CGPoint(x: rect.midX, y: rect.midY)
+            let outerRadius = (min(rect.width, rect.height) * 0.5) - outerInset
+            let innerRadius = outerRadius * innerRadiusRatio
+            let path = CGMutablePath()
+
+            for index in 0..<(points * 2) {
+                let angle = (CGFloat(index) * .pi / CGFloat(points)) - (.pi / 2)
+                let radius = index.isMultiple(of: 2) ? outerRadius : innerRadius
+                let point = CGPoint(
+                    x: center.x + cos(angle) * radius,
+                    y: center.y + sin(angle) * radius
+                )
+                if index == 0 {
+                    path.move(to: point)
+                } else {
+                    path.addLine(to: point)
+                }
+            }
+
+            path.closeSubpath()
+            context.addPath(path)
+            context.fillPath()
+        }
+    }
+
+    private static func raster(size: Int, draw: (CGContext, CGRect) -> Void) -> BrushTipRaster {
+        var pixels = [UInt8](repeating: 0, count: size * size)
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+
+        pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: size,
+                height: size,
+                bitsPerComponent: 8,
+                bytesPerRow: size,
+                space: colorSpace,
+                bitmapInfo: CGImageAlphaInfo.none.rawValue
+            ) else {
+                return
+            }
+
+            context.setAllowsAntialiasing(true)
+            context.setShouldAntialias(true)
+            context.setFillColor(gray: 1.0, alpha: 1.0)
+            draw(context, CGRect(x: 0, y: 0, width: size, height: size))
+        }
+
+        return BrushTipRaster(width: size, height: size, alphaData: Data(pixels))
     }
 }
 
@@ -1331,9 +1752,14 @@ struct PreviewStrokeStyle: Equatable {
     let isEraser: Bool
     let radius: CGFloat
     let opacity: CGFloat
+    let flow: CGFloat
     let hardness: CGFloat
+    let roundness: CGFloat
+    let angle: CGFloat
+    let followsStrokeAngle: Bool
     let pressureSensitivity: CGFloat
     let stabilization: CGFloat
+    let customTip: BrushTipRaster?
     let color: CGColor
 }
 

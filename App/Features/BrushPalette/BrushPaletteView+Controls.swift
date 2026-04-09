@@ -150,6 +150,38 @@ extension BrushPaletteView {
                         )
                     }
                     .buttonStyle(.plain)
+                } else if currentTool == .shape {
+                    segmentedModeRow(
+                        title: language.localized("形状"),
+                        selectedTitle: store.shape.mode.localizedTitle(language)
+                    ) {
+                        Picker(language.localized("形状"), selection: $store.shape.mode) {
+                            ForEach(ShapeToolMode.allCases) { mode in
+                                Label(mode.localizedTitle(language), systemImage: mode.systemImage).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
+                    sliderRow(
+                        title: language.localized("線幅"),
+                        value: "\(Int(store.brush.radius)) px",
+                        slider: Slider(value: $store.brush.radius, in: 1...64, step: 1)
+                    )
+                    sliderRow(
+                        title: language.localized("不透明度"),
+                        value: "\(Int(store.brush.opacity * 100))%",
+                        slider: Slider(value: $store.brush.opacity, in: 0.1...1.0)
+                    )
+                    sliderRow(
+                        title: language.localized("手ぶれ補正"),
+                        value: "\(Int(store.brush.stabilization * 100))%",
+                        slider: Slider(value: $store.brush.stabilization, in: 0.0...1.0)
+                    )
+
+                    Text(language.localized("Apple Pencil をドラッグすると、始点から現在位置までの範囲で図形の輪郭を描きます。"))
+                        .font(StudioTheme.Typography.body(11))
+                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .move {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(hasSelection ? language.localized("Apple Pencil で選択範囲を移動します。適用するまで確定されません。") : language.localized("Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。"))

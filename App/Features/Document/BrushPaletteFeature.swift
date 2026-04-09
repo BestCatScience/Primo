@@ -307,6 +307,10 @@ struct BrushPaletteFeature {
             var expansion: Double = 0
         }
 
+        struct ShapeSettings: Equatable {
+            var mode: ShapeToolMode = .line
+        }
+
         struct SamplingSettings: Equatable {
             var eyedropperSource: EyedropperSamplingSource = .activeLayer
         }
@@ -329,6 +333,7 @@ struct BrushPaletteFeature {
         var brush = BrushSettings()
         var selection = SelectionSettings()
         var fill = FillSettings()
+        var shape = ShapeSettings()
         var sampling = SamplingSettings()
         var paper = PaperSettings()
         var library = LibraryState()
@@ -433,6 +438,7 @@ struct BrushPaletteFeature {
                  .binding(\.fill.opacityTolerance),
                  .binding(\.fill.colorTolerance),
                  .binding(\.fill.expansion),
+                 .binding(\.shape.mode),
                  .binding(\.sampling.eyedropperSource):
                 state.library.selectedBrush = nil
                 return .none

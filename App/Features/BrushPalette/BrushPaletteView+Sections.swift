@@ -178,6 +178,33 @@ extension BrushPaletteView {
                             metricRow(language.localized("動作"), value: language.localized("なぞった範囲をぼかす"))
                         }
                     }
+                } else if currentTool == .shape {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        activeBrushAccentColor.opacity(0.94),
+                                        StudioTheme.Palette.coolGlow.opacity(0.30)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 72, height: 72)
+                            .overlay(
+                                Image(systemName: store.shape.mode.systemImage)
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+                            )
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            metricRow(language.localized("形状"), value: store.shape.mode.localizedTitle(language))
+                            metricRow(language.localized("線幅"), value: "\(Int(store.brush.radius)) px")
+                            metricRow(language.localized("不透明"), value: "\(Int(store.brush.opacity * 100))%")
+                            metricRow(language.localized("色"), value: colorHexLabel)
+                        }
+                    }
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -394,7 +421,7 @@ extension BrushPaletteView {
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .select, .move, .blur:
+        case .fill, .eyedropper, .select, .move, .blur, .shape:
             return currentTool.localizedTitle(language)
         default:
             return StudioToolKind.brush.localizedTitle(language)
@@ -462,6 +489,8 @@ extension BrushPaletteView {
             return language.localized("変形")
         case .blur:
             return language.localized("ぼかし設定")
+        case .shape:
+            return language.localized("形状設定")
         default:
             return language.localized("ブラシ設定")
         }

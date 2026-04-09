@@ -19,12 +19,14 @@ struct CanvasView: UIViewRepresentable {
         uiView.update(
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
+            activeStroke: store.activeStroke,
             incrementalUpdate: store.pendingIncrementalUpdate,
             adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
             selectionMode: store.selectionMode,
+            shapeMode: store.shapeMode,
             eyedropperSamplingSource: store.eyedropperSamplingSource,
             selection: store.selection,
             selectionPreviewPoints: store.selectionPreviewPoints,
@@ -43,6 +45,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let metalCanvasView = MetalCanvasView()
     private let selectionOverlayView = UIImageView()
     private let compositePreviewImageView = UIImageView()
+    private let shapePreviewImageView = UIImageView()
     private let inputHandler = InputHandler()
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
@@ -86,6 +89,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         compositePreviewImageView.contentMode = .scaleToFill
         compositePreviewImageView.alpha = 1.0
         addSubview(compositePreviewImageView)
+
+        shapePreviewImageView.isUserInteractionEnabled = false
+        shapePreviewImageView.contentMode = .scaleToFill
+        shapePreviewImageView.alpha = 1.0
+        addSubview(shapePreviewImageView)
 
         selectionOutlineLayer.strokeColor = UIColor.white.withAlphaComponent(0.92).cgColor
         selectionOutlineLayer.fillColor = UIColor.clear.cgColor
@@ -133,6 +141,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     override func layoutSubviews() {
         super.layoutSubviews()
         metalCanvasView.frame = bounds
+        shapePreviewImageView.frame = bounds
         selectionOutlineLayer.frame = bounds
         selectionPreviewLayer.frame = bounds
     }
@@ -140,12 +149,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     func update(
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
+        activeStroke: Stroke?,
         incrementalUpdate: IncrementalLayerUpdate?,
         adjustmentPreviewPixelData: Data?,
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
         selectionMode: SelectionToolMode,
+        shapeMode: ShapeToolMode,
         eyedropperSamplingSource: EyedropperSamplingSource,
         selection: CanvasSelection?,
         selectionPreviewPoints: [CGPoint],
@@ -167,6 +178,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
         inputHandler.tool = currentTool
         inputHandler.selectionMode = selectionMode
+        inputHandler.shapeMode = shapeMode
         inputHandler.eyedropperSamplingSource = eyedropperSamplingSource
         inputHandler.brushTipKind = previewStyle.tipKind
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
@@ -174,6 +186,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         inputHandler.strokeStabilization = Float(previewStyle.stabilization)
         updateSelectionOverlay(selection, transformPreviewScale: transformPreviewScale)
         updateSelectionPreview(selectionPreviewPoints)
+        updateShapePreview(activeStroke, style: previewStyle)
         updateTransformPreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
@@ -375,6 +388,176 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             }
         }
         selectionPreviewLayer.path = path.cgPath
+    }
+
+    private func updateShapePreview(_ stroke: Stroke?, style: PreviewStrokeStyle) {
+        guard currentTool == .shape, let stroke, stroke.points.count >= 2 else {
+            shapePreviewImageView.image = nil
+            shapePreviewImageView.isHidden = true
+            return
+        }
+
+        let renderer = UIGraphicsImageRenderer(size: bounds.size)
+        let image = renderer.image { context in
+            let cgContext = context.cgContext
+            cgContext.setAllowsAntialiasing(true)
+            cgContext.setShouldAntialias(true)
+            drawShapePreview(stroke: stroke, style: style, in: cgContext)
+        }
+
+        shapePreviewImageView.image = image
+        shapePreviewImageView.isHidden = false
+    }
+
+    private func drawShapePreview(stroke: Stroke, style: PreviewStrokeStyle, in context: CGContext) {
+        let points = stroke.points.map { point in
+            (viewPoint(fromDocumentPoint: point.cgPoint), CGFloat(point.pressure))
+        }
+
+        guard points.count >= 2 else { return }
+        let sampled = denselySampledPreviewPoints(from: points, style: style)
+        for index in sampled.indices {
+            let point = sampled[index].0
+            let pressure = sampled[index].1
+            let baseDiameter = max(style.radius * 2.0, 1.0)
+            let pressureScale = max(0.35, 1.0 - style.pressureSensitivity + (style.pressureSensitivity * pressure))
+            let diameter = max(baseDiameter * pressureScale, 1.0)
+            let angle = previewStampAngle(for: sampled, at: index, style: style)
+            drawPreviewStamp(
+                in: context,
+                center: point,
+                diameter: diameter,
+                angle: angle,
+                alpha: previewStampAlpha(style: style),
+                style: style
+            )
+        }
+    }
+
+    private func denselySampledPreviewPoints(from points: [(CGPoint, CGFloat)], style: PreviewStrokeStyle) -> [(CGPoint, CGFloat)] {
+        guard points.count >= 2 else { return points }
+
+        let baseDiameter = max(style.radius * 2.0, 1.0)
+        let spacing = max(baseDiameter * 0.16, 0.75)
+        var sampled: [(CGPoint, CGFloat)] = [points[0]]
+
+        for index in 1..<points.count {
+            let previous = points[index - 1]
+            let current = points[index]
+            let deltaX = current.0.x - previous.0.x
+            let deltaY = current.0.y - previous.0.y
+            let distance = hypot(deltaX, deltaY)
+            let steps = max(1, Int(ceil(distance / spacing)))
+
+            for step in 1...steps {
+                let t = CGFloat(step) / CGFloat(steps)
+                sampled.append((
+                    CGPoint(
+                        x: previous.0.x + deltaX * t,
+                        y: previous.0.y + deltaY * t
+                    ),
+                    previous.1 + ((current.1 - previous.1) * t)
+                ))
+            }
+        }
+
+        return sampled
+    }
+
+    private func previewStampAngle(for points: [(CGPoint, CGFloat)], at index: Int, style: PreviewStrokeStyle) -> CGFloat {
+        guard style.followsStrokeAngle, points.count >= 2 else { return style.angle }
+
+        let previous = points[max(index - 1, 0)].0
+        let next = points[min(index + 1, points.count - 1)].0
+        let deltaX = next.x - previous.x
+        let deltaY = next.y - previous.y
+        guard abs(deltaX) > 0.001 || abs(deltaY) > 0.001 else { return style.angle }
+        return atan2(deltaY, deltaX) + style.angle
+    }
+
+    private func drawPreviewStamp(
+        in context: CGContext,
+        center: CGPoint,
+        diameter: CGFloat,
+        angle: CGFloat,
+        alpha: CGFloat,
+        style: PreviewStrokeStyle
+    ) {
+        context.saveGState()
+        context.translateBy(x: center.x, y: center.y)
+        context.rotate(by: angle)
+
+        let size: CGSize = {
+            if let customTip = style.customTip, customTip.width > 0, customTip.height > 0 {
+                let aspectRatio = CGFloat(customTip.height) / CGFloat(customTip.width)
+                return CGSize(width: diameter, height: max(diameter * aspectRatio, 1.0))
+            }
+            return CGSize(width: diameter, height: max(diameter * style.roundness, diameter * 0.2))
+        }()
+        let rect = CGRect(
+            x: -size.width * 0.5,
+            y: -size.height * 0.5,
+            width: size.width,
+            height: size.height
+        )
+
+        if let customTip = style.customTip, let mask = tipMaskImage(for: customTip) {
+            context.saveGState()
+            context.clip(to: rect, mask: mask)
+            context.setFillColor(UIColor(cgColor: style.color).withAlphaComponent(alpha).cgColor)
+            context.fill(rect)
+            context.restoreGState()
+        } else {
+            context.setFillColor(UIColor(cgColor: style.color).withAlphaComponent(alpha).cgColor)
+
+            switch style.tipKind {
+            case .airbrush:
+                context.setShadow(offset: .zero, blur: diameter * (1.0 - style.hardness) * 0.8, color: UIColor(cgColor: style.color).withAlphaComponent(alpha * 0.8).cgColor)
+                context.fillEllipse(in: rect)
+            case .oil:
+                let path = UIBezierPath(roundedRect: rect, cornerRadius: rect.height * 0.22)
+                context.addPath(path.cgPath)
+                context.fillPath()
+            case .ink, .pencil:
+                context.fillEllipse(in: rect)
+            }
+        }
+
+        context.restoreGState()
+    }
+
+    private func previewStampAlpha(style: PreviewStrokeStyle) -> CGFloat {
+        let base = min(max(style.opacity, 0.04), 1.0)
+        let flow = min(max(style.flow, 0.04), 1.0)
+        let hardnessBias = 0.55 + (style.hardness * 0.45)
+        return min(max(base * flow * hardnessBias * 0.55, 0.03), 1.0)
+    }
+
+    private func tipMaskImage(for raster: BrushTipRaster) -> CGImage? {
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+        guard let provider = CGDataProvider(data: raster.alphaData as CFData) else { return nil }
+        return CGImage(
+            maskWidth: raster.width,
+            height: raster.height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 8,
+            bytesPerRow: raster.width,
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: true
+        ) ?? CGImage(
+            width: raster.width,
+            height: raster.height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 8,
+            bytesPerRow: raster.width,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: true,
+            intent: .defaultIntent
+        )
     }
 
     private func sampledColor(at point: CGPoint, source: EyedropperSamplingSource) -> SampledColor? {
