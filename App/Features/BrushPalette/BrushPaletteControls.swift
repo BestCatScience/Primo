@@ -38,7 +38,9 @@ struct SpectrumColorControl: View {
                             gradient: Gradient(colors: [
                                 .red, .yellow, .green, .cyan, .blue, .purple, .red
                             ]),
-                            center: .center
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
                         ),
                         style: StrokeStyle(lineWidth: ringWidth, lineCap: .round)
                     )

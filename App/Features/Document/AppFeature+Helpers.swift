@@ -91,6 +91,15 @@ extension AppFeature {
     static func gradientMappedLayerPixels(source: Data, preset: GradientMapPreset) -> Data? {
         guard source.count.isMultiple(of: 4) else { return nil }
         let stops = gradientMapStops(for: preset)
+        return gradientMappedLayerPixels(source: source, stops: stops)
+    }
+
+    static func gradientMappedLayerPixels(source: Data, settings: GradientMapSettings) -> Data? {
+        gradientMappedLayerPixels(source: source, stops: gradientMapStops(for: settings))
+    }
+
+    static func gradientMappedLayerPixels(source: Data, stops: [GradientMapStop]) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
         guard stops.count >= 2 else { return nil }
 
         var output = [UInt8](source)
@@ -351,6 +360,59 @@ extension AppFeature {
                 GradientMapStop(position: 1.0, red: 227, green: 255, blue: 111)
             ]
         }
+    }
+
+    static func gradientMapStops(for settings: GradientMapSettings) -> [GradientMapStop] {
+        normalizeGradientMapSettings(settings).stops.map {
+            GradientMapStop(
+                position: $0.position,
+                red: $0.red,
+                green: $0.green,
+                blue: $0.blue
+            )
+        }
+    }
+
+    static func gradientMapSettings(for preset: GradientMapPreset) -> GradientMapSettings {
+        let stops = gradientMapStops(for: preset)
+        return GradientMapSettings(
+            stops: stops.map {
+                GradientMapStopSettings(
+                    position: $0.position,
+                    red: $0.red,
+                    green: $0.green,
+                    blue: $0.blue
+                )
+            }
+        )
+    }
+
+    static func normalizeGradientMapSettings(_ settings: GradientMapSettings) -> GradientMapSettings {
+        var sortedStops = settings.stops.sorted { $0.position < $1.position }
+
+        if sortedStops.count < 2 {
+            sortedStops = [
+                GradientMapStopSettings(position: 0.0, red: 0, green: 0, blue: 0),
+                GradientMapStopSettings(position: 1.0, red: 255, green: 255, blue: 255)
+            ]
+        }
+
+        for index in sortedStops.indices {
+            sortedStops[index].position = min(max(sortedStops[index].position, 0.0), 1.0)
+        }
+
+        sortedStops[0].position = 0.0
+        sortedStops[sortedStops.count - 1].position = 1.0
+
+        if sortedStops.count > 2 {
+            for index in 1..<(sortedStops.count - 1) {
+                let lowerBound = sortedStops[index - 1].position + 0.01
+                let upperBound = sortedStops[index + 1].position - 0.01
+                sortedStops[index].position = min(max(sortedStops[index].position, lowerBound), upperBound)
+            }
+        }
+
+        return GradientMapSettings(stops: sortedStops)
     }
 
     static func mappedGradientColor(for value: Double, stops: [GradientMapStop]) -> (red: UInt8, green: UInt8, blue: UInt8) {

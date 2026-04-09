@@ -225,6 +225,8 @@ struct AppFeature {
         case toolLongPressed(StudioToolKind)
         case clearActiveLayerButtonTapped
         case gradientMapSelected(GradientMapPreset)
+        case gradientMapPreviewChanged(GradientMapSettings?)
+        case gradientMapApplied(GradientMapSettings)
         case hueSaturationBrightnessPreviewChanged(HueSaturationBrightnessSettings?)
         case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
         case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
@@ -374,6 +376,42 @@ struct AppFeature {
                     state.bannerMessage = state.appLanguage.localized("Could not apply gradient map")
                     return .none
                 }
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .gradientMapPreviewChanged(settings):
+                guard
+                    let settings,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.gradientMappedLayerPixels(source: layer.pixelData, settings: settings),
+                    let composite = Self.compositedPreviewPixelData(
+                        snapshot: snapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjusted
+                    )
+                else {
+                    state.canvas.adjustmentPreviewPixelData = nil
+                    return .none
+                }
+                state.canvas.adjustmentPreviewPixelData = composite
+                return .none
+
+            case let .gradientMapApplied(settings):
+                state.canvas.adjustmentPreviewPixelData = nil
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.gradientMappedLayerPixels(source: layer.pixelData, settings: settings)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply gradient map")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
                 if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }

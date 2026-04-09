@@ -15,8 +15,11 @@ struct ContentView: View {
     @State var showsColorBalanceSheet = false
     @State var showsThresholdSheet = false
     @State var showsPosterizeSheet = false
+    @State var showsGradientMapSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
+    @State var gradientMapSettings = GradientMapSettings()
+    @State var selectedGradientStopID: GradientMapStopSettings.ID?
     @State var hsbAdjustmentSettings = HueSaturationBrightnessSettings()
     @State var brightnessContrastSettings = BrightnessContrastSettings()
     @State var levelsAdjustmentSettings = LevelsAdjustmentSettings()
@@ -63,6 +66,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsPosterizeSheet) {
             posterizeSheet
+        }
+        .sheet(isPresented: $showsGradientMapSheet) {
+            gradientMapSheet
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,

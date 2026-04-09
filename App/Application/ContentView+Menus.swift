@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension ContentView {
     var canvasSizePresets: [(label: String, width: Int, height: Int)] {
@@ -416,6 +417,72 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var gradientMapSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.gradientMap(language)) {
+                    gradientPreviewBar
+
+                    Text(language.localized("プレビューをタップすると点を追加、点をドラッグすると移動できます。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(language.localized("プリセット読込"))
+                            .font(.headline)
+
+                        ForEach(GradientMapPreset.allCases) { preset in
+                            Button(preset.localizedTitle(language)) {
+                                gradientMapSettings = AppFeature.gradientMapSettings(for: preset)
+                                selectedGradientStopID = gradientMapSettings.stops.dropFirst().first?.id
+                            }
+                        }
+                    }
+
+                    ForEach($gradientMapSettings.stops) { $stop in
+                        gradientStopEditor(stop: $stop)
+                    }
+
+                    Button(language.localized("ポイントを追加")) {
+                        addGradientStop()
+                    }
+                    .disabled(gradientMapSettings.stops.count >= 8)
+                }
+            }
+            .navigationTitle(StudioStrings.gradientMap(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        store.send(.gradientMapPreviewChanged(nil))
+                        showsGradientMapSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(StudioStrings.apply(language)) {
+                        store.send(.gradientMapApplied(normalizedGradientMapSettings))
+                        showsGradientMapSheet = false
+                    }
+                }
+            }
+        }
+        .onAppear {
+            if selectedGradientStopID == nil {
+                selectedGradientStopID = normalizedGradientMapSettings.stops.dropFirst().first?.id
+            }
+            store.send(.gradientMapPreviewChanged(normalizedGradientMapSettings))
+        }
+        .onChange(of: gradientMapSettings) { _, _ in
+            store.send(.gradientMapPreviewChanged(normalizedGradientMapSettings))
+        }
+        .onDisappear {
+            store.send(.gradientMapPreviewChanged(nil))
+        }
+        .presentationDetents([.height(620)])
+        .presentationDragIndicator(.visible)
+    }
+
     @ViewBuilder
     func adjustmentSlider(
         title: String,
@@ -433,6 +500,208 @@ extension ContentView {
             }
             Slider(value: value, in: range, step: step)
         }
+    }
+
+    @ViewBuilder
+    func gradientStopEditor(stop: Binding<GradientMapStopSettings>) -> some View {
+        let isEndpoint = isEndpointStop(id: stop.wrappedValue.id)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(gradientStopTitle(for: stop.wrappedValue.id))
+                    .font(.headline)
+                    .foregroundStyle(selectedGradientStopID == stop.wrappedValue.id ? StudioTheme.Palette.accentBright : .primary)
+
+                Spacer()
+
+                if !isEndpoint {
+                    Button(role: .destructive) {
+                        removeGradientStop(id: stop.wrappedValue.id)
+                    } label: {
+                        Text(language.localized("削除"))
+                    }
+                }
+            }
+
+            ColorPicker(
+                language.localized("色"),
+                selection: Binding(
+                    get: { color(from: stop.wrappedValue) },
+                    set: { newColor in
+                        apply(color: newColor, to: stop)
+                    }
+                ),
+                supportsOpacity: false
+            )
+
+            if !isEndpoint {
+                adjustmentSlider(
+                    title: language.localized("位置"),
+                    valueText: String(format: "%.2f", stop.wrappedValue.position),
+                    value: stop.position,
+                    range: 0.05...0.95
+                )
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedGradientStopID = stop.wrappedValue.id
+        }
+    }
+
+    var gradientPreviewBar: some View {
+        let normalizedSettings = normalizedGradientMapSettings
+        let stops = normalizedSettings.stops
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(language.localized("プレビュー"))
+                .font(.headline)
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    LinearGradient(
+                        stops: stops.map {
+                            .init(color: color(from: $0), location: $0.position)
+                        },
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .gesture(
+                        SpatialTapGesture()
+                            .onEnded { value in
+                                addGradientStop(at: value.location.x, width: proxy.size.width)
+                            }
+                    )
+
+                    ForEach(stops) { stop in
+                        Circle()
+                            .fill(color(from: stop))
+                            .frame(
+                                width: selectedGradientStopID == stop.id ? 18 : 14,
+                                height: selectedGradientStopID == stop.id ? 18 : 14
+                            )
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            .shadow(color: .black.opacity(0.18), radius: 4, y: 2)
+                            .position(
+                                x: proxy.size.width * stop.position,
+                                y: proxy.size.height / 2
+                            )
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { value in
+                                        selectedGradientStopID = stop.id
+                                        updateGradientStopPosition(
+                                            id: stop.id,
+                                            x: value.location.x,
+                                            width: proxy.size.width
+                                        )
+                                    }
+                            )
+                    }
+                }
+            }
+            .frame(height: 44)
+        }
+    }
+
+    var normalizedGradientMapSettings: GradientMapSettings {
+        AppFeature.normalizeGradientMapSettings(gradientMapSettings)
+    }
+
+    func gradientStopTitle(for id: GradientMapStopSettings.ID) -> String {
+        let normalizedStops = normalizedGradientMapSettings.stops
+        guard let index = normalizedStops.firstIndex(where: { $0.id == id }) else {
+            return language.localized("ポイント")
+        }
+        if index == 0 {
+            return StudioStrings.shadows(language)
+        }
+        if index == normalizedStops.count - 1 {
+            return StudioStrings.highlights(language)
+        }
+        return "\(language.localized("ポイント")) \(index)"
+    }
+
+    func isEndpointStop(id: GradientMapStopSettings.ID) -> Bool {
+        let normalizedStops = normalizedGradientMapSettings.stops
+        guard let index = normalizedStops.firstIndex(where: { $0.id == id }) else { return false }
+        return index == 0 || index == normalizedStops.count - 1
+    }
+
+    func addGradientStop() {
+        let normalized = normalizedGradientMapSettings.stops
+        guard let previous = normalized.dropLast().last,
+              let next = normalized.last else { return }
+        let midpoint = (previous.position + next.position) / 2
+        insertGradientStop(at: midpoint)
+    }
+
+    func addGradientStop(at x: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        let position = min(max(Double(x / width), 0.0), 1.0)
+        insertGradientStop(at: position)
+    }
+
+    func removeGradientStop(id: GradientMapStopSettings.ID) {
+        guard gradientMapSettings.stops.count > 2 else { return }
+        gradientMapSettings.stops.removeAll { $0.id == id }
+        if selectedGradientStopID == id {
+            selectedGradientStopID = normalizedGradientMapSettings.stops.dropFirst().first?.id
+        }
+    }
+
+    func insertGradientStop(at position: Double) {
+        guard gradientMapSettings.stops.count < 8 else { return }
+        let clampedPosition = min(max(position, 0.0), 1.0)
+        let mixed = AppFeature.mappedGradientColor(
+            for: clampedPosition,
+            stops: AppFeature.gradientMapStops(for: normalizedGradientMapSettings)
+        )
+        let newStop = GradientMapStopSettings(
+            position: clampedPosition,
+            red: mixed.red,
+            green: mixed.green,
+            blue: mixed.blue
+        )
+        gradientMapSettings.stops.append(newStop)
+        gradientMapSettings = normalizedGradientMapSettings
+        selectedGradientStopID = newStop.id
+    }
+
+    func updateGradientStopPosition(id: GradientMapStopSettings.ID, x: CGFloat, width: CGFloat) {
+        guard width > 0 else { return }
+        guard let index = gradientMapSettings.stops.firstIndex(where: { $0.id == id }) else { return }
+        guard !isEndpointStop(id: id) else { return }
+        gradientMapSettings.stops[index].position = min(max(Double(x / width), 0.0), 1.0)
+        gradientMapSettings = normalizedGradientMapSettings
+    }
+
+    func color(from stop: GradientMapStopSettings) -> Color {
+        Color(
+            red: Double(stop.red) / 255.0,
+            green: Double(stop.green) / 255.0,
+            blue: Double(stop.blue) / 255.0
+        )
+    }
+
+    func color(from stop: AppFeature.GradientMapStop) -> Color {
+        Color(
+            red: Double(stop.red) / 255.0,
+            green: Double(stop.green) / 255.0,
+            blue: Double(stop.blue) / 255.0
+        )
+    }
+
+    func apply(color: Color, to stop: Binding<GradientMapStopSettings>) {
+        let resolved = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        stop.wrappedValue.red = UInt8(min(max((red * 255.0).rounded(), 0), 255))
+        stop.wrappedValue.green = UInt8(min(max((green * 255.0).rounded(), 0), 255))
+        stop.wrappedValue.blue = UInt8(min(max((blue * 255.0).rounded(), 0), 255))
     }
 
     func parsedCanvasDimension(from text: String) -> Int? {
@@ -550,6 +819,13 @@ extension ContentView {
                     }
 
                     Menu(StudioStrings.gradientMap(language)) {
+                        Button(language.localized("カスタム…")) {
+                            gradientMapSettings = AppFeature.gradientMapSettings(for: .graphite)
+                            showsGradientMapSheet = true
+                        }
+
+                        Divider()
+
                         ForEach(GradientMapPreset.allCases) { preset in
                             Button(preset.localizedTitle(language)) {
                                 store.send(.gradientMapSelected(preset))

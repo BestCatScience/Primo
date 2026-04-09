@@ -322,6 +322,36 @@ struct PosterizeSettings: Equatable, Sendable {
     var levels: Double = 6
 }
 
+struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
+    let id: UUID
+    var position: Double
+    var red: UInt8
+    var green: UInt8
+    var blue: UInt8
+
+    init(
+        id: UUID = UUID(),
+        position: Double,
+        red: UInt8,
+        green: UInt8,
+        blue: UInt8
+    ) {
+        self.id = id
+        self.position = position
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+}
+
+struct GradientMapSettings: Equatable, Sendable {
+    var stops: [GradientMapStopSettings] = [
+        GradientMapStopSettings(position: 0.0, red: 17, green: 21, blue: 27),
+        GradientMapStopSettings(position: 0.5, red: 84, green: 93, blue: 108),
+        GradientMapStopSettings(position: 1.0, red: 243, green: 244, blue: 246)
+    ]
+}
+
 enum LayerProcessingRequest: Equatable, Sendable {
     case gradientMap(GradientMapPreset)
     case hueSaturationBrightness(HueSaturationBrightnessSettings)
