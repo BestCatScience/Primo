@@ -966,7 +966,7 @@ struct AppFeature {
                 if let update = paintDocumentClient.consumeDirtyUpdate() {
                     return .send(.canvas(.applyIncrementalUpdate(update)))
                 }
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                return .none
 
             case .canvas(.delegate(.endStroke)):
                 paintDocumentClient.endStroke()

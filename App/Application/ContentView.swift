@@ -5,7 +5,7 @@ import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
-    private let studioUIScale: CGFloat = 0.5
+    private let studioUIScale: CGFloat = 0.56
     @State var showsOpenDocumentImporter = false
     @State var showsNewCanvasSheet = false
     @State var showsHSBSheet = false

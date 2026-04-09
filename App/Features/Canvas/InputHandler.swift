@@ -274,8 +274,11 @@ final class InputHandler {
         let strength = max(0, min(strokeStabilization, 1))
         guard strength > 0.001 else { return candidate }
 
+        let movementDistance = simd_length(candidate.position - previous.position)
+        let speedBias = min(max(movementDistance / max(brushSize * 1.2, 6.0), 0), 1)
         let baseResponse = 1 - (strength * 0.82)
-        let response = isFinishingStroke ? max(baseResponse, 0.62) : max(baseResponse, 0.08)
+        let adaptiveResponse = baseResponse + ((1 - baseResponse) * speedBias * 0.72)
+        let response = isFinishingStroke ? max(adaptiveResponse, 0.62) : max(adaptiveResponse, 0.08)
 
         var smoothed = candidate
         smoothed.position = previous.position + ((candidate.position - previous.position) * response)
