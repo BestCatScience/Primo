@@ -720,7 +720,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.paperThreshold = brush.paperThreshold
         descriptor.paperStrength = brush.paperStrength
         descriptor.tiltInfluence = 0.75
-        descriptor.maxDarkness = 0.95
+        descriptor.maxDarkness = 1.0
         descriptor.pressureSensitivity = brush.pressureSensitivity
         descriptor.fillThresholdMode = brush.fillThresholdMode == .opacity ? 0 : 1
         descriptor.fillOpacityTolerance = brush.fillOpacityTolerance

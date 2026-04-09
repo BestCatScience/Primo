@@ -105,6 +105,9 @@ struct AppFeature {
 
         func resolvedBrushSettings() -> BrushRuntimeSettings {
             var settings = brushPalette.runtimeSettings
+            if settings.tipKind == .oil {
+                settings.stabilization = max(settings.stabilization, 0.34)
+            }
             if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
                 settings.isEraser = true
             }
@@ -112,15 +115,23 @@ struct AppFeature {
         }
 
         func previewStrokeStyle() -> PreviewStrokeStyle {
+            let resolvedRuntimeSettings: BrushRuntimeSettings = {
+                var settings = brushPalette.runtimeSettings
+                if settings.tipKind == .oil {
+                    settings.stabilization = max(settings.stabilization, 0.34)
+                }
+                return settings
+            }()
+
             if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
                 return PreviewStrokeStyle(
                     tipKind: .ink,
                     isEraser: true,
-                    radius: CGFloat(brushPalette.runtimeSettings.radius),
+                    radius: CGFloat(resolvedRuntimeSettings.radius),
                     opacity: 0.78,
                     hardness: 0.95,
-                    pressureSensitivity: CGFloat(brushPalette.runtimeSettings.pressureSensitivity),
-                    stabilization: CGFloat(brushPalette.runtimeSettings.stabilization),
+                    pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
+                    stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
                     color: CGColor(
                         red: 0.92,
                         green: 0.95,
@@ -131,17 +142,17 @@ struct AppFeature {
             }
 
             return PreviewStrokeStyle(
-                tipKind: brushPalette.runtimeSettings.tipKind,
+                tipKind: resolvedRuntimeSettings.tipKind,
                 isEraser: false,
-                radius: CGFloat(brushPalette.runtimeSettings.radius),
-                opacity: CGFloat(brushPalette.runtimeSettings.opacity),
-                hardness: CGFloat(brushPalette.runtimeSettings.hardness),
-                pressureSensitivity: CGFloat(brushPalette.runtimeSettings.pressureSensitivity),
-                stabilization: CGFloat(brushPalette.runtimeSettings.stabilization),
+                radius: CGFloat(resolvedRuntimeSettings.radius),
+                opacity: CGFloat(resolvedRuntimeSettings.opacity),
+                hardness: CGFloat(resolvedRuntimeSettings.hardness),
+                pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
+                stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
                 color: CGColor(
-                    red: CGFloat(brushPalette.runtimeSettings.red) / 255.0,
-                    green: CGFloat(brushPalette.runtimeSettings.green) / 255.0,
-                    blue: CGFloat(brushPalette.runtimeSettings.blue) / 255.0,
+                    red: CGFloat(resolvedRuntimeSettings.red) / 255.0,
+                    green: CGFloat(resolvedRuntimeSettings.green) / 255.0,
+                    blue: CGFloat(resolvedRuntimeSettings.blue) / 255.0,
                     alpha: 1.0
                 )
             )

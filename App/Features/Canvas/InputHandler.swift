@@ -21,6 +21,7 @@ final class InputHandler {
     var tool: StudioToolKind = .brush
     var selectionMode: SelectionToolMode = .lasso
     var eyedropperSamplingSource: EyedropperSamplingSource = .activeLayer
+    var brushTipKind: BrushTipKind = .pencil
     var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     var brushSize: Float = 4.0
     var strokeStabilization: Float = 0.0
@@ -243,7 +244,11 @@ final class InputHandler {
             let stabilizedDelta = candidate.position - previous.position
             let stabilizedDistance = simd_length(stabilizedDelta)
 
-            let interpolationSpacing = max(brushSize * 0.35, 1.5)
+            let interpolationSpacing = preferredInterpolationSpacing(
+                from: previous,
+                to: candidate,
+                distance: stabilizedDistance
+            )
             if stabilizedDistance > interpolationSpacing {
                 let steps = max(1, Int(ceil(stabilizedDistance / interpolationSpacing)))
                 for step in 1...steps {
@@ -315,6 +320,38 @@ final class InputHandler {
         }
 
         return false
+    }
+
+    private func preferredInterpolationSpacing(from previous: StrokePoint, to candidate: StrokePoint, distance: Float) -> Float {
+        var spacing = max(brushSize * 0.35, 1.5)
+
+        if brushTipKind == .oil {
+            spacing = max(brushSize * 0.18, 0.9)
+        }
+
+        guard distance > 0.001 else { return spacing }
+
+        let angleFactor = turnSharpness(from: previous, to: candidate)
+        if angleFactor > 0.45 {
+            spacing *= brushTipKind == .oil ? 0.45 : 0.6
+        }
+
+        return max(spacing, 0.5)
+    }
+
+    private func turnSharpness(from previous: StrokePoint, to candidate: StrokePoint) -> Float {
+        guard let stroke = currentStroke, stroke.points.count >= 2 else { return 0 }
+        let beforePrevious = stroke.points[stroke.points.count - 2]
+        let previousDelta = previous.position - beforePrevious.position
+        let currentDelta = candidate.position - previous.position
+        let previousLength = simd_length(previousDelta)
+        let currentLength = simd_length(currentDelta)
+        guard previousLength > 0.001, currentLength > 0.001 else { return 0 }
+
+        let normalizedPrevious = previousDelta / previousLength
+        let normalizedCurrent = currentDelta / currentLength
+        let alignment = simd_dot(normalizedPrevious, normalizedCurrent)
+        return max(0, 1 - alignment)
     }
 
     private func interpolatedPoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {
