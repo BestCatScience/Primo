@@ -32,6 +32,29 @@ enum StudioPanelKind: String, CaseIterable, Equatable {
     }
 }
 
+enum HomeSidebarSection: String, CaseIterable, Equatable {
+    case home
+    case learn
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .home:
+            return language.localized("ホーム")
+        case .learn:
+            return language.localized("学ぶ")
+        }
+    }
+
+    var iconSystemName: String {
+        switch self {
+        case .home:
+            return "house.fill"
+        case .learn:
+            return "lightbulb"
+        }
+    }
+}
+
 struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
 }
@@ -48,6 +71,10 @@ struct AppFeature {
     @ObservableState
     struct State: Equatable {
         var isHydrating = true
+        var showsHome = true
+        var homeSection: HomeSidebarSection = .home
+        var homeProjects: [SavedProjectSummary] = []
+        var isLoadingHomeProjects = true
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
         var canvas = CanvasFeature.State()
@@ -215,6 +242,11 @@ struct AppFeature {
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch
+        case homeProjectsLoadRequested
+        case homeProjectsLoaded([SavedProjectSummary])
+        case homeSectionSelected(HomeSidebarSection)
+        case homeProjectSelected(URL)
+        case homeReturnRequested
         case deferredPresentationRefresh
         case refreshPresentationRequested
         case newCanvasRequested(width: Int, height: Int)
@@ -278,21 +310,26 @@ struct AppFeature {
             switch action {
             case .task:
                 state.isHydrating = true
+                state.showsHome = true
+                state.isLoadingHomeProjects = true
                 state.appLanguage = .load()
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 Self.startupLogger.debug("AppFeature.task started")
-                return .run { [paintDocumentClient] send in
-                    let startupClock = ContinuousClock()
-                    let bootstrapStart = startupClock.now
+                return .merge(
+                    .run { [paintDocumentClient] send in
+                        let startupClock = ContinuousClock()
+                        let bootstrapStart = startupClock.now
 
-                    Self.startupLogger.debug("Loading lightweight presentation")
-                    let lightweightPresentation = paintDocumentClient.lightweightPresentation()
-                    let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
-                    Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
-                    await send(.bootstrapPresentationLoaded(lightweightPresentation))
-                    paintDocumentClient.prewarmDrawingResources()
-                    await send(.loadPresentationAfterLaunch)
-                }
+                        Self.startupLogger.debug("Loading lightweight presentation")
+                        let lightweightPresentation = paintDocumentClient.lightweightPresentation()
+                        let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
+                        Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
+                        await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                        paintDocumentClient.prewarmDrawingResources()
+                        await send(.loadPresentationAfterLaunch)
+                    },
+                    .send(.homeProjectsLoadRequested)
+                )
 
             case let .bootstrapPresentationLoaded(presentation):
                 state.applyPresentation(presentation)
@@ -313,6 +350,27 @@ struct AppFeature {
                     await send(.presentationLoaded(presentation))
                 }
                 .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
+
+            case .homeProjectsLoadRequested:
+                state.isLoadingHomeProjects = true
+                return .run { send in
+                    let projects = (try? Self.savedProjects()) ?? []
+                    await send(.homeProjectsLoaded(projects))
+                }
+
+            case let .homeProjectsLoaded(projects):
+                state.homeProjects = projects
+                state.isLoadingHomeProjects = false
+                return .none
+
+            case let .homeSectionSelected(section):
+                state.homeSection = section
+                return .none
+
+            case .homeReturnRequested:
+                state.showsHome = true
+                state.homeSection = .home
+                return .send(.homeProjectsLoadRequested)
 
             case let .presentationLoaded(presentation):
                 state.applyPresentation(presentation)
@@ -340,6 +398,7 @@ struct AppFeature {
                 let height = max(height, 1)
                 paintDocumentClient.newCanvas(width, height)
                 paintDocumentClient.prewarmDrawingResources()
+                state.showsHome = false
                 state.canvas = CanvasFeature.State()
                 state.canvas.canvasSize = CGSize(width: width, height: height)
                 state.layerSidebar = LayerSidebarFeature.State()
@@ -669,7 +728,7 @@ struct AppFeature {
                 } catch {
                     state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
                 }
-                return .none
+                return .send(.homeProjectsLoadRequested)
 
             case .exportTimelapseRequested:
                 guard let capture = paintDocumentClient.timelapseCapture() else {
@@ -730,6 +789,17 @@ struct AppFeature {
                     try? FileManager.default.removeItem(at: url)
                 }
 
+            case let .homeProjectSelected(url):
+                state.isHydrating = true
+                return .run { [paintDocumentClient] send in
+                    do {
+                        let loaded = try paintDocumentClient.loadProject(url)
+                        await send(.openDocumentLoaded(loaded))
+                    } catch {
+                        await send(.openDocumentFailed(error.localizedDescription))
+                    }
+                }
+
             case let .openDocumentLoaded(loaded):
                 state.brushPalette.paper.color = Color(
                     red: Double(loaded.paperStyle.red),
@@ -745,6 +815,7 @@ struct AppFeature {
                 state.canvas.adjustmentPreviewPixelData = nil
                 state.applyPresentation(loaded.presentation)
                 state.isHydrating = false
+                state.showsHome = false
                 state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
                 return .none
 

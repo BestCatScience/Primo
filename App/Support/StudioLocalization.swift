@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
@@ -383,6 +384,54 @@ enum StudioStrings {
     static func height(_ language: AppLanguage) -> String { language.localized("高さ") }
     static func cancel(_ language: AppLanguage) -> String { language.localized("キャンセル") }
     static func create(_ language: AppLanguage) -> String { language.localized("作成") }
+    static func homeProjectsTitle(_ language: AppLanguage) -> String {
+        localized(language, english: "Projects", japanese: "プロジェクト")
+    }
+    static func homeProjectsSubtitle(_ language: AppLanguage) -> String {
+        localized(language, english: "Continue from your saved canvases or start a fresh composition.", japanese: "保存済みのキャンバスを続きから開くか、新しい作品を始められます。")
+    }
+    static func homeSettingsTitle(_ language: AppLanguage) -> String {
+        localized(language, english: "Preferences", japanese: "設定")
+    }
+    static func homeSettingsSubtitle(_ language: AppLanguage) -> String {
+        localized(language, english: "Adjust the app language and review your workspace.", japanese: "アプリ言語や作業環境の状態を確認できます。")
+    }
+    static func recentProjects(_ language: AppLanguage) -> String {
+        localized(language, english: "Recent Projects", japanese: "最近のプロジェクト")
+    }
+    static func noProjectsTitle(_ language: AppLanguage) -> String {
+        localized(language, english: "No saved projects yet", japanese: "保存済みプロジェクトはまだありません")
+    }
+    static func noProjectsMessage(_ language: AppLanguage) -> String {
+        localized(language, english: "Create your first canvas and it will appear here.", japanese: "最初のキャンバスを作成すると、ここに表示されます。")
+    }
+    static func createCanvasCTA(_ language: AppLanguage) -> String {
+        localized(language, english: "Create Canvas", japanese: "キャンバスを作成")
+    }
+    static func openFileCTA(_ language: AppLanguage) -> String {
+        localized(language, english: "Open File", japanese: "ファイルを開く")
+    }
+    static func appLanguageTitle(_ language: AppLanguage) -> String {
+        localized(language, english: "App Language", japanese: "アプリの言語")
+    }
+    static func storageSummary(_ count: Int, _ language: AppLanguage) -> String {
+        localized(language, english: "\(count) saved projects in local storage", japanese: "ローカル保存済みプロジェクト \(count) 件")
+    }
+    static func canvasSizeValue(_ size: CGSize, _ language: AppLanguage) -> String {
+        localized(
+            language,
+            english: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px",
+            japanese: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px"
+        )
+    }
+    static func updatedAt(_ date: Date, _ language: AppLanguage) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = language == .english ? Locale(identifier: "en_US_POSIX") : Locale(identifier: "ja_JP")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        let value = formatter.string(from: date)
+        return localized(language, english: "Updated \(value)", japanese: "更新 \(value)")
+    }
 
     static func layers(_ count: Int, _ language: AppLanguage) -> String {
         localized(language, english: "\(count) Layers", japanese: "\(count) レイヤー")

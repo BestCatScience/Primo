@@ -901,6 +901,36 @@ extension AppFeature {
         try appProjectsDirectory().appendingPathComponent(projectFilename(), isDirectory: true)
     }
 
+    static func savedProjects() throws -> [SavedProjectSummary] {
+        let fileManager = FileManager.default
+        let directory = try appProjectsDirectory()
+        let urls = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        return try urls
+            .filter { url in
+                (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            }
+            .map { url -> SavedProjectSummary in
+                let loaded = try PaintDocumentSession.loadProject(from: url)
+                let presentation = loaded.presentation()
+                let previewData = loaded.compositePNGData(paperStyle: loaded.currentPaperStyle)
+                let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                return SavedProjectSummary(
+                    url: url,
+                    name: url.deletingPathExtension().lastPathComponent,
+                    modifiedAt: values?.contentModificationDate ?? .distantPast,
+                    canvasSize: presentation.canvasSize,
+                    layerCount: presentation.layerRows.count,
+                    previewImageData: previewData
+                )
+            }
+            .sorted { $0.modifiedAt > $1.modifiedAt }
+    }
+
     static func exportFilename() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

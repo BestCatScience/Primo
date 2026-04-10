@@ -31,7 +31,11 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            scaledStudioInterface(in: proxy.size)
+            if store.showsHome {
+                homeDashboard
+            } else {
+                scaledStudioInterface(in: proxy.size)
+            }
         }
         .ignoresSafeArea(edges: [.horizontal, .bottom])
         .task {

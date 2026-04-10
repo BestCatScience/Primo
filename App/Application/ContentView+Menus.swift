@@ -712,6 +712,29 @@ extension ContentView {
 
     var menuBar: some View {
         HStack(spacing: 8) {
+            Button {
+                store.send(.homeReturnRequested)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text(language.localized("ホーム"))
+                        .font(StudioTheme.Typography.label(9))
+                }
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(StudioTheme.Palette.accent.opacity(0.18))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(StudioTheme.Palette.accentSoft.opacity(0.4), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+
             HStack(spacing: 6) {
                 Circle()
                     .fill(StudioTheme.Palette.accent)

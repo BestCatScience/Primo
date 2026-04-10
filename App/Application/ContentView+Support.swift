@@ -185,6 +185,358 @@ struct DiagonalStageLines: View {
     }
 }
 
+extension ContentView {
+    var homeDashboard: some View {
+        ZStack {
+            homeBackground
+
+            VStack(spacing: 0) {
+                homeTopBar
+
+                HStack(spacing: 0) {
+                    homeSidebar
+                    homePrimaryPane
+                }
+            }
+        }
+    }
+
+    private var homeBackground: some View {
+        Color(red: 0.17, green: 0.17, blue: 0.17)
+        .ignoresSafeArea()
+    }
+
+    private var homeTopBar: some View {
+        HStack(spacing: 14) {
+            Text("AtelierPrime")
+                .font(StudioTheme.Typography.title(18))
+                .foregroundStyle(.white.opacity(0.88))
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(Color(red: 0.20, green: 0.20, blue: 0.20))
+    }
+
+    private var homeSidebar: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(spacing: 8) {
+                ForEach(HomeSidebarSection.allCases, id: \.self) { section in
+                    homeSidebarButton(for: section)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(language.localized("ファイル"))
+                    .font(StudioTheme.Typography.label(14))
+                    .foregroundStyle(Color.white.opacity(0.42))
+
+                homeFileActionRow(
+                    systemName: "doc.fill",
+                    title: language.localized("自分のファイル"),
+                    action: {}
+                )
+                homeFileActionRow(
+                    systemName: "person.2.fill",
+                    title: language.localized("共有されたアイテム"),
+                    action: {}
+                )
+                homeFileActionRow(
+                    systemName: "trash.fill",
+                    title: language.localized("削除済み"),
+                    action: {}
+                )
+            }
+
+            Spacer(minLength: 0)
+
+            Divider()
+                .overlay(Color.white.opacity(0.10))
+
+            VStack(alignment: .leading, spacing: 14) {
+                homeFooterAction(
+                    systemName: "plus.circle.fill",
+                    title: language.localized("新規作成"),
+                    tint: Color(red: 0.24, green: 0.53, blue: 0.98)
+                ) {
+                    newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+                    newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    showsNewCanvasSheet = true
+                }
+
+                homeFooterAction(
+                    systemName: "rectangle.portrait.and.arrow.right",
+                    title: language.localized("読み込み／開く"),
+                    tint: Color.white.opacity(0.68)
+                ) {
+                    showsOpenDocumentImporter = true
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 18)
+        .padding(.bottom, 20)
+        .frame(width: 236)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color(red: 0.14, green: 0.14, blue: 0.14))
+    }
+
+    private func homeSidebarButton(for section: HomeSidebarSection) -> some View {
+        let isSelected = store.homeSection == section
+
+        return Button {
+            store.send(.homeSectionSelected(section))
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: section.iconSystemName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 24)
+
+                Text(section.title(language))
+                    .font(StudioTheme.Typography.title(16))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(isSelected ? .white : Color.white.opacity(0.72))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(isSelected ? Color.white.opacity(0.12) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func homeFileActionRow(systemName: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 18)
+                Text(title)
+                    .font(StudioTheme.Typography.title(15))
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Color.white.opacity(0.80))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func homeFooterAction(
+        systemName: String,
+        title: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(StudioTheme.Typography.title(17))
+                    .foregroundStyle(Color.white.opacity(0.86))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var homePrimaryPane: some View {
+        switch store.homeSection {
+        case .home:
+            homeCanvasPane
+        case .learn:
+            homeSettingsPane
+        }
+    }
+
+    private var homeCanvasPane: some View {
+        Group {
+            if store.isLoadingHomeProjects {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(.white.opacity(0.8))
+                        .controlSize(.large)
+                    Spacer()
+                }
+            } else if store.homeProjects.isEmpty {
+                homeEmptyProjectsView
+            } else {
+                ScrollView {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 18)],
+                        spacing: 18
+                    ) {
+                        ForEach(store.homeProjects) { project in
+                            homeProjectCard(project)
+                        }
+                    }
+                    .padding(14)
+                }
+            }
+        }
+        .background(Color(red: 0.20, green: 0.20, blue: 0.20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var homeSettingsPane: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(language.localized("学ぶ"))
+                    .font(StudioTheme.Typography.display(28))
+                    .foregroundStyle(.white.opacity(0.92))
+
+                learnPanel(
+                    title: language.localized("最近の制作をすぐ再開"),
+                    detail: language.localized("ホームでは保存済みの作品、クラウド状態、新規作成と読み込みをすばやく操作できます。")
+                )
+                learnPanel(
+                    title: StudioStrings.appLanguageTitle(language),
+                    detail: "\(language.title) / \(StudioStrings.storageSummary(store.homeProjects.count, language))"
+                )
+
+                Picker(StudioStrings.appLanguageTitle(language), selection: Binding(
+                    get: { store.appLanguage },
+                    set: { store.send(.languageChanged($0)) }
+                )) {
+                    ForEach(AppLanguage.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .colorScheme(.dark)
+            }
+            .padding(18)
+        }
+        .background(Color(red: 0.20, green: 0.20, blue: 0.20))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func learnPanel(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(StudioTheme.Typography.title(20))
+                .foregroundStyle(.white.opacity(0.92))
+            Text(detail)
+                .font(StudioTheme.Typography.body(15))
+                .foregroundStyle(Color.white.opacity(0.64))
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.white.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.horizontal, 2)
+        .padding(.vertical, 2)
+    }
+
+    private var homeEmptyProjectsView: some View {
+        VStack(spacing: 16) {
+            Spacer(minLength: 0)
+
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 42, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.42))
+
+            Text(StudioStrings.noProjectsTitle(language))
+                .font(StudioTheme.Typography.title(24))
+                .foregroundStyle(Color.white.opacity(0.88))
+
+            Text(StudioStrings.noProjectsMessage(language))
+                .font(StudioTheme.Typography.body(16))
+                .foregroundStyle(Color.white.opacity(0.56))
+
+            Button(StudioStrings.createCanvasCTA(language)) {
+                newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+                newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                showsNewCanvasSheet = true
+            }
+            .font(StudioTheme.Typography.title(16))
+            .padding(.horizontal, 22)
+            .padding(.vertical, 12)
+            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func homeProjectCard(_ project: SavedProjectSummary) -> some View {
+        Button {
+            store.send(.homeProjectSelected(project.url))
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                Group {
+                    if let data = project.previewImageData, let image = UIImage(data: data) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .interpolation(.medium)
+                            .scaledToFit()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.white)
+                    } else {
+                        ZStack {
+                            Color.white
+
+                            Image(systemName: "scribble")
+                                .font(.system(size: 34, weight: .regular))
+                                .foregroundStyle(Color(red: 0.60, green: 0.63, blue: 0.70))
+                        }
+                    }
+                }
+                .frame(height: 180)
+                .frame(maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
+                .overlay(alignment: .bottomTrailing) {
+                    Circle()
+                        .fill(Color(red: 0.40, green: 0.40, blue: 0.40))
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Image(systemName: "cloud.fill")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.92))
+                        )
+                        .padding(6)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(project.name)
+                            .font(StudioTheme.Typography.title(18))
+                            .foregroundStyle(Color.white.opacity(0.92))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Image(systemName: "ellipsis")
+                            .foregroundStyle(Color.white.opacity(0.54))
+                    }
+
+                    Text(StudioStrings.updatedAt(project.modifiedAt, language).replacingOccurrences(of: "更新 ", with: "").replacingOccurrences(of: "Updated ", with: ""))
+                        .font(StudioTheme.Typography.body(12))
+                        .foregroundStyle(Color.white.opacity(0.58))
+                        .lineLimit(2)
+                }
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color(red: 0.22, green: 0.22, blue: 0.22))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .move, .shape]
 
 struct StudioPanelShell<Content: View>: View {
