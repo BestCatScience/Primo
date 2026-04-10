@@ -53,6 +53,8 @@
 		A000000000000000000000B0 /* BrushPaletteView+Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B1 /* BrushPaletteView+Components.swift */; };
 		A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B3 /* LayerSidebarView+Rows.swift */; };
 		A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B5 /* LayerSidebarView+Support.swift */; };
+		A000000000000000000000B6 /* NanoBananaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B7 /* NanoBananaClient.swift */; };
+		A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B9 /* NanoBananaCommerce.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -106,6 +108,8 @@
 		A000000000000000000000B1 /* BrushPaletteView+Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Components.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B3 /* LayerSidebarView+Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Rows.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B5 /* LayerSidebarView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Support.swift"; sourceTree = "<group>"; };
+		A000000000000000000000B7 /* NanoBananaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaClient.swift; sourceTree = "<group>"; };
+		A000000000000000000000B9 /* NanoBananaCommerce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaCommerce.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -284,6 +288,8 @@
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
+				A000000000000000000000B7 /* NanoBananaClient.swift */,
+				A000000000000000000000B9 /* NanoBananaCommerce.swift */,
 				A000000000000000000000A7 /* TimelapseExporter.swift */,
 				A00000000000000000000019 /* BrushPaletteFeature.swift */,
 				A0000000000000000000001A /* LayerSidebarFeature.swift */,
@@ -404,6 +410,8 @@
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
+				A000000000000000000000B6 /* NanoBananaClient.swift in Sources */,
+				A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
 				A00000000000000000000028 /* PaintDocumentBridge.mm in Sources */,

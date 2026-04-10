@@ -70,5 +70,7 @@
     <string>UIInterfaceOrientationLandscapeLeft</string>
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
+  <key>NanoBananaProxyEndpoint</key>
+  <string>http://192.168.1.11:8787/nanobanana/edit</string>
 </dict>
 </plist>

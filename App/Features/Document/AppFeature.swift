@@ -18,6 +18,22 @@ struct TimelapseExportPreview: Equatable {
     var previewImageData: Data?
 }
 
+enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case replaceCurrentLayer
+    case newLayer
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .replaceCurrentLayer:
+            return language.localized("Replace Current Layer")
+        case .newLayer:
+            return language.localized("Generate Into New Layer")
+        }
+    }
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -62,10 +78,35 @@ struct StudioPanelLayoutState: Equatable {
 @Reducer
 struct AppFeature {
     private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
+
+    static func localizedNanoBananaErrorMessage(_ message: String, language: AppLanguage) -> String {
+        let normalized = message.lowercased()
+        if normalized.contains("quota exceeded") || normalized.contains("rate limit") {
+            switch language {
+            case .english:
+                return "Nano Banana is currently over the API quota for this model. Try again later, switch to Nano Banana, or use the app subscription route."
+            case .japanese:
+                return "このモデルは現在 API 利用上限に達しています。時間をおいて再試行するか、Nano Banana へ切り替えるか、アプリ課金プラン経由を使ってください。"
+            }
+        }
+        if normalized.contains("high demand") || normalized.contains("please try again later") {
+            switch language {
+            case .english:
+                return "Nano Banana is currently experiencing high demand. The app retried with alternate models, but no model was available right now. Please try again in a little while."
+            case .japanese:
+                return "Nano Banana は現在混雑しています。アプリ側で別モデルにも自動フォールバックしましたが、今は利用できませんでした。少し時間をおいて再試行してください。"
+            }
+        }
+        return message
+    }
+
     private enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
         case timelapseExport
+        case nanoBananaEdit
+        case nanoBananaProgress
+        case nanoBananaHUDDismiss
     }
 
     @ObservableState
@@ -83,6 +124,9 @@ struct AppFeature {
         var exportSheet: ShareExport?
         var bannerMessage: String?
         var timelapseExportPreview: TimelapseExportPreview?
+        var isNanoBananaGenerating = false
+        var nanoBananaProgress: Double?
+        var pendingNanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
         var appLanguage: AppLanguage = .load()
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
@@ -255,6 +299,18 @@ struct AppFeature {
         case saveDocumentRequested
         case exportDocumentRequested
         case exportTimelapseRequested
+        case nanoBananaEditRequested(
+            prompt: String,
+            config: NanoBananaRequestConfig,
+            model: NanoBananaModel,
+            inputLayerIndex: Int,
+            outputMode: NanoBananaOutputMode
+        )
+        case nanoBananaEditSucceeded(Int, Data)
+        case nanoBananaEditFailed(String)
+        case nanoBananaProgressUpdated(Double)
+        case nanoBananaCancelRequested
+        case nanoBananaHUDDismissed
         case openDocumentSelected(URL)
         case openDocumentLoaded(LoadedPaintProject)
         case openDocumentFailed(String)
@@ -294,6 +350,7 @@ struct AppFeature {
     }
 
     @Dependency(\.paintDocumentClient) var paintDocumentClient
+    @Dependency(\.nanoBananaClient) var nanoBananaClient
 
     var body: some ReducerOf<Self> {
         Scope(state: \.brushPalette, action: \.brushPalette) {
@@ -754,6 +811,144 @@ struct AppFeature {
                     }
                 }
                 .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
+
+            case let .nanoBananaEditRequested(prompt, config, model, inputLayerIndex, outputMode):
+                let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedCredential = config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedEndpoint = config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedPrompt.isEmpty else {
+                    state.bannerMessage = state.appLanguage.localized("Enter a prompt for Nano Banana")
+                    return .none
+                }
+                guard
+                    config.accessMode == .appManaged ||
+                    !trimmedCredential.isEmpty
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Enter your Gemini API key")
+                    return .none
+                }
+                guard
+                    config.accessMode == .userAPIKey ||
+                    !trimmedEndpoint.isEmpty
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Enter your app server endpoint")
+                    return .none
+                }
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == inputLayerIndex }),
+                    let inputPNGData = Self.pngData(
+                        fromLayerPixelData: layer.pixelData,
+                        width: snapshot.width,
+                        height: snapshot.height
+                    )
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not prepare the active layer for Nano Banana")
+                    return .none
+                }
+
+                let outputLayerIndex = state.canvas.activeLayerIndex
+                let canvasWidth = snapshot.width
+                let canvasHeight = snapshot.height
+                let appLanguage = state.appLanguage
+                state.isNanoBananaGenerating = true
+                state.nanoBananaProgress = 0.04
+                state.pendingNanoBananaOutputMode = outputMode
+
+                return .merge(
+                    .run { send in
+                        var progress = 0.04
+                        while !Task.isCancelled {
+                            try? await Task.sleep(for: .milliseconds(120))
+                            guard !Task.isCancelled else { break }
+                            progress += max(0.006, (0.94 - progress) * 0.08)
+                            await send(.nanoBananaProgressUpdated(min(progress, 0.94)))
+                        }
+                    }
+                    .cancellable(id: CancelID.nanoBananaProgress, cancelInFlight: true),
+                    .run { [nanoBananaClient] send in
+                        do {
+                            let normalizedConfig = NanoBananaRequestConfig(
+                                accessMode: config.accessMode,
+                                credential: trimmedCredential,
+                                endpoint: trimmedEndpoint
+                            )
+                            let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, trimmedPrompt, normalizedConfig, model)
+                            guard let rawPixelData = Self.rawLayerPixelData(
+                                fromPNGData: outputPNGData,
+                                width: canvasWidth,
+                                height: canvasHeight
+                            ) else {
+                                await send(.nanoBananaEditFailed("Nano Banana returned an unsupported image."))
+                                return
+                            }
+                            await send(.nanoBananaEditSucceeded(outputLayerIndex, rawPixelData))
+                        } catch {
+                            await send(.nanoBananaEditFailed(Self.localizedNanoBananaErrorMessage(error.localizedDescription, language: appLanguage)))
+                        }
+                    }
+                    .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
+                )
+
+            case let .nanoBananaEditSucceeded(layerIndex, pixelData):
+                state.isNanoBananaGenerating = false
+                state.nanoBananaProgress = 1
+                let targetLayerIndex: Int
+                switch state.pendingNanoBananaOutputMode {
+                case .replaceCurrentLayer:
+                    targetLayerIndex = layerIndex
+                case .newLayer:
+                    paintDocumentClient.addLayer("Nano Banana \(state.layerSidebar.layers.count + 1)")
+                    let presentation = paintDocumentClient.presentation()
+                    targetLayerIndex = presentation.activeLayerIndex
+                }
+                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
+                paintDocumentClient.setActiveLayer(targetLayerIndex)
+                paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
+                return .merge(
+                    .cancel(id: CancelID.nanoBananaProgress),
+                    .run { send in
+                        try? await Task.sleep(for: .milliseconds(480))
+                        await send(.nanoBananaHUDDismissed)
+                    }
+                    .cancellable(id: CancelID.nanoBananaHUDDismiss, cancelInFlight: true)
+                )
+
+            case let .nanoBananaEditFailed(message):
+                state.isNanoBananaGenerating = false
+                state.nanoBananaProgress = nil
+                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
+                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Nano Banana edit failed") : message
+                return .merge(
+                    .cancel(id: CancelID.nanoBananaProgress),
+                    .cancel(id: CancelID.nanoBananaHUDDismiss)
+                )
+
+            case let .nanoBananaProgressUpdated(progress):
+                guard state.isNanoBananaGenerating else { return .none }
+                state.nanoBananaProgress = progress
+                return .none
+
+            case .nanoBananaCancelRequested:
+                state.isNanoBananaGenerating = false
+                state.nanoBananaProgress = nil
+                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
+                state.bannerMessage = state.appLanguage.localized("Nano Banana generation canceled")
+                return .merge(
+                    .cancel(id: CancelID.nanoBananaEdit),
+                    .cancel(id: CancelID.nanoBananaProgress),
+                    .cancel(id: CancelID.nanoBananaHUDDismiss)
+                )
+
+            case .nanoBananaHUDDismissed:
+                state.nanoBananaProgress = nil
+                return .none
 
             case let .timelapseExportProgressUpdated(progress, previewData):
                 state.timelapseExportPreview = TimelapseExportPreview(progress: progress, previewImageData: previewData ?? state.timelapseExportPreview?.previewImageData)

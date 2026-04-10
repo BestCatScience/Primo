@@ -2,6 +2,7 @@ import ComposableArchitecture
 import CoreGraphics
 import Foundation
 import SwiftUI
+import UIKit
 
 extension AppFeature {
     struct GradientMapStop {
@@ -936,6 +937,53 @@ extension AppFeature {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return "atelierprime-\(formatter.string(from: Date())).png"
+    }
+
+    static func pngData(fromLayerPixelData pixelData: Data, width: Int, height: Int) -> Data? {
+        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
+        guard let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+        return UIImage(cgImage: image).pngData()
+    }
+
+    static func rawLayerPixelData(fromPNGData pngData: Data, width: Int, height: Int) -> Data? {
+        guard width > 0, height > 0, let image = UIImage(data: pngData)?.cgImage else { return nil }
+
+        let bytesPerRow = width * 4
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        guard let context = CGContext(
+            data: &buffer,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+
+        context.interpolationQuality = .high
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return Data(buffer)
     }
 
     static func projectFilename() -> String {

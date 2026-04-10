@@ -162,6 +162,38 @@ enum StudioStrings {
         "Move": "移動",
         "Move the active layer with Pencil. Nothing is committed until you apply.": "Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。",
         "Move the selected area with Pencil. Nothing is committed until you apply.": "Apple Pencil で選択範囲を移動します。適用するまで確定されません。",
+        "Nano Banana": "Nano Banana",
+        "Nano Banana Edit": "Nano Banana で編集",
+        "Edit the active layer with Nano Banana": "Nano Banana でアクティブレイヤーを編集",
+        "Prompt": "プロンプト",
+        "Describe how Nano Banana should edit the active layer": "Nano Banana にどう編集させたいか入力してください",
+        "Gemini API Key": "Gemini API キー",
+        "Saved locally on this device": "この端末内に保存されます",
+        "Generate": "生成",
+        "Generating with Nano Banana": "Nano Banana で生成中",
+        "Nano Banana generation canceled": "Nano Banana の生成をキャンセルしました",
+        "Access": "接続方式",
+        "User API Key": "ユーザー API キー",
+        "App Subscription": "アプリ課金プラン",
+        "Status": "状態",
+        "Active": "有効",
+        "Inactive": "未購入",
+        "Plan": "プラン",
+        "Purchase Subscription": "サブスクリプションを購入",
+        "Restore Purchases": "購入を復元",
+        "Input Layer": "入力レイヤー",
+        "Output": "出力",
+        "Output Target": "出力先",
+        "Replace Current Layer": "現在のレイヤーを置き換え",
+        "Generate Into New Layer": "新規レイヤーに生成",
+        "Model": "モデル",
+        "Use your own backend to inject the provider API key and verify entitlements": "自社バックエンドでプロバイダ API キー注入と購入権限チェックを行う想定です",
+        "Enter a prompt for Nano Banana": "Nano Banana 用のプロンプトを入力してください",
+        "Enter your Gemini API key": "Gemini API キーを入力してください",
+        "Enter your app server endpoint": "アプリサーバーのエンドポイントを入力してください",
+        "Could not prepare the active layer for Nano Banana": "Nano Banana 用にアクティブレイヤーを準備できませんでした",
+        "Nano Banana edit applied": "Nano Banana の編集結果を適用しました",
+        "Nano Banana edit failed": "Nano Banana の編集に失敗しました",
         "Moving": "移動",
         "Multiply": "乗算",
         "No presets yet.": "まだプリセットがありません。",
@@ -283,7 +315,6 @@ enum StudioStrings {
         "Height": "高さ",
         "Create": "作成",
         "Hidden": "非表示",
-        "Active": "選択中",
         "Standby": "待機",
         "Exporting timelapse...": "タイムラプスを書き出し中…",
         "Pressure": "筆圧",
@@ -340,6 +371,8 @@ enum StudioStrings {
     static func thresholdAdjustment(_ language: AppLanguage) -> String { language.localized("2値化") }
     static func posterize(_ language: AppLanguage) -> String { language.localized("階調化") }
     static func gradientMap(_ language: AppLanguage) -> String { language.localized("グラデーションマップ") }
+    static func nanoBanana(_ language: AppLanguage) -> String { language.localized("Nano Banana") }
+    static func nanoBananaEdit(_ language: AppLanguage) -> String { language.localized("Nano Banana で編集") }
     static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
     static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
     static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }

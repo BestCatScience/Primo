@@ -54,6 +54,76 @@ struct TimelapseExportHUD: View {
     }
 }
 
+struct NanoBananaProgressHUD: View {
+    let previewImageData: Data?
+    let progress: Double
+    let language: AppLanguage
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let image = previewImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .frame(width: 220, height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(language.localized("Generating with Nano Banana"))
+                    .font(StudioTheme.Typography.title(16))
+                    .foregroundStyle(.white.opacity(0.94))
+
+                ProgressView(value: progress, total: 1.0)
+                    .tint(StudioTheme.Palette.accentBright)
+
+                Text("\(Int((progress * 100).rounded()))%")
+                    .font(StudioTheme.Typography.mono(11))
+                    .foregroundStyle(.white.opacity(0.62))
+
+                Button(action: onCancel) {
+                    Text(language.localized("Cancel"))
+                        .font(StudioTheme.Typography.label(13))
+                        .foregroundStyle(.white.opacity(0.94))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+            .frame(width: 220, alignment: .leading)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.3), radius: 24, y: 16)
+    }
+
+    private var previewImage: UIImage? {
+        guard let previewImageData else { return nil }
+        return UIImage(data: previewImageData)
+    }
+}
+
 struct MinimumHitTargetModifier: ViewModifier {
     let minSize: CGFloat
 

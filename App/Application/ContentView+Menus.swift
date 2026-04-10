@@ -483,6 +483,146 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var nanoBananaSheet: some View {
+        NavigationStack {
+            Form {
+                Section(StudioStrings.nanoBanana(language)) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(StudioStrings.nanoBananaEdit(language))
+                        Text(language.localized("Describe how Nano Banana should edit the active layer"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    TextField(language.localized("Prompt"), text: $nanoBananaPrompt, axis: .vertical)
+                        .lineLimit(4...8)
+                        .textInputAutocapitalization(.sentences)
+                }
+
+                Section(language.localized("入力")) {
+                    Picker(language.localized("Access"), selection: Binding(
+                        get: { nanoBananaAccessMode },
+                        set: { nanoBananaAccessMode = $0 }
+                    )) {
+                        ForEach(NanoBananaAccessMode.allCases) { mode in
+                            Text(mode.title(language)).tag(mode)
+                        }
+                    }
+
+                    Picker(language.localized("入力レイヤー"), selection: $nanoBananaInputLayerIndex) {
+                        ForEach(store.layerSidebar.layers) { layer in
+                            Text(layer.name).tag(layer.index)
+                        }
+                    }
+
+                    Picker(language.localized("モデル"), selection: $nanoBananaModel) {
+                        ForEach(NanoBananaModel.allCases) { model in
+                            Text(model.title(language)).tag(model)
+                        }
+                    }
+
+                    if nanoBananaAccessMode == .userAPIKey {
+                        SecureField(language.localized("Gemini API Key"), text: $nanoBananaAPIKey)
+                        Text(language.localized("Saved locally on this device"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        LabeledContent(language.localized("Status")) {
+                            Text(
+                                nanoBananaCommerce.isSubscriptionActive
+                                ? language.localized("Active")
+                                : language.localized("Inactive")
+                            )
+                            .foregroundStyle(nanoBananaCommerce.isSubscriptionActive ? .green : .secondary)
+                        }
+
+                        if let product = nanoBananaCommerce.primaryProduct {
+                            LabeledContent(language.localized("Plan")) {
+                                Text(product.displayPrice)
+                            }
+                        }
+
+                        Button(language.localized("Purchase Subscription")) {
+                            Task {
+                                await nanoBananaCommerce.purchasePrimaryProduct()
+                            }
+                        }
+                        .disabled(nanoBananaCommerce.isLoading || nanoBananaCommerce.isSubscriptionActive)
+
+                        Button(language.localized("Restore Purchases")) {
+                            Task {
+                                await nanoBananaCommerce.restorePurchases()
+                            }
+                        }
+                        .disabled(nanoBananaCommerce.isLoading)
+
+                        if let purchaseErrorMessage = nanoBananaCommerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
+                            Text(purchaseErrorMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Text(language.localized("Use your own backend to inject the provider API key and verify entitlements"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section(language.localized("出力")) {
+                    Picker(language.localized("出力先"), selection: $nanoBananaOutputMode) {
+                        ForEach(NanoBananaOutputMode.allCases) { mode in
+                            Text(mode.title(language)).tag(mode)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(StudioStrings.nanoBanana(language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsNanoBananaSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("Generate")) {
+                        store.send(
+                            .nanoBananaEditRequested(
+                                prompt: nanoBananaPrompt,
+                                config: NanoBananaRequestConfig(
+                                    accessMode: nanoBananaAccessMode,
+                                    credential: nanoBananaAccessMode == .userAPIKey ? nanoBananaAPIKey : nanoBananaCommerce.latestEntitlementJWS,
+                                    endpoint: nanoBananaCommerce.proxyEndpoint
+                                ),
+                                model: nanoBananaModel,
+                                inputLayerIndex: nanoBananaInputLayerIndex,
+                                outputMode: nanoBananaOutputMode
+                            )
+                        )
+                        showsNanoBananaSheet = false
+                    }
+                    .disabled(
+                        store.isNanoBananaGenerating ||
+                        store.layerSidebar.layers.isEmpty ||
+                        nanoBananaPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        (
+                            nanoBananaAccessMode == .userAPIKey
+                            ? nanoBananaAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            : (
+                                !nanoBananaCommerce.isSubscriptionActive ||
+                                nanoBananaCommerce.latestEntitlementJWS.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                                nanoBananaCommerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            )
+                        )
+                    )
+                }
+            }
+        }
+        .presentationDetents([.height(560)])
+        .presentationDragIndicator(.visible)
+    }
+
     @ViewBuilder
     func adjustmentSlider(
         title: String,
@@ -860,6 +1000,15 @@ extension ContentView {
                     }
                 }
                 .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+
+                Button(StudioStrings.nanoBananaEdit(language)) {
+                    nanoBananaPrompt = ""
+                    nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
+                    nanoBananaOutputMode = .replaceCurrentLayer
+                    nanoBananaModel = .flashImage25
+                    showsNanoBananaSheet = true
+                }
+                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || store.isNanoBananaGenerating)
 
                 Divider()
 

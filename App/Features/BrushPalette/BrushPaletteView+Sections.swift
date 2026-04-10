@@ -430,11 +430,14 @@ extension BrushPaletteView {
 
     var currentBrushPreviewStyle: BrushPreviewStyle {
         BrushPreviewStyle(
+            tipKind: store.brush.tipKind,
             color: currentDetailPreviewColor,
             radius: store.brush.radius,
             opacity: store.brush.opacity,
+            hardness: store.brush.hardness,
             roundness: store.brush.roundness,
             angle: store.brush.angle,
+            followsStrokeAngle: store.brush.angleMode == .strokeDirection,
             spacing: store.brush.spacing,
             scatterEnabled: store.brush.scatterEnabled,
             scatterMode: store.brush.scatterMode,
@@ -444,7 +447,11 @@ extension BrushPaletteView {
             countSizeJitter: store.brush.countSizeJitter,
             countOpacityJitter: store.brush.countOpacityJitter,
             textureStrength: store.brush.textureStrength,
-            flow: store.brush.flow
+            flow: store.brush.flow,
+            flowPressureSensitivity: store.brush.flowPressureSensitivity,
+            opacityPressureSensitivity: store.brush.opacityPressureSensitivity,
+            pressureSensitivity: store.brush.pressureSensitivity,
+            customTip: store.brush.customTip
         )
     }
 

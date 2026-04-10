@@ -192,10 +192,6 @@ extension LayerSidebarView {
                 }
 
                 HStack(spacing: 8) {
-                    Text(StudioStrings.opacityValue(Int(layer.opacity * 100), language))
-                        .font(StudioTheme.Typography.mono(10))
-                        .foregroundStyle(.white.opacity(0.48))
-
                     if layer.folderID != nil {
                         miniActionButton(systemImage: "arrow.uturn.left") {
                             store.send(.removeLayerFromFolderButtonTapped(layer.index))

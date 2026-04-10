@@ -5,6 +5,7 @@ import UIKit
 
 struct ContentView: View {
     let store: StoreOf<AppFeature>
+    @StateObject var nanoBananaCommerce = NanoBananaCommerce()
     private let studioUIScale: CGFloat = 0.56
     @State var showsOpenDocumentImporter = false
     @State var showsNewCanvasSheet = false
@@ -16,6 +17,7 @@ struct ContentView: View {
     @State var showsThresholdSheet = false
     @State var showsPosterizeSheet = false
     @State var showsGradientMapSheet = false
+    @State var showsNanoBananaSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var gradientMapSettings = GradientMapSettings()
@@ -27,7 +29,18 @@ struct ContentView: View {
     @State var colorBalanceSettings = ColorBalanceSettings()
     @State var thresholdSettings = ThresholdSettings()
     @State var posterizeSettings = PosterizeSettings()
+    @State var nanoBananaPrompt = ""
+    @State var nanoBananaInputLayerIndex = 0
+    @State var nanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
+    @State var nanoBananaModel: NanoBananaModel = .flashImage25
+    @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
+    @AppStorage("atelierprime.nanobanana.apiKey") var nanoBananaAPIKey = ""
     var language: AppLanguage { store.appLanguage }
+
+    var nanoBananaAccessMode: NanoBananaAccessMode {
+        get { NanoBananaAccessMode(rawValue: nanoBananaAccessModeRawValue) ?? .userAPIKey }
+        nonmutating set { nanoBananaAccessModeRawValue = newValue.rawValue }
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -40,6 +53,9 @@ struct ContentView: View {
         .ignoresSafeArea(edges: [.horizontal, .bottom])
         .task {
             store.send(.task)
+        }
+        .task {
+            await nanoBananaCommerce.prepare()
         }
         .sheet(item: Binding(
             get: { store.exportSheet },
@@ -73,6 +89,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsGradientMapSheet) {
             gradientMapSheet
+        }
+        .sheet(isPresented: $showsNanoBananaSheet) {
+            nanoBananaSheet
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,
@@ -179,8 +198,36 @@ struct ContentView: View {
                     progress: preview.progress,
                     language: language
                 )
+            } else if let progress = store.nanoBananaProgress, store.isNanoBananaGenerating {
+                ZStack {
+                    Color.black.opacity(0.24)
+                        .ignoresSafeArea()
+
+                    NanoBananaProgressHUD(
+                        previewImageData: nanoBananaInputPreviewImageData,
+                        progress: progress,
+                        language: language,
+                        onCancel: {
+                            store.send(.nanoBananaCancelRequested)
+                        }
+                    )
+                }
             }
         }
+    }
+
+    private var nanoBananaInputPreviewImageData: Data? {
+        guard
+            let snapshot = store.canvas.renderSnapshot,
+            let layer = snapshot.layers.first(where: { $0.index == nanoBananaInputLayerIndex })
+        else {
+            return nil
+        }
+        return AppFeature.pngData(
+            fromLayerPixelData: layer.pixelData,
+            width: snapshot.width,
+            height: snapshot.height
+        )
     }
 
     private func stageImportedDocument(from sourceURL: URL) -> URL? {
