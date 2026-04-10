@@ -10,7 +10,7 @@ struct LayerSidebarFeature {
         var rows: [LayerSidebarRowModel] = []
         var layerBuffers: [LayerCanvasBuffer] = []
         var activeLayerIndex: Int = 0
-        var paperColor: Color = Color(red: 0.93, green: 0.93, blue: 0.91)
+        var paperColor: Color = .white
         var transparentPaper = false
         var showsPaperEditor = false
     }

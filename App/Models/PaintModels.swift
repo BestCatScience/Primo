@@ -532,9 +532,9 @@ struct CanvasPaperStyle: Equatable, Sendable {
     var isTransparent: Bool
 
     static let `default` = CanvasPaperStyle(
-        red: 0.93,
-        green: 0.93,
-        blue: 0.91,
+        red: 1.0,
+        green: 1.0,
+        blue: 1.0,
         alpha: 1.0,
         isTransparent: false
     )

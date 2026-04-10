@@ -341,8 +341,8 @@ extension ContentView {
                     title: language.localized("新規作成"),
                     tint: Color(red: 0.24, green: 0.53, blue: 0.98)
                 ) {
-                    newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-                    newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    newCanvasWidthText = "\(Int(CanvasFeature.defaultCanvasSize.width.rounded()))"
+                    newCanvasHeightText = "\(Int(CanvasFeature.defaultCanvasSize.height.rounded()))"
                     showsNewCanvasSheet = true
                 }
 
@@ -542,8 +542,8 @@ extension ContentView {
                 .foregroundStyle(Color.white.opacity(0.56))
 
             Button(StudioStrings.createCanvasCTA(language)) {
-                newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-                newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                newCanvasWidthText = "\(Int(CanvasFeature.defaultCanvasSize.width.rounded()))"
+                newCanvasHeightText = "\(Int(CanvasFeature.defaultCanvasSize.height.rounded()))"
                 showsNewCanvasSheet = true
             }
             .font(StudioTheme.Typography.title(16))

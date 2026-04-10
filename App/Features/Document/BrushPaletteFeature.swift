@@ -316,7 +316,7 @@ struct BrushPaletteFeature {
         }
 
         struct PaperSettings: Equatable {
-            var color: Color = Color(red: 0.93, green: 0.93, blue: 0.91)
+            var color: Color = .white
             var isTransparent = false
         }
 
