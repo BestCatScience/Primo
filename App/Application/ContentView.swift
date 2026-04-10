@@ -79,6 +79,12 @@ struct ContentView: View {
             guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
             store.send(.openDocumentSelected(stagedURL))
         }
+        .task(id: store.bannerMessage) {
+            guard store.bannerMessage != nil else { return }
+            try? await Task.sleep(for: .milliseconds(2200))
+            guard !Task.isCancelled else { return }
+            store.send(.bannerDismissed)
+        }
     }
 
     @ViewBuilder
@@ -184,11 +190,6 @@ struct ContentView: View {
             if let bannerMessage = store.bannerMessage {
                 BannerToast(message: bannerMessage)
                     .padding(.bottom, 18)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-                            store.send(.bannerDismissed)
-                        }
-                    }
             }
         }
         .overlay {

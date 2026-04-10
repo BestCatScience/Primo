@@ -340,7 +340,6 @@ struct AppFeature {
                 let height = max(height, 1)
                 paintDocumentClient.newCanvas(width, height)
                 paintDocumentClient.prewarmDrawingResources()
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.canvas = CanvasFeature.State()
                 state.canvas.canvasSize = CGSize(width: width, height: height)
                 state.layerSidebar = LayerSidebarFeature.State()
@@ -351,6 +350,7 @@ struct AppFeature {
                 state.exportSheet = nil
                 state.bannerMessage = nil
                 state.isHydrating = false
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .merge(
                     .cancel(id: CancelID.startupPresentationLoad),

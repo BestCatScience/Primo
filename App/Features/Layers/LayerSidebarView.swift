@@ -26,6 +26,16 @@ struct LayerSidebarView: View {
     @State var dragTargetFrames: [DragTarget: CGRect] = [:]
     @FocusState var focusedEditorTarget: EditTarget?
 
+    private var activeEditingTarget: EditTarget? {
+        if let editingLayerIndex {
+            return .layer(editingLayerIndex)
+        }
+        if let editingFolderID {
+            return .folder(editingFolderID)
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
@@ -96,27 +106,8 @@ struct LayerSidebarView: View {
         .coordinateSpace(name: "layerSidebarGlobal")
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onPreferenceChange(LayerSidebarDragTargetPreferenceKey.self) { dragTargetFrames = $0 }
-        .onChange(of: editingLayerIndex) { _, newValue in
-            guard let newValue else {
-                if editingFolderID == nil {
-                    focusedEditorTarget = nil
-                }
-                return
-            }
-            DispatchQueue.main.async {
-                focusedEditorTarget = .layer(newValue)
-            }
-        }
-        .onChange(of: editingFolderID) { _, newValue in
-            guard let newValue else {
-                if editingLayerIndex == nil {
-                    focusedEditorTarget = nil
-                }
-                return
-            }
-            DispatchQueue.main.async {
-                focusedEditorTarget = .folder(newValue)
-            }
+        .task(id: activeEditingTarget) {
+            focusedEditorTarget = activeEditingTarget
         }
         .onChange(of: store.layers) { _, newLayers in
             guard let draggedLayerIndex else { return }

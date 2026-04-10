@@ -77,6 +77,19 @@ open atelierprime.xcodeproj
 2. `atelierprime` スキームを iPad シミュレータまたは実機でビルドして実行します。
 3. Apple Pencil を使った描画挙動は実機のほうが確認しやすく、シミュレータは主に UI と基本動作の確認向けです。
 
+### CODEX 環境でビルド確認する
+
+CODEX ではネットワークやホーム配下キャッシュへの書き込みが制限されることがあるため、既存の `SourcePackages` チェックアウトを再利用する専用スクリプトを用意しています。
+
+```bash
+chmod +x scripts/codex-build.sh
+scripts/codex-build.sh
+```
+
+- 既定では `~/Library/Developer/Xcode/DerivedData/atelierprime-gruuszhkrmiexzgjfbedzywqxddp/SourcePackages` を再利用します
+- 別の場所を使う場合は `SOURCE_PACKAGES_DIR=/path/to/SourcePackages scripts/codex-build.sh` のように上書きできます
+- 生成物は `/tmp/atelierprime-codex-build` と `/tmp/atelierprime-package-cache` に出ます
+
 ## アーキテクチャ概要
 
 ### 全体の流れ
