@@ -618,6 +618,445 @@ extension AppFeature {
         return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
     }
 
+    static func layerMaskData(
+        from selection: CanvasSelection?,
+        canvasSize: CGSize
+    ) -> Data? {
+        guard let selection else { return nil }
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        return Data(expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight))
+    }
+
+    static func normalizedCommittedStrokeSamples(
+        _ samples: [StylusSample],
+        brush: BrushRuntimeSettings
+    ) -> [StylusSample] {
+        var normalized = samples.map { sample in
+            StylusSample(
+                point: CGPoint(
+                    x: sample.point.x.isFinite ? sample.point.x : 0,
+                    y: sample.point.y.isFinite ? sample.point.y : 0
+                ),
+                pressure: sample.pressure.isFinite ? sample.pressure : 1.0,
+                altitude: sample.altitude.isFinite ? sample.altitude : .pi / 2,
+                azimuth: sample.azimuth.isFinite ? sample.azimuth : 0,
+                timestamp: sample.timestamp.isFinite ? sample.timestamp : 0
+            )
+        }
+        guard normalized.count > 1 else { return normalized }
+
+        let jumpThreshold = max(CGFloat(brush.radius) * 8.0, 24.0)
+        while normalized.count > 1 {
+            let last = normalized[normalized.count - 1]
+            let previous = normalized[normalized.count - 2]
+            let dx = last.point.x - previous.point.x
+            let dy = last.point.y - previous.point.y
+            let distance = sqrt((dx * dx) + (dy * dy))
+            let pressureDropThreshold = max(0.08, previous.pressure * 0.5)
+            let isTrailingJump = distance > jumpThreshold && last.pressure < pressureDropThreshold
+            if !isTrailingJump {
+                break
+            }
+            normalized.removeLast()
+        }
+
+        var deduplicated: [StylusSample] = []
+        deduplicated.reserveCapacity(normalized.count)
+        for sample in normalized {
+            if let previous = deduplicated.last {
+                let dx = sample.point.x - previous.point.x
+                let dy = sample.point.y - previous.point.y
+                let distance = sqrt((dx * dx) + (dy * dy))
+                let pressureDelta = abs(sample.pressure - previous.pressure)
+                if distance < 0.001, pressureDelta < 0.001 {
+                    continue
+                }
+            }
+            deduplicated.append(sample)
+        }
+        guard deduplicated.count > 1 else { return deduplicated }
+
+        let shortStrokeThreshold = max(CGFloat(brush.radius) * 6.0, 18.0)
+        let endpointDistance = strokeEndpointDistance(deduplicated)
+        let visualSpan = strokeVisualSpan(deduplicated)
+        let pathLength = strokePathLength(deduplicated)
+        let noisyShortStroke =
+            endpointDistance <= shortStrokeThreshold * 1.5 &&
+            (pathLength >= max(endpointDistance * 3.0, shortStrokeThreshold * 2.0) || deduplicated.count >= 48)
+        if noisyShortStroke {
+            guard let first = deduplicated.first, let last = deduplicated.last else {
+                return deduplicated
+            }
+            let dotThreshold = max(CGFloat(brush.radius) * 1.25, 3.0)
+            if endpointDistance <= dotThreshold {
+                return [averagedStylusSample(deduplicated)]
+            }
+            return [first, last]
+        }
+
+        if endpointDistance <= shortStrokeThreshold && visualSpan <= shortStrokeThreshold * 2.0 {
+            let dotThreshold = max(CGFloat(brush.radius) * 1.25, 3.0)
+            if endpointDistance <= dotThreshold {
+                return [averagedStylusSample(deduplicated)]
+            }
+            guard let first = deduplicated.first, let last = deduplicated.last else {
+                return deduplicated
+            }
+            return [first, last]
+        }
+
+        return deduplicated
+    }
+
+    static func layerPixelDataByApplyingCommittedShortStroke(
+        snapshot: MetalDocumentSnapshot?,
+        activeLayerIndex: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings
+    ) -> Data? {
+        guard shouldRasterizeCommittedShortStroke(samples, brush: brush) else { return nil }
+        guard
+            let snapshot,
+            let layer = snapshot.layers.first(where: { $0.index == activeLayerIndex })
+        else {
+            return nil
+        }
+
+        let expectedCount = snapshot.width * snapshot.height * 4
+        guard layer.pixelData.count == expectedCount else { return nil }
+
+        let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
+        guard !committedSamples.isEmpty else { return nil }
+
+        var output = [UInt8](layer.pixelData)
+        if committedSamples.count == 1 {
+            rasterizeShortStrokeStamp(
+                into: &output,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                sample: committedSamples[0],
+                brush: brush
+            )
+            return Data(output)
+        }
+
+        for pair in zip(committedSamples, committedSamples.dropFirst()) {
+            rasterizeShortStrokeSegment(
+                into: &output,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                start: pair.0,
+                end: pair.1,
+                brush: brush
+            )
+        }
+
+        return Data(output)
+    }
+
+    static func layerPixelDataByApplyingCommittedStroke(
+        basePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings
+    ) -> Data? {
+        let expectedCount = canvasWidth * canvasHeight * 4
+        guard basePixelData.count == expectedCount else { return nil }
+
+        let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
+        guard !committedSamples.isEmpty else { return nil }
+
+        var output = [UInt8](basePixelData)
+        if committedSamples.count == 1 {
+            rasterizeShortStrokeStamp(
+                into: &output,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                sample: committedSamples[0],
+                brush: brush
+            )
+            return Data(output)
+        }
+
+        for pair in zip(committedSamples, committedSamples.dropFirst()) {
+            rasterizeShortStrokeSegment(
+                into: &output,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                start: pair.0,
+                end: pair.1,
+                brush: brush
+            )
+        }
+
+        return Data(output)
+    }
+
+    static func shouldRasterizeCommittedShortStroke(
+        _ samples: [StylusSample],
+        brush: BrushRuntimeSettings
+    ) -> Bool {
+        guard !samples.isEmpty else { return false }
+        if samples.count == 1 {
+            return true
+        }
+
+        let visualThreshold = max(CGFloat(brush.radius) * 6.0, 18.0)
+        let endpointDistance = strokeEndpointDistance(samples)
+        let pathLength = strokePathLength(samples)
+        if endpointDistance <= visualThreshold * 0.75 {
+            return true
+        }
+        if endpointDistance <= visualThreshold * 1.5 && pathLength >= max(endpointDistance * 3.0, visualThreshold * 2.0) {
+            return true
+        }
+        return strokeVisualSpan(samples) <= visualThreshold
+    }
+
+    static func strokePathLength(_ samples: [StylusSample]) -> CGFloat {
+        zip(samples, samples.dropFirst()).reduce(.zero) { partial, pair in
+            let dx = pair.1.point.x - pair.0.point.x
+            let dy = pair.1.point.y - pair.0.point.y
+            return partial + sqrt((dx * dx) + (dy * dy))
+        }
+    }
+
+    static func strokeEndpointDistance(_ samples: [StylusSample]) -> CGFloat {
+        guard let first = samples.first, let last = samples.last else { return .zero }
+        let dx = last.point.x - first.point.x
+        let dy = last.point.y - first.point.y
+        return sqrt((dx * dx) + (dy * dy))
+    }
+
+    static func strokeVisualSpan(_ samples: [StylusSample]) -> CGFloat {
+        guard let first = samples.first, let last = samples.last else { return .zero }
+        var minX = first.point.x
+        var maxX = first.point.x
+        var minY = first.point.y
+        var maxY = first.point.y
+
+        for sample in samples.dropFirst() {
+            minX = min(minX, sample.point.x)
+            maxX = max(maxX, sample.point.x)
+            minY = min(minY, sample.point.y)
+            maxY = max(maxY, sample.point.y)
+        }
+
+        let width = maxX - minX
+        let height = maxY - minY
+        let endpointDX = last.point.x - first.point.x
+        let endpointDY = last.point.y - first.point.y
+        let endpointDistance = sqrt((endpointDX * endpointDX) + (endpointDY * endpointDY))
+        return max(width, height, endpointDistance)
+    }
+
+    static func averagedStylusSample(_ samples: [StylusSample]) -> StylusSample {
+        guard let first = samples.first else {
+            return StylusSample(
+                point: .zero,
+                pressure: 1.0,
+                altitude: .pi / 2,
+                azimuth: 0,
+                timestamp: 0
+            )
+        }
+        let count = CGFloat(samples.count)
+        let summed = samples.reduce(
+            (x: CGFloat.zero, y: CGFloat.zero, pressure: CGFloat.zero, altitude: CGFloat.zero, azimuth: CGFloat.zero, timestamp: TimeInterval.zero)
+        ) { partial, sample in
+            (
+                x: partial.x + sample.point.x,
+                y: partial.y + sample.point.y,
+                pressure: partial.pressure + sample.pressure,
+                altitude: partial.altitude + sample.altitude,
+                azimuth: partial.azimuth + sample.azimuth,
+                timestamp: partial.timestamp + sample.timestamp
+            )
+        }
+        return StylusSample(
+            point: CGPoint(x: summed.x / count, y: summed.y / count),
+            pressure: summed.pressure / count,
+            altitude: summed.altitude / count,
+            azimuth: summed.azimuth / count,
+            timestamp: summed.timestamp / Double(samples.count)
+        )
+    }
+
+    static func rasterizeShortStrokeSegment(
+        into pixels: inout [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        start: StylusSample,
+        end: StylusSample,
+        brush: BrushRuntimeSettings
+    ) {
+        let dx = end.point.x - start.point.x
+        let dy = end.point.y - start.point.y
+        let distance = sqrt((dx * dx) + (dy * dy))
+        let stepDistance = max(0.35, min(max(CGFloat(brush.radius) * 0.18, 0.35), 1.0))
+        let stepCount = max(Int(ceil(distance / stepDistance)), 1)
+
+        for step in 0...stepCount {
+            let t = CGFloat(step) / CGFloat(stepCount)
+            let interpolatedSample = StylusSample(
+                point: CGPoint(
+                    x: start.point.x + (dx * t),
+                    y: start.point.y + (dy * t)
+                ),
+                pressure: start.pressure + ((end.pressure - start.pressure) * t),
+                altitude: start.altitude + ((end.altitude - start.altitude) * t),
+                azimuth: start.azimuth + ((end.azimuth - start.azimuth) * t),
+                timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
+            )
+            rasterizeShortStrokeStamp(
+                into: &pixels,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                sample: interpolatedSample,
+                brush: brush
+            )
+        }
+    }
+
+    static func rasterizeShortStrokeStamp(
+        into pixels: inout [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        sample: StylusSample,
+        brush: BrushRuntimeSettings
+    ) {
+        let pressureFactor = max(
+            0.1,
+            1.0 + ((sample.pressure - 1.0) * CGFloat(brush.pressureSensitivity))
+        )
+        let radius = max(CGFloat(brush.radius) * pressureFactor, 1.5)
+        let minX = max(Int(floor(sample.point.x - radius)), 0)
+        let maxX = min(Int(ceil(sample.point.x + radius)), canvasWidth - 1)
+        let minY = max(Int(floor(sample.point.y - radius)), 0)
+        let maxY = min(Int(ceil(sample.point.y + radius)), canvasHeight - 1)
+        guard minX <= maxX, minY <= maxY else { return }
+
+        let pressureOpacity = max(
+            0.05,
+            1.0 + ((sample.pressure - 1.0) * CGFloat(brush.opacityPressureSensitivity))
+        )
+        let flowOpacity = max(
+            0.05,
+            1.0 + ((sample.pressure - 1.0) * CGFloat(brush.flowPressureSensitivity))
+        )
+        let baseAlpha = max(
+            0,
+            min(
+                1,
+                CGFloat(brush.opacity) *
+                CGFloat(brush.flow) *
+                pressureOpacity *
+                flowOpacity
+            )
+        )
+        guard baseAlpha > 0.001 else { return }
+
+        let hardness = max(0, min(1, CGFloat(brush.hardness)))
+        let hardCore = hardness >= 0.995 ? 1.0 : pow(hardness, 3.2)
+        let sourceRed = CGFloat(brush.red) / 255.0
+        let sourceGreen = CGFloat(brush.green) / 255.0
+        let sourceBlue = CGFloat(brush.blue) / 255.0
+
+        for y in minY...maxY {
+            for x in minX...maxX {
+                let sampleX = CGFloat(x) + 0.5
+                let sampleY = CGFloat(y) + 0.5
+                let dx = sampleX - sample.point.x
+                let dy = sampleY - sample.point.y
+                let normalizedDistance = sqrt((dx * dx) + (dy * dy)) / radius
+                guard normalizedDistance <= 1 else { continue }
+
+                let falloff: CGFloat
+                if hardCore >= 0.999 || normalizedDistance <= hardCore {
+                    falloff = 1
+                } else {
+                    let span = max(0.001, 1.0 - hardCore)
+                    let softened = max(0, min(1, (normalizedDistance - hardCore) / span))
+                    falloff = 1.0 - softened
+                }
+
+                let sourceAlpha = baseAlpha * falloff
+                guard sourceAlpha > 0.001 else { continue }
+
+                let offset = ((y * canvasWidth) + x) * 4
+                let destinationAlpha = CGFloat(pixels[offset + 3]) / 255.0
+
+                if brush.isEraser {
+                    let outAlpha = destinationAlpha * (1.0 - sourceAlpha)
+                    pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+                    continue
+                }
+
+                let destinationRed = CGFloat(pixels[offset]) / 255.0
+                let destinationGreen = CGFloat(pixels[offset + 1]) / 255.0
+                let destinationBlue = CGFloat(pixels[offset + 2]) / 255.0
+                let outAlpha = sourceAlpha + (destinationAlpha * (1.0 - sourceAlpha))
+                guard outAlpha > 0.001 else { continue }
+
+                let outRed = ((sourceRed * sourceAlpha) + (destinationRed * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
+                let outGreen = ((sourceGreen * sourceAlpha) + (destinationGreen * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
+                let outBlue = ((sourceBlue * sourceAlpha) + (destinationBlue * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
+
+                pixels[offset] = UInt8(max(0, min(255, Int((outRed * 255.0).rounded()))))
+                pixels[offset + 1] = UInt8(max(0, min(255, Int((outGreen * 255.0).rounded()))))
+                pixels[offset + 2] = UInt8(max(0, min(255, Int((outBlue * 255.0).rounded()))))
+                pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+            }
+        }
+    }
+
+    static func adjustedSelection(
+        _ selection: CanvasSelection?,
+        canvasSize: CGSize,
+        expansion: Int,
+        isInverted: Bool
+    ) -> CanvasSelection? {
+        guard let selection else { return nil }
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        var mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+
+        if expansion > 0 {
+            mask = expandedSelectionMask(mask, width: canvasWidth, height: canvasHeight, expansion: expansion)
+        } else if expansion < 0 {
+            mask = contractedSelectionMask(mask, width: canvasWidth, height: canvasHeight, contraction: abs(expansion))
+        }
+
+        if isInverted {
+            mask = mask.map { $0 == 0 ? 255 : 0 }
+        }
+
+        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+    }
+
+    static func invertedSelection(
+        _ selection: CanvasSelection?,
+        canvasSize: CGSize,
+        mode: SelectionToolMode
+    ) -> CanvasSelection? {
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+
+        if let selection {
+            return adjustedSelection(
+                selection,
+                canvasSize: canvasSize,
+                expansion: 0,
+                isInverted: true
+            )
+        }
+
+        let fullMask = [UInt8](repeating: 255, count: canvasWidth * canvasHeight)
+        return croppedSelection(from: fullMask, width: canvasWidth, height: canvasHeight, mode: mode)
+    }
+
     static func alphaMask(from sourceBytes: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
         var mask = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
         for index in 0..<(canvasWidth * canvasHeight) {
@@ -819,6 +1258,35 @@ extension AppFeature {
             }
         }
         return result
+    }
+
+    static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
+        guard contraction > 0 else { return source }
+        var current = source
+
+        for _ in 0..<contraction {
+            var next = current
+            for y in 0..<height {
+                for x in 0..<width {
+                    let index = (y * width) + x
+                    guard current[index] != 0 else { continue }
+
+                    let hasOutsideNeighbor =
+                        x == 0 || x == width - 1 || y == 0 || y == height - 1 ||
+                        current[index - 1] == 0 ||
+                        current[index + 1] == 0 ||
+                        current[index - width] == 0 ||
+                        current[index + width] == 0
+
+                    if hasOutsideNeighbor {
+                        next[index] = 0
+                    }
+                }
+            }
+            current = next
+        }
+
+        return current
     }
 
     static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {

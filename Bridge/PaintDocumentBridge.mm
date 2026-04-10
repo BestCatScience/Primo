@@ -325,7 +325,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
                      visible:(BOOL)visible
                      opacity:(CGFloat)opacity
                    blendMode:(NSString *)blendMode
-                    folderID:(NSInteger)folderID {
+                    folderID:(NSInteger)folderID
+                     hasMask:(BOOL)hasMask {
     self = [super init];
     if (self) {
         _name = [name copy];
@@ -333,6 +334,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
         _opacity = opacity;
         _blendMode = [blendMode copy];
         _folderID = folderID;
+        _hasMask = hasMask;
     }
     return self;
 }
@@ -426,7 +428,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
                                                                 visible:layer.visible
                                                                 opacity:layer.opacity
                                                               blendMode:APStringFromBlendMode(layer.blendMode)
-                                                               folderID:_document->layerFolderID(index)];
+                                                               folderID:_document->layerFolderID(index)
+                                                                hasMask:_document->hasLayerMask(index)];
         [items addObject:info];
     }
     return items;
@@ -452,6 +455,14 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     return [NSData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
 }
 
+- (NSData *)layerMaskDataForLayerAtIndex:(NSInteger)index {
+    const auto mask = _document->layerMaskData((int)index);
+    if (mask.empty()) {
+        return nil;
+    }
+    return [NSData dataWithBytes:mask.data() length:mask.size()];
+}
+
 - (BOOL)applyLayerProcessingAtIndex:(NSInteger)index descriptor:(APPaintLayerProcessingDescriptor *)descriptor {
     return _document->applyLayerProcessing((int)index, APProcessingFromDescriptor(descriptor));
 }
@@ -470,6 +481,22 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
         return;
     }
     _document->replaceLayerPixelsTransient((int)index, std::span<const uint8_t>(bytes, data.length));
+}
+
+- (void)replaceLayerMaskAtIndex:(NSInteger)index data:(NSData *)data {
+    const auto *bytes = static_cast<const uint8_t *>(data.bytes);
+    if (bytes == nullptr) {
+        return;
+    }
+    _document->replaceLayerMask((int)index, std::span<const uint8_t>(bytes, data.length));
+}
+
+- (void)clearLayerMaskAtIndex:(NSInteger)index {
+    _document->clearLayerMask((int)index);
+}
+
+- (BOOL)applyLayerMaskAtIndex:(NSInteger)index {
+    return _document->applyLayerMask((int)index);
 }
 
 - (NSInteger)activeLayerIndex {
@@ -740,7 +767,18 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     }
 
     const auto &layer = _document->layer((int)index);
-    NSData *data = [NSData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
+    NSMutableData *workingData = [NSMutableData dataWithBytes:layer.pixels.data() length:layer.pixels.size()];
+    const auto mask = _document->layerMaskData((int)index);
+    if (!mask.empty()) {
+        auto *bytes = static_cast<uint8_t *>(workingData.mutableBytes);
+        for (size_t pixelIndex = 0; pixelIndex < mask.size(); ++pixelIndex) {
+            const size_t alphaOffset = (pixelIndex * 4U) + 3U;
+            const float baseAlpha = static_cast<float>(bytes[alphaOffset]) / 255.0F;
+            const float maskAlpha = static_cast<float>(mask[pixelIndex]) / 255.0F;
+            bytes[alphaOffset] = static_cast<uint8_t>(std::clamp(std::lround(baseAlpha * maskAlpha * 255.0F), 0L, 255L));
+        }
+    }
+    NSData *data = workingData;
     CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
 
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();

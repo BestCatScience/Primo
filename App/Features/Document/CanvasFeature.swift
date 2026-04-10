@@ -16,6 +16,7 @@ struct CanvasFeature {
         var localBufferRevision: Int = 0
         var lastRenderedLocalBufferRevision: Int = -1
         var activeLayerIndex = 0
+        var activeStrokeBaseSnapshot: MetalDocumentSnapshot?
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
@@ -52,7 +53,6 @@ struct CanvasFeature {
             customTip: nil,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
-        var pendingIncrementalUpdate: IncrementalLayerUpdate?
     }
 
     enum Action: Equatable {
@@ -73,7 +73,6 @@ struct CanvasFeature {
         case transformScaleChanged(CGFloat)
         case transformScaleEnded(CGFloat)
         case transformPreviewCleared
-        case applyIncrementalUpdate(IncrementalLayerUpdate)
         case requestLocalUndo
         case requestLocalRedo
         case viewportOffsetChanged(CGSize)
@@ -86,7 +85,7 @@ struct CanvasFeature {
         case appendSamples([StylusSample])
         case previewShapeStroke([StylusSample])
         case commitPreviewShapeStroke
-        case endStroke
+        case endStroke([StylusSample])
         case cancelStroke
         case commitStroke([StylusSample])
         case blurSamples([StylusSample])
@@ -103,12 +102,7 @@ struct CanvasFeature {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case let .applyIncrementalUpdate(update):
-                state.pendingIncrementalUpdate = update
-                return .none
-
             case let .fillRequested(sample):
-                state.pendingIncrementalUpdate = nil
                 return .send(.delegate(.fill(sample)))
 
             case .pencilInteractionToggleRequested:
@@ -194,7 +188,6 @@ struct CanvasFeature {
             case let .strokeUpdated(stroke):
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
-                state.pendingIncrementalUpdate = nil
                 if state.currentTool == .shape {
                     state.activeStroke = nil
                     guard stroke.points.count >= 2 else { return .none }
@@ -202,28 +195,18 @@ struct CanvasFeature {
                     return .send(.delegate(.previewShapeStroke(stroke.points.map(\.stylusSample))))
                 }
 
-                let previousPointCount = (state.activeStroke?.points.count ?? 0) + (state.activeStrokeHasCommittedStart ? 1 : 0)
-                if state.activeStrokeHasCommittedStart {
-                    state.activeStroke = stroke
-                } else if stroke.points.count >= 2 {
-                    var visibleStroke = stroke
-                    visibleStroke.points = Array(stroke.points.dropFirst())
-                    state.activeStroke = visibleStroke
-                } else {
-                    state.activeStroke = Stroke(points: [], predictedPoints: [], color: stroke.color, brushSize: stroke.brushSize)
-                }
+                let previousPointCount = state.activeStroke?.points.count ?? 0
+                state.activeStroke = stroke
                 if state.currentTool == .blur {
                     let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
                     guard !appendedSamples.isEmpty else { return .none }
                     return .send(.delegate(.blurSamples(appendedSamples)))
                 }
-
                 if !state.activeStrokeHasCommittedStart {
-                    guard stroke.points.count >= 2 else { return .none }
+                    guard let firstPoint = stroke.points.first else { return .none }
                     state.activeStrokeHasCommittedStart = true
-                    let seededSamples = seededCommittedSamples(from: stroke.points)
-                    let first = seededSamples[0]
-                    let remainder = Array(seededSamples.dropFirst())
+                    let first = firstPoint.stylusSample
+                    let remainder = Array(stroke.points.dropFirst()).map(\.stylusSample)
                     var effects: [Effect<Action>] = [
                         .send(.delegate(.beginStroke(first)))
                     ]
@@ -245,7 +228,6 @@ struct CanvasFeature {
                     state.activeStroke = nil
                     state.activeStrokeHasCommittedStart = false
                     state.shapePreviewIsLive = false
-                    state.pendingIncrementalUpdate = nil
                     if hadLivePreview {
                         return .send(.delegate(.commitPreviewShapeStroke))
                     }
@@ -254,47 +236,40 @@ struct CanvasFeature {
                 if state.currentTool == .blur {
                     state.activeStroke = nil
                     state.activeStrokeHasCommittedStart = false
-                    state.pendingIncrementalUpdate = nil
                     return .send(.delegate(.endBlurStroke))
                 }
-                let didCommitStroke = state.activeStrokeHasCommittedStart
-                let committedPreviewPoints = didCommitStroke ? Array(stroke.confirmedPreviewPoints.dropFirst()) : []
-                if didCommitStroke, !committedPreviewPoints.isEmpty {
-                    let track = PreviewStrokeTrack(
-                        layerIndex: state.activeLayerIndex,
-                        points: committedPreviewPoints,
-                        style: state.previewStyle
-                    )
-                    if let bufferIndex = state.layerBuffers.firstIndex(where: { $0.index == state.activeLayerIndex }) {
-                        state.layerBuffers[bufferIndex].strokes.append(track)
-                    } else {
-                        state.layerBuffers.append(
-                            LayerCanvasBuffer(
-                                index: state.activeLayerIndex,
-                                name: "Layer \(state.activeLayerIndex + 1)",
-                                visible: true,
-                                opacity: 1.0,
-                                strokes: [track]
-                            )
-                        )
-                    }
-                    state.localBufferRevision += 1
-                }
+                let previousPointCount = state.activeStroke?.points.count ?? 0
                 state.activeStroke = nil
+                let didCommitStroke = state.activeStrokeHasCommittedStart
                 state.activeStrokeHasCommittedStart = false
-                state.pendingIncrementalUpdate = nil
-                guard didCommitStroke else { return .none }
-                return .send(.delegate(.endStroke))
+                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
+                if didCommitStroke {
+                    var effects: [Effect<Action>] = []
+                    if !appendedSamples.isEmpty {
+                        effects.append(.send(.delegate(.appendSamples(appendedSamples))))
+                    }
+                    effects.append(.send(.delegate(.endStroke(stroke.points.map(\.stylusSample)))))
+                    return .concatenate(effects)
+                }
+                if !stroke.points.isEmpty {
+                    return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
+                }
+                return .none
 
             case .strokeCancelled:
+                let cancelledStroke = state.activeStroke
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = false
                 state.activeStroke = nil
                 state.activeStrokeHasCommittedStart = false
-                state.pendingIncrementalUpdate = nil
                 state.shapePreviewIsLive = false
                 if state.currentTool == .blur {
                     return .send(.delegate(.endBlurStroke))
+                }
+                if state.currentTool == .brush || state.currentTool == .erase,
+                   let cancelledStroke,
+                   !cancelledStroke.points.isEmpty {
+                    return .send(.delegate(.commitStroke(cancelledStroke.points.map(\.stylusSample))))
                 }
                 return .send(.delegate(.cancelStroke))
 
@@ -302,37 +277,5 @@ struct CanvasFeature {
                 return .none
             }
         }
-    }
-}
-
-private extension CanvasFeature {
-    func seededCommittedSamples(from points: [StrokePoint]) -> [StylusSample] {
-        guard points.count >= 2 else { return points.map(\.stylusSample) }
-
-        let visiblePoints = Array(points.dropFirst())
-        guard let firstVisible = visiblePoints.first else { return points.map(\.stylusSample) }
-
-        let directionSource: SIMD2<Float> = {
-            if visiblePoints.count >= 2 {
-                return visiblePoints[1].position - firstVisible.position
-            }
-            return firstVisible.position - points[0].position
-        }()
-
-        let directionLength = simd_length(directionSource)
-        guard directionLength > 0.001 else { return visiblePoints.map(\.stylusSample) }
-
-        let normalizedDirection = directionSource / directionLength
-        let leadDistance = max(min(firstVisible.pressure * 6.0, 3.0), 0.75)
-        let seededLeadPoint = StrokePoint(
-            position: firstVisible.position - (normalizedDirection * leadDistance),
-            pressure: firstVisible.pressure,
-            altitude: firstVisible.altitude,
-            azimuth: firstVisible.azimuth,
-            timestamp: firstVisible.timestamp - 0.0001,
-            isPredicted: false
-        )
-
-        return ([seededLeadPoint] + visiblePoints).map(\.stylusSample)
     }
 }

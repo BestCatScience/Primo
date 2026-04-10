@@ -160,6 +160,12 @@ extension LayerSidebarView {
                             .layoutPriority(1)
                     }
 
+                    if layer.hasMask {
+                        Image(systemName: "circle.lefthalf.filled")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(StudioTheme.Palette.accentBright)
+                    }
+
                     Spacer(minLength: 10)
 
                     Menu {

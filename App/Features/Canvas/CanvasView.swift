@@ -20,7 +20,6 @@ struct CanvasView: UIViewRepresentable {
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
             activeStroke: store.activeStroke,
-            incrementalUpdate: store.pendingIncrementalUpdate,
             adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
@@ -150,7 +149,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         activeStroke: Stroke?,
-        incrementalUpdate: IncrementalLayerUpdate?,
         adjustmentPreviewPixelData: Data?,
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
@@ -173,9 +171,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         metalCanvasView.currentActiveLayerIndex = activeLayerIndex
         metalCanvasView.updateDocumentSize(documentSize)
         metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale, paperStyle: paperStyle)
-        if let incrementalUpdate {
-            metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
-        }
         inputHandler.tool = currentTool
         inputHandler.selectionMode = selectionMode
         inputHandler.shapeMode = shapeMode
@@ -186,7 +181,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         inputHandler.strokeStabilization = Float(previewStyle.stabilization)
         updateSelectionOverlay(selection, transformPreviewScale: transformPreviewScale)
         updateSelectionPreview(selectionPreviewPoints)
-        updateShapePreview(activeStroke, style: previewStyle)
+        updateStrokePreview(activeStroke, style: previewStyle)
         updateTransformPreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
@@ -390,8 +385,18 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         selectionPreviewLayer.path = path.cgPath
     }
 
-    private func updateShapePreview(_ stroke: Stroke?, style: PreviewStrokeStyle) {
-        guard currentTool == .shape, let stroke, stroke.points.count >= 2 else {
+    private func updateStrokePreview(_ stroke: Stroke?, style: PreviewStrokeStyle) {
+        guard let stroke else {
+            shapePreviewImageView.image = nil
+            shapePreviewImageView.isHidden = true
+            return
+        }
+        guard currentTool == .shape else {
+            shapePreviewImageView.image = nil
+            shapePreviewImageView.isHidden = true
+            return
+        }
+        guard stroke.points.count >= 2 else {
             shapePreviewImageView.image = nil
             shapePreviewImageView.isHidden = true
             return
@@ -402,19 +407,35 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             let cgContext = context.cgContext
             cgContext.setAllowsAntialiasing(true)
             cgContext.setShouldAntialias(true)
-            drawShapePreview(stroke: stroke, style: style, in: cgContext)
+            drawStrokePreview(stroke: stroke, style: style, in: cgContext)
         }
 
         shapePreviewImageView.image = image
         shapePreviewImageView.isHidden = false
     }
 
-    private func drawShapePreview(stroke: Stroke, style: PreviewStrokeStyle, in context: CGContext) {
+    private func drawStrokePreview(stroke: Stroke, style: PreviewStrokeStyle, in context: CGContext) {
         let points = stroke.points.map { point in
             (viewPoint(fromDocumentPoint: point.cgPoint), CGFloat(point.pressure))
         }
 
-        guard points.count >= 2 else { return }
+        guard !points.isEmpty else { return }
+        if points.count == 1 {
+            let point = points[0].0
+            let pressure = points[0].1
+            let baseDiameter = max(style.radius * 2.0, 1.0)
+            let pressureScale = max(0.35, 1.0 - style.pressureSensitivity + (style.pressureSensitivity * pressure))
+            let diameter = max(baseDiameter * pressureScale, 1.0)
+            drawPreviewStamp(
+                in: context,
+                center: point,
+                diameter: diameter,
+                angle: style.angle,
+                alpha: previewStampAlpha(style: style),
+                style: style
+            )
+            return
+        }
         let sampled = denselySampledPreviewPoints(from: points, style: style)
         for index in sampled.indices {
             let point = sampled[index].0

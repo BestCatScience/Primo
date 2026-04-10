@@ -74,7 +74,10 @@ final class InputHandler {
             let firstPoint = makePoint(touch, in: view, predicted: false)
             shapeStartPoint = firstPoint
             currentStroke = Stroke(points: [firstPoint], predictedPoints: [], color: brushColor, brushSize: brushSize)
-            fallthrough
+            if let stroke = currentStroke {
+                delegate?.didUpdateStroke(stroke)
+            }
+            return
 
         case .moved, .stationary:
             guard var stroke = currentStroke else { return }
@@ -224,9 +227,6 @@ final class InputHandler {
             }
 
             if candidate.pressure <= 0.001 {
-                if isFinishingStroke {
-                    continue
-                }
                 candidate.pressure = max(previous.pressure * 0.92, 0.12)
             }
 
@@ -237,26 +237,22 @@ final class InputHandler {
                 continue
             }
 
-            if shouldReject(candidate, to: stroke.points, distance: distance) {
+            if shouldRejectDistance(distance) {
                 continue
             }
-
-            candidate = stabilized(candidate, previous: previous, isFinishingStroke: isFinishingStroke)
-            let stabilizedDelta = candidate.position - previous.position
-            let stabilizedDistance = simd_length(stabilizedDelta)
 
             let interpolationSpacing = preferredInterpolationSpacing(
                 from: previous,
                 to: candidate,
-                distance: stabilizedDistance
+                distance: distance
             )
-            if stabilizedDistance > interpolationSpacing {
-                let steps = max(1, Int(ceil(stabilizedDistance / interpolationSpacing)))
+            if distance > interpolationSpacing {
+                let steps = max(1, Int(ceil(distance / interpolationSpacing)))
                 for step in 1...steps {
                     let t = Float(step) / Float(steps)
                     stroke.points.append(
                         StrokePoint(
-                            position: previous.position + (stabilizedDelta * t),
+                            position: previous.position + (delta * t),
                             pressure: previous.pressure + ((candidate.pressure - previous.pressure) * t),
                             altitude: previous.altitude + ((candidate.altitude - previous.altitude) * t),
                             azimuth: previous.azimuth + ((candidate.azimuth - previous.azimuth) * t),
@@ -271,24 +267,6 @@ final class InputHandler {
         }
     }
 
-    private func stabilized(_ candidate: StrokePoint, previous: StrokePoint, isFinishingStroke: Bool) -> StrokePoint {
-        let strength = max(0, min(strokeStabilization, 1))
-        guard strength > 0.001 else { return candidate }
-
-        let movementDistance = simd_length(candidate.position - previous.position)
-        let speedBias = min(max(movementDistance / max(brushSize * 1.2, 6.0), 0), 1)
-        let baseResponse = 1 - (strength * 0.82)
-        let adaptiveResponse = baseResponse + ((1 - baseResponse) * speedBias * 0.72)
-        let response = isFinishingStroke ? max(adaptiveResponse, 0.62) : max(adaptiveResponse, 0.08)
-
-        var smoothed = candidate
-        smoothed.position = previous.position + ((candidate.position - previous.position) * response)
-        smoothed.pressure = previous.pressure + ((candidate.pressure - previous.pressure) * max(response, 0.18))
-        smoothed.altitude = previous.altitude + ((candidate.altitude - previous.altitude) * max(response, 0.24))
-        smoothed.azimuth = previous.azimuth + ((candidate.azimuth - previous.azimuth) * max(response, 0.24))
-        return smoothed
-    }
-
     private func shouldRejectFinishingJump(_ candidate: StrokePoint, previous: StrokePoint, distance: Float) -> Bool {
         // Lift-off samples can occasionally jump away from the nib while pressure drops rapidly.
         // Reject those trailing points to keep ink anchored under the pencil tip.
@@ -297,65 +275,15 @@ final class InputHandler {
         return distance > jumpThreshold && candidate.pressure < pressureDropThreshold
     }
 
-    private func shouldReject(_ candidate: StrokePoint, to points: [StrokePoint], distance: Float) -> Bool {
-        guard let previous = points.last else { return true }
-        if distance < 0.01 {
-            return true
-        }
-
+    private func shouldRejectDistance(_ distance: Float) -> Bool {
         let absurdJumpDistance = max(brushSize * 14.0, 220.0)
-        if distance > absurdJumpDistance {
-            return true
-        }
-
-        guard points.count >= 2 else { return false }
-        let beforePrevious = points[points.count - 2]
-        let previousDelta = previous.position - beforePrevious.position
-        let previousDistance = simd_length(previousDelta)
-        guard previousDistance > 0.001 else { return false }
-
-        let normalizedPrevious = previousDelta / previousDistance
-        let normalizedCurrent = (candidate.position - previous.position) / max(distance, 0.001)
-        let alignment = simd_dot(normalizedPrevious, normalizedCurrent)
-
-        let hookThreshold = max(brushSize * 1.8, 24.0)
-        if alignment < -0.75 && distance > hookThreshold {
-            return true
-        }
-
-        return false
+        return distance > absurdJumpDistance
     }
 
     private func preferredInterpolationSpacing(from previous: StrokePoint, to candidate: StrokePoint, distance: Float) -> Float {
-        var spacing = max(brushSize * 0.35, 1.5)
-
-        if brushTipKind == .oil {
-            spacing = max(brushSize * 0.18, 0.9)
-        }
-
-        guard distance > 0.001 else { return spacing }
-
-        let angleFactor = turnSharpness(from: previous, to: candidate)
-        if angleFactor > 0.45 {
-            spacing *= brushTipKind == .oil ? 0.45 : 0.6
-        }
-
-        return max(spacing, 0.5)
-    }
-
-    private func turnSharpness(from previous: StrokePoint, to candidate: StrokePoint) -> Float {
-        guard let stroke = currentStroke, stroke.points.count >= 2 else { return 0 }
-        let beforePrevious = stroke.points[stroke.points.count - 2]
-        let previousDelta = previous.position - beforePrevious.position
-        let currentDelta = candidate.position - previous.position
-        let previousLength = simd_length(previousDelta)
-        let currentLength = simd_length(currentDelta)
-        guard previousLength > 0.001, currentLength > 0.001 else { return 0 }
-
-        let normalizedPrevious = previousDelta / previousLength
-        let normalizedCurrent = currentDelta / currentLength
-        let alignment = simd_dot(normalizedPrevious, normalizedCurrent)
-        return max(0, 1 - alignment)
+        let baseSpacing = max(brushSize * 0.2, 0.35)
+        guard distance > 0.001 else { return baseSpacing }
+        return baseSpacing
     }
 
     private func interpolatedPoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {

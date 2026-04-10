@@ -4,6 +4,7 @@ import Foundation
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     var presentation: @Sendable () -> PaintDocumentPresentation
+    var compositePixelData: @Sendable () -> Data
     var prewarmDrawingResources: @Sendable () -> Void
     var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
     var timelapseCapture: @Sendable () -> TimelapseCapture?
@@ -38,7 +39,12 @@ struct PaintDocumentClient: Sendable {
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
     var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
+    var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> Bool
+    var pixelDataForLayer: @Sendable (Int) -> Data
     var replaceLayerPixels: @Sendable (Int, Data) -> Void
+    var replaceLayerMask: @Sendable (Int, Data) -> Bool
+    var clearLayerMask: @Sendable (Int) -> Bool
+    var applyLayerMask: @Sendable (Int) -> Bool
     var clearLayer: @Sendable (Int) -> Void
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
@@ -47,6 +53,7 @@ struct PaintDocumentClient: Sendable {
         return PaintDocumentClient(
             lightweightPresentation: { sessionBox.session.lightweightPresentation() },
             presentation: { sessionBox.session.presentation() },
+            compositePixelData: { sessionBox.session.compositePixelData() },
             prewarmDrawingResources: { sessionBox.session.prewarmDrawingResources() },
             compositePNGData: { style in sessionBox.session.compositePNGData(paperStyle: style) },
             timelapseCapture: { sessionBox.session.timelapseCapture() },
@@ -95,7 +102,14 @@ struct PaintDocumentClient: Sendable {
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
             applyLayerProcessing: { index, request in sessionBox.session.applyLayerProcessing(index: index, request: request) },
+            applySoftwareStroke: { samples, brush, layerIndex in
+                sessionBox.session.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
+            },
+            pixelDataForLayer: { index in sessionBox.session.pixelDataForLayer(index: index) },
             replaceLayerPixels: { index, data in sessionBox.session.replaceLayerPixels(index: index, data: data) },
+            replaceLayerMask: { index, data in sessionBox.session.replaceLayerMask(index: index, maskData: data) },
+            clearLayerMask: { index in sessionBox.session.clearLayerMask(index: index) },
+            applyLayerMask: { index in sessionBox.session.applyLayerMask(index: index) },
             clearLayer: { index in sessionBox.session.clearLayer(index: index) },
             consumeDirtyUpdate: { sessionBox.session.consumeDirtyUpdate() }
         )

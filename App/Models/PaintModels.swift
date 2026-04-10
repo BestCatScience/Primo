@@ -863,7 +863,7 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 1.9,
             sizeSpeedSensitivity: 0.0,
             opacity: 1.0,
-            hardness: 1.0,
+            hardness: 0.94,
             roundness: 1.0,
             angleMode: .fixed,
             spacing: 0.06,
@@ -873,7 +873,7 @@ struct BrushPreset: Identifiable, Equatable {
             roundnessJitter: 0.0,
             textureMode: .off,
             textureStrength: 0.0,
-            flow: 1.0,
+            flow: 0.98,
             flowPressureSensitivity: 0.0,
             opacityPressureSensitivity: 0.0,
             grainScale: 1.0,
@@ -893,7 +893,7 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 2.6,
             sizeSpeedSensitivity: 0.0,
             opacity: 1.0,
-            hardness: 0.92,
+            hardness: 0.88,
             roundness: 0.62,
             roundnessPressureSensitivity: 0.08,
             roundnessTiltSensitivity: 0.10,
@@ -906,7 +906,7 @@ struct BrushPreset: Identifiable, Equatable {
             roundnessJitter: 0.01,
             textureMode: .strokeLocked,
             textureStrength: 0.03,
-            flow: 1.0,
+            flow: 0.97,
             flowPressureSensitivity: 0.0,
             flowJitter: 0.0,
             wetness: 0.0,
@@ -932,7 +932,7 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 7.6,
             sizeSpeedSensitivity: 0.02,
             opacity: 1.0,
-            hardness: 0.96,
+            hardness: 0.93,
             roundness: 0.82,
             angle: 0.0,
             angleMode: .fixed,
@@ -943,7 +943,7 @@ struct BrushPreset: Identifiable, Equatable {
             roundnessJitter: 0.0,
             textureMode: .off,
             textureStrength: 0.0,
-            flow: 1.0,
+            flow: 0.98,
             opacityPressureSensitivity: 0.0,
             paperScale: 0.05,
             paperStrength: 0.0,
@@ -960,7 +960,7 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 7.0,
             sizeSpeedSensitivity: 0.03,
             opacity: 1.0,
-            hardness: 0.94,
+            hardness: 0.91,
             roundness: 0.56,
             roundnessPressureSensitivity: 0.08,
             angle: .pi / 8,
@@ -973,7 +973,7 @@ struct BrushPreset: Identifiable, Equatable {
             roundnessJitter: 0.0,
             textureMode: .off,
             textureStrength: 0.0,
-            flow: 1.0,
+            flow: 0.98,
             opacityPressureSensitivity: 0.0,
             paperScale: 0.05,
             paperStrength: 0.0,
@@ -990,7 +990,7 @@ struct BrushPreset: Identifiable, Equatable {
             radius: 6.4,
             sizeSpeedSensitivity: 0.0,
             opacity: 1.0,
-            hardness: 0.95,
+            hardness: 0.92,
             roundness: 0.68,
             angle: .pi / 4,
             angleMode: .fixed,
@@ -1001,7 +1001,7 @@ struct BrushPreset: Identifiable, Equatable {
             roundnessJitter: 0.0,
             textureMode: .off,
             textureStrength: 0.0,
-            flow: 1.0,
+            flow: 0.98,
             opacityPressureSensitivity: 0.0,
             paperScale: 0.05,
             paperStrength: 0.0,
@@ -1630,6 +1630,7 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
     let opacity: Double
     let blendMode: LayerBlendMode
     let folderID: Int?
+    let hasMask: Bool
 
     static func == (lhs: LayerRowModel, rhs: LayerRowModel) -> Bool {
         lhs.index == rhs.index &&
@@ -1637,7 +1638,8 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
         lhs.visible == rhs.visible &&
         lhs.opacity == rhs.opacity &&
         lhs.blendMode == rhs.blendMode &&
-        lhs.folderID == rhs.folderID
+        lhs.folderID == rhs.folderID &&
+        lhs.hasMask == rhs.hasMask
     }
 }
 

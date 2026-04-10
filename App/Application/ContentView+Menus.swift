@@ -40,17 +40,25 @@ extension ContentView {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.create(language)) {
                         guard
-                            let width = parsedCanvasDimension(from: newCanvasWidthText),
-                            let height = parsedCanvasDimension(from: newCanvasHeightText)
+                            let width = resolvedCanvasDimension(from: newCanvasWidthText, fallback: defaultNewCanvasWidth),
+                            let height = resolvedCanvasDimension(from: newCanvasHeightText, fallback: defaultNewCanvasHeight)
                         else { return }
                         store.send(.newCanvasRequested(width: width, height: height))
                         showsNewCanvasSheet = false
                     }
                     .disabled(
-                        parsedCanvasDimension(from: newCanvasWidthText) == nil ||
-                        parsedCanvasDimension(from: newCanvasHeightText) == nil
+                        resolvedCanvasDimension(from: newCanvasWidthText, fallback: defaultNewCanvasWidth) == nil ||
+                        resolvedCanvasDimension(from: newCanvasHeightText, fallback: defaultNewCanvasHeight) == nil
                     )
                 }
+            }
+        }
+        .onAppear {
+            if newCanvasWidthText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                newCanvasWidthText = "\(defaultNewCanvasWidth)"
+            }
+            if newCanvasHeightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                newCanvasHeightText = "\(defaultNewCanvasHeight)"
             }
         }
         .presentationDetents([.height(340)])
@@ -514,6 +522,18 @@ extension ContentView {
                             .textInputAutocapitalization(.sentences)
                             .focused($nanoBananaFocusedField, equals: .prompt)
                     }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(NanoBananaPromptPreset.allCases) { preset in
+                                Button(preset.title(language)) {
+                                    nanoBananaPrompt = preset.prompt(language)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 Section(language.localized("入力")) {
@@ -543,6 +563,16 @@ extension ContentView {
                         Text(language.localized("Create a selection to enable inpaint"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                    }
+
+                    if nanoBananaEditScope == .selectedArea {
+                        Stepper(
+                            "\(language.localized("Mask Expansion")): \(nanoBananaMaskExpansion)",
+                            value: $nanoBananaMaskExpansion,
+                            in: -24...48
+                        )
+
+                        Toggle(language.localized("Invert Mask"), isOn: $nanoBananaInvertsMask)
                     }
 
                     Picker(language.localized("モデル"), selection: $nanoBananaModel) {
@@ -606,6 +636,55 @@ extension ContentView {
                         }
                     }
                 }
+
+                if !store.nanoBananaJobs.isEmpty {
+                    Section(language.localized("Jobs")) {
+                        ForEach(store.nanoBananaJobs.prefix(4)) { job in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(job.request.model.title(language))
+                                    Spacer()
+                                    Text(job.status.rawValue.capitalized)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(job.request.prompt)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                if job.status == .failed || job.status == .canceled {
+                                    Button(language.localized("Retry")) {
+                                        store.send(.nanoBananaRetryJob(job.id))
+                                    }
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !store.nanoBananaHistory.isEmpty {
+                    Section(language.localized("History")) {
+                        ForEach(store.nanoBananaHistory.prefix(4)) { item in
+                            Button {
+                                nanoBananaPrompt = item.request.prompt
+                                nanoBananaInputLayerIndex = item.request.inputLayerIndex
+                                nanoBananaEditScope = item.request.editScope
+                                nanoBananaOutputMode = item.request.outputMode
+                                nanoBananaModel = item.request.model
+                                nanoBananaMaskExpansion = item.request.maskSettings.expansion
+                                nanoBananaInvertsMask = item.request.maskSettings.isInverted
+                            } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(item.request.prompt)
+                                        .lineLimit(2)
+                                    Text(item.request.model.title(language))
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(StudioStrings.nanoBanana(language))
@@ -623,16 +702,22 @@ extension ContentView {
                         nanoBananaFocusedField = nil
                         store.send(
                             .nanoBananaEditRequested(
-                                prompt: nanoBananaPrompt,
-                                config: NanoBananaRequestConfig(
+                                NanoBananaGenerationRequest(
+                                    prompt: nanoBananaPrompt,
+                                    config: NanoBananaRequestConfig(
                                     accessMode: nanoBananaAccessMode,
                                     credential: nanoBananaAccessMode == .userAPIKey ? nanoBananaAPIKey : nanoBananaCommerce.latestEntitlementJWS,
                                     endpoint: nanoBananaCommerce.proxyEndpoint
                                 ),
-                                model: nanoBananaModel,
-                                inputLayerIndex: nanoBananaInputLayerIndex,
-                                editScope: nanoBananaEditScope,
-                                outputMode: nanoBananaOutputMode
+                                    model: nanoBananaModel,
+                                    inputLayerIndex: nanoBananaInputLayerIndex,
+                                    editScope: nanoBananaEditScope,
+                                    outputMode: nanoBananaOutputMode,
+                                    maskSettings: NanoBananaMaskSettings(
+                                        expansion: nanoBananaMaskExpansion,
+                                        isInverted: nanoBananaInvertsMask
+                                    )
+                                )
                             )
                         )
                         showsNanoBananaSheet = false
@@ -885,6 +970,23 @@ extension ContentView {
         return value
     }
 
+    func resolvedCanvasDimension(from text: String, fallback: Int) -> Int? {
+        if let parsed = parsedCanvasDimension(from: text) {
+            return parsed
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty else { return nil }
+        return (64...8192).contains(fallback) ? fallback : nil
+    }
+
+    var defaultNewCanvasWidth: Int {
+        max(Int(CanvasFeature.defaultCanvasSize.width.rounded()), 1)
+    }
+
+    var defaultNewCanvasHeight: Int {
+        max(Int(CanvasFeature.defaultCanvasSize.height.rounded()), 1)
+    }
+
     var menuBar: some View {
         HStack(spacing: 8) {
             Button {
@@ -1040,6 +1142,8 @@ extension ContentView {
                     nanoBananaPrompt = ""
                     nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
                     nanoBananaEditScope = store.canvas.selection?.isEmpty == false ? .selectedArea : .wholeLayer
+                    nanoBananaMaskExpansion = 0
+                    nanoBananaInvertsMask = false
                     nanoBananaOutputMode = .replaceCurrentLayer
                     nanoBananaModel = .flashImage25
                     showsNanoBananaSheet = true
@@ -1091,6 +1195,23 @@ extension ContentView {
                     store.send(.selectNextLayer)
                 }
                 .disabled(!canSelectNextLayer)
+
+                Divider()
+
+                Button(language.localized("選択範囲からマスク作成")) {
+                    store.send(.createLayerMaskFromSelectionRequested)
+                }
+                .disabled(activeLayer == nil || store.canvas.selection?.isEmpty != false)
+
+                Button(language.localized("マスクを削除")) {
+                    store.send(.clearLayerMaskRequested)
+                }
+                .disabled(activeLayerHasMask == false)
+
+                Button(language.localized("マスクを適用")) {
+                    store.send(.applyLayerMaskRequested)
+                }
+                .disabled(activeLayerHasMask == false)
 
                 Divider()
 
@@ -1215,6 +1336,10 @@ extension ContentView {
 
     var activeLayerIsVisible: Bool {
         activeLayer?.visible ?? false
+    }
+
+    var activeLayerHasMask: Bool {
+        activeLayer?.hasMask ?? false
     }
 
     var activeLayerPosition: Int? {

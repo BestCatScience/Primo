@@ -18,38 +18,6 @@ struct TimelapseExportPreview: Equatable {
     var previewImageData: Data?
 }
 
-enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case replaceCurrentLayer
-    case newLayer
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .replaceCurrentLayer:
-            return language.localized("Replace Current Layer")
-        case .newLayer:
-            return language.localized("Generate Into New Layer")
-        }
-    }
-}
-
-enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case wholeLayer
-    case selectedArea
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .wholeLayer:
-            return language.localized("Whole Layer")
-        case .selectedArea:
-            return language.localized("Selected Area Only")
-        }
-    }
-}
-
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -95,34 +63,11 @@ struct StudioPanelLayoutState: Equatable {
 struct AppFeature {
     private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
 
-    static func localizedNanoBananaErrorMessage(_ message: String, language: AppLanguage) -> String {
-        let normalized = message.lowercased()
-        if normalized.contains("quota exceeded") || normalized.contains("rate limit") {
-            switch language {
-            case .english:
-                return "Nano Banana is currently over the API quota for this model. Try again later, switch to Nano Banana, or use the app subscription route."
-            case .japanese:
-                return "このモデルは現在 API 利用上限に達しています。時間をおいて再試行するか、Nano Banana へ切り替えるか、アプリ課金プラン経由を使ってください。"
-            }
-        }
-        if normalized.contains("high demand") || normalized.contains("please try again later") {
-            switch language {
-            case .english:
-                return "Nano Banana is currently experiencing high demand. The app retried with alternate models, but no model was available right now. Please try again in a little while."
-            case .japanese:
-                return "Nano Banana は現在混雑しています。アプリ側で別モデルにも自動フォールバックしましたが、今は利用できませんでした。少し時間をおいて再試行してください。"
-            }
-        }
-        return message
-    }
-
     private enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
         case timelapseExport
         case nanoBananaEdit
-        case nanoBananaProgress
-        case nanoBananaHUDDismiss
     }
 
     @ObservableState
@@ -141,7 +86,11 @@ struct AppFeature {
         var bannerMessage: String?
         var timelapseExportPreview: TimelapseExportPreview?
         var isNanoBananaGenerating = false
-        var nanoBananaProgress: Double?
+        var nanoBananaPreview: NanoBananaPreviewState?
+        var nanoBananaJobs: [NanoBananaJob] = []
+        var nanoBananaHistory: [NanoBananaHistoryItem] = []
+        var pendingNanoBananaRequest: NanoBananaGenerationRequest?
+        var activeNanoBananaJobID: UUID?
         var pendingNanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
         var appLanguage: AppLanguage = .load()
 
@@ -169,7 +118,6 @@ struct AppFeature {
             if let renderSnapshot = presentation.renderSnapshot {
                 canvas.renderSnapshot = renderSnapshot
                 canvas.lastCommittedRenderRevision = renderSnapshot.revision
-                canvas.pendingIncrementalUpdate = nil
                 isHydrating = false
                 if !canvas.isStrokeActive &&
                     canvas.isAwaitingCommittedRender &&
@@ -189,6 +137,96 @@ struct AppFeature {
             canvas.shapeMode = brushPalette.shape.mode
             canvas.eyedropperSamplingSource = brushPalette.sampling.eyedropperSource
             canvas.paperStyle = resolvedPaperStyle()
+        }
+
+        mutating func applyLiveCompositePixelData(_ compositePixelData: Data) {
+            let width = canvas.renderSnapshot?.width ?? max(Int(canvas.canvasSize.width.rounded()), 1)
+            let height = canvas.renderSnapshot?.height ?? max(Int(canvas.canvasSize.height.rounded()), 1)
+            guard compositePixelData.count == width * height * 4 else {
+                return
+            }
+
+            let layerSnapshots: [MetalLayerSnapshot]
+            if let existingLayers = canvas.renderSnapshot?.layers, !existingLayers.isEmpty {
+                layerSnapshots = existingLayers
+            } else {
+                layerSnapshots = canvas.layerBuffers.map { buffer in
+                    MetalLayerSnapshot(
+                        index: buffer.index,
+                        opacity: Float(buffer.opacity),
+                        visible: buffer.visible,
+                        blendMode: buffer.blendMode,
+                        thumbnailData: nil,
+                        pixelData: Data()
+                    )
+                }
+            }
+
+            let nextRevision = max(canvas.renderSnapshot?.revision ?? 0, canvas.lastCommittedRenderRevision) + 1
+            canvas.renderSnapshot = MetalDocumentSnapshot(
+                width: width,
+                height: height,
+                revision: nextRevision,
+                compositePixelData: compositePixelData,
+                layers: layerSnapshots
+            )
+            isHydrating = false
+        }
+
+        mutating func applyLiveStrokePreview(
+            baseSnapshot: MetalDocumentSnapshot,
+            activeLayerIndex: Int,
+            adjustedActiveLayerPixels: Data
+        ) {
+            let previewLayers = baseSnapshot.layers.map { layer in
+                guard layer.index == activeLayerIndex else { return layer }
+                return MetalLayerSnapshot(
+                    index: layer.index,
+                    opacity: layer.opacity,
+                    visible: true,
+                    blendMode: layer.blendMode,
+                    thumbnailData: layer.thumbnailData,
+                    pixelData: layer.pixelData
+                )
+            }
+            let previewSnapshot = MetalDocumentSnapshot(
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                revision: baseSnapshot.revision,
+                compositePixelData: baseSnapshot.compositePixelData,
+                layers: previewLayers
+            )
+            guard
+                let composite = AppFeature.compositedPreviewPixelData(
+                    snapshot: previewSnapshot,
+                    activeLayerIndex: activeLayerIndex,
+                    adjustedActiveLayerPixels: adjustedActiveLayerPixels
+                )
+            else {
+                return
+            }
+
+            let nextLayers = previewLayers.map { layer in
+                guard layer.index == activeLayerIndex else { return layer }
+                return MetalLayerSnapshot(
+                    index: layer.index,
+                    opacity: layer.opacity,
+                    visible: layer.visible,
+                    blendMode: layer.blendMode,
+                    thumbnailData: layer.thumbnailData,
+                    pixelData: adjustedActiveLayerPixels
+                )
+            }
+
+            let nextRevision = max(canvas.renderSnapshot?.revision ?? 0, canvas.lastCommittedRenderRevision) + 1
+            canvas.renderSnapshot = MetalDocumentSnapshot(
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                revision: nextRevision,
+                compositePixelData: composite,
+                layers: nextLayers
+            )
+            isHydrating = false
         }
 
         func resolvedBrushSettings() -> BrushRuntimeSettings {
@@ -315,19 +353,14 @@ struct AppFeature {
         case saveDocumentRequested
         case exportDocumentRequested
         case exportTimelapseRequested
-        case nanoBananaEditRequested(
-            prompt: String,
-            config: NanoBananaRequestConfig,
-            model: NanoBananaModel,
-            inputLayerIndex: Int,
-            editScope: NanoBananaEditScope,
-            outputMode: NanoBananaOutputMode
-        )
-        case nanoBananaEditSucceeded(Int, Data)
+        case nanoBananaEditRequested(NanoBananaGenerationRequest)
+        case nanoBananaEditSucceeded(NanoBananaPreviewState)
         case nanoBananaEditFailed(String)
-        case nanoBananaProgressUpdated(Double)
         case nanoBananaCancelRequested
-        case nanoBananaHUDDismissed
+        case nanoBananaPreviewAccepted
+        case nanoBananaPreviewDiscarded
+        case nanoBananaRegenerateRequested
+        case nanoBananaRetryJob(UUID)
         case openDocumentSelected(URL)
         case openDocumentLoaded(LoadedPaintProject)
         case openDocumentFailed(String)
@@ -340,6 +373,9 @@ struct AppFeature {
         case toolSelected(StudioToolKind)
         case toolLongPressed(StudioToolKind)
         case clearActiveLayerButtonTapped
+        case createLayerMaskFromSelectionRequested
+        case clearLayerMaskRequested
+        case applyLayerMaskRequested
         case gradientMapSelected(GradientMapPreset)
         case gradientMapPreviewChanged(GradientMapSettings?)
         case gradientMapApplied(GradientMapSettings)
@@ -447,6 +483,9 @@ struct AppFeature {
                 return .send(.homeProjectsLoadRequested)
 
             case let .presentationLoaded(presentation):
+                guard !state.canvas.isStrokeActive else {
+                    return .none
+                }
                 state.applyPresentation(presentation)
                 Self.startupLogger.debug("Full presentation applied")
                 return .none
@@ -829,23 +868,23 @@ struct AppFeature {
                 }
                 .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
 
-            case let .nanoBananaEditRequested(prompt, config, model, inputLayerIndex, editScope, outputMode):
-                let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedCredential = config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedEndpoint = config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+            case let .nanoBananaEditRequested(request):
+                let trimmedPrompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
+                let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmedPrompt.isEmpty else {
                     state.bannerMessage = state.appLanguage.localized("Enter a prompt for Nano Banana")
                     return .none
                 }
                 guard
-                    config.accessMode == .appManaged ||
+                    request.config.accessMode == .appManaged ||
                     !trimmedCredential.isEmpty
                 else {
                     state.bannerMessage = state.appLanguage.localized("Enter your Gemini API key")
                     return .none
                 }
                 guard
-                    config.accessMode == .userAPIKey ||
+                    request.config.accessMode == .userAPIKey ||
                     !trimmedEndpoint.isEmpty
                 else {
                     state.bannerMessage = state.appLanguage.localized("Enter your app server endpoint")
@@ -853,14 +892,21 @@ struct AppFeature {
                 }
                 guard
                     let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == inputLayerIndex })
+                    let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
                 else {
                     state.bannerMessage = state.appLanguage.localized("Could not prepare the active layer for Nano Banana")
                     return .none
                 }
 
-                let selection = editScope == .selectedArea ? state.canvas.selection : nil
-                if editScope == .selectedArea, selection?.isEmpty != false {
+                let adjustedSelection = request.editScope == .selectedArea
+                    ? Self.adjustedSelection(
+                        state.canvas.selection,
+                        canvasSize: state.canvas.canvasSize,
+                        expansion: request.maskSettings.expansion,
+                        isInverted: request.maskSettings.isInverted
+                    )
+                    : nil
+                if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
                     state.bannerMessage = state.appLanguage.localized("Create a selection to use inpaint")
                     return .none
                 }
@@ -870,34 +916,52 @@ struct AppFeature {
                 let canvasHeight = snapshot.height
                 let appLanguage = state.appLanguage
                 let sourceLayerPixelData = layer.pixelData
+                let beforePreviewImageData = Self.pngData(
+                    fromLayerPixelData: request.outputMode == .replaceCurrentLayer
+                        ? sourceLayerPixelData
+                        : Data(repeating: 0, count: canvasWidth * canvasHeight * 4),
+                    width: canvasWidth,
+                    height: canvasHeight
+                )
+                let normalizedRequest = NanoBananaGenerationRequest(
+                    prompt: trimmedPrompt,
+                    config: NanoBananaRequestConfig(
+                        accessMode: request.config.accessMode,
+                        credential: trimmedCredential,
+                        endpoint: trimmedEndpoint
+                    ),
+                    model: request.model,
+                    inputLayerIndex: request.inputLayerIndex,
+                    editScope: request.editScope,
+                    outputMode: request.outputMode,
+                    maskSettings: request.maskSettings
+                )
+                let jobID = UUID()
                 state.isNanoBananaGenerating = true
-                state.nanoBananaProgress = 0.04
-                state.pendingNanoBananaOutputMode = outputMode
+                state.nanoBananaPreview = nil
+                state.pendingNanoBananaRequest = normalizedRequest
+                state.activeNanoBananaJobID = jobID
+                state.pendingNanoBananaOutputMode = request.outputMode
+                state.nanoBananaJobs.insert(
+                    NanoBananaJob(
+                        id: jobID,
+                        request: normalizedRequest,
+                        createdAt: Date(),
+                        status: .running,
+                        message: nil
+                    ),
+                    at: 0
+                )
+                state.nanoBananaJobs = Array(state.nanoBananaJobs.prefix(12))
 
-                return .merge(
-                    .run { send in
-                        var progress = 0.04
-                        while !Task.isCancelled {
-                            try? await Task.sleep(for: .milliseconds(120))
-                            guard !Task.isCancelled else { break }
-                            progress += max(0.006, (0.94 - progress) * 0.08)
-                            await send(.nanoBananaProgressUpdated(min(progress, 0.94)))
-                        }
-                    }
-                    .cancellable(id: CancelID.nanoBananaProgress, cancelInFlight: true),
-                    .run { [nanoBananaClient] send in
+                return .run { [nanoBananaClient] send in
                         do {
-                            let normalizedConfig = NanoBananaRequestConfig(
-                                accessMode: config.accessMode,
-                                credential: trimmedCredential,
-                                endpoint: trimmedEndpoint
-                            )
-                            let requestPrompt = editScope == .selectedArea
+                            let requestPrompt = normalizedRequest.editScope == .selectedArea
                                 ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(trimmedPrompt)"
                                 : trimmedPrompt
 
                             let finalPixelData: Data?
-                            switch editScope {
+                            switch normalizedRequest.editScope {
                             case .wholeLayer:
                                 guard let inputPNGData = Self.pngData(
                                     fromLayerPixelData: sourceLayerPixelData,
@@ -907,7 +971,7 @@ struct AppFeature {
                                     finalPixelData = nil
                                     break
                                 }
-                                let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, requestPrompt, normalizedConfig, model)
+                                let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, requestPrompt, normalizedRequest.config, normalizedRequest.model)
                                 finalPixelData = Self.rawLayerPixelData(
                                     fromPNGData: outputPNGData,
                                     width: canvasWidth,
@@ -916,12 +980,12 @@ struct AppFeature {
 
                             case .selectedArea:
                                 guard
-                                    let selection,
+                                    let adjustedSelection,
                                     let crop = Self.inpaintCrop(
                                         source: sourceLayerPixelData,
                                         canvasWidth: canvasWidth,
                                         canvasHeight: canvasHeight,
-                                        selection: selection
+                                        selection: adjustedSelection
                                     ),
                                     let cropPNGData = Self.pngData(
                                         fromLayerPixelData: crop.pixelData,
@@ -933,7 +997,7 @@ struct AppFeature {
                                     break
                                 }
 
-                                let outputPNGData = try await nanoBananaClient.editImage(cropPNGData, requestPrompt, normalizedConfig, model)
+                                let outputPNGData = try await nanoBananaClient.editImage(cropPNGData, requestPrompt, normalizedRequest.config, normalizedRequest.model)
                                 guard let editedCropPixelData = Self.rawLayerPixelData(
                                     fromPNGData: outputPNGData,
                                     width: crop.width,
@@ -943,7 +1007,7 @@ struct AppFeature {
                                     break
                                 }
 
-                                let baseLayerPixelData = outputMode == .replaceCurrentLayer
+                                let baseLayerPixelData = normalizedRequest.outputMode == .replaceCurrentLayer
                                     ? sourceLayerPixelData
                                     : Data(repeating: 0, count: canvasWidth * canvasHeight * 4)
                                 finalPixelData = Self.applyingInpaintCrop(
@@ -959,73 +1023,104 @@ struct AppFeature {
                                 await send(.nanoBananaEditFailed("Nano Banana returned an unsupported image."))
                                 return
                             }
-                            await send(.nanoBananaEditSucceeded(outputLayerIndex, finalPixelData))
+                            let preview = NanoBananaPreviewState(
+                                request: normalizedRequest,
+                                outputLayerIndex: outputLayerIndex,
+                                pixelData: finalPixelData,
+                                beforePreviewImageData: beforePreviewImageData,
+                                afterPreviewImageData: Self.pngData(
+                                    fromLayerPixelData: finalPixelData,
+                                    width: canvasWidth,
+                                    height: canvasHeight
+                                )
+                            )
+                            await send(.nanoBananaEditSucceeded(preview))
                         } catch {
                             await send(.nanoBananaEditFailed(Self.localizedNanoBananaErrorMessage(error.localizedDescription, language: appLanguage)))
                         }
                     }
                     .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
+
+            case let .nanoBananaEditSucceeded(preview):
+                state.isNanoBananaGenerating = false
+                state.nanoBananaPreview = preview
+                state.nanoBananaHistory.insert(
+                    NanoBananaHistoryItem(
+                        id: UUID(),
+                        request: preview.request,
+                        createdAt: Date(),
+                        previewImageData: preview.afterPreviewImageData
+                    ),
+                    at: 0
+                )
+                state.nanoBananaHistory = Array(state.nanoBananaHistory.prefix(12))
+                if let activeJobID = state.activeNanoBananaJobID,
+                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
+                    state.nanoBananaJobs[jobIndex].status = .succeeded
+                    state.nanoBananaJobs[jobIndex].message = nil
+                }
+                return .none
+
+            case let .nanoBananaEditFailed(message):
+                state.isNanoBananaGenerating = false
+                if let activeJobID = state.activeNanoBananaJobID,
+                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
+                    state.nanoBananaJobs[jobIndex].status = .failed
+                    state.nanoBananaJobs[jobIndex].message = message
+                }
+                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Nano Banana edit failed") : message
+                return .none
+
+            case .nanoBananaCancelRequested:
+                state.isNanoBananaGenerating = false
+                if let activeJobID = state.activeNanoBananaJobID,
+                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
+                    state.nanoBananaJobs[jobIndex].status = .canceled
+                    state.nanoBananaJobs[jobIndex].message = state.appLanguage.localized("Nano Banana generation canceled")
+                }
+                state.bannerMessage = state.appLanguage.localized("Nano Banana generation canceled")
+                return .merge(
+                    .cancel(id: CancelID.nanoBananaEdit)
                 )
 
-            case let .nanoBananaEditSucceeded(layerIndex, pixelData):
-                state.isNanoBananaGenerating = false
-                state.nanoBananaProgress = 1
+            case .nanoBananaPreviewAccepted:
+                guard let preview = state.nanoBananaPreview else { return .none }
                 let targetLayerIndex: Int
-                switch state.pendingNanoBananaOutputMode {
+                switch preview.request.outputMode {
                 case .replaceCurrentLayer:
-                    targetLayerIndex = layerIndex
+                    targetLayerIndex = preview.outputLayerIndex
                 case .newLayer:
                     paintDocumentClient.addLayer("Nano Banana \(state.layerSidebar.layers.count + 1)")
                     let presentation = paintDocumentClient.presentation()
                     targetLayerIndex = presentation.activeLayerIndex
                 }
-                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
                 paintDocumentClient.setActiveLayer(targetLayerIndex)
-                paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData)
+                paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
                 if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
+                state.nanoBananaPreview = nil
+                state.pendingNanoBananaRequest = preview.request
+                state.activeNanoBananaJobID = nil
+                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
                 state.applyPresentation(paintDocumentClient.presentation())
                 state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
-                return .merge(
-                    .cancel(id: CancelID.nanoBananaProgress),
-                    .run { send in
-                        try? await Task.sleep(for: .milliseconds(480))
-                        await send(.nanoBananaHUDDismissed)
-                    }
-                    .cancellable(id: CancelID.nanoBananaHUDDismiss, cancelInFlight: true)
-                )
-
-            case let .nanoBananaEditFailed(message):
-                state.isNanoBananaGenerating = false
-                state.nanoBananaProgress = nil
-                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
-                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Nano Banana edit failed") : message
-                return .merge(
-                    .cancel(id: CancelID.nanoBananaProgress),
-                    .cancel(id: CancelID.nanoBananaHUDDismiss)
-                )
-
-            case let .nanoBananaProgressUpdated(progress):
-                guard state.isNanoBananaGenerating else { return .none }
-                state.nanoBananaProgress = progress
                 return .none
 
-            case .nanoBananaCancelRequested:
-                state.isNanoBananaGenerating = false
-                state.nanoBananaProgress = nil
-                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
-                state.bannerMessage = state.appLanguage.localized("Nano Banana generation canceled")
-                return .merge(
-                    .cancel(id: CancelID.nanoBananaEdit),
-                    .cancel(id: CancelID.nanoBananaProgress),
-                    .cancel(id: CancelID.nanoBananaHUDDismiss)
-                )
-
-            case .nanoBananaHUDDismissed:
-                state.nanoBananaProgress = nil
+            case .nanoBananaPreviewDiscarded:
+                state.nanoBananaPreview = nil
+                state.activeNanoBananaJobID = nil
                 return .none
+
+            case .nanoBananaRegenerateRequested:
+                guard let request = state.nanoBananaPreview?.request ?? state.pendingNanoBananaRequest else { return .none }
+                state.nanoBananaPreview = nil
+                return .send(.nanoBananaEditRequested(request))
+
+            case let .nanoBananaRetryJob(jobID):
+                guard let job = state.nanoBananaJobs.first(where: { $0.id == jobID }) else { return .none }
+                return .send(.nanoBananaEditRequested(job.request))
 
             case let .timelapseExportProgressUpdated(progress, previewData):
                 state.timelapseExportPreview = TimelapseExportPreview(progress: progress, previewImageData: previewData ?? state.timelapseExportPreview?.previewImageData)
@@ -1142,6 +1237,43 @@ struct AppFeature {
                 state.canvas.transformPreviewScale = 1.0
                 return .none
 
+            case .brushPalette(.delegate(.invertSelection)):
+                state.canvas.selection = Self.invertedSelection(
+                    state.canvas.selection,
+                    canvasSize: state.canvas.canvasSize,
+                    mode: state.canvas.selectionMode
+                )
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                return .none
+
+            case let .brushPalette(.delegate(.expandSelection(expansion))):
+                guard state.canvas.selection != nil else { return .none }
+                state.canvas.selection = Self.adjustedSelection(
+                    state.canvas.selection,
+                    canvasSize: state.canvas.canvasSize,
+                    expansion: max(expansion, 1),
+                    isInverted: false
+                )
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                return .none
+
+            case let .brushPalette(.delegate(.contractSelection(contraction))):
+                guard state.canvas.selection != nil else { return .none }
+                state.canvas.selection = Self.adjustedSelection(
+                    state.canvas.selection,
+                    canvasSize: state.canvas.canvasSize,
+                    expansion: -max(contraction, 1),
+                    isInverted: false
+                )
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                return .none
+
             case .brushPalette(.delegate(.cancelTransform)):
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
@@ -1156,6 +1288,41 @@ struct AppFeature {
             case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
                 let activeLayerIndex = state.layerSidebar.activeLayerIndex
                 paintDocumentClient.clearLayer(activeLayerIndex)
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                    state.canvas.localBufferRevision += 1
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .createLayerMaskFromSelectionRequested:
+                let activeLayerIndex = state.layerSidebar.activeLayerIndex
+                guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
+                    state.bannerMessage = state.appLanguage.localized("選択範囲を作成してからマスクを追加してください")
+                    return .none
+                }
+                guard paintDocumentClient.replaceLayerMask(activeLayerIndex, maskData) else {
+                    state.bannerMessage = state.appLanguage.localized("レイヤーマスクを作成できませんでした")
+                    return .none
+                }
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .clearLayerMaskRequested:
+                let activeLayerIndex = state.layerSidebar.activeLayerIndex
+                guard paintDocumentClient.clearLayerMask(activeLayerIndex) else {
+                    return .none
+                }
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case .applyLayerMaskRequested:
+                let activeLayerIndex = state.layerSidebar.activeLayerIndex
+                guard paintDocumentClient.applyLayerMask(activeLayerIndex) else {
+                    state.bannerMessage = state.appLanguage.localized("レイヤーマスクを適用できませんでした")
+                    return .none
+                }
                 if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                     state.canvas.localBufferRevision += 1
@@ -1341,24 +1508,56 @@ struct AppFeature {
             case let .canvas(.delegate(.beginStroke(sample))):
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil
-                paintDocumentClient.beginStroke(sample, state.resolvedBrushSettings())
-                if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .concatenate(
-                        .cancel(id: CancelID.startupPresentationLoad),
-                        .send(.canvas(.applyIncrementalUpdate(update)))
+                paintDocumentClient.cancelStroke()
+                if state.canvas.activeStrokeBaseSnapshot == nil {
+                    if state.canvas.renderSnapshot == nil {
+                        state.applyPresentation(paintDocumentClient.presentation())
+                    }
+                    state.canvas.activeStrokeBaseSnapshot = state.canvas.renderSnapshot
+                }
+                let brush = state.resolvedBrushSettings()
+                let samples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? [sample]
+                if
+                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: baseLayer.pixelData,
+                        canvasWidth: baseSnapshot.width,
+                        canvasHeight: baseSnapshot.height,
+                        samples: samples,
+                        brush: brush
+                    )
+                {
+                    state.applyLiveStrokePreview(
+                        baseSnapshot: baseSnapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjustedPixels
                     )
                 }
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                    .cancel(id: CancelID.deferredPresentationRefresh)
                 )
 
             case let .canvas(.delegate(.appendSamples(samples))):
-                for sample in samples {
-                    paintDocumentClient.appendStroke(sample)
-                }
-                if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .send(.canvas(.applyIncrementalUpdate(update)))
+                let brush = state.resolvedBrushSettings()
+                let currentSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
+                if
+                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: baseLayer.pixelData,
+                        canvasWidth: baseSnapshot.width,
+                        canvasHeight: baseSnapshot.height,
+                        samples: currentSamples,
+                        brush: brush
+                    )
+                {
+                    state.applyLiveStrokePreview(
+                        baseSnapshot: baseSnapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjustedPixels
+                    )
                 }
                 return .none
 
@@ -1371,72 +1570,106 @@ struct AppFeature {
                 for sample in samples.dropFirst() {
                     paintDocumentClient.appendStroke(sample)
                 }
-                if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .concatenate(
-                        .cancel(id: CancelID.startupPresentationLoad),
-                        .send(.canvas(.applyIncrementalUpdate(update)))
-                    )
-                }
+                state.applyLiveCompositePixelData(paintDocumentClient.compositePixelData())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                    .cancel(id: CancelID.deferredPresentationRefresh)
                 )
 
             case .canvas(.delegate(.commitPreviewShapeStroke)):
                 paintDocumentClient.endStroke()
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
-
-            case .canvas(.delegate(.endStroke)):
-                paintDocumentClient.endStroke()
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
-
-            case .canvas(.delegate(.cancelStroke)):
-                paintDocumentClient.cancelStroke()
-                if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .concatenate(
-                        .cancel(id: CancelID.startupPresentationLoad),
-                        .send(.canvas(.applyIncrementalUpdate(update)))
-                    )
-                }
+                state.applyPresentation(paintDocumentClient.presentation())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                    .cancel(id: CancelID.deferredPresentationRefresh)
+                )
+
+            case let .canvas(.delegate(.endStroke(samples))):
+                let brush = state.resolvedBrushSettings()
+                let didCommit = paintDocumentClient.applySoftwareStroke(
+                    samples,
+                    brush,
+                    state.canvas.activeLayerIndex
+                )
+                if !didCommit,
+                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: baseLayer.pixelData,
+                        canvasWidth: baseSnapshot.width,
+                        canvasHeight: baseSnapshot.height,
+                        samples: samples,
+                        brush: brush
+                    ) {
+                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                }
+                state.canvas.activeStrokeBaseSnapshot = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .cancel(id: CancelID.deferredPresentationRefresh)
+                )
+
+            case .canvas(.delegate(.cancelStroke)):
+                if state.canvas.currentTool == .shape {
+                    paintDocumentClient.cancelStroke()
+                }
+                state.canvas.activeStrokeBaseSnapshot = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .cancel(id: CancelID.deferredPresentationRefresh)
                 )
 
             case let .canvas(.delegate(.commitStroke(samples))):
-                guard let first = samples.first else { return .none }
+                let brush = state.resolvedBrushSettings()
+                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil
-                paintDocumentClient.beginStroke(first, state.resolvedBrushSettings())
-                for sample in samples.dropFirst() {
-                    paintDocumentClient.appendStroke(sample)
+                let didCommit = paintDocumentClient.applySoftwareStroke(
+                    samples,
+                    brush,
+                    state.canvas.activeLayerIndex
+                )
+                if !didCommit,
+                    let snapshot = state.canvas.renderSnapshot,
+                    let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: baseLayer.pixelData,
+                        canvasWidth: snapshot.width,
+                        canvasHeight: snapshot.height,
+                        samples: samples,
+                        brush: brush
+                    ) {
+                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
                 }
-                paintDocumentClient.endStroke()
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                state.canvas.activeStrokeBaseSnapshot = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .concatenate(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .cancel(id: CancelID.deferredPresentationRefresh)
+                )
 
             case let .canvas(.delegate(.blurSamples(samples))):
                 guard !samples.isEmpty else { return .none }
                 paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
                 paintDocumentClient.blurStroke(samples, state.resolvedBrushSettings(), state.canvas.activeLayerIndex, false)
                 state.canvas.selection = nil
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
 
             case .canvas(.delegate(.endBlurStroke)):
                 paintDocumentClient.endBlurStroke()
-                return .send(.presentationLoaded(paintDocumentClient.presentation()))
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
 
             case let .canvas(.delegate(.fill(sample))):
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 paintDocumentClient.fill(sample, state.resolvedBrushSettings())
                 state.canvas.selection = nil
-                if let update = paintDocumentClient.consumeDirtyUpdate() {
-                    return .concatenate(
-                        .cancel(id: CancelID.startupPresentationLoad),
-                        .send(.canvas(.applyIncrementalUpdate(update)))
-                    )
-                }
+                state.applyPresentation(paintDocumentClient.presentation())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
-                    .send(.presentationLoaded(paintDocumentClient.presentation()))
+                    .cancel(id: CancelID.deferredPresentationRefresh)
                 )
 
             case let .canvas(.delegate(.lassoSelect(points))):

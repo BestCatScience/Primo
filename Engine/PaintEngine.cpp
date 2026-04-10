@@ -88,8 +88,27 @@ float brushSpacingDistance(const BrushSettings& brush) {
     return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
 }
 
+bool shouldPreserveCircularInkTip(const BrushSettings& brush) {
+    if (brush.tipKind != "ink") {
+        return false;
+    }
+    if (brush.tipMaskWidth > 0 && brush.tipMaskHeight > 0 && !brush.tipMaskAlpha.empty()) {
+        return false;
+    }
+    return brush.roundness >= 0.98F &&
+        std::abs(brush.roundnessPressureSensitivity) <= 0.001F &&
+        std::abs(brush.roundnessTiltSensitivity) <= 0.001F &&
+        std::abs(brush.anglePressureSensitivity) <= 0.001F &&
+        std::abs(brush.angleTiltSensitivity) <= 0.001F &&
+        std::abs(brush.angleJitter) <= 0.001F &&
+        std::abs(brush.roundnessJitter) <= 0.001F;
+}
+
 float effectiveRoundness(const BrushSettings& brush, std::string_view tipKind, float altitudeFactor) {
     float roundness = std::clamp(brush.roundness, 0.18F, 1.0F);
+    if (tipKind == "ink" && shouldPreserveCircularInkTip(brush)) {
+        return roundness;
+    }
     if (tipKind == "ink") {
         roundness *= lerp(0.74F, 0.38F, altitudeFactor);
     } else if (tipKind == "oil") {
@@ -128,6 +147,9 @@ float resolvedBrushAngle(
     float altitudeFactor
 ) {
     float baseAngle = brush.angle;
+    if (shouldPreserveCircularInkTip(brush)) {
+        return baseAngle;
+    }
     switch (brush.angleMode) {
         case 2:
             baseAngle += point.azimuth * clamp01(brush.tiltInfluence);
@@ -137,8 +159,6 @@ float resolvedBrushAngle(
             const float dy = point.y - previousPoint.y;
             if (std::abs(dx) > 0.0001F || std::abs(dy) > 0.0001F) {
                 baseAngle += std::atan2(dy, dx);
-            } else {
-                baseAngle += point.azimuth * altitudeFactor * 0.35F;
             }
             break;
         }
@@ -1794,6 +1814,82 @@ void PaintDocument::replaceLayerPixelsTransient(int index, std::span<const uint8
     markEntireDocumentDirty();
 }
 
+bool PaintDocument::hasLayerMask(int index) const noexcept {
+    if (index < 0 || index >= layerCount()) {
+        return false;
+    }
+    return !layers_[static_cast<size_t>(index)].mask.empty();
+}
+
+std::vector<uint8_t> PaintDocument::layerMaskData(int index) const {
+    if (index < 0 || index >= layerCount()) {
+        return {};
+    }
+    return layers_[static_cast<size_t>(index)].mask;
+}
+
+void PaintDocument::replaceLayerMask(int index, std::span<const uint8_t> mask) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (mask.size() != static_cast<size_t>(width_) * static_cast<size_t>(height_)) {
+        return;
+    }
+
+    Layer& layer = layers_[static_cast<size_t>(index)];
+    if (std::equal(mask.begin(), mask.end(), layer.mask.begin(), layer.mask.end())) {
+        return;
+    }
+
+    pushLayerHistorySnapshot(index);
+    layer.mask.assign(mask.begin(), mask.end());
+    markEntireDocumentDirty();
+}
+
+void PaintDocument::clearLayerMask(int index) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+
+    Layer& layer = layers_[static_cast<size_t>(index)];
+    if (layer.mask.empty()) {
+        return;
+    }
+
+    pushLayerHistorySnapshot(index);
+    layer.mask.clear();
+    markEntireDocumentDirty();
+}
+
+bool PaintDocument::applyLayerMask(int index) {
+    if (index < 0 || index >= layerCount() || strokeInFlight_ || activeQueuedStrokeID_.has_value()) {
+        return false;
+    }
+
+    Layer& layer = layers_[static_cast<size_t>(index)];
+    if (layer.mask.size() != static_cast<size_t>(width_) * static_cast<size_t>(height_)) {
+        return false;
+    }
+
+    pushLayerHistorySnapshot(index);
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            const size_t maskOffset = static_cast<size_t>(y) * static_cast<size_t>(width_) + static_cast<size_t>(x);
+            const float maskAlpha = static_cast<float>(layer.mask[maskOffset]) / 255.0F;
+            uint8_t* pixel = tilePixelPointer(layer, x, y);
+            pixel[3] = static_cast<uint8_t>(std::clamp(
+                std::lround((static_cast<float>(pixel[3]) / 255.0F) * maskAlpha * 255.0F),
+                0L,
+                255L
+            ));
+        }
+    }
+    layer.mask.clear();
+    invalidateLayerPixelCache(layer);
+    markEntireDocumentDirty();
+    return true;
+}
+
 const Layer& PaintDocument::layer(int index) const {
     const Layer& layer = layers_.at(static_cast<size_t>(index));
     ensureLayerPixelCache(layer);
@@ -1801,58 +1897,34 @@ const Layer& PaintDocument::layer(int index) const {
 }
 
 void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
-    if (strokeInFlight_ || activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+    if (strokeInFlight_ || activeQueuedStrokeID_.has_value()) {
         return;
     }
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
-
-    activeQueuedStrokeID_ = strokesQueue_->startStroke(std::make_unique<FreehandStrokeStrategy>(brush));
-    const StrokeJobData jobData{ .payload = point };
-    if (!strokesQueue_->addInitJob(*activeQueuedStrokeID_, jobData)) {
-        activeQueuedStrokeID_.reset();
-        return;
-    }
-    strokesQueue_->process(*this);
+    beginStrokeImmediate(brush, point);
 }
 
 void PaintDocument::appendStroke(StrokePoint point) {
-    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+    if (!strokeInFlight_) {
         return;
     }
-
-    const StrokeJobData jobData{ .payload = point };
-    if (!strokesQueue_->addDabJob(*activeQueuedStrokeID_, jobData)) {
-        return;
-    }
-    strokesQueue_->process(*this);
+    appendStrokeImmediate(point);
 }
 
 void PaintDocument::endStroke() {
-    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+    if (!strokeInFlight_) {
         return;
     }
-
-    const uint64_t strokeID = *activeQueuedStrokeID_;
-    activeQueuedStrokeID_.reset();
-    if (!strokesQueue_->endStroke(strokeID)) {
-        return;
-    }
-    strokesQueue_->process(*this);
+    endStrokeImmediate();
 }
 
 void PaintDocument::cancelStroke() {
-    if (!activeQueuedStrokeID_.has_value() || strokesQueue_ == nullptr) {
+    if (!strokeInFlight_) {
         return;
     }
-
-    const uint64_t strokeID = *activeQueuedStrokeID_;
-    activeQueuedStrokeID_.reset();
-    if (!strokesQueue_->cancelStroke(strokeID)) {
-        return;
-    }
-    strokesQueue_->process(*this);
+    cancelStrokeImmediate();
 }
 
 void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
@@ -1885,7 +1957,9 @@ void PaintDocument::beginStrokeImmediate(const BrushSettings& brush, StrokePoint
     previousPoint_ = point;
     lastDabPoint_ = point;
     strokeOriginPoint_ = point;
-    distanceUntilNextDab_ = nextBrushSpacingDistance(activeBrush_, point);
+    strokeAccumulatedDistance_ = 0.0F;
+    distanceUntilNextDab_ = 0.0F;
+    strokeHasStampedDab_ = true;
     strokeInFlight_ = true;
     dirtyRect_.reset();
     point.speed = 0.0F;
@@ -1905,36 +1979,16 @@ void PaintDocument::appendStrokeImmediate(StrokePoint point) {
         previousPoint_ = point;
         return;
     }
-
-    float traveledAlongSegment = 0.0F;
-    float remainingToNextDab = std::max(0.0001F, distanceUntilNextDab_);
-    while (remainingToNextDab <= (distance - traveledAlongSegment)) {
-        traveledAlongSegment += remainingToNextDab;
-        const float t = traveledAlongSegment / distance;
-        StrokePoint interpolated;
-        interpolated.x = previousPoint_.x + (dx * t);
-        interpolated.y = previousPoint_.y + (dy * t);
-        interpolated.pressure = previousPoint_.pressure + ((point.pressure - previousPoint_.pressure) * t);
-        interpolated.altitude = previousPoint_.altitude + ((point.altitude - previousPoint_.altitude) * t);
-        interpolated.azimuth = previousPoint_.azimuth + ((point.azimuth - previousPoint_.azimuth) * t);
-        interpolated.timestamp = previousPoint_.timestamp + ((point.timestamp - previousPoint_.timestamp) * t);
-
-        const float timeDelta = std::max(0.001F, interpolated.timestamp - lastDabPoint_.timestamp);
-        const float traveled = std::sqrt(((interpolated.x - lastDabPoint_.x) * (interpolated.x - lastDabPoint_.x)) +
-                                         ((interpolated.y - lastDabPoint_.y) * (interpolated.y - lastDabPoint_.y)));
-        interpolated.speed = traveled / timeDelta;
-        stampDab(layer, interpolated);
-        lastDabPoint_ = interpolated;
-        remainingToNextDab = nextBrushSpacingDistance(activeBrush_, interpolated);
-    }
-
-    distanceUntilNextDab_ = remainingToNextDab - (distance - traveledAlongSegment);
+    strokeAccumulatedDistance_ += distance;
+    renderStrokeSegment(layer, previousPoint_, point);
     previousPoint_ = point;
 }
 
 void PaintDocument::endStrokeImmediate() {
     strokeInFlight_ = false;
+    strokeAccumulatedDistance_ = 0.0F;
     distanceUntilNextDab_ = 0.0F;
+    strokeHasStampedDab_ = false;
 }
 
 void PaintDocument::cancelStrokeImmediate() {
@@ -1957,7 +2011,9 @@ void PaintDocument::cancelStrokeImmediate() {
 
     activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
     strokeInFlight_ = false;
+    strokeAccumulatedDistance_ = 0.0F;
     distanceUntilNextDab_ = 0.0F;
+    strokeHasStampedDab_ = false;
     markEntireDocumentDirty();
 }
 
@@ -2433,6 +2489,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     if (point.pressure <= 0.001F) {
         return;
     }
+    layer.pixelsDirty = true;
 
     const float clampedPressure = std::clamp(point.pressure, 0.08F, 1.0F);
     const float clampedSensitivity = clamp01(activeBrush_.pressureSensitivity);
@@ -2468,6 +2525,9 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float strokeDX = point.x - lastDabPoint_.x;
     const float strokeDY = point.y - lastDabPoint_.y;
     const float strokeDistance = std::sqrt((strokeDX * strokeDX) + (strokeDY * strokeDY));
+    const float strokeTravelX = point.x - strokeOriginPoint_.x;
+    const float strokeTravelY = point.y - strokeOriginPoint_.y;
+    const float strokeTravel = std::sqrt((strokeTravelX * strokeTravelX) + (strokeTravelY * strokeTravelY));
     const float tangentX = strokeDistance > 0.001F ? (strokeDX / strokeDistance) : std::cos(point.azimuth);
     const float tangentY = strokeDistance > 0.001F ? (strokeDY / strokeDistance) : std::sin(point.azimuth);
     const float normalX = -tangentY;
@@ -2476,6 +2536,15 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float maxRoundnessJitter = activeBrush_.roundnessJitter;
     const float maxAngleJitter = activeBrush_.angleJitter;
     float baseRoundness = effectiveRoundness(activeBrush_, activeBrush_.tipKind, altitudeFactor);
+    const float shortStrokeRoundnessDistance = std::max(radius * 1.35F, 2.5F);
+    const float shortStrokeRoundnessBlend = std::clamp(
+        1.0F - (strokeTravel / std::max(shortStrokeRoundnessDistance, 0.001F)),
+        0.0F,
+        1.0F
+    );
+    if (shortStrokeRoundnessBlend > 0.0F) {
+        baseRoundness = lerp(baseRoundness, 1.0F, shortStrokeRoundnessBlend * 0.92F);
+    }
     baseRoundness = std::clamp(
         baseRoundness +
         (activeBrush_.roundnessPressureSensitivity * remap(clampedPressure, 0.08F, 1.0F, -0.22F, 0.18F)) +
@@ -2653,6 +2722,91 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     }
 }
 
+void PaintDocument::renderShortStroke(Layer& layer, const StrokePoint& start, const StrokePoint& end) {
+    const float dx = end.x - start.x;
+    const float dy = end.y - start.y;
+    const float distance = std::sqrt((dx * dx) + (dy * dy));
+
+    BrushSettings savedBrush = activeBrush_;
+    BrushSettings shortBrush = activeBrush_;
+    shortBrush.roundness = 1.0F;
+    shortBrush.roundnessPressureSensitivity = 0.0F;
+    shortBrush.roundnessTiltSensitivity = 0.0F;
+    shortBrush.angle = 0.0F;
+    shortBrush.anglePressureSensitivity = 0.0F;
+    shortBrush.angleTiltSensitivity = 0.0F;
+    shortBrush.angleJitter = 0.0F;
+    shortBrush.roundnessJitter = 0.0F;
+    shortBrush.angleMode = 0;
+    shortBrush.stampSpacing = 0.02F;
+    shortBrush.spacingJitter = 0.0F;
+    activeBrush_ = shortBrush;
+
+    if (distance <= 0.0001F) {
+        StrokePoint point = start;
+        point.speed = 0.0F;
+        stampDab(layer, point);
+        lastDabPoint_ = point;
+        activeBrush_ = savedBrush;
+        return;
+    }
+
+    const float stepDistance = std::max(activeBrush_.radius * 0.16F, 0.2F);
+    const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
+    for (int step = 0; step <= steps; ++step) {
+        const float t = static_cast<float>(step) / static_cast<float>(steps);
+        StrokePoint point;
+        point.x = start.x + (dx * t);
+        point.y = start.y + (dy * t);
+        point.pressure = start.pressure + ((end.pressure - start.pressure) * t);
+        point.altitude = start.altitude + ((end.altitude - start.altitude) * t);
+        point.azimuth = start.azimuth + ((end.azimuth - start.azimuth) * t);
+        point.timestamp = start.timestamp + ((end.timestamp - start.timestamp) * t);
+        point.speed = 0.0F;
+        stampDab(layer, point);
+        lastDabPoint_ = point;
+    }
+
+    activeBrush_ = savedBrush;
+}
+
+void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, const StrokePoint& end) {
+    const float dx = end.x - start.x;
+    const float dy = end.y - start.y;
+    const float distance = std::sqrt((dx * dx) + (dy * dy));
+    if (distance <= 0.0001F) {
+        StrokePoint point = end;
+        point.speed = 0.0F;
+        previousPoint_ = start;
+        stampDab(layer, point);
+        lastDabPoint_ = point;
+        return;
+    }
+
+    const float stepDistance = std::max(brushSpacingDistance(activeBrush_) * 0.35F, 0.15F);
+    const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
+    StrokePoint priorStamped = start;
+    for (int step = 1; step <= steps; ++step) {
+        const float t = static_cast<float>(step) / static_cast<float>(steps);
+        StrokePoint point;
+        point.x = start.x + (dx * t);
+        point.y = start.y + (dy * t);
+        point.pressure = start.pressure + ((end.pressure - start.pressure) * t);
+        point.altitude = start.altitude + ((end.altitude - start.altitude) * t);
+        point.azimuth = start.azimuth + ((end.azimuth - start.azimuth) * t);
+        point.timestamp = start.timestamp + ((end.timestamp - start.timestamp) * t);
+        const float timeDelta = std::max(0.001F, point.timestamp - priorStamped.timestamp);
+        point.speed = std::sqrt(
+            ((point.x - priorStamped.x) * (point.x - priorStamped.x)) +
+            ((point.y - priorStamped.y) * (point.y - priorStamped.y))
+        ) / timeDelta;
+        previousPoint_ = priorStamped;
+        stampDab(layer, point);
+        lastDabPoint_ = point;
+        priorStamped = point;
+    }
+}
+
 void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure) {
     const float srcA = clamp01(alpha);
     const float dstA = static_cast<float>(dst[3]) / 255.0F;
@@ -2762,7 +2916,12 @@ void PaintDocument::rebuildComposite() const {
                             tileOffset +
                             (static_cast<size_t>(localY) * static_cast<size_t>(Layer::kTileSize) + static_cast<size_t>(localX)) *
                                 kPixelStride;
-                        const float srcA = (static_cast<float>(layer.tiles[srcOffset + 3U]) / 255.0F) * layer.opacity;
+                        float srcA = (static_cast<float>(layer.tiles[srcOffset + 3U]) / 255.0F) * layer.opacity;
+                        if (!layer.mask.empty()) {
+                            const size_t maskOffset =
+                                static_cast<size_t>(imageY) * static_cast<size_t>(width_) + static_cast<size_t>(imageX);
+                            srcA *= static_cast<float>(layer.mask[maskOffset]) / 255.0F;
+                        }
                         if (srcA <= 0.0F) {
                             continue;
                         }

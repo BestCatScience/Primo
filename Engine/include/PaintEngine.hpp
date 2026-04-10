@@ -163,6 +163,7 @@ struct Layer {
     int tileColumns = 0;
     int tileRows = 0;
     std::vector<uint8_t> tiles;
+    std::vector<uint8_t> mask;
     mutable std::vector<uint8_t> pixels;
     mutable bool pixelsDirty = true;
 };
@@ -255,6 +256,11 @@ public:
     bool applyLayerProcessing(int index, const LayerProcessing& processing);
     void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
     void replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels);
+    bool hasLayerMask(int index) const noexcept;
+    std::vector<uint8_t> layerMaskData(int index) const;
+    void replaceLayerMask(int index, std::span<const uint8_t> mask);
+    void clearLayerMask(int index);
+    bool applyLayerMask(int index);
     const Layer& layer(int index) const;
 
     void beginStroke(const BrushSettings& brush, StrokePoint point);
@@ -299,7 +305,9 @@ private:
     StrokePoint previousPoint_{};
     StrokePoint lastDabPoint_{};
     StrokePoint strokeOriginPoint_{};
+    float strokeAccumulatedDistance_ = 0.0F;
     float distanceUntilNextDab_ = 0.0F;
+    bool strokeHasStampedDab_ = false;
     bool strokeInFlight_ = false;
     std::optional<uint64_t> activeQueuedStrokeID_;
     DirtyRect dirtyRect_;
@@ -334,6 +342,8 @@ private:
     const uint8_t* tilePixelPointer(const Layer& layer, int x, int y) const noexcept;
     const LayerFolder* folderByID(int folderID) const noexcept;
     void stampDab(Layer& layer, const StrokePoint& point);
+    void renderStrokeSegment(Layer& layer, const StrokePoint& start, const StrokePoint& end);
+    void renderShortStroke(Layer& layer, const StrokePoint& start, const StrokePoint& end);
     void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure);
     void rebuildComposite() const;
 };

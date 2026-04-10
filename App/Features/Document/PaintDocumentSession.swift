@@ -67,6 +67,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         let infos = bridge.layerInfos()
         let folderInfos = bridge.folderInfos()
         let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
+        let compositePixelData = bridge.compositePixelData() as Data
         let snapshots = infos.enumerated().map { element in
             let index = element.offset
             let info = element.element
@@ -92,7 +93,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 width: bridge.width,
                 height: bridge.height,
                 revision: revision,
-                compositePixelData: bridge.compositePixelData() as Data,
+                compositePixelData: compositePixelData,
                 layers: snapshots
             )
         )
@@ -100,6 +101,10 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func prewarmDrawingResources() {
         _ = bridge.compositePixelData()
+    }
+
+    func compositePixelData() -> Data {
+        bridge.compositePixelData() as Data
     }
 
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
@@ -340,16 +345,74 @@ final class PaintDocumentSession: @unchecked Sendable {
         return didApply
     }
 
+    func pixelDataForLayer(index: Int) -> Data {
+        bridge.pixelDataForLayer(at: index) as Data
+    }
+
+    @discardableResult
+    func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> Bool {
+        let basePixelData = bridge.pixelDataForLayer(at: layerIndex) as Data
+        guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
+            basePixelData: basePixelData,
+            canvasWidth: Int(bridge.width),
+            canvasHeight: Int(bridge.height),
+            samples: samples,
+            brush: brush
+        ) else {
+            return false
+        }
+        replaceLayerPixels(index: layerIndex, data: rasterized)
+        return true
+    }
+
     func replaceLayerPixels(index: Int, data: Data) {
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.replacePixels
         descriptor.pixelData = data
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
-        if didApply {
-            invalidateThumbnailCache(for: index)
-            timelapseEvents.append(.replaceLayerPixels(index: index, data: data))
-            captureTimelapseFrame()
+        if !didApply {
+            bridge.replaceLayerPixelsTransient(at: index, data: data)
         }
+        invalidateThumbnailCache(for: index)
+        timelapseEvents.append(.replaceLayerPixels(index: index, data: data))
+        captureTimelapseFrame()
+    }
+
+    @discardableResult
+    func replaceLayerMask(index: Int, maskData: Data) -> Bool {
+        guard maskData.count == Int(bridge.width * bridge.height) else {
+            return false
+        }
+        bridge.replaceLayerMask(at: index, data: maskData)
+        invalidateThumbnailCache(for: index)
+        timelapseEvents.append(.replaceLayerMask(index: index, data: maskData))
+        captureTimelapseFrame()
+        return true
+    }
+
+    @discardableResult
+    func clearLayerMask(index: Int) -> Bool {
+        guard bridge.layerMaskDataForLayer(at: index) != nil else {
+            return false
+        }
+        bridge.clearLayerMask(at: index)
+        invalidateThumbnailCache(for: index)
+        timelapseEvents.append(.clearLayerMask(index: index))
+        captureTimelapseFrame()
+        return true
+    }
+
+    @discardableResult
+    func applyLayerMask(index: Int) -> Bool {
+        guard bridge.applyLayerMask(at: index) else {
+            return false
+        }
+        invalidateThumbnailCache(for: index)
+        let pixelData = bridge.pixelDataForLayer(at: index) as Data
+        timelapseEvents.append(.applyLayerMask(index: index))
+        timelapseEvents.append(.replaceLayerPixels(index: index, data: pixelData))
+        captureTimelapseFrame()
+        return true
     }
 
     func clearLayer(index: Int) {
@@ -377,7 +440,8 @@ final class PaintDocumentSession: @unchecked Sendable {
                 visible: layer.visible,
                 opacity: layer.opacity,
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
-                folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil
+                folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
+                hasMask: layer.hasMask
             )
         }.reversed())
     }
@@ -464,6 +528,14 @@ final class PaintDocumentSession: @unchecked Sendable {
             let pixelURL = layersDirectory.appendingPathComponent(filename, isDirectory: false)
             let pixelData = bridge.pixelDataForLayer(at: index) as Data
             try pixelData.write(to: pixelURL, options: .atomic)
+            let maskFilename: String?
+            if let maskData = bridge.layerMaskDataForLayer(at: index) {
+                let filename = String(format: "layer-mask-%04d.mask", index)
+                try maskData.write(to: layersDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
+                maskFilename = "Layers/\(filename)"
+            } else {
+                maskFilename = nil
+            }
             return StoredAtelierDocument.Layer(
                 index: index,
                 name: layerInfo.name,
@@ -471,7 +543,8 @@ final class PaintDocumentSession: @unchecked Sendable {
                 opacity: layerInfo.opacity,
                 blendMode: layerInfo.blendMode,
                 folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
-                pixelFilename: "Layers/\(filename)"
+                pixelFilename: "Layers/\(filename)",
+                maskFilename: maskFilename
             )
         }
 
@@ -511,7 +584,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             : []
 
         let document = StoredAtelierDocument(
-            version: 2,
+            version: 3,
             canvasWidth: Int(bridge.width),
             canvasHeight: Int(bridge.height),
             activeLayerIndex: Int(bridge.activeLayerIndex),
@@ -559,6 +632,12 @@ final class PaintDocumentSession: @unchecked Sendable {
             let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
             let pixelData = try Data(contentsOf: pixelURL)
             session.bridge.replaceLayerPixelsTransient(at: layer.index, data: pixelData)
+            if let maskFilename = layer.maskFilename {
+                let maskData = try Data(contentsOf: url.appendingPathComponent(maskFilename, isDirectory: false))
+                session.bridge.replaceLayerMask(at: layer.index, data: maskData)
+            } else {
+                session.bridge.clearLayerMask(at: layer.index)
+            }
             session.bridge.setLayerName(layer.name, at: layer.index)
             session.bridge.setLayerVisible(layer.visible, at: layer.index)
             session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
@@ -647,6 +726,16 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     private func makeBrushDescriptor(from brush: BrushRuntimeSettings) -> APBrushDescriptor {
         let descriptor = APBrushDescriptor()
+        let usesCircularInkTip =
+            brush.tipKind == .ink &&
+            brush.customTip == nil &&
+            brush.roundness >= 0.98 &&
+            abs(brush.roundnessPressureSensitivity) <= 0.001 &&
+            abs(brush.roundnessTiltSensitivity) <= 0.001 &&
+            abs(brush.anglePressureSensitivity) <= 0.001 &&
+            abs(brush.angleTiltSensitivity) <= 0.001 &&
+            abs(brush.angleJitter) <= 0.001 &&
+            abs(brush.roundnessJitter) <= 0.001
         descriptor.tipKind = brush.tipKind.rawValue
         descriptor.radius = brush.radius
         descriptor.sizeSpeedSensitivity = brush.sizeSpeedSensitivity
@@ -719,7 +808,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.paperScale = brush.paperScale
         descriptor.paperThreshold = brush.paperThreshold
         descriptor.paperStrength = brush.paperStrength
-        descriptor.tiltInfluence = 0.75
+        descriptor.tiltInfluence = usesCircularInkTip ? 0.0 : 0.75
         descriptor.maxDarkness = 1.0
         descriptor.pressureSensitivity = brush.pressureSensitivity
         descriptor.fillThresholdMode = brush.fillThresholdMode == .opacity ? 0 : 1
@@ -896,6 +985,18 @@ final class PaintDocumentSession: @unchecked Sendable {
 
         case let .replaceLayerPixels(index, data):
             bridge.replaceLayerPixels(at: index, data: data)
+            invalidateThumbnailCache(for: index)
+
+        case let .replaceLayerMask(index, data):
+            bridge.replaceLayerMask(at: index, data: data)
+            invalidateThumbnailCache(for: index)
+
+        case let .clearLayerMask(index):
+            bridge.clearLayerMask(at: index)
+            invalidateThumbnailCache(for: index)
+
+        case let .applyLayerMask(index):
+            _ = bridge.applyLayerMask(at: index)
             invalidateThumbnailCache(for: index)
 
         case let .clearLayer(index):
@@ -1175,6 +1276,9 @@ enum TimelapseOperation: Equatable, Sendable {
     case setLayerOpacity(index: Int, opacity: Double)
     case setLayerBlendMode(index: Int, blendMode: LayerBlendMode)
     case replaceLayerPixels(index: Int, data: Data)
+    case replaceLayerMask(index: Int, data: Data)
+    case clearLayerMask(index: Int)
+    case applyLayerMask(index: Int)
     case clearLayer(index: Int)
     case setPaperStyle(CanvasPaperStyle)
 
@@ -1183,6 +1287,10 @@ enum TimelapseOperation: Equatable, Sendable {
         switch self {
         case let .replaceLayerPixels(_, data):
             let filename = String(format: "replace-layer-%06d.rgba", index)
+            try data.write(to: dataDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
+            dataFilename = "TimelapseData/\(filename)"
+        case let .replaceLayerMask(_, data):
+            let filename = String(format: "replace-mask-%06d.mask", index)
             try data.write(to: dataDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
             dataFilename = "TimelapseData/\(filename)"
         default:
@@ -1245,6 +1353,12 @@ enum TimelapseOperation: Equatable, Sendable {
             return StoredTimelapseOperation(kind: .setLayerBlendMode, layerIndex: index, blendMode: blendMode.rawValue)
         case let .replaceLayerPixels(index, _):
             return StoredTimelapseOperation(kind: .replaceLayerPixels, layerIndex: index, dataFilename: dataFilename)
+        case let .replaceLayerMask(index, _):
+            return StoredTimelapseOperation(kind: .replaceLayerMask, layerIndex: index, dataFilename: dataFilename)
+        case let .clearLayerMask(index):
+            return StoredTimelapseOperation(kind: .clearLayerMask, layerIndex: index)
+        case let .applyLayerMask(index):
+            return StoredTimelapseOperation(kind: .applyLayerMask, layerIndex: index)
         case let .clearLayer(index):
             return StoredTimelapseOperation(kind: .clearLayer, layerIndex: index)
         case let .setPaperStyle(style):
@@ -1323,6 +1437,18 @@ enum TimelapseOperation: Equatable, Sendable {
             }
             let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerPixels(index: layerIndex, data: data)
+        case .replaceLayerMask:
+            guard let layerIndex = stored.layerIndex, let dataFilename = stored.dataFilename else {
+                throw AtelierDocumentError.invalidDocument
+            }
+            let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
+            self = .replaceLayerMask(index: layerIndex, data: data)
+        case .clearLayerMask:
+            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            self = .clearLayerMask(index: layerIndex)
+        case .applyLayerMask:
+            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            self = .applyLayerMask(index: layerIndex)
         case .clearLayer:
             guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
             self = .clearLayer(index: layerIndex)
@@ -1358,6 +1484,7 @@ struct StoredAtelierDocument: Codable {
         let blendMode: String
         let folderID: Int?
         let pixelFilename: String
+        let maskFilename: String?
     }
 
     struct Folder: Codable {
@@ -1699,6 +1826,9 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case setLayerOpacity
         case setLayerBlendMode
         case replaceLayerPixels
+        case replaceLayerMask
+        case clearLayerMask
+        case applyLayerMask
         case clearLayer
         case setPaperStyle
     }
