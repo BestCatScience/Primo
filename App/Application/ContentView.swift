@@ -4,6 +4,11 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
+    enum NanoBananaFocusedField: Hashable {
+        case prompt
+        case apiKey
+    }
+
     let store: StoreOf<AppFeature>
     @StateObject var nanoBananaCommerce = NanoBananaCommerce()
     private let studioUIScale: CGFloat = 0.56
@@ -31,8 +36,10 @@ struct ContentView: View {
     @State var posterizeSettings = PosterizeSettings()
     @State var nanoBananaPrompt = ""
     @State var nanoBananaInputLayerIndex = 0
+    @State var nanoBananaEditScope: NanoBananaEditScope = .wholeLayer
     @State var nanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
     @State var nanoBananaModel: NanoBananaModel = .flashImage25
+    @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
     @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
     @AppStorage("atelierprime.nanobanana.apiKey") var nanoBananaAPIKey = ""
     var language: AppLanguage { store.appLanguage }

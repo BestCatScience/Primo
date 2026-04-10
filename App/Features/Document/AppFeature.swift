@@ -34,6 +34,22 @@ enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiab
     }
 }
 
+enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case wholeLayer
+    case selectedArea
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .wholeLayer:
+            return language.localized("Whole Layer")
+        case .selectedArea:
+            return language.localized("Selected Area Only")
+        }
+    }
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers
@@ -304,6 +320,7 @@ struct AppFeature {
             config: NanoBananaRequestConfig,
             model: NanoBananaModel,
             inputLayerIndex: Int,
+            editScope: NanoBananaEditScope,
             outputMode: NanoBananaOutputMode
         )
         case nanoBananaEditSucceeded(Int, Data)
@@ -812,7 +829,7 @@ struct AppFeature {
                 }
                 .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
 
-            case let .nanoBananaEditRequested(prompt, config, model, inputLayerIndex, outputMode):
+            case let .nanoBananaEditRequested(prompt, config, model, inputLayerIndex, editScope, outputMode):
                 let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
                 let trimmedCredential = config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
                 let trimmedEndpoint = config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -836,14 +853,15 @@ struct AppFeature {
                 }
                 guard
                     let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == inputLayerIndex }),
-                    let inputPNGData = Self.pngData(
-                        fromLayerPixelData: layer.pixelData,
-                        width: snapshot.width,
-                        height: snapshot.height
-                    )
+                    let layer = snapshot.layers.first(where: { $0.index == inputLayerIndex })
                 else {
                     state.bannerMessage = state.appLanguage.localized("Could not prepare the active layer for Nano Banana")
+                    return .none
+                }
+
+                let selection = editScope == .selectedArea ? state.canvas.selection : nil
+                if editScope == .selectedArea, selection?.isEmpty != false {
+                    state.bannerMessage = state.appLanguage.localized("Create a selection to use inpaint")
                     return .none
                 }
 
@@ -851,6 +869,7 @@ struct AppFeature {
                 let canvasWidth = snapshot.width
                 let canvasHeight = snapshot.height
                 let appLanguage = state.appLanguage
+                let sourceLayerPixelData = layer.pixelData
                 state.isNanoBananaGenerating = true
                 state.nanoBananaProgress = 0.04
                 state.pendingNanoBananaOutputMode = outputMode
@@ -873,16 +892,74 @@ struct AppFeature {
                                 credential: trimmedCredential,
                                 endpoint: trimmedEndpoint
                             )
-                            let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, trimmedPrompt, normalizedConfig, model)
-                            guard let rawPixelData = Self.rawLayerPixelData(
-                                fromPNGData: outputPNGData,
-                                width: canvasWidth,
-                                height: canvasHeight
-                            ) else {
+                            let requestPrompt = editScope == .selectedArea
+                                ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(trimmedPrompt)"
+                                : trimmedPrompt
+
+                            let finalPixelData: Data?
+                            switch editScope {
+                            case .wholeLayer:
+                                guard let inputPNGData = Self.pngData(
+                                    fromLayerPixelData: sourceLayerPixelData,
+                                    width: canvasWidth,
+                                    height: canvasHeight
+                                ) else {
+                                    finalPixelData = nil
+                                    break
+                                }
+                                let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, requestPrompt, normalizedConfig, model)
+                                finalPixelData = Self.rawLayerPixelData(
+                                    fromPNGData: outputPNGData,
+                                    width: canvasWidth,
+                                    height: canvasHeight
+                                )
+
+                            case .selectedArea:
+                                guard
+                                    let selection,
+                                    let crop = Self.inpaintCrop(
+                                        source: sourceLayerPixelData,
+                                        canvasWidth: canvasWidth,
+                                        canvasHeight: canvasHeight,
+                                        selection: selection
+                                    ),
+                                    let cropPNGData = Self.pngData(
+                                        fromLayerPixelData: crop.pixelData,
+                                        width: crop.width,
+                                        height: crop.height
+                                    )
+                                else {
+                                    finalPixelData = nil
+                                    break
+                                }
+
+                                let outputPNGData = try await nanoBananaClient.editImage(cropPNGData, requestPrompt, normalizedConfig, model)
+                                guard let editedCropPixelData = Self.rawLayerPixelData(
+                                    fromPNGData: outputPNGData,
+                                    width: crop.width,
+                                    height: crop.height
+                                ) else {
+                                    finalPixelData = nil
+                                    break
+                                }
+
+                                let baseLayerPixelData = outputMode == .replaceCurrentLayer
+                                    ? sourceLayerPixelData
+                                    : Data(repeating: 0, count: canvasWidth * canvasHeight * 4)
+                                finalPixelData = Self.applyingInpaintCrop(
+                                    editedCropPixelData,
+                                    to: baseLayerPixelData,
+                                    canvasWidth: canvasWidth,
+                                    canvasHeight: canvasHeight,
+                                    crop: crop
+                                )
+                            }
+
+                            guard let finalPixelData else {
                                 await send(.nanoBananaEditFailed("Nano Banana returned an unsupported image."))
                                 return
                             }
-                            await send(.nanoBananaEditSucceeded(outputLayerIndex, rawPixelData))
+                            await send(.nanoBananaEditSucceeded(outputLayerIndex, finalPixelData))
                         } catch {
                             await send(.nanoBananaEditFailed(Self.localizedNanoBananaErrorMessage(error.localizedDescription, language: appLanguage)))
                         }

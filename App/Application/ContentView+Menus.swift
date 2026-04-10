@@ -494,9 +494,26 @@ extension ContentView {
                             .foregroundStyle(.secondary)
                     }
 
-                    TextField(language.localized("Prompt"), text: $nanoBananaPrompt, axis: .vertical)
-                        .lineLimit(4...8)
-                        .textInputAutocapitalization(.sentences)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(language.localized("Prompt"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        TextEditor(text: $nanoBananaPrompt)
+                            .frame(minHeight: 110)
+                            .padding(8)
+                            .scrollContentBackground(.hidden)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.secondary.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+                            )
+                            .textInputAutocapitalization(.sentences)
+                            .focused($nanoBananaFocusedField, equals: .prompt)
+                    }
                 }
 
                 Section(language.localized("入力")) {
@@ -515,6 +532,19 @@ extension ContentView {
                         }
                     }
 
+                    Picker(language.localized("Edit Scope"), selection: $nanoBananaEditScope) {
+                        ForEach(NanoBananaEditScope.allCases) { scope in
+                            Text(scope.title(language)).tag(scope)
+                        }
+                    }
+                    .disabled(store.canvas.selection?.isEmpty != false)
+
+                    if store.canvas.selection?.isEmpty != false {
+                        Text(language.localized("Create a selection to enable inpaint"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Picker(language.localized("モデル"), selection: $nanoBananaModel) {
                         ForEach(NanoBananaModel.allCases) { model in
                             Text(model.title(language)).tag(model)
@@ -523,6 +553,7 @@ extension ContentView {
 
                     if nanoBananaAccessMode == .userAPIKey {
                         SecureField(language.localized("Gemini API Key"), text: $nanoBananaAPIKey)
+                            .focused($nanoBananaFocusedField, equals: .apiKey)
                         Text(language.localized("Saved locally on this device"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -576,17 +607,20 @@ extension ContentView {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(StudioStrings.nanoBanana(language))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
+                        nanoBananaFocusedField = nil
                         showsNanoBananaSheet = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("Generate")) {
+                        nanoBananaFocusedField = nil
                         store.send(
                             .nanoBananaEditRequested(
                                 prompt: nanoBananaPrompt,
@@ -597,6 +631,7 @@ extension ContentView {
                                 ),
                                 model: nanoBananaModel,
                                 inputLayerIndex: nanoBananaInputLayerIndex,
+                                editScope: nanoBananaEditScope,
                                 outputMode: nanoBananaOutputMode
                             )
                         )
@@ -1004,6 +1039,7 @@ extension ContentView {
                 Button(StudioStrings.nanoBananaEdit(language)) {
                     nanoBananaPrompt = ""
                     nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
+                    nanoBananaEditScope = store.canvas.selection?.isEmpty == false ? .selectedArea : .wholeLayer
                     nanoBananaOutputMode = .replaceCurrentLayer
                     nanoBananaModel = .flashImage25
                     showsNanoBananaSheet = true
