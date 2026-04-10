@@ -208,6 +208,17 @@ extension ContentView {
 
     private var homeTopBar: some View {
         HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(Color(red: 0.05, green: 0.11, blue: 0.17))
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(Color(red: 0.23, green: 0.78, blue: 1.0).opacity(0.45), lineWidth: 1)
+                Text("Ap")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 0.38, green: 0.84, blue: 1.0))
+            }
+            .frame(width: 34, height: 34)
+
             Text("AtelierPrime")
                 .font(StudioTheme.Typography.title(18))
                 .foregroundStyle(.white.opacity(0.88))
@@ -289,9 +300,7 @@ extension ContentView {
             store.send(.homeSectionSelected(section))
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: section.iconSystemName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 24)
+                homeGlyphBadge(systemName: section.iconSystemName, accent: isSelected ? Color.white : Color(red: 0.60, green: 0.82, blue: 0.98))
 
                 Text(section.title(language))
                     .font(StudioTheme.Typography.title(16))
@@ -312,9 +321,7 @@ extension ContentView {
     private func homeFileActionRow(systemName: String, title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: systemName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 18)
+                homeGlyphBadge(systemName: systemName, accent: Color.white.opacity(0.86))
                 Text(title)
                     .font(StudioTheme.Typography.title(15))
                 Spacer(minLength: 0)
@@ -332,15 +339,26 @@ extension ContentView {
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: systemName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(tint)
+                homeGlyphBadge(systemName: systemName, accent: tint)
                 Text(title)
                     .font(StudioTheme.Typography.title(17))
                     .foregroundStyle(Color.white.opacity(0.86))
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func homeGlyphBadge(systemName: String, accent: Color) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(accent)
+        }
+        .frame(width: 22, height: 22)
     }
 
     @ViewBuilder

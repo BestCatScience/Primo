@@ -716,8 +716,17 @@ extension ContentView {
                 store.send(.homeReturnRequested)
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "house.fill")
-                        .font(.system(size: 10, weight: .semibold))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color(red: 0.05, green: 0.11, blue: 0.17))
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(StudioTheme.Palette.accentSoft.opacity(0.55), lineWidth: 1)
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(StudioTheme.Palette.accentBright)
+                    }
+                    .frame(width: 18, height: 18)
+
                     Text(language.localized("ホーム"))
                         .font(StudioTheme.Typography.label(9))
                 }
