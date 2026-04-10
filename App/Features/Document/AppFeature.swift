@@ -118,6 +118,9 @@ struct AppFeature {
             if let renderSnapshot = presentation.renderSnapshot {
                 canvas.renderSnapshot = renderSnapshot
                 canvas.lastCommittedRenderRevision = renderSnapshot.revision
+                canvas.pendingIncrementalUpdate = nil
+                canvas.activeStrokeBaseSnapshot = nil
+                canvas.activeStrokePreviewLayerPixelData = nil
                 isHydrating = false
                 if !canvas.isStrokeActive &&
                     canvas.isAwaitingCommittedRender &&
@@ -170,6 +173,7 @@ struct AppFeature {
                 compositePixelData: compositePixelData,
                 layers: layerSnapshots
             )
+            canvas.pendingIncrementalUpdate = nil
             isHydrating = false
         }
 
@@ -178,35 +182,15 @@ struct AppFeature {
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data
         ) {
-            let previewLayers = baseSnapshot.layers.map { layer in
-                guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: true,
-                    blendMode: layer.blendMode,
-                    thumbnailData: layer.thumbnailData,
-                    pixelData: layer.pixelData
-                )
-            }
-            let previewSnapshot = MetalDocumentSnapshot(
-                width: baseSnapshot.width,
-                height: baseSnapshot.height,
-                revision: baseSnapshot.revision,
-                compositePixelData: baseSnapshot.compositePixelData,
-                layers: previewLayers
-            )
-            guard
-                let composite = AppFeature.compositedPreviewPixelData(
-                    snapshot: previewSnapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedActiveLayerPixels
-                )
-            else {
+            guard let composite = AppFeature.compositedPreviewPixelData(
+                snapshot: baseSnapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerPixels: adjustedActiveLayerPixels
+            ) else {
                 return
             }
 
-            let nextLayers = previewLayers.map { layer in
+            let nextLayers = baseSnapshot.layers.map { layer in
                 guard layer.index == activeLayerIndex else { return layer }
                 return MetalLayerSnapshot(
                     index: layer.index,
@@ -226,6 +210,8 @@ struct AppFeature {
                 compositePixelData: composite,
                 layers: nextLayers
             )
+            canvas.activeStrokePreviewLayerPixelData = adjustedActiveLayerPixels
+            canvas.pendingIncrementalUpdate = nil
             isHydrating = false
         }
 
@@ -1516,7 +1502,6 @@ struct AppFeature {
                     state.canvas.activeStrokeBaseSnapshot = state.canvas.renderSnapshot
                 }
                 let brush = state.resolvedBrushSettings()
-                let samples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? [sample]
                 if
                     let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
                     let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
@@ -1524,15 +1509,33 @@ struct AppFeature {
                         basePixelData: baseLayer.pixelData,
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
-                        samples: samples,
+                        samples: [sample],
                         brush: brush
                     )
                 {
-                    state.applyLiveStrokePreview(
-                        baseSnapshot: baseSnapshot,
+                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
+                    if
+                        let dirtyRect = Self.strokePreviewDirtyRect(
+                            samples: [sample],
+                            brush: brush,
+                            canvasWidth: baseSnapshot.width,
+                            canvasHeight: baseSnapshot.height
+                        ),
+                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
+                            snapshot: baseSnapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels,
+                            dirtyRect: dirtyRect
+                        )
+                    {
+                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
+                    } else if let composite = Self.compositedPreviewPixelData(
+                        snapshot: baseSnapshot,
                         activeLayerIndex: state.canvas.activeLayerIndex,
                         adjustedActiveLayerPixels: adjustedPixels
-                    )
+                    ) {
+                        state.applyLiveCompositePixelData(composite)
+                    }
                 }
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
@@ -1540,24 +1543,77 @@ struct AppFeature {
                 )
 
             case let .canvas(.delegate(.appendSamples(samples))):
+                guard !samples.isEmpty else { return .none }
                 let brush = state.resolvedBrushSettings()
-                let currentSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
                 if
                     let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
+                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
+                {
+                    let fullSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
+                    let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
+                    let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
+                    let deltaSamples = anchor.map { [$0] + samples } ?? samples
+                    let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
+                    guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: basePixelData,
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
-                        samples: currentSamples,
+                        samples: deltaSamples,
+                        brush: brush
+                    ) else {
+                        return .none
+                    }
+                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
+                    if
+                        let dirtyRect = Self.strokePreviewDirtyRect(
+                            samples: deltaSamples,
+                            brush: brush,
+                            canvasWidth: baseSnapshot.width,
+                            canvasHeight: baseSnapshot.height
+                        ),
+                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
+                            snapshot: baseSnapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels,
+                            dirtyRect: dirtyRect
+                        )
+                    {
+                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
+                    } else if let composite = Self.compositedPreviewPixelData(
+                        snapshot: baseSnapshot,
+                        activeLayerIndex: state.canvas.activeLayerIndex,
+                        adjustedActiveLayerPixels: adjustedPixels
+                    ) {
+                        state.applyLiveCompositePixelData(composite)
+                    }
+                } else if let snapshot = state.canvas.renderSnapshot,
+                    let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                        basePixelData: baseLayer.pixelData,
+                        canvasWidth: snapshot.width,
+                        canvasHeight: snapshot.height,
+                        samples: samples,
                         brush: brush
                     )
                 {
-                    state.applyLiveStrokePreview(
-                        baseSnapshot: baseSnapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjustedPixels
-                    )
+                    state.canvas.activeStrokeBaseSnapshot = snapshot
+                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
+                    if
+                        let dirtyRect = Self.strokePreviewDirtyRect(
+                            samples: samples,
+                            brush: brush,
+                            canvasWidth: snapshot.width,
+                            canvasHeight: snapshot.height
+                        ),
+                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
+                            snapshot: snapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels,
+                            dirtyRect: dirtyRect
+                        )
+                    {
+                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
+                    }
                 }
                 return .none
 
@@ -1586,24 +1642,30 @@ struct AppFeature {
 
             case let .canvas(.delegate(.endStroke(samples))):
                 let brush = state.resolvedBrushSettings()
-                let didCommit = paintDocumentClient.applySoftwareStroke(
-                    samples,
-                    brush,
-                    state.canvas.activeLayerIndex
-                )
-                if !didCommit,
-                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
-                        canvasWidth: baseSnapshot.width,
-                        canvasHeight: baseSnapshot.height,
-                        samples: samples,
-                        brush: brush
-                    ) {
-                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
+                } else {
+                    let didCommit = paintDocumentClient.applySoftwareStroke(
+                        samples,
+                        brush,
+                        state.canvas.activeLayerIndex
+                    )
+                    if !didCommit,
+                        let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+                        let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                        let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                            basePixelData: baseLayer.pixelData,
+                            canvasWidth: baseSnapshot.width,
+                            canvasHeight: baseSnapshot.height,
+                            samples: samples,
+                            brush: brush
+                        ) {
+                        paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                    }
                 }
                 state.canvas.activeStrokeBaseSnapshot = nil
+                state.canvas.activeStrokePreviewLayerPixelData = nil
+                state.canvas.pendingIncrementalUpdate = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
@@ -1615,6 +1677,8 @@ struct AppFeature {
                     paintDocumentClient.cancelStroke()
                 }
                 state.canvas.activeStrokeBaseSnapshot = nil
+                state.canvas.activeStrokePreviewLayerPixelData = nil
+                state.canvas.pendingIncrementalUpdate = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
@@ -1625,24 +1689,35 @@ struct AppFeature {
                 let brush = state.resolvedBrushSettings()
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil
-                let didCommit = paintDocumentClient.applySoftwareStroke(
-                    samples,
-                    brush,
-                    state.canvas.activeLayerIndex
-                )
-                if !didCommit,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
-                        canvasWidth: snapshot.width,
-                        canvasHeight: snapshot.height,
-                        samples: samples,
-                        brush: brush
-                    ) {
-                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
+                } else {
+                    let didCommit = paintDocumentClient.applySoftwareStroke(
+                        samples,
+                        brush,
+                        state.canvas.activeLayerIndex
+                    )
+                    if !didCommit {
+                        if state.canvas.renderSnapshot == nil {
+                            state.applyPresentation(paintDocumentClient.presentation())
+                        }
+                        let fallbackSnapshot = state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot
+                        if let snapshot = fallbackSnapshot,
+                            let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                                basePixelData: baseLayer.pixelData,
+                                canvasWidth: snapshot.width,
+                                canvasHeight: snapshot.height,
+                                samples: samples,
+                                brush: brush
+                            ) {
+                            paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                        }
+                    }
                 }
                 state.canvas.activeStrokeBaseSnapshot = nil
+                state.canvas.activeStrokePreviewLayerPixelData = nil
+                state.canvas.pendingIncrementalUpdate = nil
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),

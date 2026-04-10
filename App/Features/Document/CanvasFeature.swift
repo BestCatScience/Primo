@@ -17,6 +17,7 @@ struct CanvasFeature {
         var lastRenderedLocalBufferRevision: Int = -1
         var activeLayerIndex = 0
         var activeStrokeBaseSnapshot: MetalDocumentSnapshot?
+        var activeStrokePreviewLayerPixelData: Data?
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
@@ -53,6 +54,7 @@ struct CanvasFeature {
             customTip: nil,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
+        var pendingIncrementalUpdate: IncrementalLayerUpdate?
     }
 
     enum Action: Equatable {

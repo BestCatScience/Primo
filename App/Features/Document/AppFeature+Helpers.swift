@@ -336,6 +336,92 @@ extension AppFeature {
         return composite
     }
 
+    static func strokePreviewDirtyRect(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> (originX: Int, originY: Int, width: Int, height: Int)? {
+        guard !samples.isEmpty, canvasWidth > 0, canvasHeight > 0 else { return nil }
+
+        var minX = CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude
+        var maxX = -CGFloat.greatestFiniteMagnitude
+        var maxY = -CGFloat.greatestFiniteMagnitude
+
+        for sample in samples {
+            let pressureFactor = max(
+                0.1,
+                1.0 + ((sample.pressure - 1.0) * CGFloat(brush.pressureSensitivity))
+            )
+            let radiusPadding = max(CGFloat(brush.radius) * pressureFactor, 1.5) + 4.0
+            minX = min(minX, sample.point.x - radiusPadding)
+            minY = min(minY, sample.point.y - radiusPadding)
+            maxX = max(maxX, sample.point.x + radiusPadding)
+            maxY = max(maxY, sample.point.y + radiusPadding)
+        }
+
+        guard minX.isFinite, minY.isFinite, maxX.isFinite, maxY.isFinite else { return nil }
+        let originX = max(0, Int(floor(minX)))
+        let originY = max(0, Int(floor(minY)))
+        let maxRectX = min(canvasWidth - 1, Int(ceil(maxX)))
+        let maxRectY = min(canvasHeight - 1, Int(ceil(maxY)))
+        guard maxRectX >= originX, maxRectY >= originY else { return nil }
+        return (
+            originX: originX,
+            originY: originY,
+            width: maxRectX - originX + 1,
+            height: maxRectY - originY + 1
+        )
+    }
+
+    static func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        guard adjustedActiveLayerPixels.count == snapshot.width * snapshot.height * 4 else { return nil }
+        guard dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
+
+        let rectDataCount = dirtyRect.width * dirtyRect.height * 4
+        var composite = Data(count: rectDataCount)
+        composite.withUnsafeMutableBytes { destinationBytes in
+            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) {
+                let isActiveLayer = layer.index == activeLayerIndex
+                guard isActiveLayer || layer.visible else { continue }
+                let sourceData = isActiveLayer ? adjustedActiveLayerPixels : layer.pixelData
+                sourceData.withUnsafeBytes { sourceBytes in
+                    guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                    for localY in 0..<dirtyRect.height {
+                        let sourceY = dirtyRect.originY + localY
+                        for localX in 0..<dirtyRect.width {
+                            let sourceX = dirtyRect.originX + localX
+                            let sourceOffset = ((sourceY * snapshot.width) + sourceX) * 4
+                            let destinationOffset = ((localY * dirtyRect.width) + localX) * 4
+                            blendPreviewPixel(
+                                destination: destination + destinationOffset,
+                                source: source + sourceOffset,
+                                opacity: CGFloat(layer.opacity),
+                                blendMode: layer.blendMode
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        return IncrementalLayerUpdate(
+            layerIndex: -1,
+            originX: dirtyRect.originX,
+            originY: dirtyRect.originY,
+            width: dirtyRect.width,
+            height: dirtyRect.height,
+            pixelData: composite
+        )
+    }
+
     static func gradientMapStops(for preset: GradientMapPreset) -> [GradientMapStop] {
         switch preset {
         case .graphite:
@@ -729,30 +815,35 @@ extension AppFeature {
         let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
         guard !committedSamples.isEmpty else { return nil }
 
-        var output = [UInt8](layer.pixelData)
-        if committedSamples.count == 1 {
-            rasterizeShortStrokeStamp(
-                into: &output,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                sample: committedSamples[0],
-                brush: brush
-            )
-            return Data(output)
+        var output = layer.pixelData
+        let didRasterize = output.withUnsafeMutableBytes { rawBytes in
+            guard let baseAddress = rawBytes.bindMemory(to: UInt8.self).baseAddress else { return false }
+            let pixels = UnsafeMutableBufferPointer(start: baseAddress, count: expectedCount)
+            if committedSamples.count == 1 {
+                rasterizeShortStrokeStamp(
+                    into: pixels,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height,
+                    sample: committedSamples[0],
+                    brush: brush
+                )
+                return true
+            }
+
+            for pair in zip(committedSamples, committedSamples.dropFirst()) {
+                rasterizeShortStrokeSegment(
+                    into: pixels,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height,
+                    start: pair.0,
+                    end: pair.1,
+                    brush: brush
+                )
+            }
+            return true
         }
 
-        for pair in zip(committedSamples, committedSamples.dropFirst()) {
-            rasterizeShortStrokeSegment(
-                into: &output,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                start: pair.0,
-                end: pair.1,
-                brush: brush
-            )
-        }
-
-        return Data(output)
+        return didRasterize ? output : nil
     }
 
     static func layerPixelDataByApplyingCommittedStroke(
@@ -768,30 +859,35 @@ extension AppFeature {
         let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
         guard !committedSamples.isEmpty else { return nil }
 
-        var output = [UInt8](basePixelData)
-        if committedSamples.count == 1 {
-            rasterizeShortStrokeStamp(
-                into: &output,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
-                sample: committedSamples[0],
-                brush: brush
-            )
-            return Data(output)
+        var output = basePixelData
+        let didRasterize = output.withUnsafeMutableBytes { rawBytes in
+            guard let baseAddress = rawBytes.bindMemory(to: UInt8.self).baseAddress else { return false }
+            let pixels = UnsafeMutableBufferPointer(start: baseAddress, count: expectedCount)
+            if committedSamples.count == 1 {
+                rasterizeShortStrokeStamp(
+                    into: pixels,
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
+                    sample: committedSamples[0],
+                    brush: brush
+                )
+                return true
+            }
+
+            for pair in zip(committedSamples, committedSamples.dropFirst()) {
+                rasterizeShortStrokeSegment(
+                    into: pixels,
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
+                    start: pair.0,
+                    end: pair.1,
+                    brush: brush
+                )
+            }
+            return true
         }
 
-        for pair in zip(committedSamples, committedSamples.dropFirst()) {
-            rasterizeShortStrokeSegment(
-                into: &output,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
-                start: pair.0,
-                end: pair.1,
-                brush: brush
-            )
-        }
-
-        return Data(output)
+        return didRasterize ? output : nil
     }
 
     static func shouldRasterizeCommittedShortStroke(
@@ -885,7 +981,7 @@ extension AppFeature {
     }
 
     static func rasterizeShortStrokeSegment(
-        into pixels: inout [UInt8],
+        into pixels: UnsafeMutableBufferPointer<UInt8>,
         canvasWidth: Int,
         canvasHeight: Int,
         start: StylusSample,
@@ -895,7 +991,10 @@ extension AppFeature {
         let dx = end.point.x - start.point.x
         let dy = end.point.y - start.point.y
         let distance = sqrt((dx * dx) + (dy * dy))
-        let stepDistance = max(0.35, min(max(CGFloat(brush.radius) * 0.18, 0.35), 1.0))
+        let isPencil = brush.tipKind == .pencil
+        let stepDistance = isPencil
+            ? max(0.42, min(max(CGFloat(brush.radius) * 0.22, 0.42), 1.15))
+            : max(0.5, min(max(CGFloat(brush.radius) * 0.28, 0.5), 1.6))
         let stepCount = max(Int(ceil(distance / stepDistance)), 1)
 
         for step in 0...stepCount {
@@ -911,7 +1010,7 @@ extension AppFeature {
                 timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
             )
             rasterizeShortStrokeStamp(
-                into: &pixels,
+                into: pixels,
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 sample: interpolatedSample,
@@ -921,7 +1020,7 @@ extension AppFeature {
     }
 
     static func rasterizeShortStrokeStamp(
-        into pixels: inout [UInt8],
+        into pixels: UnsafeMutableBufferPointer<UInt8>,
         canvasWidth: Int,
         canvasHeight: Int,
         sample: StylusSample,
@@ -959,7 +1058,10 @@ extension AppFeature {
         guard baseAlpha > 0.001 else { return }
 
         let hardness = max(0, min(1, CGFloat(brush.hardness)))
-        let hardCore = hardness >= 0.995 ? 1.0 : pow(hardness, 3.2)
+        let isPencil = brush.tipKind == .pencil
+        let hardCore = isPencil
+            ? min(0.78, pow(hardness, 4.8) * 0.72)
+            : (hardness >= 0.995 ? 1.0 : pow(hardness, 3.2))
         let sourceRed = CGFloat(brush.red) / 255.0
         let sourceGreen = CGFloat(brush.green) / 255.0
         let sourceBlue = CGFloat(brush.blue) / 255.0
@@ -979,10 +1081,37 @@ extension AppFeature {
                 } else {
                     let span = max(0.001, 1.0 - hardCore)
                     let softened = max(0, min(1, (normalizedDistance - hardCore) / span))
-                    falloff = 1.0 - softened
+                    falloff = isPencil
+                        ? pow(1.0 - softened, 1.6)
+                        : (1.0 - softened)
                 }
 
-                let sourceAlpha = baseAlpha * falloff
+                let textureAlpha: CGFloat
+                if isPencil {
+                    let grainNoise = previewNoise(
+                        x: CGFloat(x) * max(CGFloat(brush.grainScale), 0.6),
+                        y: CGFloat(y) * max(CGFloat(brush.grainScale), 0.6)
+                    )
+                    let paperNoise = previewNoise(
+                        x: CGFloat(x) * max(CGFloat(brush.paperScale) * 24.0, 1.0),
+                        y: CGFloat(y) * max(CGFloat(brush.paperScale) * 24.0, 1.0)
+                    )
+                    let grainContrast = max(0.35, CGFloat(brush.grainContrast))
+                    let contrastedGrain = max(0.0, min(1.0, ((grainNoise - 0.5) * grainContrast) + 0.5))
+                    let grainStrength = min(max(CGFloat(brush.textureStrength), 0), 1) * 0.55
+                    let paperStrength = min(max(CGFloat(brush.paperStrength), 0), 1) * 0.45
+                    let grainMask = max(0.14, 1.0 - grainStrength + (contrastedGrain * grainStrength))
+                    let paperThreshold = min(max(CGFloat(brush.paperThreshold), 0), 1)
+                    let paperMask = max(
+                        0.18,
+                        1.0 - paperStrength + (max(0.0, min(1.0, (paperNoise - paperThreshold + 1.0) * 0.75)) * paperStrength)
+                    )
+                    textureAlpha = grainMask * paperMask
+                } else {
+                    textureAlpha = 1.0
+                }
+
+                let sourceAlpha = baseAlpha * falloff * textureAlpha
                 guard sourceAlpha > 0.001 else { continue }
 
                 let offset = ((y * canvasWidth) + x) * 4
@@ -1010,6 +1139,11 @@ extension AppFeature {
                 pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
             }
         }
+    }
+
+    static func previewNoise(x: CGFloat, y: CGFloat) -> CGFloat {
+        let value = sin((x * 12.9898) + (y * 78.233)) * 43758.5453
+        return value - floor(value)
     }
 
     static func adjustedSelection(

@@ -75,6 +75,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     private var compositeTexture: MTLTexture?
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var appliedRevision: Int = -1
+    private var lastAppliedIncrementalUpdateID: IncrementalLayerUpdate.ID?
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
     private var documentSize: CGSize = .zero
@@ -113,22 +114,30 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
     }
 
     func update(snapshot: MetalDocumentSnapshot?, viewportOffset: CGSize, zoomScale: CGFloat, paperStyle: CanvasPaperStyle) {
-        pendingSnapshot = snapshot
-        currentSnapshot = snapshot
-        if let snapshot {
-            documentSize = CGSize(width: snapshot.width, height: snapshot.height)
+        let previousSnapshot = currentSnapshot
+        let snapshotChanged =
+            previousSnapshot?.revision != snapshot?.revision ||
+            previousSnapshot?.width != snapshot?.width ||
+            previousSnapshot?.height != snapshot?.height
+        if snapshotChanged {
+            pendingSnapshot = snapshot
+            currentSnapshot = snapshot
+            if let snapshot {
+                documentSize = CGSize(width: snapshot.width, height: snapshot.height)
+            }
         }
         let viewportChanged = self.viewportOffset != viewportOffset || self.zoomScale != zoomScale
         let paperChanged = self.paperStyle != paperStyle
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         self.paperStyle = paperStyle
-        if snapshot != nil || viewportChanged || paperChanged {
+        if snapshotChanged || viewportChanged || paperChanged {
             scheduleRedraw()
         }
     }
 
     func applyIncrementalUpdate(_ update: IncrementalLayerUpdate) {
+        guard lastAppliedIncrementalUpdateID != update.id else { return }
         guard let currentDevice = device, !update.isEmpty else { return }
         let texture = ensureCompositeTexture(device: currentDevice)
         guard let texture else { return }
@@ -149,6 +158,7 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
                 )
             }
         }
+        lastAppliedIncrementalUpdateID = update.id
         scheduleRedraw()
     }
 
@@ -262,6 +272,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         }
 
         appliedRevision = snapshot.revision
+        lastAppliedIncrementalUpdateID = nil
+        pendingSnapshot = nil
         let duration = start.duration(to: clock.now)
         let megabytes = snapshot.compositePixelData.count / 1_048_576
         Self.logger.debug("Applied composite snapshot revision \(snapshot.revision) with \(megabytes) MB in \(String(describing: duration), privacy: .public)")

@@ -20,6 +20,7 @@ struct CanvasView: UIViewRepresentable {
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
             activeStroke: store.activeStroke,
+            incrementalUpdate: store.pendingIncrementalUpdate,
             adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
@@ -149,6 +150,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         activeStroke: Stroke?,
+        incrementalUpdate: IncrementalLayerUpdate?,
         adjustmentPreviewPixelData: Data?,
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
@@ -171,6 +173,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         metalCanvasView.currentActiveLayerIndex = activeLayerIndex
         metalCanvasView.updateDocumentSize(documentSize)
         metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale, paperStyle: paperStyle)
+        if let incrementalUpdate {
+            metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
+        }
         inputHandler.tool = currentTool
         inputHandler.selectionMode = selectionMode
         inputHandler.shapeMode = shapeMode
