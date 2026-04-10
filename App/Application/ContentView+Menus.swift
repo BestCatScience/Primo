@@ -744,15 +744,9 @@ extension ContentView {
             }
             .buttonStyle(.plain)
 
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(StudioTheme.Palette.accent)
-                    .frame(width: 6, height: 6)
-
-                Text(StudioStrings.appName(language))
-                    .font(StudioTheme.Typography.label(9))
-                    .foregroundStyle(StudioTheme.Palette.textPrimary)
-            }
+            Text(StudioStrings.appName(language))
+                .font(StudioTheme.Typography.label(10))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
 
             menuBarMenu(StudioStrings.settingsMenu(language)) {
                 Menu(StudioStrings.languageMenu(language)) {
@@ -924,38 +918,14 @@ extension ContentView {
             Spacer(minLength: 8)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 2)
-        .background(
-            ZStack {
-                StudioTheme.Gradients.surface
-
-                LinearGradient(
-                    colors: [
-                        StudioTheme.Palette.accentBright.opacity(0.18),
-                        .clear
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.05),
-                        StudioTheme.Palette.toolbarHighlight
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        )
+        .padding(.vertical, 4)
+        .background(StudioTheme.Gradients.topBar)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(StudioTheme.Palette.accentSoft.opacity(0.28))
+                .fill(Color.white.opacity(0.06))
                 .frame(height: 1)
         }
         .contentShape(Rectangle())
-        .compositingGroup()
-        .shadow(color: StudioTheme.Palette.accentGlow.opacity(0.14), radius: 18, y: 8)
     }
 
     var undoRedoBar: some View {
@@ -1024,27 +994,11 @@ extension ContentView {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 2)
-        .background(
-            ZStack {
-                StudioTheme.Gradients.surface
-
-                StudioTheme.Gradients.accentBar
-                    .opacity(0.12)
-
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.04),
-                        StudioTheme.Palette.toolbarHighlight
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        )
+        .padding(.vertical, 5)
+        .background(Color(red: 0.19, green: 0.19, blue: 0.19))
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(StudioTheme.Palette.accentSoft.opacity(0.24))
+                .fill(Color.white.opacity(0.06))
                 .frame(height: 1)
         }
     }

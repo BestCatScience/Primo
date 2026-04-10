@@ -95,13 +95,13 @@ struct PaperLayerEditor: View {
             .opacity(transparentPaper ? 0.45 : 1.0)
         }
         .padding(16)
-        .frame(width: 260, alignment: .leading)
+        .frame(width: 240, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(StudioTheme.Palette.overlayBlack.opacity(0.96))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
     }

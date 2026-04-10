@@ -9,52 +9,10 @@ extension ContentView {
 
     var centerStage: some View {
         ZStack {
-            ZStack {
-                StudioTheme.Gradients.stage
-
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                StudioTheme.Palette.cardFillStrong,
-                                .clear,
-                                StudioTheme.Palette.accentBright.opacity(0.10)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .mask(
-                        Rectangle()
-                            .rotationEffect(.degrees(-18))
-                            .scaleEffect(1.6)
-                    )
-            }
-            .overlay {
-                ZStack {
-                    Circle()
-                        .fill(StudioTheme.Palette.cardFillStrong)
-                        .frame(width: 360, height: 360)
-                        .blur(radius: 100)
-                        .offset(x: -320, y: -180)
-
-                    Circle()
-                        .fill(StudioTheme.Palette.accent.opacity(0.24))
-                        .frame(width: 320, height: 320)
-                        .blur(radius: 90)
-                        .offset(x: 380, y: 220)
-
-                    Circle()
-                        .fill(StudioTheme.Palette.coolGlow.opacity(0.18))
-                        .frame(width: 280, height: 280)
-                        .blur(radius: 90)
-                        .offset(x: -220, y: 260)
-                }
-            }
+            StudioTheme.Gradients.stage
             .overlay {
                 DiagonalStageLines()
-                    .opacity(0.16)
-                    .blendMode(.screen)
+                    .opacity(0.05)
                     .allowsHitTesting(false)
             }
 
@@ -68,7 +26,7 @@ extension ContentView {
                             action: \.canvas
                         )
                     )
-                    .padding(14)
+                    .padding(10)
 
                     if store.isHydrating {
                         ProgressView()
@@ -78,9 +36,9 @@ extension ContentView {
                             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-                .padding(.horizontal, 14)
-                .padding(.top, 6)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
             }
         }
         .simultaneousGesture(
@@ -93,16 +51,15 @@ extension ContentView {
     var toolDockColumn: some View {
         VStack {
             toolDock
-                .padding(.leading, 10)
-                .padding(.top, 20)
+                .padding(.top, 0)
 
             toolDockColorCluster
-                .padding(.leading, 10)
-                .padding(.top, 12)
+                .padding(.top, 10)
 
             Spacer(minLength: 0)
         }
-        .frame(width: 90)
+        .frame(width: 52)
+        .background(Color(red: 0.17, green: 0.17, blue: 0.17))
     }
 
     func panelRail(for panel: StudioPanelKind) -> some View {
@@ -137,9 +94,9 @@ extension ContentView {
             studioPanel(for: panel)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 14)
-        .frame(width: panelState.isCollapsed ? 74 : 304)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .frame(width: panelState.isCollapsed ? 60 : (panel == .layers ? 248 : 280))
         .frame(maxHeight: .infinity, alignment: .top)
         .overlay(alignment: panel == .brush ? .trailing : .leading) {
             Rectangle()
@@ -197,8 +154,8 @@ extension ContentView {
                 )
             }
         }
-        .frame(maxHeight: panelState.isCollapsed ? 68 : .infinity, alignment: .top)
-        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .frame(maxHeight: panelState.isCollapsed ? 50 : .infinity, alignment: .top)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture(count: 2) {
             store.send(.panelCollapseToggled(panel))
         }
@@ -214,40 +171,13 @@ extension ContentView {
     }
 
     var stageChrome: some View {
-        RoundedRectangle(cornerRadius: 34, style: .continuous)
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(StudioTheme.Gradients.surface)
             .overlay(
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.03),
-                                StudioTheme.Palette.accentBright.opacity(0.28)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
-            .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.16),
-                                .clear
-                            ],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                    )
-                    .mask(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    )
-            }
-            .shadow(color: .black.opacity(0.42), radius: 28, y: 18)
+            .shadow(color: .black.opacity(0.22), radius: 10, y: 3)
     }
 
     var toolDock: some View {
@@ -263,14 +193,13 @@ extension ContentView {
             Spacer()
         }
         .padding(8)
-        .frame(width: 60)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(StudioTheme.Palette.cardFill)
-        )
+        .frame(width: 46)
+        .background(Color(red: 0.18, green: 0.18, blue: 0.18))
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(width: 1),
+            alignment: .trailing
         )
         .simultaneousGesture(
             TapGesture().onEnded {
@@ -282,17 +211,13 @@ extension ContentView {
     func toolDockItem(tool: StudioToolKind, isActive: Bool) -> some View {
         Image(systemName: tool.systemImage)
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(isActive ? Color.white : StudioTheme.Palette.textSecondary)
-            .frame(width: 42, height: 42)
+            .foregroundStyle(isActive ? Color.white : Color.white.opacity(0.72))
+            .frame(width: 34, height: 34)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isActive ? StudioTheme.Palette.accent.opacity(0.9) : Color.clear)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.white.opacity(isActive ? 0.12 : 0.06), lineWidth: 1)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
                 store.send(.toolSelected(tool))
             }
@@ -338,15 +263,7 @@ extension ContentView {
                 }
             }
         }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(StudioTheme.Palette.cardFill)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
-        )
+        .padding(.vertical, 8)
     }
 
     func toolDockColorSlotButton(
@@ -361,7 +278,7 @@ extension ContentView {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .fill(Color(red: 0.23, green: 0.23, blue: 0.23))
 
                 if slot == .transparent {
                     dockCheckerboard(cornerRadius: max(4, cornerRadius - 2))
@@ -396,7 +313,7 @@ extension ContentView {
                 .frame(width: 24, height: 24)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(StudioTheme.Palette.cardFillStrong)
+                        .fill(Color(red: 0.23, green: 0.23, blue: 0.23))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)

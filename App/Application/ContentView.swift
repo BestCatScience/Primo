@@ -120,31 +120,7 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            ZStack {
-                StudioTheme.Gradients.appBackground
-
-                RadialGradient(
-                    colors: [
-                        StudioTheme.Palette.accentGlow.opacity(0.22),
-                        .clear
-                    ],
-                    center: .topTrailing,
-                    startRadius: 30,
-                    endRadius: 520
-                )
-
-                RadialGradient(
-                    colors: [
-                        StudioTheme.Palette.coolGlow.opacity(0.20),
-                        .clear
-                    ],
-                    center: .bottomLeading,
-                    startRadius: 40,
-                    endRadius: 520
-                )
-            }
-        )
+        .background(StudioTheme.Gradients.appBackground)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 menuBar

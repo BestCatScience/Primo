@@ -48,8 +48,8 @@ struct LayerSidebarView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
                         Text(StudioStrings.layers(store.layers.count + 1, language))
-                            .font(StudioTheme.Typography.title(18))
-                            .foregroundStyle(.white.opacity(0.9))
+                            .font(StudioTheme.Typography.title(16))
+                            .foregroundStyle(.white.opacity(0.88))
 
                         Spacer()
 
@@ -59,9 +59,9 @@ struct LayerSidebarView: View {
                             Image(systemName: "folder.badge.plus")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.92))
-                                .frame(width: 36, height: 36)
+                                .frame(width: 28, height: 28)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .fill(StudioTheme.Palette.cardFillStrong)
                                 )
                         }
@@ -72,12 +72,12 @@ struct LayerSidebarView: View {
                             store.send(.addLayerButtonTapped)
                         } label: {
                             Label(StudioStrings.addLayer(language), systemImage: "plus")
-                                .font(StudioTheme.Typography.label(12))
+                                .font(StudioTheme.Typography.label(11))
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .fill(StudioTheme.Palette.accent)
                                 )
                         }
