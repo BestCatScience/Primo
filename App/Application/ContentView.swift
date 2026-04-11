@@ -38,6 +38,8 @@ struct ContentView: View {
     @State var nanoBananaInputLayerIndex = 0
     @State var nanoBananaEditScope: NanoBananaEditScope = .wholeLayer
     @State var nanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
+    @State var nanoBananaMaskExpansion = 0
+    @State var nanoBananaInvertsMask = false
     @State var nanoBananaModel: NanoBananaModel = .flashImage25
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
     @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue

@@ -361,6 +361,9 @@ struct BrushPaletteFeature {
     enum Delegate: Equatable {
         case clearActiveLayer
         case clearSelection
+        case invertSelection
+        case expandSelection(Int)
+        case contractSelection(Int)
         case applyTransform
         case cancelTransform
     }

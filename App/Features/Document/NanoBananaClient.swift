@@ -1,6 +1,118 @@
 import ComposableArchitecture
 import Foundation
 
+enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case wholeLayer
+    case selectedArea
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .wholeLayer:
+            return language.localized("Whole Layer")
+        case .selectedArea:
+            return language.localized("Selected Area")
+        }
+    }
+}
+
+enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case replaceCurrentLayer
+    case newLayer
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .replaceCurrentLayer:
+            return language.localized("Replace Current Layer")
+        case .newLayer:
+            return language.localized("New Layer")
+        }
+    }
+}
+
+struct NanoBananaMaskSettings: Equatable, Sendable {
+    var expansion: Int = 0
+    var isInverted = false
+}
+
+struct NanoBananaGenerationRequest: Equatable, Sendable {
+    var prompt: String
+    var config: NanoBananaRequestConfig
+    var model: NanoBananaModel
+    var inputLayerIndex: Int
+    var editScope: NanoBananaEditScope
+    var outputMode: NanoBananaOutputMode
+    var maskSettings: NanoBananaMaskSettings = .init()
+}
+
+struct NanoBananaPreviewState: Equatable, Sendable {
+    var request: NanoBananaGenerationRequest
+    var outputLayerIndex: Int
+    var pixelData: Data
+    var beforePreviewImageData: Data?
+    var afterPreviewImageData: Data?
+}
+
+enum NanoBananaJobStatus: String, Equatable, Sendable {
+    case running
+    case succeeded
+    case failed
+    case canceled
+}
+
+struct NanoBananaJob: Equatable, Sendable, Identifiable {
+    var id: UUID
+    var request: NanoBananaGenerationRequest
+    var createdAt: Date
+    var status: NanoBananaJobStatus
+    var message: String?
+}
+
+struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
+    var id: UUID
+    var request: NanoBananaGenerationRequest
+    var createdAt: Date
+    var previewImageData: Data?
+}
+
+enum NanoBananaPromptPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case retouch
+    case relight
+    case cleanup
+    case variant
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .retouch:
+            return language.localized("Retouch")
+        case .relight:
+            return language.localized("Relight")
+        case .cleanup:
+            return language.localized("Cleanup")
+        case .variant:
+            return language.localized("Variant")
+        }
+    }
+
+    func prompt(_ language: AppLanguage) -> String {
+        switch self {
+        case .retouch:
+            return language.localized("Refine this artwork with cleaner edges, improved detail, and polished shading.")
+        case .relight:
+            return language.localized("Keep the composition the same, but change the lighting to feel more dramatic and cinematic.")
+        case .cleanup:
+            return language.localized("Clean up artifacts and unwanted marks while preserving the original style and colors.")
+        case .variant:
+            return language.localized("Create a close variation of this image while preserving the overall composition and subject.")
+        }
+    }
+}
+
 enum NanoBananaModel: String, CaseIterable, Equatable, Sendable, Identifiable {
     case flashImage25 = "gemini-2.5-flash-image"
     case flashImage31Preview = "gemini-3.1-flash-image-preview"

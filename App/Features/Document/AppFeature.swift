@@ -94,6 +94,11 @@ struct AppFeature {
         var pendingNanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
         var appLanguage: AppLanguage = .load()
 
+        var nanoBananaProgress: Double? {
+            guard isNanoBananaGenerating else { return nil }
+            return 0.6
+        }
+
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
             canvas.canvasSize = presentation.canvasSize
             canvas.activeLayerIndex = presentation.activeLayerIndex
@@ -392,18 +397,19 @@ struct AppFeature {
     @Dependency(\.nanoBananaClient) var nanoBananaClient
 
     var body: some ReducerOf<Self> {
-        Scope(state: \.brushPalette, action: \.brushPalette) {
-            BrushPaletteFeature()
-        }
-        Scope(state: \.layerSidebar, action: \.layerSidebar) {
-            LayerSidebarFeature()
-        }
-        Scope(state: \.canvas, action: \.canvas) {
-            CanvasFeature()
-        }
+        CombineReducers {
+            Scope(state: \.brushPalette, action: \.brushPalette) {
+                BrushPaletteFeature()
+            }
+            Scope(state: \.layerSidebar, action: \.layerSidebar) {
+                LayerSidebarFeature()
+            }
+            Scope(state: \.canvas, action: \.canvas) {
+                CanvasFeature()
+            }
 
-        Reduce { state, action in
-            switch action {
+            Reduce { (state: inout State, action: Action) -> Effect<Action> in
+                switch action {
             case .task:
                 state.isHydrating = true
                 state.showsHome = true
@@ -1808,8 +1814,9 @@ struct AppFeature {
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
 
-            case .layerSidebar, .canvas:
-                return .none
+                case .layerSidebar, .canvas:
+                    return .none
+                }
             }
         }
     }

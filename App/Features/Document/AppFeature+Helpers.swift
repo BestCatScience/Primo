@@ -1969,4 +1969,27 @@ extension AppFeature {
             b: max(0, min(1, color.b))
         )
     }
+
+    static func localizedNanoBananaErrorMessage(_ message: String, language: AppLanguage) -> String {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return language.localized("Nano Banana edit failed")
+        }
+
+        let normalized = trimmed.lowercased()
+        if normalized.contains("invalid response") {
+            return language.localized("Nano Banana returned an invalid response")
+        }
+        if normalized.contains("invalid endpoint") {
+            return language.localized("Nano Banana endpoint is invalid")
+        }
+        if normalized.contains("missing image")
+            || normalized.contains("did not return decodable image")
+            || normalized.contains("returned text instead of an image")
+        {
+            return language.localized("Nano Banana did not return an image")
+        }
+
+        return trimmed
+    }
 }
