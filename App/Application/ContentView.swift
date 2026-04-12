@@ -156,6 +156,11 @@ struct ContentView: View {
             }
             .background(WindowGestureShield())
             .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in },
+                including: .all
+            )
             .zIndex(1000)
         }
         .overlay(alignment: .topLeading) {
