@@ -45,7 +45,6 @@ extension BrushPaletteView {
     var sizeControlBinding: Binding<PhotoshopDynamicControl> {
         Binding(
             get: {
-                if store.brush.sizeSpeedSensitivity > 0.001 { return .speed }
                 if store.brush.pressureSensitivity > 0.001 { return .pressure }
                 return .off
             },
@@ -53,14 +52,9 @@ extension BrushPaletteView {
                 switch newValue {
                 case .off:
                     store.brush.pressureSensitivity = 0.0
-                    store.brush.sizeSpeedSensitivity = 0.0
                 case .pressure:
                     if store.brush.pressureSensitivity <= 0.001 { store.brush.pressureSensitivity = 0.6 }
-                    store.brush.sizeSpeedSensitivity = 0.0
-                case .speed:
-                    store.brush.pressureSensitivity = 0.0
-                    if store.brush.sizeSpeedSensitivity <= 0.001 { store.brush.sizeSpeedSensitivity = 0.25 }
-                case .tilt, .random:
+                case .speed, .tilt, .random:
                     break
                 }
             }
@@ -72,17 +66,37 @@ extension BrushPaletteView {
             get: {
                 switch sizeControlBinding.wrappedValue {
                 case .pressure: return store.brush.pressureSensitivity
-                case .speed: return store.brush.sizeSpeedSensitivity
                 default: return 0.0
                 }
             },
             set: { newValue in
                 switch sizeControlBinding.wrappedValue {
                 case .pressure: store.brush.pressureSensitivity = newValue
-                case .speed: store.brush.sizeSpeedSensitivity = newValue
                 default: break
                 }
             }
+        )
+    }
+
+    private func speedSliderValue(from sensitivity: Double) -> Double {
+        min(max(100.0 + (sensitivity * 100.0), 0.0), 200.0)
+    }
+
+    private func speedSensitivity(from sliderValue: Double) -> Double {
+        min(max((sliderValue - 100.0) / 100.0, -1.0), 1.0)
+    }
+
+    var speedSizeAmountBinding: Binding<Double> {
+        Binding(
+            get: { speedSliderValue(from: store.brush.sizeSpeedSensitivity) },
+            set: { store.brush.sizeSpeedSensitivity = speedSensitivity(from: $0) }
+        )
+    }
+
+    var speedOpacityAmountBinding: Binding<Double> {
+        Binding(
+            get: { speedSliderValue(from: store.brush.velocityInfluence) },
+            set: { store.brush.velocityInfluence = speedSensitivity(from: $0) }
         )
     }
 
@@ -233,15 +247,6 @@ extension BrushPaletteView {
                 case .random: store.brush.flowJitter = 1.0 - newValue
                 default: break
                 }
-            }
-        )
-    }
-
-    var velocityDensityControlBinding: Binding<Bool> {
-        Binding(
-            get: { store.brush.velocityInfluence > 0.001 },
-            set: { enabled in
-                store.brush.velocityInfluence = enabled ? 0.012 : 0.0
             }
         )
     }

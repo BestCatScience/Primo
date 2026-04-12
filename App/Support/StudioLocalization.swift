@@ -286,6 +286,8 @@ enum StudioStrings {
         "Size Amount": "サイズ量",
         "Size Control": "サイズコントロール",
         "Soft Light": "ソフトライト",
+        "Speed Opacity": "速度で不透明度",
+        "Speed Size": "速度でサイズ",
         "Source": "取得元",
         "Spacing": "スタンプ間隔",
         "Spacing Jitter": "間隔ジッター",

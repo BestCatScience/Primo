@@ -94,9 +94,20 @@ float pressureScaleForBrush(const BrushSettings& brush, float pressure) {
     return (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
 }
 
+float normalizedSpeedFactor(const BrushSettings& brush, float speed) {
+    return clamp01(speed / std::max(12.0F, brush.radius * 18.0F));
+}
+
 float speedScaleForBrush(const BrushSettings& brush, float speed) {
-    const float speedFactor = clamp01(speed / std::max(12.0F, brush.radius * 18.0F));
-    return lerp(1.0F, remap(speedFactor, 0.0F, 1.0F, 1.0F, 0.58F), clamp01(brush.sizeSpeedSensitivity));
+    const float speedFactor = normalizedSpeedFactor(brush, speed);
+    const float clampedSensitivity = std::clamp(brush.sizeSpeedSensitivity, -1.0F, 1.0F);
+    return std::max(0.3F, 1.0F + (clampedSensitivity * speedFactor * 0.42F));
+}
+
+float speedOpacityScaleForBrush(const BrushSettings& brush, float speed) {
+    const float speedFactor = normalizedSpeedFactor(brush, speed);
+    const float clampedSensitivity = std::clamp(brush.velocityInfluence, -1.0F, 1.0F);
+    return std::max(0.2F, 1.0F + (clampedSensitivity * speedFactor * 0.6F));
 }
 
 float resolvedStrokeRadius(const BrushSettings& brush, float pressure, float speed) {
@@ -2527,7 +2538,8 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         clamp01(activeBrush_.flowPressureSensitivity)
     );
     const float resolvedFlow = clamp01(activeBrush_.flow * flowPressure * flowJitter);
-    const float effectiveOpacity = clamp01(activeBrush_.opacity * std::max(0.05F, resolvedFlow) * opacityPressure);
+    const float speedOpacity = speedOpacityScaleForBrush(activeBrush_, point.speed);
+    const float effectiveOpacity = clamp01(activeBrush_.opacity * std::max(0.05F, resolvedFlow) * opacityPressure * speedOpacity);
     const bool isPencil = activeBrush_.tipKind == "pencil";
     const bool isInk = activeBrush_.tipKind == "ink";
     const bool isOil = activeBrush_.tipKind == "oil";

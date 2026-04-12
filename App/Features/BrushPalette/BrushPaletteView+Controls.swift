@@ -283,9 +283,14 @@ extension BrushPaletteView {
             dynamicControlMenuRow(
                 title: language.localized("サイズコントロール"),
                 selection: sizeControlBinding,
-                allowed: [.off, .pressure, .speed]
+                allowed: [.off, .pressure]
             )
             sliderRow(title: language.localized("サイズ量"), value: "\(Int(sizeAmountBinding.wrappedValue * 100))%", slider: Slider(value: sizeAmountBinding, in: 0.0...1.0))
+            sliderRow(
+                title: language.localized("Speed Size"),
+                value: "\(Int(speedSizeAmountBinding.wrappedValue.rounded()))",
+                slider: Slider(value: speedSizeAmountBinding, in: 0...200, step: 1)
+            )
             sliderRow(title: language.localized("形状の細さ"), value: "\(Int(store.brush.roundness * 100))%", slider: Slider(value: $store.brush.roundness, in: 0.2...1.0))
             dynamicControlMenuRow(
                 title: language.localized("形状コントロール"),
@@ -358,6 +363,11 @@ extension BrushPaletteView {
                 allowed: [.off, .pressure]
             )
             sliderRow(title: language.localized("不透明度量"), value: "\(Int(opacityAmountBinding.wrappedValue * 100))%", slider: Slider(value: opacityAmountBinding, in: 0.0...1.0))
+            sliderRow(
+                title: language.localized("Speed Opacity"),
+                value: "\(Int(speedOpacityAmountBinding.wrappedValue.rounded()))",
+                slider: Slider(value: speedOpacityAmountBinding, in: 0...200, step: 1)
+            )
             sliderRow(title: language.localized("フロー"), value: "\(Int(store.brush.flow * 100))%", slider: Slider(value: $store.brush.flow, in: 0.05...1.0))
             dynamicControlMenuRow(
                 title: language.localized("フローコントロール"),
@@ -365,16 +375,6 @@ extension BrushPaletteView {
                 allowed: [.off, .pressure, .random]
             )
             sliderRow(title: language.localized("フロー量"), value: "\(Int(flowAmountBinding.wrappedValue * 100))%", slider: Slider(value: flowAmountBinding, in: 0.0...1.0))
-            segmentedModeRow(
-                title: language.localized("速度で濃さを変える"),
-                selectedTitle: store.brush.velocityInfluence > 0.001 ? language.localized("オン") : language.localized("オフ")
-            ) {
-                Picker(language.localized("速度で濃さを変える"), selection: velocityDensityControlBinding) {
-                    Text(language.localized("オフ")).tag(false)
-                    Text(language.localized("オン")).tag(true)
-                }
-                .pickerStyle(.segmented)
-            }
             sliderRow(title: language.localized("手ぶれ補正"), value: "\(Int(store.brush.stabilization * 100))%", slider: Slider(value: $store.brush.stabilization, in: 0.0...1.0))
         }
     }
