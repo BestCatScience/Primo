@@ -25,6 +25,7 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: Primo
         PRODUCT_NAME: atelierprime
         TARGETED_DEVICE_FAMILY: 2
         IPHONEOS_DEPLOYMENT_TARGET: 26.0

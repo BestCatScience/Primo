@@ -539,7 +539,7 @@
 					"$(SRCROOT)/Engine/include",
 				);
 				INFOPLIST_FILE = App/Support/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = AtlierPrime;
+				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
@@ -580,7 +580,7 @@
 					"$(SRCROOT)/Engine/include",
 				);
 				INFOPLIST_FILE = App/Support/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = AtlierPrime;
+				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;

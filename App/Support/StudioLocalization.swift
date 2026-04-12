@@ -361,7 +361,7 @@ enum StudioStrings {
         return map
     }()
 
-    static func appName(_ language: AppLanguage) -> String { "atelierprime" }
+    static func appName(_ language: AppLanguage) -> String { "Primo" }
 
     private static func localized(_ language: AppLanguage, english: String, japanese: String) -> String {
         switch language {

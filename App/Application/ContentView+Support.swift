@@ -283,13 +283,13 @@ extension ContentView {
                     .fill(Color(red: 0.05, green: 0.11, blue: 0.17))
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .stroke(Color(red: 0.23, green: 0.78, blue: 1.0).opacity(0.45), lineWidth: 1)
-                Text("Ap")
+                Text("P")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 0.38, green: 0.84, blue: 1.0))
             }
             .frame(width: 34, height: 34)
 
-            Text("AtelierPrime")
+            Text("Primo")
                 .font(StudioTheme.Typography.title(18))
                 .foregroundStyle(.white.opacity(0.88))
 
