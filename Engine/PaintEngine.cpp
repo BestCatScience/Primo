@@ -88,6 +88,21 @@ float brushSpacingDistance(const BrushSettings& brush) {
     return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
 }
 
+float pressureScaleForBrush(const BrushSettings& brush, float pressure) {
+    const float clampedPressure = std::clamp(pressure, 0.08F, 1.0F);
+    const float clampedSensitivity = clamp01(brush.pressureSensitivity);
+    return (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
+}
+
+float speedScaleForBrush(const BrushSettings& brush, float speed) {
+    const float speedFactor = clamp01(speed / std::max(12.0F, brush.radius * 18.0F));
+    return lerp(1.0F, remap(speedFactor, 0.0F, 1.0F, 1.0F, 0.58F), clamp01(brush.sizeSpeedSensitivity));
+}
+
+float resolvedStrokeRadius(const BrushSettings& brush, float pressure, float speed) {
+    return std::max(0.4F, brush.radius * pressureScaleForBrush(brush, pressure) * speedScaleForBrush(brush, speed));
+}
+
 bool shouldPreserveCircularInkTip(const BrushSettings& brush) {
     if (brush.tipKind != "ink") {
         return false;
@@ -2492,11 +2507,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     layer.pixelsDirty = true;
 
     const float clampedPressure = std::clamp(point.pressure, 0.08F, 1.0F);
-    const float clampedSensitivity = clamp01(activeBrush_.pressureSensitivity);
-    const float pressureScale = (1.0F - clampedSensitivity) + (clampedPressure * clampedSensitivity);
-    const float speedFactor = clamp01(point.speed / std::max(12.0F, activeBrush_.radius * 18.0F));
-    const float speedScale = lerp(1.0F, remap(speedFactor, 0.0F, 1.0F, 1.0F, 0.58F), clamp01(activeBrush_.sizeSpeedSensitivity));
-    const float radius = std::max(0.4F, activeBrush_.radius * pressureScale * speedScale);
+    const float radius = resolvedStrokeRadius(activeBrush_, clampedPressure, point.speed);
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
@@ -2751,7 +2762,14 @@ void PaintDocument::renderShortStroke(Layer& layer, const StrokePoint& start, co
         return;
     }
 
-    const float stepDistance = std::max(activeBrush_.radius * 0.16F, 0.2F);
+    const float shortStrokeRadius = std::max(
+        0.4F,
+        std::min(
+            resolvedStrokeRadius(activeBrush_, start.pressure, 0.0F),
+            resolvedStrokeRadius(activeBrush_, end.pressure, 0.0F)
+        )
+    );
+    const float stepDistance = std::max(shortStrokeRadius * 0.04F, 0.015F);
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
     for (int step = 0; step <= steps; ++step) {
         const float t = static_cast<float>(step) / static_cast<float>(steps);
@@ -2783,7 +2801,15 @@ void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, 
         return;
     }
 
-    const float stepDistance = std::max(brushSpacingDistance(activeBrush_) * 0.35F, 0.15F);
+    const float segmentTimeDelta = std::max(0.001F, end.timestamp - start.timestamp);
+    const float segmentSpeed = distance / segmentTimeDelta;
+    const float startRadius = resolvedStrokeRadius(activeBrush_, start.pressure, segmentSpeed);
+    const float endRadius = resolvedStrokeRadius(activeBrush_, end.pressure, segmentSpeed);
+    const float minimumRadius = std::max(0.4F, std::min(startRadius, endRadius));
+    const float stepDistance = std::max(
+        std::min(brushSpacingDistance(activeBrush_) * 0.05F, minimumRadius * 0.04F),
+        0.015F
+    );
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
     StrokePoint priorStamped = start;
     for (int step = 1; step <= steps; ++step) {

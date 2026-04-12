@@ -763,35 +763,6 @@ extension AppFeature {
         }
         guard deduplicated.count > 1 else { return deduplicated }
 
-        let shortStrokeThreshold = max(CGFloat(brush.radius) * 6.0, 18.0)
-        let endpointDistance = strokeEndpointDistance(deduplicated)
-        let visualSpan = strokeVisualSpan(deduplicated)
-        let pathLength = strokePathLength(deduplicated)
-        let noisyShortStroke =
-            endpointDistance <= shortStrokeThreshold * 1.5 &&
-            (pathLength >= max(endpointDistance * 3.0, shortStrokeThreshold * 2.0) || deduplicated.count >= 48)
-        if noisyShortStroke {
-            guard let first = deduplicated.first, let last = deduplicated.last else {
-                return deduplicated
-            }
-            let dotThreshold = max(CGFloat(brush.radius) * 1.25, 3.0)
-            if endpointDistance <= dotThreshold {
-                return [averagedStylusSample(deduplicated)]
-            }
-            return [first, last]
-        }
-
-        if endpointDistance <= shortStrokeThreshold && visualSpan <= shortStrokeThreshold * 2.0 {
-            let dotThreshold = max(CGFloat(brush.radius) * 1.25, 3.0)
-            if endpointDistance <= dotThreshold {
-                return [averagedStylusSample(deduplicated)]
-            }
-            guard let first = deduplicated.first, let last = deduplicated.last else {
-                return deduplicated
-            }
-            return [first, last]
-        }
-
         return deduplicated
     }
 
@@ -990,32 +961,45 @@ extension AppFeature {
     ) {
         let dx = end.point.x - start.point.x
         let dy = end.point.y - start.point.y
-        let distance = sqrt((dx * dx) + (dy * dy))
-        let isPencil = brush.tipKind == .pencil
-        let stepDistance = isPencil
-            ? max(0.42, min(max(CGFloat(brush.radius) * 0.22, 0.42), 1.15))
-            : max(0.5, min(max(CGFloat(brush.radius) * 0.28, 0.5), 1.6))
-        let stepCount = max(Int(ceil(distance / stepDistance)), 1)
+        let lengthSquared = max((dx * dx) + (dy * dy), 0.0001)
+        let maxRadius = max(
+            resolvedStrokeRadius(for: start, brush: brush),
+            resolvedStrokeRadius(for: end, brush: brush)
+        )
 
-        for step in 0...stepCount {
-            let t = CGFloat(step) / CGFloat(stepCount)
-            let interpolatedSample = StylusSample(
-                point: CGPoint(
-                    x: start.point.x + (dx * t),
-                    y: start.point.y + (dy * t)
-                ),
-                pressure: start.pressure + ((end.pressure - start.pressure) * t),
-                altitude: start.altitude + ((end.altitude - start.altitude) * t),
-                azimuth: start.azimuth + ((end.azimuth - start.azimuth) * t),
-                timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
-            )
-            rasterizeShortStrokeStamp(
-                into: pixels,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
-                sample: interpolatedSample,
-                brush: brush
-            )
+        let minX = max(Int(floor(min(start.point.x, end.point.x) - maxRadius)), 0)
+        let maxX = min(Int(ceil(max(start.point.x, end.point.x) + maxRadius)), canvasWidth - 1)
+        let minY = max(Int(floor(min(start.point.y, end.point.y) - maxRadius)), 0)
+        let maxY = min(Int(ceil(max(start.point.y, end.point.y) + maxRadius)), canvasHeight - 1)
+        guard minX <= maxX, minY <= maxY else { return }
+
+        for y in minY...maxY {
+            for x in minX...maxX {
+                let sampleX = CGFloat(x) + 0.5
+                let sampleY = CGFloat(y) + 0.5
+                let projection = (((sampleX - start.point.x) * dx) + ((sampleY - start.point.y) * dy)) / lengthSquared
+                let t = max(0, min(1, projection))
+                let interpolatedSample = interpolatedStylusSample(from: start, to: end, progress: t)
+                let radius = resolvedStrokeRadius(for: interpolatedSample, brush: brush)
+                let centerX = start.point.x + (dx * t)
+                let centerY = start.point.y + (dy * t)
+                let distanceToCenter = sqrt(pow(sampleX - centerX, 2) + pow(sampleY - centerY, 2))
+                guard distanceToCenter <= radius else { continue }
+                let sourceAlpha = sourceAlphaForRasterizedSample(
+                    interpolatedSample,
+                    brush: brush,
+                    radius: radius,
+                    sampleX: sampleX,
+                    sampleY: sampleY
+                )
+                guard sourceAlpha > 0.001 else { continue }
+                blendRasterizedPixel(
+                    into: pixels,
+                    offset: ((y * canvasWidth) + x) * 4,
+                    sourceAlpha: sourceAlpha,
+                    brush: brush
+                )
+            }
         }
     }
 
@@ -1026,17 +1010,55 @@ extension AppFeature {
         sample: StylusSample,
         brush: BrushRuntimeSettings
     ) {
-        let pressureFactor = max(
-            0.1,
-            1.0 + ((sample.pressure - 1.0) * CGFloat(brush.pressureSensitivity))
-        )
-        let radius = max(CGFloat(brush.radius) * pressureFactor, 1.5)
+        let radius = resolvedStrokeRadius(for: sample, brush: brush)
         let minX = max(Int(floor(sample.point.x - radius)), 0)
         let maxX = min(Int(ceil(sample.point.x + radius)), canvasWidth - 1)
         let minY = max(Int(floor(sample.point.y - radius)), 0)
         let maxY = min(Int(ceil(sample.point.y + radius)), canvasHeight - 1)
         guard minX <= maxX, minY <= maxY else { return }
 
+        for y in minY...maxY {
+            for x in minX...maxX {
+                let sampleX = CGFloat(x) + 0.5
+                let sampleY = CGFloat(y) + 0.5
+                let sourceAlpha = sourceAlphaForRasterizedSample(
+                    sample,
+                    brush: brush,
+                    radius: radius,
+                    sampleX: sampleX,
+                    sampleY: sampleY
+                )
+                guard sourceAlpha > 0.001 else { continue }
+                blendRasterizedPixel(
+                    into: pixels,
+                    offset: ((y * canvasWidth) + x) * 4,
+                    sourceAlpha: sourceAlpha,
+                    brush: brush
+                )
+            }
+        }
+    }
+
+    static func interpolatedStylusSample(from start: StylusSample, to end: StylusSample, progress t: CGFloat) -> StylusSample {
+        StylusSample(
+            point: CGPoint(
+                x: start.point.x + ((end.point.x - start.point.x) * t),
+                y: start.point.y + ((end.point.y - start.point.y) * t)
+            ),
+            pressure: start.pressure + ((end.pressure - start.pressure) * t),
+            altitude: start.altitude + ((end.altitude - start.altitude) * t),
+            azimuth: start.azimuth + ((end.azimuth - start.azimuth) * t),
+            timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
+        )
+    }
+
+    static func sourceAlphaForRasterizedSample(
+        _ sample: StylusSample,
+        brush: BrushRuntimeSettings,
+        radius: CGFloat,
+        sampleX: CGFloat,
+        sampleY: CGFloat
+    ) -> CGFloat {
         let pressureOpacity = max(
             0.05,
             1.0 + ((sample.pressure - 1.0) * CGFloat(brush.opacityPressureSensitivity))
@@ -1055,90 +1077,96 @@ extension AppFeature {
                 flowOpacity
             )
         )
-        guard baseAlpha > 0.001 else { return }
+        guard baseAlpha > 0.001 else { return 0 }
+
+        let dx = sampleX - sample.point.x
+        let dy = sampleY - sample.point.y
+        let normalizedDistance = sqrt((dx * dx) + (dy * dy)) / max(radius, 0.001)
+        guard normalizedDistance <= 1 else { return 0 }
 
         let hardness = max(0, min(1, CGFloat(brush.hardness)))
         let isPencil = brush.tipKind == .pencil
         let hardCore = isPencil
             ? min(0.78, pow(hardness, 4.8) * 0.72)
             : (hardness >= 0.995 ? 1.0 : pow(hardness, 3.2))
+
+        let falloff: CGFloat
+        if hardCore >= 0.999 || normalizedDistance <= hardCore {
+            falloff = 1
+        } else {
+            let span = max(0.001, 1.0 - hardCore)
+            let softened = max(0, min(1, (normalizedDistance - hardCore) / span))
+            falloff = isPencil ? pow(1.0 - softened, 1.6) : (1.0 - softened)
+        }
+
+        let textureAlpha: CGFloat
+        if isPencil {
+            let grainNoise = previewNoise(
+                x: sampleX * max(CGFloat(brush.grainScale), 0.6),
+                y: sampleY * max(CGFloat(brush.grainScale), 0.6)
+            )
+            let paperNoise = previewNoise(
+                x: sampleX * max(CGFloat(brush.paperScale) * 24.0, 1.0),
+                y: sampleY * max(CGFloat(brush.paperScale) * 24.0, 1.0)
+            )
+            let grainContrast = max(0.35, CGFloat(brush.grainContrast))
+            let contrastedGrain = max(0.0, min(1.0, ((grainNoise - 0.5) * grainContrast) + 0.5))
+            let grainStrength = min(max(CGFloat(brush.textureStrength), 0), 1) * 0.55
+            let paperStrength = min(max(CGFloat(brush.paperStrength), 0), 1) * 0.45
+            let grainMask = max(0.14, 1.0 - grainStrength + (contrastedGrain * grainStrength))
+            let paperThreshold = min(max(CGFloat(brush.paperThreshold), 0), 1)
+            let paperMask = max(
+                0.18,
+                1.0 - paperStrength + (max(0.0, min(1.0, (paperNoise - paperThreshold + 1.0) * 0.75)) * paperStrength)
+            )
+            textureAlpha = grainMask * paperMask
+        } else {
+            textureAlpha = 1.0
+        }
+
+        return baseAlpha * falloff * textureAlpha
+    }
+
+    static func blendRasterizedPixel(
+        into pixels: UnsafeMutableBufferPointer<UInt8>,
+        offset: Int,
+        sourceAlpha: CGFloat,
+        brush: BrushRuntimeSettings
+    ) {
+        let destinationAlpha = CGFloat(pixels[offset + 3]) / 255.0
+
+        if brush.isEraser {
+            let outAlpha = destinationAlpha * (1.0 - sourceAlpha)
+            pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+            return
+        }
+
         let sourceRed = CGFloat(brush.red) / 255.0
         let sourceGreen = CGFloat(brush.green) / 255.0
         let sourceBlue = CGFloat(brush.blue) / 255.0
+        let destinationRed = CGFloat(pixels[offset]) / 255.0
+        let destinationGreen = CGFloat(pixels[offset + 1]) / 255.0
+        let destinationBlue = CGFloat(pixels[offset + 2]) / 255.0
+        let outAlpha = sourceAlpha + (destinationAlpha * (1.0 - sourceAlpha))
+        guard outAlpha > 0.001 else { return }
 
-        for y in minY...maxY {
-            for x in minX...maxX {
-                let sampleX = CGFloat(x) + 0.5
-                let sampleY = CGFloat(y) + 0.5
-                let dx = sampleX - sample.point.x
-                let dy = sampleY - sample.point.y
-                let normalizedDistance = sqrt((dx * dx) + (dy * dy)) / radius
-                guard normalizedDistance <= 1 else { continue }
+        let outRed = ((sourceRed * sourceAlpha) + (destinationRed * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
+        let outGreen = ((sourceGreen * sourceAlpha) + (destinationGreen * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
+        let outBlue = ((sourceBlue * sourceAlpha) + (destinationBlue * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
 
-                let falloff: CGFloat
-                if hardCore >= 0.999 || normalizedDistance <= hardCore {
-                    falloff = 1
-                } else {
-                    let span = max(0.001, 1.0 - hardCore)
-                    let softened = max(0, min(1, (normalizedDistance - hardCore) / span))
-                    falloff = isPencil
-                        ? pow(1.0 - softened, 1.6)
-                        : (1.0 - softened)
-                }
+        pixels[offset] = UInt8(max(0, min(255, Int((outRed * 255.0).rounded()))))
+        pixels[offset + 1] = UInt8(max(0, min(255, Int((outGreen * 255.0).rounded()))))
+        pixels[offset + 2] = UInt8(max(0, min(255, Int((outBlue * 255.0).rounded()))))
+        pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
+    }
 
-                let textureAlpha: CGFloat
-                if isPencil {
-                    let grainNoise = previewNoise(
-                        x: CGFloat(x) * max(CGFloat(brush.grainScale), 0.6),
-                        y: CGFloat(y) * max(CGFloat(brush.grainScale), 0.6)
-                    )
-                    let paperNoise = previewNoise(
-                        x: CGFloat(x) * max(CGFloat(brush.paperScale) * 24.0, 1.0),
-                        y: CGFloat(y) * max(CGFloat(brush.paperScale) * 24.0, 1.0)
-                    )
-                    let grainContrast = max(0.35, CGFloat(brush.grainContrast))
-                    let contrastedGrain = max(0.0, min(1.0, ((grainNoise - 0.5) * grainContrast) + 0.5))
-                    let grainStrength = min(max(CGFloat(brush.textureStrength), 0), 1) * 0.55
-                    let paperStrength = min(max(CGFloat(brush.paperStrength), 0), 1) * 0.45
-                    let grainMask = max(0.14, 1.0 - grainStrength + (contrastedGrain * grainStrength))
-                    let paperThreshold = min(max(CGFloat(brush.paperThreshold), 0), 1)
-                    let paperMask = max(
-                        0.18,
-                        1.0 - paperStrength + (max(0.0, min(1.0, (paperNoise - paperThreshold + 1.0) * 0.75)) * paperStrength)
-                    )
-                    textureAlpha = grainMask * paperMask
-                } else {
-                    textureAlpha = 1.0
-                }
-
-                let sourceAlpha = baseAlpha * falloff * textureAlpha
-                guard sourceAlpha > 0.001 else { continue }
-
-                let offset = ((y * canvasWidth) + x) * 4
-                let destinationAlpha = CGFloat(pixels[offset + 3]) / 255.0
-
-                if brush.isEraser {
-                    let outAlpha = destinationAlpha * (1.0 - sourceAlpha)
-                    pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
-                    continue
-                }
-
-                let destinationRed = CGFloat(pixels[offset]) / 255.0
-                let destinationGreen = CGFloat(pixels[offset + 1]) / 255.0
-                let destinationBlue = CGFloat(pixels[offset + 2]) / 255.0
-                let outAlpha = sourceAlpha + (destinationAlpha * (1.0 - sourceAlpha))
-                guard outAlpha > 0.001 else { continue }
-
-                let outRed = ((sourceRed * sourceAlpha) + (destinationRed * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
-                let outGreen = ((sourceGreen * sourceAlpha) + (destinationGreen * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
-                let outBlue = ((sourceBlue * sourceAlpha) + (destinationBlue * destinationAlpha * (1.0 - sourceAlpha))) / outAlpha
-
-                pixels[offset] = UInt8(max(0, min(255, Int((outRed * 255.0).rounded()))))
-                pixels[offset + 1] = UInt8(max(0, min(255, Int((outGreen * 255.0).rounded()))))
-                pixels[offset + 2] = UInt8(max(0, min(255, Int((outBlue * 255.0).rounded()))))
-                pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
-            }
-        }
+    static func resolvedStrokeRadius(for sample: StylusSample, brush: BrushRuntimeSettings) -> CGFloat {
+        let clampedPressure = max(0.08, min(sample.pressure, 1.0))
+        let pressureFactor = max(
+            0.1,
+            1.0 + ((clampedPressure - 1.0) * CGFloat(brush.pressureSensitivity))
+        )
+        return max(CGFloat(brush.radius) * pressureFactor, 1.5)
     }
 
     static func previewNoise(x: CGFloat, y: CGFloat) -> CGFloat {

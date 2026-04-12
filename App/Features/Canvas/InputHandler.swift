@@ -237,10 +237,6 @@ final class InputHandler {
                 continue
             }
 
-            if shouldRejectDistance(distance) {
-                continue
-            }
-
             let interpolationSpacing = preferredInterpolationSpacing(
                 from: previous,
                 to: candidate,
@@ -275,13 +271,8 @@ final class InputHandler {
         return distance > jumpThreshold && candidate.pressure < pressureDropThreshold
     }
 
-    private func shouldRejectDistance(_ distance: Float) -> Bool {
-        let absurdJumpDistance = max(brushSize * 14.0, 220.0)
-        return distance > absurdJumpDistance
-    }
-
     private func preferredInterpolationSpacing(from previous: StrokePoint, to candidate: StrokePoint, distance: Float) -> Float {
-        let baseSpacing = max(brushSize * 0.2, 0.35)
+        let baseSpacing = max(brushSize * 0.04, 0.2)
         guard distance > 0.001 else { return baseSpacing }
         return baseSpacing
     }
