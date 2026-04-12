@@ -297,6 +297,8 @@ enum StudioStrings {
         "State": "状態",
         "Stroke": "ストローク固定",
         "Subtract": "削る",
+        "Taper In": "入り",
+        "Taper Out": "抜き",
         "Tap or drag with Apple Pencil to sample a color into the current paint color.": "Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。",
         "Tap to sample, then use Move to transform": "タップで選択したあと、移動ツールで変形します",
         "Target": "対象",

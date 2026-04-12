@@ -439,6 +439,8 @@ extension BrushPreset {
             color: Color(red: 0.08, green: 0.08, blue: 0.09),
             radius: max(1.0, radius),
             sizeSpeedSensitivity: analysis.sizeSpeedSensitivity,
+            taperIn: 0.0,
+            taperOut: 0.0,
             opacity: 1.0,
             hardness: analysis.hardness,
             roundness: analysis.roundness,

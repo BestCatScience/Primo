@@ -11,6 +11,8 @@ struct BrushPaletteFeature {
             var tipKind: BrushTipKind = BrushPreset.defaultPencil.tipKind
             var radius: Double = BrushPreset.defaultPencil.radius
             var sizeSpeedSensitivity: Double = BrushPreset.defaultPencil.sizeSpeedSensitivity
+            var taperIn: Double = BrushPreset.defaultPencil.taperIn
+            var taperOut: Double = BrushPreset.defaultPencil.taperOut
             var opacity: Double = BrushPreset.defaultPencil.opacity
             var hardness: Double = BrushPreset.defaultPencil.hardness
             var roundness: Double = BrushPreset.defaultPencil.roundness
@@ -110,6 +112,8 @@ struct BrushPaletteFeature {
                     tipKind: tipKind,
                     radius: radius,
                     sizeSpeedSensitivity: sizeSpeedSensitivity,
+                    taperIn: taperIn,
+                    taperOut: taperOut,
                     opacity: opacity,
                     hardness: hardness,
                     roundness: roundness,
@@ -175,6 +179,8 @@ struct BrushPaletteFeature {
                 tipKind = preset.tipKind
                 radius = preservedRadius
                 sizeSpeedSensitivity = preset.sizeSpeedSensitivity
+                taperIn = preset.taperIn
+                taperOut = preset.taperOut
                 opacity = preset.opacity
                 hardness = preset.hardness
                 roundness = preset.roundness
@@ -235,6 +241,8 @@ struct BrushPaletteFeature {
                     color: .white,
                     radius: storedRadius,
                     sizeSpeedSensitivity: sizeSpeedSensitivity,
+                    taperIn: taperIn,
+                    taperOut: taperOut,
                     opacity: opacity,
                     hardness: hardness,
                     roundness: roundness,
@@ -540,6 +548,8 @@ private extension BrushPaletteFeature.State {
                 color: preset.color,
                 radius: preset.radius,
                 sizeSpeedSensitivity: preset.sizeSpeedSensitivity,
+                taperIn: preset.taperIn,
+                taperOut: preset.taperOut,
                 opacity: preset.opacity,
                 hardness: preset.hardness,
                 roundness: preset.roundness,

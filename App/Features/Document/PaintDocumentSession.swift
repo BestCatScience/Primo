@@ -739,6 +739,8 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.tipKind = brush.tipKind.rawValue
         descriptor.radius = brush.radius
         descriptor.sizeSpeedSensitivity = brush.sizeSpeedSensitivity
+        descriptor.taperIn = brush.taperIn
+        descriptor.taperOut = brush.taperOut
         descriptor.opacity = brush.opacity
         descriptor.hardness = brush.hardness
         descriptor.roundness = brush.roundness
@@ -1607,6 +1609,8 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let tipKind: String
     let radius: Double
     let sizeSpeedSensitivity: Double
+    let taperIn: Double
+    let taperOut: Double
     let opacity: Double
     let hardness: Double
     let roundness: Double
@@ -1670,6 +1674,8 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         tipKind = brush.tipKind.rawValue
         radius = brush.radius
         sizeSpeedSensitivity = brush.sizeSpeedSensitivity
+        taperIn = brush.taperIn
+        taperOut = brush.taperOut
         opacity = brush.opacity
         hardness = brush.hardness
         roundness = brush.roundness
@@ -1746,6 +1752,8 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
             tipKind: tipKind,
             radius: radius,
             sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
             opacity: opacity,
             hardness: hardness,
             roundness: roundness,

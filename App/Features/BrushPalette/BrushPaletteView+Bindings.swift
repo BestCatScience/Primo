@@ -100,6 +100,28 @@ extension BrushPaletteView {
         )
     }
 
+    private func taperSliderValue(from amount: Double) -> Double {
+        min(max((1.0 - amount) * 100.0, 0.0), 100.0)
+    }
+
+    private func taperAmount(from sliderValue: Double) -> Double {
+        min(max(1.0 - (sliderValue / 100.0), 0.0), 1.0)
+    }
+
+    var taperInAmountBinding: Binding<Double> {
+        Binding(
+            get: { taperSliderValue(from: store.brush.taperIn) },
+            set: { store.brush.taperIn = taperAmount(from: $0) }
+        )
+    }
+
+    var taperOutAmountBinding: Binding<Double> {
+        Binding(
+            get: { taperSliderValue(from: store.brush.taperOut) },
+            set: { store.brush.taperOut = taperAmount(from: $0) }
+        )
+    }
+
     var roundnessControlBinding: Binding<PhotoshopDynamicControl> {
         Binding(
             get: {

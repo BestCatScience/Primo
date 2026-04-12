@@ -434,6 +434,8 @@ extension BrushPaletteView {
             color: currentDetailPreviewColor,
             radius: store.brush.radius,
             opacity: store.brush.opacity,
+            taperIn: store.brush.taperIn,
+            taperOut: store.brush.taperOut,
             hardness: store.brush.hardness,
             roundness: store.brush.roundness,
             angle: store.brush.angle,

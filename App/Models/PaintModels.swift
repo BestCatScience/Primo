@@ -547,6 +547,8 @@ struct BrushPreset: Identifiable, Equatable {
     let color: Color
     let radius: Double
     let sizeSpeedSensitivity: Double
+    let taperIn: Double
+    let taperOut: Double
     let opacity: Double
     let hardness: Double
     let roundness: Double
@@ -605,6 +607,8 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.tipKind == rhs.tipKind &&
         lhs.radius == rhs.radius &&
         lhs.sizeSpeedSensitivity == rhs.sizeSpeedSensitivity &&
+        lhs.taperIn == rhs.taperIn &&
+        lhs.taperOut == rhs.taperOut &&
         lhs.opacity == rhs.opacity &&
         lhs.hardness == rhs.hardness &&
         lhs.roundness == rhs.roundness &&
@@ -665,6 +669,8 @@ struct BrushPreset: Identifiable, Equatable {
         color: Color,
         radius: Double,
         sizeSpeedSensitivity: Double = 0.0,
+        taperIn: Double = 0.0,
+        taperOut: Double = 0.0,
         opacity: Double,
         hardness: Double,
         roundness: Double,
@@ -723,6 +729,8 @@ struct BrushPreset: Identifiable, Equatable {
         self.color = color
         self.radius = radius
         self.sizeSpeedSensitivity = sizeSpeedSensitivity
+        self.taperIn = taperIn
+        self.taperOut = taperOut
         self.opacity = opacity
         self.hardness = hardness
         self.roundness = roundness
@@ -1337,6 +1345,8 @@ struct BrushPreset: Identifiable, Equatable {
         color: Color,
         radius: Double,
         sizeSpeedSensitivity: Double = 0.0,
+        taperIn: Double = 0.0,
+        taperOut: Double = 0.0,
         opacity: Double,
         hardness: Double,
         roundness: Double,
@@ -1393,6 +1403,8 @@ struct BrushPreset: Identifiable, Equatable {
             color: color,
             radius: radius,
             sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
             opacity: opacity,
             hardness: hardness,
             roundness: roundness,

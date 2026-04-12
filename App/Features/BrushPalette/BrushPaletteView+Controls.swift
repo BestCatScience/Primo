@@ -291,6 +291,16 @@ extension BrushPaletteView {
                 value: "\(Int(speedSizeAmountBinding.wrappedValue.rounded()))",
                 slider: Slider(value: speedSizeAmountBinding, in: 0...200, step: 1)
             )
+            sliderRow(
+                title: language.localized("Taper In"),
+                value: "\(Int(taperInAmountBinding.wrappedValue.rounded()))",
+                slider: Slider(value: taperInAmountBinding, in: 0...100, step: 1)
+            )
+            sliderRow(
+                title: language.localized("Taper Out"),
+                value: "\(Int(taperOutAmountBinding.wrappedValue.rounded()))",
+                slider: Slider(value: taperOutAmountBinding, in: 0...100, step: 1)
+            )
             sliderRow(title: language.localized("形状の細さ"), value: "\(Int(store.brush.roundness * 100))%", slider: Slider(value: $store.brush.roundness, in: 0.2...1.0))
             dynamicControlMenuRow(
                 title: language.localized("形状コントロール"),

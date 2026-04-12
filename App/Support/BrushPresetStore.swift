@@ -122,6 +122,8 @@ private struct StoredBrushPreset: Codable {
     let tipKindRawValue: String
     let radius: Double
     let sizeSpeedSensitivity: Double
+    let taperIn: Double
+    let taperOut: Double
     let opacity: Double
     let hardness: Double
     let roundness: Double
@@ -180,6 +182,8 @@ private struct StoredBrushPreset: Codable {
         case tipKindRawValue
         case radius
         case sizeSpeedSensitivity
+        case taperIn
+        case taperOut
         case opacity
         case hardness
         case roundness
@@ -239,6 +243,8 @@ private struct StoredBrushPreset: Codable {
         tipKindRawValue = preset.tipKind.rawValue
         radius = preset.radius
         sizeSpeedSensitivity = preset.sizeSpeedSensitivity
+        taperIn = preset.taperIn
+        taperOut = preset.taperOut
         opacity = preset.opacity
         hardness = preset.hardness
         roundness = preset.roundness
@@ -299,6 +305,8 @@ private struct StoredBrushPreset: Codable {
         tipKindRawValue = try container.decode(String.self, forKey: .tipKindRawValue)
         radius = try container.decode(Double.self, forKey: .radius)
         sizeSpeedSensitivity = try container.decodeIfPresent(Double.self, forKey: .sizeSpeedSensitivity) ?? 0.0
+        taperIn = try container.decodeIfPresent(Double.self, forKey: .taperIn) ?? 0.0
+        taperOut = try container.decodeIfPresent(Double.self, forKey: .taperOut) ?? 0.0
         opacity = try container.decode(Double.self, forKey: .opacity)
         hardness = try container.decode(Double.self, forKey: .hardness)
         roundness = try container.decode(Double.self, forKey: .roundness)
@@ -374,6 +382,8 @@ private struct StoredBrushPreset: Codable {
             color: Color(red: Double(red) / 255.0, green: Double(green) / 255.0, blue: Double(blue) / 255.0),
             radius: radius,
             sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
             opacity: opacity,
             hardness: hardness,
             roundness: roundness,

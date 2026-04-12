@@ -65,6 +65,8 @@ struct BrushPreviewStyle {
     let color: Color
     let radius: Double
     let opacity: Double
+    let taperIn: Double
+    let taperOut: Double
     let hardness: Double
     let roundness: Double
     let angle: Double
@@ -89,6 +91,8 @@ struct BrushPreviewStyle {
         color: Color,
         radius: Double,
         opacity: Double,
+        taperIn: Double,
+        taperOut: Double,
         hardness: Double,
         roundness: Double,
         angle: Double,
@@ -112,6 +116,8 @@ struct BrushPreviewStyle {
         self.color = color
         self.radius = radius
         self.opacity = opacity
+        self.taperIn = taperIn
+        self.taperOut = taperOut
         self.hardness = hardness
         self.roundness = roundness
         self.angle = angle
@@ -137,6 +143,8 @@ struct BrushPreviewStyle {
         color = .white
         radius = preset.radius
         opacity = preset.opacity
+        taperIn = preset.taperIn
+        taperOut = preset.taperOut
         hardness = preset.hardness
         roundness = preset.roundness
         angle = preset.angle
@@ -172,7 +180,8 @@ struct BrushStrokePreview: View {
                     let point = points[index].0
                     let pressure = points[index].1
                     let pressureScale = max(0.35, 1.0 - style.pressureSensitivity + (style.pressureSensitivity * pressure))
-                    let diameter = max(baseDiameter * pressureScale, 1.0)
+                    let taperScale = previewTaperScale(at: index, total: points.count)
+                    let diameter = max(baseDiameter * pressureScale * taperScale, 1.0)
                     let angle = previewStampAngle(for: points, at: index)
                     let clusterCount = max(1, style.scatterEnabled ? style.count : 1)
                     for clusterIndex in 0..<clusterCount {
@@ -338,6 +347,25 @@ struct BrushStrokePreview: View {
         let envelope = sin(t * .pi)
         let pulse = 0.72 + (0.28 * sin((t * .pi * 2.4) - 0.6))
         return max(0.18, min(1.0, envelope * pulse + 0.18))
+    }
+
+    private func previewTaperScale(at index: Int, total: Int) -> Double {
+        guard total > 1 else { return 1.0 }
+        let progress = Double(index) / Double(total - 1)
+        return strokeTaperScale(progress: progress, taperIn: style.taperIn, taperOut: style.taperOut)
+    }
+
+    private func strokeTaperScale(progress: Double, taperIn: Double, taperOut: Double) -> Double {
+        func easedRamp(_ progress: Double, length: Double) -> Double {
+            guard length > 0.001 else { return 1.0 }
+            let t = min(max(progress / length, 0.0), 1.0)
+            let eased = t * t * (3.0 - (2.0 * t))
+            return 0.08 + (0.92 * eased)
+        }
+
+        let entry = easedRamp(progress, length: taperIn)
+        let exit = easedRamp(1.0 - progress, length: taperOut)
+        return min(entry, exit)
     }
 
     private func signedNoise(_ seed: Double) -> Double {

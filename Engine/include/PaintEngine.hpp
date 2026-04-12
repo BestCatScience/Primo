@@ -16,6 +16,8 @@ struct BrushSettings {
     std::string tipKind = "pencil";
     float radius = 3.0F;
     float sizeSpeedSensitivity = 0.0F;
+    float taperIn = 0.0F;
+    float taperOut = 0.0F;
     float hardness = 0.82F;
     float opacity = 0.9F;
     float roundness = 1.0F;

@@ -4,6 +4,8 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var tipKind: BrushTipKind
     var radius: Double
     var sizeSpeedSensitivity: Double = 0.0
+    var taperIn: Double = 0.0
+    var taperOut: Double = 0.0
     var opacity: Double
     var hardness: Double
     var roundness: Double
@@ -74,6 +76,8 @@ struct BrushRuntimeSettings: Equatable, Sendable {
             tipKind: imported.preset.tipKind,
             radius: imported.preset.radius,
             sizeSpeedSensitivity: imported.preset.sizeSpeedSensitivity,
+            taperIn: imported.preset.taperIn,
+            taperOut: imported.preset.taperOut,
             opacity: imported.preset.opacity,
             hardness: imported.preset.hardness,
             roundness: imported.preset.roundness,

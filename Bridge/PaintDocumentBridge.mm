@@ -253,6 +253,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
         _tipKind = @"pencil";
         _radius = 3.0;
         _sizeSpeedSensitivity = 0.0;
+        _taperIn = 0.0;
+        _taperOut = 0.0;
         _hardness = 0.82;
         _opacity = 0.9;
         _roundness = 1.0;
@@ -547,6 +549,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
     settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
+    settings.taperIn = (float)brush.taperIn;
+    settings.taperOut = (float)brush.taperOut;
     settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;
@@ -647,6 +651,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     atelierprime::BrushSettings settings;
     settings.radius = (float)brush.radius;
     settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
+    settings.taperIn = (float)brush.taperIn;
+    settings.taperOut = (float)brush.taperOut;
     settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
     settings.hardness = (float)brush.hardness;
     settings.opacity = (float)brush.opacity;

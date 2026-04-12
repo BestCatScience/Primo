@@ -25,6 +25,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *tipKind;
 @property (nonatomic) CGFloat radius;
 @property (nonatomic) CGFloat sizeSpeedSensitivity;
+@property (nonatomic) CGFloat taperIn;
+@property (nonatomic) CGFloat taperOut;
 @property (nonatomic) CGFloat hardness;
 @property (nonatomic) CGFloat opacity;
 @property (nonatomic) CGFloat roundness;

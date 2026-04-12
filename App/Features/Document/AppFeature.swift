@@ -1508,6 +1508,9 @@ struct AppFeature {
                     state.canvas.activeStrokeBaseSnapshot = state.canvas.renderSnapshot
                 }
                 let brush = state.resolvedBrushSettings()
+                var previewBrush = brush
+                previewBrush.taperIn = 0
+                previewBrush.taperOut = 0
                 if
                     let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
                     let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
@@ -1516,14 +1519,14 @@ struct AppFeature {
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
                         samples: [sample],
-                        brush: brush
+                        brush: previewBrush
                     )
                 {
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
                     if
                         let dirtyRect = Self.strokePreviewDirtyRect(
                             samples: [sample],
-                            brush: brush,
+                            brush: previewBrush,
                             canvasWidth: baseSnapshot.width,
                             canvasHeight: baseSnapshot.height
                         ),
@@ -1551,6 +1554,9 @@ struct AppFeature {
             case let .canvas(.delegate(.appendSamples(samples))):
                 guard !samples.isEmpty else { return .none }
                 let brush = state.resolvedBrushSettings()
+                var previewBrush = brush
+                previewBrush.taperIn = 0
+                previewBrush.taperOut = 0
                 if
                     let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
                     let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
@@ -1559,21 +1565,22 @@ struct AppFeature {
                     let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
                     let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
                     let deltaSamples = anchor.map { [$0] + samples } ?? samples
+                    let previewSamples = deltaSamples
                     let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
                     guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
                         basePixelData: basePixelData,
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
-                        samples: deltaSamples,
-                        brush: brush
+                        samples: previewSamples,
+                        brush: previewBrush
                     ) else {
                         return .none
                     }
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
                     if
                         let dirtyRect = Self.strokePreviewDirtyRect(
-                            samples: deltaSamples,
-                            brush: brush,
+                            samples: previewSamples,
+                            brush: previewBrush,
                             canvasWidth: baseSnapshot.width,
                             canvasHeight: baseSnapshot.height
                         ),
@@ -1599,7 +1606,7 @@ struct AppFeature {
                         canvasWidth: snapshot.width,
                         canvasHeight: snapshot.height,
                         samples: samples,
-                        brush: brush
+                        brush: previewBrush
                     )
                 {
                     state.canvas.activeStrokeBaseSnapshot = snapshot
@@ -1607,7 +1614,7 @@ struct AppFeature {
                     if
                         let dirtyRect = Self.strokePreviewDirtyRect(
                             samples: samples,
-                            brush: brush,
+                            brush: previewBrush,
                             canvasWidth: snapshot.width,
                             canvasHeight: snapshot.height
                         ),
@@ -1648,7 +1655,8 @@ struct AppFeature {
 
             case let .canvas(.delegate(.endStroke(samples))):
                 let brush = state.resolvedBrushSettings()
-                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+                let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
+                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
                     paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
                 } else {
                     let didCommit = paintDocumentClient.applySoftwareStroke(
@@ -1693,9 +1701,10 @@ struct AppFeature {
 
             case let .canvas(.delegate(.commitStroke(samples))):
                 let brush = state.resolvedBrushSettings()
+                let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil
-                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
                     paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
                 } else {
                     let didCommit = paintDocumentClient.applySoftwareStroke(

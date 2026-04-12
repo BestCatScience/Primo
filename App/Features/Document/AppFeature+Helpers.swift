@@ -766,6 +766,40 @@ extension AppFeature {
         return deduplicated
     }
 
+    static func strokeTaperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
+        func easedRamp(_ progress: CGFloat, length: CGFloat) -> CGFloat {
+            guard length > 0.001 else { return 1.0 }
+            let t = max(0.0, min(1.0, progress / length))
+            let eased = t * t * (3.0 - (2.0 * t))
+            return 0.08 + (0.92 * eased)
+        }
+
+        let entry = easedRamp(progress, length: taperIn)
+        let exit = easedRamp(1.0 - progress, length: taperOut)
+        return min(entry, exit)
+    }
+
+    static func strokeProgressTable(_ samples: [StylusSample]) -> [CGFloat] {
+        guard !samples.isEmpty else { return [] }
+        guard samples.count > 1 else { return [0] }
+
+        var cumulative: [CGFloat] = [0]
+        cumulative.reserveCapacity(samples.count)
+        var totalLength: CGFloat = 0
+        for pair in zip(samples, samples.dropFirst()) {
+            let dx = pair.1.point.x - pair.0.point.x
+            let dy = pair.1.point.y - pair.0.point.y
+            totalLength += sqrt((dx * dx) + (dy * dy))
+            cumulative.append(totalLength)
+        }
+
+        guard totalLength > 0.001 else {
+            return Array(repeating: 0, count: samples.count)
+        }
+
+        return cumulative.map { $0 / totalLength }
+    }
+
     static func layerPixelDataByApplyingCommittedShortStroke(
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
@@ -785,6 +819,7 @@ extension AppFeature {
 
         let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
         guard !committedSamples.isEmpty else { return nil }
+        let progressTable = strokeProgressTable(committedSamples)
 
         var output = layer.pixelData
         let didRasterize = output.withUnsafeMutableBytes { rawBytes in
@@ -796,18 +831,21 @@ extension AppFeature {
                     canvasWidth: snapshot.width,
                     canvasHeight: snapshot.height,
                     sample: committedSamples[0],
+                    progress: progressTable[0],
                     brush: brush
                 )
                 return true
             }
 
-            for pair in zip(committedSamples, committedSamples.dropFirst()) {
+            for (index, pair) in zip(committedSamples.indices, zip(committedSamples, committedSamples.dropFirst())) {
                 rasterizeShortStrokeSegment(
                     into: pixels,
                     canvasWidth: snapshot.width,
                     canvasHeight: snapshot.height,
                     start: pair.0,
                     end: pair.1,
+                    startProgress: progressTable[index],
+                    endProgress: progressTable[index + 1],
                     brush: brush
                 )
             }
@@ -829,6 +867,7 @@ extension AppFeature {
 
         let committedSamples = normalizedCommittedStrokeSamples(samples, brush: brush)
         guard !committedSamples.isEmpty else { return nil }
+        let progressTable = strokeProgressTable(committedSamples)
 
         var output = basePixelData
         let didRasterize = output.withUnsafeMutableBytes { rawBytes in
@@ -840,18 +879,21 @@ extension AppFeature {
                     canvasWidth: canvasWidth,
                     canvasHeight: canvasHeight,
                     sample: committedSamples[0],
+                    progress: progressTable[0],
                     brush: brush
                 )
                 return true
             }
 
-            for pair in zip(committedSamples, committedSamples.dropFirst()) {
+            for (index, pair) in zip(committedSamples.indices, zip(committedSamples, committedSamples.dropFirst())) {
                 rasterizeShortStrokeSegment(
                     into: pixels,
                     canvasWidth: canvasWidth,
                     canvasHeight: canvasHeight,
                     start: pair.0,
                     end: pair.1,
+                    startProgress: progressTable[index],
+                    endProgress: progressTable[index + 1],
                     brush: brush
                 )
             }
@@ -957,14 +999,16 @@ extension AppFeature {
         canvasHeight: Int,
         start: StylusSample,
         end: StylusSample,
+        startProgress: CGFloat,
+        endProgress: CGFloat,
         brush: BrushRuntimeSettings
     ) {
         let dx = end.point.x - start.point.x
         let dy = end.point.y - start.point.y
         let lengthSquared = max((dx * dx) + (dy * dy), 0.0001)
         let maxRadius = max(
-            resolvedStrokeRadius(for: start, brush: brush),
-            resolvedStrokeRadius(for: end, brush: brush)
+            resolvedStrokeRadius(for: start, progress: startProgress, brush: brush),
+            resolvedStrokeRadius(for: end, progress: endProgress, brush: brush)
         )
 
         let minX = max(Int(floor(min(start.point.x, end.point.x) - maxRadius)), 0)
@@ -980,7 +1024,8 @@ extension AppFeature {
                 let projection = (((sampleX - start.point.x) * dx) + ((sampleY - start.point.y) * dy)) / lengthSquared
                 let t = max(0, min(1, projection))
                 let interpolatedSample = interpolatedStylusSample(from: start, to: end, progress: t)
-                let radius = resolvedStrokeRadius(for: interpolatedSample, brush: brush)
+                let progress = startProgress + ((endProgress - startProgress) * t)
+                let radius = resolvedStrokeRadius(for: interpolatedSample, progress: progress, brush: brush)
                 let centerX = start.point.x + (dx * t)
                 let centerY = start.point.y + (dy * t)
                 let distanceToCenter = sqrt(pow(sampleX - centerX, 2) + pow(sampleY - centerY, 2))
@@ -988,6 +1033,7 @@ extension AppFeature {
                 let sourceAlpha = sourceAlphaForRasterizedSample(
                     interpolatedSample,
                     brush: brush,
+                    progress: progress,
                     radius: radius,
                     sampleX: sampleX,
                     sampleY: sampleY
@@ -1008,9 +1054,10 @@ extension AppFeature {
         canvasWidth: Int,
         canvasHeight: Int,
         sample: StylusSample,
+        progress: CGFloat,
         brush: BrushRuntimeSettings
     ) {
-        let radius = resolvedStrokeRadius(for: sample, brush: brush)
+        let radius = resolvedStrokeRadius(for: sample, progress: progress, brush: brush)
         let minX = max(Int(floor(sample.point.x - radius)), 0)
         let maxX = min(Int(ceil(sample.point.x + radius)), canvasWidth - 1)
         let minY = max(Int(floor(sample.point.y - radius)), 0)
@@ -1024,6 +1071,7 @@ extension AppFeature {
                 let sourceAlpha = sourceAlphaForRasterizedSample(
                     sample,
                     brush: brush,
+                    progress: progress,
                     radius: radius,
                     sampleX: sampleX,
                     sampleY: sampleY
@@ -1055,6 +1103,7 @@ extension AppFeature {
     static func sourceAlphaForRasterizedSample(
         _ sample: StylusSample,
         brush: BrushRuntimeSettings,
+        progress: CGFloat,
         radius: CGFloat,
         sampleX: CGFloat,
         sampleY: CGFloat
@@ -1160,13 +1209,18 @@ extension AppFeature {
         pixels[offset + 3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
     }
 
-    static func resolvedStrokeRadius(for sample: StylusSample, brush: BrushRuntimeSettings) -> CGFloat {
+    static func resolvedStrokeRadius(for sample: StylusSample, progress: CGFloat = 0, brush: BrushRuntimeSettings) -> CGFloat {
         let clampedPressure = max(0.08, min(sample.pressure, 1.0))
         let pressureFactor = max(
             0.1,
             1.0 + ((clampedPressure - 1.0) * CGFloat(brush.pressureSensitivity))
         )
-        return max(CGFloat(brush.radius) * pressureFactor, 1.5)
+        let taperScale = strokeTaperScale(
+            progress: progress,
+            taperIn: CGFloat(brush.taperIn),
+            taperOut: CGFloat(brush.taperOut)
+        )
+        return max(CGFloat(brush.radius) * pressureFactor * taperScale, 1.5)
     }
 
     static func previewNoise(x: CGFloat, y: CGFloat) -> CGFloat {
