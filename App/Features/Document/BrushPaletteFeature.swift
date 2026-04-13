@@ -328,6 +328,25 @@ struct BrushPaletteFeature {
             var isTransparent = false
         }
 
+        struct TextSettings: Equatable {
+            var content = "Text"
+            var fontSize: Double = 64
+            var position: CGPoint?
+            var scale: Double = 1.0
+            var rotationDegrees: Double = 0
+            var targetLayerIndex: Int?
+            var availableFonts: [TextFontOption]
+            var selectedFontPostScriptName: String?
+            var selectedFontDisplayName: String?
+
+            init() {
+                let fonts = TextFontLibrary.availableFonts()
+                self.availableFonts = fonts
+                self.selectedFontPostScriptName = fonts.first?.postScriptName
+                self.selectedFontDisplayName = fonts.first?.displayName
+            }
+        }
+
         struct LibraryState: Equatable {
             var selectedBrush: BrushPreset? = .defaultPencil
             var presets: [BrushPreset] = BrushPreset.defaults
@@ -344,6 +363,7 @@ struct BrushPaletteFeature {
         var shape = ShapeSettings()
         var sampling = SamplingSettings()
         var paper = PaperSettings()
+        var text = TextSettings()
         var library = LibraryState()
         var ui = UIState()
 
@@ -356,9 +376,13 @@ struct BrushPaletteFeature {
         case binding(BindingAction<State>)
         case selectPreset(BrushPreset)
         case importedPresets([BrushPreset])
+        case importedTextFonts([TextFontOption])
         case saveCurrentBrushButtonTapped
         case resetCurrentBrushSettingsButtonTapped
         case deleteSavedPresetButtonTapped(String)
+        case setTextPlacement(CGPoint)
+        case configureTextForActiveLayer(TextLayerDraft?)
+        case applyTextButtonTapped
         case clearActiveLayerButtonTapped
         case clearSelectionButtonTapped
         case applyTransformButtonTapped
@@ -374,6 +398,7 @@ struct BrushPaletteFeature {
         case contractSelection(Int)
         case applyTransform
         case cancelTransform
+        case applyText(TextLayerDraft)
     }
 
     var body: some ReducerOf<Self> {
@@ -454,6 +479,12 @@ struct BrushPaletteFeature {
                 state.library.selectedBrush = nil
                 return .none
 
+            case .binding(\.text.content),
+                 .binding(\.text.fontSize),
+                 .binding(\.text.selectedFontPostScriptName),
+                 .binding(\.text.selectedFontDisplayName):
+                return .none
+
             case .binding:
                 return .none
 
@@ -469,6 +500,57 @@ struct BrushPaletteFeature {
                     state.applyPreset(first)
                 }
                 return .none
+
+            case let .importedTextFonts(fonts):
+                state.text.availableFonts = TextFontLibrary.availableFonts()
+                if state.text.selectedFontPostScriptName == nil, let first = state.text.availableFonts.first {
+                    state.text.selectedFontPostScriptName = first.postScriptName
+                    state.text.selectedFontDisplayName = first.displayName
+                } else if let selected = fonts.first {
+                    state.text.selectedFontPostScriptName = selected.postScriptName
+                    state.text.selectedFontDisplayName = selected.displayName
+                }
+                return .none
+
+            case let .setTextPlacement(position):
+                state.text.position = position
+                return .none
+
+            case let .configureTextForActiveLayer(draft):
+                if let draft {
+                    state.text.content = draft.text
+                    state.text.fontSize = draft.fontSize
+                    state.text.position = draft.position
+                    state.text.scale = draft.scale
+                    state.text.rotationDegrees = draft.rotationDegrees
+                    state.text.targetLayerIndex = draft.targetLayerIndex
+                    state.text.selectedFontPostScriptName = draft.fontPostScriptName
+                    state.text.selectedFontDisplayName = draft.fontDisplayName
+                } else {
+                    state.text.targetLayerIndex = nil
+                    state.text.scale = 1.0
+                    state.text.rotationDegrees = 0
+                    if state.text.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        state.text.content = "Text"
+                    }
+                }
+                return .none
+
+            case .applyTextButtonTapped:
+                let trimmed = state.text.content.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return .none }
+                guard let position = state.text.position else { return .none }
+                let draft = TextLayerDraft(
+                    targetLayerIndex: state.text.targetLayerIndex,
+                    text: trimmed,
+                    position: position,
+                    fontPostScriptName: state.text.selectedFontPostScriptName,
+                    fontDisplayName: state.text.selectedFontDisplayName,
+                    fontSize: state.text.fontSize,
+                    scale: state.text.scale,
+                    rotationDegrees: state.text.rotationDegrees
+                )
+                return .send(.delegate(.applyText(draft)))
 
             case .saveCurrentBrushButtonTapped:
                 let savedNames = state.library.savedPresets.map(\.name)

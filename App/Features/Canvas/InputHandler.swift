@@ -10,6 +10,7 @@ protocol InputHandlerDelegate: AnyObject {
     func didUpdateSelectionPath(_ points: [CGPoint])
     func didEndSelectionPath(_ points: [CGPoint])
     func didRequestAutoSelection(at sample: StylusSample)
+    func didRequestTextPlacement(at point: CGPoint)
     func didBeginTransform()
     func didUpdateTransform(translation: CGSize)
     func didEndTransform(translation: CGSize)
@@ -35,7 +36,7 @@ final class InputHandler {
 
     func handleTouches(_ touches: Set<UITouch>, with event: UIEvent?, in view: UIView) {
         guard let touch = touches.first,
-              touch.type == .pencil else { return }
+              (touch.type == .pencil || tool == .text) else { return }
 
         if tool == .select {
             handleSelectionTouches(touch, with: event, in: view)
@@ -44,6 +45,14 @@ final class InputHandler {
 
         if tool == .move {
             handleTransformTouches(touch, in: view)
+            return
+        }
+
+        if tool == .text {
+            guard touch.phase == .began else { return }
+            delegate?.didRequestTextPlacement(at: makePoint(touch, in: view, predicted: false).cgPoint)
+            currentStroke = nil
+            shapeStartPoint = nil
             return
         }
 
@@ -79,7 +88,7 @@ final class InputHandler {
             }
             return
 
-        case .moved, .stationary:
+        case .moved:
             guard var stroke = currentStroke else { return }
 
             if tool == .shape, let shapeStartPoint {
@@ -94,6 +103,9 @@ final class InputHandler {
 
             currentStroke = stroke
             delegate?.didUpdateStroke(stroke)
+
+        case .stationary:
+            return
 
         case .ended:
             if var stroke = currentStroke {
@@ -233,6 +245,18 @@ final class InputHandler {
             let delta = candidate.position - previous.position
             let distance = simd_length(delta)
 
+            if !isFinishingStroke && distance <= duplicateSampleDistanceThreshold {
+                stroke.points[stroke.points.count - 1] = StrokePoint(
+                    position: previous.position,
+                    pressure: candidate.pressure,
+                    altitude: candidate.altitude,
+                    azimuth: candidate.azimuth,
+                    timestamp: candidate.timestamp,
+                    isPredicted: false
+                )
+                continue
+            }
+
             if isFinishingStroke && shouldRejectFinishingJump(candidate, previous: previous, distance: distance) {
                 continue
             }
@@ -275,6 +299,10 @@ final class InputHandler {
         let baseSpacing = max(brushSize * 0.04, 0.2)
         guard distance > 0.001 else { return baseSpacing }
         return baseSpacing
+    }
+
+    private var duplicateSampleDistanceThreshold: Float {
+        max(brushSize * 0.0025, 0.05)
     }
 
     private func interpolatedPoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {

@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
+import CoreText
+import UIKit
 import simd
 
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
@@ -12,6 +14,7 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case select
     case move
     case shape
+    case text
 
     var id: String { rawValue }
 
@@ -37,6 +40,8 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return language.localized("移動")
         case .shape:
             return language.localized("形状")
+        case .text:
+            return language.localized("テキスト")
         }
     }
 
@@ -58,7 +63,213 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
             return "arrow.up.left.and.down.right.and.arrow.up.right.and.down.left"
         case .shape:
             return "square.on.circle"
+        case .text:
+            return "textformat"
         }
+    }
+}
+
+struct TextFontOption: Identifiable, Equatable, Sendable, Codable {
+    let postScriptName: String
+    let displayName: String
+    let sourceFilename: String?
+
+    var id: String { postScriptName }
+}
+
+struct TextLayerData: Equatable, Sendable, Codable {
+    var text: String
+    var positionX: Double
+    var positionY: Double
+    var fontPostScriptName: String
+    var fontDisplayName: String
+    var fontSize: Double
+    var scale: Double
+    var rotationDegrees: Double
+    var red: Double
+    var green: Double
+    var blue: Double
+    var alpha: Double
+
+    var position: CGPoint {
+        get { CGPoint(x: positionX, y: positionY) }
+        set {
+            positionX = newValue.x
+            positionY = newValue.y
+        }
+    }
+
+    var color: Color {
+        Color(red: red, green: green, blue: blue, opacity: alpha)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case positionX
+        case positionY
+        case fontPostScriptName
+        case fontDisplayName
+        case fontSize
+        case scale
+        case rotationDegrees
+        case red
+        case green
+        case blue
+        case alpha
+    }
+
+    init(
+        text: String,
+        positionX: Double,
+        positionY: Double,
+        fontPostScriptName: String,
+        fontDisplayName: String,
+        fontSize: Double,
+        scale: Double = 1.0,
+        rotationDegrees: Double = 0,
+        red: Double,
+        green: Double,
+        blue: Double,
+        alpha: Double
+    ) {
+        self.text = text
+        self.positionX = positionX
+        self.positionY = positionY
+        self.fontPostScriptName = fontPostScriptName
+        self.fontDisplayName = fontDisplayName
+        self.fontSize = fontSize
+        self.scale = scale
+        self.rotationDegrees = rotationDegrees
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decode(String.self, forKey: .text)
+        positionX = try container.decode(Double.self, forKey: .positionX)
+        positionY = try container.decode(Double.self, forKey: .positionY)
+        fontPostScriptName = try container.decode(String.self, forKey: .fontPostScriptName)
+        fontDisplayName = try container.decode(String.self, forKey: .fontDisplayName)
+        fontSize = try container.decode(Double.self, forKey: .fontSize)
+        scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1.0
+        rotationDegrees = try container.decodeIfPresent(Double.self, forKey: .rotationDegrees) ?? 0
+        red = try container.decode(Double.self, forKey: .red)
+        green = try container.decode(Double.self, forKey: .green)
+        blue = try container.decode(Double.self, forKey: .blue)
+        alpha = try container.decode(Double.self, forKey: .alpha)
+    }
+}
+
+struct TextLayerDraft: Equatable, Sendable {
+    var targetLayerIndex: Int?
+    var text: String
+    var position: CGPoint?
+    var fontPostScriptName: String?
+    var fontDisplayName: String?
+    var fontSize: Double
+    var scale: Double
+    var rotationDegrees: Double
+}
+
+enum TextFontLibrary {
+    private static let fileManager = FileManager.default
+    private static let importedFontsDirectoryName = "ImportedFonts"
+    private static var registeredFontURLs = Set<String>()
+
+    static func availableFonts() -> [TextFontOption] {
+        registerImportedFontsIfNeeded()
+        var options: [TextFontOption] = []
+        for family in UIFont.familyNames.sorted() {
+            for postScriptName in UIFont.fontNames(forFamilyName: family).sorted() {
+                let font = UIFont(name: postScriptName, size: 14)
+                options.append(
+                    TextFontOption(
+                        postScriptName: postScriptName,
+                        displayName: font?.fontName ?? postScriptName,
+                        sourceFilename: nil
+                    )
+                )
+            }
+        }
+        return options.sorted {
+            ($0.displayName, $0.postScriptName) < ($1.displayName, $1.postScriptName)
+        }
+    }
+
+    static func importFonts(from urls: [URL]) throws -> [TextFontOption] {
+        try fileManager.createDirectory(at: importedFontsDirectoryURL(), withIntermediateDirectories: true)
+        var imported: [TextFontOption] = []
+
+        for url in urls {
+            let destinationURL = uniqueImportedFontURL(for: url.lastPathComponent)
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try fileManager.removeItem(at: destinationURL)
+            }
+            try fileManager.copyItem(at: url, to: destinationURL)
+            imported.append(contentsOf: try registerFont(at: destinationURL, sourceFilename: destinationURL.lastPathComponent))
+        }
+
+        return imported
+    }
+
+    static func registerImportedFontsIfNeeded() {
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: importedFontsDirectoryURL(),
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else {
+            return
+        }
+        for url in urls {
+            _ = try? registerFont(at: url, sourceFilename: url.lastPathComponent)
+        }
+    }
+
+    static func importedFontsDirectoryURL() -> URL {
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        return baseURL.appendingPathComponent(importedFontsDirectoryName, isDirectory: true)
+    }
+
+    private static func uniqueImportedFontURL(for filename: String) -> URL {
+        let directory = importedFontsDirectoryURL()
+        let ext = (filename as NSString).pathExtension
+        let stem = ((filename as NSString).deletingPathExtension.isEmpty ? "ImportedFont" : (filename as NSString).deletingPathExtension)
+        var counter = 0
+        while true {
+            let candidateName = counter == 0
+                ? "\(stem)\(ext.isEmpty ? "" : ".\(ext)")"
+                : "\(stem)-\(counter)\(ext.isEmpty ? "" : ".\(ext)")"
+            let candidateURL = directory.appendingPathComponent(candidateName, isDirectory: false)
+            if !fileManager.fileExists(atPath: candidateURL.path) {
+                return candidateURL
+            }
+            counter += 1
+        }
+    }
+
+    private static func registerFont(at url: URL, sourceFilename: String?) throws -> [TextFontOption] {
+        if !registeredFontURLs.contains(url.path) {
+            var registrationError: Unmanaged<CFError>?
+            let didRegister = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &registrationError)
+            if !didRegister, let error = registrationError?.takeRetainedValue() {
+                let description = CFErrorCopyDescription(error) as String
+                if !description.localizedCaseInsensitiveContains("already") {
+                    throw error
+                }
+            }
+            registeredFontURLs.insert(url.path)
+        }
+
+        guard let provider = CGDataProvider(url: url as CFURL), let cgFont = CGFont(provider) else {
+            return []
+        }
+        let postScriptName = cgFont.postScriptName as String? ?? url.deletingPathExtension().lastPathComponent
+        let displayName = CTFontCopyFullName(CTFontCreateWithGraphicsFont(cgFont, 14, nil, nil)) as String
+        return [TextFontOption(postScriptName: postScriptName, displayName: displayName, sourceFilename: sourceFilename)]
     }
 }
 
@@ -406,7 +617,7 @@ enum LayerProcessingRequest: Equatable, Sendable {
     case colorBalance(ColorBalanceSettings)
     case threshold(ThresholdSettings)
     case posterize(PosterizeSettings)
-    case transform(translation: CGSize, scale: CGFloat, selection: CanvasSelection?)
+    case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 }
 
 enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
@@ -1645,6 +1856,8 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
     let blendMode: LayerBlendMode
     let folderID: Int?
     let hasMask: Bool
+    let isTextLayer: Bool
+    let textLayer: TextLayerData?
 
     static func == (lhs: LayerRowModel, rhs: LayerRowModel) -> Bool {
         lhs.index == rhs.index &&
@@ -1655,7 +1868,9 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
         lhs.isAlphaLocked == rhs.isAlphaLocked &&
         lhs.blendMode == rhs.blendMode &&
         lhs.folderID == rhs.folderID &&
-        lhs.hasMask == rhs.hasMask
+        lhs.hasMask == rhs.hasMask &&
+        lhs.isTextLayer == rhs.isTextLayer &&
+        lhs.textLayer == rhs.textLayer
     }
 }
 

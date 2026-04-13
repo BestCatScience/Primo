@@ -139,6 +139,7 @@ extension ContentView {
                     hasSelection: store.canvas.selection != nil,
                     transformPreviewOffset: store.canvas.transformPreviewOffset,
                     transformPreviewScale: store.canvas.transformPreviewScale,
+                    transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
                     language: language,
                     showsTitle: false
                 )
@@ -156,9 +157,6 @@ extension ContentView {
         }
         .frame(maxHeight: panelState.isCollapsed ? 50 : .infinity, alignment: .top)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .onTapGesture(count: 2) {
-            store.send(.panelCollapseToggled(panel))
-        }
     }
 
     func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {

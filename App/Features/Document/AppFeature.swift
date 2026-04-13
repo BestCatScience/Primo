@@ -145,6 +145,31 @@ struct AppFeature {
             canvas.shapeMode = brushPalette.shape.mode
             canvas.eyedropperSamplingSource = brushPalette.sampling.eyedropperSource
             canvas.paperStyle = resolvedPaperStyle()
+            canvas.activeTextLayer = presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
+            syncTextEditorWithActiveLayer()
+        }
+
+        mutating func syncTextEditorWithActiveLayer() {
+            guard let activeLayer = layerSidebar.layers.first(where: { $0.index == layerSidebar.activeLayerIndex }) else {
+                brushPalette.text.targetLayerIndex = nil
+                brushPalette.text.scale = 1.0
+                brushPalette.text.rotationDegrees = 0
+                return
+            }
+            if let textLayer = activeLayer.textLayer {
+                brushPalette.text.content = textLayer.text
+                brushPalette.text.fontSize = textLayer.fontSize
+                brushPalette.text.position = textLayer.position
+                brushPalette.text.scale = textLayer.scale
+                brushPalette.text.rotationDegrees = textLayer.rotationDegrees
+                brushPalette.text.targetLayerIndex = activeLayer.index
+                brushPalette.text.selectedFontPostScriptName = textLayer.fontPostScriptName
+                brushPalette.text.selectedFontDisplayName = textLayer.fontDisplayName
+            } else {
+                brushPalette.text.targetLayerIndex = nil
+                brushPalette.text.scale = 1.0
+                brushPalette.text.rotationDegrees = 0
+            }
         }
 
         mutating func applyLiveCompositePixelData(_ compositePixelData: Data) {
@@ -1171,6 +1196,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 state.canvas.adjustmentPreviewPixelData = nil
                 state.applyPresentation(loaded.presentation)
                 state.isHydrating = false
@@ -1191,10 +1217,21 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 if tool != .select {
                     if tool != .move {
                         state.canvas.selection = nil
                     }
+                }
+                if tool == .text {
+                    state.brushPanel.isCollapsed = false
+                    if state.brushPalette.text.position == nil {
+                        state.brushPalette.text.position = CGPoint(
+                            x: state.canvas.canvasSize.width * 0.12,
+                            y: state.canvas.canvasSize.height * 0.12
+                        )
+                    }
+                    state.syncTextEditorWithActiveLayer()
                 }
                 state.canvas.previewStyle = state.previewStrokeStyle()
                 return .none
@@ -1206,6 +1243,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 if tool != .select {
                     if tool != .move {
                         state.canvas.selection = nil
@@ -1227,6 +1265,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 return .none
 
             case .brushPalette(.delegate(.invertSelection)):
@@ -1238,6 +1277,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 return .none
 
             case let .brushPalette(.delegate(.expandSelection(expansion))):
@@ -1251,6 +1291,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 return .none
 
             case let .brushPalette(.delegate(.contractSelection(contraction))):
@@ -1264,17 +1305,70 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 return .none
 
             case .brushPalette(.delegate(.cancelTransform)):
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 return .none
 
             case .brushPalette(.delegate(.applyTransform)):
                 return applyTransform(state: &state)
 
+            case let .brushPalette(.delegate(.applyText(draft))):
+                let fontOption = state.brushPalette.text.availableFonts.first(where: { $0.postScriptName == draft.fontPostScriptName })
+                    ?? state.brushPalette.text.availableFonts.first
+                guard let position = draft.position else { return .none }
+                let uiColor = UIColor(state.brushPalette.brush.activeOpaqueColor)
+                var red: CGFloat = 0
+                var green: CGFloat = 0
+                var blue: CGFloat = 0
+                var alpha: CGFloat = 0
+                uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+                let textLayer = TextLayerData(
+                    text: draft.text,
+                    positionX: position.x,
+                    positionY: position.y,
+                    fontPostScriptName: fontOption?.postScriptName ?? draft.fontPostScriptName ?? UIFont.systemFont(ofSize: draft.fontSize).fontName,
+                    fontDisplayName: fontOption?.displayName ?? draft.fontDisplayName ?? UIFont.systemFont(ofSize: draft.fontSize).fontName,
+                    fontSize: draft.fontSize,
+                    scale: draft.scale,
+                    rotationDegrees: draft.rotationDegrees,
+                    red: red,
+                    green: green,
+                    blue: blue,
+                    alpha: alpha
+                )
+
+                let targetLayerIndex: Int
+                if let existingIndex = draft.targetLayerIndex {
+                    targetLayerIndex = existingIndex
+                } else {
+                    let layerName = draft.text.components(separatedBy: .newlines).first?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let resolvedName = (layerName?.isEmpty == false ? layerName! : (state.appLanguage == .japanese ? "テキスト" : "Text"))
+                    paintDocumentClient.addLayer(resolvedName)
+                    targetLayerIndex = state.layerSidebar.layers.count
+                }
+
+                guard paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
+                    state.bannerMessage = state.appLanguage.localized("テキストをレイヤーに適用できませんでした")
+                    return .none
+                }
+                paintDocumentClient.setActiveLayer(targetLayerIndex)
+                state.canvas.activeLayerIndex = targetLayerIndex
+                state.canvas.currentTool = .text
+                state.brushPalette.text.targetLayerIndex = targetLayerIndex
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case .canvas(.delegate(.applyTransform)):
+                return .none
+
+            case let .canvas(.delegate(.placeText(point))):
+                state.brushPalette.text.position = point
+                state.brushPanel.isCollapsed = false
                 return .none
 
             case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
@@ -1872,6 +1966,7 @@ struct AppFeature {
                 state.canvas.selectionPreviewPoints = []
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
                 if nextTool != .select && nextTool != .move {
                     state.canvas.selection = nil
                 }

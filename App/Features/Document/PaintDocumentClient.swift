@@ -42,6 +42,9 @@ struct PaintDocumentClient: Sendable {
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
     var mergeLayerDown: @Sendable (Int) -> Bool
+    var textLayerData: @Sendable (Int) -> TextLayerData?
+    var setTextLayer: @Sendable (Int, TextLayerData) -> Bool
+    var clearTextLayerData: @Sendable (Int) -> Void
     var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
     var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> Bool
     var pixelDataForLayer: @Sendable (Int) -> Data
@@ -109,6 +112,9 @@ struct PaintDocumentClient: Sendable {
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
             mergeLayerDown: { index in sessionBox.session.mergeLayerDown(index: index) },
+            textLayerData: { index in sessionBox.session.textLayerData(index: index) },
+            setTextLayer: { index, textLayer in sessionBox.session.setTextLayer(index: index, textLayer: textLayer) },
+            clearTextLayerData: { index in sessionBox.session.clearTextLayerData(index: index) },
             applyLayerProcessing: { index, request in sessionBox.session.applyLayerProcessing(index: index, request: request) },
             applySoftwareStroke: { samples, brush, layerIndex in
                 sessionBox.session.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)

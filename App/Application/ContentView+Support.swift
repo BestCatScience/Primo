@@ -625,7 +625,7 @@ extension ContentView {
     }
 }
 
-let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .move, .shape]
+let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, .select, .move, .shape, .text]
 
 struct StudioPanelShell<Content: View>: View {
     let title: String

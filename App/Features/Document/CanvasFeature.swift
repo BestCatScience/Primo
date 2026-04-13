@@ -36,6 +36,9 @@ struct CanvasFeature {
         var transformGestureBaseOffset: CGSize = .zero
         var transformPreviewScale: CGFloat = 1.0
         var transformGestureBaseScale: CGFloat = 1.0
+        var transformPreviewRotationDegrees: Double = 0
+        var transformGestureBaseRotationDegrees: Double = 0
+        var activeTextLayer: TextLayerData?
         var viewportOffset: CGSize = .zero
         var zoomScale: CGFloat = 1.0
         var paperStyle: CanvasPaperStyle = .default
@@ -67,6 +70,7 @@ struct CanvasFeature {
         case selectionPreviewUpdated([CGPoint])
         case selectionPathEnded([CGPoint])
         case autoSelectionRequested(StylusSample)
+        case textPlacementRequested(CGPoint)
         case selectionUpdated(CanvasSelection?)
         case transformGestureBegan
         case transformPreviewChanged(CGSize)
@@ -74,6 +78,9 @@ struct CanvasFeature {
         case transformScaleGestureBegan
         case transformScaleChanged(CGFloat)
         case transformScaleEnded(CGFloat)
+        case transformRotationGestureBegan
+        case transformRotationChanged(CGFloat)
+        case transformRotationEnded(CGFloat)
         case transformPreviewCleared
         case requestLocalUndo
         case requestLocalRedo
@@ -95,6 +102,7 @@ struct CanvasFeature {
         case fill(StylusSample)
         case lassoSelect([CGPoint])
         case autoSelect(StylusSample)
+        case placeText(CGPoint)
         case applyTransform(CGSize)
         case toggleBrushAndEraser
         case requestUndo
@@ -125,6 +133,9 @@ struct CanvasFeature {
                 state.selectionPreviewPoints = []
                 return .send(.delegate(.autoSelect(sample)))
 
+            case let .textPlacementRequested(point):
+                return .send(.delegate(.placeText(point)))
+
             case let .selectionUpdated(selection):
                 state.selection = selection
                 state.selectionPreviewPoints = []
@@ -132,6 +143,8 @@ struct CanvasFeature {
                 state.transformGestureBaseOffset = .zero
                 state.transformPreviewScale = 1.0
                 state.transformGestureBaseScale = 1.0
+                state.transformPreviewRotationDegrees = 0
+                state.transformGestureBaseRotationDegrees = 0
                 return .none
 
             case .transformGestureBegan:
@@ -166,11 +179,26 @@ struct CanvasFeature {
                 state.transformGestureBaseScale = state.transformPreviewScale
                 return .none
 
+            case .transformRotationGestureBegan:
+                state.transformGestureBaseRotationDegrees = state.transformPreviewRotationDegrees
+                return .none
+
+            case let .transformRotationChanged(rotation):
+                state.transformPreviewRotationDegrees = state.transformGestureBaseRotationDegrees + (Double(rotation) * 180.0 / .pi)
+                return .none
+
+            case let .transformRotationEnded(rotation):
+                state.transformPreviewRotationDegrees = state.transformGestureBaseRotationDegrees + (Double(rotation) * 180.0 / .pi)
+                state.transformGestureBaseRotationDegrees = state.transformPreviewRotationDegrees
+                return .none
+
             case .transformPreviewCleared:
                 state.transformPreviewOffset = .zero
                 state.transformGestureBaseOffset = .zero
                 state.transformPreviewScale = 1.0
                 state.transformGestureBaseScale = 1.0
+                state.transformPreviewRotationDegrees = 0
+                state.transformGestureBaseRotationDegrees = 0
                 return .none
 
             case .requestLocalUndo:

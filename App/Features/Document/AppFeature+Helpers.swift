@@ -27,16 +27,50 @@ extension AppFeature {
             height: state.canvas.transformPreviewOffset.height.rounded()
         )
         let scale = state.canvas.transformPreviewScale
-        guard translation != .zero || abs(scale - 1.0) > 0.001 else { return .none }
-        guard paintDocumentClient.applyLayerProcessing(
-            state.canvas.activeLayerIndex,
-            .transform(translation: translation, scale: scale, selection: state.canvas.selection)
+        let rotationDegrees = state.canvas.transformPreviewRotationDegrees
+        guard translation != .zero || abs(scale - 1.0) > 0.001 || abs(rotationDegrees) > 0.001 else { return .none }
+        if
+            state.canvas.selection == nil,
+            var textLayer = state.canvas.activeTextLayer
+        {
+            textLayer.position = CGPoint(
+                x: textLayer.position.x + translation.width,
+                y: textLayer.position.y + translation.height
+            )
+            textLayer.scale = min(max(textLayer.scale * scale, 0.2), 6.0)
+            textLayer.rotationDegrees += rotationDegrees
+            guard paintDocumentClient.setTextLayer(state.canvas.activeLayerIndex, textLayer) else {
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                return .none
+            }
+            state.canvas.transformPreviewOffset = .zero
+            state.canvas.transformPreviewScale = 1.0
+            state.canvas.transformPreviewRotationDegrees = 0
+            state.applyPresentation(paintDocumentClient.presentation())
+            return .none
+        }
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let source = paintDocumentClient.pixelDataForLayer(activeLayerIndex)
+        let canvasWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
+        guard let transformed = Self.transformedLayerPixels(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            selection: state.canvas.selection,
+            translation: translation,
+            scale: scale,
+            rotationDegrees: rotationDegrees
         ) else {
             state.canvas.transformPreviewOffset = .zero
             state.canvas.transformPreviewScale = 1.0
+            state.canvas.transformPreviewRotationDegrees = 0
             return .none
         }
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+        paintDocumentClient.replaceLayerPixels(activeLayerIndex, transformed)
+        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
             state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
             state.canvas.localBufferRevision += 1
         }
@@ -44,10 +78,12 @@ extension AppFeature {
             state.canvas.selection,
             translation: translation,
             scale: scale,
+            rotationDegrees: rotationDegrees,
             canvasSize: state.canvas.canvasSize
         )
         state.canvas.transformPreviewOffset = .zero
         state.canvas.transformPreviewScale = 1.0
+        state.canvas.transformPreviewRotationDegrees = 0
         state.applyPresentation(paintDocumentClient.presentation())
         return .none
     }
@@ -614,12 +650,16 @@ extension AppFeature {
         canvasHeight: Int,
         selection: CanvasSelection?,
         translation: CGSize,
-        scale: CGFloat
+        scale: CGFloat,
+        rotationDegrees: Double
     ) -> Data? {
         let dx = Int(translation.width.rounded())
         let dy = Int(translation.height.rounded())
         let clampedScale = min(max(scale, 0.2), 6.0)
-        guard dx != 0 || dy != 0 || abs(clampedScale - 1.0) > 0.001 else { return nil }
+        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
+        let cosTheta = cos(rotationRadians)
+        let sinTheta = sin(rotationRadians)
+        guard dx != 0 || dy != 0 || abs(clampedScale - 1.0) > 0.001 || abs(rotationRadians) > 0.001 else { return nil }
 
         let expectedCount = canvasWidth * canvasHeight * 4
         guard source.count == expectedCount else { return nil }
@@ -647,8 +687,12 @@ extension AppFeature {
                     x: CGFloat(x) - translation.width,
                     y: CGFloat(y) - translation.height
                 )
-                let sourceX = ((destinationPoint.x - anchor.x) / clampedScale) + anchor.x
-                let sourceY = ((destinationPoint.y - anchor.y) / clampedScale) + anchor.y
+                let localX = destinationPoint.x - anchor.x
+                let localY = destinationPoint.y - anchor.y
+                let unrotatedX = (localX * cosTheta) + (localY * sinTheta)
+                let unrotatedY = (-localX * sinTheta) + (localY * cosTheta)
+                let sourceX = (unrotatedX / clampedScale) + anchor.x
+                let sourceY = (unrotatedY / clampedScale) + anchor.y
                 let sourcePixelX = Int(sourceX.rounded())
                 let sourcePixelY = Int(sourceY.rounded())
                 guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else {
@@ -671,7 +715,13 @@ extension AppFeature {
         return Data(destination)
     }
 
-    static func transformedSelection(_ selection: CanvasSelection?, translation: CGSize, scale: CGFloat, canvasSize: CGSize) -> CanvasSelection? {
+    static func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scale: CGFloat,
+        rotationDegrees: Double,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
@@ -679,6 +729,9 @@ extension AppFeature {
         let bounds = selection.bounds
         let anchor = CGPoint(x: bounds.midX, y: bounds.midY)
         let clampedScale = min(max(scale, 0.2), 6.0)
+        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
+        let cosTheta = cos(rotationRadians)
+        let sinTheta = sin(rotationRadians)
         var transformed = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
 
         for y in 0..<canvasHeight {
@@ -687,8 +740,12 @@ extension AppFeature {
                     x: CGFloat(x) - translation.width,
                     y: CGFloat(y) - translation.height
                 )
-                let sourceX = ((destinationPoint.x - anchor.x) / clampedScale) + anchor.x
-                let sourceY = ((destinationPoint.y - anchor.y) / clampedScale) + anchor.y
+                let localX = destinationPoint.x - anchor.x
+                let localY = destinationPoint.y - anchor.y
+                let unrotatedX = (localX * cosTheta) + (localY * sinTheta)
+                let unrotatedY = (-localX * sinTheta) + (localY * cosTheta)
+                let sourceX = (unrotatedX / clampedScale) + anchor.x
+                let sourceY = (unrotatedY / clampedScale) + anchor.y
                 let sourcePixelX = Int(sourceX.rounded())
                 let sourcePixelY = Int(sourceY.rounded())
                 guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else {

@@ -239,6 +239,12 @@ extension LayerSidebarView {
                             .foregroundStyle(StudioTheme.Palette.accentBright)
                     }
 
+                    if layer.isTextLayer {
+                        Image(systemName: "textformat")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.95, green: 0.82, blue: 0.42))
+                    }
+
                     Spacer(minLength: 10)
 
                     Menu {

@@ -10,12 +10,15 @@ struct BrushPaletteView: View {
     let hasSelection: Bool
     let transformPreviewOffset: CGSize
     var transformPreviewScale: CGFloat = 1.0
+    var transformPreviewRotationDegrees: Double = 0
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
+    @State var isImportingTextFont = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
     @State var importErrorMessage: String?
+    @State var textFontImportErrorMessage: String?
     var rendersFloatingPanelOnly = false
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
@@ -48,6 +51,15 @@ struct BrushPaletteView: View {
             )
             .ignoresSafeArea()
         }
+        .sheet(isPresented: $isImportingTextFont) {
+            BrushImportDocumentPicker(
+                allowedContentTypes: [UTType(filenameExtension: "ttf") ?? .data, UTType(filenameExtension: "otf") ?? .data],
+                allowsMultipleSelection: true,
+                onPick: importTextFonts,
+                onCancel: { isImportingTextFont = false }
+            )
+            .ignoresSafeArea()
+        }
         .alert(
             language.localized("ブラシを読み込めませんでした"),
             isPresented: Binding(
@@ -65,6 +77,25 @@ struct BrushPaletteView: View {
             },
             message: {
                 Text(importErrorMessage ?? "")
+            }
+        )
+        .alert(
+            language.localized("フォントを読み込めませんでした"),
+            isPresented: Binding(
+                get: { textFontImportErrorMessage != nil },
+                set: { newValue in
+                    if !newValue {
+                        textFontImportErrorMessage = nil
+                    }
+                }
+            ),
+            actions: {
+                Button("OK", role: .cancel) {
+                    textFontImportErrorMessage = nil
+                }
+            },
+            message: {
+                Text(textFontImportErrorMessage ?? "")
             }
         )
     }
@@ -117,6 +148,29 @@ struct BrushPaletteView: View {
         }
         if !failures.isEmpty {
             importErrorMessage = failures.joined(separator: "\n")
+        }
+    }
+
+    private func importTextFonts(_ urls: [URL]) {
+        isImportingTextFont = false
+        var importedFonts: [TextFontOption] = []
+        var failures: [String] = []
+
+        for url in urls {
+            withSecurityScopedAccess(to: url) {
+                do {
+                    importedFonts.append(contentsOf: try TextFontLibrary.importFonts(from: [url]))
+                } catch {
+                    failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+        }
+
+        if !importedFonts.isEmpty {
+            store.send(.importedTextFonts(importedFonts))
+        }
+        if !failures.isEmpty {
+            textFontImportErrorMessage = failures.joined(separator: "\n")
         }
     }
 }

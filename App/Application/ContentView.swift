@@ -187,6 +187,7 @@ struct ContentView: View {
                             hasSelection: store.canvas.selection != nil,
                             transformPreviewOffset: store.canvas.transformPreviewOffset,
                             transformPreviewScale: store.canvas.transformPreviewScale,
+                            transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
                             language: language,
                             showsTitle: false,
                             rendersFloatingPanelOnly: true

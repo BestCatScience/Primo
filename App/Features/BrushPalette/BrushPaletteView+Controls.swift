@@ -5,7 +5,101 @@ extension BrushPaletteView {
     func controlsCard(proxy: GeometryProxy, showsChrome: Bool, showsCategoryPicker: Bool = true) -> some View {
         cardContainer(showsChrome: showsChrome) {
             VStack(alignment: .leading, spacing: 10) {
-                if currentTool == .fill {
+                if currentTool == .text {
+                    segmentedModeRow(
+                        title: language.localized("フォント"),
+                        selectedTitle: store.text.selectedFontDisplayName ?? language.localized("システム")
+                    ) {
+                        Picker(language.localized("フォント"), selection: $store.text.selectedFontPostScriptName) {
+                            ForEach(store.text.availableFonts) { font in
+                                Text(font.displayName).tag(Optional(font.postScriptName))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .onChange(of: store.text.selectedFontPostScriptName) { _, newValue in
+                            if let font = store.text.availableFonts.first(where: { $0.postScriptName == newValue }) {
+                                store.text.selectedFontDisplayName = font.displayName
+                            }
+                        }
+                    }
+
+                    sliderRow(
+                        title: language.localized("文字サイズ"),
+                        value: "\(Int(store.text.fontSize.rounded())) px",
+                        slider: Slider(value: $store.text.fontSize, in: 12...240, step: 1)
+                    )
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(language.localized("テキスト"))
+                            .font(StudioTheme.Typography.title(12))
+                            .foregroundStyle(panelPrimaryTextStyle)
+
+                        PaletteTextEditor(
+                            text: $store.text.content,
+                            textColor: usesLightPanelTheme ? UIColor.black.withAlphaComponent(0.84) : UIColor.white.withAlphaComponent(0.92),
+                            fontSize: max(min(store.text.fontSize * 0.26, 24), 14),
+                            backgroundColor: .clear
+                        )
+                            .frame(minHeight: 116)
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(panelCardFillStrong)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(panelCardBorder, lineWidth: 1)
+                            )
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            isImportingTextFont = true
+                        } label: {
+                            Label(language.localized("フォントを追加"), systemImage: "plus.circle")
+                                .font(StudioTheme.Typography.label(12))
+                                .foregroundStyle(panelPrimaryTextStyle)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 38)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(panelCardFillStrong)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(panelCardBorder, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            store.send(.applyTextButtonTapped)
+                        } label: {
+                            Label(
+                                store.text.targetLayerIndex == nil ? language.localized("テキストレイヤーを追加") : language.localized("テキストを更新"),
+                                systemImage: "text.badge.plus"
+                            )
+                            .font(StudioTheme.Typography.label(12))
+                            .foregroundStyle(.white.opacity(0.94))
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(StudioTheme.Palette.accent)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.text.position == nil || store.text.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    Text(
+                        store.text.position == nil
+                            ? language.localized("キャンバスをタップしてテキスト位置を決めてください。")
+                            : "\(language.localized("配置")): x \(Int((store.text.position?.x ?? 0).rounded())) / y \(Int((store.text.position?.y ?? 0).rounded()))"
+                    )
+                    .font(StudioTheme.Typography.body(11))
+                    .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
+                } else if currentTool == .fill {
                     segmentedModeRow(
                         title: language.localized("しきい値モード"),
                         selectedTitle: store.fill.thresholdMode.localizedTitle(language)
@@ -472,6 +566,53 @@ extension BrushPaletteView {
                     sliderRow(title: language.localized("粒コントラスト"), value: String(format: "%.2f", store.brush.grainContrast), slider: Slider(value: $store.brush.grainContrast, in: 0.8...2.8))
                 }
             }
+        }
+    }
+}
+
+private struct PaletteTextEditor: UIViewRepresentable {
+    @Binding var text: String
+    let textColor: UIColor
+    let fontSize: CGFloat
+    let backgroundColor: UIColor
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.backgroundColor = backgroundColor
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.autocapitalizationType = .sentences
+        textView.autocorrectionType = .default
+        textView.spellCheckingType = .yes
+        textView.text = text
+        textView.textColor = textColor
+        textView.font = .systemFont(ofSize: fontSize)
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+        uiView.textColor = textColor
+        uiView.backgroundColor = backgroundColor
+        uiView.font = .systemFont(ofSize: fontSize)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var text: String
+
+        init(text: Binding<String>) {
+            _text = text
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text
         }
     }
 }

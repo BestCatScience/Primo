@@ -29,7 +29,34 @@ extension BrushPaletteView {
             VStack(alignment: .leading, spacing: 12) {
                 sectionLabel(sectionTitle)
 
-                if currentTool == .fill {
+                if currentTool == .text {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        activeBrushAccentColor.opacity(0.94),
+                                        StudioTheme.Palette.coolGlow.opacity(0.34)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 72, height: 72)
+                            .overlay(
+                                Image(systemName: "textformat")
+                                    .font(.system(size: 25, weight: .bold))
+                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+                            )
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            metricRow(language.localized("フォント"), value: store.text.selectedFontDisplayName ?? language.localized("システム"))
+                            metricRow(language.localized("文字サイズ"), value: "\(Int(store.text.fontSize.rounded())) px")
+                            metricRow(language.localized("配置"), value: store.text.position == nil ? language.localized("未配置") : language.localized("配置済み"))
+                            metricRow(language.localized("レイヤー"), value: store.text.targetLayerIndex == nil ? language.localized("新規") : language.localized("編集中"))
+                        }
+                    }
+                } else if currentTool == .fill {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(
@@ -148,7 +175,13 @@ extension BrushPaletteView {
                             metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
                             metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
                             metricRow(language.localized("拡大率"), value: "\(Int((transformPreviewScale * 100).rounded()))%")
-                            metricRow(language.localized("状態"), value: transformPreviewOffset == .zero ? language.localized("待機") : language.localized("未確定"))
+                            metricRow(language.localized("回転"), value: "\(Int(transformPreviewRotationDegrees.rounded()))°")
+                            metricRow(
+                                language.localized("状態"),
+                                value: transformPreviewOffset == .zero && abs(transformPreviewScale - 1.0) <= 0.001 && abs(transformPreviewRotationDegrees) <= 0.001
+                                    ? language.localized("待機")
+                                    : language.localized("未確定")
+                            )
                         }
                     }
                 } else if currentTool == .blur {
@@ -253,7 +286,51 @@ extension BrushPaletteView {
 
     @ViewBuilder
     func detailCard(showsChrome: Bool) -> some View {
-        if currentTool == .blur {
+        if currentTool == .text {
+            cardContainer(showsChrome: showsChrome) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            StudioTheme.Palette.accent,
+                                            StudioTheme.Palette.coolGlow
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+
+                            Image(systemName: "textformat")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.92))
+                        }
+                        .frame(width: 38, height: 38)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(language.localized("テキスト"))
+                                .font(StudioTheme.Typography.title(14))
+                                .foregroundStyle(panelStrongTextStyle)
+                            Text(language.localized("キャンバスをタップして位置を決め、文字とフォントを設定してレイヤーへ適用します。"))
+                                .font(StudioTheme.Typography.body(11))
+                                .foregroundStyle(panelSecondaryTextStyle)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    SpectrumColorControl(color: editableBrushColorBinding)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(panelHairlineFill)
+                        )
+                }
+            }
+        } else if currentTool == .blur {
             cardContainer(showsChrome: showsChrome) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center, spacing: 10) {
@@ -421,7 +498,7 @@ extension BrushPaletteView {
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .select, .move, .blur, .shape:
+        case .fill, .eyedropper, .select, .move, .blur, .shape, .text:
             return currentTool.localizedTitle(language)
         default:
             return StudioToolKind.brush.localizedTitle(language)
@@ -488,6 +565,8 @@ extension BrushPaletteView {
 
     var sectionTitle: String {
         switch currentTool {
+        case .text:
+            return language.localized("テキスト設定")
         case .fill:
             return language.localized("塗りつぶし設定")
         case .eyedropper:

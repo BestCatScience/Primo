@@ -24,6 +24,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var activeBlurStrokeBrush: BrushRuntimeSettings?
     private var activeBlurStrokeSamples: [StylusSample] = []
     private var blurStrokeHasCapturedHistory = false
+    private var textLayers: [Int: TextLayerData] = [:]
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
@@ -111,6 +112,9 @@ final class PaintDocumentSession: @unchecked Sendable {
         activeStrokeLayerIndex = Int(bridge.activeLayerIndex)
         activeStrokeBrush = brush
         activeStrokeSamples = [sample]
+        if let activeStrokeLayerIndex {
+            clearTextLayerData(index: activeStrokeLayerIndex)
+        }
         bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
     }
 
@@ -150,6 +154,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
         let layerIndex = Int(bridge.activeLayerIndex)
         guard !isLayerLocked(index: layerIndex) else { return }
+        clearTextLayerData(index: layerIndex)
         bridge.fill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
@@ -168,6 +173,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) {
         guard !samples.isEmpty else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
+        clearTextLayerData(index: layerIndex)
         if activeBlurStrokeLayerIndex != layerIndex {
             activeBlurStrokeLayerIndex = layerIndex
             activeBlurStrokeBrush = brush
@@ -243,6 +249,11 @@ final class PaintDocumentSession: @unchecked Sendable {
     func duplicateLayer(index: Int, name: String) -> Int {
         let duplicatedIndex = Int(bridge.duplicateLayer(at: index, name: name))
         if duplicatedIndex >= 0 {
+            if let textLayer = textLayers[index] {
+                textLayers = remappedTextLayersForDuplication(of: index, duplicatedIndex: duplicatedIndex, duplicate: textLayer)
+            } else {
+                textLayers = remappedTextLayersForInsertion(at: duplicatedIndex)
+            }
             invalidateThumbnailCache()
             timelapseEvents.append(.duplicateLayer(index: index, name: name))
             captureTimelapseFrame()
@@ -254,6 +265,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func deleteLayer(index: Int) -> Bool {
         let didDelete = bridge.deleteLayer(at: index)
         if didDelete {
+            textLayers = remappedTextLayersForDeletion(of: index)
             invalidateThumbnailCache()
             timelapseEvents.append(.deleteLayer(index: index))
             captureTimelapseFrame()
@@ -265,6 +277,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
         let didMove = bridge.moveLayer(at: index, to: destinationIndex)
         if didMove {
+            textLayers = remappedTextLayersForMove(from: index, to: destinationIndex)
             invalidateThumbnailCache()
             timelapseEvents.append(.moveLayer(index: index, destinationIndex: destinationIndex))
             captureTimelapseFrame()
@@ -321,6 +334,25 @@ final class PaintDocumentSession: @unchecked Sendable {
         bridge.setLayerName(name, at: index)
     }
 
+    func textLayerData(index: Int) -> TextLayerData? {
+        textLayers[index]
+    }
+
+    @discardableResult
+    func setTextLayer(index: Int, textLayer: TextLayerData) -> Bool {
+        guard !isLayerLocked(index: index) else { return false }
+        let existingPixelData = bridge.pixelDataForLayer(at: index) as Data
+        guard !existingPixelData.isEmpty else { return false }
+        guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }
+        textLayers[index] = textLayer
+        replaceLayerPixels(index: index, data: rasterized, preservesTextLayerMetadata: true)
+        return true
+    }
+
+    func clearTextLayerData(index: Int) {
+        textLayers.removeValue(forKey: index)
+    }
+
     func setLayerVisibility(index: Int, isVisible: Bool) {
         bridge.setLayerVisible(isVisible, at: index)
         timelapseEvents.append(.setLayerVisibility(index: index, isVisible: isVisible))
@@ -364,6 +396,8 @@ final class PaintDocumentSession: @unchecked Sendable {
         guard let merged = mergedLayerDownPixelData(upperIndex: index, lowerIndex: index - 1) else {
             return false
         }
+        clearTextLayerData(index: index)
+        clearTextLayerData(index: index - 1)
         replaceLayerPixels(index: index - 1, data: merged)
         return deleteLayer(index: index)
     }
@@ -371,6 +405,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     @discardableResult
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
         guard !isLayerLocked(index: index) else { return false }
+        clearTextLayerData(index: index)
         let descriptor = makeProcessingDescriptor(from: request)
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
         if didApply {
@@ -422,6 +457,27 @@ final class PaintDocumentSession: @unchecked Sendable {
             }
         }
         return output
+    }
+
+    static func pixelData(from cgImage: CGImage, size: CGSize) -> Data? {
+        let width = Int(size.width)
+        let height = Int(size.height)
+        guard width > 0, height > 0 else { return nil }
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &bytes,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return Data(bytes)
     }
 
     func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
@@ -493,8 +549,11 @@ final class PaintDocumentSession: @unchecked Sendable {
         return true
     }
 
-    func replaceLayerPixels(index: Int, data: Data) {
+    func replaceLayerPixels(index: Int, data: Data, preservesTextLayerMetadata: Bool = false) {
         guard !isLayerLocked(index: index) else { return }
+        if !preservesTextLayerMetadata {
+            clearTextLayerData(index: index)
+        }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.replacePixels
         let adjustedData = isLayerAlphaLocked(index: index)
@@ -549,6 +608,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func clearLayer(index: Int) {
         guard !isLayerLocked(index: index) else { return }
+        clearTextLayerData(index: index)
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.clear
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
@@ -557,6 +617,119 @@ final class PaintDocumentSession: @unchecked Sendable {
             timelapseEvents.append(.clearLayer(index: index))
             captureTimelapseFrame()
         }
+    }
+
+    private func remappedTextLayersForInsertion(at insertedIndex: Int) -> [Int: TextLayerData] {
+        Dictionary(uniqueKeysWithValues: textLayers.map { index, value in
+            (index >= insertedIndex ? index + 1 : index, value)
+        })
+    }
+
+    private func remappedTextLayersForDuplication(of sourceIndex: Int, duplicatedIndex: Int, duplicate: TextLayerData) -> [Int: TextLayerData] {
+        var remapped = remappedTextLayersForInsertion(at: duplicatedIndex)
+        remapped[duplicatedIndex] = duplicate
+        return remapped
+    }
+
+    private func remappedTextLayersForDeletion(of deletedIndex: Int) -> [Int: TextLayerData] {
+        Dictionary(uniqueKeysWithValues: textLayers.compactMap { index, value in
+            guard index != deletedIndex else { return nil }
+            return (index > deletedIndex ? index - 1 : index, value)
+        })
+    }
+
+    private func remappedTextLayersForMove(from sourceIndex: Int, to destinationIndex: Int) -> [Int: TextLayerData] {
+        var remapped: [Int: TextLayerData] = [:]
+        for (index, value) in textLayers {
+            if index == sourceIndex {
+                remapped[destinationIndex] = value
+            } else if sourceIndex < destinationIndex, index > sourceIndex, index <= destinationIndex {
+                remapped[index - 1] = value
+            } else if sourceIndex > destinationIndex, index >= destinationIndex, index < sourceIndex {
+                remapped[index + 1] = value
+            } else {
+                remapped[index] = value
+            }
+        }
+        return remapped
+    }
+
+    private func rasterizedTextLayerPixelData(_ textLayer: TextLayerData) -> Data? {
+        let canvasSize = CGSize(width: bridge.width, height: bridge.height)
+        guard
+            canvasSize.width > 0,
+            canvasSize.height > 0,
+            let resolved = Self.resolvedTextLayout(for: textLayer, canvasSize: canvasSize)
+        else {
+            return nil
+        }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+        let image = renderer.image { context in
+            Self.drawTextLayer(textLayer, resolved: resolved, in: context.cgContext)
+        }
+
+        guard let cgImage = image.cgImage else { return nil }
+        return Self.pixelData(from: cgImage, size: canvasSize)
+    }
+
+    static func resolvedTextLayout(
+        for textLayer: TextLayerData,
+        canvasSize: CGSize
+    ) -> (drawRect: CGRect, attributes: [NSAttributedString.Key: Any])? {
+        let font = UIFont(name: textLayer.fontPostScriptName, size: textLayer.fontSize)
+            ?? UIFont.systemFont(ofSize: textLayer.fontSize, weight: .regular)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .left
+        paragraphStyle.lineBreakMode = .byWordWrapping
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor(textLayer.color),
+            .paragraphStyle: paragraphStyle
+        ]
+        let constraintRect = CGSize(
+            width: max(canvasSize.width - textLayer.position.x - 12, textLayer.fontSize),
+            height: max(canvasSize.height - textLayer.position.y - 12, textLayer.fontSize * 2.0)
+        )
+        let measuredBounds = (textLayer.text as NSString).boundingRect(
+            with: constraintRect,
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).integral
+        let drawRect = CGRect(
+            origin: textLayer.position,
+            size: CGSize(
+                width: max(measuredBounds.width, textLayer.fontSize * 0.5),
+                height: max(measuredBounds.height, textLayer.fontSize * 1.2)
+            )
+        )
+        return (drawRect, attributes)
+    }
+
+    static func drawTextLayer(
+        _ textLayer: TextLayerData,
+        resolved: (drawRect: CGRect, attributes: [NSAttributedString.Key: Any]),
+        in context: CGContext
+    ) {
+        let drawRect = resolved.drawRect
+        let anchor = CGPoint(x: drawRect.midX, y: drawRect.midY)
+        let scale = CGFloat(min(max(textLayer.scale, 0.2), 6.0))
+        context.saveGState()
+        context.translateBy(x: anchor.x, y: anchor.y)
+        context.rotate(by: CGFloat(textLayer.rotationDegrees * .pi / 180.0))
+        context.scaleBy(x: scale, y: scale)
+        let localRect = CGRect(
+            x: -(drawRect.width / 2),
+            y: -(drawRect.height / 2),
+            width: drawRect.width,
+            height: drawRect.height
+        )
+        (textLayer.text as NSString).draw(in: localRect, withAttributes: resolved.attributes)
+        context.restoreGState()
     }
 
     func setPaperStyle(_ style: CanvasPaperStyle) {
@@ -576,7 +749,9 @@ final class PaintDocumentSession: @unchecked Sendable {
                 isAlphaLocked: layer.alphaLocked,
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
-                hasMask: layer.hasMask
+                hasMask: layer.hasMask,
+                isTextLayer: textLayers[index] != nil,
+                textLayer: textLayers[index]
             )
         }.reversed())
     }
@@ -680,6 +855,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 opacity: layerInfo.opacity,
                 blendMode: layerInfo.blendMode,
                 folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
+                textLayer: textLayers[index],
                 pixelFilename: "Layers/\(filename)",
                 maskFilename: maskFilename
             )
@@ -721,7 +897,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             : []
 
         let document = StoredAtelierDocument(
-            version: 3,
+            version: 4,
             canvasWidth: Int(bridge.width),
             canvasHeight: Int(bridge.height),
             activeLayerIndex: Int(bridge.activeLayerIndex),
@@ -781,6 +957,9 @@ final class PaintDocumentSession: @unchecked Sendable {
             session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
             session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
             session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
+            if let textLayer = layer.textLayer {
+                session.textLayers[layer.index] = textLayer
+            }
         }
 
         var folderIDMap: [Int: Int] = [:]
@@ -1020,7 +1199,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             descriptor.kind = APPaintLayerProcessingKind.posterize
             descriptor.posterizeLevels = CGFloat(settings.levels)
 
-        case let .transform(translation, scale, selection):
+        case let .transform(translation, scale, _, selection):
             descriptor.kind = APPaintLayerProcessingKind.transform
             descriptor.transformTranslateX = Int(translation.width.rounded())
             descriptor.transformTranslateY = Int(translation.height.rounded())
@@ -1660,6 +1839,7 @@ struct StoredAtelierDocument: Codable {
         let opacity: Double
         let blendMode: String
         let folderID: Int?
+        let textLayer: TextLayerData?
         let pixelFilename: String
         let maskFilename: String?
 
@@ -1672,6 +1852,7 @@ struct StoredAtelierDocument: Codable {
             case opacity
             case blendMode
             case folderID
+            case textLayer
             case pixelFilename
             case maskFilename
         }
@@ -1685,6 +1866,7 @@ struct StoredAtelierDocument: Codable {
             opacity: Double,
             blendMode: String,
             folderID: Int?,
+            textLayer: TextLayerData?,
             pixelFilename: String,
             maskFilename: String?
         ) {
@@ -1696,6 +1878,7 @@ struct StoredAtelierDocument: Codable {
             self.opacity = opacity
             self.blendMode = blendMode
             self.folderID = folderID
+            self.textLayer = textLayer
             self.pixelFilename = pixelFilename
             self.maskFilename = maskFilename
         }
@@ -1710,6 +1893,7 @@ struct StoredAtelierDocument: Codable {
             opacity = try container.decode(Double.self, forKey: .opacity)
             blendMode = try container.decode(String.self, forKey: .blendMode)
             folderID = try container.decodeIfPresent(Int.self, forKey: .folderID)
+            textLayer = try container.decodeIfPresent(TextLayerData.self, forKey: .textLayer)
             pixelFilename = try container.decode(String.self, forKey: .pixelFilename)
             maskFilename = try container.decodeIfPresent(String.self, forKey: .maskFilename)
         }

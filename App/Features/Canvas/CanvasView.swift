@@ -32,6 +32,8 @@ struct CanvasView: UIViewRepresentable {
             selectionPreviewPoints: store.selectionPreviewPoints,
             transformPreviewOffset: store.transformPreviewOffset,
             transformPreviewScale: store.transformPreviewScale,
+            transformPreviewRotationDegrees: store.transformPreviewRotationDegrees,
+            activeTextLayer: store.activeTextLayer,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,
         )
@@ -46,6 +48,16 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let selectionOverlayView = UIImageView()
     private let compositePreviewImageView = UIImageView()
     private let shapePreviewImageView = UIImageView()
+    private let textTransformBoxView = UIView()
+    private let textTransformRotationStemView = UIView()
+    private let textTransformTopLeftHandleView = UIView()
+    private let textTransformTopRightHandleView = UIView()
+    private let textTransformBottomLeftHandleView = UIView()
+    private let textTransformScaleHandleView = UIView()
+    private let textTransformLeftMidHandleView = UIView()
+    private let textTransformRightMidHandleView = UIView()
+    private let textTransformBottomMidHandleView = UIView()
+    private let textTransformRotationHandleView = UIView()
     private let inputHandler = InputHandler()
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
@@ -55,6 +67,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var currentTool: StudioToolKind = .brush
     private var paperStyle: CanvasPaperStyle = .default
     private var transformPreviewOffset: CGSize = .zero
+    private var transformPreviewScale: CGFloat = 1.0
+    private var transformPreviewRotationDegrees: Double = 0
+    private var activeTextLayer: TextLayerData?
     private var panStartLocation: CGPoint?
     private var panStartOffset: CGSize = .zero
     private var panDidMove = false
@@ -63,6 +78,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var pinchAnchorDocumentPoint: CGPoint?
     private var isPinchGestureActive = false
     private var lastNavigationGestureEndedAt: CFTimeInterval = 0
+    private var currentTransformGeometry: TextTransformGeometry?
+    private var textHandleStartDistance: CGFloat = 1.0
+    private var textRotationHandleStartAngle: CGFloat = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -95,6 +113,73 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         shapePreviewImageView.alpha = 1.0
         addSubview(shapePreviewImageView)
 
+        textTransformBoxView.isHidden = true
+        textTransformBoxView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.045)
+        textTransformBoxView.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.96).cgColor
+        textTransformBoxView.layer.borderWidth = 1.1
+        textTransformBoxView.layer.cornerRadius = 4
+        textTransformBoxView.layer.shadowColor = UIColor.black.cgColor
+        textTransformBoxView.layer.shadowOpacity = 0.12
+        textTransformBoxView.layer.shadowRadius = 5
+        textTransformBoxView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        let textBoxPanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextBoxPan(_:)))
+        textBoxPanRecognizer.delegate = self
+        textTransformBoxView.addGestureRecognizer(textBoxPanRecognizer)
+        addSubview(textTransformBoxView)
+
+        textTransformRotationStemView.isHidden = true
+        textTransformRotationStemView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.92)
+        textTransformRotationStemView.layer.cornerRadius = 1
+        addSubview(textTransformRotationStemView)
+
+        configureTextHandle(textTransformScaleHandleView, symbol: "arrow.up.left.and.arrow.down.right")
+        let scaleHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        scaleHandlePanRecognizer.delegate = self
+        textTransformScaleHandleView.addGestureRecognizer(scaleHandlePanRecognizer)
+        addSubview(textTransformScaleHandleView)
+
+        configurePassiveTransformHandle(textTransformTopLeftHandleView)
+        let topLeftHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        topLeftHandlePanRecognizer.delegate = self
+        textTransformTopLeftHandleView.addGestureRecognizer(topLeftHandlePanRecognizer)
+        addSubview(textTransformTopLeftHandleView)
+
+        configurePassiveTransformHandle(textTransformTopRightHandleView)
+        let topRightHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        topRightHandlePanRecognizer.delegate = self
+        textTransformTopRightHandleView.addGestureRecognizer(topRightHandlePanRecognizer)
+        addSubview(textTransformTopRightHandleView)
+
+        configurePassiveTransformHandle(textTransformBottomLeftHandleView)
+        let bottomLeftHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        bottomLeftHandlePanRecognizer.delegate = self
+        textTransformBottomLeftHandleView.addGestureRecognizer(bottomLeftHandlePanRecognizer)
+        addSubview(textTransformBottomLeftHandleView)
+
+        configurePassiveTransformHandle(textTransformLeftMidHandleView)
+        let leftMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        leftMidHandlePanRecognizer.delegate = self
+        textTransformLeftMidHandleView.addGestureRecognizer(leftMidHandlePanRecognizer)
+        addSubview(textTransformLeftMidHandleView)
+
+        configurePassiveTransformHandle(textTransformRightMidHandleView)
+        let rightMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        rightMidHandlePanRecognizer.delegate = self
+        textTransformRightMidHandleView.addGestureRecognizer(rightMidHandlePanRecognizer)
+        addSubview(textTransformRightMidHandleView)
+
+        configurePassiveTransformHandle(textTransformBottomMidHandleView)
+        let bottomMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
+        bottomMidHandlePanRecognizer.delegate = self
+        textTransformBottomMidHandleView.addGestureRecognizer(bottomMidHandlePanRecognizer)
+        addSubview(textTransformBottomMidHandleView)
+
+        configureTextHandle(textTransformRotationHandleView, symbol: "rotate.right.fill")
+        let rotationHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextRotationPan(_:)))
+        rotationHandlePanRecognizer.delegate = self
+        textTransformRotationHandleView.addGestureRecognizer(rotationHandlePanRecognizer)
+        addSubview(textTransformRotationHandleView)
+
         selectionOutlineLayer.strokeColor = UIColor.white.withAlphaComponent(0.92).cgColor
         selectionOutlineLayer.fillColor = UIColor.clear.cgColor
         selectionOutlineLayer.lineWidth = 1.5
@@ -111,6 +196,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         pinchRecognizer.delegate = self
         pinchRecognizer.cancelsTouchesInView = false
         addGestureRecognizer(pinchRecognizer)
+
+        let rotationRecognizer = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        rotationRecognizer.delegate = self
+        rotationRecognizer.cancelsTouchesInView = false
+        addGestureRecognizer(rotationRecognizer)
 
         let undoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerUndoTap(_:)))
         undoTapRecognizer.numberOfTouchesRequired = 2
@@ -162,12 +252,17 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         selectionPreviewPoints: [CGPoint],
         transformPreviewOffset: CGSize,
         transformPreviewScale: CGFloat,
+        transformPreviewRotationDegrees: Double,
+        activeTextLayer: TextLayerData?,
         viewportOffset: CGSize,
         zoomScale: CGFloat
     ) {
         self.currentTool = currentTool
         self.paperStyle = paperStyle
         self.transformPreviewOffset = transformPreviewOffset
+        self.transformPreviewScale = transformPreviewScale
+        self.transformPreviewRotationDegrees = transformPreviewRotationDegrees
+        self.activeTextLayer = activeTextLayer
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         metalCanvasView.currentActiveLayerIndex = activeLayerIndex
@@ -193,26 +288,38 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             adjustmentPreviewPixelData: adjustmentPreviewPixelData,
             selection: selection,
             paperStyle: paperStyle,
-            transformPreviewScale: transformPreviewScale
+            transformPreviewScale: transformPreviewScale,
+            transformPreviewRotationDegrees: transformPreviewRotationDegrees,
+            activeTextLayer: activeTextLayer
+        )
+        updateTextTransformOverlay(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            activeTextLayer: activeTextLayer,
+            selection: selection
         )
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .began) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .moved) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .ended) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if shouldRouteTouchesToTransformOverlay(touches) { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .cancelled) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
@@ -257,6 +364,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         sendAction?(.autoSelectionRequested(sample))
     }
 
+    func didRequestTextPlacement(at point: CGPoint) {
+        sendAction?(.textPlacementRequested(point))
+    }
+
     func didBeginTransform() {
         sendAction?(.transformGestureBegan)
     }
@@ -270,7 +381,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
-        sendAction?(.pencilInteractionToggleRequested)
+        // Ignore Apple Pencil double-tap so brush/panel visibility stays unchanged.
     }
 
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
@@ -312,11 +423,136 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         var rect = viewRect(forDocumentRect: selection.bounds)
         if currentTool == .move {
-            rect = transformedRect(for: selection.bounds, translation: transformPreviewOffset, scale: transformPreviewScale)
+            rect = transformedRect(
+                for: selection.bounds,
+                translation: transformPreviewOffset,
+                scale: transformPreviewScale,
+                rotationDegrees: transformPreviewRotationDegrees
+            )
         }
         selectionOverlayView.image = image
         selectionOverlayView.frame = rect
-        selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
+        if currentTool == .move, abs(transformPreviewRotationDegrees) > 0.001 {
+            let corners = transformedCorners(
+                for: selection.bounds,
+                translation: transformPreviewOffset,
+                scale: transformPreviewScale,
+                rotationDegrees: transformPreviewRotationDegrees
+            ).map(viewPoint(fromDocumentPoint:))
+            let path = UIBezierPath()
+            if let first = corners.first {
+                path.move(to: first)
+                for corner in corners.dropFirst() {
+                    path.addLine(to: corner)
+                }
+                path.close()
+            }
+            selectionOutlineLayer.path = path.cgPath
+        } else {
+            selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
+        }
+    }
+
+    private func updateTextTransformOverlay(
+        snapshot: MetalDocumentSnapshot?,
+        activeLayerIndex: Int,
+        activeTextLayer: TextLayerData?,
+        selection: CanvasSelection?
+    ) {
+        let geometry: TextTransformGeometry?
+        if let selection {
+            geometry = transformGeometry(for: selection.bounds)
+        } else if let activeTextLayer {
+            geometry = textTransformGeometry(for: activeTextLayer)
+        } else if
+            let snapshot,
+            let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex })
+        {
+            geometry = layerTransformGeometry(
+                layerData: activeLayer.pixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height
+            )
+        } else {
+            geometry = nil
+        }
+
+        guard
+            currentTool == .move,
+            let geometry
+        else {
+            currentTransformGeometry = nil
+            textTransformBoxView.isHidden = true
+            textTransformRotationStemView.isHidden = true
+            textTransformTopLeftHandleView.isHidden = true
+            textTransformTopRightHandleView.isHidden = true
+            textTransformBottomLeftHandleView.isHidden = true
+            textTransformScaleHandleView.isHidden = true
+            textTransformLeftMidHandleView.isHidden = true
+            textTransformRightMidHandleView.isHidden = true
+            textTransformBottomMidHandleView.isHidden = true
+            textTransformRotationHandleView.isHidden = true
+            return
+        }
+
+        currentTransformGeometry = geometry
+        textTransformBoxView.isHidden = false
+        textTransformRotationStemView.isHidden = false
+        textTransformTopLeftHandleView.isHidden = false
+        textTransformTopRightHandleView.isHidden = false
+        textTransformBottomLeftHandleView.isHidden = false
+        textTransformScaleHandleView.isHidden = false
+        textTransformLeftMidHandleView.isHidden = false
+        textTransformRightMidHandleView.isHidden = false
+        textTransformBottomMidHandleView.isHidden = false
+        textTransformRotationHandleView.isHidden = false
+
+        textTransformBoxView.bounds = CGRect(origin: .zero, size: geometry.viewSize)
+        textTransformBoxView.center = geometry.center
+        textTransformBoxView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        textTransformRotationStemView.bounds = CGRect(x: 0, y: 0, width: 2, height: geometry.rotationStemLength)
+        textTransformRotationStemView.center = CGPoint(
+            x: geometry.topMidpoint.x,
+            y: geometry.topMidpoint.y - (geometry.rotationStemLength / 2)
+        )
+        textTransformRotationStemView.transform = .identity
+
+        let cornerHandleSize = CGSize(width: 18, height: 18)
+        textTransformTopLeftHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
+        textTransformTopLeftHandleView.center = geometry.topLeft
+        textTransformTopLeftHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        textTransformTopRightHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
+        textTransformTopRightHandleView.center = geometry.topRight
+        textTransformTopRightHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        textTransformBottomLeftHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
+        textTransformBottomLeftHandleView.center = geometry.bottomLeft
+        textTransformBottomLeftHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        let scaleHandleSize = CGSize(width: 22, height: 22)
+        textTransformScaleHandleView.bounds = CGRect(origin: .zero, size: scaleHandleSize)
+        textTransformScaleHandleView.center = geometry.bottomRight
+        textTransformScaleHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        let edgeHandleSize = CGSize(width: 16, height: 16)
+        textTransformLeftMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
+        textTransformLeftMidHandleView.center = geometry.leftMidpoint
+        textTransformLeftMidHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        textTransformRightMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
+        textTransformRightMidHandleView.center = geometry.rightMidpoint
+        textTransformRightMidHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        textTransformBottomMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
+        textTransformBottomMidHandleView.center = geometry.bottomMidpoint
+        textTransformBottomMidHandleView.transform = CGAffineTransform(rotationAngle: geometry.rotationRadians)
+
+        let rotationHandleSize = CGSize(width: 26, height: 26)
+        textTransformRotationHandleView.bounds = CGRect(origin: .zero, size: rotationHandleSize)
+        textTransformRotationHandleView.center = geometry.rotationHandleCenter
+        textTransformRotationHandleView.transform = .identity
     }
 
     private func updateTransformPreview(
@@ -325,11 +561,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         adjustmentPreviewPixelData: Data?,
         selection: CanvasSelection?,
         paperStyle: CanvasPaperStyle,
-        transformPreviewScale: CGFloat
+        transformPreviewScale: CGFloat,
+        transformPreviewRotationDegrees: Double,
+        activeTextLayer: TextLayerData?
     ) {
         guard
             currentTool == .move,
-            transformPreviewOffset != .zero || abs(transformPreviewScale - 1.0) > 0.001,
+            transformPreviewOffset != .zero || abs(transformPreviewScale - 1.0) > 0.001 || abs(transformPreviewRotationDegrees) > 0.001,
             let snapshot
         else {
             if
@@ -359,7 +597,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             activeLayerIndex: activeLayerIndex,
             selection: selection,
             paperStyle: paperStyle,
-            transformPreviewScale: transformPreviewScale
+            transformPreviewScale: transformPreviewScale,
+            transformPreviewRotationDegrees: transformPreviewRotationDegrees,
+            activeTextLayer: activeTextLayer
         ) else {
             compositePreviewImageView.image = nil
             compositePreviewImageView.frame = .zero
@@ -670,25 +910,37 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         )
     }
 
-    private func transformedRect(for rect: CGRect, translation: CGSize, scale: CGFloat) -> CGRect {
+    private func transformedRect(for rect: CGRect, translation: CGSize, scale: CGFloat, rotationDegrees: Double = 0) -> CGRect {
+        let corners = transformedCorners(for: rect, translation: translation, scale: scale, rotationDegrees: rotationDegrees)
+            .map(viewPoint(fromDocumentPoint:))
+        let minX = corners.map(\.x).min() ?? 0
+        let maxX = corners.map(\.x).max() ?? 0
+        let minY = corners.map(\.y).min() ?? 0
+        let maxY = corners.map(\.y).max() ?? 0
+        return CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY))
+    }
+
+    private func transformedCorners(for rect: CGRect, translation: CGSize, scale: CGFloat, rotationDegrees: Double) -> [CGPoint] {
         let anchor = CGPoint(x: rect.midX, y: rect.midY)
-        let corners = [
+        let clampedScale = min(max(scale, 0.2), 6.0)
+        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
+        let cosTheta = cos(rotationRadians)
+        let sinTheta = sin(rotationRadians)
+        return [
             CGPoint(x: rect.minX, y: rect.minY),
             CGPoint(x: rect.maxX, y: rect.minY),
             CGPoint(x: rect.minX, y: rect.maxY),
             CGPoint(x: rect.maxX, y: rect.maxY)
         ].map { point in
-            CGPoint(
-                x: anchor.x + ((point.x - anchor.x) * scale) + translation.width,
-                y: anchor.y + ((point.y - anchor.y) * scale) + translation.height
+            let localX = (point.x - anchor.x) * clampedScale
+            let localY = (point.y - anchor.y) * clampedScale
+            let rotatedX = localX * cosTheta - localY * sinTheta
+            let rotatedY = localX * sinTheta + localY * cosTheta
+            return CGPoint(
+                x: anchor.x + rotatedX + translation.width,
+                y: anchor.y + rotatedY + translation.height
             )
         }
-
-        let minX = corners.map(\.x).min() ?? rect.minX
-        let maxX = corners.map(\.x).max() ?? rect.maxX
-        let minY = corners.map(\.y).min() ?? rect.minY
-        let maxY = corners.map(\.y).max() ?? rect.maxY
-        return viewRect(forDocumentRect: CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY)))
     }
 
     private func viewPoint(fromDocumentPoint point: CGPoint) -> CGPoint {
@@ -751,21 +1003,34 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         activeLayerIndex: Int,
         selection: CanvasSelection?,
         paperStyle: CanvasPaperStyle,
-        transformPreviewScale: CGFloat
+        transformPreviewScale: CGFloat,
+        transformPreviewRotationDegrees: Double,
+        activeTextLayer: TextLayerData?
     ) -> UIImage? {
         guard let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
             return nil
         }
 
-        guard let transformedLayerData = makeTransformedLayerPreview(
-            layerData: activeLayer.pixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            selection: selection,
-            scale: transformPreviewScale
-        ) else {
-            return nil
+        let transformedLayerData: Data?
+        if let activeTextLayer, selection == nil {
+            transformedLayerData = makeTransformedTextLayerPreview(
+                textLayer: activeTextLayer,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                scale: transformPreviewScale,
+                rotationDegrees: transformPreviewRotationDegrees
+            )
+        } else {
+            transformedLayerData = makeTransformedLayerPreview(
+                layerData: activeLayer.pixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                selection: selection,
+                scale: transformPreviewScale,
+                rotationDegrees: transformPreviewRotationDegrees
+            )
         }
+        guard let transformedLayerData else { return nil }
 
         var composite = Data(count: snapshot.width * snapshot.height * 4)
         composite.withUnsafeMutableBytes { destinationBytes in
@@ -871,14 +1136,18 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         canvasWidth: Int,
         canvasHeight: Int,
         selection: CanvasSelection?,
-        scale: CGFloat
+        scale: CGFloat,
+        rotationDegrees: Double
     ) -> Data? {
         guard layerData.count == canvasWidth * canvasHeight * 4 else { return nil }
         let source = [UInt8](layerData)
         let dx = Int(transformPreviewOffset.width.rounded())
         let dy = Int(transformPreviewOffset.height.rounded())
         let clampedScale = min(max(scale, 0.2), 6.0)
-        guard dx != 0 || dy != 0 || abs(clampedScale - 1.0) > 0.001 else { return layerData }
+        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
+        let cosTheta = cos(rotationRadians)
+        let sinTheta = sin(rotationRadians)
+        guard dx != 0 || dy != 0 || abs(clampedScale - 1.0) > 0.001 || abs(rotationRadians) > 0.001 else { return layerData }
 
         let mask = selection.map { expandedMask(for: $0, canvasWidth: canvasWidth, canvasHeight: canvasHeight) }
             ?? alphaMask(from: source, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
@@ -902,8 +1171,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                     x: CGFloat(x) - CGFloat(dx),
                     y: CGFloat(y) - CGFloat(dy)
                 )
-                let sourceX = ((destinationPoint.x - anchor.x) / clampedScale) + anchor.x
-                let sourceY = ((destinationPoint.y - anchor.y) / clampedScale) + anchor.y
+                let localX = destinationPoint.x - anchor.x
+                let localY = destinationPoint.y - anchor.y
+                let unrotatedX = (localX * cosTheta) + (localY * sinTheta)
+                let unrotatedY = (-localX * sinTheta) + (localY * cosTheta)
+                let sourceX = (unrotatedX / clampedScale) + anchor.x
+                let sourceY = (unrotatedY / clampedScale) + anchor.y
                 let sourcePixelX = Int(sourceX.rounded())
                 let sourcePixelY = Int(sourceY.rounded())
                 guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else { continue }
@@ -922,6 +1195,187 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
 
         return Data(destination)
+    }
+
+    private func makeTransformedTextLayerPreview(
+        textLayer: TextLayerData,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        scale: CGFloat,
+        rotationDegrees: Double
+    ) -> Data? {
+        let canvasSize = CGSize(width: canvasWidth, height: canvasHeight)
+        var transformed = textLayer
+        transformed.position = CGPoint(
+            x: transformed.position.x + transformPreviewOffset.width,
+            y: transformed.position.y + transformPreviewOffset.height
+        )
+        transformed.scale = min(max(transformed.scale * scale, 0.2), 6.0)
+        transformed.rotationDegrees += rotationDegrees
+        guard let resolved = PaintDocumentSession.resolvedTextLayout(for: transformed, canvasSize: canvasSize) else {
+            return nil
+        }
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+        let image = renderer.image { context in
+            PaintDocumentSession.drawTextLayer(transformed, resolved: resolved, in: context.cgContext)
+        }
+        guard let cgImage = image.cgImage else { return nil }
+        return PaintDocumentSession.pixelData(from: cgImage, size: canvasSize)
+    }
+
+    private func configureTextHandle(_ handle: UIView, symbol: String) {
+        handle.isHidden = true
+        let isRotationHandle = symbol.contains("rotate")
+        handle.backgroundColor = isRotationHandle
+            ? UIColor.systemBlue.withAlphaComponent(0.98)
+            : UIColor.white.withAlphaComponent(0.98)
+        handle.layer.cornerRadius = isRotationHandle ? 15 : 5
+        handle.layer.borderColor = isRotationHandle
+            ? UIColor.white.withAlphaComponent(0.92).cgColor
+            : UIColor.systemBlue.withAlphaComponent(0.96).cgColor
+        handle.layer.borderWidth = isRotationHandle ? 1.1 : 1.6
+        handle.layer.shadowColor = UIColor.black.cgColor
+        handle.layer.shadowOpacity = 0.16
+        handle.layer.shadowRadius = 5
+        handle.layer.shadowOffset = CGSize(width: 0, height: 2)
+        handle.isUserInteractionEnabled = true
+
+        let imageView = UIImageView(image: UIImage(systemName: symbol))
+        imageView.tintColor = isRotationHandle
+            ? UIColor.white.withAlphaComponent(0.96)
+            : UIColor.systemBlue.withAlphaComponent(0.96)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        handle.addSubview(imageView)
+
+        NSLayoutConstraint.activate([
+            imageView.centerXAnchor.constraint(equalTo: handle.centerXAnchor),
+            imageView.centerYAnchor.constraint(equalTo: handle.centerYAnchor),
+            imageView.widthAnchor.constraint(equalToConstant: 14),
+            imageView.heightAnchor.constraint(equalToConstant: 14)
+        ])
+    }
+
+    private func configurePassiveTransformHandle(_ handle: UIView) {
+        handle.isHidden = true
+        handle.backgroundColor = UIColor.white.withAlphaComponent(0.98)
+        handle.layer.cornerRadius = 4
+        handle.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.96).cgColor
+        handle.layer.borderWidth = 1.4
+        handle.layer.shadowColor = UIColor.black.cgColor
+        handle.layer.shadowOpacity = 0.12
+        handle.layer.shadowRadius = 4
+        handle.layer.shadowOffset = CGSize(width: 0, height: 1)
+        handle.isUserInteractionEnabled = true
+    }
+
+    private func textTransformGeometry(for textLayer: TextLayerData) -> TextTransformGeometry? {
+        guard documentSize.width > 0, documentSize.height > 0 else { return nil }
+        var transformed = textLayer
+        transformed.position = CGPoint(
+            x: transformed.position.x + transformPreviewOffset.width,
+            y: transformed.position.y + transformPreviewOffset.height
+        )
+        transformed.scale = min(max(transformed.scale * transformPreviewScale, 0.2), 6.0)
+        transformed.rotationDegrees += transformPreviewRotationDegrees
+
+        guard let resolved = PaintDocumentSession.resolvedTextLayout(for: transformed, canvasSize: documentSize) else {
+            return nil
+        }
+        return transformGeometry(
+            for: resolved.drawRect,
+            translation: .zero,
+            scale: CGFloat(transformed.scale),
+            rotationDegrees: transformed.rotationDegrees
+        )
+    }
+
+    private func layerTransformGeometry(layerData: Data, canvasWidth: Int, canvasHeight: Int) -> TextTransformGeometry? {
+        let source = [UInt8](layerData)
+        guard let bounds = transformationBounds(selection: nil, source: source, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            return nil
+        }
+        return transformGeometry(
+            for: bounds,
+            translation: transformPreviewOffset,
+            scale: transformPreviewScale,
+            rotationDegrees: transformPreviewRotationDegrees
+        )
+    }
+
+    private func transformGeometry(
+        for rect: CGRect,
+        translation: CGSize? = nil,
+        scale: CGFloat? = nil,
+        rotationDegrees: Double? = nil
+    ) -> TextTransformGeometry {
+        let resolvedTranslation = translation ?? transformPreviewOffset
+        let resolvedScale = scale ?? transformPreviewScale
+        let resolvedRotationDegrees = rotationDegrees ?? transformPreviewRotationDegrees
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let corners = transformedCorners(
+            for: rect,
+            translation: resolvedTranslation,
+            scale: resolvedScale,
+            rotationDegrees: resolvedRotationDegrees
+        ).map(viewPoint(fromDocumentPoint:))
+        let centerView = viewPoint(fromDocumentPoint: CGPoint(x: center.x + resolvedTranslation.width, y: center.y + resolvedTranslation.height))
+        let topMidpoint = CGPoint(
+            x: (corners[0].x + corners[1].x) / 2,
+            y: (corners[0].y + corners[1].y) / 2
+        )
+        let leftMidpoint = CGPoint(
+            x: (corners[0].x + corners[2].x) / 2,
+            y: (corners[0].y + corners[2].y) / 2
+        )
+        let rightMidpoint = CGPoint(
+            x: (corners[1].x + corners[3].x) / 2,
+            y: (corners[1].y + corners[3].y) / 2
+        )
+        let bottomMidpoint = CGPoint(
+            x: (corners[2].x + corners[3].x) / 2,
+            y: (corners[2].y + corners[3].y) / 2
+        )
+        let rotationHandleCenter = CGPoint(x: topMidpoint.x, y: topMidpoint.y - 30)
+        let viewSize = CGSize(
+            width: max(hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y), 28),
+            height: max(hypot(corners[2].x - corners[0].x, corners[2].y - corners[0].y), 28)
+        )
+        return TextTransformGeometry(
+            center: centerView,
+            topLeft: corners[0],
+            topRight: corners[1],
+            bottomLeft: corners[2],
+            bottomRight: corners[3],
+            topMidpoint: topMidpoint,
+            leftMidpoint: leftMidpoint,
+            rightMidpoint: rightMidpoint,
+            bottomMidpoint: bottomMidpoint,
+            rotationHandleCenter: rotationHandleCenter,
+            rotationRadians: CGFloat(resolvedRotationDegrees * .pi / 180.0),
+            viewSize: viewSize,
+            rotationStemLength: max(hypot(rotationHandleCenter.x - topMidpoint.x, rotationHandleCenter.y - topMidpoint.y), 18)
+        )
+    }
+
+    private func documentTranslation(from viewTranslation: CGPoint) -> CGSize {
+        let rect = contentRect()
+        guard rect.width > 0, rect.height > 0 else { return .zero }
+        return CGSize(
+            width: (viewTranslation.x / rect.width) * documentSize.width,
+            height: (viewTranslation.y / rect.height) * documentSize.height
+        )
+    }
+
+    private func shouldRouteTouchesToTransformOverlay(_ touches: Set<UITouch>) -> Bool {
+        guard currentTool == .move else { return false }
+        return touches.contains { touch in
+            let location = touch.location(in: self)
+            return isPointInsideTransformOverlay(location)
+        }
     }
 
     private func expandedMask(for selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
@@ -1354,6 +1808,78 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
     }
 
+    @objc
+    private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
+        guard currentTool == .move else { return }
+        switch recognizer.state {
+        case .began:
+            sendAction?(.transformRotationGestureBegan)
+        case .changed:
+            sendAction?(.transformRotationChanged(recognizer.rotation))
+        case .ended, .cancelled, .failed:
+            sendAction?(.transformRotationEnded(recognizer.rotation))
+        default:
+            break
+        }
+    }
+
+    @objc
+    private func handleTextBoxPan(_ recognizer: UIPanGestureRecognizer) {
+        guard currentTool == .move, currentTransformGeometry != nil else { return }
+        let translation = recognizer.translation(in: self)
+        let documentOffset = documentTranslation(from: translation)
+        switch recognizer.state {
+        case .began:
+            sendAction?(.transformGestureBegan)
+            sendAction?(.transformPreviewChanged(.zero))
+        case .changed:
+            sendAction?(.transformPreviewChanged(documentOffset))
+        case .ended, .cancelled, .failed:
+            sendAction?(.transformEnded(documentOffset))
+        default:
+            break
+        }
+    }
+
+    @objc
+    private func handleTextScalePan(_ recognizer: UIPanGestureRecognizer) {
+        guard currentTool == .move, let geometry = currentTransformGeometry else { return }
+        let location = recognizer.location(in: self)
+        let vector = CGPoint(x: location.x - geometry.center.x, y: location.y - geometry.center.y)
+        let distance = max(hypot(vector.x, vector.y), 1)
+
+        switch recognizer.state {
+        case .began:
+            textHandleStartDistance = distance
+            sendAction?(.transformScaleGestureBegan)
+        case .changed:
+            sendAction?(.transformScaleChanged(distance / max(textHandleStartDistance, 1)))
+        case .ended, .cancelled, .failed:
+            sendAction?(.transformScaleEnded(distance / max(textHandleStartDistance, 1)))
+        default:
+            break
+        }
+    }
+
+    @objc
+    private func handleTextRotationPan(_ recognizer: UIPanGestureRecognizer) {
+        guard currentTool == .move, let geometry = currentTransformGeometry else { return }
+        let location = recognizer.location(in: self)
+        let angle = atan2(location.y - geometry.center.y, location.x - geometry.center.x)
+
+        switch recognizer.state {
+        case .began:
+            textRotationHandleStartAngle = angle
+            sendAction?(.transformRotationGestureBegan)
+        case .changed:
+            sendAction?(.transformRotationChanged(angle - textRotationHandleStartAngle))
+        case .ended, .cancelled, .failed:
+            sendAction?(.transformRotationEnded(angle - textRotationHandleStartAngle))
+        default:
+            break
+        }
+    }
+
     private func documentPoint(at viewPoint: CGPoint, in rect: CGRect) -> CGPoint {
         CGPoint(
             x: ((viewPoint.x - rect.minX) / max(rect.width, 1)) * documentSize.width,
@@ -1397,7 +1923,58 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        true
+        if isTransformOverlayGesture(gestureRecognizer) || isTransformOverlayGesture(otherGestureRecognizer) {
+            return false
+        }
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer.view === textTransformBoxView else { return true }
+        let location = touch.location(in: self)
+        if textTransformTopLeftHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformTopRightHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformBottomLeftHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformScaleHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformLeftMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformRightMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformBottomMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        if textTransformRotationHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
+        return true
+    }
+
+    private func isTransformOverlayGesture(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        switch gestureRecognizer.view {
+        case textTransformBoxView,
+             textTransformTopLeftHandleView,
+             textTransformTopRightHandleView,
+             textTransformBottomLeftHandleView,
+             textTransformScaleHandleView,
+             textTransformLeftMidHandleView,
+             textTransformRightMidHandleView,
+             textTransformBottomMidHandleView,
+             textTransformRotationHandleView:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func isPointInsideTransformOverlay(_ point: CGPoint) -> Bool {
+        let expandedFrames = [
+            textTransformTopLeftHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformTopRightHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformBottomLeftHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformScaleHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformLeftMidHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformRightMidHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformBottomMidHandleView.frame.insetBy(dx: -10, dy: -10),
+            textTransformRotationHandleView.frame.insetBy(dx: -10, dy: -10)
+        ]
+        if expandedFrames.contains(where: { !$0.isEmpty && $0.contains(point) }) {
+            return true
+        }
+        return !textTransformBoxView.isHidden && textTransformBoxView.frame.contains(point)
     }
 }
 
@@ -1416,4 +1993,20 @@ private extension PreviewStrokeStyle {
             return SIMD4(0, 0, 0, 1)
         }
     }
+}
+
+private struct TextTransformGeometry {
+    let center: CGPoint
+    let topLeft: CGPoint
+    let topRight: CGPoint
+    let bottomLeft: CGPoint
+    let bottomRight: CGPoint
+    let topMidpoint: CGPoint
+    let leftMidpoint: CGPoint
+    let rightMidpoint: CGPoint
+    let bottomMidpoint: CGPoint
+    let rotationHandleCenter: CGPoint
+    let rotationRadians: CGFloat
+    let viewSize: CGSize
+    let rotationStemLength: CGFloat
 }
