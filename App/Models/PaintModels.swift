@@ -1640,6 +1640,8 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
     let name: String
     let visible: Bool
     let opacity: Double
+    let isLocked: Bool
+    let isAlphaLocked: Bool
     let blendMode: LayerBlendMode
     let folderID: Int?
     let hasMask: Bool
@@ -1649,6 +1651,8 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
         lhs.name == rhs.name &&
         lhs.visible == rhs.visible &&
         lhs.opacity == rhs.opacity &&
+        lhs.isLocked == rhs.isLocked &&
+        lhs.isAlphaLocked == rhs.isAlphaLocked &&
         lhs.blendMode == rhs.blendMode &&
         lhs.folderID == rhs.folderID &&
         lhs.hasMask == rhs.hasMask

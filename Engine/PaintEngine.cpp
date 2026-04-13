@@ -88,6 +88,24 @@ float brushSpacingDistance(const BrushSettings& brush) {
     return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
 }
 
+void constrainPixelsToAlphaLock(std::span<uint8_t> pixels, std::span<const uint8_t> source) {
+    if (pixels.size() != source.size()) {
+        return;
+    }
+
+    for (size_t offset = 0; offset + 3U < pixels.size(); offset += kPixelStride) {
+        const uint8_t sourceAlpha = source[offset + 3U];
+        if (sourceAlpha == 0U) {
+            pixels[offset] = 0U;
+            pixels[offset + 1U] = 0U;
+            pixels[offset + 2U] = 0U;
+            pixels[offset + 3U] = 0U;
+            continue;
+        }
+        pixels[offset + 3U] = sourceAlpha;
+    }
+}
+
 float pressureScaleForBrush(const BrushSettings& brush, float pressure) {
     const float clampedPressure = std::clamp(pressure, 0.08F, 1.0F);
     const float clampedSensitivity = clamp01(brush.pressureSensitivity);
@@ -1351,6 +1369,9 @@ public:
             if (!processed.has_value() || processed->size() != sourceLayer.pixels.size()) {
                 continue;
             }
+            if (document_.layers_[static_cast<size_t>(layerIndex)].alphaLocked) {
+                constrainPixelsToAlphaLock(*processed, sourceLayer.pixels);
+            }
             if (std::equal(processed->begin(), processed->end(), sourceLayer.pixels.begin())) {
                 continue;
             }
@@ -1784,6 +1805,30 @@ void PaintDocument::setLayerVisibility(int index, bool visible) {
     markEntireDocumentDirty();
 }
 
+void PaintDocument::setLayerLocked(int index, bool locked) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (layers_[index].locked == locked) {
+        return;
+    }
+    pushLayerHistorySnapshot(index);
+    layers_[index].locked = locked;
+    markEntireDocumentDirty();
+}
+
+void PaintDocument::setLayerAlphaLocked(int index, bool alphaLocked) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (layers_[index].alphaLocked == alphaLocked) {
+        return;
+    }
+    pushLayerHistorySnapshot(index);
+    layers_[index].alphaLocked = alphaLocked;
+    markEntireDocumentDirty();
+}
+
 void PaintDocument::setLayerOpacity(int index, float opacity) {
     if (index < 0 || index >= layerCount()) {
         return;
@@ -1811,6 +1856,9 @@ void PaintDocument::setLayerBlendMode(int index, Layer::BlendMode blendMode) {
 
 bool PaintDocument::applyLayerProcessing(int index, const LayerProcessing& processing) {
     if (index < 0 || index >= layerCount() || strokeInFlight_ || activeQueuedStrokeID_.has_value()) {
+        return false;
+    }
+    if (layers_[static_cast<size_t>(index)].locked) {
         return false;
     }
 
@@ -1856,6 +1904,9 @@ std::vector<uint8_t> PaintDocument::layerMaskData(int index) const {
 
 void PaintDocument::replaceLayerMask(int index, std::span<const uint8_t> mask) {
     if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (layers_[static_cast<size_t>(index)].locked) {
         return;
     }
     if (mask.size() != static_cast<size_t>(width_) * static_cast<size_t>(height_)) {
@@ -1929,6 +1980,9 @@ void PaintDocument::beginStroke(const BrushSettings& brush, StrokePoint point) {
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
+    if (layers_[static_cast<size_t>(activeLayerIndex_)].locked) {
+        return;
+    }
     beginStrokeImmediate(brush, point);
 }
 
@@ -1958,6 +2012,9 @@ void PaintDocument::fill(int x, int y, const BrushSettings& brush) {
         return;
     }
     if (x < 0 || x >= width_ || y < 0 || y >= height_) {
+        return;
+    }
+    if (layers_[static_cast<size_t>(activeLayerIndex_)].locked) {
         return;
     }
 
@@ -2050,6 +2107,9 @@ void PaintDocument::fillImmediate(int x, int y, const BrushSettings& brush) {
 
     activeBrush_ = brush;
     auto& layer = layers_[static_cast<size_t>(activeLayerIndex_)];
+    if (layer.locked) {
+        return;
+    }
     const uint8_t* startPixel = tilePixelPointer(layer, x, y);
 
     const std::array<uint8_t, 4> target = {
@@ -2059,9 +2119,17 @@ void PaintDocument::fillImmediate(int x, int y, const BrushSettings& brush) {
         startPixel[3]
     };
 
-    const std::array<uint8_t, 4> replacement = brush.eraser
+    std::array<uint8_t, 4> replacement = brush.eraser
         ? std::array<uint8_t, 4>{0U, 0U, 0U, 0U}
         : std::array<uint8_t, 4>{brush.red, brush.green, brush.blue, static_cast<uint8_t>(clamp01(brush.opacity) * 255.0F)};
+    if (layer.alphaLocked) {
+        replacement[3] = target[3];
+        if (replacement[3] == 0U) {
+            replacement[0] = 0U;
+            replacement[1] = 0U;
+            replacement[2] = 0U;
+        }
+    }
 
     if (target == replacement) {
         return;
@@ -2848,8 +2916,14 @@ void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, 
 void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure) {
     const float srcA = clamp01(alpha);
     const float dstA = static_cast<float>(dst[3]) / 255.0F;
+    const bool alphaLocked = activeLayerIndex_ >= 0 &&
+        activeLayerIndex_ < layerCount() &&
+        layers_[static_cast<size_t>(activeLayerIndex_)].alphaLocked;
 
     if (activeBrush_.eraser) {
+        if (alphaLocked) {
+            return;
+        }
         const float outA = clamp01(dstA * (1.0F - srcA));
         dst[3] = static_cast<uint8_t>(outA * 255.0F);
         if (outA <= 0.001F) {
@@ -2888,6 +2962,21 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
     const float srcR = lerp(baseSrcR, mixedSourceR, mixStrength);
     const float srcG = lerp(baseSrcG, mixedSourceG, mixStrength);
     const float srcB = lerp(baseSrcB, mixedSourceB, mixStrength);
+
+    if (alphaLocked) {
+        if (dstA <= 0.001F) {
+            return;
+        }
+        const float colorBlend = srcA;
+        const float outR = clamp01(lerp(dstR, srcR, colorBlend));
+        const float outG = clamp01(lerp(dstG, srcG, colorBlend));
+        const float outB = clamp01(lerp(dstB, srcB, colorBlend));
+        dst[0] = static_cast<uint8_t>(outR * 255.0F);
+        dst[1] = static_cast<uint8_t>(outG * 255.0F);
+        dst[2] = static_cast<uint8_t>(outB * 255.0F);
+        dst[3] = static_cast<uint8_t>(dstA * 255.0F);
+        return;
+    }
 
     const float outA = dstA + (srcA * (1.0F - dstA));
     if (outA <= 0.001F) {

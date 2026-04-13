@@ -1447,6 +1447,30 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case let .layerSidebar(.delegate(.toggleLayerLock(index))):
+                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+                    return .none
+                }
+                paintDocumentClient.setLayerLocked(index, !layer.isLocked)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.toggleAlphaLock(index))):
+                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+                    return .none
+                }
+                paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
+            case let .layerSidebar(.delegate(.mergeDown(index))):
+                guard paintDocumentClient.mergeLayerDown(index) else {
+                    return .none
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case let .layerSidebar(.delegate(.selectLayer(index))):
                 paintDocumentClient.setActiveLayer(index)
                 state.canvas.activeLayerIndex = index
@@ -1498,6 +1522,9 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    return .none
+                }
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 state.canvas.selection = nil
                 paintDocumentClient.cancelStroke()
@@ -1519,7 +1546,8 @@ struct AppFeature {
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
                         samples: [sample],
-                        brush: previewBrush
+                        brush: previewBrush,
+                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                     )
                 {
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
@@ -1553,6 +1581,9 @@ struct AppFeature {
 
             case let .canvas(.delegate(.appendSamples(samples))):
                 guard !samples.isEmpty else { return .none }
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    return .none
+                }
                 let brush = state.resolvedBrushSettings()
                 var previewBrush = brush
                 previewBrush.taperIn = 0
@@ -1572,7 +1603,8 @@ struct AppFeature {
                         canvasWidth: baseSnapshot.width,
                         canvasHeight: baseSnapshot.height,
                         samples: previewSamples,
-                        brush: previewBrush
+                        brush: previewBrush,
+                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                     ) else {
                         return .none
                     }
@@ -1606,7 +1638,8 @@ struct AppFeature {
                         canvasWidth: snapshot.width,
                         canvasHeight: snapshot.height,
                         samples: samples,
-                        brush: previewBrush
+                        brush: previewBrush,
+                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                     )
                 {
                     state.canvas.activeStrokeBaseSnapshot = snapshot
@@ -1654,6 +1687,12 @@ struct AppFeature {
                 )
 
             case let .canvas(.delegate(.endStroke(samples))):
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    state.canvas.activeStrokeBaseSnapshot = nil
+                    state.canvas.activeStrokePreviewLayerPixelData = nil
+                    state.canvas.pendingIncrementalUpdate = nil
+                    return .none
+                }
                 let brush = state.resolvedBrushSettings()
                 let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
                 if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
@@ -1672,7 +1711,8 @@ struct AppFeature {
                             canvasWidth: baseSnapshot.width,
                             canvasHeight: baseSnapshot.height,
                             samples: samples,
-                            brush: brush
+                            brush: brush,
+                            preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                         ) {
                         paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
                     }
@@ -1700,6 +1740,12 @@ struct AppFeature {
                 )
 
             case let .canvas(.delegate(.commitStroke(samples))):
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    state.canvas.activeStrokeBaseSnapshot = nil
+                    state.canvas.activeStrokePreviewLayerPixelData = nil
+                    state.canvas.pendingIncrementalUpdate = nil
+                    return .none
+                }
                 let brush = state.resolvedBrushSettings()
                 let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
@@ -1724,7 +1770,8 @@ struct AppFeature {
                                 canvasWidth: snapshot.width,
                                 canvasHeight: snapshot.height,
                                 samples: samples,
-                                brush: brush
+                                brush: brush,
+                                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                             ) {
                             paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
                         }
@@ -1741,6 +1788,9 @@ struct AppFeature {
 
             case let .canvas(.delegate(.blurSamples(samples))):
                 guard !samples.isEmpty else { return .none }
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    return .none
+                }
                 paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
                 paintDocumentClient.blurStroke(samples, state.resolvedBrushSettings(), state.canvas.activeLayerIndex, false)
                 state.canvas.selection = nil
@@ -1753,6 +1803,9 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.delegate(.fill(sample))):
+                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+                    return .none
+                }
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 paintDocumentClient.fill(sample, state.resolvedBrushSettings())
                 state.canvas.selection = nil

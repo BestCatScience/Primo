@@ -325,6 +325,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 
 - (instancetype)initWithName:(NSString *)name
                      visible:(BOOL)visible
+                      locked:(BOOL)locked
+                 alphaLocked:(BOOL)alphaLocked
                      opacity:(CGFloat)opacity
                    blendMode:(NSString *)blendMode
                     folderID:(NSInteger)folderID
@@ -333,6 +335,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     if (self) {
         _name = [name copy];
         _visible = visible;
+        _locked = locked;
+        _alphaLocked = alphaLocked;
         _opacity = opacity;
         _blendMode = [blendMode copy];
         _folderID = folderID;
@@ -428,6 +432,8 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
         NSString *name = [NSString stringWithUTF8String:layer.name.c_str()];
         APPaintLayerInfo *info = [[APPaintLayerInfo alloc] initWithName:name
                                                                 visible:layer.visible
+                                                                 locked:layer.locked
+                                                            alphaLocked:layer.alphaLocked
                                                                 opacity:layer.opacity
                                                               blendMode:APStringFromBlendMode(layer.blendMode)
                                                                folderID:_document->layerFolderID(index)
@@ -519,6 +525,14 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index {
     _document->setLayerVisibility((int)index, visible);
+}
+
+- (void)setLayerLocked:(BOOL)locked atIndex:(NSInteger)index {
+    _document->setLayerLocked((int)index, locked);
+}
+
+- (void)setLayerAlphaLocked:(BOOL)alphaLocked atIndex:(NSInteger)index {
+    _document->setLayerAlphaLocked((int)index, alphaLocked);
 }
 
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index {

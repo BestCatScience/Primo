@@ -149,6 +149,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
         let layerIndex = Int(bridge.activeLayerIndex)
+        guard !isLayerLocked(index: layerIndex) else { return }
         bridge.fill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
@@ -166,6 +167,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) {
         guard !samples.isEmpty else { return }
+        guard !isLayerLocked(index: layerIndex) else { return }
         if activeBlurStrokeLayerIndex != layerIndex {
             activeBlurStrokeLayerIndex = layerIndex
             activeBlurStrokeBrush = brush
@@ -314,6 +316,18 @@ final class PaintDocumentSession: @unchecked Sendable {
         captureTimelapseFrame()
     }
 
+    func setLayerLocked(index: Int, isLocked: Bool) {
+        bridge.setLayerLocked(isLocked, at: index)
+        timelapseEvents.append(.setLayerLocked(index: index, isLocked: isLocked))
+        captureTimelapseFrame()
+    }
+
+    func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) {
+        bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
+        timelapseEvents.append(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked))
+        captureTimelapseFrame()
+    }
+
     func revealLayerForEditing(index: Int) {
         bridge.setLayerVisible(true, at: index)
     }
@@ -333,7 +347,19 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     @discardableResult
+    func mergeLayerDown(index: Int) -> Bool {
+        guard index > 0 else { return false }
+        guard !isLayerLocked(index: index), !isLayerLocked(index: index - 1) else { return false }
+        guard let merged = mergedLayerDownPixelData(upperIndex: index, lowerIndex: index - 1) else {
+            return false
+        }
+        replaceLayerPixels(index: index - 1, data: merged)
+        return deleteLayer(index: index)
+    }
+
+    @discardableResult
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
+        guard !isLayerLocked(index: index) else { return false }
         let descriptor = makeProcessingDescriptor(from: request)
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
         if didApply {
@@ -349,15 +375,106 @@ final class PaintDocumentSession: @unchecked Sendable {
         bridge.pixelDataForLayer(at: index) as Data
     }
 
+    func isLayerLocked(index: Int) -> Bool {
+        guard let layer = bridge.layerInfos().enumerated().first(where: { $0.offset == index })?.element else {
+            return false
+        }
+        return layer.locked
+    }
+
+    func isLayerAlphaLocked(index: Int) -> Bool {
+        guard let layer = bridge.layerInfos().enumerated().first(where: { $0.offset == index })?.element else {
+            return false
+        }
+        return layer.alphaLocked
+    }
+
+    static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
+        guard source.count == existing.count else { return source }
+        var output = source
+        output.withUnsafeMutableBytes { outputBytes in
+            existing.withUnsafeBytes { existingBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: source.count, by: 4) {
+                    let alpha = src[offset + 3]
+                    if alpha == 0 {
+                        dst[offset] = 0
+                        dst[offset + 1] = 0
+                        dst[offset + 2] = 0
+                        dst[offset + 3] = 0
+                    } else {
+                        dst[offset + 3] = alpha
+                    }
+                }
+            }
+        }
+        return output
+    }
+
+    func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
+        let infos = bridge.layerInfos()
+        guard infos.indices.contains(upperIndex), infos.indices.contains(lowerIndex) else {
+            return nil
+        }
+        let upperInfo = infos[upperIndex]
+        let lowerInfo = infos[lowerIndex]
+        let lowerPixels = bridge.pixelDataForLayer(at: lowerIndex) as Data
+        let upperPixels = bridge.pixelDataForLayer(at: upperIndex) as Data
+        guard lowerPixels.count == upperPixels.count else { return nil }
+
+        let upperMask = bridge.layerMaskDataForLayer(at: upperIndex) as Data?
+        var maskedUpper = upperPixels
+        if let upperMask, upperMask.count * 4 == upperPixels.count {
+            maskedUpper.withUnsafeMutableBytes { upperBytes in
+                upperMask.withUnsafeBytes { maskBytes in
+                    guard let upperBase = upperBytes.bindMemory(to: UInt8.self).baseAddress,
+                          let maskBase = maskBytes.bindMemory(to: UInt8.self).baseAddress
+                    else { return }
+                    for pixelIndex in 0..<upperMask.count {
+                        let alphaOffset = (pixelIndex * 4) + 3
+                        let sourceAlpha = Int(upperBase[alphaOffset])
+                        let maskAlpha = Int(maskBase[pixelIndex])
+                        upperBase[alphaOffset] = UInt8((sourceAlpha * maskAlpha) / 255)
+                    }
+                }
+            }
+        }
+
+        var output = lowerPixels
+        output.withUnsafeMutableBytes { outputBytes in
+            maskedUpper.withUnsafeBytes { upperBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = upperBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: lowerPixels.count, by: 4) {
+                    AppFeature.blendPreviewPixel(
+                        destination: dst + offset,
+                        source: src + offset,
+                        opacity: CGFloat(upperInfo.opacity),
+                        blendMode: LayerBlendMode(rawValue: upperInfo.blendMode) ?? .normal
+                    )
+                }
+            }
+        }
+
+        return lowerInfo.alphaLocked
+            ? Self.pixelDataByPreservingExistingAlpha(source: output, existing: lowerPixels)
+            : output
+    }
+
     @discardableResult
     func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> Bool {
+        guard !isLayerLocked(index: layerIndex) else { return false }
         let basePixelData = bridge.pixelDataForLayer(at: layerIndex) as Data
         guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
             canvasWidth: Int(bridge.width),
             canvasHeight: Int(bridge.height),
             samples: samples,
-            brush: brush
+            brush: brush,
+            preserveAlphaLockedPixels: isLayerAlphaLocked(index: layerIndex)
         ) else {
             return false
         }
@@ -366,15 +483,19 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     func replaceLayerPixels(index: Int, data: Data) {
+        guard !isLayerLocked(index: index) else { return }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.replacePixels
-        descriptor.pixelData = data
+        let adjustedData = isLayerAlphaLocked(index: index)
+            ? Self.pixelDataByPreservingExistingAlpha(source: data, existing: bridge.pixelDataForLayer(at: index) as Data)
+            : data
+        descriptor.pixelData = adjustedData
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
         if !didApply {
-            bridge.replaceLayerPixelsTransient(at: index, data: data)
+            bridge.replaceLayerPixelsTransient(at: index, data: adjustedData)
         }
         invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.replaceLayerPixels(index: index, data: data))
+        timelapseEvents.append(.replaceLayerPixels(index: index, data: adjustedData))
         captureTimelapseFrame()
     }
 
@@ -416,6 +537,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     func clearLayer(index: Int) {
+        guard !isLayerLocked(index: index) else { return }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.clear
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
@@ -439,6 +561,8 @@ final class PaintDocumentSession: @unchecked Sendable {
                 name: layer.name,
                 visible: layer.visible,
                 opacity: layer.opacity,
+                isLocked: layer.locked,
+                isAlphaLocked: layer.alphaLocked,
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
                 hasMask: layer.hasMask
@@ -540,6 +664,8 @@ final class PaintDocumentSession: @unchecked Sendable {
                 index: index,
                 name: layerInfo.name,
                 visible: layerInfo.visible,
+                locked: layerInfo.locked,
+                alphaLocked: layerInfo.alphaLocked,
                 opacity: layerInfo.opacity,
                 blendMode: layerInfo.blendMode,
                 folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
@@ -640,6 +766,8 @@ final class PaintDocumentSession: @unchecked Sendable {
             }
             session.bridge.setLayerName(layer.name, at: layer.index)
             session.bridge.setLayerVisible(layer.visible, at: layer.index)
+            session.bridge.setLayerLocked(layer.locked, at: layer.index)
+            session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
             session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
             session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
         }
@@ -977,6 +1105,14 @@ final class PaintDocumentSession: @unchecked Sendable {
             bridge.setLayerVisible(isVisible, at: index)
             invalidateThumbnailCache(for: index)
 
+        case let .setLayerLocked(index, isLocked):
+            bridge.setLayerLocked(isLocked, at: index)
+            invalidateThumbnailCache(for: index)
+
+        case let .setLayerAlphaLocked(index, isAlphaLocked):
+            bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
+            invalidateThumbnailCache(for: index)
+
         case let .setLayerOpacity(index, opacity):
             bridge.setLayerOpacity(CGFloat(opacity), at: index)
             invalidateThumbnailCache(for: index)
@@ -1235,6 +1371,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     private func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
+        guard !isLayerLocked(index: layerIndex) else { return }
         let width = Int(bridge.width)
         let height = Int(bridge.height)
         let sourceData = bridge.pixelDataForLayer(at: layerIndex) as Data
@@ -1253,10 +1390,13 @@ final class PaintDocumentSession: @unchecked Sendable {
             samples: samples,
             brush: brush
         )
+        let outputData = isLayerAlphaLocked(index: layerIndex)
+            ? Self.pixelDataByPreservingExistingAlpha(source: Data(blended), existing: sourceData)
+            : Data(blended)
         if transient {
-            bridge.replaceLayerPixelsTransient(at: layerIndex, data: Data(blended))
+            bridge.replaceLayerPixelsTransient(at: layerIndex, data: outputData)
         } else {
-            bridge.replaceLayerPixels(at: layerIndex, data: Data(blended))
+            bridge.replaceLayerPixels(at: layerIndex, data: outputData)
         }
     }
 }
@@ -1275,6 +1415,8 @@ enum TimelapseOperation: Equatable, Sendable {
     case setFolderVisibility(folderID: Int, isVisible: Bool)
     case assignLayerToFolder(index: Int, folderID: Int?)
     case setLayerVisibility(index: Int, isVisible: Bool)
+    case setLayerLocked(index: Int, isLocked: Bool)
+    case setLayerAlphaLocked(index: Int, isAlphaLocked: Bool)
     case setLayerOpacity(index: Int, opacity: Double)
     case setLayerBlendMode(index: Int, blendMode: LayerBlendMode)
     case replaceLayerPixels(index: Int, data: Data)
@@ -1349,6 +1491,10 @@ enum TimelapseOperation: Equatable, Sendable {
             return StoredTimelapseOperation(kind: .assignLayerToFolder, layerIndex: index, folderID: folderID)
         case let .setLayerVisibility(index, isVisible):
             return StoredTimelapseOperation(kind: .setLayerVisibility, layerIndex: index, isVisible: isVisible)
+        case let .setLayerLocked(index, isLocked):
+            return StoredTimelapseOperation(kind: .setLayerLocked, layerIndex: index, isLocked: isLocked)
+        case let .setLayerAlphaLocked(index, isAlphaLocked):
+            return StoredTimelapseOperation(kind: .setLayerAlphaLocked, layerIndex: index, isAlphaLocked: isAlphaLocked)
         case let .setLayerOpacity(index, opacity):
             return StoredTimelapseOperation(kind: .setLayerOpacity, layerIndex: index, opacity: opacity)
         case let .setLayerBlendMode(index, blendMode):
@@ -1424,6 +1570,12 @@ enum TimelapseOperation: Equatable, Sendable {
         case .setLayerVisibility:
             guard let layerIndex = stored.layerIndex, let isVisible = stored.isVisible else { throw AtelierDocumentError.invalidDocument }
             self = .setLayerVisibility(index: layerIndex, isVisible: isVisible)
+        case .setLayerLocked:
+            guard let layerIndex = stored.layerIndex, let isLocked = stored.isLocked else { throw AtelierDocumentError.invalidDocument }
+            self = .setLayerLocked(index: layerIndex, isLocked: isLocked)
+        case .setLayerAlphaLocked:
+            guard let layerIndex = stored.layerIndex, let isAlphaLocked = stored.isAlphaLocked else { throw AtelierDocumentError.invalidDocument }
+            self = .setLayerAlphaLocked(index: layerIndex, isAlphaLocked: isAlphaLocked)
         case .setLayerOpacity:
             guard let layerIndex = stored.layerIndex, let opacity = stored.opacity else { throw AtelierDocumentError.invalidDocument }
             self = .setLayerOpacity(index: layerIndex, opacity: opacity)
@@ -1482,11 +1634,64 @@ struct StoredAtelierDocument: Codable {
         let index: Int
         let name: String
         let visible: Bool
+        let locked: Bool
+        let alphaLocked: Bool
         let opacity: Double
         let blendMode: String
         let folderID: Int?
         let pixelFilename: String
         let maskFilename: String?
+
+        enum CodingKeys: String, CodingKey {
+            case index
+            case name
+            case visible
+            case locked
+            case alphaLocked
+            case opacity
+            case blendMode
+            case folderID
+            case pixelFilename
+            case maskFilename
+        }
+
+        init(
+            index: Int,
+            name: String,
+            visible: Bool,
+            locked: Bool,
+            alphaLocked: Bool,
+            opacity: Double,
+            blendMode: String,
+            folderID: Int?,
+            pixelFilename: String,
+            maskFilename: String?
+        ) {
+            self.index = index
+            self.name = name
+            self.visible = visible
+            self.locked = locked
+            self.alphaLocked = alphaLocked
+            self.opacity = opacity
+            self.blendMode = blendMode
+            self.folderID = folderID
+            self.pixelFilename = pixelFilename
+            self.maskFilename = maskFilename
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            index = try container.decode(Int.self, forKey: .index)
+            name = try container.decode(String.self, forKey: .name)
+            visible = try container.decode(Bool.self, forKey: .visible)
+            locked = try container.decodeIfPresent(Bool.self, forKey: .locked) ?? false
+            alphaLocked = try container.decodeIfPresent(Bool.self, forKey: .alphaLocked) ?? false
+            opacity = try container.decode(Double.self, forKey: .opacity)
+            blendMode = try container.decode(String.self, forKey: .blendMode)
+            folderID = try container.decodeIfPresent(Int.self, forKey: .folderID)
+            pixelFilename = try container.decode(String.self, forKey: .pixelFilename)
+            maskFilename = try container.decodeIfPresent(String.self, forKey: .maskFilename)
+        }
     }
 
     struct Folder: Codable {
@@ -1831,6 +2036,8 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case setFolderVisibility
         case assignLayerToFolder
         case setLayerVisibility
+        case setLayerLocked
+        case setLayerAlphaLocked
         case setLayerOpacity
         case setLayerBlendMode
         case replaceLayerPixels
@@ -1848,6 +2055,8 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     var anchorLayerIndex: Int?
     var name: String?
     var isVisible: Bool?
+    var isLocked: Bool?
+    var isAlphaLocked: Bool?
     var opacity: Double?
     var blendMode: String?
     var brush: StoredBrushRuntimeSettings?
@@ -1864,6 +2073,8 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         anchorLayerIndex: Int? = nil,
         name: String? = nil,
         isVisible: Bool? = nil,
+        isLocked: Bool? = nil,
+        isAlphaLocked: Bool? = nil,
         opacity: Double? = nil,
         blendMode: String? = nil,
         brush: StoredBrushRuntimeSettings? = nil,
@@ -1879,6 +2090,8 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         self.anchorLayerIndex = anchorLayerIndex
         self.name = name
         self.isVisible = isVisible
+        self.isLocked = isLocked
+        self.isAlphaLocked = isAlphaLocked
         self.opacity = opacity
         self.blendMode = blendMode
         self.brush = brush

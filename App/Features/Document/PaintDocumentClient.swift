@@ -35,9 +35,12 @@ struct PaintDocumentClient: Sendable {
     var setActiveLayer: @Sendable (Int) -> Void
     var setLayerName: @Sendable (Int, String) -> Void
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
+    var setLayerLocked: @Sendable (Int, Bool) -> Void
+    var setLayerAlphaLocked: @Sendable (Int, Bool) -> Void
     var revealLayerForEditing: @Sendable (Int) -> Void
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
+    var mergeLayerDown: @Sendable (Int) -> Bool
     var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
     var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> Bool
     var pixelDataForLayer: @Sendable (Int) -> Data
@@ -98,9 +101,12 @@ struct PaintDocumentClient: Sendable {
             setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
             setLayerName: { index, name in sessionBox.session.setLayerName(index: index, name: name) },
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
+            setLayerLocked: { index, isLocked in sessionBox.session.setLayerLocked(index: index, isLocked: isLocked) },
+            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.session.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) },
             revealLayerForEditing: { index in sessionBox.session.revealLayerForEditing(index: index) },
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
+            mergeLayerDown: { index in sessionBox.session.mergeLayerDown(index: index) },
             applyLayerProcessing: { index, request in sessionBox.session.applyLayerProcessing(index: index, request: request) },
             applySoftwareStroke: { samples, brush, layerIndex in
                 sessionBox.session.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)

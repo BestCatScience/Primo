@@ -804,7 +804,8 @@ extension AppFeature {
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         samples: [StylusSample],
-        brush: BrushRuntimeSettings
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
         guard shouldRasterizeCommittedShortStroke(samples, brush: brush) else { return nil }
         guard
@@ -852,7 +853,10 @@ extension AppFeature {
             return true
         }
 
-        return didRasterize ? output : nil
+        guard didRasterize else { return nil }
+        return preserveAlphaLockedPixels
+            ? pixelDataByPreservingExistingAlpha(source: output, existing: layer.pixelData)
+            : output
     }
 
     static func layerPixelDataByApplyingCommittedStroke(
@@ -860,7 +864,8 @@ extension AppFeature {
         canvasWidth: Int,
         canvasHeight: Int,
         samples: [StylusSample],
-        brush: BrushRuntimeSettings
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
         let expectedCount = canvasWidth * canvasHeight * 4
         guard basePixelData.count == expectedCount else { return nil }
@@ -900,7 +905,34 @@ extension AppFeature {
             return true
         }
 
-        return didRasterize ? output : nil
+        guard didRasterize else { return nil }
+        return preserveAlphaLockedPixels
+            ? pixelDataByPreservingExistingAlpha(source: output, existing: basePixelData)
+            : output
+    }
+
+    static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
+        guard source.count == existing.count else { return source }
+        var output = source
+        output.withUnsafeMutableBytes { outputBytes in
+            existing.withUnsafeBytes { existingBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: source.count, by: 4) {
+                    let alpha = src[offset + 3]
+                    if alpha == 0 {
+                        dst[offset] = 0
+                        dst[offset + 1] = 0
+                        dst[offset + 2] = 0
+                        dst[offset + 3] = 0
+                    } else {
+                        dst[offset + 3] = alpha
+                    }
+                }
+            }
+        }
+        return output
     }
 
     static func shouldRasterizeCommittedShortStroke(
