@@ -3,6 +3,44 @@ import SwiftUI
 extension LayerSidebarView {
     func activeLayerOpacitySection(_ activeLayer: LayerRowModel) -> some View {
         VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                layerStatusButton(
+                    systemImage: "arrow.down.to.line",
+                    isActive: false,
+                    accessibilityLabel: language.localized("下のレイヤーと結合")
+                ) {
+                    store.send(.mergeDownButtonTapped(activeLayer.index))
+                }
+                .disabled(activeLayer.index <= 0)
+
+                layerStatusButton(
+                    systemImage: activeLayer.isAlphaLocked ? "a.square.fill" : "a.square",
+                    isActive: activeLayer.isAlphaLocked,
+                    accessibilityLabel: language.localized("アルファロック")
+                ) {
+                    store.send(.alphaLockButtonTapped(activeLayer.index))
+                }
+
+                layerStatusButton(
+                    systemImage: activeLayer.isLocked ? "lock.fill" : "lock.open",
+                    isActive: activeLayer.isLocked,
+                    accessibilityLabel: language.localized("レイヤーロック")
+                ) {
+                    store.send(.layerLockButtonTapped(activeLayer.index))
+                }
+
+                layerStatusButton(
+                    systemImage: "trash",
+                    isActive: false,
+                    accessibilityLabel: language.localized("アクティブレイヤーを削除")
+                ) {
+                    store.send(.deleteLayerButtonTapped(activeLayer.index))
+                }
+                .disabled(store.layers.count <= 1)
+
+                Spacer(minLength: 0)
+            }
+
             HStack {
                 Text(language.localized("レイヤー不透明度"))
                     .font(StudioTheme.Typography.mono(10))
@@ -23,6 +61,31 @@ extension LayerSidebarView {
             .tint(StudioTheme.Palette.accentBright)
         }
         .padding(.horizontal, 2)
+    }
+
+    func layerStatusButton(
+        systemImage: String,
+        isActive: Bool,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isActive ? .white : .white.opacity(0.62))
+                .frame(width: 30, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : StudioTheme.Palette.cardFillStrong)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .minimumHitTarget()
+        .accessibilityLabel(accessibilityLabel)
     }
 
     func folderRow(for folder: LayerFolderModel) -> some View {
@@ -133,7 +196,7 @@ extension LayerSidebarView {
 
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(StudioTheme.Palette.cardFillStrong)
-                .frame(width: 40, height: 40)
+                .frame(width: 34, height: 34)
                 .overlay {
                     LayerThumbnailView(snapshot: snapshot)
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -197,17 +260,12 @@ extension LayerSidebarView {
                     .fixedSize(horizontal: true, vertical: false)
                 }
 
-                HStack(spacing: 8) {
-                    if layer.folderID != nil {
+                if layer.folderID != nil {
+                    HStack(spacing: 8) {
                         miniActionButton(systemImage: "arrow.uturn.left") {
                             store.send(.removeLayerFromFolderButtonTapped(layer.index))
                         }
                     }
-
-                    miniActionButton(systemImage: "trash") {
-                        store.send(.deleteLayerButtonTapped(layer.index))
-                    }
-                    .disabled(store.layers.count <= 1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,7 +276,7 @@ extension LayerSidebarView {
                 Image(systemName: layer.visible ? "eye.fill" : "eye.slash.fill")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(layer.visible ? .white.opacity(0.9) : .white.opacity(0.45))
-                    .frame(width: 26, height: 26)
+                    .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(StudioTheme.Palette.cardFillStrong)
@@ -228,7 +286,7 @@ extension LayerSidebarView {
             .minimumHitTarget()
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.vertical, 7)
         .padding(.leading, childIndent)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
