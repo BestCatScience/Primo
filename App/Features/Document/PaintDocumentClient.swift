@@ -24,6 +24,7 @@ struct PaintDocumentClient: Sendable {
     var undo: @Sendable () -> Bool
     var redo: @Sendable () -> Bool
     var addLayer: @Sendable (String) -> Void
+    var duplicateLayer: @Sendable (Int, String) -> Int
     var deleteLayer: @Sendable (Int) -> Bool
     var moveLayer: @Sendable (Int, Int) -> Bool
     var createFolder: @Sendable (String, Int) -> Int
@@ -90,6 +91,7 @@ struct PaintDocumentClient: Sendable {
             undo: { sessionBox.session.undo() },
             redo: { sessionBox.session.redo() },
             addLayer: { name in sessionBox.session.addLayer(name: name) },
+            duplicateLayer: { index, name in sessionBox.session.duplicateLayer(index: index, name: name) },
             deleteLayer: { index in sessionBox.session.deleteLayer(index: index) },
             moveLayer: { index, destination in sessionBox.session.moveLayer(from: index, to: destination) },
             createFolder: { name, layerIndex in sessionBox.session.createFolder(name: name, layerIndex: layerIndex) },

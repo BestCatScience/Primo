@@ -209,6 +209,7 @@ typedef NS_ENUM(NSInteger, APPaintGradientMapPreset) {
 - (instancetype)init NS_UNAVAILABLE;
 
 - (NSInteger)addLayerWithName:(NSString *)name NS_SWIFT_NAME(addLayer(name:));
+- (NSInteger)duplicateLayerAtIndex:(NSInteger)index name:(NSString *)name NS_SWIFT_NAME(duplicateLayer(at:name:));
 - (BOOL)deleteLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(deleteLayer(at:));
 - (BOOL)moveLayerAtIndex:(NSInteger)index toIndex:(NSInteger)destinationIndex NS_SWIFT_NAME(moveLayer(at:to:));
 - (NSInteger)createFolderWithName:(NSString *)name layerIndex:(NSInteger)layerIndex NS_SWIFT_NAME(createFolder(name:layerIndex:));

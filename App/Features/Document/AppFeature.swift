@@ -1419,6 +1419,18 @@ struct AppFeature {
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
+            case let .layerSidebar(.delegate(.duplicateLayer(index))):
+                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+                    return .none
+                }
+                let duplicateName = state.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
+                guard paintDocumentClient.duplicateLayer(index, duplicateName) >= 0 else {
+                    return .none
+                }
+                state.canvas.selection = nil
+                state.applyPresentation(paintDocumentClient.presentation())
+                return .none
+
             case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
                 guard paintDocumentClient.moveLayer(index, destinationIndex) else {
                     return .none

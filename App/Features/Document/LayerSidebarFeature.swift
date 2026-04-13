@@ -29,6 +29,7 @@ struct LayerSidebarFeature {
         case layerLockButtonTapped(Int)
         case alphaLockButtonTapped(Int)
         case mergeDownButtonTapped(Int)
+        case duplicateLayerButtonTapped(Int)
         case opacityChanged(Int, Double)
         case blendModeSelected(Int, LayerBlendMode)
         case renameLayerCommitted(Int, String)
@@ -52,6 +53,7 @@ struct LayerSidebarFeature {
         case toggleLayerLock(Int)
         case toggleAlphaLock(Int)
         case mergeDown(Int)
+        case duplicateLayer(Int)
         case setOpacity(Int, Double)
         case setBlendMode(Int, LayerBlendMode)
         case renameLayer(Int, String)
@@ -104,6 +106,8 @@ struct LayerSidebarFeature {
                 return .send(.delegate(.toggleAlphaLock(index)))
             case let .mergeDownButtonTapped(index):
                 return .send(.delegate(.mergeDown(index)))
+            case let .duplicateLayerButtonTapped(index):
+                return .send(.delegate(.duplicateLayer(index)))
             case let .opacityChanged(index, opacity):
                 return .send(.delegate(.setOpacity(index, opacity)))
             case let .blendModeSelected(index, blendMode):

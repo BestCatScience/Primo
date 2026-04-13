@@ -240,6 +240,17 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     @discardableResult
+    func duplicateLayer(index: Int, name: String) -> Int {
+        let duplicatedIndex = Int(bridge.duplicateLayer(at: index, name: name))
+        if duplicatedIndex >= 0 {
+            invalidateThumbnailCache()
+            timelapseEvents.append(.duplicateLayer(index: index, name: name))
+            captureTimelapseFrame()
+        }
+        return duplicatedIndex
+    }
+
+    @discardableResult
     func deleteLayer(index: Int) -> Bool {
         let didDelete = bridge.deleteLayer(at: index)
         if didDelete {
@@ -1073,6 +1084,10 @@ final class PaintDocumentSession: @unchecked Sendable {
             bridge.activeLayerIndex = bridge.addLayer(name: name)
             invalidateThumbnailCache()
 
+        case let .duplicateLayer(index, name):
+            bridge.activeLayerIndex = bridge.duplicateLayer(at: index, name: name)
+            invalidateThumbnailCache()
+
         case let .deleteLayer(index):
             _ = bridge.deleteLayer(at: index)
             invalidateThumbnailCache()
@@ -1408,6 +1423,7 @@ enum TimelapseOperation: Equatable, Sendable {
     case undo
     case redo
     case addLayer(name: String)
+    case duplicateLayer(index: Int, name: String)
     case deleteLayer(index: Int)
     case moveLayer(index: Int, destinationIndex: Int)
     case createFolder(folderID: Int, name: String, anchorLayerIndex: Int?)
@@ -1472,6 +1488,8 @@ enum TimelapseOperation: Equatable, Sendable {
             return StoredTimelapseOperation(kind: .redo)
         case let .addLayer(name):
             return StoredTimelapseOperation(kind: .addLayer, name: name)
+        case let .duplicateLayer(index, name):
+            return StoredTimelapseOperation(kind: .duplicateLayer, layerIndex: index, name: name)
         case let .deleteLayer(index):
             return StoredTimelapseOperation(kind: .deleteLayer, layerIndex: index)
         case let .moveLayer(index, destinationIndex):
@@ -1547,6 +1565,9 @@ enum TimelapseOperation: Equatable, Sendable {
         case .addLayer:
             guard let name = stored.name else { throw AtelierDocumentError.invalidDocument }
             self = .addLayer(name: name)
+        case .duplicateLayer:
+            guard let layerIndex = stored.layerIndex, let name = stored.name else { throw AtelierDocumentError.invalidDocument }
+            self = .duplicateLayer(index: layerIndex, name: name)
         case .deleteLayer:
             guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
             self = .deleteLayer(index: layerIndex)
@@ -2029,6 +2050,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case undo
         case redo
         case addLayer
+        case duplicateLayer
         case deleteLayer
         case moveLayer
         case createFolder

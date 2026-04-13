@@ -409,6 +409,10 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     return _document->addLayer(name.UTF8String);
 }
 
+- (NSInteger)duplicateLayerAtIndex:(NSInteger)index name:(NSString *)name {
+    return _document->duplicateLayer((int)index, name.UTF8String);
+}
+
 - (BOOL)deleteLayerAtIndex:(NSInteger)index {
     return _document->deleteLayer((int)index);
 }

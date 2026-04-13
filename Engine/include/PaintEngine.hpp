@@ -240,6 +240,7 @@ public:
     void setActiveLayerIndex(int index);
 
     int addLayer(const std::string& name);
+    int duplicateLayer(int index, const std::string& name);
     bool deleteLayer(int index);
     bool moveLayer(int fromIndex, int toIndex);
     int createFolder(const std::string& name, int layerIndex);

@@ -30,6 +30,14 @@ extension LayerSidebarView {
                 }
 
                 layerStatusButton(
+                    systemImage: "plus.square.on.square",
+                    isActive: false,
+                    accessibilityLabel: language.localized("Duplicate Layer")
+                ) {
+                    store.send(.duplicateLayerButtonTapped(activeLayer.index))
+                }
+
+                layerStatusButton(
                     systemImage: "trash",
                     isActive: false,
                     accessibilityLabel: language.localized("アクティブレイヤーを削除")
@@ -157,12 +165,13 @@ extension LayerSidebarView {
         .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(StudioTheme.Palette.cardFill)
+                .fill(folderBackgroundFill(for: folder))
         )
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                .stroke(folderBorderColor(for: folder), lineWidth: folderStrokeWidth(for: folder))
         }
+        .shadow(color: folderShadowColor(for: folder), radius: dropTargetFolderID == folder.id ? 12 : 0, x: 0, y: 0)
         .background(
             GeometryReader { proxy in
                 Color.clear.preference(
@@ -176,6 +185,7 @@ extension LayerSidebarView {
             isDraggingLayer = false
             draggedLayerIndex = nil
             dropTargetLayerIndex = nil
+            dropTargetFolderID = nil
             if editingFolderID == folder.id {
                 commitFolderNameEdit(for: folder.id)
             } else {
@@ -292,10 +302,15 @@ extension LayerSidebarView {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(backgroundFill(for: layer))
         )
+        .shadow(color: dragShadowColor(for: layer), radius: isDraggedLayer(layer) ? 12 : 0, x: 0, y: 0)
+        .scaleEffect(isDraggedLayer(layer) ? 1.015 : 1.0)
+        .animation(.easeInOut(duration: 0.12), value: draggedLayerIndex)
+        .animation(.easeInOut(duration: 0.12), value: dropTargetLayerIndex)
+        .animation(.easeInOut(duration: 0.12), value: dropTargetFolderID)
         .overlay {
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(borderColor(for: layer), lineWidth: 1)
+                    .stroke(borderColor(for: layer), lineWidth: borderWidth(for: layer))
 
                 if depth > 0 {
                     RoundedRectangle(cornerRadius: 999, style: .continuous)
@@ -323,6 +338,7 @@ extension LayerSidebarView {
             isDraggingLayer = false
             draggedLayerIndex = nil
             dropTargetLayerIndex = nil
+            dropTargetFolderID = nil
             if editingLayerIndex == layer.index {
                 commitLayerNameEdit(for: layer.index)
             } else {
@@ -490,6 +506,7 @@ extension LayerSidebarView {
             isDraggingLayer = false
             draggedLayerIndex = nil
             dropTargetLayerIndex = nil
+            dropTargetFolderID = nil
         }
     }
 
@@ -523,7 +540,7 @@ extension LayerSidebarView {
     func layerDragHandle(for layer: LayerRowModel, snapshot: MetalLayerSnapshot?) -> some View {
         Image(systemName: "line.3.horizontal")
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.34))
+            .foregroundStyle(isDraggedLayer(layer) ? StudioTheme.Palette.accentBright : .white.opacity(0.34))
             .frame(width: 14, height: 32)
             .contentShape(Rectangle())
             .gesture(
@@ -541,7 +558,14 @@ extension LayerSidebarView {
         dropTargetLayerIndex == layer.index && draggedLayerIndex != layer.index
     }
 
+    func isDraggedLayer(_ layer: LayerRowModel) -> Bool {
+        isDraggingLayer && draggedLayerIndex == layer.index
+    }
+
     func backgroundFill(for layer: LayerRowModel) -> Color {
+        if isDraggedLayer(layer) {
+            return StudioTheme.Palette.accent.opacity(0.18)
+        }
         if showsInsertionIndicator(for: layer) {
             return StudioTheme.Palette.accent.opacity(0.10)
         }
@@ -549,10 +573,37 @@ extension LayerSidebarView {
     }
 
     func borderColor(for layer: LayerRowModel) -> Color {
+        if isDraggedLayer(layer) {
+            return StudioTheme.Palette.accentBright.opacity(0.92)
+        }
         if showsInsertionIndicator(for: layer) {
             return StudioTheme.Palette.accent.opacity(0.55)
         }
         return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder
+    }
+
+    func borderWidth(for layer: LayerRowModel) -> CGFloat {
+        isDraggedLayer(layer) ? 1.4 : 1
+    }
+
+    func dragShadowColor(for layer: LayerRowModel) -> Color {
+        isDraggedLayer(layer) ? StudioTheme.Palette.accentGlow.opacity(0.34) : .clear
+    }
+
+    func folderBackgroundFill(for folder: LayerFolderModel) -> Color {
+        dropTargetFolderID == folder.id ? StudioTheme.Palette.accent.opacity(0.10) : StudioTheme.Palette.cardFill
+    }
+
+    func folderBorderColor(for folder: LayerFolderModel) -> Color {
+        dropTargetFolderID == folder.id ? StudioTheme.Palette.accentBright.opacity(0.82) : StudioTheme.Palette.cardBorder
+    }
+
+    func folderStrokeWidth(for folder: LayerFolderModel) -> CGFloat {
+        dropTargetFolderID == folder.id ? 1.4 : 1
+    }
+
+    func folderShadowColor(for folder: LayerFolderModel) -> Color {
+        dropTargetFolderID == folder.id ? StudioTheme.Palette.accentGlow.opacity(0.26) : .clear
     }
 
     func startEditingLayer(_ layer: LayerRowModel) {
@@ -614,16 +665,24 @@ extension LayerSidebarView {
             isDraggingLayer = true
             draggedLayerIndex = layer.index
             dropTargetLayerIndex = layer.index
+            dropTargetFolderID = nil
         }
 
         guard let draggedLayerIndex else { return }
 
         if let destinationIndex = layerIndex(at: location) {
+            dropTargetFolderID = nil
             guard destinationIndex != draggedLayerIndex else { return }
             guard dropTargetLayerIndex != destinationIndex else { return }
             dropTargetLayerIndex = destinationIndex
             store.send(.moveLayerRequested(draggedLayerIndex, destinationIndex))
             self.draggedLayerIndex = destinationIndex
+            return
+        }
+
+        if let folderID = folderID(at: location) {
+            dropTargetLayerIndex = nil
+            dropTargetFolderID = folderID
         }
     }
 
@@ -632,6 +691,7 @@ extension LayerSidebarView {
             isDraggingLayer = false
             draggedLayerIndex = nil
             dropTargetLayerIndex = nil
+            dropTargetFolderID = nil
         }
 
         guard let draggedLayerIndex else { return }

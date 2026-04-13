@@ -19,6 +19,7 @@ struct LayerSidebarView: View {
     @State var isDraggingLayer = false
     @State var draggedLayerIndex: Int?
     @State var dropTargetLayerIndex: Int?
+    @State var dropTargetFolderID: Int?
     @State var editingLayerIndex: Int?
     @State var editingLayerName = ""
     @State var editingFolderID: Int?
@@ -115,6 +116,7 @@ struct LayerSidebarView: View {
             isDraggingLayer = false
             self.draggedLayerIndex = nil
             dropTargetLayerIndex = nil
+            dropTargetFolderID = nil
         }
     }
 

@@ -1604,6 +1604,27 @@ int PaintDocument::addLayer(const std::string& name) {
     return activeLayerIndex_;
 }
 
+int PaintDocument::duplicateLayer(int index, const std::string& name) {
+    if (index < 0 || index >= layerCount()) {
+        return -1;
+    }
+    pushHistorySnapshot();
+    Layer duplicatedLayer = layers_[static_cast<size_t>(index)];
+    duplicatedLayer.name = name;
+    const int destinationIndex = index + 1;
+    const int duplicatedLayerFolderID = layerFolderIDs_[static_cast<size_t>(index)];
+    layers_.insert(layers_.begin() + destinationIndex, std::move(duplicatedLayer));
+    layerFolderIDs_.insert(layerFolderIDs_.begin() + destinationIndex, duplicatedLayerFolderID);
+    for (LayerFolder& folder : folders_) {
+        if (folder.anchorLayerIndex > index) {
+            folder.anchorLayerIndex += 1;
+        }
+    }
+    activeLayerIndex_ = destinationIndex;
+    markEntireDocumentDirty();
+    return destinationIndex;
+}
+
 bool PaintDocument::deleteLayer(int index) {
     if (index < 0 || index >= layerCount() || layerCount() <= 1) {
         return false;

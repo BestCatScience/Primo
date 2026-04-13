@@ -84,6 +84,7 @@ enum StudioStrings {
         "Darker": "暗い方",
         "Darker Color": "カラー比較(暗)",
         "Difference": "差の絶対値",
+        "Duplicate Layer": "レイヤーを複製",
         "Direction": "線方向",
         "Directional": "方向散布",
         "Divide": "除算",
