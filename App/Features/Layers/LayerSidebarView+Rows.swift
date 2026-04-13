@@ -303,7 +303,8 @@ extension LayerSidebarView {
                 .fill(backgroundFill(for: layer))
         )
         .shadow(color: dragShadowColor(for: layer), radius: isDraggedLayer(layer) ? 12 : 0, x: 0, y: 0)
-        .scaleEffect(isDraggedLayer(layer) ? 1.015 : 1.0)
+        .scaleEffect(isDraggedLayer(layer) ? (dragAnimationPhase ? 1.024 : 1.012) : 1.0)
+        .offset(y: isDraggedLayer(layer) ? (dragAnimationPhase ? -1.5 : -3.5) : 0)
         .animation(.easeInOut(duration: 0.12), value: draggedLayerIndex)
         .animation(.easeInOut(duration: 0.12), value: dropTargetLayerIndex)
         .animation(.easeInOut(duration: 0.12), value: dropTargetFolderID)
@@ -541,9 +542,10 @@ extension LayerSidebarView {
         Image(systemName: "line.3.horizontal")
             .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(isDraggedLayer(layer) ? StudioTheme.Palette.accentBright : .white.opacity(0.34))
-            .frame(width: 14, height: 32)
+            .frame(width: 24, height: 36)
+            .scaleEffect(isDraggedLayer(layer) ? (dragAnimationPhase ? 1.14 : 1.04) : 1.0)
             .contentShape(Rectangle())
-            .gesture(
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .global)
                     .onChanged { value in
                         handleLayerDragChanged(for: layer, at: value.location)

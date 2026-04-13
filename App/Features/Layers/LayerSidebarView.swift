@@ -17,6 +17,7 @@ struct LayerSidebarView: View {
     var language: AppLanguage = .japanese
     var showsTitle = true
     @State var isDraggingLayer = false
+    @State var dragAnimationPhase = false
     @State var draggedLayerIndex: Int?
     @State var dropTargetLayerIndex: Int?
     @State var dropTargetFolderID: Int?
@@ -114,9 +115,20 @@ struct LayerSidebarView: View {
             guard let draggedLayerIndex else { return }
             guard !newLayers.contains(where: { $0.index == draggedLayerIndex }) else { return }
             isDraggingLayer = false
+            dragAnimationPhase = false
             self.draggedLayerIndex = nil
             dropTargetLayerIndex = nil
             dropTargetFolderID = nil
+        }
+        .onChange(of: isDraggingLayer) { _, isDragging in
+            if isDragging {
+                dragAnimationPhase = false
+                withAnimation(.easeInOut(duration: 0.68).repeatForever(autoreverses: true)) {
+                    dragAnimationPhase = true
+                }
+            } else {
+                dragAnimationPhase = false
+            }
         }
     }
 
