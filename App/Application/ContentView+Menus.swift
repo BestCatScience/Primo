@@ -1031,20 +1031,6 @@ extension ContentView {
                 Text(StudioStrings.appName(language))
                     .font(StudioTheme.Typography.label(10))
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
-
-                Text("PRIMO")
-                    .font(StudioTheme.Typography.mono(9))
-                    .foregroundStyle(StudioTheme.Palette.accentBright)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(StudioTheme.Palette.accent.opacity(0.16))
-                    )
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
-                    }
             }
 
             menuBarMenu(StudioStrings.settingsMenu(language)) {
@@ -1252,25 +1238,6 @@ extension ContentView {
 
             Spacer(minLength: 8)
 
-            HStack(spacing: 8) {
-                Text(language.localized("Brush"))
-                    .font(StudioTheme.Typography.mono(9))
-                    .foregroundStyle(StudioTheme.Palette.textMuted)
-
-                Text(store.canvas.currentTool.localizedTitle(language).uppercased())
-                    .font(StudioTheme.Typography.label(10))
-                    .foregroundStyle(StudioTheme.Palette.textPrimary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(StudioTheme.Palette.toolbarFill)
-            )
-            .overlay {
-                Capsule(style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -1372,11 +1339,6 @@ extension ContentView {
             .disabled(activeLayer == nil)
 
             Spacer(minLength: 0)
-
-            HStack(spacing: 10) {
-                statusPill(title: language.localized("Opacity"), value: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))%")
-                statusPill(title: language.localized("Size"), value: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded())) px")
-            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -1406,28 +1368,6 @@ extension ContentView {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 }
-        }
-    }
-
-    func statusPill(title: String, value: String) -> some View {
-        HStack(spacing: 6) {
-            Text(title.uppercased())
-                .font(StudioTheme.Typography.mono(8))
-                .foregroundStyle(StudioTheme.Palette.textMuted)
-
-            Text(value)
-                .font(StudioTheme.Typography.label(9))
-                .foregroundStyle(StudioTheme.Palette.textPrimary)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule(style: .continuous)
-                .fill(StudioTheme.Palette.toolbarFill)
-        )
-        .overlay {
-            Capsule(style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         }
     }
 

@@ -209,7 +209,7 @@ extension BrushPaletteView {
             compactSliderRow(
                 title: language.localized("ブラシサイズ"),
                 value: "\(Int(store.brush.radius.rounded()))",
-                slider: Slider(value: $store.brush.radius, in: 1...100, step: 1)
+                slider: Slider(value: $store.brush.radius, in: 1...BrushPaletteFeature.maximumBrushRadius, step: 1)
             )
 
             compactSliderRow(
@@ -325,7 +325,7 @@ extension BrushPaletteView {
             heroSliderRow(
                 title: language.localized("ブラシサイズ"),
                 value: String(format: "%.1f", store.brush.radius),
-                slider: Slider(value: $store.brush.radius, in: 1...100)
+                slider: Slider(value: $store.brush.radius, in: 1...BrushPaletteFeature.maximumBrushRadius)
             )
 
             heroSliderRow(

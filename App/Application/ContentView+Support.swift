@@ -316,17 +316,10 @@ extension ContentView {
                 homeFileActionRow(
                     systemName: "doc.fill",
                     title: language.localized("自分のファイル"),
-                    action: {}
-                )
-                homeFileActionRow(
-                    systemName: "person.2.fill",
-                    title: language.localized("共有されたアイテム"),
-                    action: {}
-                )
-                homeFileActionRow(
-                    systemName: "trash.fill",
-                    title: language.localized("削除済み"),
-                    action: {}
+                    action: {
+                        store.send(.homeProjectsLoadRequested)
+                        store.send(.homeSectionSelected(.home))
+                    }
                 )
             }
 

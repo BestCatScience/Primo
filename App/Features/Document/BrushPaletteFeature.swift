@@ -5,6 +5,8 @@ import UIKit
 
 @Reducer
 struct BrushPaletteFeature {
+    static let maximumBrushRadius: Double = 256
+
     @ObservableState
     struct State: Equatable {
         struct BrushSettings: Equatable {
@@ -433,11 +435,14 @@ struct BrushPaletteFeature {
                  .binding(\.paper.isTransparent):
                 return .none
 
+            case .binding(\.brush.radius):
+                state.brush.radius = min(max(state.brush.radius, 1), Self.maximumBrushRadius)
+                return .none
+
             case .binding(\.brush.color),
                  .binding(\.brush.secondaryColor),
                  .binding(\.brush.selectedColorSlot),
                  .binding(\.brush.tipKind),
-                 .binding(\.brush.radius),
                  .binding(\.brush.sizeSpeedSensitivity),
                  .binding(\.brush.opacity),
                  .binding(\.brush.hardness),

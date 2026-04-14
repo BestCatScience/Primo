@@ -47,6 +47,9 @@ struct ContentView: View {
     @State var nanoBananaModel: NanoBananaModel = .flashImage25
     @State var selectedPhotoLayerItem: PhotosPickerItem?
     @State var selectedNewCanvasPhotoItem: PhotosPickerItem?
+    @State var selectedToolMetricEditor: ToolMetricEditor?
+    @State var toolMetricSizeText = ""
+    @State var toolMetricOpacityText = ""
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
     @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
     @AppStorage("atelierprime.nanobanana.apiKey") var nanoBananaAPIKey = ""
@@ -55,6 +58,11 @@ struct ContentView: View {
     var nanoBananaAccessMode: NanoBananaAccessMode {
         get { NanoBananaAccessMode(rawValue: nanoBananaAccessModeRawValue) ?? .userAPIKey }
         nonmutating set { nanoBananaAccessModeRawValue = newValue.rawValue }
+    }
+
+    enum ToolMetricEditor: Hashable {
+        case size
+        case opacity
     }
 
     var body: some View {

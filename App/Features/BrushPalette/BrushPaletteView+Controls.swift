@@ -147,7 +147,7 @@ extension BrushPaletteView {
                     sliderRow(
                         title: language.localized("ぼかし半径"),
                         value: "\(Int(store.brush.radius)) px",
-                        slider: Slider(value: $store.brush.radius, in: 2...96, step: 1)
+                        slider: Slider(value: $store.brush.radius, in: 2...BrushPaletteFeature.maximumBrushRadius, step: 1)
                     )
                     sliderRow(
                         title: language.localized("エッジの柔らかさ"),
@@ -260,7 +260,7 @@ extension BrushPaletteView {
                     sliderRow(
                         title: language.localized("線幅"),
                         value: "\(Int(store.brush.radius)) px",
-                        slider: Slider(value: $store.brush.radius, in: 1...64, step: 1)
+                        slider: Slider(value: $store.brush.radius, in: 1...BrushPaletteFeature.maximumBrushRadius, step: 1)
                     )
                     sliderRow(
                         title: language.localized("不透明度"),
@@ -373,7 +373,7 @@ extension BrushPaletteView {
                     }
                 }
             }
-            sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brush.radius)) px", slider: Slider(value: $store.brush.radius, in: 1...100), isFullHeight: true, proxy: proxy)
+            sliderRow(title: language.localized("サイズ"), value: "\(Int(store.brush.radius)) px", slider: Slider(value: $store.brush.radius, in: 1...BrushPaletteFeature.maximumBrushRadius), isFullHeight: true, proxy: proxy)
             dynamicControlMenuRow(
                 title: language.localized("サイズコントロール"),
                 selection: sizeControlBinding,

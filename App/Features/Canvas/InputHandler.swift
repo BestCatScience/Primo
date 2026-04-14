@@ -296,13 +296,27 @@ final class InputHandler {
     }
 
     private func preferredInterpolationSpacing(from previous: StrokePoint, to candidate: StrokePoint, distance: Float) -> Float {
-        let baseSpacing = max(brushSize * 0.04, 0.2)
+        let normalizedBrushSize = max(brushSize, 1.0)
+        let adaptiveSpacingFactor: Float
+        switch normalizedBrushSize {
+        case ..<24:
+            adaptiveSpacingFactor = 0.05
+        case ..<72:
+            adaptiveSpacingFactor = 0.075
+        case ..<160:
+            adaptiveSpacingFactor = 0.11
+        default:
+            adaptiveSpacingFactor = 0.15
+        }
+        let baseSpacing = max(normalizedBrushSize * adaptiveSpacingFactor, 0.35)
         guard distance > 0.001 else { return baseSpacing }
         return baseSpacing
     }
 
     private var duplicateSampleDistanceThreshold: Float {
-        max(brushSize * 0.0025, 0.05)
+        let normalizedBrushSize = max(brushSize, 1.0)
+        let thresholdFactor: Float = normalizedBrushSize >= 160 ? 0.035 : (normalizedBrushSize >= 72 ? 0.02 : 0.01)
+        return max(normalizedBrushSize * thresholdFactor, 0.2)
     }
 
     private func interpolatedPoints(from start: StrokePoint, to end: StrokePoint, predicted: Bool) -> [StrokePoint] {

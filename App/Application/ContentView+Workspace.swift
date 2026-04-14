@@ -290,25 +290,111 @@ extension ContentView {
 
     var toolDockMetrics: some View {
         VStack(spacing: 8) {
-            toolMetricBubble(text: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded()))")
-            toolMetricBubble(text: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))")
+            toolMetricBubble(
+                text: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded()))",
+                title: language.localized("ブラシサイズ"),
+                metric: .size
+            )
+
+            toolMetricBubble(
+                text: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))",
+                title: language.localized("不透明度"),
+                metric: .opacity
+            )
         }
+        .frame(width: 62)
     }
 
-    func toolMetricBubble(text: String) -> some View {
-        Text(text)
-            .font(StudioTheme.Typography.title(18))
-            .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .frame(width: 46, height: 46)
-            .background(
-                Circle()
-                    .fill(StudioTheme.Gradients.surface)
-            )
-            .overlay(
-                Circle()
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+    func toolMetricBubble(
+        text: String,
+        title: String,
+        metric: ContentView.ToolMetricEditor
+    ) -> some View {
+        ZStack {
+            Circle()
+                .fill(StudioTheme.Gradients.surface)
+
+            Circle()
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+
+            if selectedToolMetricEditor == metric {
+                TextField(
+                    "",
+                    text: metric == .size ? $toolMetricSizeText : $toolMetricOpacityText
+                )
+                .font(StudioTheme.Typography.mono(12))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .keyboardType(.numberPad)
+                .frame(width: 34)
+                .onSubmit {
+                    commitToolMetricInput(for: metric)
+                }
+                .onChange(of: metric == .size ? toolMetricSizeText : toolMetricOpacityText) { _, newValue in
+                    let filtered = newValue.filter(\.isNumber)
+                    if metric == .size {
+                        if filtered != newValue {
+                            toolMetricSizeText = filtered
+                        }
+                    } else if filtered != newValue {
+                        toolMetricOpacityText = filtered
+                    }
+                }
+            } else {
+                Text(text)
+                    .font(StudioTheme.Typography.title(18))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+            }
+        }
+        .frame(width: 46, height: 46)
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+        .contentShape(Circle())
+        .onTapGesture {
+            if selectedToolMetricEditor == metric {
+                commitToolMetricInput(for: metric)
+            } else {
+                selectedToolMetricEditor = metric
+                switch metric {
+                case .size:
+                    toolMetricSizeText = "\(Int(store.brushPalette.brush.radius.rounded()))"
+                case .opacity:
+                    toolMetricOpacityText = "\(Int((store.brushPalette.brush.opacity * 100).rounded()))"
+                }
+            }
+        }
+        .accessibilityLabel(title)
+    }
+
+    func commitToolMetricSizeInput() {
+        guard let value = Double(toolMetricSizeText) else {
+            toolMetricSizeText = "\(Int(store.brushPalette.brush.radius.rounded()))"
+            return
+        }
+        let clamped = min(max(value, 1), BrushPaletteFeature.maximumBrushRadius)
+        store.send(.brushPalette(.binding(.set(\.brush.radius, clamped))))
+        toolMetricSizeText = "\(Int(clamped.rounded()))"
+        selectedToolMetricEditor = nil
+    }
+
+    func commitToolMetricOpacityInput() {
+        guard let value = Double(toolMetricOpacityText) else {
+            toolMetricOpacityText = "\(Int((store.brushPalette.brush.opacity * 100).rounded()))"
+            return
+        }
+        let clampedPercent = min(max(value, 10), 100)
+        store.send(.brushPalette(.binding(.set(\.brush.opacity, clampedPercent / 100.0))))
+        toolMetricOpacityText = "\(Int(clampedPercent.rounded()))"
+        selectedToolMetricEditor = nil
+    }
+
+    func commitToolMetricInput(for metric: ContentView.ToolMetricEditor) {
+        switch metric {
+        case .size:
+            commitToolMetricSizeInput()
+        case .opacity:
+            commitToolMetricOpacityInput()
+        }
     }
 
     var toolDockColorCluster: some View {

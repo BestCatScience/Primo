@@ -507,6 +507,12 @@ struct AppFeature {
                 return .none
 
             case .homeReturnRequested:
+                do {
+                    let url = try Self.projectURLInDocuments()
+                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
+                } catch {
+                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                }
                 state.showsHome = true
                 state.homeSection = .home
                 return .send(.homeProjectsLoadRequested)

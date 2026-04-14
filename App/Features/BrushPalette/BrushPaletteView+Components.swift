@@ -344,8 +344,8 @@ extension BrushPaletteView {
                     title: language.localized("サイズ"),
                     valueText: "\(Int(store.brush.radius.rounded()))",
                     normalizedValue: Binding(
-                        get: { min(max((store.brush.radius - 1.0) / 99.0, 0.0), 1.0) },
-                        set: { store.brush.radius = 1.0 + ($0 * 99.0) }
+                        get: { min(max((store.brush.radius - 1.0) / (BrushPaletteFeature.maximumBrushRadius - 1.0), 0.0), 1.0) },
+                        set: { store.brush.radius = 1.0 + ($0 * (BrushPaletteFeature.maximumBrushRadius - 1.0)) }
                     )
                 )
                 .frame(maxHeight: .infinity)
