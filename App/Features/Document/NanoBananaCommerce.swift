@@ -3,7 +3,7 @@ import StoreKit
 
 @MainActor
 final class NanoBananaCommerce: ObservableObject {
-    static let monthlyProductID = "com.primo.nanobanana.monthly"
+    static let monthlyProductID = "com.bestcatscience.primo.nanobanana.monthly"
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var isLoading = false

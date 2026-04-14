@@ -23,7 +23,7 @@ const config = {
     .filter(Boolean)
     .map((value) => path.resolve(projectRoot, value)),
   allowedProductIDs: new Set(
-    (process.env.NANO_BANANA_ALLOWED_PRODUCT_IDS ?? 'com.primo.nanobanana.monthly')
+    (process.env.NANO_BANANA_ALLOWED_PRODUCT_IDS ?? 'com.bestcatscience.primo.nanobanana.monthly')
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean)
