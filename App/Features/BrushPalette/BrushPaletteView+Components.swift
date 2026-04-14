@@ -279,7 +279,7 @@ extension BrushPaletteView {
                 if showsTitle {
                     Text(language.localized("ブラシライブラリ"))
                         .font(StudioTheme.Typography.title(18))
-                        .foregroundStyle(Color.black.opacity(0.76))
+                        .foregroundStyle(StudioTheme.Palette.textPrimary)
                 }
 
                 HStack(spacing: 8) {
@@ -398,12 +398,12 @@ extension BrushPaletteView {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(Color.black.opacity(0.42))
+                .foregroundStyle(StudioTheme.Palette.textMuted)
 
             if presets.isEmpty {
                 Text(emptyMessage)
                     .font(StudioTheme.Typography.body(11))
-                    .foregroundStyle(Color.black.opacity(0.46))
+                    .foregroundStyle(StudioTheme.Palette.textMuted)
                     .padding(.top, 2)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -459,11 +459,11 @@ extension BrushPaletteView {
             HStack {
                 Text(language.localized("色").uppercased())
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(Color.black.opacity(0.42))
+                    .foregroundStyle(StudioTheme.Palette.textMuted)
                 Spacer(minLength: 0)
                 Text(store.brush.selectedColorSlot.localizedTitle(language))
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(Color.black.opacity(0.54))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
             }
 
             SpectrumColorControl(color: editableBrushColorBinding)
@@ -529,15 +529,15 @@ extension BrushPaletteView {
                     .font(StudioTheme.Typography.mono(9))
                     .lineLimit(1)
             }
-            .foregroundStyle(Color.black.opacity(0.68))
+            .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
             .frame(maxWidth: .infinity, minHeight: 58)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isActive ? Color(red: 0.86, green: 0.93, blue: 1.0) : Color.black.opacity(0.04))
+                    .fill(isActive ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(isActive ? StudioTheme.Palette.accent : Color.black.opacity(0.08), lineWidth: 1)
+                    .stroke(isActive ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

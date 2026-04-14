@@ -15,10 +15,10 @@ struct LayerThumbnailView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(red: 0.95, green: 0.94, blue: 0.90))
+                .fill(StudioTheme.Gradients.surface)
 
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
 
             if let thumbnail = thumbnailImage {
                 Image(uiImage: thumbnail)

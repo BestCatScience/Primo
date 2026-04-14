@@ -1001,7 +1001,7 @@ extension ContentView {
                 HStack(spacing: 6) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color(red: 0.05, green: 0.11, blue: 0.17))
+                            .fill(Color.black.opacity(0.4))
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .stroke(StudioTheme.Palette.accentSoft.opacity(0.55), lineWidth: 1)
                         Image(systemName: "house.fill")
@@ -1018,18 +1018,34 @@ extension ContentView {
                 .padding(.vertical, 4)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(StudioTheme.Palette.accent.opacity(0.18))
+                        .fill(StudioTheme.Palette.cardFillStrong)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(StudioTheme.Palette.accentSoft.opacity(0.4), lineWidth: 1)
+                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 }
             }
             .buttonStyle(.plain)
 
-            Text(StudioStrings.appName(language))
-                .font(StudioTheme.Typography.label(10))
-                .foregroundStyle(StudioTheme.Palette.textPrimary)
+            HStack(spacing: 8) {
+                Text(StudioStrings.appName(language))
+                    .font(StudioTheme.Typography.label(10))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+
+                Text("PRIMO")
+                    .font(StudioTheme.Typography.mono(9))
+                    .foregroundStyle(StudioTheme.Palette.accentBright)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(StudioTheme.Palette.accent.opacity(0.16))
+                    )
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
+                    }
+            }
 
             menuBarMenu(StudioStrings.settingsMenu(language)) {
                 Menu(StudioStrings.languageMenu(language)) {
@@ -1235,20 +1251,45 @@ extension ContentView {
             }
 
             Spacer(minLength: 8)
+
+            HStack(spacing: 8) {
+                Text(language.localized("Brush"))
+                    .font(StudioTheme.Typography.mono(9))
+                    .foregroundStyle(StudioTheme.Palette.textMuted)
+
+                Text(store.canvas.currentTool.localizedTitle(language).uppercased())
+                    .font(StudioTheme.Typography.label(10))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(StudioTheme.Palette.toolbarFill)
+            )
+            .overlay {
+                Capsule(style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+            }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(StudioTheme.Gradients.topBar)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.04))
+                .frame(height: 1)
+        }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.06))
+                .fill(Color.white.opacity(0.05))
                 .frame(height: 1)
         }
         .contentShape(Rectangle())
     }
 
     var undoRedoBar: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             Button {
                 store.send(.undoRequested)
             } label: {
@@ -1262,11 +1303,11 @@ extension ContentView {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.accent.opacity(0.18))
+                    .fill(StudioTheme.Palette.cardFillStrong)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             }
 
             Button {
@@ -1282,11 +1323,11 @@ extension ContentView {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.accent.opacity(0.18))
+                    .fill(StudioTheme.Palette.cardFillStrong)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             }
 
             Button {
@@ -1302,11 +1343,11 @@ extension ContentView {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.accent.opacity(0.14))
+                    .fill(StudioTheme.Palette.cardFillStrong)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.32), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             }
 
             Button {
@@ -1322,22 +1363,27 @@ extension ContentView {
             .minimumHitTarget(30)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.accent.opacity(0.14))
+                    .fill(StudioTheme.Palette.cardFillStrong)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.34), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             }
             .disabled(activeLayer == nil)
 
             Spacer(minLength: 0)
+
+            HStack(spacing: 10) {
+                statusPill(title: language.localized("Opacity"), value: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))%")
+                statusPill(title: language.localized("Size"), value: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded())) px")
+            }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color(red: 0.19, green: 0.19, blue: 0.19))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.06))
+                .fill(Color.white.opacity(0.05))
                 .frame(height: 1)
         }
     }
@@ -1349,8 +1395,8 @@ extension ContentView {
             Text(title)
                 .font(StudioTheme.Typography.label(9))
                 .foregroundStyle(StudioTheme.Palette.textPrimary)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
                 .minimumHitTarget(28)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -1358,8 +1404,30 @@ extension ContentView {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .stroke(StudioTheme.Palette.accentSoft.opacity(0.22), lineWidth: 1)
+                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 }
+        }
+    }
+
+    func statusPill(title: String, value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(title.uppercased())
+                .font(StudioTheme.Typography.mono(8))
+                .foregroundStyle(StudioTheme.Palette.textMuted)
+
+            Text(value)
+                .font(StudioTheme.Typography.label(9))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            Capsule(style: .continuous)
+                .fill(StudioTheme.Palette.toolbarFill)
+        )
+        .overlay {
+            Capsule(style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         }
     }
 

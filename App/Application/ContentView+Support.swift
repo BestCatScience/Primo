@@ -245,12 +245,12 @@ struct DiagonalStageLines: View {
             Path { path in
                 let width = geometry.size.width
                 let height = geometry.size.height
-                stride(from: -height, through: width + height, by: 36).forEach { offset in
+                stride(from: -height, through: width + height, by: 32).forEach { offset in
                     path.move(to: CGPoint(x: offset, y: 0))
                     path.addLine(to: CGPoint(x: offset - height, y: height))
                 }
             }
-            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
         }
     }
 }
@@ -657,39 +657,36 @@ struct StudioPanelShell<Content: View>: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(panelBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.03), lineWidth: 1)
+                .blur(radius: 0.5)
+                .padding(1)
+        }
         .overlay(alignment: .top) {
             Capsule(style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.76, green: 0.88, blue: 1.0),
-                            Color(red: 0.90, green: 0.84, blue: 0.98)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: isCollapsed ? 26 : 92, height: 4)
-                .padding(.top, 8)
+                .fill(StudioTheme.Gradients.accentBar)
+                .frame(width: isCollapsed ? 28 : 120, height: 3)
+                .padding(.top, 10)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.10), radius: 22, y: 10)
+        .shadow(color: Color.black.opacity(0.32), radius: 28, y: 18)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(red: 0.69, green: 0.83, blue: 1.0))
+                    .fill(StudioTheme.Gradients.accent)
                     .frame(width: 4, height: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(StudioTheme.Typography.title(19))
-                        .foregroundStyle(Color.black.opacity(0.74))
+                        .foregroundStyle(StudioTheme.Palette.textPrimary)
                         .lineLimit(1)
                 }
             }
@@ -703,8 +700,9 @@ struct StudioPanelShell<Content: View>: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.55),
-                    Color.clear
+                    Color.white.opacity(0.045),
+                    Color.clear,
+                    Color.black.opacity(0.1)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -714,25 +712,18 @@ struct StudioPanelShell<Content: View>: View {
     }
 
     private var panelBackground: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color.white.opacity(0.98),
-                Color(red: 0.97, green: 0.97, blue: 0.98)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        StudioTheme.Gradients.panel
     }
 
     private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isActive ? .white : Color.black.opacity(0.56))
+                .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.accent : Color.black.opacity(0.05))
+                        .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                 )
         }
         .buttonStyle(.plain)

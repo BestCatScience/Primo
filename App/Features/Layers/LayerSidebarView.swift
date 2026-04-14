@@ -44,14 +44,14 @@ struct LayerSidebarView: View {
                 if showsTitle {
                     Text(StudioStrings.layersTitle(language))
                         .font(StudioTheme.Typography.title(26))
-                        .foregroundStyle(Color.black.opacity(0.76))
+                        .foregroundStyle(StudioTheme.Palette.textPrimary)
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
                         Text(StudioStrings.layers(store.layers.count + 1, language))
                             .font(StudioTheme.Typography.title(16))
-                            .foregroundStyle(Color.black.opacity(0.7))
+                            .foregroundStyle(StudioTheme.Palette.textSecondary)
 
                         Spacer()
 
@@ -60,11 +60,11 @@ struct LayerSidebarView: View {
                         } label: {
                             Image(systemName: "folder.badge.plus")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.black.opacity(0.68))
+                                .foregroundStyle(StudioTheme.Palette.textSecondary)
                                 .frame(width: 28, height: 28)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(Color.black.opacity(0.05))
+                                        .fill(StudioTheme.Palette.cardFillStrong)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -80,7 +80,7 @@ struct LayerSidebarView: View {
                                 .padding(.vertical, 6)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(StudioTheme.Palette.accent)
+                                        .fill(StudioTheme.Gradients.accent)
                                 )
                         }
                         .buttonStyle(.plain)

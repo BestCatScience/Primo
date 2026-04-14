@@ -52,11 +52,11 @@ extension LayerSidebarView {
             HStack {
                 Text(language.localized("レイヤー不透明度"))
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(Color.black.opacity(0.46))
+                    .foregroundStyle(StudioTheme.Palette.textMuted)
                 Spacer(minLength: 0)
                 Text("\(Int(activeLayer.opacity * 100))%")
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(Color.black.opacity(0.62))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
             }
 
             Slider(
@@ -80,15 +80,15 @@ extension LayerSidebarView {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isActive ? .white : Color.black.opacity(0.54))
+                .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
                 .frame(width: 30, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : Color.black.opacity(0.05))
+                        .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : StudioTheme.Palette.cardFillStrong)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : Color.black.opacity(0.08), lineWidth: 1)
+                        .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -114,7 +114,7 @@ extension LayerSidebarView {
                 .overlay {
                     Image(systemName: folder.isExpanded ? "folder.fill" : "folder")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(folder.visible ? Color(red: 0.95, green: 0.82, blue: 0.42) : .white.opacity(0.34))
+                        .foregroundStyle(folder.visible ? StudioTheme.Palette.warning : .white.opacity(0.34))
                 }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -242,7 +242,7 @@ extension LayerSidebarView {
                     if layer.isTextLayer {
                         Image(systemName: "textformat")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.95, green: 0.82, blue: 0.42))
+                            .foregroundStyle(StudioTheme.Palette.warning)
                     }
 
                     Spacer(minLength: 10)
@@ -261,7 +261,7 @@ extension LayerSidebarView {
                         }
                     } label: {
                         Text(layer.blendMode.localizedTitle(language))
-                        .font(StudioTheme.Typography.mono(9))
+                            .font(StudioTheme.Typography.mono(9))
                             .foregroundStyle(.white.opacity(0.9))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
