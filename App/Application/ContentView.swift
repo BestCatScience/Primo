@@ -220,7 +220,10 @@ struct ContentView: View {
                             transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
                             language: language,
                             showsTitle: false,
-                            rendersFloatingPanelOnly: true
+                            rendersFloatingPanelOnly: true,
+                            onSelectTool: { tool in
+                                store.send(.toolSelected(tool))
+                            }
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
                         .offset(x: panelX, y: panelY)

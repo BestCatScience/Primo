@@ -44,14 +44,14 @@ struct LayerSidebarView: View {
                 if showsTitle {
                     Text(StudioStrings.layersTitle(language))
                         .font(StudioTheme.Typography.title(26))
-                        .foregroundStyle(.white.opacity(0.94))
+                        .foregroundStyle(Color.black.opacity(0.76))
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .center) {
                         Text(StudioStrings.layers(store.layers.count + 1, language))
                             .font(StudioTheme.Typography.title(16))
-                            .foregroundStyle(.white.opacity(0.88))
+                            .foregroundStyle(Color.black.opacity(0.7))
 
                         Spacer()
 
@@ -60,11 +60,11 @@ struct LayerSidebarView: View {
                         } label: {
                             Image(systemName: "folder.badge.plus")
                                 .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.92))
+                                .foregroundStyle(Color.black.opacity(0.68))
                                 .frame(width: 28, height: 28)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(StudioTheme.Palette.cardFillStrong)
+                                        .fill(Color.black.opacity(0.05))
                                 )
                         }
                         .buttonStyle(.plain)

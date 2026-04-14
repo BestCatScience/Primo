@@ -10,6 +10,8 @@ struct BrushPaletteFeature {
         struct BrushSettings: Equatable {
             var tipKind: BrushTipKind = BrushPreset.defaultPencil.tipKind
             var radius: Double = BrushPreset.defaultPencil.radius
+            var brushToolRadius: Double = BrushPreset.defaultPencil.radius
+            var eraserToolRadius: Double = 16.0
             var sizeSpeedSensitivity: Double = BrushPreset.defaultPencil.sizeSpeedSensitivity
             var taperIn: Double = BrushPreset.defaultPencil.taperIn
             var taperOut: Double = BrushPreset.defaultPencil.taperOut
@@ -230,6 +232,28 @@ struct BrushPaletteFeature {
                 flipY = preset.flipY
                 customTip = preset.customTip
                 pressureSensitivity = preset.pressureSensitivity
+            }
+
+            func storedRadius(for tool: StudioToolKind) -> Double {
+                switch tool {
+                case .erase:
+                    return eraserToolRadius
+                default:
+                    return brushToolRadius
+                }
+            }
+
+            mutating func storeCurrentRadius(for tool: StudioToolKind) {
+                switch tool {
+                case .erase:
+                    eraserToolRadius = radius
+                default:
+                    brushToolRadius = radius
+                }
+            }
+
+            mutating func applyStoredRadius(for tool: StudioToolKind) {
+                radius = storedRadius(for: tool)
             }
 
             func makePreset(named name: String) -> BrushPreset {

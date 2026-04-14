@@ -9,10 +9,17 @@ extension ContentView {
 
     var centerStage: some View {
         ZStack {
-            StudioTheme.Gradients.stage
+            LinearGradient(
+                colors: [
+                    Color(red: 0.98, green: 0.97, blue: 0.95),
+                    Color(red: 0.95, green: 0.96, blue: 0.99)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
             .overlay {
                 DiagonalStageLines()
-                    .opacity(0.05)
+                    .opacity(0.035)
                     .allowsHitTesting(false)
             }
 
@@ -53,13 +60,25 @@ extension ContentView {
             toolDock
                 .padding(.top, 0)
 
+            toolDockMetrics
+                .padding(.top, 10)
+
             toolDockColorCluster
                 .padding(.top, 10)
 
             Spacer(minLength: 0)
         }
-        .frame(width: 52)
-        .background(Color(red: 0.17, green: 0.17, blue: 0.17))
+        .frame(width: 72)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(red: 0.99, green: 0.99, blue: 0.98),
+                    Color(red: 0.96, green: 0.96, blue: 0.97)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 
     func panelRail(for panel: StudioPanelKind) -> some View {
@@ -96,7 +115,7 @@ extension ContentView {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
-        .frame(width: panelState.isCollapsed ? 60 : (panel == .layers ? 248 : 280))
+        .frame(width: panelState.isCollapsed ? 64 : (panel == .layers ? 290 : 332))
         .frame(maxHeight: .infinity, alignment: .top)
         .overlay(alignment: panel == .brush ? .trailing : .leading) {
             Rectangle()
@@ -141,7 +160,10 @@ extension ContentView {
                     transformPreviewScale: store.canvas.transformPreviewScale,
                     transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
                     language: language,
-                    showsTitle: false
+                    showsTitle: false,
+                    onSelectTool: { tool in
+                        store.send(.toolSelected(tool))
+                    }
                 )
             case .layers:
                 LayerSidebarView(
@@ -170,12 +192,21 @@ extension ContentView {
 
     var stageChrome: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(StudioTheme.Gradients.surface)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.96),
+                        Color(red: 0.96, green: 0.97, blue: 0.99)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.22), radius: 10, y: 3)
+            .shadow(color: .black.opacity(0.10), radius: 24, y: 10)
     }
 
     var toolDock: some View {
@@ -191,14 +222,16 @@ extension ContentView {
             Spacer()
         }
         .padding(8)
-        .frame(width: 46)
-        .background(Color(red: 0.18, green: 0.18, blue: 0.18))
-        .overlay(
-            Rectangle()
-                .fill(Color.white.opacity(0.06))
-                .frame(width: 1),
-            alignment: .trailing
+        .frame(width: 54)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.82))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.black.opacity(0.07), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.10), radius: 16, y: 8)
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
@@ -209,21 +242,44 @@ extension ContentView {
     func toolDockItem(tool: StudioToolKind, isActive: Bool) -> some View {
         Image(systemName: tool.systemImage)
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(isActive ? Color.white : Color.white.opacity(0.72))
-            .frame(width: 34, height: 34)
+            .foregroundStyle(isActive ? Color(red: 0.13, green: 0.45, blue: 0.88) : Color.black.opacity(0.54))
+            .frame(width: 38, height: 38)
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(isActive ? StudioTheme.Palette.accent.opacity(0.9) : Color.clear)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isActive ? Color(red: 0.86, green: 0.93, blue: 1.0) : Color.clear)
             )
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
                 store.send(.toolSelected(tool))
             }
             .onLongPressGesture(minimumDuration: 0.45) {
-                if tool == .brush {
+                if tool == .brush || tool == .erase {
                     store.send(.toolLongPressed(tool))
                 }
             }
+    }
+
+    var toolDockMetrics: some View {
+        VStack(spacing: 8) {
+            toolMetricBubble(text: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded()))")
+            toolMetricBubble(text: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))")
+        }
+    }
+
+    func toolMetricBubble(text: String) -> some View {
+        Text(text)
+            .font(StudioTheme.Typography.title(18))
+            .foregroundStyle(Color.black.opacity(0.62))
+            .frame(width: 46, height: 46)
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(0.92))
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.black.opacity(0.16), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
     }
 
     var toolDockColorCluster: some View {
@@ -276,7 +332,7 @@ extension ContentView {
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(red: 0.23, green: 0.23, blue: 0.23))
+                    .fill(Color.white.opacity(0.96))
 
                 if slot == .transparent {
                     dockCheckerboard(cornerRadius: max(4, cornerRadius - 2))
@@ -294,9 +350,9 @@ extension ContentView {
             .frame(width: size, height: size)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(isSelected ? StudioTheme.Palette.accentBright : Color.white.opacity(0.10), lineWidth: isSelected ? 2 : 1)
+                    .stroke(isSelected ? StudioTheme.Palette.accentBright : Color.black.opacity(0.10), lineWidth: isSelected ? 2 : 1)
             )
-            .shadow(color: .black.opacity(slot == .primary ? 0.28 : 0.16), radius: slot == .primary ? 8 : 4, y: 3)
+            .shadow(color: .black.opacity(slot == .primary ? 0.14 : 0.08), radius: slot == .primary ? 10 : 6, y: 4)
         }
         .buttonStyle(.plain)
         .minimumHitTarget()
@@ -307,15 +363,15 @@ extension ContentView {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(StudioTheme.Palette.textSecondary)
+                .foregroundStyle(Color.black.opacity(0.56))
                 .frame(width: 24, height: 24)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color(red: 0.23, green: 0.23, blue: 0.23))
+                        .fill(Color.white.opacity(0.94))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(Color.black.opacity(0.08), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -330,7 +386,7 @@ extension ContentView {
 
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color(red: 0.18, green: 0.2, blue: 0.24))
+                    .fill(Color(red: 0.90, green: 0.92, blue: 0.96))
 
                 VStack(spacing: 0) {
                     ForEach(0..<rows, id: \.self) { row in

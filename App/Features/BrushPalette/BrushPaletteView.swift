@@ -17,9 +17,11 @@ struct BrushPaletteView: View {
     @State var isImportingTextFont = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
+    @State var selectedToolInspectorTab: ToolInspectorTab = .basic
     @State var importErrorMessage: String?
     @State var textFontImportErrorMessage: String?
     var rendersFloatingPanelOnly = false
+    var onSelectTool: (StudioToolKind) -> Void = { _ in }
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {
@@ -101,6 +103,9 @@ struct BrushPaletteView: View {
     }
 
     private func floatingPanelWidth(in proxy: GeometryProxy) -> CGFloat {
+        if currentTool == .brush || currentTool == .erase {
+            return min(max(proxy.size.width * 0.24, 260), 320)
+        }
         let availableWidth = proxy.size.width + floatingPanelXOffset + 80
         if horizontalSizeClass == .regular {
             return min(max(availableWidth * 0.72, 560), 720)

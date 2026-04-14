@@ -60,6 +60,22 @@ enum BrushSettingsCategory: String, CaseIterable, Identifiable {
     }
 }
 
+enum ToolInspectorTab: String, CaseIterable, Identifiable {
+    case basic
+    case detail
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .basic:
+            return language.localized("基本")
+        case .detail:
+            return language.localized("詳細")
+        }
+    }
+}
+
 struct BrushPreviewStyle {
     let tipKind: BrushTipKind
     let color: Color

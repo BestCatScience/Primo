@@ -52,11 +52,11 @@ extension LayerSidebarView {
             HStack {
                 Text(language.localized("レイヤー不透明度"))
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(Color.black.opacity(0.46))
                 Spacer(minLength: 0)
                 Text("\(Int(activeLayer.opacity * 100))%")
                     .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(.white.opacity(0.72))
+                    .foregroundStyle(Color.black.opacity(0.62))
             }
 
             Slider(
@@ -80,15 +80,15 @@ extension LayerSidebarView {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(isActive ? .white : .white.opacity(0.62))
+                .foregroundStyle(isActive ? .white : Color.black.opacity(0.54))
                 .frame(width: 30, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : StudioTheme.Palette.cardFillStrong)
+                        .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : Color.black.opacity(0.05))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : Color.black.opacity(0.08), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

@@ -659,28 +659,37 @@ struct StudioPanelShell<Content: View>: View {
         .background(panelBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay(alignment: .top) {
             Capsule(style: .continuous)
-                .fill(StudioTheme.Gradients.accentBar)
-                .frame(width: isCollapsed ? 26 : 92, height: 5)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.76, green: 0.88, blue: 1.0),
+                            Color(red: 0.90, green: 0.84, blue: 0.98)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: isCollapsed ? 26 : 92, height: 4)
                 .padding(.top, 8)
         }
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(StudioTheme.Palette.hairline, lineWidth: 1)
+                .strokeBorder(Color.black.opacity(0.06), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.22), radius: 18, y: 10)
+        .shadow(color: Color.black.opacity(0.10), radius: 22, y: 10)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
             HStack(spacing: 10) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(StudioTheme.Palette.accent.opacity(0.9))
+                    .fill(Color(red: 0.69, green: 0.83, blue: 1.0))
                     .frame(width: 4, height: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(StudioTheme.Typography.title(19))
-                        .foregroundStyle(.white.opacity(0.92))
+                        .foregroundStyle(Color.black.opacity(0.74))
                         .lineLimit(1)
                 }
             }
@@ -694,7 +703,7 @@ struct StudioPanelShell<Content: View>: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.06),
+                    Color.white.opacity(0.55),
                     Color.clear
                 ],
                 startPoint: .top,
@@ -705,18 +714,25 @@ struct StudioPanelShell<Content: View>: View {
     }
 
     private var panelBackground: LinearGradient {
-        StudioTheme.Gradients.panel
+        LinearGradient(
+            colors: [
+                Color.white.opacity(0.98),
+                Color(red: 0.97, green: 0.97, blue: 0.98)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private func panelButton(systemName: String, isActive: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(isActive ? .white : .white.opacity(0.68))
+                .foregroundStyle(isActive ? .white : Color.black.opacity(0.56))
                 .frame(width: 28, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
+                        .fill(isActive ? StudioTheme.Palette.accent : Color.black.opacity(0.05))
                 )
         }
         .buttonStyle(.plain)

@@ -498,9 +498,9 @@ extension BrushPaletteView {
 
     var panelTitle: String {
         switch currentTool {
-        case .fill, .eyedropper, .select, .move, .blur, .shape, .text:
+        case .fill, .eyedropper, .select, .move, .blur, .shape, .text, .erase:
             return currentTool.localizedTitle(language)
-        default:
+        case .brush:
             return StudioToolKind.brush.localizedTitle(language)
         }
     }
@@ -537,6 +537,9 @@ extension BrushPaletteView {
     var currentDetailPreviewColor: Color {
         if currentTool == .blur {
             return Color.white.opacity(0.92)
+        }
+        if currentTool == .erase {
+            return Color.white.opacity(0.96)
         }
         if isTransparentBrushColorSelected {
             return Color.white.opacity(0.82)
@@ -579,7 +582,9 @@ extension BrushPaletteView {
             return language.localized("ぼかし設定")
         case .shape:
             return language.localized("形状設定")
-        default:
+        case .erase:
+            return language.localized("消しゴム設定")
+        case .brush:
             return language.localized("ブラシ設定")
         }
     }

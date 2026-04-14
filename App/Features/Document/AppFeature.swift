@@ -349,6 +349,14 @@ struct AppFeature {
             current.isCollapsed.toggle()
             setPanelState(current, for: panel)
         }
+
+        mutating func syncToolSpecificBrushSize() {
+            brushPalette.brush.storeCurrentRadius(for: canvas.currentTool)
+        }
+
+        mutating func applyToolSpecificBrushSize(for tool: StudioToolKind) {
+            brushPalette.brush.applyStoredRadius(for: tool)
+        }
     }
 
     enum Action: Equatable {
@@ -1287,7 +1295,9 @@ struct AppFeature {
                 return .none
 
             case let .toolSelected(tool):
+                state.syncToolSpecificBrushSize()
                 state.canvas.currentTool = tool
+                state.applyToolSpecificBrushSize(for: tool)
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.shapeMode = state.brushPalette.shape.mode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
@@ -1314,7 +1324,9 @@ struct AppFeature {
                 return .none
 
             case let .toolLongPressed(tool):
+                state.syncToolSpecificBrushSize()
                 state.canvas.currentTool = tool
+                state.applyToolSpecificBrushSize(for: tool)
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
@@ -1326,7 +1338,7 @@ struct AppFeature {
                         state.canvas.selection = nil
                     }
                 }
-                if tool == .brush {
+                if tool == .brush || tool == .erase {
                     state.brushPanel.isCollapsed = false
                     state.brushPalette.ui.showsBrushSettingsPopover = true
                 }
@@ -1533,6 +1545,7 @@ struct AppFeature {
                 return .none
 
             case .brushPalette:
+                state.syncToolSpecificBrushSize()
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.shapeMode = state.brushPalette.shape.mode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
@@ -2036,8 +2049,10 @@ struct AppFeature {
                 return .send(.redoRequested)
 
             case .canvas(.delegate(.toggleBrushAndEraser)):
+                state.syncToolSpecificBrushSize()
                 let nextTool: StudioToolKind = state.canvas.currentTool == .erase ? .brush : .erase
                 state.canvas.currentTool = nextTool
+                state.applyToolSpecificBrushSize(for: nextTool)
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
