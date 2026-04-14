@@ -27,6 +27,12 @@ extension ContentView {
                     TextField(StudioStrings.height(language), text: $newCanvasHeightText)
                         .keyboardType(.numberPad)
                 }
+
+                Section(language.localized("開始方法")) {
+                    Button(language.localized("画像から作成")) {
+                        beginCreateCanvasFromImageFlow()
+                    }
+                }
             }
             .navigationTitle(StudioStrings.newCanvas(language))
             .navigationBarTitleDisplayMode(.inline)
@@ -61,7 +67,7 @@ extension ContentView {
                 newCanvasHeightText = "\(defaultNewCanvasHeight)"
             }
         }
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(410)])
         .presentationDragIndicator(.visible)
     }
 
@@ -1070,6 +1076,9 @@ extension ContentView {
                 Button(StudioStrings.open(language)) {
                     showsOpenDocumentImporter = true
                 }
+                Button(language.localized("Import Photo to New Layer")) {
+                    showsPhotoLayerImporter = true
+                }
                 Button(StudioStrings.save(language)) {
                     store.send(.saveDocumentRequested)
                 }
@@ -1175,6 +1184,10 @@ extension ContentView {
                     store.send(.layerSidebar(.addLayerButtonTapped))
                 }
 
+                Button(language.localized("Import Photo to New Layer")) {
+                    showsPhotoLayerImporter = true
+                }
+
                 Button(StudioStrings.addFolder(language)) {
                     store.send(.layerSidebar(.addFolderButtonTapped))
                 }
@@ -1274,6 +1287,26 @@ extension ContentView {
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .stroke(StudioTheme.Palette.accentSoft.opacity(0.42), lineWidth: 1)
+            }
+
+            Button {
+                showsPhotoLayerImporter = true
+            } label: {
+                Image(systemName: "photo.badge.plus")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(StudioTheme.Palette.textPrimary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .minimumHitTarget(30)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(StudioTheme.Palette.accent.opacity(0.14))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(StudioTheme.Palette.accentSoft.opacity(0.32), lineWidth: 1)
             }
 
             Button {

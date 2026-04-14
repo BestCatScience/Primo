@@ -380,6 +380,8 @@ struct AppFeature {
         case openDocumentSelected(URL)
         case openDocumentLoaded(LoadedPaintProject)
         case openDocumentFailed(String)
+        case photoImportReceived(name: String?, data: Data)
+        case photoImportFailed(String)
         case timelapseExportProgressUpdated(Double, Data?)
         case timelapseExportSucceeded(URL)
         case timelapseExportFailed(String)
@@ -388,6 +390,8 @@ struct AppFeature {
         case languageChanged(AppLanguage)
         case toolSelected(StudioToolKind)
         case toolLongPressed(StudioToolKind)
+        case newCanvasFromImageReceived(name: String?, data: Data)
+        case newCanvasFromImageFailed(String)
         case clearActiveLayerButtonTapped
         case createLayerMaskFromSelectionRequested
         case clearLayerMaskRequested
@@ -545,6 +549,50 @@ struct AppFeature {
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)
                 )
+
+            case let .newCanvasFromImageReceived(name, data):
+                guard let importedImage = Self.importedCanvasImage(from: data) else {
+                    state.bannerMessage = state.appLanguage.localized("Could not create canvas from image")
+                    return .none
+                }
+                let width = importedImage.width
+                let height = importedImage.height
+                guard (64...8192).contains(width), (64...8192).contains(height) else {
+                    state.bannerMessage = state.appLanguage.localized("Image size is not supported")
+                    return .none
+                }
+
+                paintDocumentClient.newCanvas(width, height)
+                paintDocumentClient.prewarmDrawingResources()
+                state.showsHome = false
+                state.canvas = CanvasFeature.State()
+                state.canvas.canvasSize = CGSize(width: width, height: height)
+                state.layerSidebar = LayerSidebarFeature.State()
+                state.brushPalette = BrushPaletteFeature.State()
+                state.brushPanel = StudioPanelLayoutState()
+                state.layerPanel = StudioPanelLayoutState()
+                state.canvas.adjustmentPreviewPixelData = nil
+                state.exportSheet = nil
+                state.bannerMessage = nil
+                state.isHydrating = false
+                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
+                let nextName = {
+                    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return trimmed.isEmpty ? (state.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
+                }()
+                paintDocumentClient.setLayerName(0, nextName)
+                paintDocumentClient.setActiveLayer(0)
+                state.applyPresentation(paintDocumentClient.presentation())
+                state.bannerMessage = state.appLanguage.localized("Canvas created from image")
+                return .merge(
+                    .cancel(id: CancelID.startupPresentationLoad),
+                    .cancel(id: CancelID.deferredPresentationRefresh)
+                )
+
+            case let .newCanvasFromImageFailed(message):
+                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
+                return .none
 
             case .undoRequested:
                 guard !state.canvas.isStrokeActive else {
@@ -1207,6 +1255,35 @@ struct AppFeature {
             case let .openDocumentFailed(message):
                 state.isHydrating = false
                 state.bannerMessage = message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
+                return .none
+
+            case let .photoImportReceived(name, data):
+                guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
+                    state.bannerMessage = state.appLanguage.localized("Could not import photo")
+                    return .none
+                }
+                let nextNumber = state.layerSidebar.layers.count + 1
+                let fallbackName = state.appLanguage == .japanese ? "写真 \(nextNumber)" : "Photo \(nextNumber)"
+                let layerName = {
+                    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return trimmed.isEmpty ? fallbackName : trimmed
+                }()
+                paintDocumentClient.addLayer(layerName)
+                let targetLayerIndex = state.layerSidebar.layers.count
+                paintDocumentClient.replaceLayerPixels(targetLayerIndex, importedPixelData)
+                paintDocumentClient.setActiveLayer(targetLayerIndex)
+                state.canvas.activeLayerIndex = targetLayerIndex
+                state.canvas.selection = nil
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                state.applyPresentation(paintDocumentClient.presentation())
+                state.bannerMessage = state.appLanguage.localized("Photo imported to a new layer")
+                return .none
+
+            case let .photoImportFailed(message):
+                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not import photo") : message
                 return .none
 
             case let .toolSelected(tool):

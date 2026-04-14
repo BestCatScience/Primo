@@ -81,6 +81,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var currentTransformGeometry: TextTransformGeometry?
     private var textHandleStartDistance: CGFloat = 1.0
     private var textRotationHandleStartAngle: CGFloat = 0
+    private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -221,6 +223,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let pencilInteraction = UIPencilInteraction()
         pencilInteraction.delegate = self
         addInteraction(pencilInteraction)
+        pencilToggleFeedbackGenerator.prepare()
+        pencilToggleNotificationFeedbackGenerator.prepare()
     }
 
     @available(*, unavailable)
@@ -381,7 +385,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func pencilInteractionDidTap(_ interaction: UIPencilInteraction) {
-        // Ignore Apple Pencil double-tap so brush/panel visibility stays unchanged.
+        pencilToggleFeedbackGenerator.impactOccurred(intensity: 1.0)
+        pencilToggleNotificationFeedbackGenerator.notificationOccurred(.success)
+        pencilToggleFeedbackGenerator.prepare()
+        pencilToggleNotificationFeedbackGenerator.prepare()
+        sendAction?(.pencilInteractionToggleRequested)
     }
 
     private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {

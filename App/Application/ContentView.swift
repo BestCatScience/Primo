@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import Foundation
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
 
 struct ContentView: View {
@@ -13,6 +15,8 @@ struct ContentView: View {
     @StateObject var nanoBananaCommerce = NanoBananaCommerce()
     private let studioUIScale: CGFloat = 0.56
     @State var showsOpenDocumentImporter = false
+    @State var showsPhotoLayerImporter = false
+    @State var showsNewCanvasPhotoImporter = false
     @State var showsNewCanvasSheet = false
     @State var showsHSBSheet = false
     @State var showsBrightnessContrastSheet = false
@@ -41,6 +45,8 @@ struct ContentView: View {
     @State var nanoBananaMaskExpansion = 0
     @State var nanoBananaInvertsMask = false
     @State var nanoBananaModel: NanoBananaModel = .flashImage25
+    @State var selectedPhotoLayerItem: PhotosPickerItem?
+    @State var selectedNewCanvasPhotoItem: PhotosPickerItem?
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
     @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
     @AppStorage("atelierprime.nanobanana.apiKey") var nanoBananaAPIKey = ""
@@ -110,6 +116,30 @@ struct ContentView: View {
             guard case let .success(urls) = result, let sourceURL = urls.first else { return }
             guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
             store.send(.openDocumentSelected(stagedURL))
+        }
+        .photosPicker(
+            isPresented: $showsPhotoLayerImporter,
+            selection: $selectedPhotoLayerItem,
+            matching: .images,
+            preferredItemEncoding: .current
+        )
+        .photosPicker(
+            isPresented: $showsNewCanvasPhotoImporter,
+            selection: $selectedNewCanvasPhotoItem,
+            matching: .images,
+            preferredItemEncoding: .current
+        )
+        .onChange(of: selectedPhotoLayerItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                await importPhotoLayer(from: newItem)
+            }
+        }
+        .onChange(of: selectedNewCanvasPhotoItem) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                await createCanvasFromPhoto(from: newItem)
+            }
         }
         .task(id: store.bannerMessage) {
             guard store.bannerMessage != nil else { return }
@@ -275,5 +305,41 @@ struct ContentView: View {
             }
         }
         return work()
+    }
+
+    @MainActor
+    private func importPhotoLayer(from item: PhotosPickerItem) async {
+        defer { selectedPhotoLayerItem = nil }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                store.send(.photoImportFailed(language.localized("Could not import photo")))
+                return
+            }
+            store.send(.photoImportReceived(name: nil, data: data))
+        } catch {
+            store.send(.photoImportFailed(error.localizedDescription))
+        }
+    }
+
+    @MainActor
+    private func createCanvasFromPhoto(from item: PhotosPickerItem) async {
+        defer { selectedNewCanvasPhotoItem = nil }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                store.send(.newCanvasFromImageFailed(language.localized("Could not create canvas from image")))
+                return
+            }
+            store.send(.newCanvasFromImageReceived(name: nil, data: data))
+            showsNewCanvasSheet = false
+        } catch {
+            store.send(.newCanvasFromImageFailed(error.localizedDescription))
+        }
+    }
+
+    func beginCreateCanvasFromImageFlow() {
+        showsNewCanvasSheet = false
+        DispatchQueue.main.async {
+            showsNewCanvasPhotoImporter = true
+        }
     }
 }
