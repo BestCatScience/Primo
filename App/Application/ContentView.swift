@@ -11,6 +11,18 @@ struct ContentView: View {
         case apiKey
     }
 
+    enum WorkspaceSidebarSection: Hashable {
+        case explorer
+        case brush
+        case ai
+    }
+
+    enum WorkspaceBottomPanelSection: Hashable {
+        case nanoBanana
+        case history
+        case output
+    }
+
     let store: StoreOf<AppFeature>
     @StateObject var nanoBananaCommerce = NanoBananaCommerce()
     private let studioUIScale: CGFloat = 0.56
@@ -50,9 +62,12 @@ struct ContentView: View {
     @State var selectedToolMetricEditor: ToolMetricEditor?
     @State var toolMetricSizeText = ""
     @State var toolMetricOpacityText = ""
+    @State var workspaceSidebarSection: WorkspaceSidebarSection = .explorer
+    @State var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
+    @State var workspaceBottomPanelCollapsed = false
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
-    @AppStorage("atelierprime.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
-    @AppStorage("atelierprime.nanobanana.apiKey") var nanoBananaAPIKey = ""
+    @AppStorage("primo.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
+    @AppStorage("primo.nanobanana.apiKey") var nanoBananaAPIKey = ""
     var language: AppLanguage { store.appLanguage }
 
     var nanoBananaAccessMode: NanoBananaAccessMode {
@@ -189,16 +204,21 @@ struct ContentView: View {
         .background(StudioTheme.Gradients.appBackground)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
-                menuBar
-                undoRedoBar
+                VStack(spacing: 0) {
+                    menuBar
+                    undoRedoBar
+                }
+                .background(WindowGestureShield())
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in },
+                    including: .all
+                )
+                if !store.openTabs.isEmpty {
+                    workspaceTabBar
+                }
             }
-            .background(WindowGestureShield())
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in },
-                including: .all
-            )
             .zIndex(1000)
         }
         .overlay(alignment: .topLeading) {
@@ -275,7 +295,7 @@ struct ContentView: View {
     private var nanoBananaInputPreviewImageData: Data? {
         guard
             let snapshot = store.canvas.renderSnapshot,
-            let layer = snapshot.layers.first(where: { $0.index == nanoBananaInputLayerIndex })
+            let layer = snapshot.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })
         else {
             return nil
         }
@@ -290,7 +310,7 @@ struct ContentView: View {
         withSecurityScopedAccess(to: sourceURL) {
             let fileManager = FileManager.default
             let stagingRoot = fileManager.temporaryDirectory
-                .appendingPathComponent("atelierprime-open", isDirectory: true)
+                .appendingPathComponent("primo-open", isDirectory: true)
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
             let destinationURL = stagingRoot.appendingPathComponent(sourceURL.lastPathComponent, isDirectory: true)
 

@@ -8,183 +8,183 @@
 
 namespace {
 
-atelierprime::Layer::BlendMode APBlendModeFromString(NSString *blendMode) {
+primo::Layer::BlendMode APBlendModeFromString(NSString *blendMode) {
     if ([blendMode isEqualToString:@"darken"]) {
-        return atelierprime::Layer::BlendMode::Darken;
+        return primo::Layer::BlendMode::Darken;
     }
     if ([blendMode isEqualToString:@"multiply"]) {
-        return atelierprime::Layer::BlendMode::Multiply;
+        return primo::Layer::BlendMode::Multiply;
     }
     if ([blendMode isEqualToString:@"colorBurn"]) {
-        return atelierprime::Layer::BlendMode::ColorBurn;
+        return primo::Layer::BlendMode::ColorBurn;
     }
     if ([blendMode isEqualToString:@"linearBurn"]) {
-        return atelierprime::Layer::BlendMode::LinearBurn;
+        return primo::Layer::BlendMode::LinearBurn;
     }
     if ([blendMode isEqualToString:@"subtract"]) {
-        return atelierprime::Layer::BlendMode::Subtract;
+        return primo::Layer::BlendMode::Subtract;
     }
     if ([blendMode isEqualToString:@"lighten"]) {
-        return atelierprime::Layer::BlendMode::Lighten;
+        return primo::Layer::BlendMode::Lighten;
     }
     if ([blendMode isEqualToString:@"screen"]) {
-        return atelierprime::Layer::BlendMode::Screen;
+        return primo::Layer::BlendMode::Screen;
     }
     if ([blendMode isEqualToString:@"add"]) {
-        return atelierprime::Layer::BlendMode::Add;
+        return primo::Layer::BlendMode::Add;
     }
     if ([blendMode isEqualToString:@"colorDodge"]) {
-        return atelierprime::Layer::BlendMode::ColorDodge;
+        return primo::Layer::BlendMode::ColorDodge;
     }
     if ([blendMode isEqualToString:@"glowDodge"]) {
-        return atelierprime::Layer::BlendMode::GlowDodge;
+        return primo::Layer::BlendMode::GlowDodge;
     }
     if ([blendMode isEqualToString:@"overlay"]) {
-        return atelierprime::Layer::BlendMode::Overlay;
+        return primo::Layer::BlendMode::Overlay;
     }
     if ([blendMode isEqualToString:@"softLight"]) {
-        return atelierprime::Layer::BlendMode::SoftLight;
+        return primo::Layer::BlendMode::SoftLight;
     }
     if ([blendMode isEqualToString:@"hardLight"]) {
-        return atelierprime::Layer::BlendMode::HardLight;
+        return primo::Layer::BlendMode::HardLight;
     }
     if ([blendMode isEqualToString:@"difference"]) {
-        return atelierprime::Layer::BlendMode::Difference;
+        return primo::Layer::BlendMode::Difference;
     }
     if ([blendMode isEqualToString:@"vividLight"]) {
-        return atelierprime::Layer::BlendMode::VividLight;
+        return primo::Layer::BlendMode::VividLight;
     }
     if ([blendMode isEqualToString:@"linearLight"]) {
-        return atelierprime::Layer::BlendMode::LinearLight;
+        return primo::Layer::BlendMode::LinearLight;
     }
     if ([blendMode isEqualToString:@"pinLight"]) {
-        return atelierprime::Layer::BlendMode::PinLight;
+        return primo::Layer::BlendMode::PinLight;
     }
     if ([blendMode isEqualToString:@"hardMix"]) {
-        return atelierprime::Layer::BlendMode::HardMix;
+        return primo::Layer::BlendMode::HardMix;
     }
     if ([blendMode isEqualToString:@"exclusion"]) {
-        return atelierprime::Layer::BlendMode::Exclusion;
+        return primo::Layer::BlendMode::Exclusion;
     }
     if ([blendMode isEqualToString:@"darkerColor"]) {
-        return atelierprime::Layer::BlendMode::DarkerColor;
+        return primo::Layer::BlendMode::DarkerColor;
     }
     if ([blendMode isEqualToString:@"lighterColor"]) {
-        return atelierprime::Layer::BlendMode::LighterColor;
+        return primo::Layer::BlendMode::LighterColor;
     }
     if ([blendMode isEqualToString:@"divide"]) {
-        return atelierprime::Layer::BlendMode::Divide;
+        return primo::Layer::BlendMode::Divide;
     }
     if ([blendMode isEqualToString:@"hue"]) {
-        return atelierprime::Layer::BlendMode::Hue;
+        return primo::Layer::BlendMode::Hue;
     }
     if ([blendMode isEqualToString:@"saturation"]) {
-        return atelierprime::Layer::BlendMode::Saturation;
+        return primo::Layer::BlendMode::Saturation;
     }
     if ([blendMode isEqualToString:@"color"]) {
-        return atelierprime::Layer::BlendMode::Color;
+        return primo::Layer::BlendMode::Color;
     }
     if ([blendMode isEqualToString:@"addGlow"]) {
-        return atelierprime::Layer::BlendMode::AddGlow;
+        return primo::Layer::BlendMode::AddGlow;
     }
     if ([blendMode isEqualToString:@"luminosity"]) {
-        return atelierprime::Layer::BlendMode::Luminosity;
+        return primo::Layer::BlendMode::Luminosity;
     }
-    return atelierprime::Layer::BlendMode::Normal;
+    return primo::Layer::BlendMode::Normal;
 }
 
-NSString *APStringFromBlendMode(atelierprime::Layer::BlendMode blendMode) {
+NSString *APStringFromBlendMode(primo::Layer::BlendMode blendMode) {
     switch (blendMode) {
-        case atelierprime::Layer::BlendMode::Darken:
+        case primo::Layer::BlendMode::Darken:
             return @"darken";
-        case atelierprime::Layer::BlendMode::Multiply:
+        case primo::Layer::BlendMode::Multiply:
             return @"multiply";
-        case atelierprime::Layer::BlendMode::ColorBurn:
+        case primo::Layer::BlendMode::ColorBurn:
             return @"colorBurn";
-        case atelierprime::Layer::BlendMode::LinearBurn:
+        case primo::Layer::BlendMode::LinearBurn:
             return @"linearBurn";
-        case atelierprime::Layer::BlendMode::Subtract:
+        case primo::Layer::BlendMode::Subtract:
             return @"subtract";
-        case atelierprime::Layer::BlendMode::Lighten:
+        case primo::Layer::BlendMode::Lighten:
             return @"lighten";
-        case atelierprime::Layer::BlendMode::Screen:
+        case primo::Layer::BlendMode::Screen:
             return @"screen";
-        case atelierprime::Layer::BlendMode::Add:
+        case primo::Layer::BlendMode::Add:
             return @"add";
-        case atelierprime::Layer::BlendMode::ColorDodge:
+        case primo::Layer::BlendMode::ColorDodge:
             return @"colorDodge";
-        case atelierprime::Layer::BlendMode::GlowDodge:
+        case primo::Layer::BlendMode::GlowDodge:
             return @"glowDodge";
-        case atelierprime::Layer::BlendMode::Overlay:
+        case primo::Layer::BlendMode::Overlay:
             return @"overlay";
-        case atelierprime::Layer::BlendMode::SoftLight:
+        case primo::Layer::BlendMode::SoftLight:
             return @"softLight";
-        case atelierprime::Layer::BlendMode::HardLight:
+        case primo::Layer::BlendMode::HardLight:
             return @"hardLight";
-        case atelierprime::Layer::BlendMode::Difference:
+        case primo::Layer::BlendMode::Difference:
             return @"difference";
-        case atelierprime::Layer::BlendMode::VividLight:
+        case primo::Layer::BlendMode::VividLight:
             return @"vividLight";
-        case atelierprime::Layer::BlendMode::LinearLight:
+        case primo::Layer::BlendMode::LinearLight:
             return @"linearLight";
-        case atelierprime::Layer::BlendMode::PinLight:
+        case primo::Layer::BlendMode::PinLight:
             return @"pinLight";
-        case atelierprime::Layer::BlendMode::HardMix:
+        case primo::Layer::BlendMode::HardMix:
             return @"hardMix";
-        case atelierprime::Layer::BlendMode::Exclusion:
+        case primo::Layer::BlendMode::Exclusion:
             return @"exclusion";
-        case atelierprime::Layer::BlendMode::DarkerColor:
+        case primo::Layer::BlendMode::DarkerColor:
             return @"darkerColor";
-        case atelierprime::Layer::BlendMode::LighterColor:
+        case primo::Layer::BlendMode::LighterColor:
             return @"lighterColor";
-        case atelierprime::Layer::BlendMode::Divide:
+        case primo::Layer::BlendMode::Divide:
             return @"divide";
-        case atelierprime::Layer::BlendMode::Hue:
+        case primo::Layer::BlendMode::Hue:
             return @"hue";
-        case atelierprime::Layer::BlendMode::Saturation:
+        case primo::Layer::BlendMode::Saturation:
             return @"saturation";
-        case atelierprime::Layer::BlendMode::Color:
+        case primo::Layer::BlendMode::Color:
             return @"color";
-        case atelierprime::Layer::BlendMode::AddGlow:
+        case primo::Layer::BlendMode::AddGlow:
             return @"addGlow";
-        case atelierprime::Layer::BlendMode::Luminosity:
+        case primo::Layer::BlendMode::Luminosity:
             return @"luminosity";
-        case atelierprime::Layer::BlendMode::Normal:
+        case primo::Layer::BlendMode::Normal:
             return @"normal";
     }
 }
 
-atelierprime::LayerProcessingKind APProcessingKind(APPaintLayerProcessingKind kind) {
+primo::LayerProcessingKind APProcessingKind(APPaintLayerProcessingKind kind) {
     switch (kind) {
         case APPaintLayerProcessingKindReplacePixels:
-            return atelierprime::LayerProcessingKind::ReplacePixels;
+            return primo::LayerProcessingKind::ReplacePixels;
         case APPaintLayerProcessingKindClear:
-            return atelierprime::LayerProcessingKind::Clear;
+            return primo::LayerProcessingKind::Clear;
         case APPaintLayerProcessingKindGradientMap:
-            return atelierprime::LayerProcessingKind::GradientMap;
+            return primo::LayerProcessingKind::GradientMap;
         case APPaintLayerProcessingKindHueSaturationBrightness:
-            return atelierprime::LayerProcessingKind::HueSaturationBrightness;
+            return primo::LayerProcessingKind::HueSaturationBrightness;
         case APPaintLayerProcessingKindBrightnessContrast:
-            return atelierprime::LayerProcessingKind::BrightnessContrast;
+            return primo::LayerProcessingKind::BrightnessContrast;
         case APPaintLayerProcessingKindLevels:
-            return atelierprime::LayerProcessingKind::Levels;
+            return primo::LayerProcessingKind::Levels;
         case APPaintLayerProcessingKindToneCurve:
-            return atelierprime::LayerProcessingKind::ToneCurve;
+            return primo::LayerProcessingKind::ToneCurve;
         case APPaintLayerProcessingKindColorBalance:
-            return atelierprime::LayerProcessingKind::ColorBalance;
+            return primo::LayerProcessingKind::ColorBalance;
         case APPaintLayerProcessingKindThreshold:
-            return atelierprime::LayerProcessingKind::Threshold;
+            return primo::LayerProcessingKind::Threshold;
         case APPaintLayerProcessingKindPosterize:
-            return atelierprime::LayerProcessingKind::Posterize;
+            return primo::LayerProcessingKind::Posterize;
         case APPaintLayerProcessingKindTransform:
-            return atelierprime::LayerProcessingKind::Transform;
+            return primo::LayerProcessingKind::Transform;
     }
 
-    return atelierprime::LayerProcessingKind::ReplacePixels;
+    return primo::LayerProcessingKind::ReplacePixels;
 }
 
-atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescriptor *descriptor) {
-    atelierprime::LayerProcessing processing;
+primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescriptor *descriptor) {
+    primo::LayerProcessing processing;
     processing.kind = APProcessingKind(descriptor.kind);
     processing.gradientMapPreset = (int)descriptor.gradientMapPreset;
     processing.hueDegrees = descriptor.hueDegrees;
@@ -389,7 +389,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 @end
 
 @interface APPaintDocumentBridge () {
-    std::unique_ptr<atelierprime::PaintDocument> _document;
+    std::unique_ptr<primo::PaintDocument> _document;
 }
 @end
 
@@ -398,7 +398,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 - (instancetype)initWithWidth:(NSInteger)width height:(NSInteger)height {
     self = [super init];
     if (self) {
-        _document = std::make_unique<atelierprime::PaintDocument>((int)width, (int)height);
+        _document = std::make_unique<primo::PaintDocument>((int)width, (int)height);
         _width = width;
         _height = height;
     }
@@ -564,7 +564,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 }
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {
-    atelierprime::BrushSettings settings;
+    primo::BrushSettings settings;
     settings.radius = (float)brush.radius;
     settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
     settings.taperIn = (float)brush.taperIn;
@@ -635,7 +635,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
     settings.blue = brush.blue;
     settings.eraser = brush.eraser;
 
-    atelierprime::StrokePoint startPoint;
+    primo::StrokePoint startPoint;
     startPoint.x = (float)point.x;
     startPoint.y = (float)point.y;
     startPoint.pressure = (float)point.pressure;
@@ -647,7 +647,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 }
 
 - (void)appendStroke:(APStrokePoint *)point {
-    atelierprime::StrokePoint strokePoint;
+    primo::StrokePoint strokePoint;
     strokePoint.x = (float)point.x;
     strokePoint.y = (float)point.y;
     strokePoint.pressure = (float)point.pressure;
@@ -666,7 +666,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 }
 
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
-    atelierprime::BrushSettings settings;
+    primo::BrushSettings settings;
     settings.radius = (float)brush.radius;
     settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
     settings.taperIn = (float)brush.taperIn;
@@ -841,7 +841,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 }
 
 - (NSData *)compositePixelDataInRect:(APDirtyRect *)rect {
-    atelierprime::DirtyRect engineRect;
+    primo::DirtyRect engineRect;
     engineRect.minX = (int)rect.originX;
     engineRect.minY = (int)rect.originY;
     engineRect.maxX = (int)(rect.originX + rect.width - 1);
@@ -851,7 +851,7 @@ atelierprime::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingD
 }
 
 - (NSData *)pixelDataForLayerAtIndex:(NSInteger)index inRect:(APDirtyRect *)rect {
-    atelierprime::DirtyRect engineRect;
+    primo::DirtyRect engineRect;
     engineRect.minX = (int)rect.originX;
     engineRect.minY = (int)rect.originY;
     engineRect.maxX = (int)(rect.originX + rect.width - 1);

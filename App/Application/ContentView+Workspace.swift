@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension ContentView {
     func dismissBrushSettingsPopover() {
@@ -21,40 +22,39 @@ extension ContentView {
                         endRadius: 460
                     )
                 }
-            .overlay {
-                DiagonalStageLines()
-                    .opacity(0.48)
-                    .allowsHitTesting(false)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 0, style: .continuous)
-                    .stroke(Color.white.opacity(0.02), lineWidth: 1)
-            }
-
-            VStack {
-                ZStack {
-                    stageChrome
-
-                    CanvasView(
-                        store: store.scope(
-                            state: \.canvas,
-                            action: \.canvas
-                        )
-                    )
-                    .padding(10)
-
-                    if store.isHydrating {
-                        ProgressView()
-                            .controlSize(.large)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 20)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    }
+                .overlay {
+                    DiagonalStageLines()
+                        .opacity(0.48)
+                        .allowsHitTesting(false)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .padding(.horizontal, 18)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 0, style: .continuous)
+                        .stroke(Color.white.opacity(0.02), lineWidth: 1)
+                }
+
+            VStack(spacing: 10) {
+                if store.workspaceLayout == .split {
+                    HStack(spacing: 12) {
+                        workspacePaneStage(.primary)
+                        workspacePaneStage(.secondary)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
+                } else {
+                    workspacePaneStage(.primary)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 16)
+                }
+
+                if !workspaceBottomPanelCollapsed {
+                    workspaceBottomPanel
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 12)
+                } else {
+                    collapsedWorkspaceBottomBar
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 12)
+                }
             }
         }
         .simultaneousGesture(
@@ -64,21 +64,116 @@ extension ContentView {
         )
     }
 
+    @ViewBuilder
+    func workspacePaneStage(_ pane: WorkspacePane) -> some View {
+        let selectedTab = workspaceSelectedTab(in: pane)
+        let isActivePane = store.focusedWorkspacePane == pane
+        let isLivePane = isActivePane && store.activeTabID == selectedTab?.id && !store.showsHome
+
+        ZStack {
+            stageChrome
+
+            if isLivePane {
+                CanvasView(
+                    store: store.scope(
+                        state: \.canvas,
+                        action: \.canvas
+                    )
+                )
+                .padding(10)
+            } else {
+                workspacePanePreview(pane: pane, selectedTab: selectedTab)
+                    .padding(10)
+            }
+
+            if store.isHydrating && isActivePane {
+                ProgressView()
+                    .controlSize(.large)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            Text(pane == .primary ? language.localized("左ペイン") : language.localized("右ペイン"))
+                .font(StudioTheme.Typography.mono(10))
+                .foregroundStyle(.white.opacity(0.48))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(isActivePane ? StudioTheme.Palette.selectedBorder : Color.white.opacity(0.05), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .onTapGesture {
+            store.send(.workspacePaneActivated(pane))
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard
+                let rawValue = items.first,
+                let movingID = UUID(uuidString: rawValue)
+            else {
+                return false
+            }
+            store.send(.tabDropped(moving: movingID, toPane: pane, before: nil))
+            return true
+        }
+    }
+
+    @ViewBuilder
+    func workspacePanePreview(pane: WorkspacePane, selectedTab: OpenDocumentTab?) -> some View {
+        if let selectedTab, let previewImageData = selectedTab.previewImageData, let image = UIImage(data: previewImageData) {
+            VStack(spacing: 18) {
+                Spacer(minLength: 0)
+
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.medium)
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+
+                VStack(spacing: 6) {
+                    Text(selectedTab.title)
+                        .font(StudioTheme.Typography.title(15))
+                        .foregroundStyle(.white.opacity(0.92))
+                    Text(language.localized("タップしてこのペインを編集"))
+                        .font(StudioTheme.Typography.label(12))
+                        .foregroundStyle(.white.opacity(0.52))
+                }
+                .padding(.bottom, 10)
+            }
+            .padding(22)
+        } else {
+            VStack(spacing: 14) {
+                Image(systemName: pane == .secondary ? "square.split.2x1" : "doc")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                Text(language.localized(pane == .secondary ? "右ペインにタブをドロップ" : "タブを開いてください"))
+                    .font(StudioTheme.Typography.title(14))
+                    .foregroundStyle(.white.opacity(0.84))
+                Text(language.localized("ここをタップするとこのペインへ切り替わります"))
+                    .font(StudioTheme.Typography.label(12))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
     var toolDockColumn: some View {
         VStack {
-            toolDock
-                .padding(.top, 0)
-
-            toolDockMetrics
-                .padding(.top, 10)
-
-            toolDockColorCluster
-                .padding(.top, 10)
+            workspaceActivityBar
 
             Spacer(minLength: 0)
         }
-        .frame(width: 82)
-        .padding(.top, 12)
+        .frame(width: 72)
+        .padding(.top, 10)
         .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .trailing) {
             Rectangle()
@@ -150,28 +245,13 @@ extension ContentView {
         let panelState = panelState(for: panel)
 
         StudioPanelShell(
-            title: panel.title(language),
+            title: panelTitle(for: panel),
             isCollapsed: panelState.isCollapsed,
             onToggleCollapse: { store.send(.panelCollapseToggled(panel)) }
         ) {
             switch panel {
             case .brush:
-                BrushPaletteView(
-                    store: store.scope(
-                        state: \.brushPalette,
-                        action: \.brushPalette
-                    ),
-                    currentTool: store.canvas.currentTool,
-                    hasSelection: store.canvas.selection != nil,
-                    transformPreviewOffset: store.canvas.transformPreviewOffset,
-                    transformPreviewScale: store.canvas.transformPreviewScale,
-                    transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
-                    language: language,
-                    showsTitle: false,
-                    onSelectTool: { tool in
-                        store.send(.toolSelected(tool))
-                    }
-                )
+                leftWorkspaceSidebar
             case .layers:
                 LayerSidebarView(
                     store: store.scope(
@@ -194,6 +274,593 @@ extension ContentView {
             return store.brushPanel
         case .layers:
             return store.layerPanel
+        }
+    }
+
+    func panelTitle(for panel: StudioPanelKind) -> String {
+        switch panel {
+        case .brush:
+            switch workspaceSidebarSection {
+            case .explorer:
+                return "Explorer"
+            case .brush:
+                return panel.title(language)
+            case .ai:
+                return "Nano Banana"
+            }
+        case .layers:
+            return panel.title(language)
+        }
+    }
+
+    @ViewBuilder
+    var leftWorkspaceSidebar: some View {
+        switch workspaceSidebarSection {
+        case .explorer:
+            workspaceExplorerSidebar
+        case .brush:
+            BrushPaletteView(
+                store: store.scope(
+                    state: \.brushPalette,
+                    action: \.brushPalette
+                ),
+                currentTool: store.canvas.currentTool,
+                hasSelection: store.canvas.selection != nil,
+                transformPreviewOffset: store.canvas.transformPreviewOffset,
+                transformPreviewScale: store.canvas.transformPreviewScale,
+                transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
+                language: language,
+                showsTitle: false,
+                onSelectTool: { tool in
+                    store.send(.toolSelected(tool))
+                }
+            )
+        case .ai:
+            workspaceAISidebar
+        }
+    }
+
+    var workspaceActivityBar: some View {
+        VStack(spacing: 10) {
+            workspaceBrandBadge
+
+            VStack(spacing: 6) {
+                workspaceActivityButton(
+                    symbol: "folder",
+                    isActive: workspaceSidebarSection == .explorer,
+                    label: "Explorer"
+                ) {
+                    workspaceSidebarSection = .explorer
+                    if store.brushPanel.isCollapsed {
+                        store.send(.panelCollapseToggled(.brush))
+                    }
+                }
+
+                workspaceActivityButton(
+                    symbol: "paintbrush.pointed",
+                    isActive: workspaceSidebarSection == .brush,
+                    label: language.localized("ブラシ")
+                ) {
+                    workspaceSidebarSection = .brush
+                    if store.brushPanel.isCollapsed {
+                        store.send(.panelCollapseToggled(.brush))
+                    }
+                }
+
+                workspaceActivityButton(
+                    symbol: "sparkles.rectangle.stack",
+                    isActive: workspaceSidebarSection == .ai,
+                    label: "Nano Banana"
+                ) {
+                    workspaceSidebarSection = .ai
+                    workspaceBottomPanelSection = .nanoBanana
+                    workspaceBottomPanelCollapsed = false
+                    if store.brushPanel.isCollapsed {
+                        store.send(.panelCollapseToggled(.brush))
+                    }
+                }
+            }
+
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+                .padding(.vertical, 6)
+
+            toolDock
+            toolDockMetrics
+                .padding(.top, 4)
+            toolDockColorCluster
+                .padding(.top, 6)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 10)
+    }
+
+    var workspaceBrandBadge: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(StudioTheme.Palette.cardFillStrong)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+            Text("P")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(StudioTheme.Palette.accentBright)
+        }
+        .frame(width: 38, height: 38)
+    }
+
+    func workspaceActivityButton(symbol: String, isActive: Bool, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
+                .frame(width: 38, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(isActive ? StudioTheme.Palette.selectedFill : Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(isActive ? StudioTheme.Palette.selectedBorder : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    var workspaceExplorerSidebar: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                workspaceExplorerSection(title: "OPEN EDITORS") {
+                    ForEach(store.openTabs) { tab in
+                        Button {
+                            store.send(.tabSelected(tab.id))
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: tab.pane == .secondary ? "sidebar.right" : "doc")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(tab.id == store.activeTabID ? StudioTheme.Palette.accentBright : StudioTheme.Palette.textSecondary)
+                                Text(tab.title)
+                                    .font(StudioTheme.Typography.label(12))
+                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                                if tab.isDirty {
+                                    Circle()
+                                        .fill(StudioTheme.Palette.accentBright)
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(tab.id == store.activeTabID ? Color.white.opacity(0.08) : Color.clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(language.localized("閉じる")) {
+                                store.send(.tabClosed(tab.id))
+                            }
+                            Button(language.localized("他を閉じる")) {
+                                store.send(.closeOtherTabs(tab.id))
+                            }
+                            Button(language.localized("右側を閉じる")) {
+                                store.send(.closeTabsToRight(tab.id))
+                            }
+                            Button(language.localized("右ペインへ移動")) {
+                                store.send(.moveTabToSecondaryPane(tab.id))
+                            }
+                            Button(language.localized("Explorer に表示")) {
+                                workspaceSidebarSection = .explorer
+                            }
+                        }
+                    }
+                }
+
+                workspaceExplorerSection(title: "WORKSPACE") {
+                    Button {
+                        showsOpenDocumentImporter = true
+                    } label: {
+                        workspaceExplorerActionRow(symbol: "folder.badge.plus", title: language.localized("ファイルを開く"))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        newCanvasWidthText = "\(Int(CanvasFeature.defaultCanvasSize.width.rounded()))"
+                        newCanvasHeightText = "\(Int(CanvasFeature.defaultCanvasSize.height.rounded()))"
+                        showsNewCanvasSheet = true
+                    } label: {
+                        workspaceExplorerActionRow(symbol: "square.and.pencil", title: language.localized("新規キャンバス"))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                workspaceExplorerSection(title: "FILES") {
+                    ForEach(workspaceExplorerFolders, id: \.self) { folderPath in
+                        workspaceExplorerFolderSection(folderPath: folderPath)
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    func workspaceExplorerSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(StudioTheme.Typography.mono(10))
+                .foregroundStyle(.white.opacity(0.45))
+            content()
+        }
+    }
+
+    func workspaceExplorerActionRow(symbol: String, title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(StudioTheme.Palette.textSecondary)
+            Text(title)
+                .font(StudioTheme.Typography.label(12))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+    }
+
+    var workspaceExplorerFolders: [String?] {
+        let folders = Set(store.homeProjects.map(\.relativeFolderPath))
+        return folders
+            .sorted { lhs, rhs in
+                switch (lhs, rhs) {
+                case (nil, nil):
+                    return false
+                case (nil, _):
+                    return true
+                case (_, nil):
+                    return false
+                case let (lhs?, rhs?):
+                    return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+                }
+            }
+    }
+
+    func workspaceExplorerProjects(in folderPath: String?) -> [SavedProjectSummary] {
+        store.homeProjects.filter { $0.relativeFolderPath == folderPath }
+    }
+
+    func workspaceExplorerFolderSection(folderPath: String?) -> some View {
+        let projects = workspaceExplorerProjects(in: folderPath)
+        let title = folderPath ?? "root"
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: folderPath == nil ? "internaldrive" : "folder")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+                Text(title)
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(.white.opacity(0.45))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+            )
+            .dropDestination(for: URL.self) { items, _ in
+                guard let projectURL = items.first else { return false }
+                store.send(.moveSavedProject(projectURL, folderPath))
+                return true
+            }
+
+            ForEach(projects) { project in
+                Button {
+                    store.send(.homeProjectSelected(project.url))
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(StudioTheme.Palette.textSecondary)
+                            Text(project.name)
+                                .font(StudioTheme.Typography.label(12))
+                                .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                .lineLimit(1)
+                        }
+                        Text("\(Int(project.canvasSize.width)) × \(Int(project.canvasSize.height))")
+                            .font(StudioTheme.Typography.mono(10))
+                            .foregroundStyle(.white.opacity(0.45))
+                            .padding(.leading, 19)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.02))
+                    )
+                }
+                .buttonStyle(.plain)
+                .draggable(project.url)
+            }
+        }
+    }
+
+    var workspaceAISidebar: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                workspaceExplorerSection(title: "NANO BANANA") {
+                    Text(language.localized("生成AIの編集ハブ。下部パネルからすぐ実行し、必要なときだけ詳細シートを開けます。"))
+                        .font(StudioTheme.Typography.body(13))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                workspaceExplorerSection(title: "SHORTCUTS") {
+                    Button {
+                        prepareNanoBananaComposer()
+                        workspaceBottomPanelSection = .nanoBanana
+                        workspaceBottomPanelCollapsed = false
+                    } label: {
+                        workspaceExplorerActionRow(symbol: "text.badge.plus", title: language.localized("クイックプロンプト"))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        prepareNanoBananaComposer()
+                        showsNanoBananaSheet = true
+                    } label: {
+                        workspaceExplorerActionRow(symbol: "slider.horizontal.3", title: language.localized("詳細設定を開く"))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if !store.nanoBananaJobs.isEmpty {
+                    workspaceExplorerSection(title: "RECENT JOBS") {
+                        ForEach(store.nanoBananaJobs.prefix(5)) { job in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(job.request.model.title(language))
+                                        .font(StudioTheme.Typography.label(12))
+                                        .foregroundStyle(StudioTheme.Palette.textPrimary)
+                                    Spacer()
+                                    Text(job.status.rawValue.capitalized)
+                                        .font(StudioTheme.Typography.mono(10))
+                                        .foregroundStyle(.white.opacity(0.45))
+                                }
+                                Text(job.request.prompt)
+                                    .font(StudioTheme.Typography.body(12))
+                                    .foregroundStyle(.white.opacity(0.62))
+                                    .lineLimit(2)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.white.opacity(0.04))
+                            )
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    var workspaceBottomPanel: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                workspaceBottomTab(title: "NANO BANANA", section: .nanoBanana)
+                workspaceBottomTab(title: "HISTORY", section: .history)
+                workspaceBottomTab(title: "OUTPUT", section: .output)
+                Spacer(minLength: 0)
+                workspaceTabChromeButton(symbol: "chevron.down") {
+                    workspaceBottomPanelCollapsed = true
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.03))
+
+            Group {
+                switch workspaceBottomPanelSection {
+                case .nanoBanana:
+                    workspaceNanoBananaPanel
+                case .history:
+                    workspaceHistoryPanel
+                case .output:
+                    workspaceOutputPanel
+                }
+            }
+            .padding(12)
+        }
+        .frame(height: 224)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.78))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+    }
+
+    var collapsedWorkspaceBottomBar: some View {
+        HStack {
+            Text(workspaceBottomPanelSection == .nanoBanana ? "NANO BANANA" : workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT")
+                .font(StudioTheme.Typography.mono(10))
+                .foregroundStyle(.white.opacity(0.55))
+            Spacer(minLength: 0)
+            workspaceTabChromeButton(symbol: "chevron.up") {
+                workspaceBottomPanelCollapsed = false
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(StudioTheme.Palette.overlayBlack.opacity(0.7))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+    }
+
+    func workspaceBottomTab(title: String, section: ContentView.WorkspaceBottomPanelSection) -> some View {
+        Button {
+            workspaceBottomPanelSection = section
+        } label: {
+            Text(title)
+                .font(StudioTheme.Typography.mono(10))
+                .foregroundStyle(workspaceBottomPanelSection == section ? .white.opacity(0.9) : .white.opacity(0.45))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(workspaceBottomPanelSection == section ? Color.white.opacity(0.10) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    var workspaceNanoBananaPanel: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(language.localized("Prompt"))
+                    .font(StudioTheme.Typography.label(12))
+                    .foregroundStyle(.white.opacity(0.55))
+                TextEditor(text: $nanoBananaPrompt)
+                    .font(StudioTheme.Typography.body(13))
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                workspaceNanoBananaStat(label: language.localized("Input"), value: resolvedNanoBananaInputLayerName)
+                workspaceNanoBananaStat(label: language.localized("Scope"), value: nanoBananaEditScope.title(language))
+                workspaceNanoBananaStat(label: language.localized("Output"), value: nanoBananaOutputMode.title(language))
+                workspaceNanoBananaStat(label: language.localized("Model"), value: nanoBananaModel.title(language))
+
+                HStack(spacing: 8) {
+                    Button(language.localized("Run")) {
+                        submitNanoBananaRequest(closeSheet: false)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.94))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(StudioTheme.Palette.accentBright.opacity(0.8))
+                    )
+                    .disabled(nanoBananaGenerateDisabled)
+
+                    Button(language.localized("Open Full Panel")) {
+                        showsNanoBananaSheet = true
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.72))
+                }
+            }
+            .frame(width: 250, alignment: .leading)
+        }
+    }
+
+    func workspaceNanoBananaStat(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label.uppercased())
+                .font(StudioTheme.Typography.mono(10))
+                .foregroundStyle(.white.opacity(0.42))
+            Text(value)
+                .font(StudioTheme.Typography.label(12))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+        }
+    }
+
+    var workspaceHistoryPanel: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(store.nanoBananaHistory.prefix(8)) { item in
+                    Button {
+                        nanoBananaPrompt = item.request.prompt
+                        nanoBananaInputLayerIndex = item.request.inputLayerIndex
+                        nanoBananaEditScope = item.request.editScope
+                        nanoBananaOutputMode = item.request.outputMode
+                        nanoBananaModel = item.request.model
+                        nanoBananaMaskExpansion = item.request.maskSettings.expansion
+                        nanoBananaInvertsMask = item.request.maskSettings.isInverted
+                        workspaceBottomPanelSection = .nanoBanana
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.request.prompt)
+                                .font(StudioTheme.Typography.body(13))
+                                .foregroundStyle(.white.opacity(0.88))
+                                .lineLimit(2)
+                            Text(item.request.model.title(language))
+                                .font(StudioTheme.Typography.mono(10))
+                                .foregroundStyle(.white.opacity(0.45))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white.opacity(0.04))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    var workspaceOutputPanel: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(store.nanoBananaJobs.prefix(8)) { job in
+                    HStack(alignment: .top, spacing: 10) {
+                        Circle()
+                            .fill(job.status == .succeeded ? Color.green.opacity(0.8) : job.status == .failed ? Color.red.opacity(0.8) : StudioTheme.Palette.accentBright)
+                            .frame(width: 8, height: 8)
+                            .padding(.top, 5)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(job.request.model.title(language))
+                                    .font(StudioTheme.Typography.label(12))
+                                    .foregroundStyle(.white.opacity(0.9))
+                                Spacer(minLength: 0)
+                                Text(job.status.rawValue.capitalized)
+                                    .font(StudioTheme.Typography.mono(10))
+                                    .foregroundStyle(.white.opacity(0.45))
+                            }
+                            Text(job.request.prompt)
+                                .font(StudioTheme.Typography.body(12))
+                                .foregroundStyle(.white.opacity(0.62))
+                                .lineLimit(2)
+                        }
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                }
+            }
         }
     }
 

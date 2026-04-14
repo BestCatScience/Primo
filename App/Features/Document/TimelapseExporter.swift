@@ -317,7 +317,7 @@ enum TimelapseExporter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "atelierprime-timelapse-\(formatter.string(from: Date())).mp4"
+        return "primo-timelapse-\(formatter.string(from: Date())).mp4"
     }
 
     private static func sampledFrames(from frames: [TimelapseFrame]) -> [TimelapseFrame] {

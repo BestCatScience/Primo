@@ -1,4 +1,4 @@
-name: atelierprime
+name: primo
 options:
   deploymentTarget:
     iOS: 26.0
@@ -8,12 +8,12 @@ packages:
     exactVersion: 1.25.2
 settings:
   base:
-    PRODUCT_BUNDLE_IDENTIFIER: com.atelierprime.app
+    PRODUCT_BUNDLE_IDENTIFIER: com.primo.app
     SWIFT_VERSION: 5.10
     CLANG_CXX_LANGUAGE_STANDARD: gnu++20
     CLANG_CXX_LIBRARY: libc++
 targets:
-  atelierprime:
+  primo:
     type: application
     platform: iOS
     sources:
@@ -26,10 +26,10 @@ targets:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Primo
-        PRODUCT_NAME: atelierprime
+        PRODUCT_NAME: primo
         TARGETED_DEVICE_FAMILY: 2
         IPHONEOS_DEPLOYMENT_TARGET: 26.0
-        SWIFT_OBJC_BRIDGING_HEADER: App/Support/atelierprime-Bridging-Header.h
+        SWIFT_OBJC_BRIDGING_HEADER: App/Support/primo-Bridging-Header.h
         CLANG_ENABLE_OBJC_ARC: YES
         HEADER_SEARCH_PATHS:
           - $(SRCROOT)/Engine/include

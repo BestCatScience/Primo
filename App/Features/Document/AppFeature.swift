@@ -61,7 +61,7 @@ struct StudioPanelLayoutState: Equatable {
 
 @Reducer
 struct AppFeature {
-    private static let startupLogger = Logger(subsystem: "com.atelierprime.app", category: "Startup")
+    private static let startupLogger = Logger(subsystem: "com.primo.app", category: "Startup")
 
     private enum CancelID {
         case deferredPresentationRefresh
@@ -76,6 +76,12 @@ struct AppFeature {
         var showsHome = true
         var homeSection: HomeSidebarSection = .home
         var homeProjects: [SavedProjectSummary] = []
+        var openTabs: [OpenDocumentTab] = []
+        var activeTabID: OpenDocumentTab.ID?
+        var primarySelectedTabID: OpenDocumentTab.ID?
+        var secondarySelectedTabID: OpenDocumentTab.ID?
+        var focusedWorkspacePane: WorkspacePane = .primary
+        var workspaceLayout: WorkspaceLayoutMode = .single
         var isLoadingHomeProjects = true
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
@@ -97,6 +103,52 @@ struct AppFeature {
         var nanoBananaProgress: Double? {
             guard isNanoBananaGenerating else { return nil }
             return 0.6
+        }
+
+        var activeTabIndex: Int? {
+            guard let activeTabID else { return nil }
+            return openTabs.firstIndex(where: { $0.id == activeTabID })
+        }
+
+        var activeTab: OpenDocumentTab? {
+            guard let activeTabIndex else { return nil }
+            return openTabs[activeTabIndex]
+        }
+
+        func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
+            switch pane {
+            case .primary:
+                return primarySelectedTabID
+            case .secondary:
+                return secondarySelectedTabID
+            }
+        }
+
+        mutating func setSelectedTabID(_ tabID: OpenDocumentTab.ID?, for pane: WorkspacePane) {
+            switch pane {
+            case .primary:
+                primarySelectedTabID = tabID
+            case .secondary:
+                secondarySelectedTabID = tabID
+            }
+        }
+
+        func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
+            openTabs.filter { $0.pane == pane }
+        }
+
+        func selectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
+            guard let tabID = selectedTabID(for: pane) else { return nil }
+            return openTabs.first(where: { $0.id == tabID })
+        }
+
+        func hasTabs(in pane: WorkspacePane) -> Bool {
+            openTabs.contains(where: { $0.pane == pane })
+        }
+
+        func tabID(forSourceProjectURL sourceProjectURL: URL) -> OpenDocumentTab.ID? {
+            let normalizedURL = sourceProjectURL.standardizedFileURL
+            return openTabs.first { $0.sourceProjectURL?.standardizedFileURL == normalizedURL }?.id
         }
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
@@ -147,6 +199,97 @@ struct AppFeature {
             canvas.paperStyle = resolvedPaperStyle()
             canvas.activeTextLayer = presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
             syncTextEditorWithActiveLayer()
+        }
+
+        mutating func updateActiveTabMetadata(title: String? = nil, sourceProjectURL: URL? = nil, previewImageData: Data? = nil) {
+            guard let activeTabIndex else { return }
+            if let title {
+                openTabs[activeTabIndex].title = title
+            }
+            if let sourceProjectURL {
+                openTabs[activeTabIndex].sourceProjectURL = sourceProjectURL
+            }
+            if let previewImageData {
+                openTabs[activeTabIndex].previewImageData = previewImageData
+            }
+            openTabs[activeTabIndex].canvasSize = canvas.canvasSize
+        }
+
+        mutating func setActiveTabDirty(_ isDirty: Bool) {
+            guard let activeTabIndex else { return }
+            openTabs[activeTabIndex].isDirty = isDirty
+        }
+
+        mutating func reorderTabs(moving movingID: OpenDocumentTab.ID, before targetID: OpenDocumentTab.ID) {
+            guard
+                let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }),
+                let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }),
+                sourceIndex != destinationIndex
+            else {
+                return
+            }
+            let tab = openTabs.remove(at: sourceIndex)
+            let adjustedDestination = sourceIndex < destinationIndex ? max(destinationIndex - 1, 0) : destinationIndex
+            openTabs.insert(tab, at: adjustedDestination)
+        }
+
+        mutating func moveTab(_ movingID: OpenDocumentTab.ID, to pane: WorkspacePane, before targetID: OpenDocumentTab.ID?) {
+            guard let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }) else { return }
+            let sourcePane = openTabs[sourceIndex].pane
+            var tab = openTabs.remove(at: sourceIndex)
+            tab.pane = pane
+
+            if let targetID, let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }) {
+                openTabs.insert(tab, at: destinationIndex)
+            } else {
+                openTabs.append(tab)
+            }
+
+            setSelectedTabID(tab.id, for: pane)
+            if selectedTabID(for: sourcePane) == movingID {
+                setSelectedTabID(tabs(in: sourcePane).first?.id, for: sourcePane)
+            }
+            if activeTabID == movingID {
+                focusedWorkspacePane = pane
+            }
+            workspaceLayout = hasTabs(in: .secondary) ? .split : .single
+        }
+
+        mutating func ensureWorkspaceSelectionIntegrity() {
+            if primarySelectedTabID != nil, openTabs.contains(where: { $0.id == primarySelectedTabID && $0.pane == .primary }) == false {
+                primarySelectedTabID = tabs(in: .primary).first?.id
+            }
+            if secondarySelectedTabID != nil, openTabs.contains(where: { $0.id == secondarySelectedTabID && $0.pane == .secondary }) == false {
+                secondarySelectedTabID = tabs(in: .secondary).first?.id
+            }
+            if primarySelectedTabID == nil {
+                primarySelectedTabID = tabs(in: .primary).first?.id
+            }
+            if !hasTabs(in: .secondary) {
+                secondarySelectedTabID = nil
+                workspaceLayout = .single
+                if focusedWorkspacePane == .secondary {
+                    focusedWorkspacePane = .primary
+                }
+            }
+        }
+
+        mutating func applyLoadedProject(_ loaded: LoadedPaintProject) {
+            brushPalette.paper.color = Color(
+                red: Double(loaded.paperStyle.red),
+                green: Double(loaded.paperStyle.green),
+                blue: Double(loaded.paperStyle.blue),
+                opacity: Double(loaded.paperStyle.alpha)
+            )
+            brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
+            canvas.selection = nil
+            canvas.selectionPreviewPoints = []
+            canvas.transformPreviewOffset = .zero
+            canvas.transformPreviewScale = 1.0
+            canvas.transformPreviewRotationDegrees = 0
+            canvas.adjustmentPreviewPixelData = nil
+            applyPresentation(loaded.presentation)
+            isHydrating = false
         }
 
         mutating func syncTextEditorWithActiveLayer() {
@@ -367,7 +510,18 @@ struct AppFeature {
         case homeProjectsLoadRequested
         case homeProjectsLoaded([SavedProjectSummary])
         case homeSectionSelected(HomeSidebarSection)
+        case tabSelected(OpenDocumentTab.ID)
+        case tabClosed(OpenDocumentTab.ID)
+        case closeOtherTabs(OpenDocumentTab.ID)
+        case closeTabsToRight(OpenDocumentTab.ID)
+        case moveTabToSecondaryPane(OpenDocumentTab.ID)
+        case tabReordered(moving: OpenDocumentTab.ID, before: OpenDocumentTab.ID)
+        case tabDropped(moving: OpenDocumentTab.ID, toPane: WorkspacePane, before: OpenDocumentTab.ID?)
+        case splitActiveTabIntoSecondaryPane
+        case mergeWorkspacePanes
+        case workspacePaneActivated(WorkspacePane)
         case homeProjectSelected(URL)
+        case moveSavedProject(URL, String?)
         case homeReturnRequested
         case deferredPresentationRefresh
         case refreshPresentationRequested
@@ -386,7 +540,7 @@ struct AppFeature {
         case nanoBananaRegenerateRequested
         case nanoBananaRetryJob(UUID)
         case openDocumentSelected(URL)
-        case openDocumentLoaded(LoadedPaintProject)
+        case openDocumentLoaded(LoadedPaintProject, URL)
         case openDocumentFailed(String)
         case photoImportReceived(name: String?, data: Data)
         case photoImportFailed(String)
@@ -506,13 +660,141 @@ struct AppFeature {
                 state.homeSection = section
                 return .none
 
+            case let .tabSelected(tabID):
+                guard let targetTab = state.openTabs.first(where: { $0.id == tabID }) else {
+                    return .none
+                }
+                if !state.showsHome, state.activeTabID != tabID {
+                    persistActiveTabToBackingStore(state: &state)
+                }
+                do {
+                    let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL)
+                    state.activeTabID = tabID
+                    state.setSelectedTabID(tabID, for: targetTab.pane)
+                    state.focusedWorkspacePane = targetTab.pane
+                    state.applyLoadedProject(loaded)
+                    state.showsHome = false
+                } catch {
+                    state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+                }
+                return .none
+
+            case let .tabClosed(tabID):
+                guard let closingIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else {
+                    return .none
+                }
+                let closingTab = state.openTabs[closingIndex]
+                let wasActive = state.activeTabID == tabID
+                state.openTabs.remove(at: closingIndex)
+                try? FileManager.default.removeItem(at: closingTab.backingStoreURL)
+                state.ensureWorkspaceSelectionIntegrity()
+
+                if wasActive {
+                    let replacement = state.selectedTab(in: closingTab.pane)
+                        ?? state.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
+                    if let replacement {
+                        do {
+                            let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL)
+                            state.activeTabID = replacement.id
+                            state.focusedWorkspacePane = replacement.pane
+                            state.applyLoadedProject(loaded)
+                            state.showsHome = false
+                        } catch {
+                            state.activeTabID = nil
+                            state.showsHome = true
+                            state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+                        }
+                    } else {
+                        state.activeTabID = nil
+                        state.showsHome = true
+                    }
+                }
+                return .none
+
+            case let .closeOtherTabs(tabID):
+                let retainedTabs = state.openTabs.filter { $0.id == tabID }
+                let removedTabs = state.openTabs.filter { $0.id != tabID }
+                removedTabs.forEach { try? FileManager.default.removeItem(at: $0.backingStoreURL) }
+                state.openTabs = retainedTabs
+                state.primarySelectedTabID = retainedTabs.first(where: { $0.pane == .primary })?.id
+                state.secondarySelectedTabID = retainedTabs.first(where: { $0.pane == .secondary })?.id
+                if state.activeTabID != tabID {
+                    return .send(.tabSelected(tabID))
+                }
+                state.ensureWorkspaceSelectionIntegrity()
+                return .none
+
+            case let .closeTabsToRight(tabID):
+                guard let tabIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else { return .none }
+                let tab = state.openTabs[tabIndex]
+                let paneTabs = state.openTabs.enumerated().filter { $0.element.pane == tab.pane }
+                guard let paneIndex = paneTabs.firstIndex(where: { $0.element.id == tabID }) else { return .none }
+                let idsToRemove = Set(paneTabs.dropFirst(paneIndex + 1).map(\.element.id))
+                let removedTabs = state.openTabs.filter { idsToRemove.contains($0.id) }
+                removedTabs.forEach { try? FileManager.default.removeItem(at: $0.backingStoreURL) }
+                state.openTabs.removeAll { idsToRemove.contains($0.id) }
+                state.ensureWorkspaceSelectionIntegrity()
+                return .none
+
+            case let .moveTabToSecondaryPane(tabID):
+                state.workspaceLayout = .split
+                state.moveTab(tabID, to: .secondary, before: nil)
+                state.ensureWorkspaceSelectionIntegrity()
+                return .none
+
+            case let .tabReordered(movingID, targetID):
+                state.reorderTabs(moving: movingID, before: targetID)
+                return .none
+
+            case let .tabDropped(movingID, pane, targetID):
+                state.moveTab(movingID, to: pane, before: targetID)
+                return .none
+
+            case .splitActiveTabIntoSecondaryPane:
+                state.workspaceLayout = .split
+                state.ensureWorkspaceSelectionIntegrity()
+                return .none
+
+            case .mergeWorkspacePanes:
+                let secondaryTabs = state.tabs(in: .secondary).map(\.id)
+                for tabID in secondaryTabs {
+                    state.moveTab(tabID, to: .primary, before: nil)
+                }
+                state.workspaceLayout = .single
+                state.secondarySelectedTabID = nil
+                state.focusedWorkspacePane = .primary
+                state.ensureWorkspaceSelectionIntegrity()
+                return .none
+
+            case let .workspacePaneActivated(pane):
+                state.focusedWorkspacePane = pane
+                guard let tabID = state.selectedTabID(for: pane) else { return .none }
+                if state.activeTabID == tabID {
+                    return .none
+                }
+                return .send(.tabSelected(tabID))
+
+            case let .moveSavedProject(url, relativeFolderPath):
+                do {
+                    let destinationURL = try Self.moveSavedProject(at: url, toRelativeFolderPath: relativeFolderPath)
+                    if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL?.standardizedFileURL == url.standardizedFileURL }) {
+                        state.openTabs[openTabIndex].sourceProjectURL = destinationURL
+                    }
+                    return .send(.homeProjectsLoadRequested)
+                } catch {
+                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Move failed") : error.localizedDescription
+                    return .none
+                }
+
             case .homeReturnRequested:
                 do {
                     let url = try Self.projectURLInDocuments()
                     try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
+                    state.setActiveTabDirty(false)
                 } catch {
                     state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
                 }
+                persistActiveTabToBackingStore(state: &state)
                 state.showsHome = true
                 state.homeSection = .home
                 return .send(.homeProjectsLoadRequested)
@@ -533,7 +815,7 @@ struct AppFeature {
 
             case .refreshPresentationRequested:
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .languageChanged(language):
@@ -542,6 +824,9 @@ struct AppFeature {
                 return .none
 
             case let .newCanvasRequested(width, height):
+                if !state.showsHome {
+                    persistActiveTabToBackingStore(state: &state)
+                }
                 let width = max(width, 1)
                 let height = max(height, 1)
                 paintDocumentClient.newCanvas(width, height)
@@ -559,12 +844,20 @@ struct AppFeature {
                 state.isHydrating = false
                 paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
                 state.applyPresentation(paintDocumentClient.presentation())
+                activateNewTab(
+                    state: &state,
+                    title: Self.nextUntitledTabTitle(existingTabs: state.openTabs),
+                    sourceProjectURL: nil
+                )
                 return .merge(
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)
                 )
 
             case let .newCanvasFromImageReceived(name, data):
+                if !state.showsHome {
+                    persistActiveTabToBackingStore(state: &state)
+                }
                 guard let importedImage = Self.importedCanvasImage(from: data) else {
                     state.bannerMessage = state.appLanguage.localized("Could not create canvas from image")
                     return .none
@@ -598,6 +891,11 @@ struct AppFeature {
                 paintDocumentClient.setLayerName(0, nextName)
                 paintDocumentClient.setActiveLayer(0)
                 state.applyPresentation(paintDocumentClient.presentation())
+                activateNewTab(
+                    state: &state,
+                    title: nextName,
+                    sourceProjectURL: nil
+                )
                 state.bannerMessage = state.appLanguage.localized("Canvas created from image")
                 return .merge(
                     .cancel(id: CancelID.startupPresentationLoad),
@@ -617,7 +915,7 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .redoRequested:
@@ -629,7 +927,7 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .gradientMapSelected(preset):
@@ -642,7 +940,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .gradientMapPreviewChanged(settings):
@@ -678,7 +976,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .hueSaturationBrightnessPreviewChanged(settings):
@@ -709,7 +1007,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .brightnessContrastPreviewChanged(settings):
@@ -740,7 +1038,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .levelsPreviewChanged(settings):
@@ -771,7 +1069,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .toneCurvePreviewChanged(settings):
@@ -802,7 +1100,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .colorBalancePreviewChanged(settings):
@@ -833,7 +1131,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .thresholdPreviewChanged(settings):
@@ -864,7 +1162,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .posterizePreviewChanged(settings):
@@ -895,7 +1193,7 @@ struct AppFeature {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .exportDocumentRequested:
@@ -917,6 +1215,12 @@ struct AppFeature {
                     try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
                     state.exportSheet = ShareExport(url: url)
                     state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
+                    state.updateActiveTabMetadata(
+                        title: url.deletingPathExtension().lastPathComponent,
+                        sourceProjectURL: url
+                    )
+                    state.setActiveTabDirty(false)
+                    persistActiveTabToBackingStore(state: &state)
                 } catch {
                     state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
                 }
@@ -990,7 +1294,9 @@ struct AppFeature {
                     return .none
                 }
 
-                let outputLayerIndex = state.canvas.activeLayerIndex
+                let outputLayerIndex = request.outputMode == .replaceCurrentLayer
+                    ? request.inputLayerIndex
+                    : state.canvas.activeLayerIndex
                 let canvasWidth = snapshot.width
                 let canvasHeight = snapshot.height
                 let appLanguage = state.appLanguage
@@ -1183,7 +1489,7 @@ struct AppFeature {
                 state.pendingNanoBananaRequest = preview.request
                 state.activeNanoBananaJobID = nil
                 state.pendingNanoBananaOutputMode = .replaceCurrentLayer
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
                 return .none
 
@@ -1224,11 +1530,18 @@ struct AppFeature {
                 return .none
 
             case let .openDocumentSelected(url):
+                if let existingTabID = state.tabID(forSourceProjectURL: url) {
+                    state.isHydrating = false
+                    return .send(.tabSelected(existingTabID))
+                }
+                if !state.showsHome {
+                    persistActiveTabToBackingStore(state: &state)
+                }
                 state.isHydrating = true
                 return .run { [paintDocumentClient] send in
                     do {
                         let loaded = try paintDocumentClient.loadProject(url)
-                        await send(.openDocumentLoaded(loaded))
+                        await send(.openDocumentLoaded(loaded, url))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
                     }
@@ -1236,31 +1549,38 @@ struct AppFeature {
                 }
 
             case let .homeProjectSelected(url):
+                if let existingTabID = state.tabID(forSourceProjectURL: url) {
+                    state.showsHome = false
+                    state.isHydrating = false
+                    return .send(.tabSelected(existingTabID))
+                }
+                if !state.showsHome {
+                    persistActiveTabToBackingStore(state: &state)
+                }
                 state.isHydrating = true
                 return .run { [paintDocumentClient] send in
                     do {
                         let loaded = try paintDocumentClient.loadProject(url)
-                        await send(.openDocumentLoaded(loaded))
+                        await send(.openDocumentLoaded(loaded, url))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
                     }
                 }
 
-            case let .openDocumentLoaded(loaded):
-                state.brushPalette.paper.color = Color(
-                    red: Double(loaded.paperStyle.red),
-                    green: Double(loaded.paperStyle.green),
-                    blue: Double(loaded.paperStyle.blue),
-                    opacity: Double(loaded.paperStyle.alpha)
+            case let .openDocumentLoaded(loaded, sourceURL):
+                if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
+                    state.activeTabID = existingTabID
+                    state.isHydrating = false
+                    state.showsHome = false
+                    return .send(.tabSelected(existingTabID))
+                }
+                state.applyLoadedProject(loaded)
+                let title = sourceURL.deletingPathExtension().lastPathComponent
+                activateNewTab(
+                    state: &state,
+                    title: title,
+                    sourceProjectURL: sourceURL
                 )
-                state.brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
-                state.canvas.selection = nil
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
-                state.canvas.adjustmentPreviewPixelData = nil
-                state.applyPresentation(loaded.presentation)
                 state.isHydrating = false
                 state.showsHome = false
                 state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
@@ -1292,7 +1612,7 @@ struct AppFeature {
                 state.canvas.transformPreviewOffset = .zero
                 state.canvas.transformPreviewScale = 1.0
                 state.canvas.transformPreviewRotationDegrees = 0
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 state.bannerMessage = state.appLanguage.localized("Photo imported to a new layer")
                 return .none
 
@@ -1455,7 +1775,7 @@ struct AppFeature {
                 state.canvas.activeLayerIndex = targetLayerIndex
                 state.canvas.currentTool = .text
                 state.brushPalette.text.targetLayerIndex = targetLayerIndex
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .canvas(.delegate(.applyTransform)):
@@ -1474,7 +1794,7 @@ struct AppFeature {
                     state.canvas.localBufferRevision += 1
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .createLayerMaskFromSelectionRequested:
@@ -1487,7 +1807,7 @@ struct AppFeature {
                     state.bannerMessage = state.appLanguage.localized("レイヤーマスクを作成できませんでした")
                     return .none
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .clearLayerMaskRequested:
@@ -1495,7 +1815,7 @@ struct AppFeature {
                 guard paintDocumentClient.clearLayerMask(activeLayerIndex) else {
                     return .none
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .applyLayerMaskRequested:
@@ -1509,7 +1829,7 @@ struct AppFeature {
                     state.canvas.localBufferRevision += 1
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .activeLayerVisibilityToggled:
@@ -1519,7 +1839,7 @@ struct AppFeature {
                 }
                 paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .selectPreviousLayer:
@@ -1578,7 +1898,7 @@ struct AppFeature {
                 paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
                 state.canvas.activeLayerIndex = state.layerSidebar.layers.count
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .layerSidebar(.delegate(.addFolder)):
@@ -1591,14 +1911,14 @@ struct AppFeature {
                     StudioStrings.folderName(nextFolderNumber, state.appLanguage),
                     state.layerSidebar.activeLayerIndex
                 )
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.deleteFolder(folderID))):
                 guard paintDocumentClient.deleteFolder(folderID) else {
                     return .none
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.deleteLayer(index))):
@@ -1606,7 +1926,7 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.duplicateLayer(index))):
@@ -1618,7 +1938,7 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
@@ -1626,27 +1946,27 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
                 guard paintDocumentClient.assignLayerToFolder(index, folderID) else {
                     return .none
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
                 guard paintDocumentClient.assignLayerToFolder(index, -1) else {
                     return .none
                 }
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setOpacity(index, opacity))):
                 paintDocumentClient.setLayerOpacity(index, opacity)
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleLayerLock(index))):
@@ -1654,7 +1974,7 @@ struct AppFeature {
                     return .none
                 }
                 paintDocumentClient.setLayerLocked(index, !layer.isLocked)
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleAlphaLock(index))):
@@ -1662,7 +1982,7 @@ struct AppFeature {
                     return .none
                 }
                 paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.mergeDown(index))):
@@ -1670,7 +1990,7 @@ struct AppFeature {
                     return .none
                 }
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.selectLayer(index))):
@@ -1686,7 +2006,7 @@ struct AppFeature {
                 }
                 paintDocumentClient.setLayerVisibility(index, !layer.visible)
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setFolderExpanded(folderID, isExpanded))):
@@ -1704,23 +2024,23 @@ struct AppFeature {
                     return .none
                 }
                 paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.renameFolder(folderID, name))):
                 paintDocumentClient.setFolderName(folderID, name)
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setBlendMode(index, blendMode))):
                 paintDocumentClient.setLayerBlendMode(index, blendMode)
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.renameLayer(index, name))):
                 paintDocumentClient.setLayerName(index, name)
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
@@ -1882,7 +2202,7 @@ struct AppFeature {
 
             case .canvas(.delegate(.commitPreviewShapeStroke)):
                 paintDocumentClient.endStroke()
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)
@@ -1922,7 +2242,7 @@ struct AppFeature {
                 state.canvas.activeStrokeBaseSnapshot = nil
                 state.canvas.activeStrokePreviewLayerPixelData = nil
                 state.canvas.pendingIncrementalUpdate = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)
@@ -1996,12 +2316,12 @@ struct AppFeature {
                 paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
                 paintDocumentClient.blurStroke(samples, state.resolvedBrushSettings(), state.canvas.activeLayerIndex, false)
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case .canvas(.delegate(.endBlurStroke)):
                 paintDocumentClient.endBlurStroke()
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .canvas(.delegate(.fill(sample))):
@@ -2011,7 +2331,7 @@ struct AppFeature {
                 paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
                 paintDocumentClient.fill(sample, state.resolvedBrushSettings())
                 state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                applyDirtyPresentation(state: &state)
                 return .concatenate(
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)

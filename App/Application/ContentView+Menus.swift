@@ -2,6 +2,71 @@ import SwiftUI
 import UIKit
 
 extension ContentView {
+    var resolvedNanoBananaInputLayerIndex: Int {
+        if store.layerSidebar.layers.contains(where: { $0.index == nanoBananaInputLayerIndex }) {
+            return nanoBananaInputLayerIndex
+        }
+        return store.layerSidebar.activeLayerIndex
+    }
+
+    var resolvedNanoBananaInputLayerName: String {
+        store.layerSidebar.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })?.name ?? "-"
+    }
+
+    func prepareNanoBananaComposer() {
+        nanoBananaPrompt = ""
+        nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
+        nanoBananaEditScope = store.canvas.selection?.isEmpty == false ? .selectedArea : .wholeLayer
+        nanoBananaMaskExpansion = 0
+        nanoBananaInvertsMask = false
+        nanoBananaOutputMode = .replaceCurrentLayer
+        nanoBananaModel = .flashImage25
+        workspaceBottomPanelSection = .nanoBanana
+        workspaceBottomPanelCollapsed = false
+    }
+
+    var nanoBananaGenerateDisabled: Bool {
+        store.isNanoBananaGenerating ||
+        store.layerSidebar.layers.isEmpty ||
+        nanoBananaPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        (
+            nanoBananaAccessMode == .userAPIKey
+            ? nanoBananaAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            : (
+                !nanoBananaCommerce.isSubscriptionActive ||
+                nanoBananaCommerce.latestEntitlementJWS.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                nanoBananaCommerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
+        )
+    }
+
+    func submitNanoBananaRequest(closeSheet: Bool) {
+        nanoBananaFocusedField = nil
+        store.send(
+            .nanoBananaEditRequested(
+                NanoBananaGenerationRequest(
+                    prompt: nanoBananaPrompt,
+                    config: NanoBananaRequestConfig(
+                        accessMode: nanoBananaAccessMode,
+                        credential: nanoBananaAccessMode == .userAPIKey ? nanoBananaAPIKey : nanoBananaCommerce.latestEntitlementJWS,
+                        endpoint: nanoBananaCommerce.proxyEndpoint
+                    ),
+                    model: nanoBananaModel,
+                    inputLayerIndex: resolvedNanoBananaInputLayerIndex,
+                    editScope: nanoBananaEditScope,
+                    outputMode: nanoBananaOutputMode,
+                    maskSettings: NanoBananaMaskSettings(
+                        expansion: nanoBananaMaskExpansion,
+                        isInverted: nanoBananaInvertsMask
+                    )
+                )
+            )
+        )
+        if closeSheet {
+            showsNanoBananaSheet = false
+        }
+    }
+
     var canvasSizePresets: [(label: String, width: Int, height: Int)] {
         [
             (
@@ -705,43 +770,9 @@ extension ContentView {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("Generate")) {
-                        nanoBananaFocusedField = nil
-                        store.send(
-                            .nanoBananaEditRequested(
-                                NanoBananaGenerationRequest(
-                                    prompt: nanoBananaPrompt,
-                                    config: NanoBananaRequestConfig(
-                                    accessMode: nanoBananaAccessMode,
-                                    credential: nanoBananaAccessMode == .userAPIKey ? nanoBananaAPIKey : nanoBananaCommerce.latestEntitlementJWS,
-                                    endpoint: nanoBananaCommerce.proxyEndpoint
-                                ),
-                                    model: nanoBananaModel,
-                                    inputLayerIndex: nanoBananaInputLayerIndex,
-                                    editScope: nanoBananaEditScope,
-                                    outputMode: nanoBananaOutputMode,
-                                    maskSettings: NanoBananaMaskSettings(
-                                        expansion: nanoBananaMaskExpansion,
-                                        isInverted: nanoBananaInvertsMask
-                                    )
-                                )
-                            )
-                        )
-                        showsNanoBananaSheet = false
+                        submitNanoBananaRequest(closeSheet: true)
                     }
-                    .disabled(
-                        store.isNanoBananaGenerating ||
-                        store.layerSidebar.layers.isEmpty ||
-                        nanoBananaPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                        (
-                            nanoBananaAccessMode == .userAPIKey
-                            ? nanoBananaAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            : (
-                                !nanoBananaCommerce.isSubscriptionActive ||
-                                nanoBananaCommerce.latestEntitlementJWS.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                                nanoBananaCommerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                            )
-                        )
-                    )
+                    .disabled(nanoBananaGenerateDisabled)
                 }
             }
         }
@@ -1150,13 +1181,7 @@ extension ContentView {
                 .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
 
                 Button(StudioStrings.nanoBananaEdit(language)) {
-                    nanoBananaPrompt = ""
-                    nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
-                    nanoBananaEditScope = store.canvas.selection?.isEmpty == false ? .selectedArea : .wholeLayer
-                    nanoBananaMaskExpansion = 0
-                    nanoBananaInvertsMask = false
-                    nanoBananaOutputMode = .replaceCurrentLayer
-                    nanoBananaModel = .flashImage25
+                    prepareNanoBananaComposer()
                     showsNanoBananaSheet = true
                 }
                 .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || store.isNanoBananaGenerating)

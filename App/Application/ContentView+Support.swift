@@ -256,12 +256,33 @@ struct DiagonalStageLines: View {
 }
 
 extension ContentView {
+    func workspaceTabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
+        store.openTabs.filter { $0.pane == pane }
+    }
+
+    func workspaceSelectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
+        switch pane {
+        case .primary:
+            return store.primarySelectedTabID
+        case .secondary:
+            return store.secondarySelectedTabID
+        }
+    }
+
+    func workspaceSelectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
+        guard let selectedTabID = workspaceSelectedTabID(for: pane) else { return nil }
+        return store.openTabs.first(where: { $0.id == selectedTabID })
+    }
+
     var homeDashboard: some View {
         ZStack {
             homeBackground
 
             VStack(spacing: 0) {
                 homeTopBar
+                if !store.openTabs.isEmpty {
+                    workspaceTabBar
+                }
 
                 HStack(spacing: 0) {
                     homeSidebar
@@ -274,6 +295,166 @@ extension ContentView {
     private var homeBackground: some View {
         Color(red: 0.17, green: 0.17, blue: 0.17)
         .ignoresSafeArea()
+    }
+
+    var workspaceTabBar: some View {
+        Group {
+            if store.workspaceLayout == .split {
+                HStack(spacing: 0) {
+                    workspaceTabStrip(for: .primary)
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 1)
+                    workspaceTabStrip(for: .secondary)
+                }
+            } else {
+                workspaceTabStrip(for: .primary)
+            }
+        }
+        .background(StudioTheme.Gradients.chrome)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.white.opacity(0.05))
+                .frame(height: 1)
+        }
+    }
+
+    func workspaceTabStrip(for pane: WorkspacePane) -> some View {
+        let tabs = workspaceTabs(in: pane)
+
+        return HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tabs) { tab in
+                        workspaceTabItem(tab, in: pane)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard
+                    let rawValue = items.first,
+                    let movingID = UUID(uuidString: rawValue)
+                else {
+                    return false
+                }
+                store.send(.tabDropped(moving: movingID, toPane: pane, before: nil))
+                return true
+            }
+
+            HStack(spacing: 6) {
+                if pane == .primary {
+                    if store.workspaceLayout == .single, store.activeTabID != nil {
+                        workspaceTabChromeButton(symbol: "square.split.2x1") {
+                            store.send(.splitActiveTabIntoSecondaryPane)
+                        }
+                    } else if store.workspaceLayout == .split {
+                        workspaceTabChromeButton(symbol: "sidebar.leading") {
+                            store.send(.mergeWorkspacePanes)
+                        }
+                    }
+                }
+            }
+            .padding(.trailing, 10)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    func workspaceTabItem(_ tab: OpenDocumentTab, in pane: WorkspacePane) -> some View {
+        let isActive = store.activeTabID == tab.id && store.focusedWorkspacePane == pane
+        let isSelected = workspaceSelectedTabID(for: pane) == tab.id
+
+        return HStack(spacing: 10) {
+            Image(systemName: "doc.richtext")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
+
+            Circle()
+                .fill(tab.isDirty ? StudioTheme.Palette.accentBright : Color.clear)
+                .frame(width: 7, height: 7)
+
+            Text(tab.title)
+                .font(StudioTheme.Typography.label(10))
+                .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
+                .lineLimit(1)
+
+            Button {
+                store.send(.tabClosed(tab.id))
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
+                    .frame(width: 18, height: 18)
+                    .background(
+                        Circle()
+                            .fill(Color.black.opacity(0.16))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(minWidth: 144, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(isActive ? StudioTheme.Palette.selectedFill : (isSelected ? Color.white.opacity(0.08) : StudioTheme.Palette.toolbarFill))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(isActive ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.cardBorder, lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture {
+            store.send(.tabSelected(tab.id))
+        }
+        .contextMenu {
+            Button(language.localized("閉じる")) {
+                store.send(.tabClosed(tab.id))
+            }
+            Button(language.localized("他を閉じる")) {
+                store.send(.closeOtherTabs(tab.id))
+            }
+            Button(language.localized("右側を閉じる")) {
+                store.send(.closeTabsToRight(tab.id))
+            }
+            Button(language.localized("右ペインへ移動")) {
+                store.send(.moveTabToSecondaryPane(tab.id))
+            }
+            Button(language.localized("Explorer に表示")) {
+                workspaceSidebarSection = .explorer
+            }
+        }
+        .draggable(tab.id.uuidString)
+        .dropDestination(for: String.self) { items, _ in
+            guard
+                let rawValue = items.first,
+                let movingID = UUID(uuidString: rawValue),
+                movingID != tab.id
+            else {
+                return false
+            }
+            store.send(.tabDropped(moving: movingID, toPane: pane, before: tab.id))
+            return true
+        }
+    }
+
+    func workspaceTabChromeButton(symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.74))
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private var homeTopBar: some View {

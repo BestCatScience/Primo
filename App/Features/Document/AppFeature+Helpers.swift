@@ -48,7 +48,7 @@ extension AppFeature {
             state.canvas.transformPreviewOffset = .zero
             state.canvas.transformPreviewScale = 1.0
             state.canvas.transformPreviewRotationDegrees = 0
-            state.applyPresentation(paintDocumentClient.presentation())
+            applyDirtyPresentation(state: &state)
             return .none
         }
         let activeLayerIndex = state.canvas.activeLayerIndex
@@ -84,8 +84,56 @@ extension AppFeature {
         state.canvas.transformPreviewOffset = .zero
         state.canvas.transformPreviewScale = 1.0
         state.canvas.transformPreviewRotationDegrees = 0
-        state.applyPresentation(paintDocumentClient.presentation())
+        applyDirtyPresentation(state: &state)
         return .none
+    }
+
+    func persistActiveTabToBackingStore(state: inout State) {
+        guard let activeTab = state.activeTab else { return }
+        do {
+            try paintDocumentClient.saveProject(activeTab.backingStoreURL, state.resolvedPaperStyle())
+            state.updateActiveTabMetadata(
+                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+            )
+        } catch {
+            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+        }
+    }
+
+    func activateNewTab(
+        state: inout State,
+        title: String,
+        sourceProjectURL: URL?
+    ) {
+        let tabID = UUID()
+        guard let backingStoreURL = try? Self.tabBackingStoreURL(for: tabID) else {
+            state.bannerMessage = state.appLanguage.localized("Could not create a tab")
+            return
+        }
+        let tab = OpenDocumentTab(
+            id: tabID,
+            title: title,
+            backingStoreURL: backingStoreURL,
+            sourceProjectURL: sourceProjectURL,
+            canvasSize: state.canvas.canvasSize,
+            isDirty: false,
+            pane: state.focusedWorkspacePane,
+            previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+        )
+        state.openTabs.append(tab)
+        state.activeTabID = tabID
+        state.setSelectedTabID(tabID, for: state.focusedWorkspacePane)
+        persistActiveTabToBackingStore(state: &state)
+    }
+
+    func applyDirtyPresentation(state: inout State) {
+        state.applyPresentation(paintDocumentClient.presentation())
+        state.setActiveTabDirty(true)
+    }
+
+    static func nextUntitledTabTitle(existingTabs: [OpenDocumentTab]) -> String {
+        let untitledTabs = existingTabs.filter { $0.sourceProjectURL == nil && $0.title.hasPrefix("Untitled") }
+        return untitledTabs.isEmpty ? "Untitled" : "Untitled \(untitledTabs.count + 1)"
     }
 
     static func combinedSelection(
@@ -1650,7 +1698,7 @@ extension AppFeature {
 
     static func writePNGToDocuments(data: Data) throws -> URL {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let exportsDirectory = documentsDirectory.appendingPathComponent("atelierprime", isDirectory: true)
+        let exportsDirectory = documentsDirectory.appendingPathComponent("primo", isDirectory: true)
         try FileManager.default.createDirectory(at: exportsDirectory, withIntermediateDirectories: true)
         let url = exportsDirectory.appendingPathComponent(exportFilename())
         try data.write(to: url, options: .atomic)
@@ -1659,7 +1707,7 @@ extension AppFeature {
 
     static func writePNGToTemporaryDirectory(data: Data) throws -> URL {
         let temporaryDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("atelierprime-export", isDirectory: true)
+            .appendingPathComponent("primo-export", isDirectory: true)
         try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
         let url = temporaryDirectory.appendingPathComponent(exportFilename())
         try data.write(to: url, options: .atomic)
@@ -1668,14 +1716,25 @@ extension AppFeature {
 
     static func timelapseTemporaryDirectory() -> URL {
         FileManager.default.temporaryDirectory
-            .appendingPathComponent("atelierprime-export", isDirectory: true)
+            .appendingPathComponent("primo-export", isDirectory: true)
             .appendingPathComponent("timelapse", isDirectory: true)
+    }
+
+    static func tabProjectsDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primo-tabs", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func tabBackingStoreURL(for id: UUID) throws -> URL {
+        try tabProjectsDirectory().appendingPathComponent(id.uuidString, isDirectory: true)
     }
 
     static func appProjectsDirectory() throws -> URL {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let directory = documentsDirectory
-            .appendingPathComponent("atelierprime-projects", isDirectory: true)
+            .appendingPathComponent("primo-projects", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
     }
@@ -1687,11 +1746,8 @@ extension AppFeature {
     static func savedProjects() throws -> [SavedProjectSummary] {
         let fileManager = FileManager.default
         let directory = try appProjectsDirectory()
-        let urls = try fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
+        let urls = try fileManager.subpathsOfDirectory(atPath: directory.path)
+            .map { directory.appendingPathComponent($0, isDirectory: true) }
 
         return urls
             .filter { url in
@@ -1704,9 +1760,14 @@ extension AppFeature {
                 let presentation = loaded.presentation()
                 let previewData = loaded.compositePNGData(paperStyle: loaded.currentPaperStyle)
                 let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+                let relativeFolderPath = url
+                    .deletingLastPathComponent()
+                    .path.replacingOccurrences(of: directory.path, with: "")
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
                 return SavedProjectSummary(
                     url: url,
                     name: url.deletingPathExtension().lastPathComponent,
+                    relativeFolderPath: relativeFolderPath.isEmpty ? nil : relativeFolderPath,
                     modifiedAt: values?.contentModificationDate ?? .distantPast,
                     canvasSize: presentation.canvasSize,
                     layerCount: presentation.layerRows.count,
@@ -1716,11 +1777,33 @@ extension AppFeature {
             .sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
+    static func moveSavedProject(at url: URL, toRelativeFolderPath relativeFolderPath: String?) throws -> URL {
+        let fileManager = FileManager.default
+        let rootDirectory = try appProjectsDirectory()
+        let destinationDirectory: URL
+        if let relativeFolderPath, !relativeFolderPath.isEmpty {
+            destinationDirectory = rootDirectory.appendingPathComponent(relativeFolderPath, isDirectory: true)
+            try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+        } else {
+            destinationDirectory = rootDirectory
+        }
+
+        let destinationURL = destinationDirectory.appendingPathComponent(url.lastPathComponent, isDirectory: true)
+        guard destinationURL.standardizedFileURL != url.standardizedFileURL else {
+            return url
+        }
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            throw CocoaError(.fileWriteFileExists)
+        }
+        try fileManager.moveItem(at: url, to: destinationURL)
+        return destinationURL
+    }
+
     static func exportFilename() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "atelierprime-\(formatter.string(from: Date())).png"
+        return "primo-\(formatter.string(from: Date())).png"
     }
 
     static func pngData(fromLayerPixelData pixelData: Data, width: Int, height: Int) -> Data? {
@@ -2010,7 +2093,7 @@ extension AppFeature {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "atelierprime-\(formatter.string(from: Date())).atelier"
+        return "primo-\(formatter.string(from: Date())).atelier"
     }
 
     static func blendPreviewPixel(

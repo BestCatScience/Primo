@@ -417,7 +417,7 @@ extension PhotoshopBrushImportError: LocalizedError {
         case .htmlInsteadOfABR:
             return "The selected .abr file is actually an HTML page, not a Photoshop brush. Please re-download the real ABR file."
         case .missingSampleSection:
-            return "This ABR file does not contain a sampled brush section that atelierprime can import yet."
+            return "This ABR file does not contain a sampled brush section that primo can import yet."
         case let .unsupportedVersion(version):
             return "ABR version \(version) is not supported yet."
         case let .unsupportedSubversion(subversion):

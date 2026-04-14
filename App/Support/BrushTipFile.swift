@@ -5,8 +5,8 @@ import ImageIO
 import UniformTypeIdentifiers
 
 extension UTType {
-    static let atelierBrushTip = UTType(exportedAs: "com.bestcatscience.atelierprime.brush-tip", conformingTo: .data)
-    static let atelierDocument = UTType(exportedAs: "com.bestcatscience.atelierprime.document", conformingTo: .package)
+    static let atelierBrushTip = UTType(exportedAs: "com.bestcatscience.primo.brush-tip", conformingTo: .data)
+    static let atelierDocument = UTType(exportedAs: "com.bestcatscience.primo.document", conformingTo: .package)
 }
 
 struct BrushTipRaster: Equatable, Sendable {
@@ -211,7 +211,7 @@ enum BrushTipLibrary {
     private static func brushTipCacheDirectory() throws -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let directory = base
-            .appendingPathComponent("atelierprime", isDirectory: true)
+            .appendingPathComponent("primo", isDirectory: true)
             .appendingPathComponent("BrushTips", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory

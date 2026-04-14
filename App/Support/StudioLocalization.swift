@@ -5,7 +5,7 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
     case english
     case japanese
 
-    static let storageKey = "atelierprime.appLanguage"
+    static let storageKey = "primo.appLanguage"
 
     var id: String { rawValue }
 

@@ -1,6 +1,6 @@
-# atelierprime
+# primo
 
-`atelierprime` は、SwiftUI フロントエンドと C++ 描画コアを組み合わせた iPad ファーストのペイントプロトタイプです。
+`primo` は、SwiftUI フロントエンドと C++ 描画コアを組み合わせた iPad ファーストのペイントプロトタイプです。
 
 このリポジトリは「Apple Pencil での描画体験」と「Krita のような本格的な画像処理コア」のあいだをつなぐ実験場として作られています。UI は SwiftUI と TCA で組み、描画本体は C++ で持ち、Swift からは Objective-C++ ブリッジ越しに利用します。
 
@@ -44,26 +44,26 @@
   Swift と C++ の橋渡し層です。`APPaintDocumentBridge` が `PaintDocument` を Objective-C API として公開します。
 - `Engine/`
   描画コアです。レイヤー、ストローク、塗りつぶし、合成、dirty 管理などの中核処理があります。
-- `atelierprime.xcodeproj`
+- `primo.xcodeproj`
   依存関係込みでそのまま開ける Xcode プロジェクトです。
 
 ## 重要なファイル
 
-- [App/Features/Document/AppFeature.swift](/Users/goldstein/git/atelierprime/App/Features/Document/AppFeature.swift)
+- [App/Features/Document/AppFeature.swift](/Users/goldstein/git/primo/App/Features/Document/AppFeature.swift)
   アプリ全体のドキュメント操作を束ねる TCA reducer です。
-- [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/atelierprime/App/Features/Document/PaintDocumentSession.swift)
+- [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift)
   Swift 側の document session です。保存、読み込み、タイムラプス、presentation 生成を担当します。
-- [App/Features/Canvas/CanvasView.swift](/Users/goldstein/git/atelierprime/App/Features/Canvas/CanvasView.swift)
+- [App/Features/Canvas/CanvasView.swift](/Users/goldstein/git/primo/App/Features/Canvas/CanvasView.swift)
   UIKit ベースのキャンバスコンテナです。入力を受けて Metal 表示へ渡します。
-- [App/Features/Canvas/InputHandler.swift](/Users/goldstein/git/atelierprime/App/Features/Canvas/InputHandler.swift)
+- [App/Features/Canvas/InputHandler.swift](/Users/goldstein/git/primo/App/Features/Canvas/InputHandler.swift)
   Apple Pencil / touch をストロークや選択操作へ変換します。
-- [App/Rendering/MetalCanvasRenderer.swift](/Users/goldstein/git/atelierprime/App/Rendering/MetalCanvasRenderer.swift)
+- [App/Rendering/MetalCanvasRenderer.swift](/Users/goldstein/git/primo/App/Rendering/MetalCanvasRenderer.swift)
   合成済みピクセルデータを Metal テクスチャへ載せて描画します。
-- [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/atelierprime/Bridge/PaintDocumentBridge.mm)
+- [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/primo/Bridge/PaintDocumentBridge.mm)
   C++ エンジンを Swift から呼べるように変換するブリッジ実装です。
-- [Engine/include/PaintEngine.hpp](/Users/goldstein/git/atelierprime/Engine/include/PaintEngine.hpp)
+- [Engine/include/PaintEngine.hpp](/Users/goldstein/git/primo/Engine/include/PaintEngine.hpp)
   描画エンジンの公開インターフェースです。
-- [Engine/PaintEngine.cpp](/Users/goldstein/git/atelierprime/Engine/PaintEngine.cpp)
+- [Engine/PaintEngine.cpp](/Users/goldstein/git/primo/Engine/PaintEngine.cpp)
   ブラシ描画、ストロークキュー、タイルストレージ、レイヤー合成などの本体です。
 
 ## はじめ方
@@ -71,10 +71,10 @@
 1. Xcode でプロジェクトを開きます。
 
 ```bash
-open atelierprime.xcodeproj
+open primo.xcodeproj
 ```
 
-2. `atelierprime` スキームを iPad シミュレータまたは実機でビルドして実行します。
+2. `primo` スキームを iPad シミュレータまたは実機でビルドして実行します。
 3. Apple Pencil を使った描画挙動は実機のほうが確認しやすく、シミュレータは主に UI と基本動作の確認向けです。
 
 ## アーキテクチャ概要
@@ -132,7 +132,7 @@ open atelierprime.xcodeproj
 - `TimelapseData/`
   操作ベースのタイムラプス保存で使う補助データです。
 
-この形式は [PaintDocumentSession.swift](/Users/goldstein/git/atelierprime/App/Features/Document/PaintDocumentSession.swift) と [StoredAtelierDocument](/Users/goldstein/git/atelierprime/App/Features/Document/PaintDocumentSession.swift#L1249) で定義されています。
+この形式は [PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift) と [StoredAtelierDocument](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift#L1249) で定義されています。
 
 ## 開発メモ
 
@@ -143,11 +143,11 @@ open atelierprime.xcodeproj
 
 ## この README を読んだあとにおすすめの読む順番
 
-1. [App/Features/Document/AppFeature.swift](/Users/goldstein/git/atelierprime/App/Features/Document/AppFeature.swift)
-2. [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/atelierprime/App/Features/Document/PaintDocumentSession.swift)
-3. [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/atelierprime/Bridge/PaintDocumentBridge.mm)
-4. [Engine/include/PaintEngine.hpp](/Users/goldstein/git/atelierprime/Engine/include/PaintEngine.hpp)
-5. [Engine/PaintEngine.cpp](/Users/goldstein/git/atelierprime/Engine/PaintEngine.cpp)
+1. [App/Features/Document/AppFeature.swift](/Users/goldstein/git/primo/App/Features/Document/AppFeature.swift)
+2. [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift)
+3. [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/primo/Bridge/PaintDocumentBridge.mm)
+4. [Engine/include/PaintEngine.hpp](/Users/goldstein/git/primo/Engine/include/PaintEngine.hpp)
+5. [Engine/PaintEngine.cpp](/Users/goldstein/git/primo/Engine/PaintEngine.cpp)
 
 ## 現状の注意点
 

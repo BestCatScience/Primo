@@ -91,7 +91,7 @@ enum BrushPresetStore {
     private static func libraryDirectory() throws -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let directory = base
-            .appendingPathComponent("atelierprime", isDirectory: true)
+            .appendingPathComponent("primo", isDirectory: true)
             .appendingPathComponent("BrushLibrary", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory

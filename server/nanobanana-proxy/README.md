@@ -1,18 +1,18 @@
 # Nano Banana Proxy
 
-`atelierprime` の有料 Nano Banana 機能を代理実行するサーバーです。
+`primo` の有料 Nano Banana 機能を代理実行するサーバーです。
 
 このサーバーは次を行います。
 
 - アプリから送られた `Authorization: Bearer <Transaction JWS>` を検証
-- `com.atelierprime.nanobanana.monthly` の購読権利が有効か確認
+- `com.primo.nanobanana.monthly` の購読権利が有効か確認
 - 有効ならサーバー側の `GEMINI_API_KEY` で Nano Banana を呼ぶ
 - 生成画像だけをアプリへ返す
 
 ## 前提
 
 - Node.js 20 以上
-- App Store Connect で `com.atelierprime.nanobanana.monthly` を作成済み
+- App Store Connect で `com.primo.nanobanana.monthly` を作成済み
 - サーバー環境変数 `GEMINI_API_KEY` を設定済み
 - Apple Root CA 証明書を `certs/` に配置済み
 
@@ -83,7 +83,7 @@ Success:
 ```json
 {
   "image_base64": "...",
-  "product_id": "com.atelierprime.nanobanana.monthly",
+  "product_id": "com.primo.nanobanana.monthly",
   "environment": "Sandbox"
 }
 ```

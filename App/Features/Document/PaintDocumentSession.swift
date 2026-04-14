@@ -6,7 +6,7 @@ import UIKit
 import simd
 
 final class PaintDocumentSession: @unchecked Sendable {
-    private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Document")
+    private static let logger = Logger(subsystem: "com.primo.app", category: "Document")
     private static let maxTimelapseFrames = 20_000
     let bridge: APPaintDocumentBridge
     private var revision: Int = 0
@@ -1382,7 +1382,7 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     private static func makeTimelapseDirectoryURL() -> URL {
         FileManager.default.temporaryDirectory
-            .appendingPathComponent("atelierprime-timelapse", isDirectory: true)
+            .appendingPathComponent("primo-timelapse", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
     }
 

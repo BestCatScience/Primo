@@ -67,7 +67,7 @@ private enum MetalCanvasRendererCache {
 }
 
 final class MetalCanvasView: MTKView, MTKViewDelegate {
-    private static let logger = Logger(subsystem: "com.atelierprime.app", category: "Renderer")
+    private static let logger = Logger(subsystem: "com.primo.app", category: "Renderer")
     private let commandQueue: MTLCommandQueue?
     private let layerPipeline: MTLRenderPipelineState?
     private let paperPipeline: MTLRenderPipelineState?

@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000060"
-               BuildableName = "atelierprime.app"
-               BlueprintName = "atelierprime"
+               BuildableName = "Primo.app"
+               BlueprintName = "Primo"
                ReferencedContainer = "container:atelierprime.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A00000000000000000000060"
-            BuildableName = "atelierprime.app"
-            BlueprintName = "atelierprime"
+            BuildableName = "Primo.app"
+            BlueprintName = "Primo"
             ReferencedContainer = "container:atelierprime.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A00000000000000000000060"
-            BuildableName = "atelierprime.app"
-            BlueprintName = "atelierprime"
+            BuildableName = "Primo.app"
+            BlueprintName = "Primo"
             ReferencedContainer = "container:atelierprime.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

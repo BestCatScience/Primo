@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <variant>
 
-namespace atelierprime {
+namespace primo {
 
 namespace {
 
@@ -3127,4 +3127,4 @@ void PaintDocument::rebuildComposite() const {
     }
 }
 
-}  // namespace atelierprime
+}  // namespace primo

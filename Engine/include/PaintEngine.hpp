@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace atelierprime {
+namespace primo {
 
 struct BrushSettings {
     std::string tipKind = "pencil";
@@ -355,4 +355,4 @@ private:
     void rebuildComposite() const;
 };
 
-}  // namespace atelierprime
+}  // namespace primo
