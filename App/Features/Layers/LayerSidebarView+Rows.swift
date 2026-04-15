@@ -22,6 +22,16 @@ extension LayerSidebarView {
                 }
 
                 layerStatusButton(
+                    systemImage: "arrow.turn.down.right",
+                    rotationDegrees: 90,
+                    isActive: activeLayer.isClipped,
+                    accessibilityLabel: language.localized("Clipping Mask")
+                ) {
+                    store.send(.clippingMaskButtonTapped(activeLayer.index))
+                }
+                .disabled(activeLayer.index <= 0 && !activeLayer.isClipped)
+
+                layerStatusButton(
                     systemImage: activeLayer.isLocked ? "lock.fill" : "lock.open",
                     isActive: activeLayer.isLocked,
                     accessibilityLabel: language.localized("レイヤーロック")
@@ -73,12 +83,14 @@ extension LayerSidebarView {
 
     func layerStatusButton(
         systemImage: String,
+        rotationDegrees: Double = 0,
         isActive: Bool,
         accessibilityLabel: String,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
+                .rotationEffect(.degrees(rotationDegrees))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
                 .frame(width: 30, height: 28)
@@ -239,6 +251,13 @@ extension LayerSidebarView {
                             .foregroundStyle(StudioTheme.Palette.accentBright)
                     }
 
+                    if layer.isClipped {
+                        Image(systemName: "arrow.turn.down.right")
+                            .rotationEffect(.degrees(90))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(StudioTheme.Palette.warning)
+                    }
+
                     if layer.isTextLayer {
                         Image(systemName: "textformat")
                             .font(.system(size: 11, weight: .semibold))
@@ -248,6 +267,18 @@ extension LayerSidebarView {
                     Spacer(minLength: 10)
 
                     Menu {
+                        Button {
+                            store.send(.clippingMaskButtonTapped(layer.index))
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.turn.down.right")
+                                    .rotationEffect(.degrees(90))
+                                Text(language.localized("Clipping Mask"))
+                            }
+                        }
+
+                        Divider()
+
                         ForEach(LayerBlendMode.allCases) { blendMode in
                             Button {
                                 store.send(.blendModeSelected(layer.index, blendMode))

@@ -1715,6 +1715,7 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
     let opacity: Double
     let isLocked: Bool
     let isAlphaLocked: Bool
+    let isClipped: Bool
     let blendMode: LayerBlendMode
     let folderID: Int?
     let hasMask: Bool
@@ -1728,6 +1729,7 @@ struct LayerRowModel: Identifiable, Equatable, Sendable {
         lhs.opacity == rhs.opacity &&
         lhs.isLocked == rhs.isLocked &&
         lhs.isAlphaLocked == rhs.isAlphaLocked &&
+        lhs.isClipped == rhs.isClipped &&
         lhs.blendMode == rhs.blendMode &&
         lhs.folderID == rhs.folderID &&
         lhs.hasMask == rhs.hasMask &&
@@ -1884,6 +1886,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
     let index: Int
     let opacity: Float
     let visible: Bool
+    let isClipped: Bool
     let blendMode: LayerBlendMode
     let thumbnailData: Data?
     let pixelData: Data
@@ -1892,6 +1895,7 @@ struct MetalLayerSnapshot: Identifiable, Equatable {
         lhs.index == rhs.index &&
         lhs.opacity == rhs.opacity &&
         lhs.visible == rhs.visible &&
+        lhs.isClipped == rhs.isClipped &&
         lhs.blendMode == rhs.blendMode &&
         lhs.thumbnailData?.count == rhs.thumbnailData?.count &&
         lhs.pixelData.count == rhs.pixelData.count

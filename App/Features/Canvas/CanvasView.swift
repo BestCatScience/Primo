@@ -1041,6 +1041,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         guard let transformedLayerData else { return nil }
 
         var composite = Data(count: snapshot.width * snapshot.height * 4)
+        var clipMask = [CGFloat](repeating: 0, count: snapshot.width * snapshot.height)
         composite.withUnsafeMutableBytes { destinationBytes in
             guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
@@ -1049,10 +1050,16 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                     guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
                     for pixelIndex in 0..<(snapshot.width * snapshot.height) {
                         let offset = pixelIndex * 4
+                        let alphaOffset = offset + 3
+                        let baseAlpha = (CGFloat(source[alphaOffset]) / 255.0) * CGFloat(layer.opacity)
+                        let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
+                        if !layer.isClipped {
+                            clipMask[pixelIndex] = baseAlpha
+                        }
                         blendPixel(
                             destination: destination + offset,
                             source: source + offset,
-                            opacity: CGFloat(layer.opacity),
+                            opacity: effectiveAlpha,
                             blendMode: layer.blendMode
                         )
                     }

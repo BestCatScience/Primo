@@ -28,6 +28,7 @@ struct LayerSidebarFeature {
         case visibilityButtonTapped(Int)
         case layerLockButtonTapped(Int)
         case alphaLockButtonTapped(Int)
+        case clippingMaskButtonTapped(Int)
         case mergeDownButtonTapped(Int)
         case duplicateLayerButtonTapped(Int)
         case opacityChanged(Int, Double)
@@ -52,6 +53,7 @@ struct LayerSidebarFeature {
         case toggleVisibility(Int)
         case toggleLayerLock(Int)
         case toggleAlphaLock(Int)
+        case toggleClippingMask(Int)
         case mergeDown(Int)
         case duplicateLayer(Int)
         case setOpacity(Int, Double)
@@ -104,6 +106,8 @@ struct LayerSidebarFeature {
                 return .send(.delegate(.toggleLayerLock(index)))
             case let .alphaLockButtonTapped(index):
                 return .send(.delegate(.toggleAlphaLock(index)))
+            case let .clippingMaskButtonTapped(index):
+                return .send(.delegate(.toggleClippingMask(index)))
             case let .mergeDownButtonTapped(index):
                 return .send(.delegate(.mergeDown(index)))
             case let .duplicateLayerButtonTapped(index):

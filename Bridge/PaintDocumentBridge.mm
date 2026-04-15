@@ -327,6 +327,7 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
                      visible:(BOOL)visible
                       locked:(BOOL)locked
                  alphaLocked:(BOOL)alphaLocked
+                     clipped:(BOOL)clipped
                      opacity:(CGFloat)opacity
                    blendMode:(NSString *)blendMode
                     folderID:(NSInteger)folderID
@@ -337,6 +338,7 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
         _visible = visible;
         _locked = locked;
         _alphaLocked = alphaLocked;
+        _clipped = clipped;
         _opacity = opacity;
         _blendMode = [blendMode copy];
         _folderID = folderID;
@@ -438,6 +440,7 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
                                                                 visible:layer.visible
                                                                  locked:layer.locked
                                                             alphaLocked:layer.alphaLocked
+                                                                clipped:layer.clipped
                                                                 opacity:layer.opacity
                                                               blendMode:APStringFromBlendMode(layer.blendMode)
                                                                folderID:_document->layerFolderID(index)
@@ -537,6 +540,10 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
 
 - (void)setLayerAlphaLocked:(BOOL)alphaLocked atIndex:(NSInteger)index {
     _document->setLayerAlphaLocked((int)index, alphaLocked);
+}
+
+- (void)setLayerClipped:(BOOL)clipped atIndex:(NSInteger)index {
+    _document->setLayerClipped((int)index, clipped);
 }
 
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index {

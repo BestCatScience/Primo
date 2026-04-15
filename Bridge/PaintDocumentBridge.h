@@ -108,6 +108,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) BOOL visible;
 @property (nonatomic) BOOL locked;
 @property (nonatomic) BOOL alphaLocked;
+@property (nonatomic) BOOL clipped;
 @property (nonatomic) CGFloat opacity;
 @property (nonatomic, copy) NSString *blendMode;
 @property (nonatomic) NSInteger folderID;
@@ -117,6 +118,7 @@ NS_ASSUME_NONNULL_BEGIN
                      visible:(BOOL)visible
                       locked:(BOOL)locked
                  alphaLocked:(BOOL)alphaLocked
+                     clipped:(BOOL)clipped
                      opacity:(CGFloat)opacity
                    blendMode:(NSString *)blendMode
                     folderID:(NSInteger)folderID
@@ -229,6 +231,7 @@ typedef NS_ENUM(NSInteger, APPaintGradientMapPreset) {
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerVisible(_:at:));
 - (void)setLayerLocked:(BOOL)locked atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerLocked(_:at:));
 - (void)setLayerAlphaLocked:(BOOL)alphaLocked atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerAlphaLocked(_:at:));
+- (void)setLayerClipped:(BOOL)clipped atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerClipped(_:at:));
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerOpacity(_:at:));
 - (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index NS_SWIFT_NAME(setLayerBlendMode(_:at:));
 - (void)setFolderVisible:(BOOL)visible folderID:(NSInteger)folderID NS_SWIFT_NAME(setFolderVisible(_:folderID:));

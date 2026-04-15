@@ -66,6 +66,7 @@ enum StudioStrings {
         "Cancel": "キャンセル",
         "Canvas": "キャンバス",
         "Clear Selection": "選択を解除",
+        "Clipping Mask": "クリッピングマスク",
         "Close Path": "パスを閉じる",
         "Color": "色",
         "Color Burn": "焼き込みカラー",

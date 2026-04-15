@@ -422,6 +422,7 @@ extension AppFeature {
         guard adjustedActiveLayerPixels.count == snapshot.width * snapshot.height * 4 else { return nil }
 
         var composite = Data(count: snapshot.width * snapshot.height * 4)
+        var clipMask = [CGFloat](repeating: 0, count: snapshot.width * snapshot.height)
         composite.withUnsafeMutableBytes { destinationBytes in
             guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
@@ -430,10 +431,15 @@ extension AppFeature {
                     guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
                     for pixelIndex in 0..<(snapshot.width * snapshot.height) {
                         let offset = pixelIndex * 4
+                        let baseAlpha = (CGFloat(source[offset + 3]) / 255.0) * CGFloat(layer.opacity)
+                        let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
+                        if !layer.isClipped {
+                            clipMask[pixelIndex] = baseAlpha
+                        }
                         blendPreviewPixel(
                             destination: destination + offset,
                             source: source + offset,
-                            opacity: CGFloat(layer.opacity),
+                            opacity: effectiveAlpha,
                             blendMode: layer.blendMode
                         )
                     }
@@ -493,6 +499,7 @@ extension AppFeature {
 
         let rectDataCount = dirtyRect.width * dirtyRect.height * 4
         var composite = Data(count: rectDataCount)
+        var clipMask = [CGFloat](repeating: 0, count: dirtyRect.width * dirtyRect.height)
         composite.withUnsafeMutableBytes { destinationBytes in
             guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) {
@@ -507,10 +514,16 @@ extension AppFeature {
                             let sourceX = dirtyRect.originX + localX
                             let sourceOffset = ((sourceY * snapshot.width) + sourceX) * 4
                             let destinationOffset = ((localY * dirtyRect.width) + localX) * 4
+                            let maskIndex = (localY * dirtyRect.width) + localX
+                            let baseAlpha = (CGFloat(source[sourceOffset + 3]) / 255.0) * CGFloat(layer.opacity)
+                            let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[maskIndex]) : baseAlpha
+                            if !layer.isClipped {
+                                clipMask[maskIndex] = baseAlpha
+                            }
                             blendPreviewPixel(
                                 destination: destination + destinationOffset,
                                 source: source + sourceOffset,
-                                opacity: CGFloat(layer.opacity),
+                                opacity: effectiveAlpha,
                                 blendMode: layer.blendMode
                             )
                         }

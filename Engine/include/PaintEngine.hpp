@@ -162,6 +162,7 @@ struct Layer {
     bool visible = true;
     bool locked = false;
     bool alphaLocked = false;
+    bool clipped = false;
     float opacity = 1.0F;
     BlendMode blendMode = BlendMode::Normal;
     int tileColumns = 0;
@@ -258,6 +259,7 @@ public:
     void setLayerVisibility(int index, bool visible);
     void setLayerLocked(int index, bool locked);
     void setLayerAlphaLocked(int index, bool alphaLocked);
+    void setLayerClipped(int index, bool clipped);
     void setLayerOpacity(int index, float opacity);
     void setLayerBlendMode(int index, Layer::BlendMode blendMode);
     bool applyLayerProcessing(int index, const LayerProcessing& processing);

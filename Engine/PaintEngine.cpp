@@ -1850,6 +1850,18 @@ void PaintDocument::setLayerAlphaLocked(int index, bool alphaLocked) {
     markEntireDocumentDirty();
 }
 
+void PaintDocument::setLayerClipped(int index, bool clipped) {
+    if (index < 0 || index >= layerCount()) {
+        return;
+    }
+    if (layers_[index].clipped == clipped) {
+        return;
+    }
+    pushLayerHistorySnapshot(index);
+    layers_[index].clipped = clipped;
+    markEntireDocumentDirty();
+}
+
 void PaintDocument::setLayerOpacity(int index, float opacity) {
     if (index < 0 || index >= layerCount()) {
         return;
@@ -3048,6 +3060,7 @@ void PaintDocument::rebuildComposite() const {
                     0U
                 );
             }
+            std::vector<float> clipMaskBuffer(static_cast<size_t>(copyWidth) * static_cast<size_t>(copyHeight), 0.0F);
 
             for (size_t layerIndexValue = 0; layerIndexValue < layers_.size(); ++layerIndexValue) {
                 const auto& layer = layers_[layerIndexValue];
@@ -3069,6 +3082,14 @@ void PaintDocument::rebuildComposite() const {
                             const size_t maskOffset =
                                 static_cast<size_t>(imageY) * static_cast<size_t>(width_) + static_cast<size_t>(imageX);
                             srcA *= static_cast<float>(layer.mask[maskOffset]) / 255.0F;
+                        }
+                        const size_t clipIndex =
+                            static_cast<size_t>(localY) * static_cast<size_t>(copyWidth) + static_cast<size_t>(localX);
+                        const float baseMaskAlpha = clipMaskBuffer[clipIndex];
+                        if (layer.clipped) {
+                            srcA *= baseMaskAlpha;
+                        } else {
+                            clipMaskBuffer[clipIndex] = srcA;
                         }
                         if (srcA <= 0.0F) {
                             continue;

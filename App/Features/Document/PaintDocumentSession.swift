@@ -76,6 +76,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 index: index,
                 opacity: Float(info.opacity),
                 visible: info.visible && (info.folderID < 0 || (folderVisibilityByID[Int(info.folderID)] ?? true)),
+                isClipped: info.clipped,
                 blendMode: LayerBlendMode(rawValue: info.blendMode) ?? .normal,
                 thumbnailData: cachedLayerThumbnailData(index: index),
                 pixelData: bridge.pixelDataForLayer(at: index) as Data
@@ -368,6 +369,13 @@ final class PaintDocumentSession: @unchecked Sendable {
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) {
         bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
         timelapseEvents.append(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked))
+        captureTimelapseFrame()
+    }
+
+    func setLayerClipped(index: Int, isClipped: Bool) {
+        bridge.setLayerClipped(isClipped, at: index)
+        invalidateThumbnailCache(for: index)
+        timelapseEvents.append(.setLayerClipped(index: index, isClipped: isClipped))
         captureTimelapseFrame()
     }
 
@@ -747,6 +755,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 opacity: layer.opacity,
                 isLocked: layer.locked,
                 isAlphaLocked: layer.alphaLocked,
+                isClipped: layer.clipped,
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
                 hasMask: layer.hasMask,
@@ -852,6 +861,7 @@ final class PaintDocumentSession: @unchecked Sendable {
                 visible: layerInfo.visible,
                 locked: layerInfo.locked,
                 alphaLocked: layerInfo.alphaLocked,
+                clipped: layerInfo.clipped,
                 opacity: layerInfo.opacity,
                 blendMode: layerInfo.blendMode,
                 folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
@@ -897,7 +907,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             : []
 
         let document = StoredAtelierDocument(
-            version: 4,
+            version: 5,
             canvasWidth: Int(bridge.width),
             canvasHeight: Int(bridge.height),
             activeLayerIndex: Int(bridge.activeLayerIndex),
@@ -955,6 +965,7 @@ final class PaintDocumentSession: @unchecked Sendable {
             session.bridge.setLayerVisible(layer.visible, at: layer.index)
             session.bridge.setLayerLocked(layer.locked, at: layer.index)
             session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
+            session.bridge.setLayerClipped(layer.clipped, at: layer.index)
             session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
             session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
             if let textLayer = layer.textLayer {
@@ -1307,6 +1318,10 @@ final class PaintDocumentSession: @unchecked Sendable {
             bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
             invalidateThumbnailCache(for: index)
 
+        case let .setLayerClipped(index, isClipped):
+            bridge.setLayerClipped(isClipped, at: index)
+            invalidateThumbnailCache(for: index)
+
         case let .setLayerOpacity(index, opacity):
             bridge.setLayerOpacity(CGFloat(opacity), at: index)
             invalidateThumbnailCache(for: index)
@@ -1612,6 +1627,7 @@ enum TimelapseOperation: Equatable, Sendable {
     case setLayerVisibility(index: Int, isVisible: Bool)
     case setLayerLocked(index: Int, isLocked: Bool)
     case setLayerAlphaLocked(index: Int, isAlphaLocked: Bool)
+    case setLayerClipped(index: Int, isClipped: Bool)
     case setLayerOpacity(index: Int, opacity: Double)
     case setLayerBlendMode(index: Int, blendMode: LayerBlendMode)
     case replaceLayerPixels(index: Int, data: Data)
@@ -1692,6 +1708,8 @@ enum TimelapseOperation: Equatable, Sendable {
             return StoredTimelapseOperation(kind: .setLayerLocked, layerIndex: index, isLocked: isLocked)
         case let .setLayerAlphaLocked(index, isAlphaLocked):
             return StoredTimelapseOperation(kind: .setLayerAlphaLocked, layerIndex: index, isAlphaLocked: isAlphaLocked)
+        case let .setLayerClipped(index, isClipped):
+            return StoredTimelapseOperation(kind: .setLayerClipped, layerIndex: index, isClipped: isClipped)
         case let .setLayerOpacity(index, opacity):
             return StoredTimelapseOperation(kind: .setLayerOpacity, layerIndex: index, opacity: opacity)
         case let .setLayerBlendMode(index, blendMode):
@@ -1776,6 +1794,9 @@ enum TimelapseOperation: Equatable, Sendable {
         case .setLayerAlphaLocked:
             guard let layerIndex = stored.layerIndex, let isAlphaLocked = stored.isAlphaLocked else { throw AtelierDocumentError.invalidDocument }
             self = .setLayerAlphaLocked(index: layerIndex, isAlphaLocked: isAlphaLocked)
+        case .setLayerClipped:
+            guard let layerIndex = stored.layerIndex, let isClipped = stored.isClipped else { throw AtelierDocumentError.invalidDocument }
+            self = .setLayerClipped(index: layerIndex, isClipped: isClipped)
         case .setLayerOpacity:
             guard let layerIndex = stored.layerIndex, let opacity = stored.opacity else { throw AtelierDocumentError.invalidDocument }
             self = .setLayerOpacity(index: layerIndex, opacity: opacity)
@@ -1836,6 +1857,7 @@ struct StoredAtelierDocument: Codable {
         let visible: Bool
         let locked: Bool
         let alphaLocked: Bool
+        let clipped: Bool
         let opacity: Double
         let blendMode: String
         let folderID: Int?
@@ -1849,6 +1871,7 @@ struct StoredAtelierDocument: Codable {
             case visible
             case locked
             case alphaLocked
+            case clipped
             case opacity
             case blendMode
             case folderID
@@ -1863,6 +1886,7 @@ struct StoredAtelierDocument: Codable {
             visible: Bool,
             locked: Bool,
             alphaLocked: Bool,
+            clipped: Bool,
             opacity: Double,
             blendMode: String,
             folderID: Int?,
@@ -1875,6 +1899,7 @@ struct StoredAtelierDocument: Codable {
             self.visible = visible
             self.locked = locked
             self.alphaLocked = alphaLocked
+            self.clipped = clipped
             self.opacity = opacity
             self.blendMode = blendMode
             self.folderID = folderID
@@ -1890,6 +1915,7 @@ struct StoredAtelierDocument: Codable {
             visible = try container.decode(Bool.self, forKey: .visible)
             locked = try container.decodeIfPresent(Bool.self, forKey: .locked) ?? false
             alphaLocked = try container.decodeIfPresent(Bool.self, forKey: .alphaLocked) ?? false
+            clipped = try container.decodeIfPresent(Bool.self, forKey: .clipped) ?? false
             opacity = try container.decode(Double.self, forKey: .opacity)
             blendMode = try container.decode(String.self, forKey: .blendMode)
             folderID = try container.decodeIfPresent(Int.self, forKey: .folderID)
@@ -2244,6 +2270,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case setLayerVisibility
         case setLayerLocked
         case setLayerAlphaLocked
+        case setLayerClipped
         case setLayerOpacity
         case setLayerBlendMode
         case replaceLayerPixels
@@ -2263,6 +2290,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     var isVisible: Bool?
     var isLocked: Bool?
     var isAlphaLocked: Bool?
+    var isClipped: Bool?
     var opacity: Double?
     var blendMode: String?
     var brush: StoredBrushRuntimeSettings?
@@ -2281,6 +2309,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         isVisible: Bool? = nil,
         isLocked: Bool? = nil,
         isAlphaLocked: Bool? = nil,
+        isClipped: Bool? = nil,
         opacity: Double? = nil,
         blendMode: String? = nil,
         brush: StoredBrushRuntimeSettings? = nil,
@@ -2298,6 +2327,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         self.isVisible = isVisible
         self.isLocked = isLocked
         self.isAlphaLocked = isAlphaLocked
+        self.isClipped = isClipped
         self.opacity = opacity
         self.blendMode = blendMode
         self.brush = brush

@@ -38,6 +38,7 @@ struct PaintDocumentClient: Sendable {
     var setLayerVisibility: @Sendable (Int, Bool) -> Void
     var setLayerLocked: @Sendable (Int, Bool) -> Void
     var setLayerAlphaLocked: @Sendable (Int, Bool) -> Void
+    var setLayerClipped: @Sendable (Int, Bool) -> Void
     var revealLayerForEditing: @Sendable (Int) -> Void
     var setLayerOpacity: @Sendable (Int, Double) -> Void
     var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
@@ -108,6 +109,7 @@ struct PaintDocumentClient: Sendable {
             setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
             setLayerLocked: { index, isLocked in sessionBox.session.setLayerLocked(index: index, isLocked: isLocked) },
             setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.session.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) },
+            setLayerClipped: { index, isClipped in sessionBox.session.setLayerClipped(index: index, isClipped: isClipped) },
             revealLayerForEditing: { index in sessionBox.session.revealLayerForEditing(index: index) },
             setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
             setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },

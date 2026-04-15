@@ -358,6 +358,7 @@ struct AppFeature {
                         index: buffer.index,
                         opacity: Float(buffer.opacity),
                         visible: buffer.visible,
+                        isClipped: false,
                         blendMode: buffer.blendMode,
                         thumbnailData: nil,
                         pixelData: Data()
@@ -396,6 +397,7 @@ struct AppFeature {
                     index: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
+                    isClipped: layer.isClipped,
                     blendMode: layer.blendMode,
                     thumbnailData: layer.thumbnailData,
                     pixelData: adjustedActiveLayerPixels
@@ -2023,6 +2025,17 @@ struct AppFeature {
                     return .none
                 }
                 paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
+                applyDirtyPresentation(state: &state)
+                return .none
+
+            case let .layerSidebar(.delegate(.toggleClippingMask(index))):
+                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+                    return .none
+                }
+                guard layer.isClipped || index > 0 else {
+                    return .none
+                }
+                paintDocumentClient.setLayerClipped(index, !layer.isClipped)
                 applyDirtyPresentation(state: &state)
                 return .none
 

@@ -91,7 +91,7 @@ struct LayerSidebarView: View {
                         activeLayerOpacitySection(activeLayer)
                     }
 
-                    ForEach(store.rows) { row in
+                    ForEach(store.rows, id: \.id) { row in
                         switch row {
                         case let .folder(folder):
                             folderRow(for: folder)
