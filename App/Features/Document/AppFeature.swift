@@ -582,6 +582,8 @@ struct AppFeature {
         case languageChanged(AppLanguage)
         case toolSelected(StudioToolKind)
         case toolLongPressed(StudioToolKind)
+        case resizeCanvasRequested(width: Int, height: Int)
+        case resizeCanvasExtentRequested(width: Int, height: Int)
         case newCanvasFromImageReceived(name: String?, data: Data)
         case newCanvasFromImageFailed(String)
         case clearActiveLayerButtonTapped
@@ -884,6 +886,44 @@ struct AppFeature {
                     .cancel(id: CancelID.startupPresentationLoad),
                     .cancel(id: CancelID.deferredPresentationRefresh)
                 )
+
+            case let .resizeCanvasRequested(width, height):
+                let width = max(width, 1)
+                let height = max(height, 1)
+                let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
+                let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
+                guard width != currentWidth || height != currentHeight else {
+                    return .none
+                }
+                paintDocumentClient.resizeCanvas(width, height)
+                state.canvas.selection = nil
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.adjustmentPreviewPixelData = nil
+                applyDirtyPresentation(state: &state)
+                state.bannerMessage = state.appLanguage.localized("Image resolution updated")
+                return .none
+
+            case let .resizeCanvasExtentRequested(width, height):
+                let width = max(width, 1)
+                let height = max(height, 1)
+                let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
+                let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
+                guard width != currentWidth || height != currentHeight else {
+                    return .none
+                }
+                paintDocumentClient.resizeCanvasExtent(width, height)
+                state.canvas.selection = nil
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.adjustmentPreviewPixelData = nil
+                applyDirtyPresentation(state: &state)
+                state.bannerMessage = state.appLanguage.localized("Canvas size updated")
+                return .none
 
             case let .newCanvasFromImageReceived(name, data):
                 if !state.showsHome {

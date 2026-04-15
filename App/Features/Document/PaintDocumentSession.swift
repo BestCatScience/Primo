@@ -8,7 +8,7 @@ import simd
 final class PaintDocumentSession: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "Document")
     private static let maxTimelapseFrames = 20_000
-    let bridge: APPaintDocumentBridge
+    var bridge: APPaintDocumentBridge
     private var revision: Int = 0
     private var activeStrokeLayerIndex: Int?
     private var activeStrokeBrush: BrushRuntimeSettings?
@@ -746,6 +746,227 @@ final class PaintDocumentSession: @unchecked Sendable {
         timelapseEvents.append(.setPaperStyle(style))
     }
 
+    func resizeCanvas(width: Int, height: Int) {
+        let targetWidth = max(width, 1)
+        let targetHeight = max(height, 1)
+        let sourceWidth = Int(bridge.width)
+        let sourceHeight = Int(bridge.height)
+        guard targetWidth != sourceWidth || targetHeight != sourceHeight else { return }
+
+        let layerInfos = bridge.layerInfos()
+        let folderInfos = bridge.folderInfos()
+        let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
+        let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
+        let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
+        let sourceTextLayers = textLayers
+        let widthScale = CGFloat(targetWidth) / CGFloat(max(sourceWidth, 1))
+        let heightScale = CGFloat(targetHeight) / CGFloat(max(sourceHeight, 1))
+        let textScale = min(widthScale, heightScale)
+
+        let resizedBridge = APPaintDocumentBridge(width: targetWidth, height: targetHeight)
+        if layerInfos.count > 1 {
+            for index in 1..<layerInfos.count {
+                _ = resizedBridge.addLayer(name: layerInfos[index].name)
+            }
+        }
+
+        var folderIDMap: [Int: Int] = [:]
+        for folder in folderInfos {
+            let createdFolderID = Int(
+                resizedBridge.createFolder(
+                    name: folder.name,
+                    layerIndex: folder.anchorLayerIndex >= 0 ? Int(folder.anchorLayerIndex) : -1
+                )
+            )
+            folderIDMap[Int(folder.folderID)] = createdFolderID
+            resizedBridge.setFolderVisible(folder.visible, folderID: createdFolderID)
+            resizedBridge.setFolderExpanded(folder.expanded, folderID: createdFolderID)
+            resizedBridge.setFolderName(folder.name, folderID: createdFolderID)
+        }
+
+        let resizedTextLayers = Dictionary(uniqueKeysWithValues: sourceTextLayers.map { index, textLayer in
+            (
+                index,
+                TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX * Double(widthScale),
+                    positionY: textLayer.positionY * Double(heightScale),
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: max(1, textLayer.fontSize * Double(textScale)),
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            )
+        })
+
+        for (index, info) in layerInfos.enumerated() {
+            resizedBridge.setLayerName(info.name, at: index)
+            if let resizedPixels = Self.scaledLayerPixelData(
+                sourcePixels[index],
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight
+            ) {
+                resizedBridge.replaceLayerPixels(at: index, data: resizedPixels)
+            }
+            if let maskData = sourceMasks[index],
+               let resizedMask = Self.scaledLayerMaskData(
+                maskData,
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight
+               ) {
+                resizedBridge.replaceLayerMask(at: index, data: resizedMask)
+            }
+            resizedBridge.setLayerVisible(info.visible, at: index)
+            resizedBridge.setLayerLocked(info.locked, at: index)
+            resizedBridge.setLayerAlphaLocked(info.alphaLocked, at: index)
+            resizedBridge.setLayerClipped(info.clipped, at: index)
+            resizedBridge.setLayerOpacity(info.opacity, at: index)
+            resizedBridge.setLayerBlendMode(info.blendMode, at: index)
+            if info.folderID >= 0, let mappedFolderID = folderIDMap[Int(info.folderID)] {
+                _ = resizedBridge.setLayerFolder(at: index, folderID: mappedFolderID)
+            }
+        }
+
+        bridge = resizedBridge
+        textLayers = resizedTextLayers
+        for (index, textLayer) in resizedTextLayers {
+            guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { continue }
+            bridge.replaceLayerPixels(at: index, data: rasterized)
+        }
+        bridge.activeLayerIndex = activeLayerIndex
+        activeStrokeLayerIndex = nil
+        activeStrokeBrush = nil
+        activeStrokeSamples.removeAll(keepingCapacity: true)
+        activeBlurStrokeLayerIndex = nil
+        activeBlurStrokeBrush = nil
+        activeBlurStrokeSamples.removeAll(keepingCapacity: true)
+        blurStrokeHasCapturedHistory = false
+        resetTimelapseHistory()
+        invalidateThumbnailCache()
+        captureTimelapseFrame()
+    }
+
+    func resizeCanvasExtent(width: Int, height: Int) {
+        let targetWidth = max(width, 1)
+        let targetHeight = max(height, 1)
+        let sourceWidth = Int(bridge.width)
+        let sourceHeight = Int(bridge.height)
+        guard targetWidth != sourceWidth || targetHeight != sourceHeight else { return }
+
+        let layerInfos = bridge.layerInfos()
+        let folderInfos = bridge.folderInfos()
+        let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
+        let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
+        let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
+        let sourceTextLayers = textLayers
+        let offsetX = (targetWidth - sourceWidth) / 2
+        let offsetY = (targetHeight - sourceHeight) / 2
+
+        let resizedBridge = APPaintDocumentBridge(width: targetWidth, height: targetHeight)
+        if layerInfos.count > 1 {
+            for index in 1..<layerInfos.count {
+                _ = resizedBridge.addLayer(name: layerInfos[index].name)
+            }
+        }
+
+        var folderIDMap: [Int: Int] = [:]
+        for folder in folderInfos {
+            let createdFolderID = Int(
+                resizedBridge.createFolder(
+                    name: folder.name,
+                    layerIndex: folder.anchorLayerIndex >= 0 ? Int(folder.anchorLayerIndex) : -1
+                )
+            )
+            folderIDMap[Int(folder.folderID)] = createdFolderID
+            resizedBridge.setFolderVisible(folder.visible, folderID: createdFolderID)
+            resizedBridge.setFolderExpanded(folder.expanded, folderID: createdFolderID)
+            resizedBridge.setFolderName(folder.name, folderID: createdFolderID)
+        }
+
+        let shiftedTextLayers = Dictionary(uniqueKeysWithValues: sourceTextLayers.map { index, textLayer in
+            (
+                index,
+                TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX + Double(offsetX),
+                    positionY: textLayer.positionY + Double(offsetY),
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: textLayer.fontSize,
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            )
+        })
+
+        for (index, info) in layerInfos.enumerated() {
+            resizedBridge.setLayerName(info.name, at: index)
+            if let translatedPixels = Self.translatedLayerPixelData(
+                sourcePixels[index],
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                offsetX: offsetX,
+                offsetY: offsetY
+            ) {
+                resizedBridge.replaceLayerPixels(at: index, data: translatedPixels)
+            }
+            if let maskData = sourceMasks[index],
+               let translatedMask = Self.translatedLayerMaskData(
+                maskData,
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                offsetX: offsetX,
+                offsetY: offsetY
+               ) {
+                resizedBridge.replaceLayerMask(at: index, data: translatedMask)
+            }
+            resizedBridge.setLayerVisible(info.visible, at: index)
+            resizedBridge.setLayerLocked(info.locked, at: index)
+            resizedBridge.setLayerAlphaLocked(info.alphaLocked, at: index)
+            resizedBridge.setLayerClipped(info.clipped, at: index)
+            resizedBridge.setLayerOpacity(info.opacity, at: index)
+            resizedBridge.setLayerBlendMode(info.blendMode, at: index)
+            if info.folderID >= 0, let mappedFolderID = folderIDMap[Int(info.folderID)] {
+                _ = resizedBridge.setLayerFolder(at: index, folderID: mappedFolderID)
+            }
+        }
+
+        bridge = resizedBridge
+        textLayers = shiftedTextLayers
+        for (index, textLayer) in shiftedTextLayers {
+            guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { continue }
+            bridge.replaceLayerPixels(at: index, data: rasterized)
+        }
+        bridge.activeLayerIndex = activeLayerIndex
+        activeStrokeLayerIndex = nil
+        activeStrokeBrush = nil
+        activeStrokeSamples.removeAll(keepingCapacity: true)
+        activeBlurStrokeLayerIndex = nil
+        activeBlurStrokeBrush = nil
+        activeBlurStrokeSamples.removeAll(keepingCapacity: true)
+        blurStrokeHasCapturedHistory = false
+        resetTimelapseHistory()
+        invalidateThumbnailCache()
+        captureTimelapseFrame()
+    }
+
     private func buildLayerRows(from infos: [APPaintLayerInfo]) -> [LayerRowModel] {
         Array(infos.enumerated().map { index, layer in
             LayerRowModel(
@@ -1456,12 +1677,170 @@ final class PaintDocumentSession: @unchecked Sendable {
         return thumbnail.pngData()
     }
 
+    private func resetTimelapseHistory() {
+        for frame in timelapseFrames {
+            try? FileManager.default.removeItem(at: frame.imageURL)
+        }
+        timelapseFrames.removeAll(keepingCapacity: false)
+        timelapseEvents.removeAll(keepingCapacity: false)
+        nextTimelapseFrameID = 0
+    }
+
     private func invalidateThumbnailCache(for index: Int? = nil) {
         if let index {
             layerThumbnailCache.removeValue(forKey: index)
         } else {
             layerThumbnailCache.removeAll(keepingCapacity: true)
         }
+    }
+
+    private static func scaledLayerPixelData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data? {
+        guard sourceWidth > 0, sourceHeight > 0, targetWidth > 0, targetHeight > 0 else { return nil }
+        guard source.count == sourceWidth * sourceHeight * 4 else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(data: source as CFData),
+              let image = CGImage(
+                width: sourceWidth,
+                height: sourceHeight,
+                bitsPerComponent: 8,
+                bitsPerPixel: 32,
+                bytesPerRow: sourceWidth * 4,
+                space: colorSpace,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              ) else {
+            return nil
+        }
+
+        var bytes = [UInt8](repeating: 0, count: targetWidth * targetHeight * 4)
+        guard let context = CGContext(
+            data: &bytes,
+            width: targetWidth,
+            height: targetHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: targetWidth * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
+        context.interpolationQuality = .high
+        context.clear(CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        return Data(bytes)
+    }
+
+    private static func scaledLayerMaskData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data? {
+        guard sourceWidth > 0, sourceHeight > 0, targetWidth > 0, targetHeight > 0 else { return nil }
+        guard source.count == sourceWidth * sourceHeight else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceGray()
+        guard let provider = CGDataProvider(data: source as CFData),
+              let image = CGImage(
+                width: sourceWidth,
+                height: sourceHeight,
+                bitsPerComponent: 8,
+                bitsPerPixel: 8,
+                bytesPerRow: sourceWidth,
+                space: colorSpace,
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              ) else {
+            return nil
+        }
+
+        var bytes = [UInt8](repeating: 0, count: targetWidth * targetHeight)
+        guard let context = CGContext(
+            data: &bytes,
+            width: targetWidth,
+            height: targetHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: targetWidth,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ) else {
+            return nil
+        }
+        context.interpolationQuality = .high
+        context.clear(CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: targetWidth, height: targetHeight))
+        return Data(bytes)
+    }
+
+    private static func translatedLayerPixelData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+        offsetX: Int,
+        offsetY: Int
+    ) -> Data? {
+        guard source.count == sourceWidth * sourceHeight * 4 else { return nil }
+        var bytes = [UInt8](repeating: 0, count: targetWidth * targetHeight * 4)
+        source.withUnsafeBytes { sourceBytes in
+            guard let sourceBase = sourceBytes.bindMemory(to: UInt8.self).baseAddress else { return }
+            for y in 0..<sourceHeight {
+                let destinationY = y + offsetY
+                guard destinationY >= 0, destinationY < targetHeight else { continue }
+                for x in 0..<sourceWidth {
+                    let destinationX = x + offsetX
+                    guard destinationX >= 0, destinationX < targetWidth else { continue }
+                    let sourceOffset = ((y * sourceWidth) + x) * 4
+                    let destinationOffset = ((destinationY * targetWidth) + destinationX) * 4
+                    bytes[destinationOffset] = sourceBase[sourceOffset]
+                    bytes[destinationOffset + 1] = sourceBase[sourceOffset + 1]
+                    bytes[destinationOffset + 2] = sourceBase[sourceOffset + 2]
+                    bytes[destinationOffset + 3] = sourceBase[sourceOffset + 3]
+                }
+            }
+        }
+        return Data(bytes)
+    }
+
+    private static func translatedLayerMaskData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+        offsetX: Int,
+        offsetY: Int
+    ) -> Data? {
+        guard source.count == sourceWidth * sourceHeight else { return nil }
+        var bytes = [UInt8](repeating: 0, count: targetWidth * targetHeight)
+        source.withUnsafeBytes { sourceBytes in
+            guard let sourceBase = sourceBytes.bindMemory(to: UInt8.self).baseAddress else { return }
+            for y in 0..<sourceHeight {
+                let destinationY = y + offsetY
+                guard destinationY >= 0, destinationY < targetHeight else { continue }
+                for x in 0..<sourceWidth {
+                    let destinationX = x + offsetX
+                    guard destinationX >= 0, destinationX < targetWidth else { continue }
+                    let sourceOffset = (y * sourceWidth) + x
+                    let destinationOffset = (destinationY * targetWidth) + destinationX
+                    bytes[destinationOffset] = sourceBase[sourceOffset]
+                }
+            }
+        }
+        return Data(bytes)
     }
 
     private func boxBlurredPixels(from original: [UInt8], width: Int, height: Int, radius: Double) -> [UInt8]? {

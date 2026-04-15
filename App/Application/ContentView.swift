@@ -24,6 +24,8 @@ struct ContentView: View {
     @State var showsPhotoLayerImporter = false
     @State var showsNewCanvasPhotoImporter = false
     @State var showsNewCanvasSheet = false
+    @State var showsResizeCanvasSheet = false
+    @State var showsResizeCanvasExtentSheet = false
     @State var showsHSBSheet = false
     @State var showsBrightnessContrastSheet = false
     @State var showsLevelsSheet = false
@@ -36,6 +38,10 @@ struct ContentView: View {
     @State var showsNanoBananaPaywall = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
+    @State var resizeCanvasWidthText = ""
+    @State var resizeCanvasHeightText = ""
+    @State var resizeCanvasExtentWidthText = ""
+    @State var resizeCanvasExtentHeightText = ""
     @State var gradientMapSettings = GradientMapSettings()
     @State var selectedGradientStopID: GradientMapStopSettings.ID?
     @State var hsbAdjustmentSettings = HueSaturationBrightnessSettings()
@@ -97,6 +103,12 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsNewCanvasSheet) {
             newCanvasSheet
+        }
+        .sheet(isPresented: $showsResizeCanvasSheet) {
+            resizeCanvasSheet
+        }
+        .sheet(isPresented: $showsResizeCanvasExtentSheet) {
+            resizeCanvasExtentSheet
         }
         .sheet(isPresented: $showsHSBSheet) {
             hueSaturationBrightnessSheet

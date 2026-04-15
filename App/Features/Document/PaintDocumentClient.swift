@@ -12,6 +12,8 @@ struct PaintDocumentClient: Sendable {
     var loadProject: @Sendable (URL) throws -> LoadedPaintProject
     var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
     var newCanvas: @Sendable (Int, Int) -> Void
+    var resizeCanvas: @Sendable (Int, Int) -> Void
+    var resizeCanvasExtent: @Sendable (Int, Int) -> Void
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
@@ -80,6 +82,12 @@ struct PaintDocumentClient: Sendable {
             setPaperStyle: { style in sessionBox.session.setPaperStyle(style) },
             newCanvas: { width, height in
                 sessionBox.session = PaintDocumentSession(width: width, height: height)
+            },
+            resizeCanvas: { width, height in
+                sessionBox.session.resizeCanvas(width: width, height: height)
+            },
+            resizeCanvasExtent: { width, height in
+                sessionBox.session.resizeCanvasExtent(width: width, height: height)
             },
             beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
             appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },

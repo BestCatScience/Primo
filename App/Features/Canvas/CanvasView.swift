@@ -61,6 +61,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let inputHandler = InputHandler()
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
+    private let touchEyedropperLoupeView = UIView()
+    private let touchEyedropperImageView = UIImageView()
+    private let touchEyedropperRingView = UIView()
+    private let touchEyedropperFocusView = UIView()
+    private let touchEyedropperLongPressRecognizer: UILongPressGestureRecognizer
 
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
@@ -83,8 +88,17 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private var textRotationHandleStartAngle: CGFloat = 0
     private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
     private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
+    private var currentSnapshot: MetalDocumentSnapshot?
+    private var isTouchEyedropperActive = false
+
+    private let touchEyedropperLoupeSize = CGSize(width: 102, height: 102)
+    private let touchEyedropperPreviewInset: CGFloat = 9
+    private let touchEyedropperPreviewGridSize = 17
+    private let touchEyedropperPreviewScale: CGFloat = 6
+    private let touchEyedropperVerticalOffset: CGFloat = 86
 
     override init(frame: CGRect) {
+        touchEyedropperLongPressRecognizer = UILongPressGestureRecognizer()
         super.init(frame: frame)
         backgroundColor = .clear
         isMultipleTouchEnabled = true
@@ -194,6 +208,62 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         selectionPreviewLayer.lineDashPattern = [4, 4]
         layer.addSublayer(selectionPreviewLayer)
 
+        touchEyedropperLoupeView.isHidden = true
+        touchEyedropperLoupeView.isUserInteractionEnabled = false
+        touchEyedropperLoupeView.bounds = CGRect(origin: .zero, size: touchEyedropperLoupeSize)
+        touchEyedropperLoupeView.backgroundColor = UIColor.black.withAlphaComponent(0.9)
+        touchEyedropperLoupeView.layer.cornerRadius = touchEyedropperLoupeSize.width / 2
+        touchEyedropperLoupeView.layer.shadowColor = UIColor.black.cgColor
+        touchEyedropperLoupeView.layer.shadowOpacity = 0.28
+        touchEyedropperLoupeView.layer.shadowRadius = 18
+        touchEyedropperLoupeView.layer.shadowOffset = CGSize(width: 0, height: 8)
+
+        touchEyedropperRingView.frame = touchEyedropperLoupeView.bounds
+        touchEyedropperRingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        touchEyedropperRingView.backgroundColor = .clear
+        touchEyedropperRingView.layer.cornerRadius = touchEyedropperLoupeSize.width / 2
+        touchEyedropperRingView.layer.borderWidth = 6
+        touchEyedropperRingView.layer.borderColor = UIColor.white.cgColor
+        touchEyedropperLoupeView.addSubview(touchEyedropperRingView)
+
+        let previewFrame = touchEyedropperLoupeView.bounds.insetBy(dx: touchEyedropperPreviewInset, dy: touchEyedropperPreviewInset)
+        touchEyedropperImageView.frame = previewFrame
+        touchEyedropperImageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        touchEyedropperImageView.layer.cornerRadius = previewFrame.width / 2
+        touchEyedropperImageView.layer.masksToBounds = true
+        touchEyedropperImageView.contentMode = .scaleAspectFill
+        touchEyedropperImageView.backgroundColor = .white
+        touchEyedropperImageView.layer.borderWidth = 1
+        touchEyedropperImageView.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        touchEyedropperLoupeView.addSubview(touchEyedropperImageView)
+
+        touchEyedropperFocusView.bounds = CGRect(x: 0, y: 0, width: 18, height: 18)
+        touchEyedropperFocusView.center = CGPoint(x: previewFrame.midX, y: previewFrame.midY)
+        touchEyedropperFocusView.autoresizingMask = [
+            .flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin
+        ]
+        touchEyedropperFocusView.backgroundColor = .clear
+        touchEyedropperFocusView.layer.cornerRadius = 9
+        touchEyedropperFocusView.layer.borderWidth = 1.5
+        touchEyedropperFocusView.layer.borderColor = UIColor.white.withAlphaComponent(0.95).cgColor
+        touchEyedropperFocusView.layer.shadowColor = UIColor.black.cgColor
+        touchEyedropperFocusView.layer.shadowOpacity = 0.16
+        touchEyedropperFocusView.layer.shadowRadius = 2
+        touchEyedropperFocusView.layer.shadowOffset = .zero
+        touchEyedropperImageView.addSubview(touchEyedropperFocusView)
+
+        let horizontalCrosshair = UIView(frame: CGRect(x: 0, y: 8.5, width: 18, height: 1))
+        horizontalCrosshair.autoresizingMask = [.flexibleWidth]
+        horizontalCrosshair.backgroundColor = UIColor.white.withAlphaComponent(0.95)
+        touchEyedropperFocusView.addSubview(horizontalCrosshair)
+
+        let verticalCrosshair = UIView(frame: CGRect(x: 8.5, y: 0, width: 1, height: 18))
+        verticalCrosshair.autoresizingMask = [.flexibleHeight]
+        verticalCrosshair.backgroundColor = UIColor.white.withAlphaComponent(0.95)
+        touchEyedropperFocusView.addSubview(verticalCrosshair)
+
+        addSubview(touchEyedropperLoupeView)
+
         let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         pinchRecognizer.delegate = self
         pinchRecognizer.cancelsTouchesInView = false
@@ -219,6 +289,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         redoTapRecognizer.delegate = self
         redoTapRecognizer.require(toFail: pinchRecognizer)
         addGestureRecognizer(redoTapRecognizer)
+
+        touchEyedropperLongPressRecognizer.addTarget(self, action: #selector(handleTouchEyedropperLongPress(_:)))
+        touchEyedropperLongPressRecognizer.minimumPressDuration = 0.34
+        touchEyedropperLongPressRecognizer.allowableMovement = 18
+        touchEyedropperLongPressRecognizer.cancelsTouchesInView = false
+        touchEyedropperLongPressRecognizer.delegate = self
+        addGestureRecognizer(touchEyedropperLongPressRecognizer)
 
         let pencilInteraction = UIPencilInteraction()
         pencilInteraction.delegate = self
@@ -261,6 +338,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         viewportOffset: CGSize,
         zoomScale: CGFloat
     ) {
+        currentSnapshot = snapshot
         self.currentTool = currentTool
         self.paperStyle = paperStyle
         self.transformPreviewOffset = transformPreviewOffset
@@ -306,24 +384,28 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
+        if isTouchEyedropperActive { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .began) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
+        if isTouchEyedropperActive { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .moved) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
+        if isTouchEyedropperActive { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .ended) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
+        if isTouchEyedropperActive { return }
         if handlePanTouchesIfNeeded(touches, with: event, phase: .cancelled) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
@@ -354,6 +436,27 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return
         }
         sendAction?(.colorSampled(sampledColor))
+    }
+
+    @objc
+    private func handleTouchEyedropperLongPress(_ recognizer: UILongPressGestureRecognizer) {
+        guard recognizer.numberOfTouches == 1 else {
+            hideTouchEyedropperLoupe()
+            return
+        }
+
+        let location = recognizer.location(in: self)
+        switch recognizer.state {
+        case .began, .changed:
+            updateTouchEyedropper(at: location)
+        case .ended:
+            updateTouchEyedropper(at: location)
+            hideTouchEyedropperLoupe()
+        case .cancelled, .failed:
+            hideTouchEyedropperLoupe()
+        default:
+            break
+        }
     }
 
     func didUpdateSelectionPath(_ points: [CGPoint]) {
@@ -836,7 +939,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     private func sampledColor(at point: CGPoint, source: EyedropperSamplingSource) -> SampledColor? {
         guard
-            let snapshot = metalCanvasView.currentSnapshot,
+            let snapshot = currentSnapshot,
             snapshot.width > 0,
             snapshot.height > 0
         else {
@@ -898,6 +1001,140 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             green: blendedChannel(source: foreground.green, background: background.green, alpha: alpha),
             blue: blendedChannel(source: foreground.blue, background: background.blue, alpha: alpha),
             alpha: 255
+        )
+    }
+
+    private func updateTouchEyedropper(at viewPoint: CGPoint) {
+        guard let documentPoint = documentPointForEyedropper(at: viewPoint) else {
+            hideTouchEyedropperLoupe()
+            return
+        }
+        guard let sampledColor = sampledColor(at: documentPoint, source: inputHandler.eyedropperSamplingSource) else {
+            hideTouchEyedropperLoupe()
+            return
+        }
+
+        isTouchEyedropperActive = true
+        panStartLocation = nil
+        panDidMove = false
+        isCanvasPanGestureActive = false
+
+        sendAction?(.colorSampled(sampledColor))
+        touchEyedropperRingView.layer.borderColor = uiColor(from: sampledColor).cgColor
+        touchEyedropperImageView.image = makeEyedropperLoupeImage(
+            around: documentPoint,
+            source: inputHandler.eyedropperSamplingSource
+        )
+        positionTouchEyedropperLoupe(above: viewPoint)
+        if touchEyedropperLoupeView.isHidden {
+            touchEyedropperLoupeView.alpha = 0
+            touchEyedropperLoupeView.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+            touchEyedropperLoupeView.isHidden = false
+            UIView.animate(withDuration: 0.14, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                self.touchEyedropperLoupeView.alpha = 1
+                self.touchEyedropperLoupeView.transform = .identity
+            }
+        }
+    }
+
+    private func hideTouchEyedropperLoupe() {
+        guard isTouchEyedropperActive || !touchEyedropperLoupeView.isHidden else { return }
+        isTouchEyedropperActive = false
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
+            self.touchEyedropperLoupeView.alpha = 0
+            self.touchEyedropperLoupeView.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)
+        } completion: { _ in
+            self.touchEyedropperLoupeView.isHidden = true
+            self.touchEyedropperLoupeView.transform = .identity
+            self.touchEyedropperImageView.image = nil
+        }
+    }
+
+    private func documentPointForEyedropper(at viewPoint: CGPoint) -> CGPoint? {
+        let rect = contentRect()
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        guard rect.insetBy(dx: -18, dy: -18).contains(viewPoint) else { return nil }
+        let point = documentPoint(at: viewPoint, in: rect)
+        return CGPoint(
+            x: min(max(point.x, 0), max(documentSize.width - 1, 0)),
+            y: min(max(point.y, 0), max(documentSize.height - 1, 0))
+        )
+    }
+
+    private func positionTouchEyedropperLoupe(above fingerPoint: CGPoint) {
+        let halfWidth = touchEyedropperLoupeSize.width / 2
+        let halfHeight = touchEyedropperLoupeSize.height / 2
+        let minX = halfWidth + 10
+        let maxX = bounds.width - halfWidth - 10
+        let minY = halfHeight + 10
+        let preferredY = fingerPoint.y - touchEyedropperVerticalOffset
+        let clampedCenter = CGPoint(
+            x: min(max(fingerPoint.x, minX), max(maxX, minX)),
+            y: max(minY, preferredY)
+        )
+        touchEyedropperLoupeView.center = clampedCenter
+    }
+
+    private func makeEyedropperLoupeImage(around point: CGPoint, source: EyedropperSamplingSource) -> UIImage? {
+        guard touchEyedropperPreviewGridSize > 0 else { return nil }
+        let grid = touchEyedropperPreviewGridSize
+        let centerX = Int(point.x.rounded())
+        let centerY = Int(point.y.rounded())
+        var rgba = [UInt8](repeating: 255, count: grid * grid * 4)
+        for row in 0..<grid {
+            for column in 0..<grid {
+                let sampleX = centerX + column - (grid / 2)
+                let sampleY = centerY + row - (grid / 2)
+                let samplePoint = CGPoint(x: sampleX, y: sampleY)
+                let sampled = sampledColor(at: samplePoint, source: source) ?? SampledColor(red: 255, green: 255, blue: 255, alpha: 255)
+                let offset = ((row * grid) + column) * 4
+                rgba[offset] = sampled.red
+                rgba[offset + 1] = sampled.green
+                rgba[offset + 2] = sampled.blue
+                rgba[offset + 3] = 255
+            }
+        }
+
+        let data = Data(rgba)
+        guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let cgImage = CGImage(
+            width: grid,
+            height: grid,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: grid * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else {
+            return nil
+        }
+
+        let outputSize = CGSize(
+            width: CGFloat(grid) * touchEyedropperPreviewScale,
+            height: CGFloat(grid) * touchEyedropperPreviewScale
+        )
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: outputSize, format: format)
+        return renderer.image { context in
+            context.cgContext.interpolationQuality = .none
+            context.cgContext.setFillColor(UIColor.white.cgColor)
+            context.cgContext.fill(CGRect(origin: .zero, size: outputSize))
+            context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: outputSize))
+        }
+    }
+
+    private func uiColor(from sampledColor: SampledColor) -> UIColor {
+        UIColor(
+            red: CGFloat(sampledColor.red) / 255.0,
+            green: CGFloat(sampledColor.green) / 255.0,
+            blue: CGFloat(sampledColor.blue) / 255.0,
+            alpha: 1.0
         )
     }
 
@@ -1938,6 +2175,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === touchEyedropperLongPressRecognizer || otherGestureRecognizer === touchEyedropperLongPressRecognizer {
+            return false
+        }
         if isTransformOverlayGesture(gestureRecognizer) || isTransformOverlayGesture(otherGestureRecognizer) {
             return false
         }
@@ -1945,6 +2185,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        if gestureRecognizer === touchEyedropperLongPressRecognizer {
+            guard touch.type != .pencil else { return false }
+            let location = touch.location(in: self)
+            guard contentRect().insetBy(dx: -18, dy: -18).contains(location) else { return false }
+            if shouldRouteTouchesToTransformOverlay(Set([touch])) { return false }
+            return true
+        }
         guard gestureRecognizer.view === textTransformBoxView else { return true }
         let location = touch.location(in: self)
         if textTransformTopLeftHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }

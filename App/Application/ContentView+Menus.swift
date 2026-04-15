@@ -250,6 +250,106 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var resizeCanvasSheet: some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("サイズ")) {
+                    TextField(StudioStrings.width(language), text: $resizeCanvasWidthText)
+                        .keyboardType(.numberPad)
+
+                    TextField(StudioStrings.height(language), text: $resizeCanvasHeightText)
+                        .keyboardType(.numberPad)
+                }
+
+                Section {
+                    Text(language.localized("現在のレイヤー内容を新しい解像度へ合わせて拡大縮小します。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(language.localized("画像解像度"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsResizeCanvasSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("変更")) {
+                        guard
+                            let width = resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)),
+                            let height = resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1))
+                        else { return }
+                        store.send(.resizeCanvasRequested(width: width, height: height))
+                        showsResizeCanvasSheet = false
+                    }
+                    .disabled(
+                        resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)) == nil ||
+                        resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1)) == nil
+                    )
+                }
+            }
+        }
+        .onAppear {
+            resizeCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+            resizeCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+        }
+        .presentationDetents([.height(280)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var resizeCanvasExtentSheet: some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("サイズ")) {
+                    TextField(StudioStrings.width(language), text: $resizeCanvasExtentWidthText)
+                        .keyboardType(.numberPad)
+
+                    TextField(StudioStrings.height(language), text: $resizeCanvasExtentHeightText)
+                        .keyboardType(.numberPad)
+                }
+
+                Section {
+                    Text(language.localized("描画内容は拡大縮小せず、中央基準で余白追加またはトリミングします。"))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(language.localized("キャンバスサイズ"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsResizeCanvasExtentSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("変更")) {
+                        guard
+                            let width = resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)),
+                            let height = resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1))
+                        else { return }
+                        store.send(.resizeCanvasExtentRequested(width: width, height: height))
+                        showsResizeCanvasExtentSheet = false
+                    }
+                    .disabled(
+                        resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)) == nil ||
+                        resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1)) == nil
+                    )
+                }
+            }
+        }
+        .onAppear {
+            resizeCanvasExtentWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+            resizeCanvasExtentHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+        }
+        .presentationDetents([.height(280)])
+        .presentationDragIndicator(.visible)
+    }
+
     var hueSaturationBrightnessSheet: some View {
         NavigationStack {
             Form {
@@ -1154,32 +1254,6 @@ extension ContentView {
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
             }
 
-            menuBarMenu(StudioStrings.settingsMenu(language)) {
-                Menu(StudioStrings.languageMenu(language)) {
-                    ForEach(AppLanguage.allCases) { option in
-                        Button {
-                            store.send(.languageChanged(option))
-                        } label: {
-                            if option == language {
-                                Label(option.title, systemImage: "checkmark")
-                            } else {
-                                Text(option.title)
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button(store.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
-                    store.send(.panelCollapseToggled(.brush))
-                }
-
-                Button(store.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
-                    store.send(.panelCollapseToggled(.layers))
-                }
-            }
-
             menuBarMenu(StudioStrings.fileMenu(language)) {
                 Menu(StudioStrings.newCanvas(language)) {
                     ForEach(canvasSizePresets, id: \.label) { preset in
@@ -1217,6 +1291,20 @@ extension ContentView {
             }
 
             menuBarMenu(StudioStrings.editMenu(language)) {
+                Button(language.localized("キャンバスサイズを変更")) {
+                    resizeCanvasExtentWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+                    resizeCanvasExtentHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    showsResizeCanvasExtentSheet = true
+                }
+
+                Button(language.localized("画像解像度を変更")) {
+                    resizeCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
+                    resizeCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    showsResizeCanvasSheet = true
+                }
+
+                Divider()
+
                 Menu(StudioStrings.colorCorrection(language)) {
                     Button(StudioStrings.hueSaturationBrightness(language)) {
                         store.send(.brightnessContrastPreviewChanged(nil))
@@ -1356,6 +1444,32 @@ extension ContentView {
                     store.send(.clearActiveLayerButtonTapped)
                 }
                 .disabled(activeLayer == nil)
+            }
+
+            menuBarMenu(StudioStrings.settingsMenu(language)) {
+                Menu(StudioStrings.languageMenu(language)) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Button {
+                            store.send(.languageChanged(option))
+                        } label: {
+                            if option == language {
+                                Label(option.title, systemImage: "checkmark")
+                            } else {
+                                Text(option.title)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button(store.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
+                    store.send(.panelCollapseToggled(.brush))
+                }
+
+                Button(store.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
+                    store.send(.panelCollapseToggled(.layers))
+                }
             }
 
             Spacer(minLength: 8)
