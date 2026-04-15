@@ -603,6 +603,7 @@ struct AppFeature {
         case thresholdApplied(ThresholdSettings)
         case posterizePreviewChanged(PosterizeSettings?)
         case posterizeApplied(PosterizeSettings)
+        case luminanceToAlphaRequested
         case activeLayerVisibilityToggled
         case selectPreviousLayer
         case selectNextLayer
@@ -1217,6 +1218,23 @@ struct AppFeature {
                     state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
                     return .none
                 }
+                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
+                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+                }
+                state.canvas.selection = nil
+                applyDirtyPresentation(state: &state)
+                return .none
+
+            case .luminanceToAlphaRequested:
+                guard
+                    let snapshot = state.canvas.renderSnapshot,
+                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+                    let adjusted = Self.luminanceToAlphaLayerPixels(source: layer.pixelData)
+                else {
+                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
+                    return .none
+                }
+                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
                 if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
                     state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
                 }

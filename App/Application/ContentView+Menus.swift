@@ -694,15 +694,17 @@ extension ContentView {
 
                         TextEditor(text: $nanoBananaPrompt)
                             .frame(minHeight: 110)
+                            .foregroundStyle(.black)
+                            .tint(.black)
                             .padding(8)
                             .scrollContentBackground(.hidden)
                             .background(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(Color.secondary.opacity(0.08))
+                                    .fill(Color.white)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+                                    .stroke(Color.black.opacity(0.14), lineWidth: 1)
                             )
                             .textInputAutocapitalization(.sentences)
                             .focused($nanoBananaFocusedField, equals: .prompt)
@@ -714,7 +716,18 @@ extension ContentView {
                                 Button(preset.title(language)) {
                                     nanoBananaPrompt = preset.prompt(language)
                                 }
-                                .buttonStyle(.bordered)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.black.opacity(0.92))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.white.opacity(0.96))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                )
                             }
                         }
                         .padding(.vertical, 4)
@@ -1241,6 +1254,10 @@ extension ContentView {
                     Button(StudioStrings.posterize(language)) {
                         posterizeSettings = PosterizeSettings()
                         showsPosterizeSheet = true
+                    }
+
+                    Button(language.localized("Convert Luminance To Opacity")) {
+                        store.send(.luminanceToAlphaRequested)
                     }
 
                     Menu(StudioStrings.gradientMap(language)) {

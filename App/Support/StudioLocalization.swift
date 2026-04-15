@@ -346,6 +346,7 @@ enum StudioStrings {
         "Texture Apply": "テクスチャ適用",
         "Threshold": "しきい値",
         "Threshold Mode": "しきい値モード",
+        "Convert Luminance To Opacity": "輝度を透明度に変換",
         "Tilt": "傾き",
         "Timelapse export failed": "タイムラプスの書き出しに失敗しました",
         "Tip": "先端",

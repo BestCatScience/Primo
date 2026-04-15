@@ -391,6 +391,29 @@ extension AppFeature {
         return Data(output)
     }
 
+    static func luminanceToAlphaLayerPixels(source: Data) -> Data? {
+        guard source.count.isMultiple(of: 4) else { return nil }
+        var output = [UInt8](source)
+
+        for pixelOffset in stride(from: 0, to: output.count, by: 4) {
+            let existingAlpha = Double(output[pixelOffset + 3]) / 255.0
+            guard existingAlpha > 0 else { continue }
+
+            let red = Double(output[pixelOffset]) / 255.0
+            let green = Double(output[pixelOffset + 1]) / 255.0
+            let blue = Double(output[pixelOffset + 2]) / 255.0
+            let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+            let alpha = existingAlpha * (1.0 - luminance)
+
+            output[pixelOffset] = 0
+            output[pixelOffset + 1] = 0
+            output[pixelOffset + 2] = 0
+            output[pixelOffset + 3] = UInt8(max(0, min(255, Int((alpha * 255.0).rounded()))))
+        }
+
+        return Data(output)
+    }
+
     static func compositedPreviewPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,

@@ -382,19 +382,24 @@ extension ContentView {
                 Text(language.localized("Prompt"))
                     .font(StudioTheme.Typography.label(12))
                     .foregroundStyle(.white.opacity(0.55))
-                TextEditor(text: $nanoBananaPrompt)
+                TextField(
+                    language.localized("Describe how Nano Banana should edit the active layer"),
+                    text: $nanoBananaPrompt,
+                    axis: .vertical
+                )
                     .font(StudioTheme.Typography.body(13))
-                    .foregroundStyle(.white.opacity(0.94))
-                    .tint(StudioTheme.Palette.accentBright)
-                    .scrollContentBackground(.hidden)
+                    .foregroundStyle(.black)
+                    .tint(.black)
+                    .textFieldStyle(.plain)
+                    .lineLimit(4...8)
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.black.opacity(0.26))
+                            .fill(Color.white)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            .stroke(Color.black.opacity(0.14), lineWidth: 1)
                     )
             }
 
