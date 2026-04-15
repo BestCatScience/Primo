@@ -2379,6 +2379,7 @@ struct AppFeature {
                 {
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
                     if
+                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
                         let dirtyRect = Self.strokePreviewDirtyRect(
                             samples: [sample],
                             brush: previewBrush,
@@ -2393,12 +2394,12 @@ struct AppFeature {
                         )
                     {
                         state.canvas.pendingIncrementalUpdate = incrementalUpdate
-                    } else if let composite = Self.compositedPreviewPixelData(
-                        snapshot: baseSnapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjustedPixels
-                    ) {
-                        state.applyLiveCompositePixelData(composite)
+                    } else {
+                        state.applyLiveStrokePreview(
+                            baseSnapshot: baseSnapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels
+                        )
                     }
                 }
                 return .concatenate(
@@ -2437,6 +2438,7 @@ struct AppFeature {
                     }
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
                     if
+                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
                         let dirtyRect = Self.strokePreviewDirtyRect(
                             samples: previewSamples,
                             brush: previewBrush,
@@ -2451,12 +2453,12 @@ struct AppFeature {
                         )
                     {
                         state.canvas.pendingIncrementalUpdate = incrementalUpdate
-                    } else if let composite = Self.compositedPreviewPixelData(
-                        snapshot: baseSnapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjustedPixels
-                    ) {
-                        state.applyLiveCompositePixelData(composite)
+                    } else {
+                        state.applyLiveStrokePreview(
+                            baseSnapshot: baseSnapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels
+                        )
                     }
                 } else if let snapshot = state.canvas.renderSnapshot,
                     let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
@@ -2472,6 +2474,7 @@ struct AppFeature {
                     state.canvas.activeStrokeBaseSnapshot = snapshot
                     state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
                     if
+                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
                         let dirtyRect = Self.strokePreviewDirtyRect(
                             samples: samples,
                             brush: previewBrush,
@@ -2486,6 +2489,12 @@ struct AppFeature {
                         )
                     {
                         state.canvas.pendingIncrementalUpdate = incrementalUpdate
+                    } else {
+                        state.applyLiveStrokePreview(
+                            baseSnapshot: snapshot,
+                            activeLayerIndex: state.canvas.activeLayerIndex,
+                            adjustedActiveLayerPixels: adjustedPixels
+                        )
                     }
                 }
                 return .none

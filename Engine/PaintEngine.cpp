@@ -2677,7 +2677,11 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         1.0F
     );
     const float scatterExtent = activeBrush_.scatterEnabled ? std::max(activeBrush_.scatterLateral, activeBrush_.scatterLinear) : 0.0F;
-    const float boundRadius = radius + scatterExtent * radius + 2.5F;
+    const float softness = std::clamp(1.0F - activeBrush_.hardness, 0.0F, 1.0F);
+    const float featherPadding = isAirbrush
+        ? std::max(radius * (0.9F + softness * 0.6F), 18.0F)
+        : std::max(radius * (0.35F + softness * 0.75F), 10.0F);
+    const float boundRadius = radius + scatterExtent * radius + featherPadding + 6.0F;
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - boundRadius)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + boundRadius)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));

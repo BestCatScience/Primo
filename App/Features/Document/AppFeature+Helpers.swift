@@ -646,14 +646,16 @@ extension AppFeature {
                     for pixelIndex in 0..<(snapshot.width * snapshot.height) {
                         let offset = pixelIndex * 4
                         let baseAlpha = (CGFloat(source[offset + 3]) / 255.0) * CGFloat(layer.opacity)
-                        let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
+                        let effectiveOpacity = layer.isClipped
+                            ? (CGFloat(layer.opacity) * clipMask[pixelIndex])
+                            : CGFloat(layer.opacity)
                         if !layer.isClipped {
                             clipMask[pixelIndex] = baseAlpha
                         }
                         blendPreviewPixel(
                             destination: destination + offset,
                             source: source + offset,
-                            opacity: effectiveAlpha,
+                            opacity: effectiveOpacity,
                             blendMode: layer.blendMode
                         )
                     }
@@ -675,13 +677,22 @@ extension AppFeature {
         var minY = CGFloat.greatestFiniteMagnitude
         var maxX = -CGFloat.greatestFiniteMagnitude
         var maxY = -CGFloat.greatestFiniteMagnitude
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let softness = max(0, 1.0 - CGFloat(brush.hardness))
+        let featherPadding = max(
+            brush.tipKind == .airbrush ? CGFloat(brush.radius) * (0.9 + softness * 0.6) : CGFloat(brush.radius) * (0.35 + softness * 0.75),
+            brush.tipKind == .airbrush ? 18.0 : 10.0
+        )
 
         for sample in samples {
             let pressureFactor = max(
                 0.1,
                 1.0 + ((sample.pressure - 1.0) * CGFloat(brush.pressureSensitivity))
             )
-            let radiusPadding = max(CGFloat(brush.radius) * pressureFactor, 1.5) + 4.0
+            let radiusPadding = max(CGFloat(brush.radius) * pressureFactor, 1.5)
+                + (scatterExtent * CGFloat(brush.radius))
+                + featherPadding
+                + 6.0
             minX = min(minX, sample.point.x - radiusPadding)
             minY = min(minY, sample.point.y - radiusPadding)
             maxX = max(maxX, sample.point.x + radiusPadding)
@@ -730,14 +741,16 @@ extension AppFeature {
                             let destinationOffset = ((localY * dirtyRect.width) + localX) * 4
                             let maskIndex = (localY * dirtyRect.width) + localX
                             let baseAlpha = (CGFloat(source[sourceOffset + 3]) / 255.0) * CGFloat(layer.opacity)
-                            let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[maskIndex]) : baseAlpha
+                            let effectiveOpacity = layer.isClipped
+                                ? (CGFloat(layer.opacity) * clipMask[maskIndex])
+                                : CGFloat(layer.opacity)
                             if !layer.isClipped {
                                 clipMask[maskIndex] = baseAlpha
                             }
                             blendPreviewPixel(
                                 destination: destination + destinationOffset,
                                 source: source + sourceOffset,
-                                opacity: effectiveAlpha,
+                                opacity: effectiveOpacity,
                                 blendMode: layer.blendMode
                             )
                         }
@@ -754,6 +767,20 @@ extension AppFeature {
             height: dirtyRect.height,
             pixelData: composite
         )
+    }
+
+    static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
+        let softness = 1.0 - CGFloat(brush.hardness)
+
+        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
+            return false
+        }
+        if softness >= 0.34 && effectiveDiameter >= 56 {
+            return false
+        }
+        return true
     }
 
     static func gradientMapStops(for preset: GradientMapPreset) -> [GradientMapStop] {
