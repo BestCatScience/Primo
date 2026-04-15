@@ -168,12 +168,19 @@ extension ContentView {
 
     var toolDockColumn: some View {
         VStack {
-            workspaceActivityBar
+            toolDock
+                .padding(.top, 0)
+
+            toolDockMetrics
+                .padding(.top, 10)
+
+            toolDockColorCluster
+                .padding(.top, 10)
 
             Spacer(minLength: 0)
         }
-        .frame(width: 72)
-        .padding(.top, 10)
+        .frame(width: 82)
+        .padding(.top, 12)
         .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .trailing) {
             Rectangle()
@@ -245,13 +252,28 @@ extension ContentView {
         let panelState = panelState(for: panel)
 
         StudioPanelShell(
-            title: panelTitle(for: panel),
+            title: panel.title(language),
             isCollapsed: panelState.isCollapsed,
             onToggleCollapse: { store.send(.panelCollapseToggled(panel)) }
         ) {
             switch panel {
             case .brush:
-                leftWorkspaceSidebar
+                BrushPaletteView(
+                    store: store.scope(
+                        state: \.brushPalette,
+                        action: \.brushPalette
+                    ),
+                    currentTool: store.canvas.currentTool,
+                    hasSelection: store.canvas.selection != nil,
+                    transformPreviewOffset: store.canvas.transformPreviewOffset,
+                    transformPreviewScale: store.canvas.transformPreviewScale,
+                    transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
+                    language: language,
+                    showsTitle: false,
+                    onSelectTool: { tool in
+                        store.send(.toolSelected(tool))
+                    }
+                )
             case .layers:
                 LayerSidebarView(
                     store: store.scope(
@@ -274,382 +296,6 @@ extension ContentView {
             return store.brushPanel
         case .layers:
             return store.layerPanel
-        }
-    }
-
-    func panelTitle(for panel: StudioPanelKind) -> String {
-        switch panel {
-        case .brush:
-            switch workspaceSidebarSection {
-            case .explorer:
-                return "Explorer"
-            case .brush:
-                return panel.title(language)
-            case .ai:
-                return "Nano Banana"
-            }
-        case .layers:
-            return panel.title(language)
-        }
-    }
-
-    @ViewBuilder
-    var leftWorkspaceSidebar: some View {
-        switch workspaceSidebarSection {
-        case .explorer:
-            workspaceExplorerSidebar
-        case .brush:
-            BrushPaletteView(
-                store: store.scope(
-                    state: \.brushPalette,
-                    action: \.brushPalette
-                ),
-                currentTool: store.canvas.currentTool,
-                hasSelection: store.canvas.selection != nil,
-                transformPreviewOffset: store.canvas.transformPreviewOffset,
-                transformPreviewScale: store.canvas.transformPreviewScale,
-                transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
-                language: language,
-                showsTitle: false,
-                onSelectTool: { tool in
-                    store.send(.toolSelected(tool))
-                }
-            )
-        case .ai:
-            workspaceAISidebar
-        }
-    }
-
-    var workspaceActivityBar: some View {
-        VStack(spacing: 10) {
-            workspaceBrandBadge
-
-            VStack(spacing: 6) {
-                workspaceActivityButton(
-                    symbol: "folder",
-                    isActive: workspaceSidebarSection == .explorer,
-                    label: "Explorer"
-                ) {
-                    workspaceSidebarSection = .explorer
-                    if store.brushPanel.isCollapsed {
-                        store.send(.panelCollapseToggled(.brush))
-                    }
-                }
-
-                workspaceActivityButton(
-                    symbol: "paintbrush.pointed",
-                    isActive: workspaceSidebarSection == .brush,
-                    label: language.localized("ブラシ")
-                ) {
-                    workspaceSidebarSection = .brush
-                    if store.brushPanel.isCollapsed {
-                        store.send(.panelCollapseToggled(.brush))
-                    }
-                }
-
-                workspaceActivityButton(
-                    symbol: "sparkles.rectangle.stack",
-                    isActive: workspaceSidebarSection == .ai,
-                    label: "Nano Banana"
-                ) {
-                    workspaceSidebarSection = .ai
-                    workspaceBottomPanelSection = .nanoBanana
-                    workspaceBottomPanelCollapsed = false
-                    if store.brushPanel.isCollapsed {
-                        store.send(.panelCollapseToggled(.brush))
-                    }
-                }
-            }
-
-            Divider()
-                .overlay(Color.white.opacity(0.08))
-                .padding(.vertical, 6)
-
-            toolDock
-            toolDockMetrics
-                .padding(.top, 4)
-            toolDockColorCluster
-                .padding(.top, 6)
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 10)
-    }
-
-    var workspaceBrandBadge: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(StudioTheme.Palette.cardFillStrong)
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-            Text("P")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(StudioTheme.Palette.accentBright)
-        }
-        .frame(width: 38, height: 38)
-    }
-
-    func workspaceActivityButton(symbol: String, isActive: Bool, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
-                .frame(width: 38, height: 38)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(isActive ? StudioTheme.Palette.selectedFill : Color.clear)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(isActive ? StudioTheme.Palette.selectedBorder : Color.clear, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-    }
-
-    var workspaceExplorerSidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                workspaceExplorerSection(title: "OPEN EDITORS") {
-                    ForEach(store.openTabs) { tab in
-                        Button {
-                            store.send(.tabSelected(tab.id))
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: tab.pane == .secondary ? "sidebar.right" : "doc")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(tab.id == store.activeTabID ? StudioTheme.Palette.accentBright : StudioTheme.Palette.textSecondary)
-                                Text(tab.title)
-                                    .font(StudioTheme.Typography.label(12))
-                                    .foregroundStyle(StudioTheme.Palette.textPrimary)
-                                    .lineLimit(1)
-                                Spacer(minLength: 0)
-                                if tab.isDirty {
-                                    Circle()
-                                        .fill(StudioTheme.Palette.accentBright)
-                                        .frame(width: 6, height: 6)
-                                }
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(tab.id == store.activeTabID ? Color.white.opacity(0.08) : Color.clear)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button(language.localized("閉じる")) {
-                                store.send(.tabClosed(tab.id))
-                            }
-                            Button(language.localized("他を閉じる")) {
-                                store.send(.closeOtherTabs(tab.id))
-                            }
-                            Button(language.localized("右側を閉じる")) {
-                                store.send(.closeTabsToRight(tab.id))
-                            }
-                            Button(language.localized("右ペインへ移動")) {
-                                store.send(.moveTabToSecondaryPane(tab.id))
-                            }
-                            Button(language.localized("Explorer に表示")) {
-                                workspaceSidebarSection = .explorer
-                            }
-                        }
-                    }
-                }
-
-                workspaceExplorerSection(title: "WORKSPACE") {
-                    Button {
-                        showsOpenDocumentImporter = true
-                    } label: {
-                        workspaceExplorerActionRow(symbol: "folder.badge.plus", title: language.localized("ファイルを開く"))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        newCanvasWidthText = "\(Int(CanvasFeature.defaultCanvasSize.width.rounded()))"
-                        newCanvasHeightText = "\(Int(CanvasFeature.defaultCanvasSize.height.rounded()))"
-                        showsNewCanvasSheet = true
-                    } label: {
-                        workspaceExplorerActionRow(symbol: "square.and.pencil", title: language.localized("新規キャンバス"))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                workspaceExplorerSection(title: "FILES") {
-                    ForEach(workspaceExplorerFolders, id: \.self) { folderPath in
-                        workspaceExplorerFolderSection(folderPath: folderPath)
-                    }
-                }
-            }
-            .padding(.vertical, 6)
-        }
-    }
-
-    func workspaceExplorerSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(.white.opacity(0.45))
-            content()
-        }
-    }
-
-    func workspaceExplorerActionRow(symbol: String, title: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(StudioTheme.Palette.textSecondary)
-            Text(title)
-                .font(StudioTheme.Typography.label(12))
-                .foregroundStyle(StudioTheme.Palette.textPrimary)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.04))
-        )
-    }
-
-    var workspaceExplorerFolders: [String?] {
-        let folders = Set(store.homeProjects.map(\.relativeFolderPath))
-        return folders
-            .sorted { lhs, rhs in
-                switch (lhs, rhs) {
-                case (nil, nil):
-                    return false
-                case (nil, _):
-                    return true
-                case (_, nil):
-                    return false
-                case let (lhs?, rhs?):
-                    return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
-                }
-            }
-    }
-
-    func workspaceExplorerProjects(in folderPath: String?) -> [SavedProjectSummary] {
-        store.homeProjects.filter { $0.relativeFolderPath == folderPath }
-    }
-
-    func workspaceExplorerFolderSection(folderPath: String?) -> some View {
-        let projects = workspaceExplorerProjects(in: folderPath)
-        let title = folderPath ?? "root"
-
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: folderPath == nil ? "internaldrive" : "folder")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
-                Text(title)
-                    .font(StudioTheme.Typography.mono(10))
-                    .foregroundStyle(.white.opacity(0.45))
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.03))
-            )
-            .dropDestination(for: URL.self) { items, _ in
-                guard let projectURL = items.first else { return false }
-                store.send(.moveSavedProject(projectURL, folderPath))
-                return true
-            }
-
-            ForEach(projects) { project in
-                Button {
-                    store.send(.homeProjectSelected(project.url))
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(StudioTheme.Palette.textSecondary)
-                            Text(project.name)
-                                .font(StudioTheme.Typography.label(12))
-                                .foregroundStyle(StudioTheme.Palette.textPrimary)
-                                .lineLimit(1)
-                        }
-                        Text("\(Int(project.canvasSize.width)) × \(Int(project.canvasSize.height))")
-                            .font(StudioTheme.Typography.mono(10))
-                            .foregroundStyle(.white.opacity(0.45))
-                            .padding(.leading, 19)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.02))
-                    )
-                }
-                .buttonStyle(.plain)
-                .draggable(project.url)
-            }
-        }
-    }
-
-    var workspaceAISidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                workspaceExplorerSection(title: "NANO BANANA") {
-                    Text(language.localized("生成AIの編集ハブ。下部パネルからすぐ実行し、必要なときだけ詳細シートを開けます。"))
-                        .font(StudioTheme.Typography.body(13))
-                        .foregroundStyle(.white.opacity(0.62))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                workspaceExplorerSection(title: "SHORTCUTS") {
-                    Button {
-                        prepareNanoBananaComposer()
-                        workspaceBottomPanelSection = .nanoBanana
-                        workspaceBottomPanelCollapsed = false
-                    } label: {
-                        workspaceExplorerActionRow(symbol: "text.badge.plus", title: language.localized("クイックプロンプト"))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        prepareNanoBananaComposer()
-                        showsNanoBananaSheet = true
-                    } label: {
-                        workspaceExplorerActionRow(symbol: "slider.horizontal.3", title: language.localized("詳細設定を開く"))
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if !store.nanoBananaJobs.isEmpty {
-                    workspaceExplorerSection(title: "RECENT JOBS") {
-                        ForEach(store.nanoBananaJobs.prefix(5)) { job in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(job.request.model.title(language))
-                                        .font(StudioTheme.Typography.label(12))
-                                        .foregroundStyle(StudioTheme.Palette.textPrimary)
-                                    Spacer()
-                                    Text(job.status.rawValue.capitalized)
-                                        .font(StudioTheme.Typography.mono(10))
-                                        .foregroundStyle(.white.opacity(0.45))
-                                }
-                                Text(job.request.prompt)
-                                    .font(StudioTheme.Typography.body(12))
-                                    .foregroundStyle(.white.opacity(0.62))
-                                    .lineLimit(2)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.white.opacity(0.04))
-                            )
-                        }
-                    }
-                }
-            }
-            .padding(.vertical, 6)
         }
     }
 
@@ -738,15 +384,17 @@ extension ContentView {
                     .foregroundStyle(.white.opacity(0.55))
                 TextEditor(text: $nanoBananaPrompt)
                     .font(StudioTheme.Typography.body(13))
+                    .foregroundStyle(.white.opacity(0.94))
+                    .tint(StudioTheme.Palette.accentBright)
                     .scrollContentBackground(.hidden)
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                            .fill(Color.black.opacity(0.26))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
                     )
             }
 
@@ -756,9 +404,42 @@ extension ContentView {
                 workspaceNanoBananaStat(label: language.localized("Output"), value: nanoBananaOutputMode.title(language))
                 workspaceNanoBananaStat(label: language.localized("Model"), value: nanoBananaModel.title(language))
 
+                if nanoBananaAccessMode == .appManaged && !nanoBananaCommerce.isSubscriptionActive {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(language.localized("Subscription Required"))
+                            .font(StudioTheme.Typography.label(12))
+                            .foregroundStyle(.white.opacity(0.92))
+                        Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
+                            .font(StudioTheme.Typography.body(11))
+                            .foregroundStyle(.white.opacity(0.6))
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Button(language.localized("Unlock Nano Banana")) {
+                            showsNanoBananaPaywall = true
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white.opacity(0.94))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.white.opacity(0.08))
+                        )
+                    }
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                }
+
                 HStack(spacing: 8) {
                     Button(language.localized("Run")) {
-                        submitNanoBananaRequest(closeSheet: false)
+                        requestNanoBananaGeneration(closeSheet: false)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white.opacity(0.94))
@@ -766,9 +447,13 @@ extension ContentView {
                     .padding(.vertical, 9)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(StudioTheme.Palette.accentBright.opacity(0.8))
+                            .fill(
+                                (store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
+                                ? StudioTheme.Palette.accentBright.opacity(0.34)
+                                : StudioTheme.Palette.accentBright.opacity(0.8)
+                            )
                     )
-                    .disabled(nanoBananaGenerateDisabled)
+                    .disabled(store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
 
                     Button(language.localized("Open Full Panel")) {
                         showsNanoBananaSheet = true

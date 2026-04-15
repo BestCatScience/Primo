@@ -11,7 +11,14 @@ final class NanoBananaCommerce: ObservableObject {
     @Published private(set) var latestEntitlementJWS = ""
     @Published private(set) var purchaseErrorMessage: String?
 
+    private var transactionUpdatesTask: Task<Void, Never>?
+
+    deinit {
+        transactionUpdatesTask?.cancel()
+    }
+
     func prepare() async {
+        startObservingTransactionsIfNeeded()
         if products.isEmpty {
             await loadProducts()
         }
@@ -20,6 +27,7 @@ final class NanoBananaCommerce: ObservableObject {
 
     func loadProducts() async {
         isLoading = true
+        purchaseErrorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -37,6 +45,7 @@ final class NanoBananaCommerce: ObservableObject {
         }
 
         isLoading = true
+        purchaseErrorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -61,6 +70,7 @@ final class NanoBananaCommerce: ObservableObject {
 
     func restorePurchases() async {
         isLoading = true
+        purchaseErrorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -89,11 +99,32 @@ final class NanoBananaCommerce: ObservableObject {
         latestEntitlementJWS = latestJWS
     }
 
+    func clearPurchaseError() {
+        purchaseErrorMessage = nil
+    }
+
     var primaryProduct: Product? {
         products.first
     }
 
+    var manageSubscriptionsURL: URL? {
+        URL(string: "https://apps.apple.com/account/subscriptions")
+    }
+
     var proxyEndpoint: String {
         (Bundle.main.object(forInfoDictionaryKey: "NanoBananaProxyEndpoint") as? String) ?? ""
+    }
+
+    private func startObservingTransactionsIfNeeded() {
+        guard transactionUpdatesTask == nil else { return }
+        transactionUpdatesTask = Task { [weak self] in
+            for await result in Transaction.updates {
+                guard let self else { return }
+                if case let .verified(transaction) = result {
+                    await transaction.finish()
+                }
+                await self.refreshEntitlements()
+            }
+        }
     }
 }

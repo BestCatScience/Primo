@@ -421,9 +421,6 @@ extension ContentView {
             Button(language.localized("右ペインへ移動")) {
                 store.send(.moveTabToSecondaryPane(tab.id))
             }
-            Button(language.localized("Explorer に表示")) {
-                workspaceSidebarSection = .explorer
-            }
         }
         .draggable(tab.id.uuidString)
         .dropDestination(for: String.self) { items, _ in

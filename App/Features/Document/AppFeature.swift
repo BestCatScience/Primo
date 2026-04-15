@@ -215,6 +215,33 @@ struct AppFeature {
             openTabs[activeTabIndex].canvasSize = canvas.canvasSize
         }
 
+        mutating func applyNanoBananaPreview(
+            _ preview: NanoBananaPreviewState,
+            paintDocumentClient: PaintDocumentClient
+        ) {
+            let targetLayerIndex: Int
+            switch preview.request.outputMode {
+            case .replaceCurrentLayer:
+                targetLayerIndex = preview.outputLayerIndex
+            case .newLayer:
+                paintDocumentClient.addLayer("Nano Banana \(layerSidebar.layers.count + 1)")
+                targetLayerIndex = paintDocumentClient.presentation().activeLayerIndex
+            }
+
+            paintDocumentClient.setActiveLayer(targetLayerIndex)
+            paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
+            if let bufferIndex = canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
+                canvas.layerBuffers[bufferIndex].strokes.removeAll()
+            }
+            canvas.selection = nil
+            nanoBananaPreview = nil
+            pendingNanoBananaRequest = preview.request
+            activeNanoBananaJobID = nil
+            pendingNanoBananaOutputMode = .replaceCurrentLayer
+            applyPresentation(paintDocumentClient.presentation())
+            bannerMessage = appLanguage.localized("Nano Banana edit applied")
+        }
+
         mutating func setActiveTabDirty(_ isDirty: Bool) {
             guard let activeTabIndex else { return }
             openTabs[activeTabIndex].isDirty = isDirty
@@ -529,6 +556,7 @@ struct AppFeature {
         case undoRequested
         case redoRequested
         case saveDocumentRequested
+        case saveDocumentCopyRequested
         case exportDocumentRequested
         case exportTimelapseRequested
         case nanoBananaEditRequested(NanoBananaGenerationRequest)
@@ -1211,9 +1239,24 @@ struct AppFeature {
 
             case .saveDocumentRequested:
                 do {
+                    let url = try state.activeTab?.sourceProjectURL ?? Self.projectURLInDocuments()
+                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
+                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
+                    state.updateActiveTabMetadata(
+                        title: url.deletingPathExtension().lastPathComponent,
+                        sourceProjectURL: url
+                    )
+                    state.setActiveTabDirty(false)
+                    persistActiveTabToBackingStore(state: &state)
+                } catch {
+                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                }
+                return .send(.homeProjectsLoadRequested)
+
+            case .saveDocumentCopyRequested:
+                do {
                     let url = try Self.projectURLInDocuments()
                     try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
-                    state.exportSheet = ShareExport(url: url)
                     state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
                     state.updateActiveTabMetadata(
                         title: url.deletingPathExtension().lastPathComponent,
@@ -1428,7 +1471,6 @@ struct AppFeature {
 
             case let .nanoBananaEditSucceeded(preview):
                 state.isNanoBananaGenerating = false
-                state.nanoBananaPreview = preview
                 state.nanoBananaHistory.insert(
                     NanoBananaHistoryItem(
                         id: UUID(),
@@ -1444,6 +1486,7 @@ struct AppFeature {
                     state.nanoBananaJobs[jobIndex].status = .succeeded
                     state.nanoBananaJobs[jobIndex].message = nil
                 }
+                state.applyNanoBananaPreview(preview, paintDocumentClient: paintDocumentClient)
                 return .none
 
             case let .nanoBananaEditFailed(message):
@@ -1470,27 +1513,7 @@ struct AppFeature {
 
             case .nanoBananaPreviewAccepted:
                 guard let preview = state.nanoBananaPreview else { return .none }
-                let targetLayerIndex: Int
-                switch preview.request.outputMode {
-                case .replaceCurrentLayer:
-                    targetLayerIndex = preview.outputLayerIndex
-                case .newLayer:
-                    paintDocumentClient.addLayer("Nano Banana \(state.layerSidebar.layers.count + 1)")
-                    let presentation = paintDocumentClient.presentation()
-                    targetLayerIndex = presentation.activeLayerIndex
-                }
-                paintDocumentClient.setActiveLayer(targetLayerIndex)
-                paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                state.nanoBananaPreview = nil
-                state.pendingNanoBananaRequest = preview.request
-                state.activeNanoBananaJobID = nil
-                state.pendingNanoBananaOutputMode = .replaceCurrentLayer
-                applyDirtyPresentation(state: &state)
-                state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
+                state.applyNanoBananaPreview(preview, paintDocumentClient: paintDocumentClient)
                 return .none
 
             case .nanoBananaPreviewDiscarded:

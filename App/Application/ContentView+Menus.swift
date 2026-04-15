@@ -33,11 +33,18 @@ extension ContentView {
             nanoBananaAccessMode == .userAPIKey
             ? nanoBananaAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             : (
-                !nanoBananaCommerce.isSubscriptionActive ||
-                nanoBananaCommerce.latestEntitlementJWS.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                 nanoBananaCommerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             )
         )
+    }
+
+    func requestNanoBananaGeneration(closeSheet: Bool) {
+        if nanoBananaAccessMode == .appManaged, !nanoBananaCommerce.isSubscriptionActive {
+            nanoBananaFocusedField = nil
+            showsNanoBananaPaywall = true
+            return
+        }
+        submitNanoBananaRequest(closeSheet: closeSheet)
     }
 
     func submitNanoBananaRequest(closeSheet: Bool) {
@@ -65,6 +72,113 @@ extension ContentView {
         if closeSheet {
             showsNanoBananaSheet = false
         }
+    }
+
+    @ViewBuilder
+    var nanoBananaSubscriptionControls: some View {
+        LabeledContent(language.localized("Status")) {
+            Text(
+                nanoBananaCommerce.isSubscriptionActive
+                ? language.localized("Active")
+                : language.localized("Inactive")
+            )
+            .foregroundStyle(nanoBananaCommerce.isSubscriptionActive ? .green : .secondary)
+        }
+
+        if let product = nanoBananaCommerce.primaryProduct {
+            LabeledContent(language.localized("Plan")) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(product.displayName)
+                    Text(product.displayPrice)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } else if nanoBananaCommerce.isLoading {
+            Text(language.localized("Loading subscription details…"))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+
+        Button(language.localized("Purchase Subscription")) {
+            Task {
+                await nanoBananaCommerce.purchasePrimaryProduct()
+            }
+        }
+        .disabled(nanoBananaCommerce.isLoading || nanoBananaCommerce.isSubscriptionActive)
+
+        Button(language.localized("Restore Purchases")) {
+            Task {
+                await nanoBananaCommerce.restorePurchases()
+            }
+        }
+        .disabled(nanoBananaCommerce.isLoading)
+
+        if let manageURL = nanoBananaCommerce.manageSubscriptionsURL {
+            Link(language.localized("Manage Subscription"), destination: manageURL)
+        }
+
+        if let purchaseErrorMessage = nanoBananaCommerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
+            Text(purchaseErrorMessage)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+
+        Text(language.localized("Use your own backend to inject the provider API key and verify entitlements"))
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+    }
+
+    var nanoBananaPaywallSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(language.localized("Unlock Nano Banana"))
+                            .font(.title3.weight(.semibold))
+                        Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Section(language.localized("Included")) {
+                    Label(language.localized("Unlimited app-managed Nano Banana edits"), systemImage: "sparkles")
+                    Label(language.localized("Purchase state syncs automatically"), systemImage: "arrow.triangle.2.circlepath")
+                    Label(language.localized("Restore purchases on a new device"), systemImage: "icloud")
+                }
+
+                Section(language.localized("Plan")) {
+                    if let product = nanoBananaCommerce.primaryProduct {
+                        LabeledContent(product.displayName) {
+                            Text(product.displayPrice)
+                        }
+                    } else {
+                        Text(
+                            nanoBananaCommerce.isLoading
+                            ? language.localized("Loading subscription details…")
+                            : language.localized("Subscription product is unavailable.")
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section(language.localized("App Subscription")) {
+                    nanoBananaSubscriptionControls
+                }
+            }
+            .navigationTitle(language.localized("Subscription Required"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsNanoBananaPaywall = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     var canvasSizePresets: [(label: String, width: Int, height: Int)] {
@@ -659,44 +773,7 @@ extension ContentView {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
-                        LabeledContent(language.localized("Status")) {
-                            Text(
-                                nanoBananaCommerce.isSubscriptionActive
-                                ? language.localized("Active")
-                                : language.localized("Inactive")
-                            )
-                            .foregroundStyle(nanoBananaCommerce.isSubscriptionActive ? .green : .secondary)
-                        }
-
-                        if let product = nanoBananaCommerce.primaryProduct {
-                            LabeledContent(language.localized("Plan")) {
-                                Text(product.displayPrice)
-                            }
-                        }
-
-                        Button(language.localized("Purchase Subscription")) {
-                            Task {
-                                await nanoBananaCommerce.purchasePrimaryProduct()
-                            }
-                        }
-                        .disabled(nanoBananaCommerce.isLoading || nanoBananaCommerce.isSubscriptionActive)
-
-                        Button(language.localized("Restore Purchases")) {
-                            Task {
-                                await nanoBananaCommerce.restorePurchases()
-                            }
-                        }
-                        .disabled(nanoBananaCommerce.isLoading)
-
-                        if let purchaseErrorMessage = nanoBananaCommerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
-                            Text(purchaseErrorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Text(language.localized("Use your own backend to inject the provider API key and verify entitlements"))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        nanoBananaSubscriptionControls
                     }
                 }
 
@@ -770,7 +847,7 @@ extension ContentView {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("Generate")) {
-                        submitNanoBananaRequest(closeSheet: true)
+                        requestNanoBananaGeneration(closeSheet: true)
                     }
                     .disabled(nanoBananaGenerateDisabled)
                 }
@@ -1114,6 +1191,9 @@ extension ContentView {
                 }
                 Button(StudioStrings.save(language)) {
                     store.send(.saveDocumentRequested)
+                }
+                Button(language.localized("名前を付けて保存")) {
+                    store.send(.saveDocumentCopyRequested)
                 }
                 Button(StudioStrings.export(language)) {
                     store.send(.exportDocumentRequested)

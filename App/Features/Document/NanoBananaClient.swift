@@ -255,76 +255,123 @@ struct NanoBananaClient: Sendable {
         config: NanoBananaRequestConfig,
         model: NanoBananaModel
     ) async throws -> Data? {
-        let request: URLRequest
         switch config.accessMode {
         case .userAPIKey:
-            request = try makeGeminiRequest(
+            var lastError: Error?
+            for request in makeGeminiRequests(
                 inputPNGData: inputPNGData,
                 prompt: prompt,
                 apiKey: config.credential,
                 model: model
-            )
+            ) {
+                do {
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw NanoBananaError.invalidResponse
+                    }
+
+                    guard (200...299).contains(httpResponse.statusCode) else {
+                        if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
+                            throw NanoBananaError.apiError(apiError.error.message)
+                        }
+                        throw NanoBananaError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)")
+                    }
+
+                    if let imageData = try decodeImageData(from: data) {
+                        return imageData
+                    }
+                } catch {
+                    lastError = error
+                }
+            }
+            if let lastError {
+                throw lastError
+            }
+            return nil
         case .appManaged:
-            request = try makeProxyRequest(
+            let request = try makeProxyRequest(
                 inputPNGData: inputPNGData,
                 prompt: prompt,
                 accessToken: config.credential,
                 endpoint: config.endpoint,
                 model: model
             )
-        }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NanoBananaError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
-                throw NanoBananaError.apiError(apiError.error.message)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NanoBananaError.invalidResponse
             }
-            throw NanoBananaError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)")
-        }
 
-        return try decodeImageData(from: data)
+            guard (200...299).contains(httpResponse.statusCode) else {
+                if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
+                    throw NanoBananaError.apiError(apiError.error.message)
+                }
+                throw NanoBananaError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)")
+            }
+
+            return try decodeImageData(from: data)
+        }
     }
 
-    private static func makeGeminiRequest(
+    private static func makeGeminiRequests(
         inputPNGData: Data,
         prompt: String,
         apiKey: String,
         model: NanoBananaModel
-    ) throws -> URLRequest {
-        let requestBody = GenerateContentRequest(
-            contents: [
-                RequestContent(
-                    parts: [
-                        RequestPart(text: prompt),
-                        RequestPart(
-                            inlineData: InlineData(
-                                mimeType: "image/png",
-                                data: inputPNGData.base64EncodedString()
-                            )
-                        )
-                    ]
-                )
-            ],
-            generationConfig: GenerationConfig(
-                responseModalities: ["IMAGE"],
-                imageConfig: imageConfig(for: model)
-            )
-        )
-
+    ) -> [URLRequest] {
         guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model.rawValue):generateContent") else {
-            throw NanoBananaError.invalidEndpoint
+            return []
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
-        request.httpBody = try JSONEncoder().encode(requestBody)
-        return request
+        let imagePart = RequestPart(
+            inlineData: InlineData(
+                mimeType: "image/png",
+                data: inputPNGData.base64EncodedString()
+            )
+        )
+        let textPart = RequestPart(text: prompt)
+
+        let requestBodies: [GenerateContentRequest] = [
+            GenerateContentRequest(
+                contents: [
+                    RequestContent(parts: [textPart, imagePart])
+                ],
+                generationConfig: GenerationConfig(
+                    responseModalities: ["TEXT", "IMAGE"],
+                    imageConfig: imageConfig(for: model)
+                )
+            ),
+            GenerateContentRequest(
+                contents: [
+                    RequestContent(parts: [imagePart, textPart])
+                ],
+                generationConfig: GenerationConfig(
+                    responseModalities: ["TEXT", "IMAGE"],
+                    imageConfig: imageConfig(for: model)
+                )
+            ),
+            GenerateContentRequest(
+                contents: [
+                    RequestContent(parts: [textPart, imagePart])
+                ],
+                generationConfig: nil
+            ),
+            GenerateContentRequest(
+                contents: [
+                    RequestContent(parts: [imagePart, textPart])
+                ],
+                generationConfig: nil
+            )
+        ]
+
+        return requestBodies.compactMap { requestBody in
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
+            request.httpBody = try? JSONEncoder().encode(requestBody)
+            return request.httpBody == nil ? nil : request
+        }
     }
 
     private static func makeProxyRequest(

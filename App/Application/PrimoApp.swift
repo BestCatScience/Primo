@@ -30,6 +30,11 @@ struct PrimoApp: App {
                     store.send(.saveDocumentRequested)
                 }
                 .keyboardShortcut("s", modifiers: .command)
+
+                Button("Save As") {
+                    store.send(.saveDocumentCopyRequested)
+                }
+                .keyboardShortcut("S", modifiers: [.command, .shift])
             }
         }
     }

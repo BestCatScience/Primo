@@ -1,0 +1,66 @@
+{
+  "identifier" : "D4B1E2B8-8E9C-4EF6-BBB2-A112D3217C6F",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21482014",
+      "localizations" : [
+        {
+          "description" : "Unlimited Nano Banana access inside Primo.",
+          "displayName" : "Primo Nano Banana",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Primo で Nano Banana を無制限に利用できます。",
+          "displayName" : "Primo Nano Banana",
+          "locale" : "ja_JP"
+        }
+      ],
+      "name" : "Primo Nano Banana",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "900",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "NB-MONTHLY-001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly subscription for app-managed Nano Banana access in Primo.",
+              "displayName" : "Primo Nano Banana Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Primo でアプリ管理の Nano Banana を利用するための月額サブスクリプションです。",
+              "displayName" : "Primo Nano Banana Monthly",
+              "locale" : "ja_JP"
+            }
+          ],
+          "productID" : "com.bestcatscience.primo.nanobanana.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Primo Nano Banana Monthly",
+          "subscriptionGroupID" : "21482014",
+          "type" : "Auto-Renewable Subscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

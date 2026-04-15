@@ -11,12 +11,6 @@ struct ContentView: View {
         case apiKey
     }
 
-    enum WorkspaceSidebarSection: Hashable {
-        case explorer
-        case brush
-        case ai
-    }
-
     enum WorkspaceBottomPanelSection: Hashable {
         case nanoBanana
         case history
@@ -39,6 +33,7 @@ struct ContentView: View {
     @State var showsPosterizeSheet = false
     @State var showsGradientMapSheet = false
     @State var showsNanoBananaSheet = false
+    @State var showsNanoBananaPaywall = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var gradientMapSettings = GradientMapSettings()
@@ -62,7 +57,6 @@ struct ContentView: View {
     @State var selectedToolMetricEditor: ToolMetricEditor?
     @State var toolMetricSizeText = ""
     @State var toolMetricOpacityText = ""
-    @State var workspaceSidebarSection: WorkspaceSidebarSection = .explorer
     @State var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
     @State var workspaceBottomPanelCollapsed = false
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
@@ -130,6 +124,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsNanoBananaSheet) {
             nanoBananaSheet
+        }
+        .sheet(isPresented: $showsNanoBananaPaywall) {
+            nanoBananaPaywallSheet
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,
