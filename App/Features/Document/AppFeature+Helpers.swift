@@ -1,10 +1,25 @@
 import ComposableArchitecture
+import CryptoKit
 import CoreGraphics
 import Foundation
 import SwiftUI
 import UIKit
 
 extension AppFeature {
+    private struct StoredAutosaveMetadata: Codable {
+        let id: String
+        let title: String
+        let sourceProjectPath: String?
+        let updatedAt: Date
+    }
+
+    private struct StoredSaveHistoryMetadata: Codable {
+        let id: String
+        let title: String
+        let createdAt: Date
+        let trigger: SaveHistoryTrigger
+    }
+
     struct InpaintCrop: Sendable {
         let pixelData: Data
         let width: Int
@@ -129,11 +144,210 @@ extension AppFeature {
     func applyDirtyPresentation(state: inout State) {
         state.applyPresentation(paintDocumentClient.presentation())
         state.setActiveTabDirty(true)
+        persistActiveTabToBackingStore(state: &state)
+        persistActiveTabAutosave(state: &state)
+    }
+
+    func persistActiveTabAutosave(state: inout State) {
+        guard let activeTab = state.activeTab else { return }
+        let autosaveID = Self.autosaveIdentifier(for: activeTab)
+
+        do {
+            let projectURL = try Self.autosaveProjectURL(for: autosaveID)
+            try paintDocumentClient.saveProject(projectURL, state.resolvedPaperStyle())
+
+            let metadata = StoredAutosaveMetadata(
+                id: autosaveID,
+                title: activeTab.title,
+                sourceProjectPath: activeTab.sourceProjectURL?.standardizedFileURL.path,
+                updatedAt: Date()
+            )
+            let data = try JSONEncoder().encode(metadata)
+            try data.write(to: try Self.autosaveMetadataURL(for: autosaveID), options: .atomic)
+        } catch {
+            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+        }
+    }
+
+    func clearAutosave(for tab: OpenDocumentTab) {
+        let autosaveID = Self.autosaveIdentifier(for: tab)
+        try? Self.discardAutosaveEntry(id: autosaveID)
+    }
+
+    func persistSaveHistorySnapshot(
+        for tab: OpenDocumentTab,
+        trigger: SaveHistoryTrigger
+    ) {
+        let title = (tab.sourceProjectURL ?? tab.backingStoreURL).deletingPathExtension().lastPathComponent
+
+        do {
+            let entryID = UUID().uuidString.lowercased()
+            let projectURL = try Self.saveHistoryProjectURL(for: tab, entryID: entryID)
+            let metadataURL = try Self.saveHistoryMetadataURL(for: tab, entryID: entryID)
+            let session = try PaintDocumentSession.loadProject(from: tab.backingStoreURL)
+            try session.saveProject(to: projectURL)
+
+            let metadata = StoredSaveHistoryMetadata(
+                id: entryID,
+                title: title,
+                createdAt: Date(),
+                trigger: trigger
+            )
+            let data = try JSONEncoder().encode(metadata)
+            try data.write(to: metadataURL, options: .atomic)
+            try Self.trimSaveHistoryEntries(for: tab, limit: 20)
+        } catch {
+            // Save history is a resilience feature. Keep editing even if a snapshot could not be recorded.
+        }
+    }
+
+    func requestCloseOperation(
+        state: inout State,
+        operation: PendingCloseOperation
+    ) -> Effect<Action> {
+        let tabIDs: [OpenDocumentTab.ID] = {
+            switch operation {
+            case let .tab(tabID):
+                return [tabID]
+            case let .closeOtherTabs(tabID):
+                return state.openTabs.filter { $0.id != tabID }.map(\.id)
+            case let .closeTabsToRight(tabID):
+                guard let tab = state.openTabs.first(where: { $0.id == tabID }) else { return [] }
+                let paneTabs = state.openTabs.filter { $0.pane == tab.pane }
+                guard let index = paneTabs.firstIndex(where: { $0.id == tabID }) else { return [] }
+                return Array(paneTabs.dropFirst(index + 1).map(\.id))
+            }
+        }()
+
+        let dirtyTabs = state.openTabs.filter { tabIDs.contains($0.id) && $0.isDirty }
+        guard !dirtyTabs.isEmpty else {
+            return performCloseOperation(state: &state, operation: operation)
+        }
+
+        state.pendingCloseConfirmation = PendingCloseConfirmationState(
+            operation: operation,
+            tabIDs: dirtyTabs.map(\.id),
+            tabTitles: dirtyTabs.map(\.title)
+        )
+        return .none
+    }
+
+    func performCloseOperation(
+        state: inout State,
+        operation: PendingCloseOperation
+    ) -> Effect<Action> {
+        switch operation {
+        case let .tab(tabID):
+            return .send(.tabClosed(tabID))
+        case let .closeOtherTabs(tabID):
+            return .send(.closeOtherTabs(tabID))
+        case let .closeTabsToRight(tabID):
+            return .send(.closeTabsToRight(tabID))
+        }
+    }
+
+    func saveTabsForClose(
+        _ tabIDs: [OpenDocumentTab.ID],
+        state: inout State
+    ) throws {
+        if let activeTabID = state.activeTabID, tabIDs.contains(activeTabID) {
+            persistActiveTabToBackingStore(state: &state)
+        }
+        for tabID in tabIDs {
+            guard let tabIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else { continue }
+            let tab = state.openTabs[tabIndex]
+            let session = try PaintDocumentSession.loadProject(from: tab.backingStoreURL)
+            let destinationURL = try tab.sourceProjectURL ?? Self.projectURLInDocuments()
+            try session.saveProject(to: destinationURL)
+            state.openTabs[tabIndex].sourceProjectURL = destinationURL
+            state.openTabs[tabIndex].title = destinationURL.deletingPathExtension().lastPathComponent
+            state.openTabs[tabIndex].isDirty = false
+            if tabID == state.activeTabID {
+                state.updateActiveTabMetadata(
+                    title: destinationURL.deletingPathExtension().lastPathComponent,
+                    sourceProjectURL: destinationURL,
+                    previewImageData: session.compositePNGData(paperStyle: session.currentPaperStyle)
+                )
+            }
+            clearAutosave(for: state.openTabs[tabIndex])
+            persistSaveHistorySnapshot(for: state.openTabs[tabIndex], trigger: .closeSave)
+        }
     }
 
     static func nextUntitledTabTitle(existingTabs: [OpenDocumentTab]) -> String {
         let untitledTabs = existingTabs.filter { $0.sourceProjectURL == nil && $0.title.hasPrefix("Untitled") }
         return untitledTabs.isEmpty ? "Untitled" : "Untitled \(untitledTabs.count + 1)"
+    }
+
+    static func loadAutosaveRecoveryItems() throws -> [AutosaveRecoveryItem] {
+        let fileManager = FileManager.default
+        let directory = try autosavesDirectory()
+        let entryURLs = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        return try entryURLs.compactMap { entryURL -> AutosaveRecoveryItem? in
+            let metadataURL = entryURL.appendingPathComponent("metadata.json", isDirectory: false)
+            guard let data = try? Data(contentsOf: metadataURL) else { return nil }
+            let metadata = try JSONDecoder().decode(StoredAutosaveMetadata.self, from: data)
+            let projectURL = entryURL.appendingPathComponent("project.atelier", isDirectory: true)
+            guard fileManager.fileExists(atPath: projectURL.path) else { return nil }
+            let previewImageData: Data? = {
+                guard let session = try? PaintDocumentSession.loadProject(from: projectURL) else { return nil }
+                return session.compositePNGData(paperStyle: session.currentPaperStyle)
+            }()
+            return AutosaveRecoveryItem(
+                id: metadata.id,
+                title: metadata.title,
+                sourceProjectURL: metadata.sourceProjectPath.map { URL(fileURLWithPath: $0) },
+                autosaveProjectURL: projectURL,
+                updatedAt: metadata.updatedAt,
+                previewImageData: previewImageData
+            )
+        }
+        .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    static func discardAutosaveEntry(id: String) throws {
+        let directory = try autosavesDirectory().appendingPathComponent(id, isDirectory: true)
+        if FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.removeItem(at: directory)
+        }
+    }
+
+    static func loadSaveHistoryEntries(for tab: OpenDocumentTab) throws -> [SaveHistoryEntry] {
+        let fileManager = FileManager.default
+        let directory = try saveHistoryEntriesDirectory(for: tab)
+        let entryURLs = try fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        return try entryURLs.compactMap { entryURL -> SaveHistoryEntry? in
+            let metadataURL = entryURL.appendingPathComponent("metadata.json", isDirectory: false)
+            guard let data = try? Data(contentsOf: metadataURL) else { return nil }
+            let metadata = try JSONDecoder().decode(StoredSaveHistoryMetadata.self, from: data)
+            let projectURL = entryURL.appendingPathComponent("project.atelier", isDirectory: true)
+            guard fileManager.fileExists(atPath: projectURL.path) else { return nil }
+
+            let previewImageData: Data? = {
+                guard let session = try? PaintDocumentSession.loadProject(from: projectURL) else { return nil }
+                return session.compositePNGData(paperStyle: session.currentPaperStyle)
+            }()
+
+            return SaveHistoryEntry(
+                id: metadata.id,
+                title: metadata.title,
+                projectURL: projectURL,
+                createdAt: metadata.createdAt,
+                trigger: metadata.trigger,
+                previewImageData: previewImageData
+            )
+        }
+        .sorted { $0.createdAt > $1.createdAt }
     }
 
     static func combinedSelection(
@@ -1767,6 +1981,57 @@ extension AppFeature {
         try tabProjectsDirectory().appendingPathComponent(id.uuidString, isDirectory: true)
     }
 
+    static func autosavesDirectory() throws -> URL {
+        let directory = try appProjectsDirectory()
+            .appendingPathComponent(".primo-autosaves", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func autosaveEntryDirectory(for id: String) throws -> URL {
+        let directory = try autosavesDirectory().appendingPathComponent(id, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func autosaveProjectURL(for id: String) throws -> URL {
+        try autosaveEntryDirectory(for: id).appendingPathComponent("project.atelier", isDirectory: true)
+    }
+
+    static func autosaveMetadataURL(for id: String) throws -> URL {
+        try autosaveEntryDirectory(for: id).appendingPathComponent("metadata.json", isDirectory: false)
+    }
+
+    static func saveHistoryDirectory() throws -> URL {
+        let directory = try appProjectsDirectory()
+            .appendingPathComponent(".primo-save-history", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func saveHistoryEntriesDirectory(for tab: OpenDocumentTab) throws -> URL {
+        let directory = try saveHistoryDirectory()
+            .appendingPathComponent(historyIdentifier(for: tab), isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func saveHistoryEntryDirectory(for tab: OpenDocumentTab, entryID: String) throws -> URL {
+        let directory = try saveHistoryEntriesDirectory(for: tab).appendingPathComponent(entryID, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    static func saveHistoryProjectURL(for tab: OpenDocumentTab, entryID: String) throws -> URL {
+        try saveHistoryEntryDirectory(for: tab, entryID: entryID)
+            .appendingPathComponent("project.atelier", isDirectory: true)
+    }
+
+    static func saveHistoryMetadataURL(for tab: OpenDocumentTab, entryID: String) throws -> URL {
+        try saveHistoryEntryDirectory(for: tab, entryID: entryID)
+            .appendingPathComponent("metadata.json", isDirectory: false)
+    }
+
     static func appProjectsDirectory() throws -> URL {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let directory = documentsDirectory
@@ -1779,10 +2044,35 @@ extension AppFeature {
         try appProjectsDirectory().appendingPathComponent(projectFilename(), isDirectory: true)
     }
 
+    static func autosaveIdentifier(for tab: OpenDocumentTab) -> String {
+        if let sourceProjectURL = tab.sourceProjectURL?.standardizedFileURL {
+            return "saved-\(stableIdentifier(for: sourceProjectURL.path))"
+        }
+        return "untitled-\(tab.id.uuidString.lowercased())"
+    }
+
+    static func historyIdentifier(for tab: OpenDocumentTab) -> String {
+        if let sourceProjectURL = tab.sourceProjectURL?.standardizedFileURL {
+            return "saved-\(stableIdentifier(for: sourceProjectURL.path))"
+        }
+        return "untitled-\(tab.id.uuidString.lowercased())"
+    }
+
+    static func stableIdentifier(for value: String) -> String {
+        let digest = SHA256.hash(data: Data(value.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
     static func savedProjects() throws -> [SavedProjectSummary] {
         let fileManager = FileManager.default
         let directory = try appProjectsDirectory()
+        let ignoredPathFragments = [".primo-autosaves", ".primo-save-history"]
         let urls = try fileManager.subpathsOfDirectory(atPath: directory.path)
+            .filter { subpath in
+                ignoredPathFragments.allSatisfy { fragment in
+                    !subpath.contains(fragment)
+                }
+            }
             .map { directory.appendingPathComponent($0, isDirectory: true) }
 
         return urls
@@ -1833,6 +2123,19 @@ extension AppFeature {
         }
         try fileManager.moveItem(at: url, to: destinationURL)
         return destinationURL
+    }
+
+    static func trimSaveHistoryEntries(for tab: OpenDocumentTab, limit: Int) throws {
+        guard limit > 0 else { return }
+        let fileManager = FileManager.default
+        let entries = try loadSaveHistoryEntries(for: tab)
+        guard entries.count > limit else { return }
+        for entry in entries.dropFirst(limit) {
+            let directory = try saveHistoryEntryDirectory(for: tab, entryID: entry.id)
+            if fileManager.fileExists(atPath: directory.path) {
+                try fileManager.removeItem(at: directory)
+            }
+        }
     }
 
     static func exportFilename() -> String {

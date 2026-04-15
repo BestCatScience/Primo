@@ -264,6 +264,168 @@ struct BannerToast: View {
     }
 }
 
+struct AutosaveRecoverySheet: View {
+    let items: [AutosaveRecoveryItem]
+    let language: AppLanguage
+    let onRestore: (String) -> Void
+    let onDiscard: (String) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 12) {
+                            preview(item.previewImageData, symbol: "clock.arrow.circlepath")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.headline)
+                                Text(dateFormatter.string(from: item.updatedAt))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+
+                        HStack(spacing: 10) {
+                            Button(language.localized("復元")) {
+                                onRestore(item.id)
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button(language.localized("破棄")) {
+                                onDiscard(item.id)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle(language.localized("自動保存を復元"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(language.localized("後で")) {
+                        onClose()
+                    }
+                }
+            }
+        }
+    }
+
+    private func preview(_ data: Data?, symbol: String) -> some View {
+        Group {
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.black.opacity(0.08))
+                    .overlay(Image(systemName: symbol).foregroundStyle(.secondary))
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }
+}
+
+struct SaveHistorySheet: View {
+    let title: String
+    let entries: [SaveHistoryEntry]
+    let language: AppLanguage
+    let onRestoreCurrent: (URL) -> Void
+    let onOpenNewTab: (URL) -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if entries.isEmpty {
+                    Text(language.localized("保存履歴はまだありません"))
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(entries) { entry in
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 12) {
+                                preview(entry.previewImageData, symbol: "clock.arrow.circlepath")
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(entry.trigger.title(language))
+                                        .font(.headline)
+                                    Text(dateFormatter.string(from: entry.createdAt))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                            }
+
+                            HStack(spacing: 10) {
+                                Button(language.localized("現在のタブに復元")) {
+                                    onRestoreCurrent(entry.projectURL)
+                                }
+                                .buttonStyle(.borderedProminent)
+
+                                Button(language.localized("新しいタブで開く")) {
+                                    onOpenNewTab(entry.projectURL)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(language.localized("閉じる")) {
+                        onClose()
+                    }
+                }
+            }
+        }
+    }
+
+    private func preview(_ data: Data?, symbol: String) -> some View {
+        Group {
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.black.opacity(0.08))
+                    .overlay(Image(systemName: symbol).foregroundStyle(.secondary))
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }
+}
+
 struct CanvasHUD: View {
     let title: String
     let value: String
@@ -431,7 +593,7 @@ extension ContentView {
                 .lineLimit(1)
 
             Button {
-                store.send(.tabClosed(tab.id))
+                store.send(.tabCloseRequested(tab.id))
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
@@ -461,13 +623,13 @@ extension ContentView {
         }
         .contextMenu {
             Button(language.localized("閉じる")) {
-                store.send(.tabClosed(tab.id))
+                store.send(.tabCloseRequested(tab.id))
             }
             Button(language.localized("他を閉じる")) {
-                store.send(.closeOtherTabs(tab.id))
+                store.send(.closeOtherTabsRequested(tab.id))
             }
             Button(language.localized("右側を閉じる")) {
-                store.send(.closeTabsToRight(tab.id))
+                store.send(.closeTabsToRightRequested(tab.id))
             }
             Button(language.localized("右ペインへ移動")) {
                 store.send(.moveTabToSecondaryPane(tab.id))

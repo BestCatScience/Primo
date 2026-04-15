@@ -1282,6 +1282,9 @@ extension ContentView {
                 Button(language.localized("名前を付けて保存")) {
                     store.send(.saveDocumentCopyRequested)
                 }
+                Button(language.localized("保存履歴")) {
+                    store.send(.saveHistoryRequested)
+                }
                 Button(StudioStrings.export(language)) {
                     store.send(.exportDocumentRequested)
                 }

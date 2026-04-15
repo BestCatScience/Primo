@@ -46,3 +46,38 @@ struct OpenDocumentTab: Equatable, Sendable, Identifiable {
     var pane: WorkspacePane
     var previewImageData: Data?
 }
+
+struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let sourceProjectURL: URL?
+    let autosaveProjectURL: URL
+    let updatedAt: Date
+    let previewImageData: Data?
+}
+
+enum SaveHistoryTrigger: String, Codable, Equatable, Sendable {
+    case manualSave
+    case autoSave
+    case closeSave
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .manualSave:
+            return language.localized("手動保存")
+        case .autoSave:
+            return language.localized("自動保存")
+        case .closeSave:
+            return language.localized("閉じる前に保存")
+        }
+    }
+}
+
+struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let projectURL: URL
+    let createdAt: Date
+    let trigger: SaveHistoryTrigger
+    let previewImageData: Data?
+}

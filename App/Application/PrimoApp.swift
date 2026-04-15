@@ -35,6 +35,10 @@ struct PrimoApp: App {
                     store.send(.saveDocumentCopyRequested)
                 }
                 .keyboardShortcut("S", modifiers: [.command, .shift])
+
+                Button("Save History") {
+                    store.send(.saveHistoryRequested)
+                }
             }
         }
     }

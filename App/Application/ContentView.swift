@@ -140,6 +140,35 @@ struct ContentView: View {
         .sheet(isPresented: $showsNanoBananaPaywall) {
             nanoBananaPaywallSheet
         }
+        .sheet(
+            isPresented: Binding(
+                get: { store.isShowingAutosaveRecovery },
+                set: { if !$0 { store.send(.autosaveRecoveryDismissed) } }
+            )
+        ) {
+            AutosaveRecoverySheet(
+                items: store.autosaveRecoveryItems,
+                language: language,
+                onRestore: { store.send(.autosaveRecoveryRestoreRequested($0)) },
+                onDiscard: { store.send(.autosaveRecoveryDiscardRequested($0)) },
+                onClose: { store.send(.autosaveRecoveryDismissed) }
+            )
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { store.isShowingSaveHistory },
+                set: { if !$0 { store.send(.saveHistoryDismissed) } }
+            )
+        ) {
+            SaveHistorySheet(
+                title: language.localized("保存履歴"),
+                entries: store.saveHistoryEntries,
+                language: language,
+                onRestoreCurrent: { store.send(.saveHistoryRestoreRequested($0, false)) },
+                onOpenNewTab: { store.send(.saveHistoryRestoreRequested($0, true)) },
+                onClose: { store.send(.saveHistoryDismissed) }
+            )
+        }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,
             allowedContentTypes: [.atelierDocument],
@@ -178,6 +207,28 @@ struct ContentView: View {
             try? await Task.sleep(for: .milliseconds(2200))
             guard !Task.isCancelled else { return }
             store.send(.bannerDismissed)
+        }
+        .alert(
+            language.localized("未保存の変更があります"),
+            isPresented: Binding(
+                get: { store.pendingCloseConfirmation != nil },
+                set: { if !$0 { store.send(.pendingCloseCancelled) } }
+            )
+        ) {
+            Button(language.localized("保存して閉じる")) {
+                store.send(.pendingCloseSaveConfirmed)
+            }
+            Button(language.localized("保存せず閉じる"), role: .destructive) {
+                store.send(.pendingCloseDiscardConfirmed)
+            }
+            Button(language.localized("キャンセル"), role: .cancel) {
+                store.send(.pendingCloseCancelled)
+            }
+        } message: {
+            Text(
+                store.pendingCloseConfirmation?.tabTitles.prefix(3).joined(separator: "\n")
+                ?? language.localized("閉じる前に保存するか選んでください")
+            )
         }
     }
 
