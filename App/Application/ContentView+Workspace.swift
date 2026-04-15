@@ -377,98 +377,32 @@ extension ContentView {
     }
 
     var workspaceNanoBananaPanel: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(language.localized("Prompt"))
-                    .font(StudioTheme.Typography.label(12))
-                    .foregroundStyle(.white.opacity(0.55))
-                TextField(
-                    language.localized("Describe how Nano Banana should edit the active layer"),
-                    text: $nanoBananaPrompt,
-                    axis: .vertical
-                )
-                    .font(StudioTheme.Typography.body(13))
-                    .foregroundStyle(.black)
-                    .tint(.black)
-                    .textFieldStyle(.plain)
-                    .lineLimit(4...8)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.black.opacity(0.14), lineWidth: 1)
-                    )
-            }
+        GeometryReader { geometry in
+            let usesCompactStack = geometry.size.width < 980
+            let promptWidth = usesCompactStack ? geometry.size.width : max(geometry.size.width * 0.56, 360)
 
-            VStack(alignment: .leading, spacing: 10) {
-                workspaceNanoBananaStat(label: language.localized("Input"), value: resolvedNanoBananaInputLayerName)
-                workspaceNanoBananaStat(label: language.localized("Scope"), value: nanoBananaEditScope.title(language))
-                workspaceNanoBananaStat(label: language.localized("Output"), value: nanoBananaOutputMode.title(language))
-                workspaceNanoBananaStat(label: language.localized("Model"), value: nanoBananaModel.title(language))
-
-                if nanoBananaAccessMode == .appManaged && !nanoBananaCommerce.isSubscriptionActive {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(language.localized("Subscription Required"))
-                            .font(StudioTheme.Typography.label(12))
-                            .foregroundStyle(.white.opacity(0.92))
-                        Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
-                            .font(StudioTheme.Typography.body(11))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Button(language.localized("Unlock Nano Banana")) {
-                            showsNanoBananaPaywall = true
+            Group {
+                if usesCompactStack {
+                    VStack(alignment: .leading, spacing: 12) {
+                        workspaceNanoBananaPromptEditor
+                        workspaceNanoBananaMetaColumn
+                        workspaceNanoBananaActions
+                    }
+                } else {
+                    HStack(alignment: .top, spacing: 14) {
+                        workspaceNanoBananaPromptEditor
+                            .frame(width: promptWidth, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 12) {
+                            workspaceNanoBananaMetaColumn
+                            workspaceNanoBananaActions
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.white.opacity(0.94))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.white.opacity(0.08))
-                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(0.04))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                    )
-                }
-
-                HStack(spacing: 8) {
-                    Button(language.localized("Run")) {
-                        requestNanoBananaGeneration(closeSheet: false)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white.opacity(0.94))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(
-                                (store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
-                                ? StudioTheme.Palette.accentBright.opacity(0.34)
-                                : StudioTheme.Palette.accentBright.opacity(0.8)
-                            )
-                    )
-                    .disabled(store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
-
-                    Button(language.localized("Open Full Panel")) {
-                        showsNanoBananaSheet = true
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white.opacity(0.72))
                 }
             }
-            .frame(width: 250, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     func workspaceNanoBananaStat(label: String, value: String) -> some View {
@@ -480,6 +414,148 @@ extension ContentView {
                 .font(StudioTheme.Typography.label(12))
                 .foregroundStyle(.white.opacity(0.88))
                 .lineLimit(1)
+        }
+    }
+
+    var workspaceNanoBananaPromptEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(language.localized("Prompt"))
+                .font(StudioTheme.Typography.label(12))
+                .foregroundStyle(.white.opacity(0.55))
+
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white)
+
+                if nanoBananaPrompt.isEmpty {
+                    Text(language.localized("Describe how Nano Banana should edit the active layer"))
+                        .font(StudioTheme.Typography.body(13))
+                        .foregroundStyle(Color.black.opacity(0.38))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .allowsHitTesting(false)
+                }
+
+                StudioPlainTextView(
+                    text: $nanoBananaPrompt,
+                    textColor: .black,
+                    tintColor: .black,
+                    font: .systemFont(ofSize: 13, weight: .medium),
+                    backgroundColor: .clear
+                )
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 82, maxHeight: 110, alignment: .topLeading)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.black.opacity(0.14), lineWidth: 1)
+            )
+        }
+    }
+
+    var workspaceNanoBananaMetaColumn: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(minimum: 110), spacing: 10),
+                    GridItem(.flexible(minimum: 110), spacing: 10)
+                ],
+                alignment: .leading,
+                spacing: 10
+            ) {
+                workspaceNanoBananaStatCard(label: language.localized("Input"), value: resolvedNanoBananaInputLayerName)
+                workspaceNanoBananaStatCard(label: language.localized("Scope"), value: nanoBananaEditScope.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("Output"), value: nanoBananaOutputMode.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("Model"), value: nanoBananaModel.title(language))
+            }
+
+            if nanoBananaAccessMode == .appManaged && !nanoBananaCommerce.isSubscriptionActive {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(language.localized("Subscription Required"))
+                        .font(StudioTheme.Typography.label(12))
+                        .foregroundStyle(.white.opacity(0.92))
+                    Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
+                        .font(StudioTheme.Typography.body(11))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button(language.localized("Unlock Nano Banana")) {
+                        showsNanoBananaPaywall = true
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.94))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    func workspaceNanoBananaStatCard(label: String, value: String) -> some View {
+        workspaceNanoBananaStat(label: label, value: value)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+    }
+
+    var workspaceNanoBananaActions: some View {
+        HStack(spacing: 8) {
+            Button(language.localized("Run")) {
+                requestNanoBananaGeneration(closeSheet: false)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.94))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        (store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
+                        ? StudioTheme.Palette.accentBright.opacity(0.34)
+                        : StudioTheme.Palette.accentBright.opacity(0.8)
+                    )
+            )
+            .disabled(store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
+
+            Button(language.localized("Open Full Panel")) {
+                showsNanoBananaSheet = true
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.72))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+
+            Spacer(minLength: 0)
         }
     }
 

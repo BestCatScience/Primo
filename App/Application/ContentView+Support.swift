@@ -192,6 +192,57 @@ struct WindowGestureShield: UIViewRepresentable {
     }
 }
 
+struct StudioPlainTextView: UIViewRepresentable {
+    @Binding var text: String
+    let textColor: UIColor
+    let tintColor: UIColor
+    let font: UIFont
+    let backgroundColor: UIColor
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.backgroundColor = backgroundColor
+        textView.textContainerInset = UIEdgeInsets(top: 1, left: 0, bottom: 1, right: 0)
+        textView.textContainer.lineFragmentPadding = 0
+        textView.autocapitalizationType = .sentences
+        textView.autocorrectionType = .default
+        textView.spellCheckingType = .yes
+        textView.keyboardDismissMode = .interactive
+        textView.text = text
+        textView.textColor = textColor
+        textView.tintColor = tintColor
+        textView.font = font
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+        uiView.textColor = textColor
+        uiView.tintColor = tintColor
+        uiView.backgroundColor = backgroundColor
+        uiView.font = font
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var text: String
+
+        init(text: Binding<String>) {
+            _text = text
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text
+        }
+    }
+}
+
 struct BannerToast: View {
     let message: String
 
