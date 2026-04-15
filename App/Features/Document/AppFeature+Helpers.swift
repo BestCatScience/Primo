@@ -1687,6 +1687,19 @@ extension AppFeature {
         return croppedSelection(from: fullMask, width: canvasWidth, height: canvasHeight, mode: mode)
     }
 
+    static func featheredSelection(
+        _ selection: CanvasSelection?,
+        canvasSize: CGSize,
+        radius: Int
+    ) -> CanvasSelection? {
+        guard let selection else { return nil }
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        let featheredMask = featheredSelectionMask(mask, width: canvasWidth, height: canvasHeight, radius: radius)
+        return croppedSelection(from: featheredMask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+    }
+
     static func alphaMask(from sourceBytes: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
         var mask = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
         for index in 0..<(canvasWidth * canvasHeight) {
@@ -1868,6 +1881,54 @@ extension AppFeature {
         )
     }
 
+    static func makeColorRangeSelection(
+        request: ColorRangeSelectionRequest,
+        snapshot: MetalDocumentSnapshot?,
+        activeLayerIndex: Int,
+        mode: SelectionToolMode
+    ) -> CanvasSelection? {
+        guard let snapshot else { return nil }
+        let width = snapshot.width
+        let height = snapshot.height
+        guard width > 0, height > 0 else { return nil }
+
+        let pixelData: Data
+        switch request.source {
+        case .activeLayer:
+            guard let layer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else { return nil }
+            pixelData = layer.pixelData
+        case .canvas:
+            pixelData = snapshot.compositePixelData
+        }
+
+        guard pixelData.count == width * height * 4 else { return nil }
+        let tolerance = min(max(request.tolerance, 0.0), 1.0)
+        let minimumAlpha = min(max(request.minimumAlpha, 0.0), 1.0)
+        var selected = [UInt8](repeating: 0, count: width * height)
+
+        pixelData.withUnsafeBytes { bytes in
+            guard let base = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for index in 0..<(width * height) {
+                let offset = index * 4
+                let alpha = Double(base[offset + 3]) / 255.0
+                guard alpha >= minimumAlpha else { continue }
+
+                let dr = (Double(base[offset]) - Double(request.red)) / 255.0
+                let dg = (Double(base[offset + 1]) - Double(request.green)) / 255.0
+                let db = (Double(base[offset + 2]) - Double(request.blue)) / 255.0
+                let distance = sqrt((dr * dr) + (dg * dg) + (db * db)) / sqrt(3.0)
+                if distance <= tolerance {
+                    selected[index] = 255
+                }
+            }
+        }
+
+        let expandedMask = request.expansion > 0
+            ? expandedSelectionMask(selected, width: width, height: height, expansion: request.expansion)
+            : selected
+        return croppedSelection(from: expandedMask, width: width, height: height, mode: mode)
+    }
+
     static func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
         var result = source
@@ -1917,6 +1978,50 @@ extension AppFeature {
         }
 
         return current
+    }
+
+    static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
+        guard radius > 0, width > 0, height > 0 else { return source }
+
+        let kernelSize = (radius * 2) + 1
+        let normalization = Double(kernelSize)
+        var horizontal = [Double](repeating: 0, count: width * height)
+        var vertical = [UInt8](repeating: 0, count: width * height)
+
+        for y in 0..<height {
+            var runningSum = 0.0
+            for sampleX in -radius...radius {
+                let clampedX = min(max(sampleX, 0), width - 1)
+                runningSum += Double(source[(y * width) + clampedX])
+            }
+
+            for x in 0..<width {
+                horizontal[(y * width) + x] = runningSum / normalization
+                let outgoingX = max(x - radius, 0)
+                let incomingX = min(x + radius + 1, width - 1)
+                runningSum -= Double(source[(y * width) + outgoingX])
+                runningSum += Double(source[(y * width) + incomingX])
+            }
+        }
+
+        for x in 0..<width {
+            var runningSum = 0.0
+            for sampleY in -radius...radius {
+                let clampedY = min(max(sampleY, 0), height - 1)
+                runningSum += horizontal[(clampedY * width) + x]
+            }
+
+            for y in 0..<height {
+                let blurred = runningSum / normalization
+                vertical[(y * width) + x] = UInt8(max(0, min(255, Int(blurred.rounded()))))
+                let outgoingY = max(y - radius, 0)
+                let incomingY = min(y + radius + 1, height - 1)
+                runningSum -= horizontal[(outgoingY * width) + x]
+                runningSum += horizontal[(incomingY * width) + x]
+            }
+        }
+
+        return vertical.map { $0 < 2 ? 0 : $0 }
     }
 
     static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {

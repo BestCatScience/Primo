@@ -591,6 +591,8 @@ struct AppFeature {
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(URL, Bool)
         case saveHistoryOpened(LoadedPaintProject, URL, Bool)
+        case featherSelectionRequested(Int)
+        case colorRangeSelectionRequested(ColorRangeSelectionRequest)
         case saveDocumentRequested
         case saveDocumentCopyRequested
         case exportDocumentRequested
@@ -2016,6 +2018,38 @@ struct AppFeature {
                 state.canvas.transformPreviewScale = 1.0
                 state.canvas.transformPreviewRotationDegrees = 0
                 return .none
+
+            case let .featherSelectionRequested(radius):
+                guard state.canvas.selection != nil else { return .none }
+                state.canvas.selection = Self.featheredSelection(
+                    state.canvas.selection,
+                    canvasSize: state.canvas.canvasSize,
+                    radius: max(radius, 1)
+                )
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                return .none
+
+            case let .colorRangeSelectionRequested(request):
+                let incomingSelection = Self.makeColorRangeSelection(
+                    request: request,
+                    snapshot: state.canvas.renderSnapshot,
+                    activeLayerIndex: state.canvas.activeLayerIndex,
+                    mode: state.canvas.selectionMode
+                )
+                let selection = Self.combinedSelection(
+                    existing: state.canvas.selection,
+                    incoming: incomingSelection,
+                    mode: state.brushPalette.selection.combineMode,
+                    canvasSize: state.canvas.canvasSize
+                )
+                state.canvas.selectionPreviewPoints = []
+                state.canvas.transformPreviewOffset = .zero
+                state.canvas.transformPreviewScale = 1.0
+                state.canvas.transformPreviewRotationDegrees = 0
+                return .send(.canvas(.selectionUpdated(selection)))
 
             case .brushPalette(.delegate(.cancelTransform)):
                 state.canvas.transformPreviewOffset = .zero

@@ -34,6 +34,10 @@ struct ContentView: View {
     @State var showsThresholdSheet = false
     @State var showsPosterizeSheet = false
     @State var showsGradientMapSheet = false
+    @State var showsExpandSelectionSheet = false
+    @State var showsContractSelectionSheet = false
+    @State var showsFeatherSelectionSheet = false
+    @State var showsColorRangeSelectionSheet = false
     @State var showsNanoBananaSheet = false
     @State var showsNanoBananaPaywall = false
     @State var newCanvasWidthText = ""
@@ -51,6 +55,13 @@ struct ContentView: View {
     @State var colorBalanceSettings = ColorBalanceSettings()
     @State var thresholdSettings = ThresholdSettings()
     @State var posterizeSettings = PosterizeSettings()
+    @State var selectionExpansionText = "4"
+    @State var selectionContractionText = "4"
+    @State var selectionFeatherRadiusText = "8"
+    @State var colorRangeTolerance = 0.12
+    @State var colorRangeMinimumAlpha = 0.05
+    @State var colorRangeExpansion = 0.0
+    @State var colorRangeSource: ColorRangeSelectionSource = .activeLayer
     @State var nanoBananaPrompt = ""
     @State var nanoBananaInputLayerIndex = 0
     @State var nanoBananaEditScope: NanoBananaEditScope = .wholeLayer
@@ -133,6 +144,18 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsGradientMapSheet) {
             gradientMapSheet
+        }
+        .sheet(isPresented: $showsExpandSelectionSheet) {
+            expandSelectionSheet
+        }
+        .sheet(isPresented: $showsContractSelectionSheet) {
+            contractSelectionSheet
+        }
+        .sheet(isPresented: $showsFeatherSelectionSheet) {
+            featherSelectionSheet
+        }
+        .sheet(isPresented: $showsColorRangeSelectionSheet) {
+            colorRangeSelectionSheet
         }
         .sheet(isPresented: $showsNanoBananaSheet) {
             nanoBananaSheet
@@ -311,6 +334,14 @@ struct ContentView: View {
                             rendersFloatingPanelOnly: true,
                             onSelectTool: { tool in
                                 store.send(.toolSelected(tool))
+                            },
+                            onRequestExpandSelection: {
+                                selectionExpansionText = "4"
+                                showsExpandSelectionSheet = true
+                            },
+                            onRequestContractSelection: {
+                                selectionContractionText = "4"
+                                showsContractSelectionSheet = true
                             }
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)

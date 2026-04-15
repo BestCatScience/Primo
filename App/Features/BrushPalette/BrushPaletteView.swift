@@ -22,6 +22,8 @@ struct BrushPaletteView: View {
     @State var textFontImportErrorMessage: String?
     var rendersFloatingPanelOnly = false
     var onSelectTool: (StudioToolKind) -> Void = { _ in }
+    var onRequestExpandSelection: () -> Void = {}
+    var onRequestContractSelection: () -> Void = {}
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
     var body: some View {

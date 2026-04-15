@@ -81,3 +81,29 @@ struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
     let trigger: SaveHistoryTrigger
     let previewImageData: Data?
 }
+
+enum ColorRangeSelectionSource: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case activeLayer
+    case canvas
+
+    var id: String { rawValue }
+
+    func title(_ language: AppLanguage) -> String {
+        switch self {
+        case .activeLayer:
+            return language.localized("アクティブレイヤー")
+        case .canvas:
+            return language.localized("キャンバス合成")
+        }
+    }
+}
+
+struct ColorRangeSelectionRequest: Equatable, Sendable {
+    let source: ColorRangeSelectionSource
+    let red: UInt8
+    let green: UInt8
+    let blue: UInt8
+    let tolerance: Double
+    let minimumAlpha: Double
+    let expansion: Int
+}

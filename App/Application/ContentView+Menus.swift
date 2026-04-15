@@ -350,6 +350,157 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
+    var expandSelectionSheet: some View {
+        selectionPixelAmountSheet(
+            title: language.localized("選択範囲を拡張"),
+            text: $selectionExpansionText,
+            confirmTitle: language.localized("拡張")
+        ) { amount in
+            store.send(.brushPalette(.delegate(.expandSelection(amount))))
+            showsExpandSelectionSheet = false
+        }
+    }
+
+    var contractSelectionSheet: some View {
+        selectionPixelAmountSheet(
+            title: language.localized("選択範囲を縮小"),
+            text: $selectionContractionText,
+            confirmTitle: language.localized("縮小")
+        ) { amount in
+            store.send(.brushPalette(.delegate(.contractSelection(amount))))
+            showsContractSelectionSheet = false
+        }
+    }
+
+    var featherSelectionSheet: some View {
+        selectionPixelAmountSheet(
+            title: language.localized("境界をぼかす"),
+            text: $selectionFeatherRadiusText,
+            confirmTitle: language.localized("適用")
+        ) { amount in
+            store.send(.featherSelectionRequested(amount))
+            showsFeatherSelectionSheet = false
+        }
+    }
+
+    @ViewBuilder
+    func selectionPixelAmountSheet(
+        title: String,
+        text: Binding<String>,
+        confirmTitle: String,
+        onConfirm: @escaping (Int) -> Void
+    ) -> some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("ピクセル数")) {
+                    TextField(language.localized("値"), text: text)
+                        .keyboardType(.numberPad)
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsExpandSelectionSheet = false
+                        showsContractSelectionSheet = false
+                        showsFeatherSelectionSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(confirmTitle) {
+                        guard let amount = parsedSelectionPixelValue(from: text.wrappedValue) else { return }
+                        onConfirm(amount)
+                    }
+                    .disabled(parsedSelectionPixelValue(from: text.wrappedValue) == nil)
+                }
+            }
+        }
+        .presentationDetents([.height(220)])
+        .presentationDragIndicator(.visible)
+    }
+
+    var colorRangeSelectionSheet: some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("対象")) {
+                    Picker(language.localized("サンプル元"), selection: $colorRangeSource) {
+                        ForEach(ColorRangeSelectionSource.allCases) { source in
+                            Text(source.title(language)).tag(source)
+                        }
+                    }
+                }
+
+                Section(language.localized("現在色")) {
+                    HStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(store.brushPalette.brush.activeOpaqueColor)
+                            .frame(width: 42, height: 42)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                            )
+
+                        Text(language.localized("ブラシの現在色に近い色を選択します"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section(language.localized("しきい値")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(language.localized("色しきい値"))
+                            Spacer()
+                            Text("\(Int(colorRangeTolerance * 100))%")
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $colorRangeTolerance, in: 0.0...1.0)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(language.localized("最小不透明度"))
+                            Spacer()
+                            Text("\(Int(colorRangeMinimumAlpha * 100))%")
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $colorRangeMinimumAlpha, in: 0.0...1.0)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(language.localized("拡張"))
+                            Spacer()
+                            Text("\(Int(colorRangeExpansion.rounded())) px")
+                                .foregroundStyle(.secondary)
+                        }
+                        Slider(value: $colorRangeExpansion, in: 0...24, step: 1)
+                    }
+                }
+            }
+            .navigationTitle(language.localized("色域選択"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsColorRangeSelectionSheet = false
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("選択")) {
+                        store.send(.colorRangeSelectionRequested(currentColorRangeRequest))
+                        showsColorRangeSelectionSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
     var hueSaturationBrightnessSheet: some View {
         NavigationStack {
             Form {
@@ -1206,6 +1357,29 @@ extension ContentView {
         return (64...8192).contains(fallback) ? fallback : nil
     }
 
+    func parsedSelectionPixelValue(from text: String) -> Int? {
+        let digits = text.filter(\.isNumber)
+        guard let value = Int(digits), (1...256).contains(value) else { return nil }
+        return value
+    }
+
+    var currentColorRangeRequest: ColorRangeSelectionRequest {
+        let resolved = UIColor(store.brushPalette.brush.activeOpaqueColor)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        return ColorRangeSelectionRequest(
+            source: colorRangeSource,
+            red: UInt8(min(max((red * 255.0).rounded(), 0), 255)),
+            green: UInt8(min(max((green * 255.0).rounded(), 0), 255)),
+            blue: UInt8(min(max((blue * 255.0).rounded(), 0), 255)),
+            tolerance: colorRangeTolerance,
+            minimumAlpha: colorRangeMinimumAlpha,
+            expansion: Int(colorRangeExpansion.rounded())
+        )
+    }
+
     var defaultNewCanvasWidth: Int {
         max(Int(CanvasFeature.defaultCanvasSize.width.rounded()), 1)
     }
@@ -1294,6 +1468,37 @@ extension ContentView {
             }
 
             menuBarMenu(StudioStrings.editMenu(language)) {
+                Menu(language.localized("選択範囲")) {
+                    Button(language.localized("選択反転")) {
+                        store.send(.brushPalette(.delegate(.invertSelection)))
+                    }
+
+                    Button(language.localized("選択範囲を拡張")) {
+                        selectionExpansionText = "4"
+                        showsExpandSelectionSheet = true
+                    }
+
+                    Button(language.localized("選択範囲を縮小")) {
+                        selectionContractionText = "4"
+                        showsContractSelectionSheet = true
+                    }
+
+                    Button(language.localized("境界をぼかす")) {
+                        selectionFeatherRadiusText = "8"
+                        showsFeatherSelectionSheet = true
+                    }
+
+                    Button(language.localized("色域選択")) {
+                        colorRangeTolerance = store.brushPalette.selection.colorTolerance
+                        colorRangeMinimumAlpha = 0.05
+                        colorRangeExpansion = max(store.brushPalette.selection.expansion, 0)
+                        colorRangeSource = .activeLayer
+                        showsColorRangeSelectionSheet = true
+                    }
+                }
+
+                Divider()
+
                 Button(language.localized("キャンバスサイズを変更")) {
                     resizeCanvasExtentWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
                     resizeCanvasExtentHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"

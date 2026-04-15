@@ -272,6 +272,14 @@ extension ContentView {
                     showsTitle: false,
                     onSelectTool: { tool in
                         store.send(.toolSelected(tool))
+                    },
+                    onRequestExpandSelection: {
+                        selectionExpansionText = "4"
+                        showsExpandSelectionSheet = true
+                    },
+                    onRequestContractSelection: {
+                        selectionContractionText = "4"
+                        showsContractSelectionSheet = true
                     }
                 )
             case .layers:

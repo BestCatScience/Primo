@@ -244,6 +244,56 @@ extension BrushPaletteView {
                         )
                     }
                     .buttonStyle(.plain)
+
+                    HStack(spacing: 8) {
+                        Button {
+                            onRequestExpandSelection()
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(language.localized("拡張"))
+                                    .font(StudioTheme.Typography.label(12))
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(panelPrimaryTextStyle)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(panelCardFillStrong)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(panelCardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            onRequestContractSelection()
+                        } label: {
+                            HStack {
+                                Image(systemName: "minus.circle")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(language.localized("縮小"))
+                                    .font(StudioTheme.Typography.label(12))
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(panelPrimaryTextStyle)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(panelCardFillStrong)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(panelCardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 } else if currentTool == .shape {
                     segmentedModeRow(
                         title: language.localized("形状"),
