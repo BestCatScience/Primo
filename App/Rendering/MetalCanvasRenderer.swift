@@ -148,7 +148,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         let copyHeight = min(update.height, maxHeight)
         guard copyWidth > 0, copyHeight > 0 else { return }
 
-        update.pixelData.withUnsafeBytes { bytes in
+        let premultiplied = Self.premultipliedRGBAData(update.pixelData)
+        premultiplied.withUnsafeBytes { bytes in
             if let baseAddress = bytes.baseAddress {
                 texture.replace(
                     region: MTLRegionMake2D(update.originX, update.originY, copyWidth, copyHeight),
@@ -260,7 +261,8 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         let start = clock.now
 
         let texture = ensureCompositeTexture(device: device)
-        snapshot.compositePixelData.withUnsafeBytes { bytes in
+        let premultiplied = Self.premultipliedRGBAData(snapshot.compositePixelData)
+        premultiplied.withUnsafeBytes { bytes in
             if let baseAddress = bytes.baseAddress {
                 texture?.replace(
                     region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
@@ -319,6 +321,18 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         guard !needsRedraw else { return }
         needsRedraw = true
         setNeedsDisplay()
+    }
+
+    private static func premultipliedRGBAData(_ source: Data) -> Data {
+        guard !source.isEmpty else { return source }
+        var bytes = [UInt8](source)
+        for offset in stride(from: 0, to: bytes.count, by: 4) {
+            let alpha = UInt16(bytes[offset + 3])
+            bytes[offset] = UInt8((UInt16(bytes[offset]) * alpha + 127) / 255)
+            bytes[offset + 1] = UInt8((UInt16(bytes[offset + 1]) * alpha + 127) / 255)
+            bytes[offset + 2] = UInt8((UInt16(bytes[offset + 2]) * alpha + 127) / 255)
+        }
+        return Data(bytes)
     }
 
     static func makePipeline(

@@ -70,6 +70,10 @@ float remap(float value, float inMin, float inMax, float outMin, float outMax) {
     return lerp(outMin, outMax, t);
 }
 
+float rgbLuminance(float r, float g, float b) {
+    return (r * 0.2126F) + (g * 0.7152F) + (b * 0.0722F);
+}
+
 constexpr size_t kPixelStride = 4U;
 constexpr size_t kTileByteCount =
     static_cast<size_t>(Layer::kTileSize) *
@@ -96,9 +100,9 @@ void constrainPixelsToAlphaLock(std::span<uint8_t> pixels, std::span<const uint8
     for (size_t offset = 0; offset + 3U < pixels.size(); offset += kPixelStride) {
         const uint8_t sourceAlpha = source[offset + 3U];
         if (sourceAlpha == 0U) {
-            pixels[offset] = 0U;
-            pixels[offset + 1U] = 0U;
-            pixels[offset + 2U] = 0U;
+            pixels[offset] = source[offset];
+            pixels[offset + 1U] = source[offset + 1U];
+            pixels[offset + 2U] = source[offset + 2U];
             pixels[offset + 3U] = 0U;
             continue;
         }
@@ -130,6 +134,10 @@ float speedOpacityScaleForBrush(const BrushSettings& brush, float speed) {
 
 float resolvedStrokeRadius(const BrushSettings& brush, float pressure, float speed) {
     return std::max(0.4F, brush.radius * pressureScaleForBrush(brush, pressure) * speedScaleForBrush(brush, speed));
+}
+
+float normalizedBrushSpacing(const BrushSettings& brush) {
+    return clamp01(remap(std::clamp(brush.stampSpacing, 0.02F, 0.4F), 0.02F, 0.4F, 0.0F, 1.0F));
 }
 
 bool shouldPreserveCircularInkTip(const BrushSettings& brush) {
@@ -2077,6 +2085,8 @@ void PaintDocument::beginStrokeImmediate(const BrushSettings& brush, StrokePoint
     distanceUntilNextDab_ = 0.0F;
     strokeHasStampedDab_ = true;
     strokeInFlight_ = true;
+    smearCarryValid_ = false;
+    seedSmudgeCarry(layers_[static_cast<size_t>(activeLayerIndex_)], point);
     dirtyRect_.reset();
     point.speed = 0.0F;
     stampDab(layers_[static_cast<size_t>(activeLayerIndex_)], point);
@@ -2105,6 +2115,7 @@ void PaintDocument::endStrokeImmediate() {
     strokeAccumulatedDistance_ = 0.0F;
     distanceUntilNextDab_ = 0.0F;
     strokeHasStampedDab_ = false;
+    smearCarryValid_ = false;
 }
 
 void PaintDocument::cancelStrokeImmediate() {
@@ -2130,6 +2141,7 @@ void PaintDocument::cancelStrokeImmediate() {
     strokeAccumulatedDistance_ = 0.0F;
     distanceUntilNextDab_ = 0.0F;
     strokeHasStampedDab_ = false;
+    smearCarryValid_ = false;
     markEntireDocumentDirty();
 }
 
@@ -2639,8 +2651,12 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         clamp01(activeBrush_.flowPressureSensitivity)
     );
     const float resolvedFlow = clamp01(activeBrush_.flow * flowPressure * flowJitter);
+    const bool zeroDensityMixing =
+        activeBrush_.colorMixingMode != 0 &&
+        activeBrush_.flow <= 0.001F;
     const float speedOpacity = speedOpacityScaleForBrush(activeBrush_, point.speed);
-    const float effectiveOpacity = clamp01(activeBrush_.opacity * std::max(0.05F, resolvedFlow) * opacityPressure * speedOpacity);
+    const float coverageFlow = zeroDensityMixing ? 1.0F : resolvedFlow;
+    const float effectiveOpacity = clamp01(activeBrush_.opacity * coverageFlow * opacityPressure * speedOpacity);
     const bool isPencil = activeBrush_.tipKind == "pencil";
     const bool isInk = activeBrush_.tipKind == "ink";
     const bool isOil = activeBrush_.tipKind == "oil";
@@ -2687,6 +2703,30 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));
     const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + boundRadius)));
     markDirtyRect(minX, minY, maxX, maxY);
+    beginSmudgeAccumulation();
+    const int centerSampleX = std::clamp(static_cast<int>(std::lround(point.x)), 0, width_ - 1);
+    const int centerSampleY = std::clamp(static_cast<int>(std::lround(point.y)), 0, height_ - 1);
+    const auto* centerPixel = tilePixelPointer(layer, centerSampleX, centerSampleY);
+    const float centerSurfaceAlpha = static_cast<float>(centerPixel[3]) / 255.0F;
+    const bool transparentSurface =
+        centerSurfaceAlpha <= 0.02F &&
+        (!smearCarryValid_ || smearCarryA_ <= 0.02F);
+    const bool usesUndercoatSampling =
+        activeBrush_.colorMixingMode == 1 ||
+        activeBrush_.colorMixingMode == 2;
+    const bool allowNeighborhoodSampling =
+        smudgeEnabledForActiveBrush() &&
+        usesUndercoatSampling &&
+        !transparentSurface &&
+        (activeBrush_.smudgeBlurEnabled ||
+         activeBrush_.smudgeRadius > 0.08F ||
+         activeBrush_.colorMixStrength > 0.16F ||
+         zeroDensityMixing ||
+         clampedPressure < 0.55F);
+    const bool preferWideNeighborhood =
+        activeBrush_.tipKind == "oil" ||
+        activeBrush_.smudgeRadius > 0.35F ||
+        activeBrush_.smudgeBleed > 0.45F;
 
     for (int y = minY; y <= maxY; ++y) {
         for (int x = minX; x <= maxX; ++x) {
@@ -2845,9 +2885,44 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
                 continue;
             }
             auto* pixel = tilePixelPointer(layer, x, y);
-            blendPixel(pixel, activeBrush_.red, activeBrush_.green, activeBrush_.blue, alpha, clampedPressure);
+            const float pixelAlpha = static_cast<float>(pixel[3]) / 255.0F;
+            std::array<float, 4> pulledColor = {
+                (static_cast<float>(pixel[0]) / 255.0F) * pixelAlpha,
+                (static_cast<float>(pixel[1]) / 255.0F) * pixelAlpha,
+                (static_cast<float>(pixel[2]) / 255.0F) * pixelAlpha,
+                pixelAlpha
+            };
+            const float neighborhoodAlphaGate = activeBrush_.tipKind == "oil" ? 0.28F : 0.58F;
+            const float pressureNeighborhoodGate = neighborhoodAlphaGate * (0.52F + (clampedPressure * 0.48F));
+            if (allowNeighborhoodSampling && alpha > pressureNeighborhoodGate) {
+                pulledColor = sampleSmudgeNeighborhood(
+                    layer,
+                    x,
+                    y,
+                    tangentX,
+                    tangentY,
+                    normalX,
+                    normalY,
+                    radius,
+                    preferWideNeighborhood
+                );
+            }
+            accumulateSmudgeSample(pixel, alpha);
+            blendPixel(
+                pixel,
+                activeBrush_.red,
+                activeBrush_.green,
+                activeBrush_.blue,
+                alpha,
+                clampedPressure,
+                pulledColor[0],
+                pulledColor[1],
+                pulledColor[2],
+                pulledColor[3]
+            );
         }
     }
+    commitSmudgeCarry();
 }
 
 void PaintDocument::renderShortStroke(Layer& layer, const StrokePoint& start, const StrokePoint& end) {
@@ -2950,8 +3025,19 @@ void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, 
     }
 }
 
-void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure) {
-    const float srcA = clamp01(alpha);
+void PaintDocument::blendPixel(
+    uint8_t* dst,
+    uint8_t r,
+    uint8_t g,
+    uint8_t b,
+    float alpha,
+    float pressure,
+    float pulledR,
+    float pulledG,
+    float pulledB,
+    float pulledA
+) {
+    float srcA = clamp01(alpha);
     const float dstA = static_cast<float>(dst[3]) / 255.0F;
     const bool alphaLocked = activeLayerIndex_ >= 0 &&
         activeLayerIndex_ < layerCount() &&
@@ -2963,42 +3049,167 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
         }
         const float outA = clamp01(dstA * (1.0F - srcA));
         dst[3] = static_cast<uint8_t>(outA * 255.0F);
-        if (outA <= 0.001F) {
-            dst[0] = 0U;
-            dst[1] = 0U;
-            dst[2] = 0U;
-        }
         return;
     }
 
     const float dstR = static_cast<float>(dst[0]) / 255.0F;
     const float dstG = static_cast<float>(dst[1]) / 255.0F;
     const float dstB = static_cast<float>(dst[2]) / 255.0F;
-    const float baseSrcR = static_cast<float>(r) / 255.0F;
-    const float baseSrcG = static_cast<float>(g) / 255.0F;
-    const float baseSrcB = static_cast<float>(b) / 255.0F;
+    const float pigmentR = static_cast<float>(r) / 255.0F;
+    const float pigmentG = static_cast<float>(g) / 255.0F;
+    const float pigmentB = static_cast<float>(b) / 255.0F;
+    const float dstPremulR = dstR * dstA;
+    const float dstPremulG = dstG * dstA;
+    const float dstPremulB = dstB * dstA;
     const float clampedPressure = std::clamp(pressure, 0.08F, 1.0F);
-    const float wetness = clamp01(lerp(
+    const int mixingMode = activeBrush_.colorMixingMode;
+    const float configuredColorStretch = clamp01(lerp(
         activeBrush_.wetness,
         activeBrush_.wetness * clampedPressure,
         clamp01(activeBrush_.wetnessPressureSensitivity)
     ));
-    const float wetPickup = wetness * dstA;
-    const float mixStrength = clamp01(activeBrush_.colorMixStrength) * wetPickup;
     const float loadAmount = clamp01(lerp(
         activeBrush_.paintLoad,
         activeBrush_.paintLoad * clampedPressure,
         clamp01(activeBrush_.loadPressureSensitivity)
     ));
-    const float wettedDstR = lerp(baseSrcR, dstR, wetPickup);
-    const float wettedDstG = lerp(baseSrcG, dstG, wetPickup);
-    const float wettedDstB = lerp(baseSrcB, dstB, wetPickup);
-    const float mixedSourceR = lerp(wettedDstR, baseSrcR, loadAmount);
-    const float mixedSourceG = lerp(wettedDstG, baseSrcG, loadAmount);
-    const float mixedSourceB = lerp(wettedDstB, baseSrcB, loadAmount);
-    const float srcR = lerp(baseSrcR, mixedSourceR, mixStrength);
-    const float srcG = lerp(baseSrcG, mixedSourceG, mixStrength);
-    const float srcB = lerp(baseSrcB, mixedSourceB, mixStrength);
+    const float configuredUndercoatMix = clamp01(activeBrush_.colorMixStrength);
+    const float configuredBlurAmount = clamp01(activeBrush_.smudgeBleed);
+    const float configuredBlurRadius = clamp01(activeBrush_.smudgeRadius);
+    const float pigmentDensity = clamp01(activeBrush_.flow);
+    float colorStretch = 0.0F;
+    float undercoatMix = 0.0F;
+    float blurAmount = 0.0F;
+    float blurRadius = 0.0F;
+    bool blurEnabled = false;
+    switch (mixingMode) {
+        case 1:
+            colorStretch = configuredColorStretch;
+            undercoatMix = std::max(configuredUndercoatMix, 0.72F);
+            blurAmount = 0.0F;
+            blurRadius = 0.0F;
+            blurEnabled = false;
+            break;
+        case 2:
+            colorStretch = configuredColorStretch;
+            undercoatMix = std::max(configuredUndercoatMix, 0.84F);
+            blurAmount = std::max(configuredBlurAmount, 0.18F);
+            blurRadius = std::max(configuredBlurRadius, 0.18F);
+            blurEnabled = activeBrush_.smudgeBlurEnabled;
+            break;
+        case 3:
+            colorStretch = configuredColorStretch;
+            undercoatMix = 0.0F;
+            blurAmount = 0.0F;
+            blurRadius = 0.0F;
+            blurEnabled = false;
+            break;
+        case 0:
+        default:
+            break;
+    }
+    if (mixingMode != 0 &&
+        pigmentDensity <= 0.001F &&
+        colorStretch <= 0.001F &&
+        undercoatMix <= 0.001F &&
+        blurAmount <= 0.001F &&
+        blurRadius <= 0.001F) {
+        undercoatMix = 0.58F;
+        blurAmount = 0.44F;
+        blurRadius = 0.36F;
+        blurEnabled = true;
+    }
+    const float lowPressureMix = clamp01((1.0F - clampedPressure) / 0.92F);
+    const float activeBlurAmount = blurEnabled ? blurAmount : 0.0F;
+    const float activeBlurRadius = blurEnabled ? blurRadius : 0.0F;
+    const float effectiveColorStretch = clamp01(colorStretch * (0.74F + (lowPressureMix * 0.82F)));
+    const float effectiveUndercoatMix = clamp01(undercoatMix * (0.78F + (lowPressureMix * 0.72F)));
+    const float effectiveBlurAmount = clamp01(activeBlurAmount * (0.72F + (lowPressureMix * 0.88F)));
+    const float effectiveBlurRadius = clamp01(activeBlurRadius * (0.84F + (lowPressureMix * 0.44F)));
+    const float spacingFactor = normalizedBrushSpacing(activeBrush_);
+    const float smudgeOpacityGate = clamp01(remap(srcA, 0.04F, 0.96F, 0.0F, 1.0F));
+    const float mixActivation = clamp01(smudgeOpacityGate + (lowPressureMix * 0.42F));
+    const float edgeColorGuard = clamp01(remap(srcA, 0.10F, 0.46F, 0.0F, 1.0F));
+    const float contourFade = clamp01(remap(srcA, 0.20F, 0.64F, 0.0F, 1.0F));
+    const float corePresence = clamp01(remap(srcA, 0.46F, 0.80F, 0.0F, 1.0F));
+    const float edgeMixGuard = clamp01(edgeColorGuard + (lowPressureMix * 0.20F)) * (0.18F + (contourFade * 0.82F));
+    const float colorRate = clamp01(loadAmount);
+    const float effectiveColorRate = clamp01(colorRate * (0.24F + (clampedPressure * 0.76F)));
+    const float effectivePigmentDensity = clamp01(pigmentDensity * (0.16F + (clampedPressure * 0.84F)));
+    const bool transparentSurface =
+        dstA <= 0.02F &&
+        pulledA <= 0.02F &&
+        (!smearCarryValid_ || smearCarryA_ <= 0.02F);
+    float srcR = pigmentR;
+    float srcG = pigmentG;
+    float srcB = pigmentB;
+    if (smudgeEnabledForActiveBrush() && !transparentSurface) {
+        const float carriedR = smearCarryValid_ ? smearCarryR_ : dstPremulR;
+        const float carriedG = smearCarryValid_ ? smearCarryG_ : dstPremulG;
+        const float carriedB = smearCarryValid_ ? smearCarryB_ : dstPremulB;
+        const float carriedA = smearCarryValid_ ? smearCarryA_ : dstA;
+        const float smearInfluence = clamp01(
+            mixActivation *
+            (0.16F + (effectiveColorStretch * 0.98F) + ((1.0F - spacingFactor) * 0.10F))
+        );
+        const float dullingInfluence = clamp01(
+            pulledA *
+            mixActivation *
+            (0.04F + (effectiveUndercoatMix * 0.94F) + (effectiveBlurAmount * 0.10F))
+        );
+        float mixedR = lerp(dstPremulR, carriedR, smearInfluence);
+        float mixedG = lerp(dstPremulG, carriedG, smearInfluence);
+        float mixedB = lerp(dstPremulB, carriedB, smearInfluence);
+        float mixedA = lerp(dstA, carriedA, smearInfluence);
+        if (effectiveUndercoatMix > 0.001F) {
+            mixedR = lerp(mixedR, pulledR, dullingInfluence);
+            mixedG = lerp(mixedG, pulledG, dullingInfluence);
+            mixedB = lerp(mixedB, pulledB, dullingInfluence);
+            mixedA = lerp(mixedA, pulledA, dullingInfluence);
+        }
+        if (blurEnabled && (effectiveBlurAmount > 0.001F || effectiveBlurRadius > 0.001F)) {
+            const float blurMix = clamp01(
+                mixActivation *
+                (0.02F + (effectiveUndercoatMix * 0.26F) + (effectiveBlurAmount * 0.86F) + (effectiveBlurRadius * 0.32F))
+            );
+            const float blurR = (pulledR * 0.86F) + (mixedR * 0.14F);
+            const float blurG = (pulledG * 0.86F) + (mixedG * 0.14F);
+            const float blurB = (pulledB * 0.86F) + (mixedB * 0.14F);
+            const float blurA = (pulledA * 0.82F) + (mixedA * 0.18F);
+            mixedR = lerp(mixedR, blurR, blurMix);
+            mixedG = lerp(mixedG, blurG, blurMix);
+            mixedB = lerp(mixedB, blurB, blurMix);
+            mixedA = lerp(mixedA, blurA, blurMix);
+        }
+        const float edgeAlphaGuard = clamp01(remap(std::max(dstA, mixedA), 0.02F, 0.18F, 0.0F, 1.0F));
+        const float transparencyDrag = clamp01(
+            (1.0F - mixedA) *
+            mixActivation *
+            (0.20F + (effectiveColorStretch * 0.26F) + (effectiveUndercoatMix * 0.16F))
+        );
+        const float mixedColorA = std::max(mixedA, 0.0001F);
+        const float mixedColorR = mixedR / mixedColorA;
+        const float mixedColorG = mixedG / mixedColorA;
+        const float mixedColorB = mixedB / mixedColorA;
+        const float undercoatBlend = clamp01(edgeMixGuard * (0.18F + (effectiveUndercoatMix * 0.82F)) * (1.0F - (corePresence * 0.18F)));
+        const float baseBlend = (mixingMode == 3 ? edgeMixGuard : undercoatBlend) * (1.0F - (corePresence * 0.12F));
+        const float centerPigmentRetention = clamp01(effectivePigmentDensity * (1.0F + (corePresence * 0.30F)));
+        const float brushBaseR = lerp(mixedColorR, pigmentR, centerPigmentRetention);
+        const float brushBaseG = lerp(mixedColorG, pigmentG, centerPigmentRetention);
+        const float brushBaseB = lerp(mixedColorB, pigmentB, centerPigmentRetention);
+        const float smudgedR = lerp(brushBaseR, mixedColorR, baseBlend);
+        const float smudgedG = lerp(brushBaseG, mixedColorG, baseBlend);
+        const float smudgedB = lerp(brushBaseB, mixedColorB, baseBlend);
+        const float adjustedPigmentInfluence = clamp01(((mixingMode == 3 ? std::min(effectiveColorRate, 0.28F) : effectiveColorRate) * 0.96F) + ((1.0F - edgeAlphaGuard) * 0.04F)) * centerPigmentRetention;
+        srcR = lerp(smudgedR, pigmentR, adjustedPigmentInfluence);
+        srcG = lerp(smudgedG, pigmentG, adjustedPigmentInfluence);
+        srcB = lerp(smudgedB, pigmentB, adjustedPigmentInfluence);
+        srcA *= clamp01(1.0F - (transparencyDrag * (0.92F + ((1.0F - contourFade) * 0.30F)) * (1.0F - (corePresence * 0.42F))));
+        srcA *= 0.60F + (contourFade * 0.40F);
+        if (mixedA <= 0.02F) {
+            srcA *= 0.16F;
+        }
+    }
 
     if (alphaLocked) {
         if (dstA <= 0.001F) {
@@ -3017,9 +3228,6 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
 
     const float outA = dstA + (srcA * (1.0F - dstA));
     if (outA <= 0.001F) {
-        dst[0] = 0U;
-        dst[1] = 0U;
-        dst[2] = 0U;
         dst[3] = 0U;
         return;
     }
@@ -3035,6 +3243,238 @@ void PaintDocument::blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, fl
     dst[1] = static_cast<uint8_t>(outG * 255.0F);
     dst[2] = static_cast<uint8_t>(outB * 255.0F);
     dst[3] = static_cast<uint8_t>(clamp01(outA) * 255.0F);
+}
+
+bool PaintDocument::smudgeEnabledForActiveBrush() const noexcept {
+    if (activeBrush_.colorMixingMode == 0) {
+        return false;
+    }
+    return activeBrush_.wetness > 0.001F ||
+        activeBrush_.colorMixStrength > 0.001F ||
+        activeBrush_.paintLoad < 0.999F ||
+        activeBrush_.flow <= 0.001F ||
+        activeBrush_.smudgeBlurEnabled ||
+        activeBrush_.smudgeBleed > 0.001F ||
+        activeBrush_.smudgeRadius > 0.001F;
+}
+
+void PaintDocument::seedSmudgeCarry(const Layer& layer, const StrokePoint& point) {
+    if (!smudgeEnabledForActiveBrush()) {
+        smearCarryValid_ = false;
+        return;
+    }
+
+    const int sampleX = std::clamp(static_cast<int>(std::lround(point.x)), 0, width_ - 1);
+    const int sampleY = std::clamp(static_cast<int>(std::lround(point.y)), 0, height_ - 1);
+    const auto* pixel = tilePixelPointer(layer, sampleX, sampleY);
+    smearCarryA_ = static_cast<float>(pixel[3]) / 255.0F;
+    smearCarryR_ = (static_cast<float>(pixel[0]) / 255.0F) * smearCarryA_;
+    smearCarryG_ = (static_cast<float>(pixel[1]) / 255.0F) * smearCarryA_;
+    smearCarryB_ = (static_cast<float>(pixel[2]) / 255.0F) * smearCarryA_;
+    smearCarryValid_ = smearCarryA_ > 0.001F;
+}
+
+void PaintDocument::beginSmudgeAccumulation() noexcept {
+    smearAccumulatorR_ = 0.0F;
+    smearAccumulatorG_ = 0.0F;
+    smearAccumulatorB_ = 0.0F;
+    smearAccumulatorA_ = 0.0F;
+    smearAccumulatorWeight_ = 0.0F;
+}
+
+void PaintDocument::accumulateSmudgeSample(const uint8_t* src, float weight) noexcept {
+    if (!smudgeEnabledForActiveBrush()) {
+        return;
+    }
+    const float clampedWeight = clamp01(weight);
+    if (clampedWeight <= 0.001F) {
+        return;
+    }
+    const float alpha = static_cast<float>(src[3]) / 255.0F;
+    smearAccumulatorR_ += (static_cast<float>(src[0]) / 255.0F) * alpha * clampedWeight;
+    smearAccumulatorG_ += (static_cast<float>(src[1]) / 255.0F) * alpha * clampedWeight;
+    smearAccumulatorB_ += (static_cast<float>(src[2]) / 255.0F) * alpha * clampedWeight;
+    smearAccumulatorA_ += alpha * clampedWeight;
+    smearAccumulatorWeight_ += clampedWeight;
+}
+
+void PaintDocument::commitSmudgeCarry() noexcept {
+    if (!smudgeEnabledForActiveBrush() || smearAccumulatorWeight_ <= 0.001F) {
+        return;
+    }
+
+    const float invWeight = 1.0F / smearAccumulatorWeight_;
+    const float sampledR = smearAccumulatorR_ * invWeight;
+    const float sampledG = smearAccumulatorG_ * invWeight;
+    const float sampledB = smearAccumulatorB_ * invWeight;
+    const float sampledA = smearAccumulatorA_ * invWeight;
+    const float wetness = clamp01(activeBrush_.wetness);
+    const float mixStrength = clamp01(activeBrush_.colorMixStrength);
+    const float bleedStrength = clamp01(activeBrush_.smudgeBleed);
+    const float oilBias = activeBrush_.tipKind == "oil" ? 0.22F : 0.0F;
+    const float effectiveBleedStrength = clamp01(bleedStrength + oilBias + (wetness * 0.14F));
+    const float spacingFactor = normalizedBrushSpacing(activeBrush_);
+    const float carryBlend = smearCarryValid_
+        ? clamp01(
+            0.72F -
+            (wetness * 0.36F) -
+            (effectiveBleedStrength * 0.22F) -
+            (mixStrength * 0.08F) +
+            (spacingFactor * 0.10F)
+        )
+        : 1.0F;
+
+    if (smearCarryValid_) {
+        smearCarryR_ = lerp(smearCarryR_, sampledR, carryBlend);
+        smearCarryG_ = lerp(smearCarryG_, sampledG, carryBlend);
+        smearCarryB_ = lerp(smearCarryB_, sampledB, carryBlend);
+        smearCarryA_ = lerp(smearCarryA_, sampledA, carryBlend);
+    } else {
+        smearCarryR_ = sampledR;
+        smearCarryG_ = sampledG;
+        smearCarryB_ = sampledB;
+        smearCarryA_ = sampledA;
+    }
+    if (smearCarryA_ <= 0.02F) {
+        smearCarryR_ = 0.0F;
+        smearCarryG_ = 0.0F;
+        smearCarryB_ = 0.0F;
+    }
+    smearCarryValid_ = smearCarryA_ > 0.001F;
+}
+
+std::array<float, 4> PaintDocument::sampleSmudgeNeighborhood(
+    const Layer& layer,
+    int x,
+    int y,
+    float tangentX,
+    float tangentY,
+    float normalX,
+    float normalY,
+    float radius,
+    bool wideSampling
+) const noexcept {
+    const float bleedStrength = clamp01(activeBrush_.smudgeBleed);
+    const float bleedRadius = clamp01(activeBrush_.smudgeRadius);
+    const float wetness = clamp01(activeBrush_.wetness);
+    const float mixStrength = clamp01(activeBrush_.colorMixStrength);
+    const float oilRadiusBias = activeBrush_.tipKind == "oil" ? 0.24F : 0.0F;
+    const float effectiveBleedRadius = clamp01(std::max(bleedRadius, oilRadiusBias));
+    if ((bleedStrength <= 0.001F && !activeBrush_.smudgeBlurEnabled && oilRadiusBias <= 0.001F) || effectiveBleedRadius <= 0.001F || wetness <= 0.001F) {
+        const auto* center = tilePixelPointer(layer, x, y);
+        const float alpha = static_cast<float>(center[3]) / 255.0F;
+        return {
+            (static_cast<float>(center[0]) / 255.0F) * alpha,
+            (static_cast<float>(center[1]) / 255.0F) * alpha,
+            (static_cast<float>(center[2]) / 255.0F) * alpha,
+            alpha
+        };
+    }
+
+    const auto* center = tilePixelPointer(layer, x, y);
+    const float centerAlpha = static_cast<float>(center[3]) / 255.0F;
+    const float centerR = static_cast<float>(center[0]) / 255.0F;
+    const float centerG = static_cast<float>(center[1]) / 255.0F;
+    const float centerB = static_cast<float>(center[2]) / 255.0F;
+    const float centerLuma = rgbLuminance(centerR, centerG, centerB);
+    const float pigmentR = static_cast<float>(activeBrush_.red) / 255.0F;
+    const float pigmentG = static_cast<float>(activeBrush_.green) / 255.0F;
+    const float pigmentB = static_cast<float>(activeBrush_.blue) / 255.0F;
+
+    const float extent = std::max(1.0F, radius * (0.28F + (effectiveBleedRadius * 1.68F) + (mixStrength * 0.34F) + (bleedStrength * 0.16F)));
+    constexpr std::array<std::array<float, 3>, 9> kWideTaps = {{
+        {{0.0F, 0.0F, 0.20F}},
+        {{-0.46F, 0.0F, 0.12F}},
+        {{0.46F, 0.0F, 0.12F}},
+        {{0.0F, 0.46F, 0.12F}},
+        {{0.0F, -0.46F, 0.12F}},
+        {{-0.34F, 0.34F, 0.08F}},
+        {{-0.34F, -0.34F, 0.08F}},
+        {{0.34F, 0.34F, 0.08F}},
+        {{0.34F, -0.34F, 0.08F}},
+    }};
+    constexpr std::array<std::array<float, 3>, 5> kNarrowTaps = {{
+        {{0.0F, 0.0F, 0.28F}},
+        {{-0.42F, 0.0F, 0.18F}},
+        {{0.42F, 0.0F, 0.18F}},
+        {{0.0F, 0.42F, 0.18F}},
+        {{0.0F, -0.42F, 0.18F}},
+    }};
+
+    float accumulatedR = 0.0F;
+    float accumulatedG = 0.0F;
+    float accumulatedB = 0.0F;
+    float accumulatedA = 0.0F;
+    float accumulatedWeight = 0.0F;
+    const auto accumulateTap = [&](const std::array<float, 3>& tap) noexcept {
+        const float offsetX = ((tangentX * tap[0]) + (normalX * tap[1])) * extent;
+        const float offsetY = ((tangentY * tap[0]) + (normalY * tap[1])) * extent;
+        const int sampleX = std::clamp(static_cast<int>(std::lround(static_cast<float>(x) + offsetX)), 0, width_ - 1);
+        const int sampleY = std::clamp(static_cast<int>(std::lround(static_cast<float>(y) + offsetY)), 0, height_ - 1);
+        const auto* pixel = tilePixelPointer(layer, sampleX, sampleY);
+        const float alpha = static_cast<float>(pixel[3]) / 255.0F;
+        if (alpha <= 0.001F) {
+            return;
+        }
+        const float sampleR = static_cast<float>(pixel[0]) / 255.0F;
+        const float sampleG = static_cast<float>(pixel[1]) / 255.0F;
+        const float sampleB = static_cast<float>(pixel[2]) / 255.0F;
+        const float sampleLuma = rgbLuminance(sampleR, sampleG, sampleB);
+        const float centerDistance =
+            std::abs(sampleR - centerR) +
+            std::abs(sampleG - centerG) +
+            std::abs(sampleB - centerB);
+        const float pigmentDistance =
+            std::abs(sampleR - pigmentR) +
+            std::abs(sampleG - pigmentG) +
+            std::abs(sampleB - pigmentB);
+        const float lumaDistance = std::abs(sampleLuma - centerLuma);
+        const float similarityWeight = clamp01(
+            1.12F -
+            (centerDistance * 0.34F) -
+            (pigmentDistance * 0.10F) -
+            (lumaDistance * 0.40F)
+        );
+        const float alphaWeight = 0.10F + (alpha * 0.90F);
+        const float centerAlphaBias = 0.55F + (centerAlpha * 0.45F);
+        const float weight = tap[2] * alphaWeight * centerAlphaBias * similarityWeight;
+        if (weight <= 0.001F) {
+            return;
+        }
+        accumulatedR += sampleR * alpha * weight;
+        accumulatedG += sampleG * alpha * weight;
+        accumulatedB += sampleB * alpha * weight;
+        accumulatedA += alpha * weight;
+        accumulatedWeight += weight;
+    };
+    if (wideSampling) {
+        for (const auto& tap : kWideTaps) {
+            accumulateTap(tap);
+        }
+    } else {
+        for (const auto& tap : kNarrowTaps) {
+            accumulateTap(tap);
+        }
+    }
+
+    if (accumulatedWeight <= 0.001F) {
+        const auto* center = tilePixelPointer(layer, x, y);
+        const float alpha = static_cast<float>(center[3]) / 255.0F;
+        return {
+            (static_cast<float>(center[0]) / 255.0F) * alpha,
+            (static_cast<float>(center[1]) / 255.0F) * alpha,
+            (static_cast<float>(center[2]) / 255.0F) * alpha,
+            alpha
+        };
+    }
+
+    const float inverseWeight = 1.0F / accumulatedWeight;
+    return {
+        accumulatedR * inverseWeight,
+        accumulatedG * inverseWeight,
+        accumulatedB * inverseWeight,
+        accumulatedA * inverseWeight
+    };
 }
 
 void PaintDocument::rebuildComposite() const {
@@ -3105,9 +3545,6 @@ void PaintDocument::rebuildComposite() const {
                         const float dstA = static_cast<float>(compositeBuffer_[dstOffset + 3U]) / 255.0F;
                         const float outA = srcA + (dstA * (1.0F - srcA));
                         if (outA <= 0.0F) {
-                            compositeBuffer_[dstOffset] = 0U;
-                            compositeBuffer_[dstOffset + 1U] = 0U;
-                            compositeBuffer_[dstOffset + 2U] = 0U;
                             compositeBuffer_[dstOffset + 3U] = 0U;
                             continue;
                         }

@@ -304,4 +304,20 @@ extension BrushPaletteView {
             set: { store.brush.loadPressureSensitivity = 1.0 - $0 }
         )
     }
+
+    var customTipPresetBinding: Binding<BrushTipShapePreset> {
+        Binding(
+            get: { BrushTipShapePreset.matching(customTip: store.brush.customTip) },
+            set: { preset in
+                switch preset {
+                case .round:
+                    store.brush.customTip = nil
+                case .custom:
+                    break
+                default:
+                    store.brush.customTip = preset.raster(currentCustomTip: store.brush.customTip)
+                }
+            }
+        )
+    }
 }

@@ -33,10 +33,14 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var flowPressureSensitivity: Double = 0.0
     var flowJitter: Double = 0.0
     var velocityInfluence: Double = 0.0
+    var colorMixingMode: BrushColorMixingMode = .off
     var wetness: Double = 0.0
     var wetnessPressureSensitivity: Double = 0.0
     var opacityPressureSensitivity: Double = 0.0
     var colorMixStrength: Double = 0.0
+    var smudgeBlurEnabled: Bool = false
+    var smudgeBleed: Double = 0.0
+    var smudgeRadius: Double = 0.0
     var paintLoad: Double = 1.0
     var loadPressureSensitivity: Double = 0.0
     var dualBrushEnabled: Bool = false
@@ -105,10 +109,14 @@ struct BrushRuntimeSettings: Equatable, Sendable {
             flowPressureSensitivity: imported.preset.flowPressureSensitivity,
             flowJitter: imported.preset.flowJitter,
             velocityInfluence: imported.preset.velocityInfluence,
+            colorMixingMode: imported.preset.colorMixingMode,
             wetness: imported.preset.wetness,
             wetnessPressureSensitivity: imported.preset.wetnessPressureSensitivity,
             opacityPressureSensitivity: imported.preset.opacityPressureSensitivity,
             colorMixStrength: imported.preset.colorMixStrength,
+            smudgeBlurEnabled: imported.preset.smudgeBlurEnabled,
+            smudgeBleed: imported.preset.smudgeBleed,
+            smudgeRadius: imported.preset.smudgeRadius,
             paintLoad: imported.preset.paintLoad,
             loadPressureSensitivity: imported.preset.loadPressureSensitivity,
             dualBrushEnabled: imported.preset.dualBrushEnabled,

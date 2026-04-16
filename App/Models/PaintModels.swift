@@ -735,6 +735,110 @@ enum BrushScatterMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
+enum BrushColorMixingMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case off
+    case blend
+    case runningColor
+    case smear
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .off:
+            return language.localized("オフ")
+        case .blend:
+            return language.localized("ブレンド")
+        case .runningColor:
+            return language.localized("ランニングカラー")
+        case .smear:
+            return language.localized("スメア")
+        }
+    }
+
+    static func inferred(
+        wetness: Double,
+        colorMixStrength: Double,
+        smudgeBlurEnabled: Bool,
+        smudgeBleed: Double,
+        smudgeRadius: Double,
+        paintLoad: Double
+    ) -> BrushColorMixingMode {
+        if smudgeBlurEnabled || smudgeBleed > 0.001 || smudgeRadius > 0.001 {
+            return .runningColor
+        }
+        if wetness > 0.001 || colorMixStrength > 0.001 {
+            return paintLoad <= 0.18 ? .smear : .blend
+        }
+        return .off
+    }
+}
+
+enum BrushTipShapePreset: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case round
+    case block
+    case diamond
+    case ribbon
+    case petal
+    case rake
+    case star
+    case custom
+
+    var id: String { rawValue }
+
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .round:
+            return language.localized("ラウンド")
+        case .block:
+            return language.localized("スクエア")
+        case .diamond:
+            return language.localized("ダイヤ")
+        case .ribbon:
+            return language.localized("リボン")
+        case .petal:
+            return language.localized("花びら")
+        case .rake:
+            return language.localized("レーキ")
+        case .star:
+            return language.localized("スター")
+        case .custom:
+            return language.localized("カスタム")
+        }
+    }
+
+    func raster(currentCustomTip: BrushTipRaster?) -> BrushTipRaster? {
+        switch self {
+        case .round:
+            return nil
+        case .block:
+            return BuiltInBrushTipFactory.block
+        case .diamond:
+            return BuiltInBrushTipFactory.diamond
+        case .ribbon:
+            return BuiltInBrushTipFactory.ribbon
+        case .petal:
+            return BuiltInBrushTipFactory.petal
+        case .rake:
+            return BuiltInBrushTipFactory.rake
+        case .star:
+            return BuiltInBrushTipFactory.star
+        case .custom:
+            return currentCustomTip
+        }
+    }
+
+    static func matching(customTip: BrushTipRaster?) -> BrushTipShapePreset {
+        guard let customTip else { return .round }
+        for preset in BrushTipShapePreset.allCases where preset != .round && preset != .custom {
+            if preset.raster(currentCustomTip: nil) == customTip {
+                return preset
+            }
+        }
+        return .custom
+    }
+}
+
 struct CanvasPaperStyle: Equatable, Sendable {
     var red: Float
     var green: Float
@@ -787,10 +891,14 @@ struct BrushPreset: Identifiable, Equatable {
     let flowPressureSensitivity: Double
     let flowJitter: Double
     let velocityInfluence: Double
+    let colorMixingMode: BrushColorMixingMode
     let wetness: Double
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
     let colorMixStrength: Double
+    let smudgeBlurEnabled: Bool
+    let smudgeBleed: Double
+    let smudgeRadius: Double
     let paintLoad: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
@@ -847,10 +955,14 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.flowPressureSensitivity == rhs.flowPressureSensitivity &&
         lhs.flowJitter == rhs.flowJitter &&
         lhs.velocityInfluence == rhs.velocityInfluence &&
+        lhs.colorMixingMode == rhs.colorMixingMode &&
         lhs.wetness == rhs.wetness &&
         lhs.wetnessPressureSensitivity == rhs.wetnessPressureSensitivity &&
         lhs.opacityPressureSensitivity == rhs.opacityPressureSensitivity &&
         lhs.colorMixStrength == rhs.colorMixStrength &&
+        lhs.smudgeBlurEnabled == rhs.smudgeBlurEnabled &&
+        lhs.smudgeBleed == rhs.smudgeBleed &&
+        lhs.smudgeRadius == rhs.smudgeRadius &&
         lhs.paintLoad == rhs.paintLoad &&
         lhs.loadPressureSensitivity == rhs.loadPressureSensitivity &&
         lhs.dualBrushEnabled == rhs.dualBrushEnabled &&
@@ -909,10 +1021,14 @@ struct BrushPreset: Identifiable, Equatable {
         flowPressureSensitivity: Double = 0.0,
         flowJitter: Double = 0.0,
         velocityInfluence: Double = 0.0,
+        colorMixingMode: BrushColorMixingMode = .off,
         wetness: Double = 0.0,
         wetnessPressureSensitivity: Double = 0.0,
         opacityPressureSensitivity: Double = 0.0,
         colorMixStrength: Double = 0.0,
+        smudgeBlurEnabled: Bool = false,
+        smudgeBleed: Double = 0.0,
+        smudgeRadius: Double = 0.0,
         paintLoad: Double = 1.0,
         loadPressureSensitivity: Double = 0.0,
         dualBrushEnabled: Bool = false,
@@ -969,10 +1085,14 @@ struct BrushPreset: Identifiable, Equatable {
         self.flowPressureSensitivity = flowPressureSensitivity
         self.flowJitter = flowJitter
         self.velocityInfluence = velocityInfluence
+        self.colorMixingMode = colorMixingMode
         self.wetness = wetness
         self.wetnessPressureSensitivity = wetnessPressureSensitivity
         self.opacityPressureSensitivity = opacityPressureSensitivity
         self.colorMixStrength = colorMixStrength
+        self.smudgeBlurEnabled = smudgeBlurEnabled
+        self.smudgeBleed = smudgeBleed
+        self.smudgeRadius = smudgeRadius
         self.paintLoad = paintLoad
         self.loadPressureSensitivity = loadPressureSensitivity
         self.dualBrushEnabled = dualBrushEnabled
@@ -1267,8 +1387,8 @@ struct BrushPreset: Identifiable, Equatable {
             color: Color(red: 0.23, green: 0.27, blue: 0.34),
             radius: 7.2,
             sizeSpeedSensitivity: 0.0,
-            opacity: 0.92,
-            hardness: 0.80,
+            opacity: 0.90,
+            hardness: 0.74,
             roundness: 0.86,
             roundnessPressureSensitivity: 0.03,
             roundnessTiltSensitivity: 0.03,
@@ -1276,7 +1396,7 @@ struct BrushPreset: Identifiable, Equatable {
             anglePressureSensitivity: 0.0,
             angleTiltSensitivity: 0.0,
             angleMode: .fixed,
-            spacing: 0.09,
+            spacing: 0.05,
             spacingJitter: 0.0,
             scatterEnabled: false,
             scatterMode: .directional,
@@ -1289,16 +1409,20 @@ struct BrushPreset: Identifiable, Equatable {
             angleJitter: 0.0,
             roundnessJitter: 0.0,
             textureMode: .strokeLocked,
-            textureStrength: 0.22,
-            flow: 0.96,
-            flowPressureSensitivity: 0.04,
+            textureStrength: 0.20,
+            flow: 0.70,
+            flowPressureSensitivity: 0.08,
             flowJitter: 0.0,
-            wetness: 0.16,
-            wetnessPressureSensitivity: 0.08,
+            colorMixingMode: .runningColor,
+            wetness: 0.84,
+            wetnessPressureSensitivity: 0.18,
             opacityPressureSensitivity: 0.12,
-            colorMixStrength: 0.08,
-            paintLoad: 0.92,
-            loadPressureSensitivity: 0.04,
+            colorMixStrength: 0.76,
+            smudgeBlurEnabled: true,
+            smudgeBleed: 0.90,
+            smudgeRadius: 0.96,
+            paintLoad: 0.14,
+            loadPressureSensitivity: 0.18,
             dualBrushEnabled: false,
             dualTipKind: .oil,
             dualScale: 0.64,
@@ -1323,8 +1447,8 @@ struct BrushPreset: Identifiable, Equatable {
             color: Color(red: 0.16, green: 0.17, blue: 0.18),
             radius: 5.8,
             sizeSpeedSensitivity: 0.0,
-            opacity: 0.82,
-            hardness: 0.86,
+            opacity: 0.78,
+            hardness: 0.88,
             roundness: 0.76,
             roundnessPressureSensitivity: 0.03,
             roundnessTiltSensitivity: 0.04,
@@ -1332,7 +1456,7 @@ struct BrushPreset: Identifiable, Equatable {
             anglePressureSensitivity: 0.0,
             angleTiltSensitivity: 0.0,
             angleMode: .fixed,
-            spacing: 0.10,
+            spacing: 0.08,
             spacingJitter: 0.0,
             scatterEnabled: false,
             scatterMode: .directional,
@@ -1345,16 +1469,19 @@ struct BrushPreset: Identifiable, Equatable {
             angleJitter: 0.0,
             roundnessJitter: 0.0,
             textureMode: .strokeLocked,
-            textureStrength: 0.34,
-            flow: 0.90,
-            flowPressureSensitivity: 0.05,
+            textureStrength: 0.38,
+            flow: 0.60,
+            flowPressureSensitivity: 0.06,
             flowJitter: 0.0,
-            wetness: 0.10,
-            wetnessPressureSensitivity: 0.04,
+            colorMixingMode: .blend,
+            wetness: 0.58,
+            wetnessPressureSensitivity: 0.10,
             opacityPressureSensitivity: 0.10,
-            colorMixStrength: 0.08,
-            paintLoad: 0.92,
-            loadPressureSensitivity: 0.04,
+            colorMixStrength: 0.54,
+            smudgeBleed: 0.68,
+            smudgeRadius: 0.74,
+            paintLoad: 0.24,
+            loadPressureSensitivity: 0.14,
             dualBrushEnabled: false,
             dualTipKind: .oil,
             dualScale: 0.60,
@@ -1378,25 +1505,29 @@ struct BrushPreset: Identifiable, Equatable {
             color: Color(red: 0.18, green: 0.20, blue: 0.23),
             radius: 8.4,
             sizeSpeedSensitivity: 0.0,
-            opacity: 0.90,
-            hardness: 0.80,
+            opacity: 0.88,
+            hardness: 0.72,
             roundness: 0.74,
             angleMode: .strokeDirection,
-            spacing: 0.09,
+            spacing: 0.05,
             scatterLateral: 0.0,
             scatterLinear: 0.0,
             angleJitter: 0.0,
             roundnessJitter: 0.0,
             textureMode: .strokeLocked,
-            textureStrength: 0.16,
-            flow: 0.94,
-            flowPressureSensitivity: 0.08,
-            wetness: 0.12,
-            wetnessPressureSensitivity: 0.08,
+            textureStrength: 0.14,
+            flow: 0.64,
+            flowPressureSensitivity: 0.12,
+            colorMixingMode: .runningColor,
+            wetness: 0.92,
+            wetnessPressureSensitivity: 0.18,
             opacityPressureSensitivity: 0.10,
-            colorMixStrength: 0.10,
-            paintLoad: 0.92,
-            loadPressureSensitivity: 0.06,
+            colorMixStrength: 0.84,
+            smudgeBlurEnabled: true,
+            smudgeBleed: 1.00,
+            smudgeRadius: 1.00,
+            paintLoad: 0.08,
+            loadPressureSensitivity: 0.18,
             grainScale: 1.08,
             grainContrast: 1.24,
             paperScale: 0.08,
@@ -1407,6 +1538,100 @@ struct BrushPreset: Identifiable, Equatable {
             green: 50,
             blue: 58,
             customTip: BuiltInBrushTipFactory.rake
+        ),
+        studioPreset(
+            name: "Smudge Pull",
+            tipKind: .oil,
+            color: Color(red: 0.24, green: 0.25, blue: 0.28),
+            radius: 9.8,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.72,
+            hardness: 0.44,
+            roundness: 0.88,
+            angleMode: .strokeDirection,
+            spacing: 0.04,
+            scatterLateral: 0.01,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.12,
+            flow: 0.36,
+            flowPressureSensitivity: 0.10,
+            colorMixingMode: .smear,
+            wetness: 1.00,
+            wetnessPressureSensitivity: 0.22,
+            opacityPressureSensitivity: 0.10,
+            colorMixStrength: 0.92,
+            smudgeBlurEnabled: true,
+            smudgeBleed: 0.96,
+            smudgeRadius: 1.00,
+            paintLoad: 0.03,
+            loadPressureSensitivity: 0.20,
+            dualBrushEnabled: true,
+            dualTipKind: .oil,
+            dualScale: 0.72,
+            dualSpacing: 0.18,
+            dualScatter: 0.08,
+            dualAngle: 0.10,
+            dualBlendMode: .darker,
+            grainScale: 1.12,
+            grainContrast: 1.24,
+            paperScale: 0.10,
+            paperStrength: 0.08,
+            paperThreshold: 0.46,
+            pressureSensitivity: 0.12,
+            red: 61,
+            green: 63,
+            blue: 71,
+            customTip: BuiltInBrushTipFactory.block
+        ),
+        studioPreset(
+            name: "Wet Mixer",
+            tipKind: .airbrush,
+            color: Color(red: 0.22, green: 0.23, blue: 0.26),
+            radius: 12.0,
+            sizeSpeedSensitivity: 0.0,
+            opacity: 0.32,
+            hardness: 0.16,
+            roundness: 1.0,
+            angleMode: .fixed,
+            spacing: 0.18,
+            spacingJitter: 0.03,
+            scatterEnabled: true,
+            scatterMode: .spray,
+            scatterLateral: 0.08,
+            scatterLinear: 0.04,
+            count: 2,
+            countJitter: 0.10,
+            countSizeJitter: 0.08,
+            countOpacityJitter: 0.10,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .moving,
+            textureStrength: 0.10,
+            flow: 0.58,
+            flowPressureSensitivity: 0.12,
+            flowJitter: 0.08,
+            colorMixingMode: .runningColor,
+            wetness: 0.94,
+            wetnessPressureSensitivity: 0.20,
+            opacityPressureSensitivity: 0.22,
+            colorMixStrength: 0.88,
+            smudgeBlurEnabled: true,
+            smudgeBleed: 1.00,
+            smudgeRadius: 1.00,
+            paintLoad: 0.08,
+            loadPressureSensitivity: 0.18,
+            grainScale: 1.02,
+            grainContrast: 1.08,
+            paperScale: 0.06,
+            paperStrength: 0.02,
+            paperThreshold: 0.48,
+            pressureSensitivity: 0.06,
+            red: 56,
+            green: 58,
+            blue: 63
         )
     ]
 
@@ -1446,10 +1671,14 @@ struct BrushPreset: Identifiable, Equatable {
         flow: Double,
         flowPressureSensitivity: Double = 0.0,
         flowJitter: Double = 0.0,
+        colorMixingMode: BrushColorMixingMode = .off,
         wetness: Double = 0.0,
         wetnessPressureSensitivity: Double = 0.0,
         opacityPressureSensitivity: Double = 0.0,
         colorMixStrength: Double = 0.0,
+        smudgeBlurEnabled: Bool = false,
+        smudgeBleed: Double = 0.0,
+        smudgeRadius: Double = 0.0,
         paintLoad: Double = 1.0,
         loadPressureSensitivity: Double = 0.0,
         dualBrushEnabled: Bool = false,
@@ -1504,10 +1733,14 @@ struct BrushPreset: Identifiable, Equatable {
             flow: flow,
             flowPressureSensitivity: flowPressureSensitivity,
             flowJitter: flowJitter,
+            colorMixingMode: colorMixingMode,
             wetness: wetness,
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeBlurEnabled: smudgeBlurEnabled,
+            smudgeBleed: smudgeBleed,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,

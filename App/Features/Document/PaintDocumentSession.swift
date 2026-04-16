@@ -1331,10 +1331,21 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.flowPressureSensitivity = brush.flowPressureSensitivity
         descriptor.flowJitter = brush.flowJitter
         descriptor.velocityInfluence = brush.velocityInfluence
+        descriptor.colorMixingMode = {
+            switch brush.colorMixingMode {
+            case .off: return 0
+            case .blend: return 1
+            case .runningColor: return 2
+            case .smear: return 3
+            }
+        }()
         descriptor.wetness = brush.wetness
         descriptor.wetnessPressureSensitivity = brush.wetnessPressureSensitivity
         descriptor.opacityPressureSensitivity = brush.opacityPressureSensitivity
         descriptor.colorMixStrength = brush.colorMixStrength
+        descriptor.smudgeBlurEnabled = brush.smudgeBlurEnabled
+        descriptor.smudgeBleed = brush.smudgeBleed
+        descriptor.smudgeRadius = brush.smudgeRadius
         descriptor.paintLoad = brush.paintLoad
         descriptor.loadPressureSensitivity = brush.loadPressureSensitivity
         descriptor.dualBrushEnabled = brush.dualBrushEnabled
@@ -1899,7 +1910,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     ) -> [UInt8] {
         var output = original
         let influenceRadius = max(4.0, brush.radius * 1.35)
-        let blurStrength = max(0.08, min(brush.flow, 1.0))
+        let blurStrength = max(0.0, min(brush.flow, 1.0))
         let softness = max(0.12, 1.0 - brush.hardness)
         let sampleXs = samples.map { Double($0.point.x) }
         let sampleYs = samples.map { Double($0.point.y) }
@@ -2453,10 +2464,14 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let flowPressureSensitivity: Double
     let flowJitter: Double
     let velocityInfluence: Double
+    let colorMixingMode: String?
     let wetness: Double
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
     let colorMixStrength: Double
+    let smudgeBlurEnabled: Bool
+    let smudgeBleed: Double
+    let smudgeRadius: Double
     let paintLoad: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
@@ -2518,10 +2533,14 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         flowPressureSensitivity = brush.flowPressureSensitivity
         flowJitter = brush.flowJitter
         velocityInfluence = brush.velocityInfluence
+        colorMixingMode = brush.colorMixingMode.rawValue
         wetness = brush.wetness
         wetnessPressureSensitivity = brush.wetnessPressureSensitivity
         opacityPressureSensitivity = brush.opacityPressureSensitivity
         colorMixStrength = brush.colorMixStrength
+        smudgeBlurEnabled = brush.smudgeBlurEnabled
+        smudgeBleed = brush.smudgeBleed
+        smudgeRadius = brush.smudgeRadius
         paintLoad = brush.paintLoad
         loadPressureSensitivity = brush.loadPressureSensitivity
         dualBrushEnabled = brush.dualBrushEnabled
@@ -2562,6 +2581,14 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         else {
             return nil
         }
+        let resolvedColorMixingMode = BrushColorMixingMode(rawValue: colorMixingMode ?? "") ?? BrushColorMixingMode.inferred(
+            wetness: wetness,
+            colorMixStrength: colorMixStrength,
+            smudgeBlurEnabled: smudgeBlurEnabled,
+            smudgeBleed: smudgeBleed,
+            smudgeRadius: smudgeRadius,
+            paintLoad: paintLoad
+        )
 
         return BrushRuntimeSettings(
             tipKind: tipKind,
@@ -2596,10 +2623,14 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
             flowPressureSensitivity: flowPressureSensitivity,
             flowJitter: flowJitter,
             velocityInfluence: velocityInfluence,
+            colorMixingMode: resolvedColorMixingMode,
             wetness: wetness,
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeBlurEnabled: smudgeBlurEnabled,
+            smudgeBleed: smudgeBleed,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,

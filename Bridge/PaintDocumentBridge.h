@@ -53,10 +53,14 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) CGFloat flow;
 @property (nonatomic) CGFloat flowPressureSensitivity;
 @property (nonatomic) CGFloat flowJitter;
+@property (nonatomic) NSInteger colorMixingMode;
 @property (nonatomic) CGFloat wetness;
 @property (nonatomic) CGFloat wetnessPressureSensitivity;
 @property (nonatomic) CGFloat opacityPressureSensitivity;
 @property (nonatomic) CGFloat colorMixStrength;
+@property (nonatomic) BOOL smudgeBlurEnabled;
+@property (nonatomic) CGFloat smudgeBleed;
+@property (nonatomic) CGFloat smudgeRadius;
 @property (nonatomic) CGFloat paintLoad;
 @property (nonatomic) CGFloat loadPressureSensitivity;
 @property (nonatomic) BOOL dualBrushEnabled;

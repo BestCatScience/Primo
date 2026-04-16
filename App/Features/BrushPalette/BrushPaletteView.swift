@@ -17,12 +17,15 @@ struct BrushPaletteView: View {
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
+    @State var isImportingCustomTip = false
     @State var isImportingTextFont = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
     @State var selectedToolInspectorTab: ToolInspectorTab = .basic
     @State var importErrorMessage: String?
     @State var textFontImportErrorMessage: String?
+    @State var renamingSavedTipPresetName: String?
+    @State var savedTipRenameDraft = ""
     var rendersFloatingPanelOnly = false
     var onSelectTool: (StudioToolKind) -> Void = { _ in }
     var onRequestExpandSelection: () -> Void = {}
@@ -58,6 +61,15 @@ struct BrushPaletteView: View {
                 allowsMultipleSelection: true,
                 onPick: importBrushes,
                 onCancel: { isImportingBrush = false }
+            )
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $isImportingCustomTip) {
+            BrushImportDocumentPicker(
+                allowedContentTypes: [.png, .atelierBrushTip],
+                allowsMultipleSelection: false,
+                onPick: importCustomTip,
+                onCancel: { isImportingCustomTip = false }
             )
             .ignoresSafeArea()
         }
@@ -106,6 +118,35 @@ struct BrushPaletteView: View {
             },
             message: {
                 Text(textFontImportErrorMessage ?? "")
+            }
+        )
+        .alert(
+            language.localized("先端名を変更"),
+            isPresented: Binding(
+                get: { renamingSavedTipPresetName != nil },
+                set: { newValue in
+                    if !newValue {
+                        renamingSavedTipPresetName = nil
+                        savedTipRenameDraft = ""
+                    }
+                }
+            ),
+            actions: {
+                TextField(language.localized("先端名"), text: $savedTipRenameDraft)
+                Button(language.localized("キャンセル"), role: .cancel) {
+                    renamingSavedTipPresetName = nil
+                    savedTipRenameDraft = ""
+                }
+                Button(language.localized("保存")) {
+                    if let oldName = renamingSavedTipPresetName {
+                        store.send(.renameSavedPresetButtonTapped(oldName: oldName, newName: savedTipRenameDraft))
+                    }
+                    renamingSavedTipPresetName = nil
+                    savedTipRenameDraft = ""
+                }
+            },
+            message: {
+                Text(language.localized("保存した先端の名前を変更します。"))
             }
         )
     }
@@ -184,6 +225,28 @@ struct BrushPaletteView: View {
         }
         if !failures.isEmpty {
             textFontImportErrorMessage = failures.joined(separator: "\n")
+        }
+    }
+
+    private func importCustomTip(_ urls: [URL]) {
+        isImportingCustomTip = false
+        guard let url = urls.first else { return }
+
+        var resolvedTip: BrushTipRaster?
+        var failure: String?
+
+        withSecurityScopedAccess(to: url) {
+            do {
+                resolvedTip = try BrushTipLibrary.loadRaster(from: url)
+            } catch {
+                failure = "\(url.lastPathComponent): \(error.localizedDescription)"
+            }
+        }
+
+        if let resolvedTip {
+            store.brush.customTip = resolvedTip
+        } else if let failure {
+            importErrorMessage = failure
         }
     }
 }
