@@ -5,8 +5,8 @@ import ImageIO
 import UniformTypeIdentifiers
 
 extension UTType {
-    static let atelierBrushTip = UTType(exportedAs: "com.bestcatscience.primo.brush-tip", conformingTo: .data)
-    static let atelierDocument = UTType(exportedAs: "com.bestcatscience.primo.document", conformingTo: .package)
+    static let primoBrushTip = UTType(exportedAs: "com.bestcatscience.primo.brush-tip", conformingTo: .data)
+    static let primoDocument = UTType(exportedAs: "com.bestcatscience.primo.document", conformingTo: .package)
 }
 
 struct BrushTipRaster: Equatable, Sendable {

@@ -57,7 +57,7 @@ struct BrushPaletteView: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.ui.showsBrushSettingsPopover)
         .sheet(isPresented: $isImportingBrush) {
             BrushImportDocumentPicker(
-                allowedContentTypes: [.png, .atelierBrushTip, UTType(filenameExtension: "abr") ?? .data],
+                allowedContentTypes: [.png, .primoBrushTip, UTType(filenameExtension: "abr") ?? .data],
                 allowsMultipleSelection: true,
                 onPick: importBrushes,
                 onCancel: { isImportingBrush = false }
@@ -66,7 +66,7 @@ struct BrushPaletteView: View {
         }
         .sheet(isPresented: $isImportingCustomTip) {
             BrushImportDocumentPicker(
-                allowedContentTypes: [.png, .atelierBrushTip],
+                allowedContentTypes: [.png, .primoBrushTip],
                 allowsMultipleSelection: false,
                 onPick: importCustomTip,
                 onCancel: { isImportingCustomTip = false }

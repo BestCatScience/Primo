@@ -206,7 +206,7 @@ struct ContentView: View {
         }
         .fileImporter(
             isPresented: $showsOpenDocumentImporter,
-            allowedContentTypes: [.atelierDocument],
+            allowedContentTypes: [.primoDocument],
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let sourceURL = urls.first else { return }

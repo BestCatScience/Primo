@@ -6,25 +6,25 @@ import UIKit
 import simd
 
 final class PaintDocumentSession: @unchecked Sendable {
-    private static let logger = Logger(subsystem: "com.primo.app", category: "Document")
-    private static let maxTimelapseFrames = 20_000
+    static let logger = Logger(subsystem: "com.primo.app", category: "Document")
+    static let maxTimelapseFrames = 20_000
     var bridge: APPaintDocumentBridge
     private var revision: Int = 0
     private var activeStrokeLayerIndex: Int?
     private var activeStrokeBrush: BrushRuntimeSettings?
     private var activeStrokeSamples: [StylusSample] = []
-    private var timelapseFrames: [TimelapseFrame] = []
-    private var timelapseEvents: [TimelapseOperation] = []
-    private var layerThumbnailCache: [Int: Data] = [:]
-    private var paperStyle: CanvasPaperStyle = .default
-    private let timelapseDirectoryURL: URL
-    private var nextTimelapseFrameID: Int = 0
-    private var usesOperationTimelapsePersistence = true
+    var timelapseFrames: [TimelapseFrame] = []
+    var timelapseEvents: [TimelapseOperation] = []
+    var layerThumbnailCache: [Int: Data] = [:]
+    var paperStyle: CanvasPaperStyle = .default
+    let timelapseDirectoryURL: URL
+    var nextTimelapseFrameID: Int = 0
+    var usesOperationTimelapsePersistence = true
     private var activeBlurStrokeLayerIndex: Int?
     private var activeBlurStrokeBrush: BrushRuntimeSettings?
     private var activeBlurStrokeSamples: [StylusSample] = []
     private var blurStrokeHasCapturedHistory = false
-    private var textLayers: [Int: TextLayerData] = [:]
+    var textLayers: [Int: TextLayerData] = [:]
 
     init(width: Int = 1152, height: Int = 1536) {
         let clock = ContinuousClock()
@@ -335,25 +335,6 @@ final class PaintDocumentSession: @unchecked Sendable {
         bridge.setLayerName(name, at: index)
     }
 
-    func textLayerData(index: Int) -> TextLayerData? {
-        textLayers[index]
-    }
-
-    @discardableResult
-    func setTextLayer(index: Int, textLayer: TextLayerData) -> Bool {
-        guard !isLayerLocked(index: index) else { return false }
-        let existingPixelData = bridge.pixelDataForLayer(at: index) as Data
-        guard !existingPixelData.isEmpty else { return false }
-        guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }
-        textLayers[index] = textLayer
-        replaceLayerPixels(index: index, data: rasterized, preservesTextLayerMetadata: true)
-        return true
-    }
-
-    func clearTextLayerData(index: Int) {
-        textLayers.removeValue(forKey: index)
-    }
-
     func setLayerVisibility(index: Int, isVisible: Bool) {
         bridge.setLayerVisible(isVisible, at: index)
         timelapseEvents.append(.setLayerVisibility(index: index, isVisible: isVisible))
@@ -423,69 +404,6 @@ final class PaintDocumentSession: @unchecked Sendable {
             captureTimelapseFrame()
         }
         return didApply
-    }
-
-    func pixelDataForLayer(index: Int) -> Data {
-        bridge.pixelDataForLayer(at: index) as Data
-    }
-
-    func isLayerLocked(index: Int) -> Bool {
-        guard let layer = bridge.layerInfos().enumerated().first(where: { $0.offset == index })?.element else {
-            return false
-        }
-        return layer.locked
-    }
-
-    func isLayerAlphaLocked(index: Int) -> Bool {
-        guard let layer = bridge.layerInfos().enumerated().first(where: { $0.offset == index })?.element else {
-            return false
-        }
-        return layer.alphaLocked
-    }
-
-    static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
-        guard source.count == existing.count else { return source }
-        var output = source
-        output.withUnsafeMutableBytes { outputBytes in
-            existing.withUnsafeBytes { existingBytes in
-                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
-                else { return }
-                for offset in stride(from: 0, to: source.count, by: 4) {
-                    let alpha = src[offset + 3]
-                    if alpha == 0 {
-                        dst[offset] = 0
-                        dst[offset + 1] = 0
-                        dst[offset + 2] = 0
-                        dst[offset + 3] = 0
-                    } else {
-                        dst[offset + 3] = alpha
-                    }
-                }
-            }
-        }
-        return output
-    }
-
-    static func pixelData(from cgImage: CGImage, size: CGSize) -> Data? {
-        let width = Int(size.width)
-        let height = Int(size.height)
-        guard width > 0, height > 0 else { return nil }
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        guard let context = CGContext(
-            data: &bytes,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            return nil
-        }
-        context.clear(CGRect(x: 0, y: 0, width: width, height: height))
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return Data(bytes)
     }
 
     func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
@@ -625,125 +543,6 @@ final class PaintDocumentSession: @unchecked Sendable {
             timelapseEvents.append(.clearLayer(index: index))
             captureTimelapseFrame()
         }
-    }
-
-    private func remappedTextLayersForInsertion(at insertedIndex: Int) -> [Int: TextLayerData] {
-        Dictionary(uniqueKeysWithValues: textLayers.map { index, value in
-            (index >= insertedIndex ? index + 1 : index, value)
-        })
-    }
-
-    private func remappedTextLayersForDuplication(of sourceIndex: Int, duplicatedIndex: Int, duplicate: TextLayerData) -> [Int: TextLayerData] {
-        var remapped = remappedTextLayersForInsertion(at: duplicatedIndex)
-        remapped[duplicatedIndex] = duplicate
-        return remapped
-    }
-
-    private func remappedTextLayersForDeletion(of deletedIndex: Int) -> [Int: TextLayerData] {
-        Dictionary(uniqueKeysWithValues: textLayers.compactMap { index, value in
-            guard index != deletedIndex else { return nil }
-            return (index > deletedIndex ? index - 1 : index, value)
-        })
-    }
-
-    private func remappedTextLayersForMove(from sourceIndex: Int, to destinationIndex: Int) -> [Int: TextLayerData] {
-        var remapped: [Int: TextLayerData] = [:]
-        for (index, value) in textLayers {
-            if index == sourceIndex {
-                remapped[destinationIndex] = value
-            } else if sourceIndex < destinationIndex, index > sourceIndex, index <= destinationIndex {
-                remapped[index - 1] = value
-            } else if sourceIndex > destinationIndex, index >= destinationIndex, index < sourceIndex {
-                remapped[index + 1] = value
-            } else {
-                remapped[index] = value
-            }
-        }
-        return remapped
-    }
-
-    private func rasterizedTextLayerPixelData(_ textLayer: TextLayerData) -> Data? {
-        let canvasSize = CGSize(width: bridge.width, height: bridge.height)
-        guard
-            canvasSize.width > 0,
-            canvasSize.height > 0,
-            let resolved = Self.resolvedTextLayout(for: textLayer, canvasSize: canvasSize)
-        else {
-            return nil
-        }
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = false
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
-        let image = renderer.image { context in
-            Self.drawTextLayer(textLayer, resolved: resolved, in: context.cgContext)
-        }
-
-        guard let cgImage = image.cgImage else { return nil }
-        return Self.pixelData(from: cgImage, size: canvasSize)
-    }
-
-    static func resolvedTextLayout(
-        for textLayer: TextLayerData,
-        canvasSize: CGSize
-    ) -> (drawRect: CGRect, attributes: [NSAttributedString.Key: Any])? {
-        let font = UIFont(name: textLayer.fontPostScriptName, size: textLayer.fontSize)
-            ?? UIFont.systemFont(ofSize: textLayer.fontSize, weight: .regular)
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .left
-        paragraphStyle.lineBreakMode = .byWordWrapping
-
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: UIColor(textLayer.color),
-            .paragraphStyle: paragraphStyle
-        ]
-        let constraintRect = CGSize(
-            width: max(canvasSize.width - textLayer.position.x - 12, textLayer.fontSize),
-            height: max(canvasSize.height - textLayer.position.y - 12, textLayer.fontSize * 2.0)
-        )
-        let measuredBounds = (textLayer.text as NSString).boundingRect(
-            with: constraintRect,
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attributes,
-            context: nil
-        ).integral
-        let drawRect = CGRect(
-            origin: textLayer.position,
-            size: CGSize(
-                width: max(measuredBounds.width, textLayer.fontSize * 0.5),
-                height: max(measuredBounds.height, textLayer.fontSize * 1.2)
-            )
-        )
-        return (drawRect, attributes)
-    }
-
-    static func drawTextLayer(
-        _ textLayer: TextLayerData,
-        resolved: (drawRect: CGRect, attributes: [NSAttributedString.Key: Any]),
-        in context: CGContext
-    ) {
-        let drawRect = resolved.drawRect
-        let anchor = CGPoint(x: drawRect.midX, y: drawRect.midY)
-        let scale = CGFloat(min(max(textLayer.scale, 0.2), 6.0))
-        context.saveGState()
-        context.translateBy(x: anchor.x, y: anchor.y)
-        context.rotate(by: CGFloat(textLayer.rotationDegrees * .pi / 180.0))
-        context.scaleBy(x: scale, y: scale)
-        let localRect = CGRect(
-            x: -(drawRect.width / 2),
-            y: -(drawRect.height / 2),
-            width: drawRect.width,
-            height: drawRect.height
-        )
-        (textLayer.text as NSString).draw(in: localRect, withAttributes: resolved.attributes)
-        context.restoreGState()
-    }
-
-    func setPaperStyle(_ style: CanvasPaperStyle) {
-        guard paperStyle != style else { return }
-        paperStyle = style
-        timelapseEvents.append(.setPaperStyle(style))
     }
 
     func resizeCanvas(width: Int, height: Int) {
@@ -1038,672 +837,6 @@ final class PaintDocumentSession: @unchecked Sendable {
         return rows
     }
 
-    func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
-        self.paperStyle = paperStyle
-        return renderedCompositeImage(paperStyle: paperStyle)?.pngData()
-    }
-
-    func saveProject(to url: URL) throws {
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
-        }
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-
-        let layersDirectory = url.appendingPathComponent("Layers", isDirectory: true)
-        let timelapseDirectory = url.appendingPathComponent("Timelapse", isDirectory: true)
-        let timelapseDataDirectory = url.appendingPathComponent("TimelapseData", isDirectory: true)
-        try fileManager.createDirectory(at: layersDirectory, withIntermediateDirectories: true)
-        if !usesOperationTimelapsePersistence {
-            try fileManager.createDirectory(at: timelapseDirectory, withIntermediateDirectories: true)
-        } else {
-            try fileManager.createDirectory(at: timelapseDataDirectory, withIntermediateDirectories: true)
-        }
-
-        let layerInfos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
-
-        let storedLayers = try layerInfos.enumerated().map { index, layerInfo -> StoredAtelierDocument.Layer in
-            let filename = String(format: "layer-%04d.rgba", index)
-            let pixelURL = layersDirectory.appendingPathComponent(filename, isDirectory: false)
-            let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            try pixelData.write(to: pixelURL, options: .atomic)
-            let maskFilename: String?
-            if let maskData = bridge.layerMaskDataForLayer(at: index) {
-                let filename = String(format: "layer-mask-%04d.mask", index)
-                try maskData.write(to: layersDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
-                maskFilename = "Layers/\(filename)"
-            } else {
-                maskFilename = nil
-            }
-            return StoredAtelierDocument.Layer(
-                index: index,
-                name: layerInfo.name,
-                visible: layerInfo.visible,
-                locked: layerInfo.locked,
-                alphaLocked: layerInfo.alphaLocked,
-                clipped: layerInfo.clipped,
-                opacity: layerInfo.opacity,
-                blendMode: layerInfo.blendMode,
-                folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
-                textLayer: textLayers[index],
-                pixelFilename: "Layers/\(filename)",
-                maskFilename: maskFilename
-            )
-        }
-
-        let storedFolders = folderInfos.map { folderInfo in
-            StoredAtelierDocument.Folder(
-                id: Int(folderInfo.folderID),
-                name: folderInfo.name,
-                visible: folderInfo.visible,
-                expanded: folderInfo.expanded,
-                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? Int(folderInfo.anchorLayerIndex) : nil
-            )
-        }
-
-        let storedTimelapseFrames: [StoredAtelierDocument.TimelapseFrame]
-        if !usesOperationTimelapsePersistence {
-            storedTimelapseFrames = try timelapseFrames.enumerated().map { index, frame in
-                let filename = String(format: "frame-%06d.jpg", index)
-                let destinationURL = timelapseDirectory.appendingPathComponent(filename, isDirectory: false)
-                if fileManager.fileExists(atPath: destinationURL.path) {
-                    try fileManager.removeItem(at: destinationURL)
-                }
-                try fileManager.copyItem(at: frame.imageURL, to: destinationURL)
-                return StoredAtelierDocument.TimelapseFrame(
-                    filename: "Timelapse/\(filename)",
-                    width: Double(frame.size.width),
-                    height: Double(frame.size.height)
-                )
-            }
-        } else {
-            storedTimelapseFrames = []
-        }
-
-        let storedTimelapseOperations = usesOperationTimelapsePersistence
-            ? try timelapseEvents.enumerated().map { index, event in
-                try event.storedRepresentation(index: index, dataDirectory: timelapseDataDirectory)
-            }
-            : []
-
-        let document = StoredAtelierDocument(
-            version: 5,
-            canvasWidth: Int(bridge.width),
-            canvasHeight: Int(bridge.height),
-            activeLayerIndex: Int(bridge.activeLayerIndex),
-            paperStyle: StoredAtelierDocument.PaperStyle(
-                red: Double(paperStyle.red),
-                green: Double(paperStyle.green),
-                blue: Double(paperStyle.blue),
-                alpha: Double(paperStyle.alpha),
-                isTransparent: paperStyle.isTransparent
-            ),
-            layers: storedLayers,
-            folders: storedFolders,
-            timelapseFrames: storedTimelapseFrames,
-            timelapseOperations: storedTimelapseOperations
-        )
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let manifestData = try encoder.encode(document)
-        try manifestData.write(to: url.appendingPathComponent("manifest.json"), options: .atomic)
-    }
-
-    static func loadProject(from url: URL) throws -> PaintDocumentSession {
-        let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
-        let data = try Data(contentsOf: manifestURL)
-        let document = try JSONDecoder().decode(StoredAtelierDocument.self, from: data)
-        guard !document.layers.isEmpty else {
-            throw AtelierDocumentError.invalidDocument
-        }
-
-        let session = PaintDocumentSession(width: document.canvasWidth, height: document.canvasHeight)
-        session.paperStyle = CanvasPaperStyle(
-            red: Float(document.paperStyle.red),
-            green: Float(document.paperStyle.green),
-            blue: Float(document.paperStyle.blue),
-            alpha: Float(document.paperStyle.alpha),
-            isTransparent: document.paperStyle.isTransparent
-        )
-
-        while Int(session.bridge.layerInfos().count) < document.layers.count {
-            _ = session.bridge.addLayer(name: "Layer \(Int(session.bridge.layerInfos().count) + 1)")
-        }
-
-        for layer in document.layers.sorted(by: { $0.index < $1.index }) {
-            let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
-            let pixelData = try Data(contentsOf: pixelURL)
-            session.bridge.replaceLayerPixelsTransient(at: layer.index, data: pixelData)
-            if let maskFilename = layer.maskFilename {
-                let maskData = try Data(contentsOf: url.appendingPathComponent(maskFilename, isDirectory: false))
-                session.bridge.replaceLayerMask(at: layer.index, data: maskData)
-            } else {
-                session.bridge.clearLayerMask(at: layer.index)
-            }
-            session.bridge.setLayerName(layer.name, at: layer.index)
-            session.bridge.setLayerVisible(layer.visible, at: layer.index)
-            session.bridge.setLayerLocked(layer.locked, at: layer.index)
-            session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
-            session.bridge.setLayerClipped(layer.clipped, at: layer.index)
-            session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
-            session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
-            if let textLayer = layer.textLayer {
-                session.textLayers[layer.index] = textLayer
-            }
-        }
-
-        var folderIDMap: [Int: Int] = [:]
-        for folder in document.folders {
-            let newFolderID = Int(session.bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1))
-            folderIDMap[folder.id] = newFolderID
-            session.bridge.setFolderVisible(folder.visible, folderID: newFolderID)
-            session.bridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
-        }
-
-        for layer in document.layers {
-            guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = session.bridge.setLayerFolder(at: layer.index, folderID: resolvedFolderID)
-        }
-
-        session.bridge.activeLayerIndex = min(max(document.activeLayerIndex, 0), document.layers.count - 1)
-
-        session.timelapseFrames.removeAll(keepingCapacity: true)
-        session.timelapseEvents.removeAll(keepingCapacity: true)
-        if !document.timelapseOperations.isEmpty {
-            session.usesOperationTimelapsePersistence = true
-            session.timelapseEvents = try document.timelapseOperations.map { try TimelapseOperation(stored: $0, baseURL: url) }
-        } else {
-            session.usesOperationTimelapsePersistence = false
-            for (index, storedFrame) in document.timelapseFrames.enumerated() {
-                let sourceURL = url.appendingPathComponent(storedFrame.filename, isDirectory: false)
-                let destinationURL = session.timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", index), isDirectory: false)
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
-                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
-                session.timelapseFrames.append(
-                    TimelapseFrame(
-                        imageURL: destinationURL,
-                        size: CGSize(width: storedFrame.width, height: storedFrame.height)
-                    )
-                )
-            }
-        }
-        session.nextTimelapseFrameID = session.timelapseFrames.count
-        session.layerThumbnailCache.removeAll(keepingCapacity: true)
-        session.bridge.clearHistory()
-        return session
-    }
-
-    func timelapseCapture() -> TimelapseCapture? {
-        let previewData = makeTimelapseThumbnail()?.jpegData(compressionQuality: 0.72)
-        if usesOperationTimelapsePersistence, !timelapseEvents.isEmpty {
-            return TimelapseCapture(
-                canvasSize: CGSize(width: bridge.width, height: bridge.height),
-                paperStyle: paperStyle,
-                previewImageData: previewData,
-                source: .operations(timelapseEvents),
-                framesPerSecond: 24
-            )
-        }
-
-        guard timelapseFrames.count >= 2 else { return nil }
-        return TimelapseCapture(
-            canvasSize: CGSize(width: bridge.width, height: bridge.height),
-            paperStyle: paperStyle,
-            previewImageData: previewData,
-            source: .frames(timelapseFrames),
-            framesPerSecond: 24
-        )
-    }
-
-    func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
-        let dirtyRect = bridge.consumeDirtyRect()
-        guard !dirtyRect.empty else { return nil }
-        let pixelData = bridge.compositePixelData(in: dirtyRect) as Data
-        guard !pixelData.isEmpty else { return nil }
-        return IncrementalLayerUpdate(
-            layerIndex: -1,
-            originX: Int(dirtyRect.originX),
-            originY: Int(dirtyRect.originY),
-            width: Int(dirtyRect.width),
-            height: Int(dirtyRect.height),
-            pixelData: pixelData
-        )
-    }
-
-    private func makeBrushDescriptor(from brush: BrushRuntimeSettings) -> APBrushDescriptor {
-        let descriptor = APBrushDescriptor()
-        let usesCircularInkTip =
-            brush.tipKind == .ink &&
-            brush.customTip == nil &&
-            brush.roundness >= 0.98 &&
-            abs(brush.roundnessPressureSensitivity) <= 0.001 &&
-            abs(brush.roundnessTiltSensitivity) <= 0.001 &&
-            abs(brush.anglePressureSensitivity) <= 0.001 &&
-            abs(brush.angleTiltSensitivity) <= 0.001 &&
-            abs(brush.angleJitter) <= 0.001 &&
-            abs(brush.roundnessJitter) <= 0.001
-        descriptor.tipKind = brush.tipKind.rawValue
-        descriptor.radius = brush.radius
-        descriptor.sizeSpeedSensitivity = brush.sizeSpeedSensitivity
-        descriptor.taperIn = brush.taperIn
-        descriptor.taperOut = brush.taperOut
-        descriptor.opacity = brush.opacity
-        descriptor.hardness = brush.hardness
-        descriptor.roundness = brush.roundness
-        descriptor.roundnessPressureSensitivity = brush.roundnessPressureSensitivity
-        descriptor.roundnessTiltSensitivity = brush.roundnessTiltSensitivity
-        descriptor.angle = brush.angle
-        descriptor.anglePressureSensitivity = brush.anglePressureSensitivity
-        descriptor.angleTiltSensitivity = brush.angleTiltSensitivity
-        descriptor.angleMode = {
-            switch brush.angleMode {
-            case .fixed: return 0
-            case .strokeDirection: return 1
-            case .stylusTilt: return 2
-            }
-        }()
-        descriptor.stampSpacing = brush.stampSpacing
-        descriptor.spacingJitter = brush.spacingJitter
-        descriptor.scatterEnabled = brush.scatterEnabled
-        descriptor.scatterMode = brush.scatterMode == .spray ? 1 : 0
-        descriptor.scatterLateral = brush.scatterLateral
-        descriptor.scatterLinear = brush.scatterLinear
-        descriptor.count = brush.count
-        descriptor.countJitter = brush.countJitter
-        descriptor.countSizeJitter = brush.countSizeJitter
-        descriptor.countOpacityJitter = brush.countOpacityJitter
-        descriptor.angleJitter = brush.angleJitter
-        descriptor.roundnessJitter = brush.roundnessJitter
-        descriptor.textureMode = {
-            switch brush.textureMode {
-            case .off: return 0
-            case .strokeLocked: return 1
-            case .eachTip: return 2
-            case .moving: return 3
-            }
-        }()
-        descriptor.textureStrength = brush.textureStrength
-        descriptor.flow = brush.flow
-        descriptor.flowPressureSensitivity = brush.flowPressureSensitivity
-        descriptor.flowJitter = brush.flowJitter
-        descriptor.velocityInfluence = brush.velocityInfluence
-        descriptor.colorMixingMode = {
-            switch brush.colorMixingMode {
-            case .off: return 0
-            case .blend: return 1
-            case .runningColor: return 2
-            case .smear: return 3
-            }
-        }()
-        descriptor.wetness = brush.wetness
-        descriptor.wetnessPressureSensitivity = brush.wetnessPressureSensitivity
-        descriptor.opacityPressureSensitivity = brush.opacityPressureSensitivity
-        descriptor.colorMixStrength = brush.colorMixStrength
-        descriptor.smudgeBlurEnabled = brush.smudgeBlurEnabled
-        descriptor.smudgeBleed = brush.smudgeBleed
-        descriptor.smudgeRadius = brush.smudgeRadius
-        descriptor.paintLoad = brush.paintLoad
-        descriptor.loadPressureSensitivity = brush.loadPressureSensitivity
-        descriptor.dualBrushEnabled = brush.dualBrushEnabled
-        descriptor.dualTipKind = brush.dualTipKind.rawValue
-        descriptor.dualScale = brush.dualScale
-        descriptor.dualSpacing = brush.dualSpacing
-        descriptor.dualScatter = brush.dualScatter
-        descriptor.dualAngle = brush.dualAngle
-        descriptor.dualBlendMode = {
-            switch brush.dualBlendMode {
-            case .multiply: return 0
-            case .darker: return 1
-            case .subtract: return 2
-            }
-        }()
-        descriptor.flipX = brush.flipX
-        descriptor.flipY = brush.flipY
-        descriptor.tipMaskWidth = brush.customTip?.width ?? 0
-        descriptor.tipMaskHeight = brush.customTip?.height ?? 0
-        descriptor.tipMaskData = brush.customTip?.alphaData
-        descriptor.grainScale = brush.grainScale
-        descriptor.grainContrast = brush.grainContrast
-        descriptor.paperScale = brush.paperScale
-        descriptor.paperThreshold = brush.paperThreshold
-        descriptor.paperStrength = brush.paperStrength
-        descriptor.tiltInfluence = usesCircularInkTip ? 0.0 : 0.75
-        descriptor.maxDarkness = 1.0
-        descriptor.pressureSensitivity = brush.pressureSensitivity
-        descriptor.fillThresholdMode = brush.fillThresholdMode == .opacity ? 0 : 1
-        descriptor.fillOpacityTolerance = brush.fillOpacityTolerance
-        descriptor.fillColorTolerance = brush.fillColorTolerance
-        descriptor.fillExpansion = brush.fillExpansion
-        descriptor.red = brush.red
-        descriptor.green = brush.green
-        descriptor.blue = brush.blue
-        descriptor.eraser = brush.isEraser
-        return descriptor
-    }
-
-    private func makeProcessingDescriptor(from request: LayerProcessingRequest) -> APPaintLayerProcessingDescriptor {
-        let descriptor = APPaintLayerProcessingDescriptor()
-        switch request {
-        case let .gradientMap(preset):
-            descriptor.kind = APPaintLayerProcessingKind.gradientMap
-            switch preset {
-            case .graphite:
-                descriptor.gradientMapPreset = APPaintGradientMapPreset.graphite
-            case .sepia:
-                descriptor.gradientMapPreset = APPaintGradientMapPreset.sepia
-            case .ocean:
-                descriptor.gradientMapPreset = APPaintGradientMapPreset.ocean
-            case .sunset:
-                descriptor.gradientMapPreset = APPaintGradientMapPreset.sunset
-            case .toxic:
-                descriptor.gradientMapPreset = APPaintGradientMapPreset.toxic
-            }
-
-        case let .hueSaturationBrightness(settings):
-            descriptor.kind = APPaintLayerProcessingKind.hueSaturationBrightness
-            descriptor.hueDegrees = CGFloat(settings.hueDegrees)
-            descriptor.saturation = CGFloat(settings.saturation)
-            descriptor.brightness = CGFloat(settings.brightness)
-
-        case let .brightnessContrast(settings):
-            descriptor.kind = APPaintLayerProcessingKind.brightnessContrast
-            descriptor.brightness = CGFloat(settings.brightness)
-            descriptor.contrast = CGFloat(settings.contrast)
-
-        case let .levels(settings):
-            descriptor.kind = APPaintLayerProcessingKind.levels
-            descriptor.inputBlack = CGFloat(settings.inputBlack)
-            descriptor.inputWhite = CGFloat(settings.inputWhite)
-            descriptor.gamma = CGFloat(settings.gamma)
-            descriptor.outputBlack = CGFloat(settings.outputBlack)
-            descriptor.outputWhite = CGFloat(settings.outputWhite)
-
-        case let .toneCurve(settings):
-            descriptor.kind = APPaintLayerProcessingKind.toneCurve
-            descriptor.shadows = CGFloat(settings.shadows)
-            descriptor.midtones = CGFloat(settings.midtones)
-            descriptor.highlights = CGFloat(settings.highlights)
-
-        case let .colorBalance(settings):
-            descriptor.kind = APPaintLayerProcessingKind.colorBalance
-            descriptor.redCyan = CGFloat(settings.redCyan)
-            descriptor.greenMagenta = CGFloat(settings.greenMagenta)
-            descriptor.blueYellow = CGFloat(settings.blueYellow)
-
-        case let .threshold(settings):
-            descriptor.kind = APPaintLayerProcessingKind.threshold
-            descriptor.threshold = CGFloat(settings.threshold)
-
-        case let .posterize(settings):
-            descriptor.kind = APPaintLayerProcessingKind.posterize
-            descriptor.posterizeLevels = CGFloat(settings.levels)
-
-        case let .transform(translation, scale, _, selection):
-            descriptor.kind = APPaintLayerProcessingKind.transform
-            descriptor.transformTranslateX = Int(translation.width.rounded())
-            descriptor.transformTranslateY = Int(translation.height.rounded())
-            descriptor.transformScale = scale
-            if let selection, !selection.isEmpty {
-                descriptor.selectionOriginX = Int(selection.bounds.minX.rounded(.down))
-                descriptor.selectionOriginY = Int(selection.bounds.minY.rounded(.down))
-                descriptor.selectionWidth = selection.maskWidth
-                descriptor.selectionHeight = selection.maskHeight
-                descriptor.selectionMaskData = selection.maskData
-            }
-        }
-        return descriptor
-    }
-
-    private func makeStrokePoint(from sample: StylusSample) -> APStrokePoint {
-        let point = APStrokePoint()
-        point.x = sample.point.x
-        point.y = sample.point.y
-        point.pressure = normalizedPressure(sample.pressure)
-        point.altitude = sample.altitude
-        point.azimuth = sample.azimuth
-        point.timestamp = sample.timestamp
-        return point
-    }
-
-    private func normalizedPressure(_ pressure: CGFloat) -> CGFloat {
-        max(0.08, min(max(pressure, 0.0), 1.0))
-    }
-
-    func replayTimelapseOperation(_ operation: TimelapseOperation, folderIDMap: inout [Int: Int]) {
-        switch operation {
-        case let .stroke(layerIndex, brush, samples):
-            guard let first = samples.first else { return }
-            bridge.activeLayerIndex = layerIndex
-            bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: first))
-            for sample in samples.dropFirst() {
-                bridge.appendStroke(point: makeStrokePoint(from: sample))
-            }
-            bridge.endStroke()
-            invalidateThumbnailCache(for: layerIndex)
-
-        case let .blurStroke(layerIndex, brush, samples):
-            applyBlurStroke(samples: samples, brush: brush, layerIndex: layerIndex)
-            invalidateThumbnailCache(for: layerIndex)
-
-        case let .fill(layerIndex, brush, sample):
-            bridge.activeLayerIndex = layerIndex
-            bridge.fill(at: sample.point, brush: makeBrushDescriptor(from: brush))
-            invalidateThumbnailCache(for: layerIndex)
-
-        case .undo:
-            _ = bridge.undo()
-            invalidateThumbnailCache()
-
-        case .redo:
-            _ = bridge.redo()
-            invalidateThumbnailCache()
-
-        case let .addLayer(name):
-            bridge.activeLayerIndex = bridge.addLayer(name: name)
-            invalidateThumbnailCache()
-
-        case let .duplicateLayer(index, name):
-            bridge.activeLayerIndex = bridge.duplicateLayer(at: index, name: name)
-            invalidateThumbnailCache()
-
-        case let .deleteLayer(index):
-            _ = bridge.deleteLayer(at: index)
-            invalidateThumbnailCache()
-
-        case let .moveLayer(index, destinationIndex):
-            _ = bridge.moveLayer(at: index, to: destinationIndex)
-            invalidateThumbnailCache()
-
-        case let .createFolder(folderID, name, anchorLayerIndex):
-            let createdID = Int(bridge.createFolder(name: name, layerIndex: anchorLayerIndex ?? -1))
-            folderIDMap[folderID] = createdID
-
-        case let .deleteFolder(folderID):
-            if let resolved = folderIDMap[folderID] {
-                _ = bridge.deleteFolder(id: resolved)
-                folderIDMap.removeValue(forKey: folderID)
-            }
-
-        case let .setFolderVisibility(folderID, isVisible):
-            if let resolved = folderIDMap[folderID] {
-                bridge.setFolderVisible(isVisible, folderID: resolved)
-            }
-
-        case let .assignLayerToFolder(index, folderID):
-            let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
-            _ = bridge.setLayerFolder(at: index, folderID: resolvedFolderID)
-            invalidateThumbnailCache()
-
-        case let .setLayerVisibility(index, isVisible):
-            bridge.setLayerVisible(isVisible, at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setLayerLocked(index, isLocked):
-            bridge.setLayerLocked(isLocked, at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setLayerAlphaLocked(index, isAlphaLocked):
-            bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setLayerClipped(index, isClipped):
-            bridge.setLayerClipped(isClipped, at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setLayerOpacity(index, opacity):
-            bridge.setLayerOpacity(CGFloat(opacity), at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setLayerBlendMode(index, blendMode):
-            bridge.setLayerBlendMode(blendMode.rawValue, at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .replaceLayerPixels(index, data):
-            bridge.replaceLayerPixels(at: index, data: data)
-            invalidateThumbnailCache(for: index)
-
-        case let .replaceLayerMask(index, data):
-            bridge.replaceLayerMask(at: index, data: data)
-            invalidateThumbnailCache(for: index)
-
-        case let .clearLayerMask(index):
-            bridge.clearLayerMask(at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .applyLayerMask(index):
-            _ = bridge.applyLayerMask(at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .clearLayer(index):
-            bridge.clearLayer(at: index)
-            invalidateThumbnailCache(for: index)
-
-        case let .setPaperStyle(style):
-            paperStyle = style
-        }
-    }
-
-    func timelapseCompositeImage() -> UIImage? {
-        renderedCompositeImage(paperStyle: paperStyle)
-    }
-
-    private func captureTimelapseFrame() {
-        guard let sourceImage = makeTimelapseThumbnail() else { return }
-        appendTimelapseFrame(image: sourceImage)
-    }
-
-    private func makeTimelapseThumbnail() -> UIImage? {
-        guard let sourceImage = renderedCompositeImage(paperStyle: paperStyle) else { return nil }
-        let targetSize = timelapseFrameSize(
-            for: CGSize(width: bridge.width, height: bridge.height),
-            maxDimension: 512
-        )
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-        return renderer.image { _ in
-            sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
-        }
-    }
-
-    private func appendTimelapseFrame(image: UIImage) {
-        guard let jpegData = image.jpegData(compressionQuality: 0.72) else { return }
-        let frameURL = timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", nextTimelapseFrameID))
-        nextTimelapseFrameID += 1
-        do {
-            try jpegData.write(to: frameURL, options: .atomic)
-        } catch {
-            Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
-            return
-        }
-
-        let frame = TimelapseFrame(imageURL: frameURL, size: image.size)
-        timelapseFrames.append(frame)
-        if timelapseFrames.count > Self.maxTimelapseFrames {
-            let removed = timelapseFrames.remove(at: 1)
-            try? FileManager.default.removeItem(at: removed.imageURL)
-        }
-    }
-
-    private static func makeTimelapseDirectoryURL() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("primo-timelapse", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    }
-
-    private func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
-        guard canvasSize.width > 0, canvasSize.height > 0 else {
-            return CGSize(width: maxDimension, height: maxDimension)
-        }
-        let scale = min(maxDimension / canvasSize.width, maxDimension / canvasSize.height, 1.0)
-        let width = max(2, Int((canvasSize.width * scale).rounded()))
-        let height = max(2, Int((canvasSize.height * scale).rounded()))
-        return CGSize(width: width, height: height)
-    }
-
-    private func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> UIImage? {
-        guard let imageRef = bridge.makeCompositeImage() else { return nil }
-        let compositeImage = UIImage(cgImage: imageRef)
-        let size = CGSize(width: bridge.width, height: bridge.height)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        format.opaque = !paperStyle.isTransparent
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        return renderer.image { context in
-            if !paperStyle.isTransparent {
-                UIColor(
-                    red: CGFloat(paperStyle.red),
-                    green: CGFloat(paperStyle.green),
-                    blue: CGFloat(paperStyle.blue),
-                    alpha: CGFloat(paperStyle.alpha)
-                ).setFill()
-                context.fill(CGRect(origin: .zero, size: size))
-            }
-            compositeImage.draw(in: CGRect(origin: .zero, size: size))
-        }
-    }
-
-    private func cachedLayerThumbnailData(index: Int) -> Data? {
-        if let cached = layerThumbnailCache[index] {
-            return cached
-        }
-        let thumbnail = makeLayerThumbnailData(index: index)
-        layerThumbnailCache[index] = thumbnail
-        return thumbnail
-    }
-
-    private func makeLayerThumbnailData(index: Int) -> Data? {
-        guard let imageRef = bridge.makeImageForLayer(at: index) else { return nil }
-        let sourceImage = UIImage(cgImage: imageRef)
-        let targetSize = timelapseFrameSize(
-            for: CGSize(width: bridge.width, height: bridge.height),
-            maxDimension: 96
-        )
-        let renderer = UIGraphicsImageRenderer(size: targetSize)
-        let thumbnail = renderer.image { _ in
-            sourceImage.draw(in: CGRect(origin: .zero, size: targetSize))
-        }
-        return thumbnail.pngData()
-    }
-
-    private func resetTimelapseHistory() {
-        for frame in timelapseFrames {
-            try? FileManager.default.removeItem(at: frame.imageURL)
-        }
-        timelapseFrames.removeAll(keepingCapacity: false)
-        timelapseEvents.removeAll(keepingCapacity: false)
-        nextTimelapseFrameID = 0
-    }
-
-    private func invalidateThumbnailCache(for index: Int? = nil) {
-        if let index {
-            layerThumbnailCache.removeValue(forKey: index)
-        } else {
-            layerThumbnailCache.removeAll(keepingCapacity: true)
-        }
-    }
 
     private static func scaledLayerPixelData(
         _ source: Data,
@@ -1854,7 +987,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         return Data(bytes)
     }
 
-    private func boxBlurredPixels(from original: [UInt8], width: Int, height: Int, radius: Double) -> [UInt8]? {
+    func boxBlurredPixels(from original: [UInt8], width: Int, height: Int, radius: Double) -> [UInt8]? {
         var source = original
         var destination = [UInt8](repeating: 0, count: original.count)
         var kernelSize = max(3, Int((radius * 0.9).rounded()))
@@ -1900,7 +1033,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         return source
     }
 
-    private func blendBlurredPixels(
+    func blendBlurredPixels(
         original: [UInt8],
         blurred: [UInt8],
         width: Int,
@@ -1968,7 +1101,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         return output
     }
 
-    private func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
+    func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
         let width = Int(bridge.width)
@@ -2115,7 +1248,7 @@ enum TimelapseOperation: Equatable, Sendable {
         case let .clearLayer(index):
             return StoredTimelapseOperation(kind: .clearLayer, layerIndex: index)
         case let .setPaperStyle(style):
-            return StoredTimelapseOperation(kind: .setPaperStyle, paperStyle: StoredAtelierDocument.PaperStyle(
+            return StoredTimelapseOperation(kind: .setPaperStyle, paperStyle: StoredPrimoDocument.PaperStyle(
                 red: Double(style.red),
                 green: Double(style.green),
                 blue: Double(style.blue),
@@ -2131,94 +1264,94 @@ enum TimelapseOperation: Equatable, Sendable {
             guard let layerIndex = stored.layerIndex,
                   let brush = stored.brush?.runtimeSettings,
                   let samples = stored.samples?.map(\.stylusSample)
-            else { throw AtelierDocumentError.invalidDocument }
+            else { throw PrimoDocumentError.invalidDocument }
             self = .stroke(layerIndex: layerIndex, brush: brush, samples: samples)
         case .blurStroke:
             guard let layerIndex = stored.layerIndex,
                   let brush = stored.brush?.runtimeSettings,
                   let samples = stored.samples?.map(\.stylusSample)
-            else { throw AtelierDocumentError.invalidDocument }
+            else { throw PrimoDocumentError.invalidDocument }
             self = .blurStroke(layerIndex: layerIndex, brush: brush, samples: samples)
         case .fill:
             guard let layerIndex = stored.layerIndex,
                   let brush = stored.brush?.runtimeSettings,
                   let sample = stored.sample?.stylusSample
-            else { throw AtelierDocumentError.invalidDocument }
+            else { throw PrimoDocumentError.invalidDocument }
             self = .fill(layerIndex: layerIndex, brush: brush, sample: sample)
         case .undo:
             self = .undo
         case .redo:
             self = .redo
         case .addLayer:
-            guard let name = stored.name else { throw AtelierDocumentError.invalidDocument }
+            guard let name = stored.name else { throw PrimoDocumentError.invalidDocument }
             self = .addLayer(name: name)
         case .duplicateLayer:
-            guard let layerIndex = stored.layerIndex, let name = stored.name else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let name = stored.name else { throw PrimoDocumentError.invalidDocument }
             self = .duplicateLayer(index: layerIndex, name: name)
         case .deleteLayer:
-            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .deleteLayer(index: layerIndex)
         case .moveLayer:
             guard let layerIndex = stored.layerIndex, let destinationIndex = stored.destinationIndex else {
-                throw AtelierDocumentError.invalidDocument
+                throw PrimoDocumentError.invalidDocument
             }
             self = .moveLayer(index: layerIndex, destinationIndex: destinationIndex)
         case .createFolder:
-            guard let folderID = stored.folderID, let name = stored.name else { throw AtelierDocumentError.invalidDocument }
+            guard let folderID = stored.folderID, let name = stored.name else { throw PrimoDocumentError.invalidDocument }
             self = .createFolder(folderID: folderID, name: name, anchorLayerIndex: stored.anchorLayerIndex)
         case .deleteFolder:
-            guard let folderID = stored.folderID else { throw AtelierDocumentError.invalidDocument }
+            guard let folderID = stored.folderID else { throw PrimoDocumentError.invalidDocument }
             self = .deleteFolder(folderID: folderID)
         case .setFolderVisibility:
-            guard let folderID = stored.folderID, let isVisible = stored.isVisible else { throw AtelierDocumentError.invalidDocument }
+            guard let folderID = stored.folderID, let isVisible = stored.isVisible else { throw PrimoDocumentError.invalidDocument }
             self = .setFolderVisibility(folderID: folderID, isVisible: isVisible)
         case .assignLayerToFolder:
-            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .assignLayerToFolder(index: layerIndex, folderID: stored.folderID)
         case .setLayerVisibility:
-            guard let layerIndex = stored.layerIndex, let isVisible = stored.isVisible else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let isVisible = stored.isVisible else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerVisibility(index: layerIndex, isVisible: isVisible)
         case .setLayerLocked:
-            guard let layerIndex = stored.layerIndex, let isLocked = stored.isLocked else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let isLocked = stored.isLocked else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerLocked(index: layerIndex, isLocked: isLocked)
         case .setLayerAlphaLocked:
-            guard let layerIndex = stored.layerIndex, let isAlphaLocked = stored.isAlphaLocked else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let isAlphaLocked = stored.isAlphaLocked else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerAlphaLocked(index: layerIndex, isAlphaLocked: isAlphaLocked)
         case .setLayerClipped:
-            guard let layerIndex = stored.layerIndex, let isClipped = stored.isClipped else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let isClipped = stored.isClipped else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerClipped(index: layerIndex, isClipped: isClipped)
         case .setLayerOpacity:
-            guard let layerIndex = stored.layerIndex, let opacity = stored.opacity else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex, let opacity = stored.opacity else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerOpacity(index: layerIndex, opacity: opacity)
         case .setLayerBlendMode:
             guard let layerIndex = stored.layerIndex,
                   let blendModeRaw = stored.blendMode,
                   let blendMode = LayerBlendMode(rawValue: blendModeRaw)
-            else { throw AtelierDocumentError.invalidDocument }
+            else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerBlendMode(index: layerIndex, blendMode: blendMode)
         case .replaceLayerPixels:
             guard let layerIndex = stored.layerIndex, let dataFilename = stored.dataFilename else {
-                throw AtelierDocumentError.invalidDocument
+                throw PrimoDocumentError.invalidDocument
             }
             let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerPixels(index: layerIndex, data: data)
         case .replaceLayerMask:
             guard let layerIndex = stored.layerIndex, let dataFilename = stored.dataFilename else {
-                throw AtelierDocumentError.invalidDocument
+                throw PrimoDocumentError.invalidDocument
             }
             let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerMask(index: layerIndex, data: data)
         case .clearLayerMask:
-            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex: Int = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .clearLayerMask(index: layerIndex)
         case .applyLayerMask:
-            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .applyLayerMask(index: layerIndex)
         case .clearLayer:
-            guard let layerIndex = stored.layerIndex else { throw AtelierDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .clearLayer(index: layerIndex)
         case .setPaperStyle:
-            guard let paperStyle = stored.paperStyle else { throw AtelierDocumentError.invalidDocument }
+            guard let paperStyle = stored.paperStyle else { throw PrimoDocumentError.invalidDocument }
             self = .setPaperStyle(
                 CanvasPaperStyle(
                     red: Float(paperStyle.red),
@@ -2232,7 +1365,7 @@ enum TimelapseOperation: Equatable, Sendable {
     }
 }
 
-struct StoredAtelierDocument: Codable {
+struct StoredPrimoDocument: Codable {
     struct PaperStyle: Codable, Equatable, Sendable {
         let red: Double
         let green: Double
@@ -2707,7 +1840,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     var samples: [StoredStylusSample]?
     var sample: StoredStylusSample?
     var dataFilename: String?
-    var paperStyle: StoredAtelierDocument.PaperStyle?
+    var paperStyle: StoredPrimoDocument.PaperStyle?
 
     init(
         kind: Kind,
@@ -2726,7 +1859,7 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         samples: [StoredStylusSample]? = nil,
         sample: StoredStylusSample? = nil,
         dataFilename: String? = nil,
-        paperStyle: StoredAtelierDocument.PaperStyle? = nil
+        paperStyle: StoredPrimoDocument.PaperStyle? = nil
     ) {
         self.kind = kind
         self.layerIndex = layerIndex
@@ -2748,10 +1881,10 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     }
 }
 
-private enum AtelierDocumentError: LocalizedError {
+enum PrimoDocumentError: LocalizedError {
     case invalidDocument
 
     var errorDescription: String? {
-        "The selected atelier document is invalid."
+        "The selected Primo document is invalid."
     }
 }
