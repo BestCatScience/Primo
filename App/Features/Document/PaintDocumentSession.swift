@@ -47,6 +47,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     var uuidClient: UUIDClient { services.ids }
     var persistenceService: PaintDocumentPersistenceService { services.persistence }
     var timelapseService: PaintDocumentTimelapseService { services.timelapse }
+    var editingLifecycleService: PaintDocumentEditingLifecycleService { services.editingLifecycle }
     var timelapseDirectoryURL: URL { state.timelapseDirectoryURL }
     var timelapseFrames: [TimelapseFrame] {
         get { state.timelapseFrames }
@@ -107,6 +108,23 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var blurStrokeHasCapturedHistory: Bool {
         get { state.blurStrokeHasCapturedHistory }
         set { state.blurStrokeHasCapturedHistory = newValue }
+    }
+
+    func applyLifecycleMutation(_ mutation: PaintDocumentLifecycleMutation) {
+        switch mutation.thumbnailInvalidation {
+        case .none:
+            break
+        case let .layer(index):
+            invalidateThumbnailCache(for: index)
+        case .all:
+            invalidateThumbnailCache()
+        }
+        if !mutation.timelapseEvents.isEmpty {
+            timelapseEvents.append(contentsOf: mutation.timelapseEvents)
+        }
+        if mutation.shouldCaptureTimelapseFrame {
+            captureTimelapseFrame()
+        }
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {
@@ -190,31 +208,46 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     func endStroke() {
-        if let layerIndex = activeStrokeLayerIndex,
-           let brush = activeStrokeBrush,
-           !activeStrokeSamples.isEmpty {
-            timelapseEvents.append(
-                .stroke(
-                    layerIndex: layerIndex,
-                    brush: brush,
-                    samples: activeStrokeSamples
-                )
+        let activeLayerIndex = Int(bridge.activeLayerIndex)
+        let recordedEvent: TimelapseOperation? = if let layerIndex = activeStrokeLayerIndex,
+                                                   let brush = activeStrokeBrush,
+                                                   !activeStrokeSamples.isEmpty {
+            TimelapseOperation.stroke(
+                layerIndex: layerIndex,
+                brush: brush,
+                samples: activeStrokeSamples
             )
+        } else {
+            nil
         }
         bridge.endStroke()
-        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
-        activeStrokeLayerIndex = nil
-        activeStrokeBrush = nil
-        activeStrokeSamples.removeAll(keepingCapacity: true)
-        captureTimelapseFrame()
+        editingLifecycleService.resetStrokeState(
+            activeLayerIndex: &activeStrokeLayerIndex,
+            activeBrush: &activeStrokeBrush,
+            activeSamples: &activeStrokeSamples
+        )
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: recordedEvent.map { [$0] } ?? [],
+                invalidating: .layer(activeLayerIndex)
+            )
+        )
     }
 
     func cancelStroke() {
+        let activeLayerIndex = Int(bridge.activeLayerIndex)
         bridge.cancelStroke()
-        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
-        activeStrokeLayerIndex = nil
-        activeStrokeBrush = nil
-        activeStrokeSamples.removeAll(keepingCapacity: true)
+        editingLifecycleService.resetStrokeState(
+            activeLayerIndex: &activeStrokeLayerIndex,
+            activeBrush: &activeStrokeBrush,
+            activeSamples: &activeStrokeSamples
+        )
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                invalidating: .layer(activeLayerIndex),
+                captureFrame: false
+            )
+        )
     }
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
@@ -225,15 +258,16 @@ final class PaintDocumentSession: @unchecked Sendable {
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
         )
-        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
-        timelapseEvents.append(
-            .fill(
-                layerIndex: layerIndex,
-                brush: brush,
-                sample: sample
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .fill(
+                    layerIndex: layerIndex,
+                    brush: brush,
+                    sample: sample
+                ),
+                invalidating: .layer(Int(bridge.activeLayerIndex))
             )
         )
-        captureTimelapseFrame()
     }
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) {
@@ -249,29 +283,35 @@ final class PaintDocumentSession: @unchecked Sendable {
         activeBlurStrokeSamples.append(contentsOf: samples)
         applyBlurStroke(samples: samples, brush: brush, layerIndex: layerIndex, transient: blurStrokeHasCapturedHistory)
         blurStrokeHasCapturedHistory = true
-        invalidateThumbnailCache(for: layerIndex)
-        if captureTimelapse {
-            captureTimelapseFrame()
-        }
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                invalidating: .layer(layerIndex),
+                captureFrame: captureTimelapse
+            )
+        )
     }
 
     func endBlurStroke() {
-        if let layerIndex = activeBlurStrokeLayerIndex,
-           let brush = activeBlurStrokeBrush,
-           !activeBlurStrokeSamples.isEmpty {
-            timelapseEvents.append(
-                .blurStroke(
-                    layerIndex: layerIndex,
-                    brush: brush,
-                    samples: activeBlurStrokeSamples
-                )
+        let recordedEvent: TimelapseOperation? = if let layerIndex = activeBlurStrokeLayerIndex,
+                                                   let brush = activeBlurStrokeBrush,
+                                                   !activeBlurStrokeSamples.isEmpty {
+            TimelapseOperation.blurStroke(
+                layerIndex: layerIndex,
+                brush: brush,
+                samples: activeBlurStrokeSamples
             )
+        } else {
+            nil
         }
-        activeBlurStrokeLayerIndex = nil
-        activeBlurStrokeBrush = nil
-        activeBlurStrokeSamples.removeAll(keepingCapacity: true)
-        blurStrokeHasCapturedHistory = false
-        captureTimelapseFrame()
+        editingLifecycleService.resetBlurStrokeState(
+            activeLayerIndex: &activeBlurStrokeLayerIndex,
+            activeBrush: &activeBlurStrokeBrush,
+            activeSamples: &activeBlurStrokeSamples,
+            blurStrokeHasCapturedHistory: &blurStrokeHasCapturedHistory
+        )
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(recording: recordedEvent.map { [$0] } ?? [])
+        )
     }
 
     func canUndo() -> Bool {
@@ -286,9 +326,9 @@ final class PaintDocumentSession: @unchecked Sendable {
     func undo() -> Bool {
         let didUndo = bridge.undo()
         if didUndo {
-            invalidateThumbnailCache()
-            timelapseEvents.append(.undo)
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(recording: .undo, invalidating: .all)
+            )
         }
         return didUndo
     }
@@ -297,18 +337,21 @@ final class PaintDocumentSession: @unchecked Sendable {
     func redo() -> Bool {
         let didRedo = bridge.redo()
         if didRedo {
-            invalidateThumbnailCache()
-            timelapseEvents.append(.redo)
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(recording: .redo, invalidating: .all)
+            )
         }
         return didRedo
     }
 
     func addLayer(name: String) {
         bridge.activeLayerIndex = bridge.addLayer(name: name)
-        invalidateThumbnailCache(for: Int(bridge.activeLayerIndex))
-        timelapseEvents.append(.addLayer(name: name))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .addLayer(name: name),
+                invalidating: .layer(Int(bridge.activeLayerIndex))
+            )
+        )
     }
 
     @discardableResult
@@ -320,9 +363,12 @@ final class PaintDocumentSession: @unchecked Sendable {
             } else {
                 textLayers = remappedTextLayersForInsertion(at: duplicatedIndex)
             }
-            invalidateThumbnailCache()
-            timelapseEvents.append(.duplicateLayer(index: index, name: name))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .duplicateLayer(index: index, name: name),
+                    invalidating: .all
+                )
+            )
         }
         return duplicatedIndex
     }
@@ -332,9 +378,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         let didDelete = bridge.deleteLayer(at: index)
         if didDelete {
             textLayers = remappedTextLayersForDeletion(of: index)
-            invalidateThumbnailCache()
-            timelapseEvents.append(.deleteLayer(index: index))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .deleteLayer(index: index),
+                    invalidating: .all
+                )
+            )
         }
         return didDelete
     }
@@ -344,9 +393,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         let didMove = bridge.moveLayer(at: index, to: destinationIndex)
         if didMove {
             textLayers = remappedTextLayersForMove(from: index, to: destinationIndex)
-            invalidateThumbnailCache()
-            timelapseEvents.append(.moveLayer(index: index, destinationIndex: destinationIndex))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .moveLayer(index: index, destinationIndex: destinationIndex),
+                    invalidating: .all
+                )
+            )
         }
         return didMove
     }
@@ -354,7 +406,16 @@ final class PaintDocumentSession: @unchecked Sendable {
     @discardableResult
     func createFolder(name: String, layerIndex: Int) -> Int {
         let folderID = Int(bridge.createFolder(name: name, layerIndex: layerIndex))
-        timelapseEvents.append(.createFolder(folderID: folderID, name: name, anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil))
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .createFolder(
+                    folderID: folderID,
+                    name: name,
+                    anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil
+                ),
+                captureFrame: false
+            )
+        )
         return folderID
     }
 
@@ -362,16 +423,20 @@ final class PaintDocumentSession: @unchecked Sendable {
     func deleteFolder(folderID: Int) -> Bool {
         let didDelete = bridge.deleteFolder(id: folderID)
         if didDelete {
-            timelapseEvents.append(.deleteFolder(folderID: folderID))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(recording: .deleteFolder(folderID: folderID))
+            )
         }
         return didDelete
     }
 
     func setFolderVisibility(folderID: Int, isVisible: Bool) {
         bridge.setFolderVisible(isVisible, folderID: folderID)
-        timelapseEvents.append(.setFolderVisibility(folderID: folderID, isVisible: isVisible))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setFolderVisibility(folderID: folderID, isVisible: isVisible)
+            )
+        )
     }
 
     func setFolderName(folderID: Int, name: String) {
@@ -386,8 +451,11 @@ final class PaintDocumentSession: @unchecked Sendable {
     func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
         let didAssign = bridge.setLayerFolder(at: index, folderID: folderID)
         if didAssign {
-            timelapseEvents.append(.assignLayerToFolder(index: index, folderID: folderID >= 0 ? folderID : nil))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .assignLayerToFolder(index: index, folderID: folderID >= 0 ? folderID : nil)
+                )
+            )
         }
         return didAssign
     }
@@ -402,27 +470,39 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func setLayerVisibility(index: Int, isVisible: Bool) {
         bridge.setLayerVisible(isVisible, at: index)
-        timelapseEvents.append(.setLayerVisibility(index: index, isVisible: isVisible))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerVisibility(index: index, isVisible: isVisible)
+            )
+        )
     }
 
     func setLayerLocked(index: Int, isLocked: Bool) {
         bridge.setLayerLocked(isLocked, at: index)
-        timelapseEvents.append(.setLayerLocked(index: index, isLocked: isLocked))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerLocked(index: index, isLocked: isLocked)
+            )
+        )
     }
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) {
         bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
-        timelapseEvents.append(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
+            )
+        )
     }
 
     func setLayerClipped(index: Int, isClipped: Bool) {
         bridge.setLayerClipped(isClipped, at: index)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.setLayerClipped(index: index, isClipped: isClipped))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerClipped(index: index, isClipped: isClipped),
+                invalidating: .layer(index)
+            )
+        )
     }
 
     func revealLayerForEditing(index: Int) {
@@ -431,16 +511,22 @@ final class PaintDocumentSession: @unchecked Sendable {
 
     func setLayerOpacity(index: Int, opacity: Double) {
         bridge.setLayerOpacity(CGFloat(opacity), at: index)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.setLayerOpacity(index: index, opacity: opacity))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerOpacity(index: index, opacity: opacity),
+                invalidating: .layer(index)
+            )
+        )
     }
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) {
         bridge.setLayerBlendMode(blendMode.rawValue, at: index)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.setLayerBlendMode(index: index, blendMode: blendMode))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setLayerBlendMode(index: index, blendMode: blendMode),
+                invalidating: .layer(index)
+            )
+        )
     }
 
     @discardableResult
@@ -463,10 +549,13 @@ final class PaintDocumentSession: @unchecked Sendable {
         let descriptor = makeProcessingDescriptor(from: request)
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
         if didApply {
-            invalidateThumbnailCache(for: index)
             let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            timelapseEvents.append(.replaceLayerPixels(index: index, data: pixelData))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .replaceLayerPixels(index: index, data: pixelData),
+                    invalidating: .layer(index)
+                )
+            )
         }
         return didApply
     }
@@ -555,9 +644,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         if !didApply {
             bridge.replaceLayerPixelsTransient(at: index, data: adjustedData)
         }
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.replaceLayerPixels(index: index, data: adjustedData))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .replaceLayerPixels(index: index, data: adjustedData),
+                invalidating: .layer(index)
+            )
+        )
     }
 
     @discardableResult
@@ -566,9 +658,12 @@ final class PaintDocumentSession: @unchecked Sendable {
             return false
         }
         bridge.replaceLayerMask(at: index, data: maskData)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.replaceLayerMask(index: index, data: maskData))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .replaceLayerMask(index: index, data: maskData),
+                invalidating: .layer(index)
+            )
+        )
         return true
     }
 
@@ -578,9 +673,12 @@ final class PaintDocumentSession: @unchecked Sendable {
             return false
         }
         bridge.clearLayerMask(at: index)
-        invalidateThumbnailCache(for: index)
-        timelapseEvents.append(.clearLayerMask(index: index))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .clearLayerMask(index: index),
+                invalidating: .layer(index)
+            )
+        )
         return true
     }
 
@@ -589,11 +687,16 @@ final class PaintDocumentSession: @unchecked Sendable {
         guard bridge.applyLayerMask(at: index) else {
             return false
         }
-        invalidateThumbnailCache(for: index)
         let pixelData = bridge.pixelDataForLayer(at: index) as Data
-        timelapseEvents.append(.applyLayerMask(index: index))
-        timelapseEvents.append(.replaceLayerPixels(index: index, data: pixelData))
-        captureTimelapseFrame()
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: [
+                    .applyLayerMask(index: index),
+                    .replaceLayerPixels(index: index, data: pixelData)
+                ],
+                invalidating: .layer(index)
+            )
+        )
         return true
     }
 
@@ -604,9 +707,12 @@ final class PaintDocumentSession: @unchecked Sendable {
         descriptor.kind = APPaintLayerProcessingKind.clear
         let didApply = bridge.applyLayerProcessing(at: index, descriptor: descriptor)
         if didApply {
-            invalidateThumbnailCache(for: index)
-            timelapseEvents.append(.clearLayer(index: index))
-            captureTimelapseFrame()
+            applyLifecycleMutation(
+                editingLifecycleService.mutation(
+                    recording: .clearLayer(index: index),
+                    invalidating: .layer(index)
+                )
+            )
         }
     }
 
@@ -707,16 +813,17 @@ final class PaintDocumentSession: @unchecked Sendable {
             bridge.replaceLayerPixels(at: index, data: rasterized)
         }
         bridge.activeLayerIndex = activeLayerIndex
-        activeStrokeLayerIndex = nil
-        activeStrokeBrush = nil
-        activeStrokeSamples.removeAll(keepingCapacity: true)
-        activeBlurStrokeLayerIndex = nil
-        activeBlurStrokeBrush = nil
-        activeBlurStrokeSamples.removeAll(keepingCapacity: true)
-        blurStrokeHasCapturedHistory = false
+        editingLifecycleService.resetActiveEditingState(
+            activeStrokeLayerIndex: &activeStrokeLayerIndex,
+            activeStrokeBrush: &activeStrokeBrush,
+            activeStrokeSamples: &activeStrokeSamples,
+            activeBlurStrokeLayerIndex: &activeBlurStrokeLayerIndex,
+            activeBlurStrokeBrush: &activeBlurStrokeBrush,
+            activeBlurStrokeSamples: &activeBlurStrokeSamples,
+            blurStrokeHasCapturedHistory: &blurStrokeHasCapturedHistory
+        )
         resetTimelapseHistory()
-        invalidateThumbnailCache()
-        captureTimelapseFrame()
+        applyLifecycleMutation(editingLifecycleService.mutation(invalidating: .all))
     }
 
     func resizeCanvasExtent(width: Int, height: Int) {
@@ -819,16 +926,17 @@ final class PaintDocumentSession: @unchecked Sendable {
             bridge.replaceLayerPixels(at: index, data: rasterized)
         }
         bridge.activeLayerIndex = activeLayerIndex
-        activeStrokeLayerIndex = nil
-        activeStrokeBrush = nil
-        activeStrokeSamples.removeAll(keepingCapacity: true)
-        activeBlurStrokeLayerIndex = nil
-        activeBlurStrokeBrush = nil
-        activeBlurStrokeSamples.removeAll(keepingCapacity: true)
-        blurStrokeHasCapturedHistory = false
+        editingLifecycleService.resetActiveEditingState(
+            activeStrokeLayerIndex: &activeStrokeLayerIndex,
+            activeStrokeBrush: &activeStrokeBrush,
+            activeStrokeSamples: &activeStrokeSamples,
+            activeBlurStrokeLayerIndex: &activeBlurStrokeLayerIndex,
+            activeBlurStrokeBrush: &activeBlurStrokeBrush,
+            activeBlurStrokeSamples: &activeBlurStrokeSamples,
+            blurStrokeHasCapturedHistory: &blurStrokeHasCapturedHistory
+        )
         resetTimelapseHistory()
-        invalidateThumbnailCache()
-        captureTimelapseFrame()
+        applyLifecycleMutation(editingLifecycleService.mutation(invalidating: .all))
     }
 
     private func buildLayerRows(from infos: [APPaintLayerInfo]) -> [LayerRowModel] {

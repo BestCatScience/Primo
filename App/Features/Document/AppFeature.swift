@@ -1367,50 +1367,19 @@ struct AppFeature {
                 return .none
 
             case let .toolSelected(tool):
-                state.syncToolSpecificBrushSize()
-                state.canvas.currentTool = tool
-                state.applyToolSpecificBrushSize(for: tool)
-                state.canvas.selectionMode = state.brushPalette.selection.toolMode
-                state.canvas.shapeMode = state.brushPalette.shape.mode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                if tool != .select {
-                    if tool != .move {
-                        state.canvas.selection = nil
-                    }
-                }
-                if tool == .text {
-                    state.brushPanel.isCollapsed = false
-                    if state.brushPalette.text.position == nil {
-                        state.brushPalette.text.position = CGPoint(
-                            x: state.canvas.canvasSize.width * 0.12,
-                            y: state.canvas.canvasSize.height * 0.12
-                        )
-                    }
-                    state.syncTextEditorWithActiveLayer()
-                }
-                state.canvas.previewStyle = state.previewStrokeStyle()
+                handleToolSelection(
+                    state: &state,
+                    tool: tool,
+                    showsBrushSettingsPopover: false
+                )
                 return .none
 
             case let .toolLongPressed(tool):
-                state.syncToolSpecificBrushSize()
-                state.canvas.currentTool = tool
-                state.applyToolSpecificBrushSize(for: tool)
-                state.canvas.selectionMode = state.brushPalette.selection.toolMode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                if tool != .select {
-                    if tool != .move {
-                        state.canvas.selection = nil
-                    }
-                }
-                if tool == .brush || tool == .erase {
-                    state.brushPanel.isCollapsed = false
-                    state.brushPalette.ui.showsBrushSettingsPopover = true
-                }
-                state.canvas.previewStyle = state.previewStrokeStyle()
+                handleToolSelection(
+                    state: &state,
+                    tool: tool,
+                    showsBrushSettingsPopover: tool == .brush || tool == .erase
+                )
                 return .none
 
             case let .panelCollapseToggled(panel):
@@ -1418,72 +1387,27 @@ struct AppFeature {
                 return .none
 
             case .brushPalette(.delegate(.clearSelection)):
-                state.canvas.selection = nil
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
+                handleClearSelection(state: &state)
                 return .none
 
             case .brushPalette(.delegate(.invertSelection)):
-                state.canvas.selection = Self.invertedSelection(
-                    state.canvas.selection,
-                    canvasSize: state.canvas.canvasSize,
-                    mode: state.canvas.selectionMode
-                )
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
+                handleInvertSelection(state: &state)
                 return .none
 
             case let .brushPalette(.delegate(.expandSelection(expansion))):
-                guard state.canvas.selection != nil else { return .none }
-                state.canvas.selection = Self.adjustedSelection(
-                    state.canvas.selection,
-                    canvasSize: state.canvas.canvasSize,
-                    expansion: max(expansion, 1),
-                    isInverted: false
-                )
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
+                handleAdjustSelection(state: &state, expansion: max(expansion, 1))
                 return .none
 
             case let .brushPalette(.delegate(.contractSelection(contraction))):
-                guard state.canvas.selection != nil else { return .none }
-                state.canvas.selection = Self.adjustedSelection(
-                    state.canvas.selection,
-                    canvasSize: state.canvas.canvasSize,
-                    expansion: -max(contraction, 1),
-                    isInverted: false
-                )
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
+                handleAdjustSelection(state: &state, expansion: -max(contraction, 1))
                 return .none
 
             case let .featherSelectionRequested(radius):
-                guard state.canvas.selection != nil else { return .none }
-                state.canvas.selection = Self.featheredSelection(
-                    state.canvas.selection,
-                    canvasSize: state.canvas.canvasSize,
-                    radius: max(radius, 1)
-                )
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
+                handleFeatherSelection(state: &state, radius: max(radius, 1))
                 return .none
 
             case let .colorRangeSelectionRequested(request):
-                let incomingSelection = Self.makeColorRangeSelection(
-                    request: request,
-                    snapshot: state.canvas.renderSnapshot,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    mode: state.canvas.selectionMode
-                )
-                let selection = Self.combinedSelection(
-                    existing: state.canvas.selection,
-                    incoming: incomingSelection,
-                    mode: state.brushPalette.selection.combineMode,
-                    canvasSize: state.canvas.canvasSize
-                )
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                return .send(.canvas(.selectionUpdated(selection)))
+                return handleColorRangeSelectionRequest(state: &state, request: request)
 
             case .brushPalette(.delegate(.cancelTransform)):
                 state.canvas.resetTransformPreview()
@@ -1500,8 +1424,7 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.delegate(.placeText(point))):
-                state.brushPalette.text.position = point
-                state.brushPanel.isCollapsed = false
+                handlePlaceText(state: &state, point: point)
                 return .none
 
             case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
@@ -1533,27 +1456,17 @@ struct AppFeature {
                 return .none
 
             case .brushPalette:
-                state.syncToolSpecificBrushSize()
-                state.canvas.selectionMode = state.brushPalette.selection.toolMode
-                state.canvas.shapeMode = state.brushPalette.shape.mode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-                state.canvas.previewStyle = state.previewStrokeStyle()
-                state.canvas.paperStyle = state.resolvedPaperStyle()
-                state.layerSidebar.paperColor = state.brushPalette.paper.color
-                state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                handleBrushPaletteStateRefresh(state: &state)
                 return .none
 
             case .layerSidebar(.binding(\.paperColor)):
                 state.brushPalette.paper.color = state.layerSidebar.paperColor
-                state.canvas.paperStyle = state.resolvedPaperStyle()
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                handlePaperBindingSync(state: &state)
                 return .none
 
             case .layerSidebar(.binding(\.transparentPaper)):
                 state.brushPalette.paper.isTransparent = state.layerSidebar.transparentPaper
-                state.canvas.paperStyle = state.resolvedPaperStyle()
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+                handlePaperBindingSync(state: &state)
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
@@ -1774,18 +1687,7 @@ struct AppFeature {
                 return .send(.redoRequested)
 
             case .canvas(.delegate(.toggleBrushAndEraser)):
-                state.syncToolSpecificBrushSize()
-                let nextTool: StudioToolKind = state.canvas.currentTool == .erase ? .brush : .erase
-                state.canvas.currentTool = nextTool
-                state.applyToolSpecificBrushSize(for: nextTool)
-                state.canvas.selectionMode = state.brushPalette.selection.toolMode
-                state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                if nextTool != .select && nextTool != .move {
-                    state.canvas.selection = nil
-                }
-                state.canvas.previewStyle = state.previewStrokeStyle()
+                handleToggleBrushAndEraser(state: &state)
                 return .none
 
             case let .canvas(.colorSampled(sampledColor)):

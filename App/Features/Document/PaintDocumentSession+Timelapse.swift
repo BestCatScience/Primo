@@ -6,7 +6,12 @@ extension PaintDocumentSession {
     func setPaperStyle(_ style: CanvasPaperStyle) {
         guard paperStyle != style else { return }
         paperStyle = style
-        timelapseEvents.append(.setPaperStyle(style))
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: .setPaperStyle(style),
+                captureFrame: false
+            )
+        )
     }
 
     func timelapseCapture() -> TimelapseCapture? {
