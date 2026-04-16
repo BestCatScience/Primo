@@ -168,10 +168,10 @@ extension PaintDocumentSession {
 
     func appendTimelapseFrame(image: UIImage) {
         guard let jpegData = image.jpegData(compressionQuality: 0.72) else { return }
-        let frameURL = timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", nextTimelapseFrameID))
+        let frameURL = timelapseService.makeFrameURL(in: timelapseDirectoryURL, frameID: nextTimelapseFrameID)
         nextTimelapseFrameID += 1
         do {
-            try fileClient.writeData(jpegData, frameURL, .atomic)
+            try timelapseService.persistFrameData(jpegData, to: frameURL)
         } catch {
             Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
             return
@@ -181,7 +181,7 @@ extension PaintDocumentSession {
         timelapseFrames.append(frame)
         if timelapseFrames.count > Self.maxTimelapseFrames {
             let removed = timelapseFrames.remove(at: 1)
-            try? fileClient.removeItem(removed.imageURL)
+            try? timelapseService.removeFrame(at: removed.imageURL)
         }
     }
 
@@ -248,7 +248,7 @@ extension PaintDocumentSession {
 
     func resetTimelapseHistory() {
         for frame in timelapseFrames {
-            try? fileClient.removeItem(frame.imageURL)
+            try? timelapseService.removeFrame(at: frame.imageURL)
         }
         timelapseFrames.removeAll(keepingCapacity: false)
         timelapseEvents.removeAll(keepingCapacity: false)

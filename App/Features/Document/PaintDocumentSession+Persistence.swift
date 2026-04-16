@@ -9,20 +9,14 @@ extension PaintDocumentSession {
     }
 
     func saveProject(to url: URL) throws {
-        if fileClient.fileExists(url.path) {
-            try fileClient.removeItem(url)
-        }
-        try fileClient.createDirectory(url, true)
-
-        let layersDirectory = url.appendingPathComponent("Layers", isDirectory: true)
-        let timelapseDirectory = url.appendingPathComponent("Timelapse", isDirectory: true)
-        let timelapseDataDirectory = url.appendingPathComponent("TimelapseData", isDirectory: true)
-        try fileClient.createDirectory(layersDirectory, true)
-        if !usesOperationTimelapsePersistence {
-            try fileClient.createDirectory(timelapseDirectory, true)
-        } else {
-            try fileClient.createDirectory(timelapseDataDirectory, true)
-        }
+        try persistenceService.prepareProjectDirectory(at: url)
+        let directories = try persistenceService.createProjectSubdirectories(
+            in: url,
+            usesOperationTimelapsePersistence: usesOperationTimelapsePersistence
+        )
+        let layersDirectory = directories.layersDirectory
+        let timelapseDirectory = directories.timelapseDirectory
+        let timelapseDataDirectory = directories.timelapseDataDirectory
 
         let layerInfos = bridge.layerInfos()
         let folderInfos = bridge.folderInfos()
@@ -31,15 +25,11 @@ extension PaintDocumentSession {
             let filename = String(format: "layer-%04d.rgba", index)
             let pixelURL = layersDirectory.appendingPathComponent(filename, isDirectory: false)
             let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            try fileClient.writeData(pixelData, pixelURL, Data.WritingOptions.atomic)
+            try persistenceService.writeAtomic(pixelData, to: pixelURL)
             let maskFilename: String?
             if let maskData = bridge.layerMaskDataForLayer(at: index) {
                 let filename = String(format: "layer-mask-%04d.mask", index)
-                try fileClient.writeData(
-                    maskData,
-                    layersDirectory.appendingPathComponent(filename, isDirectory: false),
-                    Data.WritingOptions.atomic
-                )
+                try persistenceService.writeAtomic(maskData, to: layersDirectory.appendingPathComponent(filename, isDirectory: false))
                 maskFilename = "Layers/\(filename)"
             } else {
                 maskFilename = nil
@@ -75,10 +65,7 @@ extension PaintDocumentSession {
             storedTimelapseFrames = try timelapseFrames.enumerated().map { index, frame in
                 let filename = String(format: "frame-%06d.jpg", index)
                 let destinationURL = timelapseDirectory.appendingPathComponent(filename, isDirectory: false)
-                if fileClient.fileExists(destinationURL.path) {
-                    try fileClient.removeItem(destinationURL)
-                }
-                try fileClient.copyItem(frame.imageURL, destinationURL)
+                try persistenceService.replaceItemIfNeeded(at: destinationURL, with: frame.imageURL)
                 return StoredPrimoDocument.TimelapseFrame(
                     filename: "Timelapse/\(filename)",
                     width: Double(frame.size.width),
@@ -116,11 +103,7 @@ extension PaintDocumentSession {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let manifestData = try encoder.encode(document)
-        try fileClient.writeData(
-            manifestData,
-            url.appendingPathComponent("manifest.json"),
-            Data.WritingOptions.atomic
-        )
+        try persistenceService.writeAtomic(manifestData, to: url.appendingPathComponent("manifest.json"))
     }
 
     static func loadProject(
@@ -129,8 +112,13 @@ extension PaintDocumentSession {
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live
     ) throws -> PaintDocumentSession {
+        let services = PaintDocumentSessionServices(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
-        let data = try fileClient.readData(manifestURL)
+        let data = try services.persistence.loadData(from: manifestURL)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: data)
         guard !document.layers.isEmpty else {
             throw PrimoDocumentError.invalidDocument
@@ -157,10 +145,10 @@ extension PaintDocumentSession {
 
         for layer in document.layers.sorted(by: { $0.index < $1.index }) {
             let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
-            let pixelData = try fileClient.readData(pixelURL)
+            let pixelData = try services.persistence.loadData(from: pixelURL)
             session.bridge.replaceLayerPixelsTransient(at: layer.index, data: pixelData)
             if let maskFilename = layer.maskFilename {
-                let maskData = try fileClient.readData(url.appendingPathComponent(maskFilename, isDirectory: false))
+                let maskData = try services.persistence.loadData(from: url.appendingPathComponent(maskFilename, isDirectory: false))
                 session.bridge.replaceLayerMask(at: layer.index, data: maskData)
             } else {
                 session.bridge.clearLayerMask(at: layer.index)
@@ -203,11 +191,8 @@ extension PaintDocumentSession {
             session.usesOperationTimelapsePersistence = false
             for (index, storedFrame) in document.timelapseFrames.enumerated() {
                 let sourceURL = url.appendingPathComponent(storedFrame.filename, isDirectory: false)
-                let destinationURL = session.timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", index), isDirectory: false)
-                if fileClient.fileExists(destinationURL.path) {
-                    try fileClient.removeItem(destinationURL)
-                }
-                try fileClient.copyItem(sourceURL, destinationURL)
+                let destinationURL = session.timelapseService.makeFrameURL(in: session.timelapseDirectoryURL, frameID: index)
+                try services.persistence.replaceItemIfNeeded(at: destinationURL, with: sourceURL)
                 session.timelapseFrames.append(
                     TimelapseFrame(
                         imageURL: destinationURL,

@@ -8,26 +8,9 @@ import simd
 final class PaintDocumentSession: @unchecked Sendable {
     static let logger = Logger(subsystem: "com.primo.app", category: "Document")
     static let maxTimelapseFrames = 20_000
-    let fileClient: FileClient
-    let dateClient: DateClient
-    let uuidClient: UUIDClient
+    private let services: PaintDocumentSessionServices
+    private var state: PaintDocumentSessionState
     var bridge: APPaintDocumentBridge
-    private var revision: Int = 0
-    private var activeStrokeLayerIndex: Int?
-    private var activeStrokeBrush: BrushRuntimeSettings?
-    private var activeStrokeSamples: [StylusSample] = []
-    var timelapseFrames: [TimelapseFrame] = []
-    var timelapseEvents: [TimelapseOperation] = []
-    var layerThumbnailCache: [Int: Data] = [:]
-    var paperStyle: CanvasPaperStyle = .default
-    let timelapseDirectoryURL: URL
-    var nextTimelapseFrameID: Int = 0
-    var usesOperationTimelapsePersistence = true
-    private var activeBlurStrokeLayerIndex: Int?
-    private var activeBlurStrokeBrush: BrushRuntimeSettings?
-    private var activeBlurStrokeSamples: [StylusSample] = []
-    private var blurStrokeHasCapturedHistory = false
-    var textLayers: [Int: TextLayerData] = [:]
 
     init(
         width: Int = 1152,
@@ -38,22 +21,92 @@ final class PaintDocumentSession: @unchecked Sendable {
     ) {
         let clock = ContinuousClock()
         let start = clock.now
-        self.fileClient = fileClient
-        self.dateClient = dateClient
-        self.uuidClient = uuidClient
+        self.services = PaintDocumentSessionServices(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
         self.bridge = APPaintDocumentBridge(width: width, height: height)
-        self.timelapseDirectoryURL = Self.makeTimelapseDirectoryURL(fileClient: fileClient, uuidClient: uuidClient)
-        try? fileClient.createDirectory(timelapseDirectoryURL, true)
+        let timelapseDirectoryURL = services.timelapse.makeDirectoryURL()
+        self.state = PaintDocumentSessionState(timelapseDirectoryURL: timelapseDirectoryURL)
+        try? services.fileIO.createDirectory(timelapseDirectoryURL, true)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
     }
 
     deinit {
-        try? fileClient.removeItem(timelapseDirectoryURL)
+        try? services.timelapse.removeDirectory(at: timelapseDirectoryURL)
     }
 
     var currentPaperStyle: CanvasPaperStyle {
         paperStyle
+    }
+
+    var fileClient: FileClient { services.fileIO }
+    var dateClient: DateClient { services.clock }
+    var uuidClient: UUIDClient { services.ids }
+    var persistenceService: PaintDocumentPersistenceService { services.persistence }
+    var timelapseService: PaintDocumentTimelapseService { services.timelapse }
+    var timelapseDirectoryURL: URL { state.timelapseDirectoryURL }
+    var timelapseFrames: [TimelapseFrame] {
+        get { state.timelapseFrames }
+        set { state.timelapseFrames = newValue }
+    }
+    var timelapseEvents: [TimelapseOperation] {
+        get { state.timelapseEvents }
+        set { state.timelapseEvents = newValue }
+    }
+    var layerThumbnailCache: [Int: Data] {
+        get { state.layerThumbnailCache }
+        set { state.layerThumbnailCache = newValue }
+    }
+    var paperStyle: CanvasPaperStyle {
+        get { state.paperStyle }
+        set { state.paperStyle = newValue }
+    }
+    var nextTimelapseFrameID: Int {
+        get { state.nextTimelapseFrameID }
+        set { state.nextTimelapseFrameID = newValue }
+    }
+    var usesOperationTimelapsePersistence: Bool {
+        get { state.usesOperationTimelapsePersistence }
+        set { state.usesOperationTimelapsePersistence = newValue }
+    }
+    var textLayers: [Int: TextLayerData] {
+        get { state.textLayers }
+        set { state.textLayers = newValue }
+    }
+    private var revision: Int {
+        get { state.revision }
+        set { state.revision = newValue }
+    }
+    private var activeStrokeLayerIndex: Int? {
+        get { state.activeStrokeLayerIndex }
+        set { state.activeStrokeLayerIndex = newValue }
+    }
+    private var activeStrokeBrush: BrushRuntimeSettings? {
+        get { state.activeStrokeBrush }
+        set { state.activeStrokeBrush = newValue }
+    }
+    private var activeStrokeSamples: [StylusSample] {
+        get { state.activeStrokeSamples }
+        set { state.activeStrokeSamples = newValue }
+    }
+    private var activeBlurStrokeLayerIndex: Int? {
+        get { state.activeBlurStrokeLayerIndex }
+        set { state.activeBlurStrokeLayerIndex = newValue }
+    }
+    private var activeBlurStrokeBrush: BrushRuntimeSettings? {
+        get { state.activeBlurStrokeBrush }
+        set { state.activeBlurStrokeBrush = newValue }
+    }
+    private var activeBlurStrokeSamples: [StylusSample] {
+        get { state.activeBlurStrokeSamples }
+        set { state.activeBlurStrokeSamples = newValue }
+    }
+    private var blurStrokeHasCapturedHistory: Bool {
+        get { state.blurStrokeHasCapturedHistory }
+        set { state.blurStrokeHasCapturedHistory = newValue }
     }
 
     func lightweightPresentation() -> PaintDocumentPresentation {

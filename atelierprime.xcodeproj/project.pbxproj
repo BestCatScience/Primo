@@ -64,6 +64,8 @@
 		A000000000000000000000C6 /* PaintDocumentSession+BridgeFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */; };
 		A000000000000000000000C8 /* SystemClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C9 /* SystemClients.swift */; };
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
+		A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CD /* PaintDocumentSessionState.swift */; };
+		A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CF /* PaintDocumentSessionServices.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -128,6 +130,8 @@
 		A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+BridgeFacade.swift"; sourceTree = "<group>"; };
 		A000000000000000000000C9 /* SystemClients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemClients.swift; sourceTree = "<group>"; };
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
+		A000000000000000000000CD /* PaintDocumentSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionState.swift; sourceTree = "<group>"; };
+		A000000000000000000000CF /* PaintDocumentSessionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionServices.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -309,6 +313,8 @@
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
+				A000000000000000000000CD /* PaintDocumentSessionState.swift */,
+				A000000000000000000000CF /* PaintDocumentSessionServices.swift */,
 				A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */,
 				A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */,
 				A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */,
@@ -446,6 +452,8 @@
 				A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
+				A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */,
+				A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */,
 				A000000000000000000000C0 /* PaintDocumentSession+TextLayer.swift in Sources */,
 				A000000000000000000000C2 /* PaintDocumentSession+Persistence.swift in Sources */,
 				A000000000000000000000C4 /* PaintDocumentSession+Timelapse.swift in Sources */,
