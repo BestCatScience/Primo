@@ -66,8 +66,16 @@
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
 		A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CD /* PaintDocumentSessionState.swift */; };
 		A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CF /* PaintDocumentSessionServices.swift */; };
-		A000000000000000000000D0 /* AppFeature+DocumentWorkflowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */; };
 		A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */; };
+		A000000000000000000000D4 /* AppFeatureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D5 /* AppFeatureModels.swift */; };
+		A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */; };
+		A000000000000000000000D8 /* AppFeature+DocumentPersistenceWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */; };
+		A000000000000000000000DA /* AppFeature+WorkspaceTabWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */; };
+		A000000000000000000000DC /* AppFeature+StartupHomeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */; };
+		A000000000000000000000DE /* AppFeature+AdjustmentWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000DF /* AppFeature+AdjustmentWorkflow.swift */; };
+		A000000000000000000000E0 /* AppFeature+LayerEditingWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */; };
+		A000000000000000000000E2 /* AppFeature+CanvasStrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */; };
+		A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -134,8 +142,16 @@
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
 		A000000000000000000000CD /* PaintDocumentSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionState.swift; sourceTree = "<group>"; };
 		A000000000000000000000CF /* PaintDocumentSessionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionServices.swift; sourceTree = "<group>"; };
-		A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentWorkflowCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+NanoBananaGenerationService.swift"; sourceTree = "<group>"; };
+		A000000000000000000000D5 /* AppFeatureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureModels.swift; sourceTree = "<group>"; };
+		A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StateCoordinators.swift"; sourceTree = "<group>"; };
+		A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentPersistenceWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceTabWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StartupHomeWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000DF /* AppFeature+AdjustmentWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+AdjustmentWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerEditingWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasStrokeWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionToolWorkflow.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -311,10 +327,18 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000003 /* AppFeature.swift */,
+				A000000000000000000000D5 /* AppFeatureModels.swift */,
+				A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */,
 				A000000000000000000000A5 /* AppFeature+PureImageOps.swift */,
 				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
 				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
-				A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */,
+				A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */,
+				A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */,
+				A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */,
+				A000000000000000000000DF /* AppFeature+AdjustmentWorkflow.swift */,
+				A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */,
+				A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */,
+				A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */,
 				A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
@@ -422,10 +446,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A000000000000000000000D4 /* AppFeatureModels.swift in Sources */,
+				A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */,
 				A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */,
 				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
 				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
-				A000000000000000000000D0 /* AppFeature+DocumentWorkflowCoordinator.swift in Sources */,
+				A000000000000000000000D8 /* AppFeature+DocumentPersistenceWorkflow.swift in Sources */,
+				A000000000000000000000DA /* AppFeature+WorkspaceTabWorkflow.swift in Sources */,
+				A000000000000000000000DC /* AppFeature+StartupHomeWorkflow.swift in Sources */,
+				A000000000000000000000DE /* AppFeature+AdjustmentWorkflow.swift in Sources */,
+				A000000000000000000000E0 /* AppFeature+LayerEditingWorkflow.swift in Sources */,
+				A000000000000000000000E2 /* AppFeature+CanvasStrokeWorkflow.swift in Sources */,
+				A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */,
 				A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,

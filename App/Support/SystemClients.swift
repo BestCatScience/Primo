@@ -77,3 +77,23 @@ struct HTTPClient: Sendable {
         try await URLSession.shared.data(for: request)
     }
 }
+
+struct AppLanguageClient: Sendable {
+    var load: @Sendable () -> AppLanguage
+    var persist: @Sendable (AppLanguage) -> Void
+
+    static let live = AppLanguageClient(
+        load: {
+            guard
+                let rawValue = UserDefaults.standard.string(forKey: AppLanguage.storageKey),
+                let language = AppLanguage(rawValue: rawValue)
+            else {
+                return .japanese
+            }
+            return language
+        },
+        persist: { language in
+            UserDefaults.standard.set(language.rawValue, forKey: AppLanguage.storageKey)
+        }
+    )
+}

@@ -16,6 +16,10 @@ private enum HTTPClientKey: DependencyKey {
     static let liveValue = HTTPClient.live
 }
 
+private enum AppLanguageClientKey: DependencyKey {
+    static let liveValue = AppLanguageClient.live
+}
+
 extension DependencyValues {
     var dateClient: DateClient {
         get { self[DateClientKey.self] }
@@ -35,5 +39,10 @@ extension DependencyValues {
     var httpClient: HTTPClient {
         get { self[HTTPClientKey.self] }
         set { self[HTTPClientKey.self] = newValue }
+    }
+
+    var appLanguageClient: AppLanguageClient {
+        get { self[AppLanguageClientKey.self] }
+        set { self[AppLanguageClientKey.self] = newValue }
     }
 }
