@@ -57,6 +57,7 @@
 		A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B9 /* NanoBananaCommerce.swift */; };
 		A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */; };
 		A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BD /* AppFeature+SelectionTransform.swift */; };
+		A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BF /* DocumentWorkspaceClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -114,6 +115,7 @@
 		A000000000000000000000B9 /* NanoBananaCommerce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaCommerce.swift; sourceTree = "<group>"; };
 		A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BD /* AppFeature+SelectionTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionTransform.swift"; sourceTree = "<group>"; };
+		A000000000000000000000BF /* DocumentWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkspaceClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -294,6 +296,7 @@
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
+				A000000000000000000000BF /* DocumentWorkspaceClient.swift */,
 				A000000000000000000000B7 /* NanoBananaClient.swift */,
 				A000000000000000000000B9 /* NanoBananaCommerce.swift */,
 				A000000000000000000000A7 /* TimelapseExporter.swift */,
@@ -418,6 +421,7 @@
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
+				A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */,
 				A000000000000000000000B6 /* NanoBananaClient.swift in Sources */,
 				A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
