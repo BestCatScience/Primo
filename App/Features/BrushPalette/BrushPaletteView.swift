@@ -35,6 +35,11 @@ struct BrushPaletteView: View {
     var onSetTransformAspectRatioLock: (Bool) -> Void = { _ in }
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
 
+    private var brushTipLibraryClient: BrushTipLibraryClient {
+        @Dependency(\.brushTipLibraryClient) var brushTipLibraryClient
+        return brushTipLibraryClient
+    }
+
     var body: some View {
         GeometryReader { proxy in
             if rendersFloatingPanelOnly {
@@ -175,7 +180,7 @@ struct BrushPaletteView: View {
             withSecurityScopedAccess(to: url) {
                 if url.pathExtension.lowercased() == "abr" {
                     do {
-                        let brushes = try BrushTipLibrary.importPhotoshopBrushes(from: url).map(\.preset)
+                        let brushes = try brushTipLibraryClient.importPhotoshopBrushes(url).map(\.preset)
                         if brushes.isEmpty {
                             failures.append("\(url.lastPathComponent): \(language.localized("対応している先端が見つかりませんでした。"))")
                         } else {
@@ -189,7 +194,7 @@ struct BrushPaletteView: View {
 
                 let brushName = url.deletingPathExtension().lastPathComponent
                 do {
-                    let tip = try BrushTipLibrary.loadRaster(from: url)
+                    let tip = try brushTipLibraryClient.loadRaster(url)
                     imported.append(BrushPreset.photoshopImported(name: brushName, tip: tip))
                 } catch {
                     failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
@@ -237,7 +242,7 @@ struct BrushPaletteView: View {
 
         withSecurityScopedAccess(to: url) {
             do {
-                resolvedTip = try BrushTipLibrary.loadRaster(from: url)
+                resolvedTip = try brushTipLibraryClient.loadRaster(url)
             } catch {
                 failure = "\(url.lastPathComponent): \(error.localizedDescription)"
             }

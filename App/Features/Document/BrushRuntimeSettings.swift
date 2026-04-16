@@ -69,9 +69,12 @@ struct BrushRuntimeSettings: Equatable, Sendable {
     var blue: UInt8
     var isEraser: Bool = false
 
-    func withCustomTip(from sourceURL: URL) throws -> BrushRuntimeSettings {
+    func withCustomTip(
+        from sourceURL: URL,
+        brushTipLibraryClient: BrushTipLibraryClient = .live(fileClient: .live)
+    ) throws -> BrushRuntimeSettings {
         var copy = self
-        copy.customTip = try BrushTipLibrary.loadRaster(from: sourceURL)
+        copy.customTip = try brushTipLibraryClient.loadRaster(sourceURL)
         return copy
     }
 

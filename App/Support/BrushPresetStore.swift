@@ -1,26 +1,82 @@
+import ComposableArchitecture
 import CryptoKit
 import Foundation
 import SwiftUI
 
-enum BrushPresetStore {
-    static func loadSavedPresets(fileClient: FileClient = .live) -> [BrushPreset] {
+struct BrushPresetLibraryClient: Sendable {
+    var loadSavedPresets: @Sendable () -> [BrushPreset]
+    var savePreset: @Sendable (BrushPreset, Bool) throws -> [BrushPreset]
+    var uniqueName: @Sendable (String, [String]) -> String
+    var deletePreset: @Sendable (String) throws -> [BrushPreset]
+    var renamePreset: @Sendable (String, String) throws -> [BrushPreset]
+
+    static func live(
+        fileClient: FileClient,
+        uuidClient: UUIDClient,
+        brushTipLibraryClient: BrushTipLibraryClient
+    ) -> BrushPresetLibraryClient {
+        let storage = BrushPresetLibraryStorage(
+            fileClient: fileClient,
+            uuidClient: uuidClient,
+            brushTipLibraryClient: brushTipLibraryClient
+        )
+        return BrushPresetLibraryClient(
+            loadSavedPresets: { storage.loadSavedPresets() },
+            savePreset: { try storage.savePreset($0, replacingExisting: $1) },
+            uniqueName: { storage.uniqueName(basedOn: $0, existingNames: $1) },
+            deletePreset: { try storage.deletePreset(named: $0) },
+            renamePreset: { try storage.renamePreset(named: $0, to: $1) }
+        )
+    }
+}
+
+private enum BrushPresetLibraryClientKey: DependencyKey {
+    static var liveValue: BrushPresetLibraryClient {
+        @Dependency(\.fileClient) var fileClient
+        @Dependency(\.uuidClient) var uuidClient
+        @Dependency(\.brushTipLibraryClient) var brushTipLibraryClient
+        return .live(
+            fileClient: fileClient,
+            uuidClient: uuidClient,
+            brushTipLibraryClient: brushTipLibraryClient
+        )
+    }
+}
+
+extension DependencyValues {
+    var brushPresetLibraryClient: BrushPresetLibraryClient {
+        get { self[BrushPresetLibraryClientKey.self] }
+        set { self[BrushPresetLibraryClientKey.self] = newValue }
+    }
+}
+
+private struct BrushPresetLibraryStorage {
+    let fileClient: FileClient
+    let uuidClient: UUIDClient
+    let brushTipLibraryClient: BrushTipLibraryClient
+
+    func loadSavedPresets() -> [BrushPreset] {
         do {
-            let payload = try loadPayload(fileClient: fileClient)
-            let directory = try libraryDirectory(fileClient: fileClient)
-            return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+            let payload = try loadPayload()
+            let directory = try libraryDirectory()
+            return try payload.presets.map {
+                try $0.makePreset(
+                    baseDirectory: directory,
+                    brushTipLibraryClient: brushTipLibraryClient
+                )
+            }
         } catch {
             return []
         }
     }
 
-    static func savePreset(
+    func savePreset(
         _ preset: BrushPreset,
-        replacingExisting: Bool,
-        fileClient: FileClient = .live
+        replacingExisting: Bool
     ) throws -> [BrushPreset] {
-        let directory = try libraryDirectory(fileClient: fileClient)
-        var payload = try loadPayload(fileClient: fileClient)
-        let tipFileName = try persistTipIfNeeded(for: preset, in: directory, fileClient: fileClient)
+        let directory = try libraryDirectory()
+        var payload = try loadPayload()
+        let tipFileName = try persistTipIfNeeded(for: preset, in: directory)
         let stored = StoredBrushPreset(preset: preset, tipFileName: tipFileName)
 
         if let existingIndex = payload.presets.firstIndex(where: { $0.name == stored.name }) {
@@ -35,13 +91,17 @@ enum BrushPresetStore {
 
         let data = try JSONEncoder().encode(payload)
         try fileClient.writeData(data, indexURL(in: directory), .atomic)
-        return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+        return try payload.presets.map {
+            try $0.makePreset(
+                baseDirectory: directory,
+                brushTipLibraryClient: brushTipLibraryClient
+            )
+        }
     }
 
-    static func uniqueName(
+    func uniqueName(
         basedOn baseName: String,
-        existingNames: [String],
-        uuidClient: UUIDClient = .live
+        existingNames: [String]
     ) -> String {
         let trimmed = baseName.trimmingCharacters(in: .whitespacesAndNewlines)
         let seed = trimmed.isEmpty ? "Imported Brush" : trimmed
@@ -57,11 +117,16 @@ enum BrushPresetStore {
         return "\(seed) \(uuidClient.generate().uuidString.prefix(4))"
     }
 
-    static func deletePreset(named name: String, fileClient: FileClient = .live) throws -> [BrushPreset] {
-        let directory = try libraryDirectory(fileClient: fileClient)
-        var payload = try loadPayload(fileClient: fileClient)
+    func deletePreset(named name: String) throws -> [BrushPreset] {
+        let directory = try libraryDirectory()
+        var payload = try loadPayload()
         guard let index = payload.presets.firstIndex(where: { $0.name == name }) else {
-            return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+            return try payload.presets.map {
+                try $0.makePreset(
+                    baseDirectory: directory,
+                    brushTipLibraryClient: brushTipLibraryClient
+                )
+            }
         }
 
         let removed = payload.presets.remove(at: index)
@@ -72,14 +137,24 @@ enum BrushPresetStore {
 
         let data = try JSONEncoder().encode(payload)
         try fileClient.writeData(data, indexURL(in: directory), .atomic)
-        return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+        return try payload.presets.map {
+            try $0.makePreset(
+                baseDirectory: directory,
+                brushTipLibraryClient: brushTipLibraryClient
+            )
+        }
     }
 
-    static func renamePreset(named oldName: String, to newName: String, fileClient: FileClient = .live) throws -> [BrushPreset] {
-        let directory = try libraryDirectory(fileClient: fileClient)
-        var payload = try loadPayload(fileClient: fileClient)
+    func renamePreset(named oldName: String, to newName: String) throws -> [BrushPreset] {
+        let directory = try libraryDirectory()
+        var payload = try loadPayload()
         guard let index = payload.presets.firstIndex(where: { $0.name == oldName }) else {
-            return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+            return try payload.presets.map {
+                try $0.makePreset(
+                    baseDirectory: directory,
+                    brushTipLibraryClient: brushTipLibraryClient
+                )
+            }
         }
 
         let existingNames = payload.presets.enumerated().compactMap { offset, preset in
@@ -90,13 +165,17 @@ enum BrushPresetStore {
 
         let data = try JSONEncoder().encode(payload)
         try fileClient.writeData(data, indexURL(in: directory), .atomic)
-        return try payload.presets.map { try $0.makePreset(baseDirectory: directory, fileClient: fileClient) }
+        return try payload.presets.map {
+            try $0.makePreset(
+                baseDirectory: directory,
+                brushTipLibraryClient: brushTipLibraryClient
+            )
+        }
     }
 
-    private static func persistTipIfNeeded(
+    private func persistTipIfNeeded(
         for preset: BrushPreset,
-        in directory: URL,
-        fileClient: FileClient
+        in directory: URL
     ) throws -> String? {
         guard let tip = preset.customTip else { return nil }
         let hash = SHA256.hash(data: tip.alphaData).compactMap { String(format: "%02x", $0) }.joined()
@@ -109,8 +188,8 @@ enum BrushPresetStore {
         return fileName
     }
 
-    private static func loadPayload(fileClient: FileClient) throws -> StoredBrushLibrary {
-        let directory = try libraryDirectory(fileClient: fileClient)
+    private func loadPayload() throws -> StoredBrushLibrary {
+        let directory = try libraryDirectory()
         let url = indexURL(in: directory)
         guard fileClient.fileExists(url.path) else {
             return StoredBrushLibrary()
@@ -119,7 +198,7 @@ enum BrushPresetStore {
         return try JSONDecoder().decode(StoredBrushLibrary.self, from: data)
     }
 
-    private static func libraryDirectory(fileClient: FileClient) throws -> URL {
+    private func libraryDirectory() throws -> URL {
         let base = fileClient.urls(.applicationSupportDirectory, .userDomainMask)[0]
         let directory = base
             .appendingPathComponent("primo", isDirectory: true)
@@ -128,11 +207,11 @@ enum BrushPresetStore {
         return directory
     }
 
-    private static func indexURL(in directory: URL) -> URL {
+    private func indexURL(in directory: URL) -> URL {
         directory.appendingPathComponent("saved-brushes.json", isDirectory: false)
     }
 
-    private static func sanitizeFileName(_ name: String) -> String {
+    private func sanitizeFileName(_ name: String) -> String {
         let sanitized = name.unicodeScalars.map { scalar -> Character in
             if CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_" {
                 return Character(scalar)
@@ -415,7 +494,10 @@ private struct StoredBrushPreset: Codable {
         tipFileName = try container.decodeIfPresent(String.self, forKey: .tipFileName)
     }
 
-    func makePreset(baseDirectory: URL, fileClient: FileClient = .live) throws -> BrushPreset {
+    func makePreset(
+        baseDirectory: URL,
+        brushTipLibraryClient: BrushTipLibraryClient = .live(fileClient: .live)
+    ) throws -> BrushPreset {
         let tipKind = BrushTipKind(rawValue: tipKindRawValue) ?? .ink
         let angleMode = BrushAngleMode(rawValue: angleModeRawValue) ?? .fixed
         let scatterMode = BrushScatterMode(rawValue: scatterModeRawValue) ?? .directional
@@ -426,7 +508,7 @@ private struct StoredBrushPreset: Codable {
         let customTip: BrushTipRaster?
         if let tipFileName {
             let url = baseDirectory.appendingPathComponent(tipFileName, isDirectory: false)
-            customTip = try BrushTipLibrary.loadRaster(from: url, fileClient: fileClient)
+            customTip = try brushTipLibraryClient.loadRaster(url)
         } else {
             customTip = nil
         }

@@ -391,7 +391,17 @@ struct BrushPaletteFeature {
         struct LibraryState: Equatable {
             var selectedBrush: BrushPreset? = .defaultPencil
             var presets: [BrushPreset] = BrushPreset.defaults
-            var savedPresets: [BrushPreset] = BrushPresetStore.loadSavedPresets()
+            var savedPresets: [BrushPreset]
+
+            init(
+                savedPresets: [BrushPreset] = BrushPresetLibraryClient.live(
+                    fileClient: .live,
+                    uuidClient: .live,
+                    brushTipLibraryClient: .live(fileClient: .live)
+                ).loadSavedPresets()
+            ) {
+                self.savedPresets = savedPresets
+            }
         }
 
         struct UIState: Equatable {
@@ -442,6 +452,8 @@ struct BrushPaletteFeature {
         case cancelTransform
         case applyText(TextLayerDraft)
     }
+
+    @Dependency(\.brushPresetLibraryClient) var brushPresetLibraryClient
 
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -538,7 +550,10 @@ struct BrushPaletteFeature {
                 return .none
 
             case let .importedPresets(presets):
-                let persistedPresets = state.persistImportedPresets(presets)
+                let persistedPresets = state.persistImportedPresets(
+                    presets,
+                    brushPresetLibraryClient: brushPresetLibraryClient
+                )
                 let resolvedPresets = persistedPresets.isEmpty ? presets : persistedPresets
                 state.library.presets.insert(contentsOf: resolvedPresets.reversed(), at: 0)
                 if let first = resolvedPresets.first {
@@ -603,9 +618,11 @@ struct BrushPaletteFeature {
                     state.library.savedPresets.contains(where: { $0.name == selected.name })
                 } ?? false
                 let baseName = state.library.selectedBrush?.name ?? (state.brush.tipKind == .pencil ? "Custom Pencil" : "Custom Brush")
-                let resolvedName = isOverwritingSavedPreset ? baseName : BrushPresetStore.uniqueName(basedOn: baseName, existingNames: savedNames)
+                let resolvedName = isOverwritingSavedPreset
+                    ? baseName
+                    : brushPresetLibraryClient.uniqueName(baseName, savedNames)
                 let preset = state.brush.makePreset(named: resolvedName)
-                if let saved = try? BrushPresetStore.savePreset(preset, replacingExisting: isOverwritingSavedPreset) {
+                if let saved = try? brushPresetLibraryClient.savePreset(preset, isOverwritingSavedPreset) {
                     state.library.savedPresets = saved
                     if let matching = saved.first(where: { $0.name == resolvedName }) {
                         state.applyPreset(matching)
@@ -620,7 +637,7 @@ struct BrushPaletteFeature {
                 return .none
 
             case let .deleteSavedPresetButtonTapped(name):
-                if let saved = try? BrushPresetStore.deletePreset(named: name) {
+                if let saved = try? brushPresetLibraryClient.deletePreset(name) {
                     state.library.savedPresets = saved
                 } else {
                     state.library.savedPresets.removeAll { $0.name == name }
@@ -634,7 +651,7 @@ struct BrushPaletteFeature {
             case let .renameSavedPresetButtonTapped(oldName, newName):
                 let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return .none }
-                if let saved = try? BrushPresetStore.renamePreset(named: oldName, to: trimmed) {
+                if let saved = try? brushPresetLibraryClient.renamePreset(oldName, trimmed) {
                     state.library.savedPresets = saved
                     if state.library.selectedBrush?.name == oldName,
                        let renamed = saved.first(where: { $0.name == trimmed }) ?? saved.first(where: { $0.customTip == state.brush.customTip }) {
@@ -668,7 +685,10 @@ private extension BrushPaletteFeature.State {
         brush.applyPreset(preset)
     }
 
-    mutating func persistImportedPresets(_ imported: [BrushPreset]) -> [BrushPreset] {
+    mutating func persistImportedPresets(
+        _ imported: [BrushPreset],
+        brushPresetLibraryClient: BrushPresetLibraryClient
+    ) -> [BrushPreset] {
         guard !imported.isEmpty else { return [] }
 
         var resolvedImported: [BrushPreset] = []
@@ -677,10 +697,7 @@ private extension BrushPaletteFeature.State {
         usedNames.formUnion(library.presets.map(\.name))
 
         for preset in imported {
-            let resolvedName = BrushPresetStore.uniqueName(
-                basedOn: preset.name,
-                existingNames: Array(usedNames)
-            )
+            let resolvedName = brushPresetLibraryClient.uniqueName(preset.name, Array(usedNames))
             let resolvedPreset = resolvedName == preset.name ? preset : BrushPreset(
                 name: resolvedName,
                 tipKind: preset.tipKind,
@@ -745,7 +762,7 @@ private extension BrushPaletteFeature.State {
             usedNames.insert(resolvedName)
             resolvedImported.append(resolvedPreset)
 
-            if let saved = try? BrushPresetStore.savePreset(resolvedPreset, replacingExisting: false) {
+            if let saved = try? brushPresetLibraryClient.savePreset(resolvedPreset, false) {
                 workingSaved = saved
             }
         }
