@@ -737,10 +737,7 @@ struct AppFeature {
                 return .none
 
             case .autosaveRecoveryLoadRequested:
-                return .run { [documentWorkspaceClient] send in
-                    let items = (try? documentWorkspaceClient.loadAutosaveRecoveryItems()) ?? []
-                    await send(.autosaveRecoveryLoaded(items))
-                }
+                return handleAutosaveRecoveryLoadRequest()
 
             case let .autosaveRecoveryLoaded(items):
                 state.autosaveRecoveryItems = items
@@ -748,45 +745,14 @@ struct AppFeature {
                 return .none
 
             case let .autosaveRecoveryRestoreRequested(autosaveID):
-                guard let item = state.autosaveRecoveryItems.first(where: { $0.id == autosaveID }) else {
-                    return .none
-                }
-                if !state.showsHome {
-                    _ = persistActiveTabToBackingStore(state: &state)
-                }
-                state.isHydrating = true
-                state.isShowingAutosaveRecovery = false
-                return .run { [paintDocumentClient] send in
-                    do {
-                        let loaded = try paintDocumentClient.loadProject(item.autosaveProjectURL.fileURL)
-                        await send(.autosaveRecoveryOpened(loaded, item))
-                    } catch {
-                        await send(.openDocumentFailed(error.localizedDescription))
-                    }
-                }
+                return handleAutosaveRecoveryRestoreRequest(state: &state, autosaveID: autosaveID)
 
             case let .autosaveRecoveryOpened(loaded, item):
-                try? documentWorkspaceClient.discardAutosaveEntry(item.id)
-                state.applyLoadedProject(loaded)
-                activateNewTab(
-                    state: &state,
-                    title: item.title,
-                    sourceProjectURL: item.sourceProjectURL
-                )
-                state.setActiveTabDirty(true)
-                _ = persistActiveTabToBackingStore(state: &state)
-                persistActiveTabAutosave(state: &state)
-                state.isHydrating = false
-                state.showsHome = false
-                state.autosaveRecoveryItems.removeAll { $0.id == item.id }
-                state.isShowingAutosaveRecovery = false
-                state.bannerMessage = state.appLanguage.localized("自動保存から復元しました")
+                handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item)
                 return .none
 
             case let .autosaveRecoveryDiscardRequested(autosaveID):
-                state.autosaveRecoveryItems.removeAll { $0.id == autosaveID }
-                state.isShowingAutosaveRecovery = !state.autosaveRecoveryItems.isEmpty
-                try? documentWorkspaceClient.discardAutosaveEntry(autosaveID)
+                handleAutosaveRecoveryDiscardRequest(state: &state, autosaveID: autosaveID)
                 return .none
 
             case .autosaveRecoveryDismissed:
@@ -798,22 +764,7 @@ struct AppFeature {
                 return .none
 
             case let .tabSelected(tabID):
-                guard let targetTab = state.openTabs.first(where: { $0.id == tabID }) else {
-                    return .none
-                }
-                if !state.showsHome, state.activeTabID != tabID {
-                    _ = persistActiveTabToBackingStore(state: &state)
-                }
-                do {
-                    let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL.fileURL)
-                    state.activeTabID = tabID
-                    state.setSelectedTabID(tabID, for: targetTab.pane)
-                    state.focusedWorkspacePane = targetTab.pane
-                    state.applyLoadedProject(loaded)
-                    state.showsHome = false
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
-                }
+                handleTabSelection(state: &state, tabID: tabID)
                 return .none
 
             case let .tabCloseRequested(tabID):
@@ -847,67 +798,14 @@ struct AppFeature {
                 return .none
 
             case let .tabClosed(tabID):
-                guard let closingIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else {
-                    return .none
-                }
-                let closingTab = state.openTabs[closingIndex]
-                let wasActive = state.activeTabID == tabID
-                state.openTabs.remove(at: closingIndex)
-                clearAutosave(for: closingTab)
-                try? documentWorkspaceClient.removeWorkspaceItem(closingTab.backingStoreURL)
-                state.ensureWorkspaceSelectionIntegrity()
-
-                if wasActive {
-                    let replacement = state.selectedTab(in: closingTab.pane)
-                        ?? state.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
-                    if let replacement {
-                        do {
-                            let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL.fileURL)
-                            state.activeTabID = replacement.id
-                            state.focusedWorkspacePane = replacement.pane
-                            state.applyLoadedProject(loaded)
-                            state.showsHome = false
-                        } catch {
-                            state.activeTabID = nil
-                            state.showsHome = true
-                            state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
-                        }
-                    } else {
-                        state.activeTabID = nil
-                        state.showsHome = true
-                    }
-                }
+                handleTabClosed(state: &state, tabID: tabID)
                 return .none
 
             case let .closeOtherTabs(tabID):
-                let retainedTabs = state.openTabs.filter { $0.id == tabID }
-                let removedTabs = state.openTabs.filter { $0.id != tabID }
-                removedTabs.forEach {
-                    clearAutosave(for: $0)
-                    try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
-                }
-                state.openTabs = retainedTabs
-                state.primarySelectedTabID = retainedTabs.first(where: { $0.pane == .primary })?.id
-                state.secondarySelectedTabID = retainedTabs.first(where: { $0.pane == .secondary })?.id
-                if state.activeTabID != tabID {
-                    return .send(.tabSelected(tabID))
-                }
-                state.ensureWorkspaceSelectionIntegrity()
-                return .none
+                return handleCloseOtherTabs(state: &state, retaining: tabID)
 
             case let .closeTabsToRight(tabID):
-                guard let tabIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else { return .none }
-                let tab = state.openTabs[tabIndex]
-                let paneTabs = state.openTabs.enumerated().filter { $0.element.pane == tab.pane }
-                guard let paneIndex = paneTabs.firstIndex(where: { $0.element.id == tabID }) else { return .none }
-                let idsToRemove = Set(paneTabs.dropFirst(paneIndex + 1).map(\.element.id))
-                let removedTabs = state.openTabs.filter { idsToRemove.contains($0.id) }
-                removedTabs.forEach {
-                    clearAutosave(for: $0)
-                    try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
-                }
-                state.openTabs.removeAll { idsToRemove.contains($0.id) }
-                state.ensureWorkspaceSelectionIntegrity()
+                handleCloseTabsToRight(state: &state, tabID: tabID)
                 return .none
 
             case let .moveTabToSecondaryPane(tabID):
@@ -949,16 +847,11 @@ struct AppFeature {
                 return .send(.tabSelected(tabID))
 
             case let .moveSavedProject(url, relativeFolderPath):
-                do {
-                    let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
-                    if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL == url }) {
-                        state.openTabs[openTabIndex].sourceProjectURL = destinationURL
-                    }
-                    return .send(.homeProjectsLoadRequested)
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Move failed") : error.localizedDescription
-                    return .none
-                }
+                return handleSavedProjectMove(
+                    state: &state,
+                    url: url,
+                    relativeFolderPath: relativeFolderPath
+                )
 
             case .homeReturnRequested:
                 if state.activeTab != nil {
@@ -1536,61 +1429,25 @@ struct AppFeature {
                 return .none
 
             case let .openDocumentSelected(url):
-                if let existingTabID = state.tabID(forSourceProjectURL: url) {
-                    state.isHydrating = false
-                    return .send(.tabSelected(existingTabID))
-                }
-                if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
-                }
-                state.isHydrating = true
-                return .run { [paintDocumentClient, documentWorkspaceClient] send in
-                    do {
-                        let loaded = try paintDocumentClient.loadProject(url.fileURL)
-                        await send(.openDocumentLoaded(loaded, url))
-                    } catch {
-                        await send(.openDocumentFailed(error.localizedDescription))
-                    }
-                    try? documentWorkspaceClient.removeWorkspaceItem(url)
-                }
+                return handleOpenDocumentSelection(
+                    state: &state,
+                    url: url,
+                    removesStagedWorkspaceItem: true
+                )
 
             case let .homeProjectSelected(url):
-                if let existingTabID = state.tabID(forSourceProjectURL: url) {
-                    state.showsHome = false
-                    state.isHydrating = false
-                    return .send(.tabSelected(existingTabID))
-                }
-                if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
-                }
-                state.isHydrating = true
-                return .run { [paintDocumentClient] send in
-                    do {
-                        let loaded = try paintDocumentClient.loadProject(url.fileURL)
-                        await send(.openDocumentLoaded(loaded, url))
-                    } catch {
-                        await send(.openDocumentFailed(error.localizedDescription))
-                    }
-                }
+                return handleOpenDocumentSelection(
+                    state: &state,
+                    url: url,
+                    removesStagedWorkspaceItem: false
+                )
 
             case let .openDocumentLoaded(loaded, sourceURL):
-                if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
-                    state.activeTabID = existingTabID
-                    state.isHydrating = false
-                    state.showsHome = false
-                    return .send(.tabSelected(existingTabID))
-                }
-                state.applyLoadedProject(loaded)
-                let title = sourceURL.displayName
-                activateNewTab(
+                return handleOpenDocumentLoaded(
                     state: &state,
-                    title: title,
-                    sourceProjectURL: sourceURL
+                    loaded: loaded,
+                    sourceURL: sourceURL
                 )
-                state.isHydrating = false
-                state.showsHome = false
-                state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
-                return .none
 
             case let .openDocumentFailed(message):
                 state.isHydrating = false
