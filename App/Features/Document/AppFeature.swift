@@ -173,53 +173,7 @@ struct AppFeature {
         }
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
-            canvas.canvasSize = presentation.canvasSize
-            canvas.activeLayerIndex = presentation.activeLayerIndex
-            let previousRevision = canvas.renderSnapshot?.revision ?? canvas.lastCommittedRenderRevision
-            var nextBuffers: [LayerCanvasBuffer] = []
-            let existingBuffers = Dictionary(uniqueKeysWithValues: canvas.layerBuffers.map { ($0.index, $0) })
-            for row in presentation.layerRows.sorted(by: { $0.index < $1.index }) {
-                var buffer = existingBuffers[row.index] ?? LayerCanvasBuffer(
-                    index: row.index,
-                    name: row.name,
-                    visible: row.visible,
-                    opacity: row.opacity,
-                    blendMode: row.blendMode
-                )
-                buffer.name = row.name
-                buffer.visible = row.visible
-                buffer.opacity = row.opacity
-                buffer.blendMode = row.blendMode
-                nextBuffers.append(buffer)
-            }
-            canvas.layerBuffers = nextBuffers
-            if let renderSnapshot = presentation.renderSnapshot {
-                canvas.renderSnapshot = renderSnapshot
-                canvas.lastCommittedRenderRevision = renderSnapshot.revision
-                canvas.pendingIncrementalUpdate = nil
-                canvas.activeStrokeBaseSnapshot = nil
-                canvas.activeStrokePreviewLayerPixelData = nil
-                isHydrating = false
-                if !canvas.isStrokeActive &&
-                    canvas.isAwaitingCommittedRender &&
-                    renderSnapshot.revision > previousRevision {
-                    canvas.isAwaitingCommittedRender = false
-                    canvas.lastRenderedLocalBufferRevision = canvas.localBufferRevision
-                }
-            }
-            layerSidebar.layers = presentation.layerRows
-            layerSidebar.rows = presentation.layerSidebarRows
-            layerSidebar.layerBuffers = canvas.layerBuffers
-            layerSidebar.activeLayerIndex = presentation.activeLayerIndex
-            layerSidebar.paperColor = brushPalette.paper.color
-            layerSidebar.transparentPaper = brushPalette.paper.isTransparent
-            canvas.previewStyle = previewStrokeStyle()
-            canvas.selectionMode = brushPalette.selection.toolMode
-            canvas.shapeMode = brushPalette.shape.mode
-            canvas.eyedropperSamplingSource = brushPalette.sampling.eyedropperSource
-            canvas.paperStyle = resolvedPaperStyle()
-            canvas.activeTextLayer = presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
-            syncTextEditorWithActiveLayer()
+            AppFeature.uiStateCoordinator.applyPresentation(presentation, to: &self)
         }
 
         mutating func updateActiveTabMetadata(
@@ -327,78 +281,15 @@ struct AppFeature {
         }
 
         mutating func applyLoadedProject(_ loaded: LoadedPaintProject) {
-            brushPalette.paper.color = Color(
-                red: Double(loaded.paperStyle.red),
-                green: Double(loaded.paperStyle.green),
-                blue: Double(loaded.paperStyle.blue),
-                opacity: Double(loaded.paperStyle.alpha)
-            )
-            brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
-            canvas.selection = nil
-            canvas.selectionPreviewPoints = []
-            canvas.resetTransformPreview()
-            canvas.adjustmentPreviewPixelData = nil
-            applyPresentation(loaded.presentation)
-            isHydrating = false
+            AppFeature.uiStateCoordinator.applyLoadedProject(loaded, to: &self)
         }
 
         mutating func syncTextEditorWithActiveLayer() {
-            guard let activeLayer = layerSidebar.layers.first(where: { $0.index == layerSidebar.activeLayerIndex }) else {
-                brushPalette.text.targetLayerIndex = nil
-                brushPalette.text.scale = 1.0
-                brushPalette.text.rotationDegrees = 0
-                return
-            }
-            if let textLayer = activeLayer.textLayer {
-                brushPalette.text.content = textLayer.text
-                brushPalette.text.fontSize = textLayer.fontSize
-                brushPalette.text.position = textLayer.position
-                brushPalette.text.scale = textLayer.scale
-                brushPalette.text.rotationDegrees = textLayer.rotationDegrees
-                brushPalette.text.targetLayerIndex = activeLayer.index
-                brushPalette.text.selectedFontPostScriptName = textLayer.fontPostScriptName
-                brushPalette.text.selectedFontDisplayName = textLayer.fontDisplayName
-            } else {
-                brushPalette.text.targetLayerIndex = nil
-                brushPalette.text.scale = 1.0
-                brushPalette.text.rotationDegrees = 0
-            }
+            AppFeature.uiStateCoordinator.syncTextEditorWithActiveLayer(state: &self)
         }
 
         mutating func applyLiveCompositePixelData(_ compositePixelData: Data) {
-            let width = canvas.renderSnapshot?.width ?? max(Int(canvas.canvasSize.width.rounded()), 1)
-            let height = canvas.renderSnapshot?.height ?? max(Int(canvas.canvasSize.height.rounded()), 1)
-            guard compositePixelData.count == width * height * 4 else {
-                return
-            }
-
-            let layerSnapshots: [MetalLayerSnapshot]
-            if let existingLayers = canvas.renderSnapshot?.layers, !existingLayers.isEmpty {
-                layerSnapshots = existingLayers
-            } else {
-                layerSnapshots = canvas.layerBuffers.map { buffer in
-                    MetalLayerSnapshot(
-                        index: buffer.index,
-                        opacity: Float(buffer.opacity),
-                        visible: buffer.visible,
-                        isClipped: false,
-                        blendMode: buffer.blendMode,
-                        thumbnailData: nil,
-                        pixelData: Data()
-                    )
-                }
-            }
-
-            let nextRevision = max(canvas.renderSnapshot?.revision ?? 0, canvas.lastCommittedRenderRevision) + 1
-            canvas.renderSnapshot = MetalDocumentSnapshot(
-                width: width,
-                height: height,
-                revision: nextRevision,
-                compositePixelData: compositePixelData,
-                layers: layerSnapshots
-            )
-            canvas.pendingIncrementalUpdate = nil
-            isHydrating = false
+            AppFeature.uiStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &self)
         }
 
         mutating func applyLiveStrokePreview(
@@ -406,119 +297,24 @@ struct AppFeature {
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data
         ) {
-            guard let composite = AppFeature.compositedPreviewPixelData(
-                snapshot: baseSnapshot,
+            AppFeature.uiStateCoordinator.applyLiveStrokePreview(
+                baseSnapshot: baseSnapshot,
                 activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedActiveLayerPixels
-            ) else {
-                return
-            }
-
-            let nextLayers = baseSnapshot.layers.map { layer in
-                guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: layer.visible,
-                    isClipped: layer.isClipped,
-                    blendMode: layer.blendMode,
-                    thumbnailData: layer.thumbnailData,
-                    pixelData: adjustedActiveLayerPixels
-                )
-            }
-
-            let nextRevision = max(canvas.renderSnapshot?.revision ?? 0, canvas.lastCommittedRenderRevision) + 1
-            canvas.renderSnapshot = MetalDocumentSnapshot(
-                width: baseSnapshot.width,
-                height: baseSnapshot.height,
-                revision: nextRevision,
-                compositePixelData: composite,
-                layers: nextLayers
+                adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+                to: &self
             )
-            canvas.activeStrokePreviewLayerPixelData = adjustedActiveLayerPixels
-            canvas.pendingIncrementalUpdate = nil
-            isHydrating = false
         }
 
         func resolvedBrushSettings() -> BrushRuntimeSettings {
-            var settings = brushPalette.runtimeSettings
-            if settings.tipKind == .oil {
-                settings.stabilization = max(settings.stabilization, 0.34)
-            }
-            if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
-                settings.isEraser = true
-            }
-            return settings
+            AppFeature.uiStateCoordinator.resolvedBrushSettings(for: self)
         }
 
         func previewStrokeStyle() -> PreviewStrokeStyle {
-            let resolvedRuntimeSettings: BrushRuntimeSettings = {
-                var settings = brushPalette.runtimeSettings
-                if settings.tipKind == .oil {
-                    settings.stabilization = max(settings.stabilization, 0.34)
-                }
-                return settings
-            }()
-
-            if canvas.currentTool == .erase || (canvas.currentTool == .brush && brushPalette.brush.usesTransparentColor) {
-                return PreviewStrokeStyle(
-                    tipKind: .ink,
-                    isEraser: true,
-                    radius: CGFloat(resolvedRuntimeSettings.radius),
-                    opacity: 0.78,
-                    flow: CGFloat(resolvedRuntimeSettings.flow),
-                    hardness: 0.95,
-                    roundness: CGFloat(resolvedRuntimeSettings.roundness),
-                    angle: CGFloat(resolvedRuntimeSettings.angle),
-                    followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
-                    pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
-                    stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
-                    customTip: resolvedRuntimeSettings.customTip,
-                    color: CGColor(
-                        red: 0.92,
-                        green: 0.95,
-                        blue: 0.98,
-                        alpha: 1.0
-                    )
-                )
-            }
-
-            return PreviewStrokeStyle(
-                tipKind: resolvedRuntimeSettings.tipKind,
-                isEraser: false,
-                radius: CGFloat(resolvedRuntimeSettings.radius),
-                opacity: CGFloat(resolvedRuntimeSettings.opacity),
-                flow: CGFloat(resolvedRuntimeSettings.flow),
-                hardness: CGFloat(resolvedRuntimeSettings.hardness),
-                roundness: CGFloat(resolvedRuntimeSettings.roundness),
-                angle: CGFloat(resolvedRuntimeSettings.angle),
-                followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
-                pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
-                stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
-                customTip: resolvedRuntimeSettings.customTip,
-                color: CGColor(
-                    red: CGFloat(resolvedRuntimeSettings.red) / 255.0,
-                    green: CGFloat(resolvedRuntimeSettings.green) / 255.0,
-                    blue: CGFloat(resolvedRuntimeSettings.blue) / 255.0,
-                    alpha: 1.0
-                )
-            )
+            AppFeature.uiStateCoordinator.previewStrokeStyle(for: self)
         }
 
         func resolvedPaperStyle() -> CanvasPaperStyle {
-            let resolved = UIColor(brushPalette.paper.color)
-            var red: CGFloat = 0
-            var green: CGFloat = 0
-            var blue: CGFloat = 0
-            var alpha: CGFloat = 0
-            resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-            return CanvasPaperStyle(
-                red: Float(red),
-                green: Float(green),
-                blue: Float(blue),
-                alpha: Float(alpha),
-                isTransparent: brushPalette.paper.isTransparent
-            )
+            AppFeature.uiStateCoordinator.resolvedPaperStyle(for: self)
         }
 
         func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {

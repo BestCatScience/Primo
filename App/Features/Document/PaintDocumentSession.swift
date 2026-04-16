@@ -48,6 +48,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     var persistenceService: PaintDocumentPersistenceService { services.persistence }
     var timelapseService: PaintDocumentTimelapseService { services.timelapse }
     var editingLifecycleService: PaintDocumentEditingLifecycleService { services.editingLifecycle }
+    var bridgeService: PaintDocumentBridgeService { services.bridge }
     var timelapseDirectoryURL: URL { state.timelapseDirectoryURL }
     var timelapseFrames: [TimelapseFrame] {
         get { state.timelapseFrames }
