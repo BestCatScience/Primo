@@ -4,106 +4,23 @@ import UIKit
 
 extension PaintDocumentSession {
     func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
-        self.paperStyle = paperStyle
+        sessionState.presentation.setPaperStyle(paperStyle)
         return renderedCompositeImage(paperStyle: paperStyle)?.pngData()
     }
 
     func saveProject(to url: URL) throws {
+        let snapshot = makePersistenceSnapshot()
         try persistenceService.prepareProjectDirectory(at: url)
         let directories = try persistenceService.createProjectSubdirectories(
             in: url,
-            usesOperationTimelapsePersistence: usesOperationTimelapsePersistence
+            usesOperationTimelapsePersistence: snapshot.usesOperationTimelapsePersistence
         )
-        let layersDirectory = directories.layersDirectory
-        let timelapseDirectory = directories.timelapseDirectory
-        let timelapseDataDirectory = directories.timelapseDataDirectory
-
-        let layerInfos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
-
-        let storedLayers = try layerInfos.enumerated().map { index, layerInfo -> StoredPrimoDocument.Layer in
-            let filename = String(format: "layer-%04d.rgba", index)
-            let pixelURL = layersDirectory.appendingPathComponent(filename, isDirectory: false)
-            let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            try persistenceService.writeAtomic(pixelData, to: pixelURL)
-            let maskFilename: String?
-            if let maskData = bridge.layerMaskDataForLayer(at: index) {
-                let filename = String(format: "layer-mask-%04d.mask", index)
-                try persistenceService.writeAtomic(maskData, to: layersDirectory.appendingPathComponent(filename, isDirectory: false))
-                maskFilename = "Layers/\(filename)"
-            } else {
-                maskFilename = nil
-            }
-            return StoredPrimoDocument.Layer(
-                index: .unchecked(index),
-                name: layerInfo.name,
-                visible: layerInfo.visible,
-                locked: layerInfo.locked,
-                alphaLocked: layerInfo.alphaLocked,
-                clipped: layerInfo.clipped,
-                opacity: layerInfo.opacity,
-                blendMode: layerInfo.blendMode,
-                folderID: layerInfo.folderID >= 0 ? .unchecked(Int(layerInfo.folderID)) : nil,
-                textLayer: textLayers[index],
-                pixelFilename: "Layers/\(filename)",
-                maskFilename: maskFilename
-            )
-        }
-
-        let storedFolders = folderInfos.map { folderInfo in
-            StoredPrimoDocument.Folder(
-                id: .unchecked(Int(folderInfo.folderID)),
-                name: folderInfo.name,
-                visible: folderInfo.visible,
-                expanded: folderInfo.expanded,
-                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? .unchecked(Int(folderInfo.anchorLayerIndex)) : nil
-            )
-        }
-
-        let storedTimelapseFrames: [StoredPrimoDocument.TimelapseFrame]
-        if !usesOperationTimelapsePersistence {
-            storedTimelapseFrames = try timelapseFrames.enumerated().map { index, frame in
-                let filename = String(format: "frame-%06d.jpg", index)
-                let destinationURL = timelapseDirectory.appendingPathComponent(filename, isDirectory: false)
-                try persistenceService.replaceItemIfNeeded(at: destinationURL, with: frame.imageURL)
-                return StoredPrimoDocument.TimelapseFrame(
-                    filename: "Timelapse/\(filename)",
-                    width: Double(frame.size.width),
-                    height: Double(frame.size.height)
-                )
-            }
-        } else {
-            storedTimelapseFrames = []
-        }
-
-        let storedTimelapseOperations = usesOperationTimelapsePersistence
-            ? try timelapseEvents.enumerated().map { index, event in
-                try event.storedRepresentation(index: index, dataDirectory: timelapseDataDirectory, fileClient: fileClient)
-            }
-            : []
-
-        let document = StoredPrimoDocument(
-            version: 5,
-            canvasWidth: Int(bridge.width),
-            canvasHeight: Int(bridge.height),
-            activeLayerIndex: .unchecked(Int(bridge.activeLayerIndex)),
-            paperStyle: StoredPrimoDocument.PaperStyle(
-                red: Double(paperStyle.red),
-                green: Double(paperStyle.green),
-                blue: Double(paperStyle.blue),
-                alpha: Double(paperStyle.alpha),
-                isTransparent: paperStyle.isTransparent
-            ),
-            layers: storedLayers,
-            folders: storedFolders,
-            timelapseFrames: storedTimelapseFrames,
-            timelapseOperations: storedTimelapseOperations
+        try snapshot.persist(
+            directories: directories,
+            persistenceService: persistenceService,
+            fileClient: fileClient,
+            manifestURL: url.appendingPathComponent("manifest.json", isDirectory: false)
         )
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let manifestData = try encoder.encode(document)
-        try persistenceService.writeAtomic(manifestData, to: url.appendingPathComponent("manifest.json"))
     }
 
     static func loadProject(
@@ -120,18 +37,353 @@ extension PaintDocumentSession {
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
         let data = try services.persistence.loadData(from: manifestURL)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: data)
-        guard !document.layers.isEmpty else {
-            throw PrimoDocumentError.invalidDocument
-        }
+        let contract = try PaintDocumentPersistenceContract(validating: document)
+        let restorationPlan = try PaintDocumentRestorePlan(
+            document: document,
+            contract: contract,
+            baseURL: url,
+            services: services,
+            fileClient: fileClient
+        )
 
         let session = PaintDocumentSession(
-            width: document.canvasWidth,
-            height: document.canvasHeight,
+            width: contract.canvasWidth,
+            height: contract.canvasHeight,
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
         )
-        session.paperStyle = CanvasPaperStyle(
+        try session.applyRestorationPlan(restorationPlan, persistenceService: services.persistence)
+        return session
+    }
+
+    private func makePersistenceSnapshot() -> PaintDocumentPersistenceSnapshot {
+        let layerInfos = bridge.layerInfos()
+        let folderInfos = bridge.folderInfos()
+        let layerPayloads = layerInfos.enumerated().map { index, layerInfo in
+            let pixelFilename = String(format: "layer-%04d.rgba", index)
+            let pixelData = bridge.pixelDataForLayer(at: index) as Data
+            let maskData = bridge.layerMaskDataForLayer(at: index) as Data?
+            let maskFilename = maskData == nil ? nil : String(format: "layer-mask-%04d.mask", index)
+            return PaintDocumentPersistenceSnapshot.LayerPayload(
+                manifest: StoredPrimoDocument.Layer(
+                    index: .unchecked(index),
+                    name: layerInfo.name,
+                    visible: layerInfo.visible,
+                    locked: layerInfo.locked,
+                    alphaLocked: layerInfo.alphaLocked,
+                    clipped: layerInfo.clipped,
+                    opacity: layerInfo.opacity,
+                    blendMode: layerInfo.blendMode,
+                    folderID: layerInfo.folderID >= 0 ? .unchecked(Int(layerInfo.folderID)) : nil,
+                    textLayer: sessionState.textLayers.data(at: index),
+                    pixelFilename: "Layers/\(pixelFilename)",
+                    maskFilename: maskFilename.map { "Layers/\($0)" }
+                ),
+                pixelFilename: pixelFilename,
+                pixelData: pixelData,
+                maskFilename: maskFilename,
+                maskData: maskData
+            )
+        }
+
+        let storedFolders = folderInfos.map { folderInfo in
+            StoredPrimoDocument.Folder(
+                id: .unchecked(Int(folderInfo.folderID)),
+                name: folderInfo.name,
+                visible: folderInfo.visible,
+                expanded: folderInfo.expanded,
+                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? .unchecked(Int(folderInfo.anchorLayerIndex)) : nil
+            )
+        }
+
+        let timelapseFramePayloads: [PaintDocumentPersistenceSnapshot.TimelapseFramePayload] = sessionState.timelapse.usesOperationPersistence
+            ? []
+            : sessionState.timelapse.frames.enumerated().map { index, frame in
+                let relativeFilename = String(format: "frame-%06d.jpg", index)
+                return PaintDocumentPersistenceSnapshot.TimelapseFramePayload(
+                    sourceURL: frame.imageURL,
+                    relativeFilename: relativeFilename,
+                    storedFrame: StoredPrimoDocument.TimelapseFrame(
+                        filename: "Timelapse/\(relativeFilename)",
+                        width: Double(frame.size.width),
+                        height: Double(frame.size.height)
+                    )
+                )
+            }
+
+        return PaintDocumentPersistenceSnapshot(
+            canvasWidth: Int(bridge.width),
+            canvasHeight: Int(bridge.height),
+            activeLayerIndex: .unchecked(Int(bridge.activeLayerIndex)),
+            paperStyle: sessionState.presentation.paperStyle,
+            layers: layerPayloads,
+            folders: storedFolders,
+            timelapseFrames: timelapseFramePayloads,
+            timelapseEvents: sessionState.timelapse.events,
+            usesOperationTimelapsePersistence: sessionState.timelapse.usesOperationPersistence
+        )
+    }
+
+    private func applyRestorationPlan(
+        _ restorationPlan: PaintDocumentRestorePlan,
+        persistenceService: PaintDocumentPersistenceService
+    ) throws {
+        sessionState.presentation.setPaperStyle(restorationPlan.paperStyle)
+        sessionState.textLayers.replaceAll(with: [:])
+
+        while Int(bridge.layerInfos().count) < restorationPlan.layers.count {
+            _ = bridge.addLayer(name: "Layer \(Int(bridge.layerInfos().count) + 1)")
+        }
+
+        for layer in restorationPlan.layers {
+            bridge.replaceLayerPixelsTransient(at: layer.index, data: layer.pixelData)
+            if let maskData = layer.maskData {
+                bridge.replaceLayerMask(at: layer.index, data: maskData)
+            } else {
+                bridge.clearLayerMask(at: layer.index)
+            }
+            bridge.setLayerName(layer.name, at: layer.index)
+            bridge.setLayerVisible(layer.visible, at: layer.index)
+            bridge.setLayerLocked(layer.locked, at: layer.index)
+            bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
+            bridge.setLayerClipped(layer.clipped, at: layer.index)
+            bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
+            bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
+            if let textLayer = layer.textLayer {
+                sessionState.textLayers.set(textLayer, at: layer.index)
+            }
+        }
+
+        var folderIDMap: [DocumentFolderID: Int] = [:]
+        for folder in restorationPlan.folders {
+            let newFolderID = Int(bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1))
+            folderIDMap[folder.id] = newFolderID
+            bridge.setFolderVisible(folder.visible, folderID: newFolderID)
+            bridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
+        }
+
+        for layer in restorationPlan.layers {
+            guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
+            _ = bridge.setLayerFolder(at: layer.index, folderID: resolvedFolderID)
+        }
+
+        bridge.activeLayerIndex = restorationPlan.activeLayerIndex
+
+        switch restorationPlan.timelapse {
+        case let .operations(events):
+            sessionState.timelapse.restoreOperations(events)
+        case let .frames(frames):
+            let restoredFrames = try frames.enumerated().map { index, frame in
+                let destinationURL = timelapseService.makeFrameURL(in: timelapseDirectoryURL, frameID: index)
+                try persistenceService.replaceItemIfNeeded(at: destinationURL, with: frame.sourceURL)
+                return TimelapseFrame(imageURL: destinationURL, size: frame.size)
+            }
+            sessionState.timelapse.restoreFrames(restoredFrames)
+        }
+
+        sessionState.presentation.invalidateThumbnailCache()
+        sessionState.editing.resetAll()
+        bridge.clearHistory()
+    }
+}
+
+private struct PaintDocumentPersistenceSnapshot {
+    struct LayerPayload {
+        let manifest: StoredPrimoDocument.Layer
+        let pixelFilename: String
+        let pixelData: Data
+        let maskFilename: String?
+        let maskData: Data?
+    }
+
+    struct TimelapseFramePayload {
+        let sourceURL: URL
+        let relativeFilename: String
+        let storedFrame: StoredPrimoDocument.TimelapseFrame
+    }
+
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let activeLayerIndex: DocumentLayerIndex
+    let paperStyle: CanvasPaperStyle
+    let layers: [LayerPayload]
+    let folders: [StoredPrimoDocument.Folder]
+    let timelapseFrames: [TimelapseFramePayload]
+    let timelapseEvents: [TimelapseOperation]
+    let usesOperationTimelapsePersistence: Bool
+
+    func persist(
+        directories: (layersDirectory: URL, timelapseDirectory: URL, timelapseDataDirectory: URL),
+        persistenceService: PaintDocumentPersistenceService,
+        fileClient: FileClient,
+        manifestURL: URL
+    ) throws {
+        for layer in layers {
+            try persistenceService.writeAtomic(
+                layer.pixelData,
+                to: directories.layersDirectory.appendingPathComponent(layer.pixelFilename, isDirectory: false)
+            )
+            if let maskFilename = layer.maskFilename, let maskData = layer.maskData {
+                try persistenceService.writeAtomic(
+                    maskData,
+                    to: directories.layersDirectory.appendingPathComponent(maskFilename, isDirectory: false)
+                )
+            }
+        }
+
+        if !usesOperationTimelapsePersistence {
+            for frame in timelapseFrames {
+                try persistenceService.replaceItemIfNeeded(
+                    at: directories.timelapseDirectory.appendingPathComponent(frame.relativeFilename, isDirectory: false),
+                    with: frame.sourceURL
+                )
+            }
+        }
+
+        let storedTimelapseOperations = usesOperationTimelapsePersistence
+            ? try timelapseEvents.enumerated().map { index, event in
+                try event.storedRepresentation(
+                    index: index,
+                    dataDirectory: directories.timelapseDataDirectory,
+                    fileClient: fileClient
+                )
+            }
+            : []
+
+        let document = StoredPrimoDocument(
+            version: 5,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            activeLayerIndex: activeLayerIndex,
+            paperStyle: StoredPrimoDocument.PaperStyle(
+                red: Double(paperStyle.red),
+                green: Double(paperStyle.green),
+                blue: Double(paperStyle.blue),
+                alpha: Double(paperStyle.alpha),
+                isTransparent: paperStyle.isTransparent
+            ),
+            layers: layers.map(\.manifest),
+            folders: folders,
+            timelapseFrames: usesOperationTimelapsePersistence ? [StoredPrimoDocument.TimelapseFrame]() : timelapseFrames.map(\.storedFrame),
+            timelapseOperations: storedTimelapseOperations
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let manifestData = try encoder.encode(document)
+        try persistenceService.writeAtomic(manifestData, to: manifestURL)
+    }
+}
+
+private struct PaintDocumentPersistenceContract {
+    let canvasWidth: Int
+    let canvasHeight: Int
+
+    var pixelByteCount: Int {
+        canvasWidth * canvasHeight * 4
+    }
+
+    var maskByteCount: Int {
+        canvasWidth * canvasHeight
+    }
+
+    init(validating document: StoredPrimoDocument) throws {
+        guard document.canvasWidth > 0, document.canvasHeight > 0 else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: canvas dimensions must be positive.")
+        }
+        guard !document.layers.isEmpty else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: at least one layer is required.")
+        }
+
+        let expectedLayerIndices = Array(0..<document.layers.count)
+        let actualLayerIndices = document.layers.map(\.index.rawValue).sorted()
+        guard actualLayerIndices == expectedLayerIndices else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: layer indices must be contiguous from 0.")
+        }
+
+        guard expectedLayerIndices.contains(document.activeLayerIndex.rawValue) else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: active layer index is out of range.")
+        }
+
+        let folderIDs = document.folders.map(\.id.rawValue)
+        guard Set(folderIDs).count == folderIDs.count else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: folder identifiers must be unique.")
+        }
+
+        let folderIDSet = Set(folderIDs)
+        let layerFolderIDs = Set(document.layers.compactMap(\.folderID?.rawValue))
+        guard layerFolderIDs.isSubset(of: folderIDSet) else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: all layer folder references must resolve.")
+        }
+
+        let validLayerIndexSet = Set(expectedLayerIndices)
+        let anchorIndices = document.folders.compactMap(\.anchorLayerIndex?.rawValue)
+        guard anchorIndices.allSatisfy(validLayerIndexSet.contains) else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: folder anchor indices must resolve to existing layers.")
+        }
+
+        guard document.timelapseFrames.isEmpty || document.timelapseOperations.isEmpty else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: timelapse data must use either frames or operations, not both.")
+        }
+
+        guard document.timelapseFrames.allSatisfy({ $0.width > 0 && $0.height > 0 }) else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: timelapse frame sizes must be positive.")
+        }
+
+        self.canvasWidth = document.canvasWidth
+        self.canvasHeight = document.canvasHeight
+    }
+}
+
+private struct PaintDocumentRestorePlan {
+    struct LayerPayload {
+        let index: Int
+        let name: String
+        let visible: Bool
+        let locked: Bool
+        let alphaLocked: Bool
+        let clipped: Bool
+        let opacity: Double
+        let blendMode: String
+        let folderID: DocumentFolderID?
+        let textLayer: TextLayerData?
+        let pixelData: Data
+        let maskData: Data?
+    }
+
+    struct FolderPayload {
+        let id: DocumentFolderID
+        let name: String
+        let visible: Bool
+        let expanded: Bool
+        let anchorLayerIndex: Int?
+    }
+
+    struct TimelapseFramePayload {
+        let sourceURL: URL
+        let size: CGSize
+    }
+
+    enum TimelapsePayload {
+        case operations([TimelapseOperation])
+        case frames([TimelapseFramePayload])
+    }
+
+    let paperStyle: CanvasPaperStyle
+    let layers: [LayerPayload]
+    let folders: [FolderPayload]
+    let activeLayerIndex: Int
+    let timelapse: TimelapsePayload
+
+    init(
+        document: StoredPrimoDocument,
+        contract: PaintDocumentPersistenceContract,
+        baseURL: URL,
+        services: PaintDocumentSessionServices,
+        fileClient: FileClient
+    ) throws {
+        paperStyle = CanvasPaperStyle(
             red: Float(document.paperStyle.red),
             green: Float(document.paperStyle.green),
             blue: Float(document.paperStyle.blue),
@@ -139,71 +391,68 @@ extension PaintDocumentSession {
             isTransparent: document.paperStyle.isTransparent
         )
 
-        while Int(session.bridge.layerInfos().count) < document.layers.count {
-            _ = session.bridge.addLayer(name: "Layer \(Int(session.bridge.layerInfos().count) + 1)")
-        }
-
-        for layer in document.layers.sorted(by: { $0.index < $1.index }) {
-            let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
+        layers = try document.layers.sorted(by: { $0.index < $1.index }).map { layer in
+            let pixelURL = baseURL.appendingPathComponent(layer.pixelFilename, isDirectory: false)
             let pixelData = try services.persistence.loadData(from: pixelURL)
-            session.bridge.replaceLayerPixelsTransient(at: layer.index.rawValue, data: pixelData)
-            if let maskFilename = layer.maskFilename {
-                let maskData = try services.persistence.loadData(from: url.appendingPathComponent(maskFilename, isDirectory: false))
-                session.bridge.replaceLayerMask(at: layer.index.rawValue, data: maskData)
-            } else {
-                session.bridge.clearLayerMask(at: layer.index.rawValue)
-            }
-            session.bridge.setLayerName(layer.name, at: layer.index.rawValue)
-            session.bridge.setLayerVisible(layer.visible, at: layer.index.rawValue)
-            session.bridge.setLayerLocked(layer.locked, at: layer.index.rawValue)
-            session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index.rawValue)
-            session.bridge.setLayerClipped(layer.clipped, at: layer.index.rawValue)
-            session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index.rawValue)
-            session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index.rawValue)
-            if let textLayer = layer.textLayer {
-                session.textLayers[layer.index.rawValue] = textLayer
-            }
-        }
-
-        var folderIDMap: [DocumentFolderID: Int] = [:]
-        for folder in document.folders {
-            let newFolderID = Int(session.bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex?.rawValue ?? -1))
-            folderIDMap[folder.id] = newFolderID
-            session.bridge.setFolderVisible(folder.visible, folderID: newFolderID)
-            session.bridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
-        }
-
-        for layer in document.layers {
-            guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = session.bridge.setLayerFolder(at: layer.index.rawValue, folderID: resolvedFolderID)
-        }
-
-        session.bridge.activeLayerIndex = min(max(document.activeLayerIndex.rawValue, 0), document.layers.count - 1)
-
-        session.timelapseFrames.removeAll(keepingCapacity: true)
-        session.timelapseEvents.removeAll(keepingCapacity: true)
-        if !document.timelapseOperations.isEmpty {
-            session.usesOperationTimelapsePersistence = true
-            session.timelapseEvents = try document.timelapseOperations.map {
-                try TimelapseOperation(stored: $0, baseURL: url, fileClient: fileClient)
-            }
-        } else {
-            session.usesOperationTimelapsePersistence = false
-            for (index, storedFrame) in document.timelapseFrames.enumerated() {
-                let sourceURL = url.appendingPathComponent(storedFrame.filename, isDirectory: false)
-                let destinationURL = session.timelapseService.makeFrameURL(in: session.timelapseDirectoryURL, frameID: index)
-                try services.persistence.replaceItemIfNeeded(at: destinationURL, with: sourceURL)
-                session.timelapseFrames.append(
-                    TimelapseFrame(
-                        imageURL: destinationURL,
-                        size: CGSize(width: storedFrame.width, height: storedFrame.height)
-                    )
+            guard pixelData.count == contract.pixelByteCount else {
+                throw PrimoDocumentError.contractViolation(
+                    "Document contract failed: layer \(layer.index.rawValue) pixel payload has unexpected size."
                 )
             }
+
+            let maskData = try layer.maskFilename.map { maskFilename -> Data in
+                let data = try services.persistence.loadData(from: baseURL.appendingPathComponent(maskFilename, isDirectory: false))
+                guard data.count == contract.maskByteCount else {
+                    throw PrimoDocumentError.contractViolation(
+                        "Document contract failed: layer \(layer.index.rawValue) mask payload has unexpected size."
+                    )
+                }
+                return data
+            }
+
+            return LayerPayload(
+                index: layer.index.rawValue,
+                name: layer.name,
+                visible: layer.visible,
+                locked: layer.locked,
+                alphaLocked: layer.alphaLocked,
+                clipped: layer.clipped,
+                opacity: layer.opacity,
+                blendMode: layer.blendMode,
+                folderID: layer.folderID,
+                textLayer: layer.textLayer,
+                pixelData: pixelData,
+                maskData: maskData
+            )
         }
-        session.nextTimelapseFrameID = session.timelapseFrames.count
-        session.layerThumbnailCache.removeAll(keepingCapacity: true)
-        session.bridge.clearHistory()
-        return session
+
+        folders = document.folders.map { folder in
+            FolderPayload(
+                id: folder.id,
+                name: folder.name,
+                visible: folder.visible,
+                expanded: folder.expanded,
+                anchorLayerIndex: folder.anchorLayerIndex?.rawValue
+            )
+        }
+
+        activeLayerIndex = document.activeLayerIndex.rawValue
+
+        if !document.timelapseOperations.isEmpty {
+            timelapse = .operations(
+                try document.timelapseOperations.map {
+                    try TimelapseOperation(stored: $0, baseURL: baseURL, fileClient: fileClient)
+                }
+            )
+        } else {
+            timelapse = .frames(
+                document.timelapseFrames.map { frame in
+                    TimelapseFramePayload(
+                        sourceURL: baseURL.appendingPathComponent(frame.filename, isDirectory: false),
+                        size: CGSize(width: frame.width, height: frame.height)
+                    )
+                }
+            )
+        }
     }
 }

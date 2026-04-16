@@ -11,9 +11,7 @@ extension PaintDocumentSession {
         case .all:
             invalidateThumbnailCache()
         }
-        if !mutation.timelapseEvents.isEmpty {
-            timelapseEvents.append(contentsOf: mutation.timelapseEvents)
-        }
+        sessionState.timelapse.record(events: mutation.timelapseEvents)
         if mutation.shouldCaptureTimelapseFrame {
             captureTimelapseFrame()
         }
@@ -39,7 +37,7 @@ extension PaintDocumentSession {
     func presentation() -> PaintDocumentPresentation {
         let clock = ContinuousClock()
         let start = clock.now
-        revision += 1
+        let revision = sessionState.presentation.advanceRevision()
         let infos = bridge.layerInfos()
         let folderInfos = bridge.folderInfos()
         let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
@@ -60,7 +58,7 @@ extension PaintDocumentSession {
         let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
-        Self.logger.debug("presentation produced revision \(self.revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
+        Self.logger.debug("presentation produced revision \(revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
             activeLayerIndex: bridge.activeLayerIndex,
@@ -97,8 +95,8 @@ extension PaintDocumentSession {
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
                 hasMask: layer.hasMask,
-                isTextLayer: textLayers[index] != nil,
-                textLayer: textLayers[index]
+                isTextLayer: sessionState.textLayers.contains(index),
+                textLayer: sessionState.textLayers.data(at: index)
             )
         }.reversed())
     }

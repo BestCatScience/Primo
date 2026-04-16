@@ -10,7 +10,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     static let maxTimelapseFrames = 20_000
 
     private let services: PaintDocumentSessionServices
-    private var state: PaintDocumentSessionState
+    let sessionState: PaintDocumentSessionState
     var bridge: APPaintDocumentBridge
 
     init(
@@ -29,7 +29,7 @@ final class PaintDocumentSession: @unchecked Sendable {
         )
         self.bridge = APPaintDocumentBridge(width: width, height: height)
         let timelapseDirectoryURL = services.timelapse.makeDirectoryURL()
-        self.state = PaintDocumentSessionState(timelapseDirectoryURL: timelapseDirectoryURL)
+        self.sessionState = PaintDocumentSessionState(timelapseDirectoryURL: timelapseDirectoryURL)
         try? services.fileIO.createDirectory(timelapseDirectoryURL, true)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
@@ -40,7 +40,7 @@ final class PaintDocumentSession: @unchecked Sendable {
     }
 
     var currentPaperStyle: CanvasPaperStyle {
-        paperStyle
+        sessionState.presentation.paperStyle
     }
 
     var fileClient: FileClient { services.fileIO }
@@ -56,80 +56,5 @@ final class PaintDocumentSession: @unchecked Sendable {
     var geometryService: PaintDocumentGeometryService { services.geometry }
     var blurService: PaintDocumentBlurService { services.blur }
 
-    var timelapseDirectoryURL: URL { state.timelapseDirectoryURL }
-
-    var timelapseFrames: [TimelapseFrame] {
-        get { state.timelapseFrames }
-        set { state.timelapseFrames = newValue }
-    }
-
-    var timelapseEvents: [TimelapseOperation] {
-        get { state.timelapseEvents }
-        set { state.timelapseEvents = newValue }
-    }
-
-    var layerThumbnailCache: [Int: Data] {
-        get { state.layerThumbnailCache }
-        set { state.layerThumbnailCache = newValue }
-    }
-
-    var paperStyle: CanvasPaperStyle {
-        get { state.paperStyle }
-        set { state.paperStyle = newValue }
-    }
-
-    var nextTimelapseFrameID: Int {
-        get { state.nextTimelapseFrameID }
-        set { state.nextTimelapseFrameID = newValue }
-    }
-
-    var usesOperationTimelapsePersistence: Bool {
-        get { state.usesOperationTimelapsePersistence }
-        set { state.usesOperationTimelapsePersistence = newValue }
-    }
-
-    var textLayers: [Int: TextLayerData] {
-        get { state.textLayers }
-        set { state.textLayers = newValue }
-    }
-
-    var revision: Int {
-        get { state.revision }
-        set { state.revision = newValue }
-    }
-
-    var activeStrokeLayerIndex: Int? {
-        get { state.activeStrokeLayerIndex }
-        set { state.activeStrokeLayerIndex = newValue }
-    }
-
-    var activeStrokeBrush: BrushRuntimeSettings? {
-        get { state.activeStrokeBrush }
-        set { state.activeStrokeBrush = newValue }
-    }
-
-    var activeStrokeSamples: [StylusSample] {
-        get { state.activeStrokeSamples }
-        set { state.activeStrokeSamples = newValue }
-    }
-
-    var activeBlurStrokeLayerIndex: Int? {
-        get { state.activeBlurStrokeLayerIndex }
-        set { state.activeBlurStrokeLayerIndex = newValue }
-    }
-
-    var activeBlurStrokeBrush: BrushRuntimeSettings? {
-        get { state.activeBlurStrokeBrush }
-        set { state.activeBlurStrokeBrush = newValue }
-    }
-
-    var activeBlurStrokeSamples: [StylusSample] {
-        get { state.activeBlurStrokeSamples }
-        set { state.activeBlurStrokeSamples = newValue }
-    }
-
-    var blurStrokeHasCapturedHistory: Bool {
-        get { state.blurStrokeHasCapturedHistory }
-        set { state.blurStrokeHasCapturedHistory = newValue }
-    }
+    var timelapseDirectoryURL: URL { sessionState.timelapse.directoryURL }
 }

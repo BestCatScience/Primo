@@ -112,7 +112,7 @@ extension PaintDocumentSession {
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setPaperStyle(style):
-            paperStyle = style
+            sessionState.presentation.setPaperStyle(style)
         }
     }
 }

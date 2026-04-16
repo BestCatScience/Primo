@@ -4,7 +4,7 @@ import UIKit
 
 extension PaintDocumentSession {
     func textLayerData(index: Int) -> TextLayerData? {
-        textLayers[index]
+        sessionState.textLayers.data(at: index)
     }
 
     @discardableResult
@@ -13,48 +13,13 @@ extension PaintDocumentSession {
         let existingPixelData = bridge.pixelDataForLayer(at: index) as Data
         guard !existingPixelData.isEmpty else { return false }
         guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }
-        textLayers[index] = textLayer
+        sessionState.textLayers.set(textLayer, at: index)
         replaceLayerPixels(index: index, data: rasterized, preservesTextLayerMetadata: true)
         return true
     }
 
     func clearTextLayerData(index: Int) {
-        textLayers.removeValue(forKey: index)
-    }
-
-    func remappedTextLayersForInsertion(at insertedIndex: Int) -> [Int: TextLayerData] {
-        Dictionary(uniqueKeysWithValues: textLayers.map { index, value in
-            (index >= insertedIndex ? index + 1 : index, value)
-        })
-    }
-
-    func remappedTextLayersForDuplication(of sourceIndex: Int, duplicatedIndex: Int, duplicate: TextLayerData) -> [Int: TextLayerData] {
-        var remapped = remappedTextLayersForInsertion(at: duplicatedIndex)
-        remapped[duplicatedIndex] = duplicate
-        return remapped
-    }
-
-    func remappedTextLayersForDeletion(of deletedIndex: Int) -> [Int: TextLayerData] {
-        Dictionary(uniqueKeysWithValues: textLayers.compactMap { index, value in
-            guard index != deletedIndex else { return nil }
-            return (index > deletedIndex ? index - 1 : index, value)
-        })
-    }
-
-    func remappedTextLayersForMove(from sourceIndex: Int, to destinationIndex: Int) -> [Int: TextLayerData] {
-        var remapped: [Int: TextLayerData] = [:]
-        for (index, value) in textLayers {
-            if index == sourceIndex {
-                remapped[destinationIndex] = value
-            } else if sourceIndex < destinationIndex, index > sourceIndex, index <= destinationIndex {
-                remapped[index - 1] = value
-            } else if sourceIndex > destinationIndex, index >= destinationIndex, index < sourceIndex {
-                remapped[index + 1] = value
-            } else {
-                remapped[index] = value
-            }
-        }
-        return remapped
+        sessionState.textLayers.remove(at: index)
     }
 
     func rasterizedTextLayerPixelData(_ textLayer: TextLayerData) -> Data? {

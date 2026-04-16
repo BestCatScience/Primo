@@ -12,7 +12,7 @@ extension PaintDocumentSession {
         let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
         let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
         let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
-        let sourceTextLayers = textLayers
+        let sourceTextLayers = sessionState.textLayers.snapshot()
         let widthScale = CGFloat(targetSize.width) / CGFloat(sourceSize.width)
         let heightScale = CGFloat(targetSize.height) / CGFloat(sourceSize.height)
         let textScale = min(widthScale, heightScale)
@@ -74,7 +74,7 @@ extension PaintDocumentSession {
         let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
         let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
         let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
-        let sourceTextLayers = textLayers
+        let sourceTextLayers = sessionState.textLayers.snapshot()
         let offsetX = (targetSize.width - sourceSize.width) / 2
         let offsetY = (targetSize.height - sourceSize.height) / 2
 
@@ -182,21 +182,13 @@ extension PaintDocumentSession {
         activeLayerIndex: Int
     ) {
         bridge = resizedBridge
-        textLayers = resizedTextLayers
+        sessionState.textLayers.replaceAll(with: resizedTextLayers)
         for (index, textLayer) in resizedTextLayers {
             guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { continue }
             bridge.replaceLayerPixels(at: index, data: rasterized)
         }
         bridge.activeLayerIndex = activeLayerIndex
-        editingLifecycleService.resetActiveEditingState(
-            activeStrokeLayerIndex: &activeStrokeLayerIndex,
-            activeStrokeBrush: &activeStrokeBrush,
-            activeStrokeSamples: &activeStrokeSamples,
-            activeBlurStrokeLayerIndex: &activeBlurStrokeLayerIndex,
-            activeBlurStrokeBrush: &activeBlurStrokeBrush,
-            activeBlurStrokeSamples: &activeBlurStrokeSamples,
-            blurStrokeHasCapturedHistory: &blurStrokeHasCapturedHistory
-        )
+        sessionState.editing.resetAll()
         resetTimelapseHistory()
         applyLifecycleMutation(editingLifecycleService.mutation(invalidating: .all))
     }

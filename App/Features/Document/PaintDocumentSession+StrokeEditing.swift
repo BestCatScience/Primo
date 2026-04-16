@@ -2,39 +2,21 @@ import Foundation
 
 extension PaintDocumentSession {
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
-        activeStrokeLayerIndex = Int(bridge.activeLayerIndex)
-        activeStrokeBrush = brush
-        activeStrokeSamples = [sample]
-        if let activeStrokeLayerIndex {
-            clearTextLayerData(index: activeStrokeLayerIndex)
-        }
+        let activeLayerIndex = Int(bridge.activeLayerIndex)
+        sessionState.editing.stroke.begin(on: activeLayerIndex, brush: brush, sample: sample)
+        clearTextLayerData(index: activeLayerIndex)
         bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
     }
 
     func appendStroke(sample: StylusSample) {
-        activeStrokeSamples.append(sample)
+        sessionState.editing.stroke.append(sample)
         bridge.appendStroke(point: makeStrokePoint(from: sample))
     }
 
     func endStroke() {
         let activeLayerIndex = Int(bridge.activeLayerIndex)
-        let recordedEvent: TimelapseOperation? = if let layerIndex = activeStrokeLayerIndex,
-                                                   let brush = activeStrokeBrush,
-                                                   !activeStrokeSamples.isEmpty {
-            TimelapseOperation.stroke(
-                layerIndex: .unchecked(layerIndex),
-                brush: brush,
-                samples: activeStrokeSamples
-            )
-        } else {
-            nil
-        }
+        let recordedEvent = sessionState.editing.stroke.takeRecordedOperation()
         bridge.endStroke()
-        editingLifecycleService.resetStrokeState(
-            activeLayerIndex: &activeStrokeLayerIndex,
-            activeBrush: &activeStrokeBrush,
-            activeSamples: &activeStrokeSamples
-        )
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: recordedEvent.map { [$0] } ?? [],
@@ -46,11 +28,7 @@ extension PaintDocumentSession {
     func cancelStroke() {
         let activeLayerIndex = Int(bridge.activeLayerIndex)
         bridge.cancelStroke()
-        editingLifecycleService.resetStrokeState(
-            activeLayerIndex: &activeStrokeLayerIndex,
-            activeBrush: &activeStrokeBrush,
-            activeSamples: &activeStrokeSamples
-        )
+        sessionState.editing.stroke.reset()
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 invalidating: .layer(activeLayerIndex),
@@ -83,15 +61,15 @@ extension PaintDocumentSession {
         guard !samples.isEmpty else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
         clearTextLayerData(index: layerIndex)
-        if activeBlurStrokeLayerIndex != layerIndex {
-            activeBlurStrokeLayerIndex = layerIndex
-            activeBlurStrokeBrush = brush
-            activeBlurStrokeSamples = []
-            blurStrokeHasCapturedHistory = false
-        }
-        activeBlurStrokeSamples.append(contentsOf: samples)
-        applyBlurStroke(samples: samples, brush: brush, layerIndex: layerIndex, transient: blurStrokeHasCapturedHistory)
-        blurStrokeHasCapturedHistory = true
+        sessionState.editing.blurStroke.beginOrContinue(on: layerIndex, brush: brush)
+        sessionState.editing.blurStroke.append(contentsOf: samples)
+        applyBlurStroke(
+            samples: samples,
+            brush: brush,
+            layerIndex: layerIndex,
+            transient: sessionState.editing.blurStroke.shouldApplyTransiently
+        )
+        sessionState.editing.blurStroke.markHistoryCaptured()
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 invalidating: .layer(layerIndex),
@@ -101,23 +79,7 @@ extension PaintDocumentSession {
     }
 
     func endBlurStroke() {
-        let recordedEvent: TimelapseOperation? = if let layerIndex = activeBlurStrokeLayerIndex,
-                                                   let brush = activeBlurStrokeBrush,
-                                                   !activeBlurStrokeSamples.isEmpty {
-            TimelapseOperation.blurStroke(
-                layerIndex: .unchecked(layerIndex),
-                brush: brush,
-                samples: activeBlurStrokeSamples
-            )
-        } else {
-            nil
-        }
-        editingLifecycleService.resetBlurStrokeState(
-            activeLayerIndex: &activeBlurStrokeLayerIndex,
-            activeBrush: &activeBlurStrokeBrush,
-            activeSamples: &activeBlurStrokeSamples,
-            blurStrokeHasCapturedHistory: &blurStrokeHasCapturedHistory
-        )
+        let recordedEvent = sessionState.editing.blurStroke.takeRecordedOperation()
         applyLifecycleMutation(
             editingLifecycleService.mutation(recording: recordedEvent.map { [$0] } ?? [])
         )

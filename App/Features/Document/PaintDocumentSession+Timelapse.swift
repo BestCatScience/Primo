@@ -4,8 +4,8 @@ import UIKit
 
 extension PaintDocumentSession {
     func setPaperStyle(_ style: CanvasPaperStyle) {
-        guard paperStyle != style else { return }
-        paperStyle = style
+        guard sessionState.presentation.paperStyle != style else { return }
+        sessionState.presentation.setPaperStyle(style)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setPaperStyle(style),
@@ -16,27 +16,27 @@ extension PaintDocumentSession {
 
     func timelapseCapture() -> TimelapseCapture? {
         let previewData = makeTimelapseThumbnail()?.jpegData(compressionQuality: 0.72)
-        if usesOperationTimelapsePersistence, !timelapseEvents.isEmpty {
+        if sessionState.timelapse.usesOperationPersistence, !sessionState.timelapse.events.isEmpty {
             return TimelapseCapture(
                 canvasSize: CGSize(width: bridge.width, height: bridge.height),
-                paperStyle: paperStyle,
+                paperStyle: sessionState.presentation.paperStyle,
                 previewImageData: previewData,
-                source: .operations(timelapseEvents),
+                source: .operations(sessionState.timelapse.events),
                 framesPerSecond: 24
             )
         }
 
-        guard timelapseFrames.count >= 2 else { return nil }
+        guard sessionState.timelapse.frames.count >= 2 else { return nil }
         return TimelapseCapture(
             canvasSize: CGSize(width: bridge.width, height: bridge.height),
-            paperStyle: paperStyle,
+            paperStyle: sessionState.presentation.paperStyle,
             previewImageData: previewData,
-            source: .frames(timelapseFrames),
+            source: .frames(sessionState.timelapse.frames),
             framesPerSecond: 24
         )
     }
 
     func timelapseCompositeImage() -> UIImage? {
-        renderedCompositeImage(paperStyle: paperStyle)
+        renderedCompositeImage(paperStyle: sessionState.presentation.paperStyle)
     }
 }

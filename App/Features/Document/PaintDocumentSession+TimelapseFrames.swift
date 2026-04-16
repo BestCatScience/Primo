@@ -9,7 +9,7 @@ extension PaintDocumentSession {
     }
 
     func makeTimelapseThumbnail() -> UIImage? {
-        guard let sourceImage = renderedCompositeImage(paperStyle: paperStyle) else { return nil }
+        guard let sourceImage = renderedCompositeImage(paperStyle: sessionState.presentation.paperStyle) else { return nil }
         let targetSize = timelapseFrameSize(
             for: CGSize(width: bridge.width, height: bridge.height),
             maxDimension: 512
@@ -22,8 +22,7 @@ extension PaintDocumentSession {
 
     func appendTimelapseFrame(image: UIImage) {
         guard let jpegData = image.jpegData(compressionQuality: 0.72) else { return }
-        let frameURL = timelapseService.makeFrameURL(in: timelapseDirectoryURL, frameID: nextTimelapseFrameID)
-        nextTimelapseFrameID += 1
+        let frameURL = sessionState.timelapse.reserveNextFrameURL(using: timelapseService)
         do {
             try timelapseService.persistFrameData(jpegData, to: frameURL)
         } catch {
@@ -32,9 +31,7 @@ extension PaintDocumentSession {
         }
 
         let frame = TimelapseFrame(imageURL: frameURL, size: image.size)
-        timelapseFrames.append(frame)
-        if timelapseFrames.count > Self.maxTimelapseFrames {
-            let removed = timelapseFrames.remove(at: 1)
+        if let removed = sessionState.timelapse.appendFrame(frame, maxFrameCount: Self.maxTimelapseFrames) {
             try? timelapseService.removeFrame(at: removed.imageURL)
         }
     }
@@ -78,11 +75,11 @@ extension PaintDocumentSession {
     }
 
     func cachedLayerThumbnailData(index: Int) -> Data? {
-        if let cached = layerThumbnailCache[index] {
+        if let cached = sessionState.presentation.cachedThumbnailData(for: index) {
             return cached
         }
         let thumbnail = makeLayerThumbnailData(index: index)
-        layerThumbnailCache[index] = thumbnail
+        sessionState.presentation.storeThumbnailData(thumbnail, for: index)
         return thumbnail
     }
 
@@ -101,19 +98,12 @@ extension PaintDocumentSession {
     }
 
     func resetTimelapseHistory() {
-        for frame in timelapseFrames {
+        for frame in sessionState.timelapse.resetHistory() {
             try? timelapseService.removeFrame(at: frame.imageURL)
         }
-        timelapseFrames.removeAll(keepingCapacity: false)
-        timelapseEvents.removeAll(keepingCapacity: false)
-        nextTimelapseFrameID = 0
     }
 
     func invalidateThumbnailCache(for index: Int? = nil) {
-        if let index {
-            layerThumbnailCache.removeValue(forKey: index)
-        } else {
-            layerThumbnailCache.removeAll(keepingCapacity: true)
-        }
+        sessionState.presentation.invalidateThumbnailCache(for: index)
     }
 }
