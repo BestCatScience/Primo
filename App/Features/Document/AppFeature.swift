@@ -1063,286 +1063,190 @@ struct AppFeature {
                 return .none
 
             case let .gradientMapSelected(preset):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .gradientMap(preset)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply gradient map")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply gradient map")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .gradientMap(preset))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .gradientMapPreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.gradientMappedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.gradientMappedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(
+                    state: &state,
+                    adjustedPixels: adjusted
+                )
                 return .none
 
             case let .gradientMapApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.gradientMappedLayerPixels(source: layer.pixelData, settings: settings)
-                else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply gradient map")
-                    return .none
-                }
-                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                let adjusted = state.canvas.renderSnapshot
+                    .flatMap { snapshot in
+                        snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
+                            .flatMap { Self.gradientMappedLayerPixels(source: $0.pixelData, settings: settings) }
+                    }
+                _ = handleAdjustmentApplyUsingPixels(
+                    state: &state,
+                    adjustedPixels: adjusted,
+                    failureMessage: state.appLanguage.localized("Could not apply gradient map")
+                )
                 return .none
 
             case let .hueSaturationBrightnessPreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.hueSaturationBrightnessAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.hueSaturationBrightnessAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .hueSaturationBrightnessApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .hueSaturationBrightness(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .hueSaturationBrightness(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .brightnessContrastPreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.brightnessContrastAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.brightnessContrastAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .brightnessContrastApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .brightnessContrast(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .brightnessContrast(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .levelsPreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.levelsAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.levelsAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .levelsApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .levels(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .levels(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .toneCurvePreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.toneCurveAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.toneCurveAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .toneCurveApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .toneCurve(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .toneCurve(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .colorBalancePreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.colorBalanceAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.colorBalanceAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .colorBalanceApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .colorBalance(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .colorBalance(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .thresholdPreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.thresholdAdjustedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.thresholdAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .thresholdApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .threshold(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .threshold(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .posterizePreviewChanged(settings):
-                guard
-                    let settings,
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.posterizedLayerPixels(source: layer.pixelData, settings: settings),
-                    let composite = Self.compositedPreviewPixelData(
-                        snapshot: snapshot,
-                        activeLayerIndex: state.canvas.activeLayerIndex,
-                        adjustedActiveLayerPixels: adjusted
-                    )
-                else {
-                    state.canvas.adjustmentPreviewPixelData = nil
-                    return .none
+                let adjusted = settings.flatMap { settings in
+                    state.canvas.renderSnapshot
+                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                        .flatMap { Self.posterizedLayerPixels(source: $0.pixelData, settings: settings) }
                 }
-                state.canvas.adjustmentPreviewPixelData = composite
+                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .posterizeApplied(settings):
-                state.canvas.adjustmentPreviewPixelData = nil
-                guard paintDocumentClient.applyLayerProcessing(state.canvas.activeLayerIndex, .posterize(settings)) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
+                let activeLayerIndex = state.canvas.activeLayerIndex
+                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
+                _ = handleAdjustmentApplyUsingProcessing(
+                    state: &state,
+                    failureMessage: failureMessage
+                ) {
+                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .posterize(settings))
                 }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case .luminanceToAlphaRequested:
-                guard
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjusted = Self.luminanceToAlphaLayerPixels(source: layer.pixelData)
-                else {
-                    state.bannerMessage = state.appLanguage.localized("Could not apply color adjustment")
-                    return .none
-                }
-                paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjusted)
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                let adjusted = state.canvas.renderSnapshot
+                    .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
+                    .flatMap { Self.luminanceToAlphaLayerPixels(source: $0.pixelData) }
+                _ = handleAdjustmentApplyUsingPixels(
+                    state: &state,
+                    adjustedPixels: adjusted,
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case .exportDocumentRequested:
@@ -1455,26 +1359,7 @@ struct AppFeature {
                 return .none
 
             case let .photoImportReceived(name, data):
-                guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not import photo")
-                    return .none
-                }
-                let nextNumber = state.layerSidebar.layers.count + 1
-                let fallbackName = state.appLanguage == .japanese ? "写真 \(nextNumber)" : "Photo \(nextNumber)"
-                let layerName = {
-                    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    return trimmed.isEmpty ? fallbackName : trimmed
-                }()
-                paintDocumentClient.addLayer(layerName)
-                let targetLayerIndex = state.layerSidebar.layers.count
-                paintDocumentClient.replaceLayerPixels(targetLayerIndex, importedPixelData)
-                paintDocumentClient.setActiveLayer(targetLayerIndex)
-                state.canvas.activeLayerIndex = targetLayerIndex
-                state.canvas.selection = nil
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                applyDirtyPresentation(state: &state)
-                state.bannerMessage = state.appLanguage.localized("Photo imported to a new layer")
+                handlePhotoImport(state: &state, name: name, data: data)
                 return .none
 
             case let .photoImportFailed(message):
@@ -1608,49 +1493,7 @@ struct AppFeature {
                 return applyTransform(state: &state)
 
             case let .brushPalette(.delegate(.applyText(draft))):
-                let fontOption = state.brushPalette.text.availableFonts.first(where: { $0.postScriptName == draft.fontPostScriptName })
-                    ?? state.brushPalette.text.availableFonts.first
-                guard let position = draft.position else { return .none }
-                let uiColor = UIColor(state.brushPalette.brush.activeOpaqueColor)
-                var red: CGFloat = 0
-                var green: CGFloat = 0
-                var blue: CGFloat = 0
-                var alpha: CGFloat = 0
-                uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-                let textLayer = TextLayerData(
-                    text: draft.text,
-                    positionX: position.x,
-                    positionY: position.y,
-                    fontPostScriptName: fontOption?.postScriptName ?? draft.fontPostScriptName ?? UIFont.systemFont(ofSize: draft.fontSize).fontName,
-                    fontDisplayName: fontOption?.displayName ?? draft.fontDisplayName ?? UIFont.systemFont(ofSize: draft.fontSize).fontName,
-                    fontSize: draft.fontSize,
-                    scale: draft.scale,
-                    rotationDegrees: draft.rotationDegrees,
-                    red: red,
-                    green: green,
-                    blue: blue,
-                    alpha: alpha
-                )
-
-                let targetLayerIndex: Int
-                if let existingIndex = draft.targetLayerIndex {
-                    targetLayerIndex = existingIndex
-                } else {
-                    let layerName = draft.text.components(separatedBy: .newlines).first?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let resolvedName = (layerName?.isEmpty == false ? layerName! : (state.appLanguage == .japanese ? "テキスト" : "Text"))
-                    paintDocumentClient.addLayer(resolvedName)
-                    targetLayerIndex = state.layerSidebar.layers.count
-                }
-
-                guard paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
-                    state.bannerMessage = state.appLanguage.localized("テキストをレイヤーに適用できませんでした")
-                    return .none
-                }
-                paintDocumentClient.setActiveLayer(targetLayerIndex)
-                state.canvas.activeLayerIndex = targetLayerIndex
-                state.canvas.currentTool = .text
-                state.brushPalette.text.targetLayerIndex = targetLayerIndex
-                applyDirtyPresentation(state: &state)
+                handleApplyText(state: &state, draft: draft)
                 return .none
 
             case .canvas(.delegate(.applyTransform)):
@@ -1662,87 +1505,31 @@ struct AppFeature {
                 return .none
 
             case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
-                let activeLayerIndex = state.layerSidebar.activeLayerIndex
-                paintDocumentClient.clearLayer(activeLayerIndex)
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                    state.canvas.localBufferRevision += 1
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleClearActiveLayer(state: &state)
                 return .none
 
             case .createLayerMaskFromSelectionRequested:
-                let activeLayerIndex = state.layerSidebar.activeLayerIndex
-                guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
-                    state.bannerMessage = state.appLanguage.localized("選択範囲を作成してからマスクを追加してください")
-                    return .none
-                }
-                guard paintDocumentClient.replaceLayerMask(activeLayerIndex, maskData) else {
-                    state.bannerMessage = state.appLanguage.localized("レイヤーマスクを作成できませんでした")
-                    return .none
-                }
-                applyDirtyPresentation(state: &state)
+                handleCreateLayerMask(state: &state)
                 return .none
 
             case .clearLayerMaskRequested:
-                let activeLayerIndex = state.layerSidebar.activeLayerIndex
-                guard paintDocumentClient.clearLayerMask(activeLayerIndex) else {
-                    return .none
-                }
-                applyDirtyPresentation(state: &state)
+                handleClearLayerMask(state: &state)
                 return .none
 
             case .applyLayerMaskRequested:
-                let activeLayerIndex = state.layerSidebar.activeLayerIndex
-                guard paintDocumentClient.applyLayerMask(activeLayerIndex) else {
-                    state.bannerMessage = state.appLanguage.localized("レイヤーマスクを適用できませんでした")
-                    return .none
-                }
-                if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
-                    state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-                    state.canvas.localBufferRevision += 1
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleApplyLayerMask(state: &state)
                 return .none
 
             case .activeLayerVisibilityToggled:
-                let activeLayerIndex = state.layerSidebar.activeLayerIndex
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == activeLayerIndex }) else {
-                    return .none
-                }
-                paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleActiveLayerVisibilityToggle(state: &state)
                 return .none
 
             case .selectPreviousLayer:
-                guard
-                    let currentPosition = state.layerSidebar.layers.firstIndex(where: { $0.index == state.layerSidebar.activeLayerIndex }),
-                    currentPosition > 0
-                else {
-                    return .none
-                }
-                let targetIndex = state.layerSidebar.layers[currentPosition - 1].index
-                paintDocumentClient.setActiveLayer(targetIndex)
-                state.canvas.activeLayerIndex = targetIndex
-                state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                handleSelectAdjacentLayer(state: &state, direction: -1)
                 return .none
 
             case .selectNextLayer:
-                guard
-                    let currentPosition = state.layerSidebar.layers.firstIndex(where: { $0.index == state.layerSidebar.activeLayerIndex }),
-                    currentPosition < state.layerSidebar.layers.count - 1
-                else {
-                    return .none
-                }
-                let targetIndex = state.layerSidebar.layers[currentPosition + 1].index
-                paintDocumentClient.setActiveLayer(targetIndex)
-                state.canvas.activeLayerIndex = targetIndex
-                state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                handleSelectAdjacentLayer(state: &state, direction: 1)
                 return .none
 
             case .brushPalette:
@@ -1770,38 +1557,23 @@ struct AppFeature {
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
-                paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
-                state.canvas.activeLayerIndex = state.layerSidebar.layers.count
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleAddLayer(state: &state)
                 return .none
 
             case .layerSidebar(.delegate(.addFolder)):
-                let nextFolderNumber = state.layerSidebar.rows.reduce(into: 0) { partialResult, row in
-                    if case .folder = row {
-                        partialResult += 1
-                    }
-                } + 1
-                _ = paintDocumentClient.createFolder(
-                    StudioStrings.folderName(nextFolderNumber, state.appLanguage),
-                    state.layerSidebar.activeLayerIndex
-                )
-                applyDirtyPresentation(state: &state)
+                handleAddFolder(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.deleteFolder(folderID))):
-                guard paintDocumentClient.deleteFolder(folderID) else {
-                    return .none
+                handleLayerMutation(state: &state) {
+                    layerWorkflowService.paintDocumentClient.deleteFolder(folderID)
                 }
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.deleteLayer(index))):
-                guard paintDocumentClient.deleteLayer(index) else {
-                    return .none
+                handleLayerMutation(state: &state, clearsSelection: true) {
+                    layerWorkflowService.paintDocumentClient.deleteLayer(index)
                 }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.duplicateLayer(index))):
@@ -1809,37 +1581,31 @@ struct AppFeature {
                     return .none
                 }
                 let duplicateName = state.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
-                guard paintDocumentClient.duplicateLayer(index, duplicateName) >= 0 else {
-                    return .none
+                handleLayerMutation(state: &state, clearsSelection: true) {
+                    layerWorkflowService.paintDocumentClient.duplicateLayer(index, duplicateName) >= 0
                 }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
-                guard paintDocumentClient.moveLayer(index, destinationIndex) else {
-                    return .none
+                handleLayerMutation(state: &state, clearsSelection: true) {
+                    layerWorkflowService.paintDocumentClient.moveLayer(index, destinationIndex)
                 }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
-                guard paintDocumentClient.assignLayerToFolder(index, folderID) else {
-                    return .none
+                handleLayerMutation(state: &state) {
+                    layerWorkflowService.paintDocumentClient.assignLayerToFolder(index, folderID)
                 }
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
-                guard paintDocumentClient.assignLayerToFolder(index, -1) else {
-                    return .none
+                handleLayerMutation(state: &state) {
+                    layerWorkflowService.paintDocumentClient.assignLayerToFolder(index, -1)
                 }
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setOpacity(index, opacity))):
-                paintDocumentClient.setLayerOpacity(index, opacity)
+                layerWorkflowService.paintDocumentClient.setLayerOpacity(index, opacity)
                 state.canvas.selection = nil
                 applyDirtyPresentation(state: &state)
                 return .none
@@ -1848,7 +1614,7 @@ struct AppFeature {
                 guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
                     return .none
                 }
-                paintDocumentClient.setLayerLocked(index, !layer.isLocked)
+                layerWorkflowService.paintDocumentClient.setLayerLocked(index, !layer.isLocked)
                 applyDirtyPresentation(state: &state)
                 return .none
 
@@ -1856,7 +1622,7 @@ struct AppFeature {
                 guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
                     return .none
                 }
-                paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
+                layerWorkflowService.paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
                 applyDirtyPresentation(state: &state)
                 return .none
 
@@ -1867,20 +1633,18 @@ struct AppFeature {
                 guard layer.isClipped || index > 0 else {
                     return .none
                 }
-                paintDocumentClient.setLayerClipped(index, !layer.isClipped)
+                layerWorkflowService.paintDocumentClient.setLayerClipped(index, !layer.isClipped)
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.mergeDown(index))):
-                guard paintDocumentClient.mergeLayerDown(index) else {
-                    return .none
+                handleLayerMutation(state: &state, clearsSelection: true) {
+                    layerWorkflowService.paintDocumentClient.mergeLayerDown(index)
                 }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.selectLayer(index))):
-                paintDocumentClient.setActiveLayer(index)
+                layerWorkflowService.paintDocumentClient.setActiveLayer(index)
                 state.canvas.activeLayerIndex = index
                 state.canvas.selection = nil
                 state.applyPresentation(paintDocumentClient.presentation())
@@ -1890,13 +1654,13 @@ struct AppFeature {
                 guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
                     return .none
                 }
-                paintDocumentClient.setLayerVisibility(index, !layer.visible)
+                layerWorkflowService.paintDocumentClient.setLayerVisibility(index, !layer.visible)
                 state.canvas.selection = nil
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setFolderExpanded(folderID, isExpanded))):
-                paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+                layerWorkflowService.paintDocumentClient.setFolderExpanded(folderID, isExpanded)
                 state.applyPresentation(paintDocumentClient.presentation())
                 return .none
 
@@ -1909,328 +1673,68 @@ struct AppFeature {
                 }).first else {
                     return .none
                 }
-                paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
+                layerWorkflowService.paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.renameFolder(folderID, name))):
-                paintDocumentClient.setFolderName(folderID, name)
+                layerWorkflowService.paintDocumentClient.setFolderName(folderID, name)
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.setBlendMode(index, blendMode))):
-                paintDocumentClient.setLayerBlendMode(index, blendMode)
+                layerWorkflowService.paintDocumentClient.setLayerBlendMode(index, blendMode)
                 state.canvas.selection = nil
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .layerSidebar(.delegate(.renameLayer(index, name))):
-                paintDocumentClient.setLayerName(index, name)
+                layerWorkflowService.paintDocumentClient.setLayerName(index, name)
                 applyDirtyPresentation(state: &state)
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    return .none
-                }
-                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
-                state.canvas.selection = nil
-                paintDocumentClient.cancelStroke()
-                if state.canvas.activeStrokeBaseSnapshot == nil {
-                    if state.canvas.renderSnapshot == nil {
-                        state.applyPresentation(paintDocumentClient.presentation())
-                    }
-                    state.canvas.activeStrokeBaseSnapshot = state.canvas.renderSnapshot
-                }
-                let brush = state.resolvedBrushSettings()
-                var previewBrush = brush
-                previewBrush.taperIn = 0
-                previewBrush.taperOut = 0
-                if
-                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
-                        canvasWidth: baseSnapshot.width,
-                        canvasHeight: baseSnapshot.height,
-                        samples: [sample],
-                        brush: previewBrush,
-                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                    )
-                {
-                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
-                    if
-                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-                        let dirtyRect = Self.strokePreviewDirtyRect(
-                            samples: [sample],
-                            brush: previewBrush,
-                            canvasWidth: baseSnapshot.width,
-                            canvasHeight: baseSnapshot.height
-                        ),
-                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                            snapshot: baseSnapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels,
-                            dirtyRect: dirtyRect
-                        )
-                    {
-                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
-                    } else {
-                        state.applyLiveStrokePreview(
-                            baseSnapshot: baseSnapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels
-                        )
-                    }
-                }
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleBeginStroke(state: &state, sample: sample)
 
             case let .canvas(.delegate(.appendSamples(samples))):
-                guard !samples.isEmpty else { return .none }
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    return .none
-                }
-                let brush = state.resolvedBrushSettings()
-                var previewBrush = brush
-                previewBrush.taperIn = 0
-                previewBrush.taperOut = 0
-                if
-                    let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                    let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
-                {
-                    let fullSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
-                    let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
-                    let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
-                    let deltaSamples = anchor.map { [$0] + samples } ?? samples
-                    let previewSamples = deltaSamples
-                    let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
-                    guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: basePixelData,
-                        canvasWidth: baseSnapshot.width,
-                        canvasHeight: baseSnapshot.height,
-                        samples: previewSamples,
-                        brush: previewBrush,
-                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                    ) else {
-                        return .none
-                    }
-                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
-                    if
-                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-                        let dirtyRect = Self.strokePreviewDirtyRect(
-                            samples: previewSamples,
-                            brush: previewBrush,
-                            canvasWidth: baseSnapshot.width,
-                            canvasHeight: baseSnapshot.height
-                        ),
-                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                            snapshot: baseSnapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels,
-                            dirtyRect: dirtyRect
-                        )
-                    {
-                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
-                    } else {
-                        state.applyLiveStrokePreview(
-                            baseSnapshot: baseSnapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels
-                        )
-                    }
-                } else if let snapshot = state.canvas.renderSnapshot,
-                    let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                    let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
-                        canvasWidth: snapshot.width,
-                        canvasHeight: snapshot.height,
-                        samples: samples,
-                        brush: previewBrush,
-                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                    )
-                {
-                    state.canvas.activeStrokeBaseSnapshot = snapshot
-                    state.canvas.activeStrokePreviewLayerPixelData = adjustedPixels
-                    if
-                        Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-                        let dirtyRect = Self.strokePreviewDirtyRect(
-                            samples: samples,
-                            brush: previewBrush,
-                            canvasWidth: snapshot.width,
-                            canvasHeight: snapshot.height
-                        ),
-                        let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                            snapshot: snapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels,
-                            dirtyRect: dirtyRect
-                        )
-                    {
-                        state.canvas.pendingIncrementalUpdate = incrementalUpdate
-                    } else {
-                        state.applyLiveStrokePreview(
-                            baseSnapshot: snapshot,
-                            activeLayerIndex: state.canvas.activeLayerIndex,
-                            adjustedActiveLayerPixels: adjustedPixels
-                        )
-                    }
-                }
+                handleAppendStrokeSamples(state: &state, samples: samples)
                 return .none
 
             case let .canvas(.delegate(.previewShapeStroke(samples))):
-                guard let first = samples.first else { return .none }
-                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
-                state.canvas.selection = nil
-                paintDocumentClient.cancelStroke()
-                paintDocumentClient.beginStroke(first, state.resolvedBrushSettings())
-                for sample in samples.dropFirst() {
-                    paintDocumentClient.appendStroke(sample)
-                }
-                state.applyLiveCompositePixelData(paintDocumentClient.compositePixelData())
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handlePreviewShapeStroke(state: &state, samples: samples)
 
             case .canvas(.delegate(.commitPreviewShapeStroke)):
-                paintDocumentClient.endStroke()
-                applyDirtyPresentation(state: &state)
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleCommitPreviewShapeStroke(state: &state)
 
             case let .canvas(.delegate(.endStroke(samples))):
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    state.canvas.activeStrokeBaseSnapshot = nil
-                    state.canvas.activeStrokePreviewLayerPixelData = nil
-                    state.canvas.pendingIncrementalUpdate = nil
-                    return .none
-                }
-                let brush = state.resolvedBrushSettings()
-                let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
-                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
-                } else {
-                    let didCommit = paintDocumentClient.applySoftwareStroke(
-                        samples,
-                        brush,
-                        state.canvas.activeLayerIndex
-                    )
-                    if !didCommit,
-                        let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                        let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                        let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                            basePixelData: baseLayer.pixelData,
-                            canvasWidth: baseSnapshot.width,
-                            canvasHeight: baseSnapshot.height,
-                            samples: samples,
-                            brush: brush,
-                            preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                        ) {
-                        paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
-                    }
-                }
-                state.canvas.activeStrokeBaseSnapshot = nil
-                state.canvas.activeStrokePreviewLayerPixelData = nil
-                state.canvas.pendingIncrementalUpdate = nil
-                applyDirtyPresentation(state: &state)
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
+                return handleFinishStroke(
+                    state: &state,
+                    samples: samples,
+                    keepsSelectionCleared: false,
+                    refreshViaDirtyPresentation: true
                 )
 
             case .canvas(.delegate(.cancelStroke)):
-                if state.canvas.currentTool == .shape {
-                    paintDocumentClient.cancelStroke()
-                }
-                state.canvas.activeStrokeBaseSnapshot = nil
-                state.canvas.activeStrokePreviewLayerPixelData = nil
-                state.canvas.pendingIncrementalUpdate = nil
-                state.applyPresentation(paintDocumentClient.presentation())
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleCancelStroke(state: &state)
 
             case let .canvas(.delegate(.commitStroke(samples))):
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    state.canvas.activeStrokeBaseSnapshot = nil
-                    state.canvas.activeStrokePreviewLayerPixelData = nil
-                    state.canvas.pendingIncrementalUpdate = nil
-                    return .none
-                }
-                let brush = state.resolvedBrushSettings()
-                let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
-                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
-                state.canvas.selection = nil
-                if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-                    paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
-                } else {
-                    let didCommit = paintDocumentClient.applySoftwareStroke(
-                        samples,
-                        brush,
-                        state.canvas.activeLayerIndex
-                    )
-                    if !didCommit {
-                        if state.canvas.renderSnapshot == nil {
-                            state.applyPresentation(paintDocumentClient.presentation())
-                        }
-                        let fallbackSnapshot = state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot
-                        if let snapshot = fallbackSnapshot,
-                            let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                                basePixelData: baseLayer.pixelData,
-                                canvasWidth: snapshot.width,
-                                canvasHeight: snapshot.height,
-                                samples: samples,
-                                brush: brush,
-                                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                            ) {
-                            paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
-                        }
-                    }
-                }
-                state.canvas.activeStrokeBaseSnapshot = nil
-                state.canvas.activeStrokePreviewLayerPixelData = nil
-                state.canvas.pendingIncrementalUpdate = nil
-                state.applyPresentation(paintDocumentClient.presentation())
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
+                return handleFinishStroke(
+                    state: &state,
+                    samples: samples,
+                    keepsSelectionCleared: true,
+                    refreshViaDirtyPresentation: false
                 )
 
             case let .canvas(.delegate(.blurSamples(samples))):
-                guard !samples.isEmpty else { return .none }
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    return .none
-                }
-                paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
-                paintDocumentClient.blurStroke(samples, state.resolvedBrushSettings(), state.canvas.activeLayerIndex, false)
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleBlurSamples(state: &state, samples: samples)
                 return .none
 
             case .canvas(.delegate(.endBlurStroke)):
-                paintDocumentClient.endBlurStroke()
-                applyDirtyPresentation(state: &state)
+                handleEndBlurStroke(state: &state)
                 return .none
 
             case let .canvas(.delegate(.fill(sample))):
-                guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
-                    return .none
-                }
-                paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
-                paintDocumentClient.fill(sample, state.resolvedBrushSettings())
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
-                return .concatenate(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleFill(state: &state, sample: sample)
 
             case let .canvas(.delegate(.lassoSelect(points))):
                 let incomingSelection = Self.makeLassoSelection(
