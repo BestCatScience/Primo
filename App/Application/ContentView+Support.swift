@@ -469,22 +469,29 @@ struct DiagonalStageLines: View {
 }
 
 extension ContentView {
+    var applicationState: AppFeature.ApplicationState { store.application }
+    var workspaceState: AppFeature.WorkspaceState { store.workspace }
+    var recoveryState: AppFeature.RecoveryState { store.recovery }
+    var saveHistoryState: AppFeature.SaveHistoryState { store.saveHistory }
+    var exportState: AppFeature.ExportState { store.export }
+    var nanoBananaState: AppFeature.NanoBananaState { store.nanoBanana }
+
     func workspaceTabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
-        store.openTabs.filter { $0.pane == pane }
+        workspaceState.openTabs.filter { $0.pane == pane }
     }
 
     func workspaceSelectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
         switch pane {
         case .primary:
-            return store.primarySelectedTabID
+            return workspaceState.primarySelectedTabID
         case .secondary:
-            return store.secondarySelectedTabID
+            return workspaceState.secondarySelectedTabID
         }
     }
 
     func workspaceSelectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
         guard let selectedTabID = workspaceSelectedTabID(for: pane) else { return nil }
-        return store.openTabs.first(where: { $0.id == selectedTabID })
+        return workspaceState.openTabs.first(where: { $0.id == selectedTabID })
     }
 
     var homeDashboard: some View {
@@ -493,7 +500,7 @@ extension ContentView {
 
             VStack(spacing: 0) {
                 homeTopBar
-                if !store.openTabs.isEmpty {
+                if !workspaceState.openTabs.isEmpty {
                     workspaceTabBar
                 }
 
@@ -512,7 +519,7 @@ extension ContentView {
 
     var workspaceTabBar: some View {
         Group {
-            if store.workspaceLayout == .split {
+            if workspaceState.workspaceLayout == .split {
                 HStack(spacing: 0) {
                     workspaceTabStrip(for: .primary)
                     Rectangle()
@@ -558,11 +565,11 @@ extension ContentView {
 
             HStack(spacing: 6) {
                 if pane == .primary {
-                    if store.workspaceLayout == .single, store.activeTabID != nil {
+                    if workspaceState.workspaceLayout == .single, workspaceState.activeTabID != nil {
                         workspaceTabChromeButton(symbol: "square.split.2x1") {
                             store.send(.splitActiveTabIntoSecondaryPane)
                         }
-                    } else if store.workspaceLayout == .split {
+                    } else if workspaceState.workspaceLayout == .split {
                         workspaceTabChromeButton(symbol: "sidebar.leading") {
                             store.send(.mergeWorkspacePanes)
                         }
@@ -575,7 +582,7 @@ extension ContentView {
     }
 
     func workspaceTabItem(_ tab: OpenDocumentTab, in pane: WorkspacePane) -> some View {
-        let isActive = store.activeTabID == tab.id && store.focusedWorkspacePane == pane
+        let isActive = workspaceState.activeTabID == tab.id && workspaceState.focusedWorkspacePane == pane
         let isSelected = workspaceSelectedTabID(for: pane) == tab.id
 
         return HStack(spacing: 10) {
@@ -748,7 +755,7 @@ extension ContentView {
     }
 
     private func homeSidebarButton(for section: HomeSidebarSection) -> some View {
-        let isSelected = store.homeSection == section
+        let isSelected = applicationState.homeSection == section
 
         return Button {
             store.send(.homeSectionSelected(section))
@@ -817,7 +824,7 @@ extension ContentView {
 
     @ViewBuilder
     private var homePrimaryPane: some View {
-        switch store.homeSection {
+        switch applicationState.homeSection {
         case .home:
             homeCanvasPane
         case .learn:
@@ -827,7 +834,7 @@ extension ContentView {
 
     private var homeCanvasPane: some View {
         Group {
-            if store.isLoadingHomeProjects {
+            if applicationState.isLoadingHomeProjects {
                 VStack {
                     Spacer()
                     ProgressView()
@@ -835,7 +842,7 @@ extension ContentView {
                         .controlSize(.large)
                     Spacer()
                 }
-            } else if store.homeProjects.isEmpty {
+            } else if applicationState.homeProjects.isEmpty {
                 homeEmptyProjectsView
             } else {
                 ScrollView {
@@ -843,7 +850,7 @@ extension ContentView {
                         columns: [GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 18)],
                         spacing: 18
                     ) {
-                        ForEach(store.homeProjects) { project in
+                        ForEach(applicationState.homeProjects) { project in
                             homeProjectCard(project)
                         }
                     }
@@ -868,11 +875,11 @@ extension ContentView {
                 )
                 learnPanel(
                     title: StudioStrings.appLanguageTitle(language),
-                    detail: "\(language.title) / \(StudioStrings.storageSummary(store.homeProjects.count, language))"
+                    detail: "\(language.title) / \(StudioStrings.storageSummary(applicationState.homeProjects.count, language))"
                 )
 
                 Picker(StudioStrings.appLanguageTitle(language), selection: Binding(
-                    get: { store.appLanguage },
+                    get: { applicationState.appLanguage },
                     set: { store.send(.languageChanged($0)) }
                 )) {
                     ForEach(AppLanguage.allCases) { item in

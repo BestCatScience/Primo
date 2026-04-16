@@ -12,6 +12,10 @@ extension AppFeature.WorkspaceState {
         return openTabs[activeTabIndex]
     }
 
+    func isActiveTab(_ tabID: OpenDocumentTab.ID) -> Bool {
+        activeTabID == tabID
+    }
+
     func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
         switch pane {
         case .primary:
@@ -33,6 +37,12 @@ extension AppFeature.WorkspaceState {
         }
     }
 
+    mutating func activateTab(_ tabID: OpenDocumentTab.ID, pane: WorkspacePane) {
+        activeTabID = tabID
+        setSelectedTabID(tabID, for: pane)
+        focus(on: pane)
+    }
+
     func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
         openTabs.filter { $0.pane == pane }
     }
@@ -46,10 +56,61 @@ extension AppFeature.WorkspaceState {
         openTabs.contains(where: { $0.pane == pane })
     }
 
+    func tab(withID tabID: OpenDocumentTab.ID) -> OpenDocumentTab? {
+        openTabs.first(where: { $0.id == tabID })
+    }
+
     func tabID(
         forSourceProjectURL sourceProjectURL: DocumentProjectPath
     ) -> OpenDocumentTab.ID? {
         openTabs.first { $0.sourceProjectURL == sourceProjectURL }?.id
+    }
+
+    func tabIDs(excluding retainedTabID: OpenDocumentTab.ID) -> [OpenDocumentTab.ID] {
+        openTabs.filter { $0.id != retainedTabID }.map(\.id)
+    }
+
+    func tabIDsToRight(of tabID: OpenDocumentTab.ID) -> [OpenDocumentTab.ID] {
+        guard let tab = tab(withID: tabID) else { return [] }
+        let paneTabs = tabs(in: tab.pane)
+        guard let index = paneTabs.firstIndex(where: { $0.id == tabID }) else { return [] }
+        return Array(paneTabs.dropFirst(index + 1).map(\.id))
+    }
+
+    func dirtyTabs(withIDs tabIDs: [OpenDocumentTab.ID]) -> [OpenDocumentTab] {
+        openTabs.filter { tabIDs.contains($0.id) && $0.isDirty }
+    }
+
+    mutating func appendTab(_ tab: OpenDocumentTab) {
+        openTabs.append(tab)
+    }
+
+    @discardableResult
+    mutating func updateTab(
+        id tabID: OpenDocumentTab.ID,
+        title: String? = nil,
+        sourceProjectURL: DocumentProjectPath? = nil,
+        previewImageData: Data? = nil,
+        canvasSize: CGSize? = nil,
+        isDirty: Bool? = nil
+    ) -> OpenDocumentTab? {
+        guard let tabIndex = openTabs.firstIndex(where: { $0.id == tabID }) else { return nil }
+        if let title {
+            openTabs[tabIndex].title = title
+        }
+        if let sourceProjectURL {
+            openTabs[tabIndex].sourceProjectURL = sourceProjectURL
+        }
+        if let previewImageData {
+            openTabs[tabIndex].previewImageData = previewImageData
+        }
+        if let canvasSize {
+            openTabs[tabIndex].canvasSize = canvasSize
+        }
+        if let isDirty {
+            openTabs[tabIndex].isDirty = isDirty
+        }
+        return openTabs[tabIndex]
     }
 
     mutating func updateActiveTabMetadata(
@@ -58,17 +119,14 @@ extension AppFeature.WorkspaceState {
         previewImageData: Data? = nil,
         canvasSize: CGSize
     ) {
-        guard let activeTabIndex else { return }
-        if let title {
-            openTabs[activeTabIndex].title = title
-        }
-        if let sourceProjectURL {
-            openTabs[activeTabIndex].sourceProjectURL = sourceProjectURL
-        }
-        if let previewImageData {
-            openTabs[activeTabIndex].previewImageData = previewImageData
-        }
-        openTabs[activeTabIndex].canvasSize = canvasSize
+        guard let activeTabID else { return }
+        updateTab(
+            id: activeTabID,
+            title: title,
+            sourceProjectURL: sourceProjectURL,
+            previewImageData: previewImageData,
+            canvasSize: canvasSize
+        )
     }
 
     mutating func setActiveTabDirty(_ isDirty: Bool) {
@@ -116,6 +174,65 @@ extension AppFeature.WorkspaceState {
             focusedWorkspacePane = pane
         }
         workspaceLayout = hasTabs(in: .secondary) ? .split : .single
+    }
+
+    mutating func beginSplitLayout() {
+        workspaceLayout = .split
+    }
+
+    mutating func focus(on pane: WorkspacePane) {
+        focusedWorkspacePane = pane
+    }
+
+    mutating func clearActiveTab() {
+        activeTabID = nil
+    }
+
+    mutating func collapseToPrimaryLayout() {
+        workspaceLayout = .single
+        secondarySelectedTabID = nil
+        focusedWorkspacePane = .primary
+    }
+
+    mutating func presentCloseConfirmation(
+        operation: PendingCloseOperation,
+        dirtyTabs: [OpenDocumentTab]
+    ) {
+        pendingCloseConfirmation = PendingCloseConfirmationState(
+            operation: operation,
+            tabIDs: dirtyTabs.map(\.id),
+            tabTitles: dirtyTabs.map(\.title)
+        )
+    }
+
+    mutating func clearCloseConfirmation() {
+        pendingCloseConfirmation = nil
+    }
+
+    @discardableResult
+    mutating func removeTab(id tabID: OpenDocumentTab.ID) -> OpenDocumentTab? {
+        guard let tabIndex = openTabs.firstIndex(where: { $0.id == tabID }) else { return nil }
+        let removedTab = openTabs.remove(at: tabIndex)
+        ensureSelectionIntegrity()
+        return removedTab
+    }
+
+    @discardableResult
+    mutating func removeTabs(withIDs tabIDs: Set<OpenDocumentTab.ID>) -> [OpenDocumentTab] {
+        let removedTabs = openTabs.filter { tabIDs.contains($0.id) }
+        openTabs.removeAll { tabIDs.contains($0.id) }
+        ensureSelectionIntegrity()
+        return removedTabs
+    }
+
+    @discardableResult
+    mutating func retainOnlyTab(id tabID: OpenDocumentTab.ID) -> [OpenDocumentTab] {
+        let removedTabs = openTabs.filter { $0.id != tabID }
+        openTabs = openTabs.filter { $0.id == tabID }
+        primarySelectedTabID = openTabs.first(where: { $0.pane == .primary })?.id
+        secondarySelectedTabID = openTabs.first(where: { $0.pane == .secondary })?.id
+        ensureSelectionIntegrity()
+        return removedTabs
     }
 
     mutating func ensureSelectionIntegrity() {

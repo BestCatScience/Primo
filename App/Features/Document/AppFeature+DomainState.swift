@@ -8,6 +8,10 @@ extension AppFeature.ApplicationState {
         appLanguage = language
     }
 
+    mutating func beginHydration() {
+        isHydrating = true
+    }
+
     mutating func finishHydration(showingHome: Bool? = nil) {
         isHydrating = false
         if let showingHome {
@@ -17,6 +21,10 @@ extension AppFeature.ApplicationState {
 
     mutating func showHome(section: HomeSidebarSection = .home) {
         showsHome = true
+        homeSection = section
+    }
+
+    mutating func selectHomeSection(_ section: HomeSidebarSection) {
         homeSection = section
     }
 
@@ -40,6 +48,10 @@ extension AppFeature.ApplicationState {
     mutating func clearBanner() {
         bannerMessage = nil
     }
+
+    mutating func updateLanguage(_ language: AppLanguage) {
+        appLanguage = language
+    }
 }
 
 extension AppFeature.RecoveryState {
@@ -59,6 +71,10 @@ extension AppFeature.RecoveryState {
 }
 
 extension AppFeature.SaveHistoryState {
+    mutating func beginPresentation() {
+        isPresented = true
+    }
+
     mutating func present(entries: [SaveHistoryEntry]) {
         self.entries = entries
         isPresented = true
@@ -70,6 +86,10 @@ extension AppFeature.SaveHistoryState {
 }
 
 extension AppFeature.ExportState {
+    mutating func presentShareSheet(_ shareExport: ShareExport) {
+        shareSheet = shareExport
+    }
+
     mutating func clearOutputs() {
         shareSheet = nil
         timelapsePreview = nil
@@ -103,5 +123,82 @@ extension AppFeature.ExportState {
 
     mutating func dismissShareSheet() {
         shareSheet = nil
+    }
+}
+
+extension AppFeature.NanoBananaState {
+    mutating func beginGeneration(
+        request: NanoBananaGenerationRequest,
+        jobID: UUID,
+        createdAt: Date
+    ) {
+        isGenerating = true
+        pendingRequest = request
+        activeJobID = jobID
+        jobs.insert(
+            NanoBananaJob(
+                id: jobID,
+                request: request,
+                createdAt: createdAt,
+                status: .running,
+                message: nil
+            ),
+            at: 0
+        )
+        jobs = Array(jobs.prefix(12))
+    }
+
+    func regenerationRequest() -> NanoBananaGenerationRequest? {
+        pendingRequest
+    }
+
+    func retryRequest(for jobID: UUID) -> NanoBananaGenerationRequest? {
+        jobs.first(where: { $0.id == jobID })?.request
+    }
+
+    mutating func recordSucceededGeneration(
+        preview: NanoBananaPreviewState,
+        historyID: UUID,
+        createdAt: Date
+    ) {
+        isGenerating = false
+        history.insert(
+            NanoBananaHistoryItem(
+                id: historyID,
+                request: preview.request,
+                createdAt: createdAt,
+                previewImageData: preview.afterPreviewImageData
+            ),
+            at: 0
+        )
+        history = Array(history.prefix(12))
+        if let activeJobID,
+           let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
+            jobs[jobIndex].status = .succeeded
+            jobs[jobIndex].message = nil
+        }
+    }
+
+    mutating func completeAppliedEdit(request: NanoBananaGenerationRequest) {
+        pendingRequest = request
+        activeJobID = nil
+    }
+
+    mutating func markFailed(message: String) {
+        isGenerating = false
+        if let activeJobID,
+           let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
+            jobs[jobIndex].status = .failed
+            jobs[jobIndex].message = message
+        }
+    }
+
+    mutating func markCanceled(localizedMessage: String) {
+        isGenerating = false
+        if let activeJobID,
+           let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
+            jobs[jobIndex].status = .canceled
+            jobs[jobIndex].message = localizedMessage
+        }
     }
 }

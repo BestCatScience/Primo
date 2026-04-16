@@ -86,7 +86,7 @@ extension AppFeature {
         state: inout State,
         language: AppLanguage
     ) {
-        state.appLanguage = language
+        state.application.updateLanguage(language)
         appLanguageClient.persist(language)
     }
 }

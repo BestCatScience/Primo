@@ -8,7 +8,7 @@ extension AppFeature {
         width: Int,
         height: Int
     ) -> Effect<Action> {
-        if !state.showsHome {
+        if !state.application.showsHome {
             persistActiveTabToBackingStore(state: &state)
         }
         let width = max(width, 1)
@@ -30,7 +30,7 @@ extension AppFeature {
         state.applyPresentation(paintDocumentClient.presentation())
         activateNewTab(
             state: &state,
-            title: Self.nextUntitledTabTitle(existingTabs: state.openTabs),
+            title: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
             sourceProjectURL: nil
         )
         return .merge(
@@ -57,7 +57,7 @@ extension AppFeature {
         state.canvas.resetTransformPreview()
         state.canvas.adjustmentPreviewPixelData = nil
         applyDirtyPresentation(state: &state)
-        state.application.presentBanner(state.appLanguage.localized("Image resolution updated"))
+        state.application.presentBanner(state.application.appLanguage.localized("Image resolution updated"))
     }
 
     func handleResizeCanvasExtentRequest(
@@ -78,7 +78,7 @@ extension AppFeature {
         state.canvas.resetTransformPreview()
         state.canvas.adjustmentPreviewPixelData = nil
         applyDirtyPresentation(state: &state)
-        state.application.presentBanner(state.appLanguage.localized("Canvas size updated"))
+        state.application.presentBanner(state.application.appLanguage.localized("Canvas size updated"))
     }
 
     func handleNewCanvasFromImageReceived(
@@ -86,17 +86,17 @@ extension AppFeature {
         name: String?,
         data: Data
     ) -> Effect<Action> {
-        if !state.showsHome {
+        if !state.application.showsHome {
             persistActiveTabToBackingStore(state: &state)
         }
         guard let importedImage = Self.importedCanvasImage(from: data) else {
-            state.application.presentBanner(state.appLanguage.localized("Could not create canvas from image"))
+            state.application.presentBanner(state.application.appLanguage.localized("Could not create canvas from image"))
             return .none
         }
         let width = importedImage.width
         let height = importedImage.height
         guard (64...8192).contains(width), (64...8192).contains(height) else {
-            state.application.presentBanner(state.appLanguage.localized("Image size is not supported"))
+            state.application.presentBanner(state.application.appLanguage.localized("Image size is not supported"))
             return .none
         }
 
@@ -117,7 +117,7 @@ extension AppFeature {
         paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
         let nextName = {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return trimmed.isEmpty ? (state.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
+            return trimmed.isEmpty ? (state.application.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
         }()
         paintDocumentClient.setLayerName(0, nextName)
         paintDocumentClient.setActiveLayer(0)
@@ -127,7 +127,7 @@ extension AppFeature {
             title: nextName,
             sourceProjectURL: nil
         )
-        state.application.presentBanner(state.appLanguage.localized("Canvas created from image"))
+        state.application.presentBanner(state.application.appLanguage.localized("Canvas created from image"))
         return .merge(
             .cancel(id: CancelID.startupPresentationLoad),
             .cancel(id: CancelID.deferredPresentationRefresh)
@@ -136,7 +136,7 @@ extension AppFeature {
 
     func handleUndoRequested(state: inout State) {
         guard !state.canvas.isStrokeActive else {
-            state.application.presentBanner(state.appLanguage.localized("Undo is unavailable while drawing"))
+            state.application.presentBanner(state.application.appLanguage.localized("Undo is unavailable while drawing"))
             return
         }
         guard paintDocumentClient.undo() else {
@@ -148,7 +148,7 @@ extension AppFeature {
 
     func handleRedoRequested(state: inout State) {
         guard !state.canvas.isStrokeActive else {
-            state.application.presentBanner(state.appLanguage.localized("Redo is unavailable while drawing"))
+            state.application.presentBanner(state.application.appLanguage.localized("Redo is unavailable while drawing"))
             return
         }
         guard paintDocumentClient.redo() else {

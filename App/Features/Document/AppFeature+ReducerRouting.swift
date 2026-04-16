@@ -26,41 +26,41 @@ extension AppFeature {
         state: inout State,
         section: HomeSidebarSection
     ) {
-        state.application.homeSection = section
+        state.application.selectHomeSection(section)
     }
 
     func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
-        guard let confirmation = state.pendingCloseConfirmation else { return .none }
+        guard let confirmation = state.workspace.pendingCloseConfirmation else { return .none }
         do {
             try saveTabsForClose(confirmation.tabIDs, state: &state)
-            state.pendingCloseConfirmation = nil
+            state.workspace.clearCloseConfirmation()
             return performCloseOperation(state: &state, operation: confirmation.operation)
         } catch {
             state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
             )
-            state.pendingCloseConfirmation = nil
+            state.workspace.clearCloseConfirmation()
             return .none
         }
     }
 
     func handlePendingCloseDiscardConfirmed(state: inout State) -> Effect<Action> {
-        guard let confirmation = state.pendingCloseConfirmation else { return .none }
-        state.pendingCloseConfirmation = nil
+        guard let confirmation = state.workspace.pendingCloseConfirmation else { return .none }
+        state.workspace.clearCloseConfirmation()
         return performCloseOperation(state: &state, operation: confirmation.operation)
     }
 
     func handlePendingCloseCancelled(state: inout State) {
-        state.pendingCloseConfirmation = nil
+        state.workspace.clearCloseConfirmation()
     }
 
     func handleMoveTabToSecondaryPane(
         state: inout State,
         tabID: OpenDocumentTab.ID
     ) {
-        state.workspaceLayout = .split
-        state.moveTab(tabID, to: .secondary, before: nil)
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.beginSplitLayout()
+        state.workspace.moveTab(tabID, to: .secondary, before: nil)
+        state.workspace.ensureSelectionIntegrity()
     }
 
     func handleTabReordered(
@@ -68,7 +68,7 @@ extension AppFeature {
         movingID: OpenDocumentTab.ID,
         targetID: OpenDocumentTab.ID
     ) {
-        state.reorderTabs(moving: movingID, before: targetID)
+        state.workspace.reorderTabs(moving: movingID, before: targetID)
     }
 
     func handleTabDropped(
@@ -77,32 +77,30 @@ extension AppFeature {
         pane: WorkspacePane,
         targetID: OpenDocumentTab.ID?
     ) {
-        state.moveTab(movingID, to: pane, before: targetID)
+        state.workspace.moveTab(movingID, to: pane, before: targetID)
     }
 
     func handleSplitActiveTabIntoSecondaryPane(state: inout State) {
-        state.workspaceLayout = .split
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.beginSplitLayout()
+        state.workspace.ensureSelectionIntegrity()
     }
 
     func handleMergeWorkspacePanes(state: inout State) {
-        let secondaryTabs = state.tabs(in: .secondary).map(\.id)
+        let secondaryTabs = state.workspace.tabs(in: .secondary).map(\.id)
         for tabID in secondaryTabs {
-            state.moveTab(tabID, to: .primary, before: nil)
+            state.workspace.moveTab(tabID, to: .primary, before: nil)
         }
-        state.workspaceLayout = .single
-        state.secondarySelectedTabID = nil
-        state.focusedWorkspacePane = .primary
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.collapseToPrimaryLayout()
+        state.workspace.ensureSelectionIntegrity()
     }
 
     func handleWorkspacePaneActivated(
         state: inout State,
         pane: WorkspacePane
     ) -> Effect<Action> {
-        state.focusedWorkspacePane = pane
-        guard let tabID = state.selectedTabID(for: pane) else { return .none }
-        guard state.activeTabID != tabID else { return .none }
+        state.workspace.focus(on: pane)
+        guard let tabID = state.workspace.selectedTabID(for: pane) else { return .none }
+        guard state.workspace.isActiveTab(tabID) == false else { return .none }
         return .send(.tabSelected(tabID))
     }
 
@@ -120,18 +118,12 @@ extension AppFeature {
         message: String
     ) {
         state.application.presentBanner(
-            message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
+            message.isEmpty ? state.application.appLanguage.localized("Could not create canvas from image") : message
         )
     }
 
-    func handleNanoBananaPreviewDiscarded(state: inout State) {
-        state.nanoBananaPreview = nil
-        state.activeNanoBananaJobID = nil
-    }
-
     func handleNanoBananaRegenerateRequested(state: inout State) -> Effect<Action> {
-        guard let request = state.nanoBananaPreview?.request ?? state.pendingNanoBananaRequest else { return .none }
-        state.nanoBananaPreview = nil
+        guard let request = state.nanoBanana.regenerationRequest() else { return .none }
         return .send(.nanoBananaEditRequested(request))
     }
 
@@ -139,8 +131,8 @@ extension AppFeature {
         state: inout State,
         jobID: UUID
     ) -> Effect<Action> {
-        guard let job = state.nanoBananaJobs.first(where: { $0.id == jobID }) else { return .none }
-        return .send(.nanoBananaEditRequested(job.request))
+        guard let request = state.nanoBanana.retryRequest(for: jobID) else { return .none }
+        return .send(.nanoBananaEditRequested(request))
     }
 
     func handleTimelapseExportProgressUpdated(
@@ -180,7 +172,7 @@ extension AppFeature {
     ) {
         state.application.finishHydration()
         state.application.presentBanner(
-            message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
+            message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message
         )
     }
 
@@ -189,7 +181,7 @@ extension AppFeature {
         message: String
     ) {
         state.application.presentBanner(
-            message.isEmpty ? state.appLanguage.localized("Could not import photo") : message
+            message.isEmpty ? state.application.appLanguage.localized("Could not import photo") : message
         )
     }
 }

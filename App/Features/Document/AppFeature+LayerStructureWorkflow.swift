@@ -15,7 +15,7 @@ extension AppFeature {
             }
         } + 1
         _ = layerWorkflowService.paintDocumentClient.createFolder(
-            StudioStrings.folderName(nextFolderNumber, state.appLanguage),
+            StudioStrings.folderName(nextFolderNumber, state.application.appLanguage),
             state.layerSidebar.activeLayerIndex
         )
         applyDirtyPresentation(state: &state)
@@ -46,7 +46,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
             return
         }
-        let duplicateName = state.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
+        let duplicateName = state.application.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
         handleLayerMutation(state: &state, clearsSelection: true) {
             layerWorkflowService.paintDocumentClient.duplicateLayer(index, duplicateName) >= 0
         }

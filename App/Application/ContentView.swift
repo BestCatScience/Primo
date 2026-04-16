@@ -88,7 +88,7 @@ struct ContentView: View {
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
     @AppStorage("primo.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
     @AppStorage("primo.nanobanana.apiKey") var nanoBananaAPIKey = ""
-    var language: AppLanguage { store.appLanguage }
+    var language: AppLanguage { applicationState.appLanguage }
 
     var nanoBananaAccessMode: NanoBananaAccessMode {
         get { NanoBananaAccessMode(rawValue: nanoBananaAccessModeRawValue) ?? .userAPIKey }
@@ -102,7 +102,7 @@ struct ContentView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            if store.showsHome {
+            if applicationState.showsHome {
                 homeDashboard
             } else {
                 scaledStudioInterface(in: proxy.size)
@@ -116,7 +116,7 @@ struct ContentView: View {
             await nanoBananaCommerce.prepare()
         }
         .sheet(item: Binding(
-            get: { store.exportSheet },
+            get: { exportState.shareSheet },
             set: { _ in store.send(.exportSheetDismissed) }
         )) { export in
             ShareSheet(items: [export.url])
@@ -177,12 +177,12 @@ struct ContentView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { store.isShowingAutosaveRecovery },
+                get: { recoveryState.isPresented },
                 set: { if !$0 { store.send(.autosaveRecoveryDismissed) } }
             )
         ) {
             AutosaveRecoverySheet(
-                items: store.autosaveRecoveryItems,
+                items: recoveryState.items,
                 language: language,
                 onRestore: { store.send(.autosaveRecoveryRestoreRequested($0)) },
                 onDiscard: { store.send(.autosaveRecoveryDiscardRequested($0)) },
@@ -191,13 +191,13 @@ struct ContentView: View {
         }
         .sheet(
             isPresented: Binding(
-                get: { store.isShowingSaveHistory },
+                get: { saveHistoryState.isPresented },
                 set: { if !$0 { store.send(.saveHistoryDismissed) } }
             )
         ) {
             SaveHistorySheet(
                 title: language.localized("保存履歴"),
-                entries: store.saveHistoryEntries,
+                entries: saveHistoryState.entries,
                 language: language,
                 onRestoreCurrent: { store.send(.saveHistoryRestoreRequested($0, false)) },
                 onOpenNewTab: { store.send(.saveHistoryRestoreRequested($0, true)) },
@@ -237,8 +237,8 @@ struct ContentView: View {
                 await createCanvasFromPhoto(from: newItem)
             }
         }
-        .task(id: store.bannerMessage) {
-            guard store.bannerMessage != nil else { return }
+        .task(id: applicationState.bannerMessage) {
+            guard applicationState.bannerMessage != nil else { return }
             try? await Task.sleep(for: .milliseconds(2200))
             guard !Task.isCancelled else { return }
             store.send(.bannerDismissed)
@@ -246,7 +246,7 @@ struct ContentView: View {
         .alert(
             language.localized("未保存の変更があります"),
             isPresented: Binding(
-                get: { store.pendingCloseConfirmation != nil },
+                get: { workspaceState.pendingCloseConfirmation != nil },
                 set: { if !$0 { store.send(.pendingCloseCancelled) } }
             )
         ) {
@@ -261,7 +261,7 @@ struct ContentView: View {
             }
         } message: {
             Text(
-                store.pendingCloseConfirmation?.tabTitles.prefix(3).joined(separator: "\n")
+                workspaceState.pendingCloseConfirmation?.tabTitles.prefix(3).joined(separator: "\n")
                 ?? language.localized("閉じる前に保存するか選んでください")
             )
         }
@@ -310,7 +310,7 @@ struct ContentView: View {
                         .onChanged { _ in },
                     including: .all
                 )
-                if !store.openTabs.isEmpty {
+                if !workspaceState.openTabs.isEmpty {
                     workspaceTabBar
                 }
             }
@@ -378,19 +378,19 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if let bannerMessage = store.bannerMessage {
+            if let bannerMessage = applicationState.bannerMessage {
                 BannerToast(message: bannerMessage)
                     .padding(.bottom, 18)
             }
         }
         .overlay {
-            if let preview = store.timelapseExportPreview {
+            if let preview = exportState.timelapsePreview {
                 TimelapseExportHUD(
                     previewImageData: preview.previewImageData,
                     progress: preview.progress,
                     language: language
                 )
-            } else if let progress = store.nanoBananaProgress, store.isNanoBananaGenerating {
+            } else if let progress = store.nanoBananaProgress, nanoBananaState.isGenerating {
                 ZStack {
                     Color.black.opacity(0.24)
                         .ignoresSafeArea()

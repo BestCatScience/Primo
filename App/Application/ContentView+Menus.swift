@@ -26,7 +26,7 @@ extension ContentView {
     }
 
     var nanoBananaGenerateDisabled: Bool {
-        store.isNanoBananaGenerating ||
+        nanoBananaState.isGenerating ||
         store.layerSidebar.layers.isEmpty ||
         nanoBananaPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         (
@@ -1192,9 +1192,9 @@ extension ContentView {
                     }
                 }
 
-                if !store.nanoBananaJobs.isEmpty {
+                if !nanoBananaState.jobs.isEmpty {
                     Section(language.localized("Jobs")) {
-                        ForEach(store.nanoBananaJobs.prefix(4)) { job in
+                        ForEach(nanoBananaState.jobs.prefix(4)) { job in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
                                     Text(job.request.model.title(language))
@@ -1217,9 +1217,9 @@ extension ContentView {
                     }
                 }
 
-                if !store.nanoBananaHistory.isEmpty {
+                if !nanoBananaState.history.isEmpty {
                     Section(language.localized("History")) {
-                        ForEach(store.nanoBananaHistory.prefix(4)) { item in
+                        ForEach(nanoBananaState.history.prefix(4)) { item in
                             Button {
                                 nanoBananaPrompt = item.request.prompt
                                 nanoBananaInputLayerIndex = item.request.inputLayerIndex
@@ -1720,7 +1720,7 @@ extension ContentView {
                     prepareNanoBananaComposer()
                     showsNanoBananaSheet = true
                 }
-                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || store.isNanoBananaGenerating)
+                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || nanoBananaState.isGenerating)
 
                 Divider()
 

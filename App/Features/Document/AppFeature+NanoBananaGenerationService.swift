@@ -27,22 +27,22 @@ extension AppFeature {
             let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedPrompt.isEmpty else {
-                state.application.presentBanner(state.appLanguage.localized("Enter a prompt for Nano Banana"))
+                state.application.presentBanner(state.application.appLanguage.localized("Enter a prompt for Nano Banana"))
                 return nil
             }
             guard request.config.accessMode == .appManaged || !trimmedCredential.isEmpty else {
-                state.application.presentBanner(state.appLanguage.localized("Enter your Gemini API key"))
+                state.application.presentBanner(state.application.appLanguage.localized("Enter your Gemini API key"))
                 return nil
             }
             guard request.config.accessMode == .userAPIKey || !trimmedEndpoint.isEmpty else {
-                state.application.presentBanner(state.appLanguage.localized("Enter your app server endpoint"))
+                state.application.presentBanner(state.application.appLanguage.localized("Enter your app server endpoint"))
                 return nil
             }
             guard
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
             else {
-                state.application.presentBanner(state.appLanguage.localized("Could not prepare the active layer for Nano Banana"))
+                state.application.presentBanner(state.application.appLanguage.localized("Could not prepare the active layer for Nano Banana"))
                 return nil
             }
 
@@ -55,7 +55,7 @@ extension AppFeature {
                 )
                 : nil
             if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
-                state.application.presentBanner(state.appLanguage.localized("Create a selection to use inpaint"))
+                state.application.presentBanner(state.application.appLanguage.localized("Create a selection to use inpaint"))
                 return nil
             }
 
@@ -86,22 +86,11 @@ extension AppFeature {
                 maskSettings: request.maskSettings
             )
             let jobID = uuidClient.generate()
-            state.isNanoBananaGenerating = true
-            state.nanoBananaPreview = nil
-            state.pendingNanoBananaRequest = normalizedRequest
-            state.activeNanoBananaJobID = jobID
-            state.pendingNanoBananaOutputMode = request.outputMode
-            state.nanoBananaJobs.insert(
-                NanoBananaJob(
-                    id: jobID,
-                    request: normalizedRequest,
-                    createdAt: dateClient.now(),
-                    status: .running,
-                    message: nil
-                ),
-                at: 0
+            state.nanoBanana.beginGeneration(
+                request: normalizedRequest,
+                jobID: jobID,
+                createdAt: dateClient.now()
             )
-            state.nanoBananaJobs = Array(state.nanoBananaJobs.prefix(12))
 
             return PreparedEdit(
                 normalizedRequest: normalizedRequest,
@@ -111,7 +100,7 @@ extension AppFeature {
                 canvasHeight: canvasHeight,
                 sourceLayerPixelData: sourceLayerPixelData,
                 beforePreviewImageData: beforePreviewImageData,
-                appLanguage: state.appLanguage,
+                appLanguage: state.application.appLanguage,
                 trimmedPrompt: trimmedPrompt
             )
         }
@@ -226,22 +215,11 @@ extension AppFeature {
             preview: NanoBananaPreviewState,
             paintDocumentClient: PaintDocumentClient
         ) {
-            state.isNanoBananaGenerating = false
-            state.nanoBananaHistory.insert(
-                NanoBananaHistoryItem(
-                    id: uuidClient.generate(),
-                    request: preview.request,
-                    createdAt: dateClient.now(),
-                    previewImageData: preview.afterPreviewImageData
-                ),
-                at: 0
+            state.nanoBanana.recordSucceededGeneration(
+                preview: preview,
+                historyID: uuidClient.generate(),
+                createdAt: dateClient.now()
             )
-            state.nanoBananaHistory = Array(state.nanoBananaHistory.prefix(12))
-            if let activeJobID = state.activeNanoBananaJobID,
-               let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                state.nanoBananaJobs[jobIndex].status = .succeeded
-                state.nanoBananaJobs[jobIndex].message = nil
-            }
             applyPreview(state: &state, preview: preview, paintDocumentClient: paintDocumentClient)
         }
 
@@ -265,36 +243,24 @@ extension AppFeature {
                 state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
             }
             state.canvas.selection = nil
-            state.nanoBananaPreview = nil
-            state.pendingNanoBananaRequest = preview.request
-            state.activeNanoBananaJobID = nil
-            state.pendingNanoBananaOutputMode = .replaceCurrentLayer
+            state.nanoBanana.completeAppliedEdit(request: preview.request)
             state.applyPresentation(paintDocumentClient.presentation())
-            state.application.presentBanner(state.appLanguage.localized("Nano Banana edit applied"))
+            state.application.presentBanner(state.application.appLanguage.localized("Nano Banana edit applied"))
         }
 
         func applyFailure(state: inout State, message: String) {
-            state.isNanoBananaGenerating = false
-            if let activeJobID = state.activeNanoBananaJobID,
-               let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                state.nanoBananaJobs[jobIndex].status = .failed
-                state.nanoBananaJobs[jobIndex].message = message
-            }
+            state.nanoBanana.markFailed(message: message)
             state.application.presentBanner(
                 message.isEmpty
-                    ? state.appLanguage.localized("Nano Banana edit failed")
+                    ? state.application.appLanguage.localized("Nano Banana edit failed")
                     : message
             )
         }
 
         func cancel(state: inout State) -> Effect<Action> {
-            state.isNanoBananaGenerating = false
-            if let activeJobID = state.activeNanoBananaJobID,
-               let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                state.nanoBananaJobs[jobIndex].status = .canceled
-                state.nanoBananaJobs[jobIndex].message = state.appLanguage.localized("Nano Banana generation canceled")
-            }
-            state.application.presentBanner(state.appLanguage.localized("Nano Banana generation canceled"))
+            let localizedMessage = state.application.appLanguage.localized("Nano Banana generation canceled")
+            state.nanoBanana.markCanceled(localizedMessage: localizedMessage)
+            state.application.presentBanner(localizedMessage)
             return .cancel(id: CancelID.nanoBananaEdit)
         }
     }
@@ -337,14 +303,5 @@ extension AppFeature {
 
     func handleNanoBananaCancelRequested(state: inout State) -> Effect<Action> {
         nanoBananaGenerationService.cancel(state: &state)
-    }
-
-    func handleNanoBananaPreviewAccepted(state: inout State) {
-        guard let preview = state.nanoBananaPreview else { return }
-        nanoBananaGenerationService.applyPreview(
-            state: &state,
-            preview: preview,
-            paintDocumentClient: paintDocumentClient
-        )
     }
 }

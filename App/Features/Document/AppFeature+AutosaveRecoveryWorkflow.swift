@@ -13,10 +13,10 @@ extension AppFeature {
         guard let item = state.recovery.items.first(where: { $0.id == autosaveID }) else {
             return .none
         }
-        if !state.showsHome {
+        if !state.application.showsHome {
             _ = persistActiveTabToBackingStore(state: &state)
         }
-        state.application.isHydrating = true
+        state.application.beginHydration()
         state.recovery.dismiss()
         return workspaceTabCoordinator.restoreAutosaveEffect(item: item)
     }
@@ -39,7 +39,7 @@ extension AppFeature {
         state.application.finishHydration(showingHome: false)
         state.recovery.removeItem(id: item.id)
         state.recovery.dismiss()
-        state.application.presentBanner(state.appLanguage.localized("自動保存から復元しました"))
+        state.application.presentBanner(state.application.appLanguage.localized("自動保存から復元しました"))
     }
 
     func handleAutosaveRecoveryDiscardRequest(

@@ -33,7 +33,7 @@ extension ContentView {
                 }
 
             VStack(spacing: 10) {
-                if store.workspaceLayout == .split {
+                if workspaceState.workspaceLayout == .split {
                     HStack(spacing: 12) {
                         workspacePaneStage(.primary)
                         workspacePaneStage(.secondary)
@@ -67,8 +67,8 @@ extension ContentView {
     @ViewBuilder
     func workspacePaneStage(_ pane: WorkspacePane) -> some View {
         let selectedTab = workspaceSelectedTab(in: pane)
-        let isActivePane = store.focusedWorkspacePane == pane
-        let isLivePane = isActivePane && store.activeTabID == selectedTab?.id && !store.showsHome
+        let isActivePane = workspaceState.focusedWorkspacePane == pane
+        let isLivePane = isActivePane && workspaceState.activeTabID == selectedTab?.id && !applicationState.showsHome
 
         ZStack {
             stageChrome
@@ -86,7 +86,7 @@ extension ContentView {
                     .padding(10)
             }
 
-            if store.isHydrating && isActivePane {
+            if applicationState.isHydrating && isActivePane {
                 ProgressView()
                     .controlSize(.large)
                     .padding(.horizontal, 24)
@@ -553,12 +553,12 @@ extension ContentView {
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(
-                        (store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
+                        (nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
                         ? StudioTheme.Palette.accentBright.opacity(0.34)
                         : StudioTheme.Palette.accentBright.opacity(0.8)
                     )
             )
-            .disabled(store.isNanoBananaGenerating || store.layerSidebar.layers.isEmpty)
+            .disabled(nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
 
             Button(language.localized("Open Full Panel")) {
                 showsNanoBananaSheet = true
@@ -583,7 +583,7 @@ extension ContentView {
     var workspaceHistoryPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(store.nanoBananaHistory.prefix(8)) { item in
+                ForEach(nanoBananaState.history.prefix(8)) { item in
                     Button {
                         nanoBananaPrompt = item.request.prompt
                         nanoBananaInputLayerIndex = item.request.inputLayerIndex
@@ -619,7 +619,7 @@ extension ContentView {
     var workspaceOutputPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(store.nanoBananaJobs.prefix(8)) { job in
+                ForEach(nanoBananaState.jobs.prefix(8)) { job in
                     HStack(alignment: .top, spacing: 10) {
                         Circle()
                             .fill(job.status == .succeeded ? Color.green.opacity(0.8) : job.status == .failed ? Color.red.opacity(0.8) : StudioTheme.Palette.accentBright)

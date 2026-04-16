@@ -9,13 +9,13 @@ extension AppFeature {
     ) -> Effect<Action> {
         do {
             let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
-            if let openTabIndex = state.workspace.openTabs.firstIndex(where: { $0.sourceProjectURL == url }) {
-                state.workspace.openTabs[openTabIndex].sourceProjectURL = destinationURL
+            if let openTabID = state.workspace.tabID(forSourceProjectURL: url) {
+                state.workspace.updateTab(id: openTabID, sourceProjectURL: destinationURL)
             }
             return .send(.homeProjectsLoadRequested)
         } catch {
             state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.appLanguage.localized("Move failed") : error.localizedDescription
+                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Move failed") : error.localizedDescription
             )
             return .none
         }
@@ -31,10 +31,10 @@ extension AppFeature {
             state.application.finishHydration()
             return .send(.tabSelected(existingTabID))
         }
-        if !state.showsHome {
+        if !state.application.showsHome {
             _ = persistActiveTabToBackingStore(state: &state)
         }
-        state.application.isHydrating = true
+        state.application.beginHydration()
         return workspaceTabCoordinator.openProjectEffect(
             at: url,
             removeWorkspaceItemAfterLoad: removesStagedWorkspaceItem
@@ -47,7 +47,6 @@ extension AppFeature {
         sourceURL: DocumentProjectPath
     ) -> Effect<Action> {
         if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
-            state.workspace.activeTabID = existingTabID
             state.application.finishHydration(showingHome: false)
             return .send(.tabSelected(existingTabID))
         }
@@ -59,7 +58,7 @@ extension AppFeature {
         )
         state.application.finishHydration(showingHome: false)
         state.application.presentBanner(
-            StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
+            StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.application.appLanguage)
         )
         return .none
     }

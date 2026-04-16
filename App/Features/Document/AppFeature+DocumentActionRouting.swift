@@ -93,14 +93,6 @@ extension AppFeature {
         case .nanoBananaCancelRequested:
             return handleNanoBananaCancelRequested(state: &state)
 
-        case .nanoBananaPreviewAccepted:
-            handleNanoBananaPreviewAccepted(state: &state)
-            return .none
-
-        case .nanoBananaPreviewDiscarded:
-            handleNanoBananaPreviewDiscarded(state: &state)
-            return .none
-
         case .nanoBananaRegenerateRequested:
             return handleNanoBananaRegenerateRequested(state: &state)
 
