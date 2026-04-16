@@ -45,6 +45,10 @@
 		A0000000000000000000009E /* BrushPaletteView+Bindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009F /* BrushPaletteView+Bindings.swift */; };
 		A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A1 /* BrushPaletteView+Sections.swift */; };
 		A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A5 /* AppFeature+PureImageOps.swift */; };
+		6F602A2861F142CEBB3FE6EA /* AppFeature+ImageAdjustmentOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE6 /* AppFeature+ImageAdjustmentOps.swift */; };
+		39BA9FE771F8496D8E5EA854 /* AppFeature+PreviewCompositeOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38659007DA5646399FFA1EB1 /* AppFeature+PreviewCompositeOps.swift */; };
+		D6B81F2981D84D67805BFF2F /* AppFeature+StrokeRasterization.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */; };
+		C8C52E9EC0B44A888AEB7B2F /* AppFeature+ImageImportOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */; };
 		A000000000000000000000A6 /* TimelapseExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A7 /* TimelapseExporter.swift */; };
 		A000000000000000000000A8 /* ContentView+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A9 /* ContentView+Menus.swift */; };
 		A000000000000000000000AA /* ContentView+Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AB /* ContentView+Workspace.swift */; };
@@ -57,6 +61,8 @@
 		A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B9 /* NanoBananaCommerce.swift */; };
 		A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */; };
 		A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BD /* AppFeature+SelectionTransform.swift */; };
+		976C75F756004B609A33D822 /* AppFeature+SelectionGeometryOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */; };
+		7B6DB0156BC14A2BB465110E /* AppFeature+SelectionMaskOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */; };
 		A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BF /* DocumentWorkspaceClient.swift */; };
 		A000000000000000000000C0 /* PaintDocumentSession+TextLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */; };
 		A000000000000000000000C2 /* PaintDocumentSession+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */; };
@@ -133,6 +139,10 @@
 		A0000000000000000000009F /* BrushPaletteView+Bindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Bindings.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A1 /* BrushPaletteView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Sections.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A5 /* AppFeature+PureImageOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+PureImageOps.swift"; sourceTree = "<group>"; };
+		1686F75A86724FBA8A0DAAE6 /* AppFeature+ImageAdjustmentOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ImageAdjustmentOps.swift"; sourceTree = "<group>"; };
+		38659007DA5646399FFA1EB1 /* AppFeature+PreviewCompositeOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+PreviewCompositeOps.swift"; sourceTree = "<group>"; };
+		EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeRasterization.swift"; sourceTree = "<group>"; };
+		9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ImageImportOps.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* TimelapseExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseExporter.swift; sourceTree = "<group>"; };
 		A000000000000000000000AB /* ContentView+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Workspace.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AD /* BrushPaletteView+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Controls.swift"; sourceTree = "<group>"; };
@@ -144,6 +154,8 @@
 		A000000000000000000000B9 /* NanoBananaCommerce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaCommerce.swift; sourceTree = "<group>"; };
 		A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BD /* AppFeature+SelectionTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionTransform.swift"; sourceTree = "<group>"; };
+		8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionGeometryOps.swift"; sourceTree = "<group>"; };
+		9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionMaskOps.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BF /* DocumentWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkspaceClient.swift; sourceTree = "<group>"; };
 		A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TextLayer.swift"; sourceTree = "<group>"; };
 		A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Persistence.swift"; sourceTree = "<group>"; };
@@ -354,8 +366,14 @@
 				A000000000000000000000F5 /* AppFeature+StateAPI.swift */,
 				A000000000000000000000F7 /* AppFeature+ActionRouting.swift */,
 				A000000000000000000000A5 /* AppFeature+PureImageOps.swift */,
+				1686F75A86724FBA8A0DAAE6 /* AppFeature+ImageAdjustmentOps.swift */,
+				38659007DA5646399FFA1EB1 /* AppFeature+PreviewCompositeOps.swift */,
+				EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */,
+				9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */,
 				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
 				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
+				8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */,
+				9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */,
 				A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */,
 				A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */,
 				A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */,
@@ -484,8 +502,14 @@
 				A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */,
 				A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */,
 				A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */,
+				6F602A2861F142CEBB3FE6EA /* AppFeature+ImageAdjustmentOps.swift in Sources */,
+				39BA9FE771F8496D8E5EA854 /* AppFeature+PreviewCompositeOps.swift in Sources */,
+				D6B81F2981D84D67805BFF2F /* AppFeature+StrokeRasterization.swift in Sources */,
+				C8C52E9EC0B44A888AEB7B2F /* AppFeature+ImageImportOps.swift in Sources */,
 				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
 				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
+				976C75F756004B609A33D822 /* AppFeature+SelectionGeometryOps.swift in Sources */,
+				7B6DB0156BC14A2BB465110E /* AppFeature+SelectionMaskOps.swift in Sources */,
 				A000000000000000000000D8 /* AppFeature+DocumentPersistenceWorkflow.swift in Sources */,
 				A000000000000000000000DA /* AppFeature+WorkspaceTabWorkflow.swift in Sources */,
 				A000000000000000000000DC /* AppFeature+StartupHomeWorkflow.swift in Sources */,
