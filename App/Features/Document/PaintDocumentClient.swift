@@ -58,8 +58,17 @@ struct PaintDocumentClient: Sendable {
     var clearLayer: @Sendable (Int) -> Void
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
-    static let live: PaintDocumentClient = {
+    static func live(
+        fileClient: FileClient,
+        dateClient: DateClient,
+        uuidClient: UUIDClient
+    ) -> PaintDocumentClient {
         let sessionBox = PaintDocumentSessionBox()
+        sessionBox.session = PaintDocumentSession(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
         return PaintDocumentClient(
             lightweightPresentation: { sessionBox.session.lightweightPresentation() },
             presentation: { sessionBox.session.presentation() },
@@ -72,7 +81,12 @@ struct PaintDocumentClient: Sendable {
                 try sessionBox.session.saveProject(to: url)
             },
             loadProject: { url in
-                let session = try PaintDocumentSession.loadProject(from: url)
+                let session = try PaintDocumentSession.loadProject(
+                    from: url,
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient
+                )
                 sessionBox.session = session
                 return LoadedPaintProject(
                     presentation: session.presentation(),
@@ -81,7 +95,13 @@ struct PaintDocumentClient: Sendable {
             },
             setPaperStyle: { style in sessionBox.session.setPaperStyle(style) },
             newCanvas: { width, height in
-                sessionBox.session = PaintDocumentSession(width: width, height: height)
+                sessionBox.session = PaintDocumentSession(
+                    width: width,
+                    height: height,
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient
+                )
             },
             resizeCanvas: { width, height in
                 sessionBox.session.resizeCanvas(width: width, height: height)
@@ -137,7 +157,7 @@ struct PaintDocumentClient: Sendable {
             clearLayer: { index in sessionBox.session.clearLayer(index: index) },
             consumeDirtyUpdate: { sessionBox.session.consumeDirtyUpdate() }
         )
-    }()
+    }
 }
 
 private final class PaintDocumentSessionBox: @unchecked Sendable {
@@ -145,7 +165,12 @@ private final class PaintDocumentSessionBox: @unchecked Sendable {
 }
 
 private enum PaintDocumentClientKey: DependencyKey {
-    static let liveValue = PaintDocumentClient.live
+    static var liveValue: PaintDocumentClient {
+        @Dependency(\.fileClient) var fileClient
+        @Dependency(\.dateClient) var dateClient
+        @Dependency(\.uuidClient) var uuidClient
+        return .live(fileClient: fileClient, dateClient: dateClient, uuidClient: uuidClient)
+    }
 }
 
 extension DependencyValues {

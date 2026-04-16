@@ -10,17 +10,19 @@ enum TimelapseExporter {
     static func exportVideo(
         from capture: TimelapseCapture,
         to directory: URL,
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
         progress: ((Double, URL) -> Void)? = nil
     ) throws -> URL {
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let outputURL = directory.appendingPathComponent(exportFilename())
-        if FileManager.default.fileExists(atPath: outputURL.path) {
-            try FileManager.default.removeItem(at: outputURL)
+        try fileClient.createDirectory(directory, true)
+        let outputURL = directory.appendingPathComponent(exportFilename(date: dateClient.now()))
+        if fileClient.fileExists(outputURL.path) {
+            try fileClient.removeItem(outputURL)
         }
 
         let previewURL = directory.appendingPathComponent("timelapse-preview.jpg")
-        if FileManager.default.fileExists(atPath: previewURL.path) {
-            try FileManager.default.removeItem(at: previewURL)
+        if fileClient.fileExists(previewURL.path) {
+            try fileClient.removeItem(previewURL)
         }
 
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
@@ -96,6 +98,7 @@ enum TimelapseExporter {
                 holdFrameCount: holdFrameCount,
                 totalFrameCount: totalFrameCount,
                 previewURL: previewURL,
+                fileClient: fileClient,
                 progress: progress
             )
         case let .operations(operations):
@@ -111,6 +114,7 @@ enum TimelapseExporter {
                 holdFrameCount: holdFrameCount,
                 totalFrameCount: totalFrameCount,
                 previewURL: previewURL,
+                fileClient: fileClient,
                 progress: progress
             )
         }
@@ -144,6 +148,7 @@ enum TimelapseExporter {
         holdFrameCount: Int,
         totalFrameCount: Int,
         previewURL: URL,
+        fileClient: FileClient,
         progress: ((Double, URL) -> Void)?
     ) throws {
         for (index, frameURL) in frameURLs.enumerated() {
@@ -159,7 +164,7 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: image, to: previewURL)
+            try writePreview(image: image, to: previewURL, fileClient: fileClient)
             progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
         }
 
@@ -178,7 +183,7 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: finalImage, to: previewURL)
+            try writePreview(image: finalImage, to: previewURL, fileClient: fileClient)
             progress?(Double(frameURLs.count + holdIndex) / Double(totalFrameCount), previewURL)
         }
     }
@@ -194,11 +199,13 @@ enum TimelapseExporter {
         holdFrameCount: Int,
         totalFrameCount: Int,
         previewURL: URL,
+        fileClient: FileClient,
         progress: ((Double, URL) -> Void)?
     ) throws {
         let replaySession = PaintDocumentSession(
             width: max(Int(capture.canvasSize.width.rounded()), 1),
-            height: max(Int(capture.canvasSize.height.rounded()), 1)
+            height: max(Int(capture.canvasSize.height.rounded()), 1),
+            fileClient: fileClient
         )
         var folderIDMap: [Int: Int] = [:]
         var finalImage: CGImage?
@@ -218,7 +225,7 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: image, to: previewURL)
+            try writePreview(image: image, to: previewURL, fileClient: fileClient)
             progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
         }
 
@@ -236,7 +243,7 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: finalImage, to: previewURL)
+            try writePreview(image: finalImage, to: previewURL, fileClient: fileClient)
             progress?(Double(operations.count + holdIndex) / Double(totalFrameCount), previewURL)
         }
     }
@@ -313,11 +320,11 @@ enum TimelapseExporter {
         return CGSize(width: evenWidth, height: evenHeight)
     }
 
-    private static func exportFilename() -> String {
+    private static func exportFilename(date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return "primo-timelapse-\(formatter.string(from: Date())).mp4"
+        return "primo-timelapse-\(formatter.string(from: date)).mp4"
     }
 
     private static func sampledFrames(from frames: [TimelapseFrame]) -> [TimelapseFrame] {
@@ -368,11 +375,11 @@ enum TimelapseExporter {
         return sampled
     }
 
-    private static func writePreview(image: CGImage, to url: URL) throws {
+    private static func writePreview(image: CGImage, to url: URL, fileClient: FileClient) throws {
         guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.72) else {
             throw TimelapseExportError.exportFailed
         }
-        try data.write(to: url, options: .atomic)
+        try fileClient.writeData(data, url, .atomic)
     }
 }
 

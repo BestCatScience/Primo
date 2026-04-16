@@ -9,20 +9,19 @@ extension PaintDocumentSession {
     }
 
     func saveProject(to url: URL) throws {
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
+        if fileClient.fileExists(url.path) {
+            try fileClient.removeItem(url)
         }
-        try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        try fileClient.createDirectory(url, true)
 
         let layersDirectory = url.appendingPathComponent("Layers", isDirectory: true)
         let timelapseDirectory = url.appendingPathComponent("Timelapse", isDirectory: true)
         let timelapseDataDirectory = url.appendingPathComponent("TimelapseData", isDirectory: true)
-        try fileManager.createDirectory(at: layersDirectory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(layersDirectory, true)
         if !usesOperationTimelapsePersistence {
-            try fileManager.createDirectory(at: timelapseDirectory, withIntermediateDirectories: true)
+            try fileClient.createDirectory(timelapseDirectory, true)
         } else {
-            try fileManager.createDirectory(at: timelapseDataDirectory, withIntermediateDirectories: true)
+            try fileClient.createDirectory(timelapseDataDirectory, true)
         }
 
         let layerInfos = bridge.layerInfos()
@@ -32,11 +31,15 @@ extension PaintDocumentSession {
             let filename = String(format: "layer-%04d.rgba", index)
             let pixelURL = layersDirectory.appendingPathComponent(filename, isDirectory: false)
             let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            try pixelData.write(to: pixelURL, options: .atomic)
+            try fileClient.writeData(pixelData, pixelURL, Data.WritingOptions.atomic)
             let maskFilename: String?
             if let maskData = bridge.layerMaskDataForLayer(at: index) {
                 let filename = String(format: "layer-mask-%04d.mask", index)
-                try maskData.write(to: layersDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
+                try fileClient.writeData(
+                    maskData,
+                    layersDirectory.appendingPathComponent(filename, isDirectory: false),
+                    Data.WritingOptions.atomic
+                )
                 maskFilename = "Layers/\(filename)"
             } else {
                 maskFilename = nil
@@ -72,10 +75,10 @@ extension PaintDocumentSession {
             storedTimelapseFrames = try timelapseFrames.enumerated().map { index, frame in
                 let filename = String(format: "frame-%06d.jpg", index)
                 let destinationURL = timelapseDirectory.appendingPathComponent(filename, isDirectory: false)
-                if fileManager.fileExists(atPath: destinationURL.path) {
-                    try fileManager.removeItem(at: destinationURL)
+                if fileClient.fileExists(destinationURL.path) {
+                    try fileClient.removeItem(destinationURL)
                 }
-                try fileManager.copyItem(at: frame.imageURL, to: destinationURL)
+                try fileClient.copyItem(frame.imageURL, destinationURL)
                 return StoredPrimoDocument.TimelapseFrame(
                     filename: "Timelapse/\(filename)",
                     width: Double(frame.size.width),
@@ -88,7 +91,7 @@ extension PaintDocumentSession {
 
         let storedTimelapseOperations = usesOperationTimelapsePersistence
             ? try timelapseEvents.enumerated().map { index, event in
-                try event.storedRepresentation(index: index, dataDirectory: timelapseDataDirectory)
+                try event.storedRepresentation(index: index, dataDirectory: timelapseDataDirectory, fileClient: fileClient)
             }
             : []
 
@@ -113,18 +116,33 @@ extension PaintDocumentSession {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let manifestData = try encoder.encode(document)
-        try manifestData.write(to: url.appendingPathComponent("manifest.json"), options: .atomic)
+        try fileClient.writeData(
+            manifestData,
+            url.appendingPathComponent("manifest.json"),
+            Data.WritingOptions.atomic
+        )
     }
 
-    static func loadProject(from url: URL) throws -> PaintDocumentSession {
+    static func loadProject(
+        from url: URL,
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) throws -> PaintDocumentSession {
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
-        let data = try Data(contentsOf: manifestURL)
+        let data = try fileClient.readData(manifestURL)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: data)
         guard !document.layers.isEmpty else {
             throw PrimoDocumentError.invalidDocument
         }
 
-        let session = PaintDocumentSession(width: document.canvasWidth, height: document.canvasHeight)
+        let session = PaintDocumentSession(
+            width: document.canvasWidth,
+            height: document.canvasHeight,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
         session.paperStyle = CanvasPaperStyle(
             red: Float(document.paperStyle.red),
             green: Float(document.paperStyle.green),
@@ -139,10 +157,10 @@ extension PaintDocumentSession {
 
         for layer in document.layers.sorted(by: { $0.index < $1.index }) {
             let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
-            let pixelData = try Data(contentsOf: pixelURL)
+            let pixelData = try fileClient.readData(pixelURL)
             session.bridge.replaceLayerPixelsTransient(at: layer.index, data: pixelData)
             if let maskFilename = layer.maskFilename {
-                let maskData = try Data(contentsOf: url.appendingPathComponent(maskFilename, isDirectory: false))
+                let maskData = try fileClient.readData(url.appendingPathComponent(maskFilename, isDirectory: false))
                 session.bridge.replaceLayerMask(at: layer.index, data: maskData)
             } else {
                 session.bridge.clearLayerMask(at: layer.index)
@@ -178,16 +196,18 @@ extension PaintDocumentSession {
         session.timelapseEvents.removeAll(keepingCapacity: true)
         if !document.timelapseOperations.isEmpty {
             session.usesOperationTimelapsePersistence = true
-            session.timelapseEvents = try document.timelapseOperations.map { try TimelapseOperation(stored: $0, baseURL: url) }
+            session.timelapseEvents = try document.timelapseOperations.map {
+                try TimelapseOperation(stored: $0, baseURL: url, fileClient: fileClient)
+            }
         } else {
             session.usesOperationTimelapsePersistence = false
             for (index, storedFrame) in document.timelapseFrames.enumerated() {
                 let sourceURL = url.appendingPathComponent(storedFrame.filename, isDirectory: false)
                 let destinationURL = session.timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", index), isDirectory: false)
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
+                if fileClient.fileExists(destinationURL.path) {
+                    try fileClient.removeItem(destinationURL)
                 }
-                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+                try fileClient.copyItem(sourceURL, destinationURL)
                 session.timelapseFrames.append(
                     TimelapseFrame(
                         imageURL: destinationURL,

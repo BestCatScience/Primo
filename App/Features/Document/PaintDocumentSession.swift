@@ -8,6 +8,9 @@ import simd
 final class PaintDocumentSession: @unchecked Sendable {
     static let logger = Logger(subsystem: "com.primo.app", category: "Document")
     static let maxTimelapseFrames = 20_000
+    let fileClient: FileClient
+    let dateClient: DateClient
+    let uuidClient: UUIDClient
     var bridge: APPaintDocumentBridge
     private var revision: Int = 0
     private var activeStrokeLayerIndex: Int?
@@ -26,18 +29,27 @@ final class PaintDocumentSession: @unchecked Sendable {
     private var blurStrokeHasCapturedHistory = false
     var textLayers: [Int: TextLayerData] = [:]
 
-    init(width: Int = 1152, height: Int = 1536) {
+    init(
+        width: Int = 1152,
+        height: Int = 1536,
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) {
         let clock = ContinuousClock()
         let start = clock.now
+        self.fileClient = fileClient
+        self.dateClient = dateClient
+        self.uuidClient = uuidClient
         self.bridge = APPaintDocumentBridge(width: width, height: height)
-        self.timelapseDirectoryURL = Self.makeTimelapseDirectoryURL()
-        try? FileManager.default.createDirectory(at: timelapseDirectoryURL, withIntermediateDirectories: true)
+        self.timelapseDirectoryURL = Self.makeTimelapseDirectoryURL(fileClient: fileClient, uuidClient: uuidClient)
+        try? fileClient.createDirectory(timelapseDirectoryURL, true)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
     }
 
     deinit {
-        try? FileManager.default.removeItem(at: timelapseDirectoryURL)
+        try? fileClient.removeItem(timelapseDirectoryURL)
     }
 
     var currentPaperStyle: CanvasPaperStyle {
@@ -1160,16 +1172,16 @@ enum TimelapseOperation: Equatable, Sendable {
     case clearLayer(index: Int)
     case setPaperStyle(CanvasPaperStyle)
 
-    func storedRepresentation(index: Int, dataDirectory: URL) throws -> StoredTimelapseOperation {
+    func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live) throws -> StoredTimelapseOperation {
         let dataFilename: String?
         switch self {
         case let .replaceLayerPixels(_, data):
             let filename = String(format: "replace-layer-%06d.rgba", index)
-            try data.write(to: dataDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
+            try fileClient.writeData(data, dataDirectory.appendingPathComponent(filename, isDirectory: false), .atomic)
             dataFilename = "TimelapseData/\(filename)"
         case let .replaceLayerMask(_, data):
             let filename = String(format: "replace-mask-%06d.mask", index)
-            try data.write(to: dataDirectory.appendingPathComponent(filename, isDirectory: false), options: .atomic)
+            try fileClient.writeData(data, dataDirectory.appendingPathComponent(filename, isDirectory: false), .atomic)
             dataFilename = "TimelapseData/\(filename)"
         default:
             dataFilename = nil
@@ -1258,7 +1270,11 @@ enum TimelapseOperation: Equatable, Sendable {
         }
     }
 
-    init(stored: StoredTimelapseOperation, baseURL: URL) throws {
+    init(
+        stored: StoredTimelapseOperation,
+        baseURL: URL,
+        fileClient: FileClient = .live
+    ) throws {
         switch stored.kind {
         case .stroke:
             guard let layerIndex = stored.layerIndex,
@@ -1333,13 +1349,13 @@ enum TimelapseOperation: Equatable, Sendable {
             guard let layerIndex = stored.layerIndex, let dataFilename = stored.dataFilename else {
                 throw PrimoDocumentError.invalidDocument
             }
-            let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
+            let data = try fileClient.readData(baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerPixels(index: layerIndex, data: data)
         case .replaceLayerMask:
             guard let layerIndex = stored.layerIndex, let dataFilename = stored.dataFilename else {
                 throw PrimoDocumentError.invalidDocument
             }
-            let data = try Data(contentsOf: baseURL.appendingPathComponent(dataFilename, isDirectory: false))
+            let data = try fileClient.readData(baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerMask(index: layerIndex, data: data)
         case .clearLayerMask:
             guard let layerIndex: Int = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }

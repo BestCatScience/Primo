@@ -175,13 +175,13 @@ enum BrushTipFileError: Error {
 }
 
 enum BrushTipLibrary {
-    static func loadRaster(from sourceURL: URL) throws -> BrushTipRaster {
-        let resolvedURL = try prepareBrushTipFile(from: sourceURL)
-        let data = try Data(contentsOf: resolvedURL)
+    static func loadRaster(from sourceURL: URL, fileClient: FileClient = .live) throws -> BrushTipRaster {
+        let resolvedURL = try prepareBrushTipFile(from: sourceURL, fileClient: fileClient)
+        let data = try fileClient.readData(resolvedURL)
         return try BrushTipFile.decode(from: data).raster
     }
 
-    static func prepareBrushTipFile(from sourceURL: URL) throws -> URL {
+    static func prepareBrushTipFile(from sourceURL: URL, fileClient: FileClient = .live) throws -> URL {
         if sourceURL.pathExtension.lowercased() == BrushTipFile.fileExtension {
             return sourceURL
         }
@@ -190,17 +190,17 @@ enum BrushTipLibrary {
             throw BrushTipFileError.invalidPNG
         }
 
-        let pngData = try Data(contentsOf: sourceURL)
+        let pngData = try fileClient.readData(sourceURL)
         let fileHash = SHA256.hash(data: pngData).compactMap { String(format: "%02x", $0) }.joined()
         let sanitizedName = sourceURL.deletingPathExtension().lastPathComponent
         let fileName = "\(sanitizedName)-\(fileHash.prefix(12)).\(BrushTipFile.fileExtension)"
-        let targetURL = try brushTipCacheDirectory().appendingPathComponent(fileName, isDirectory: false)
-        if FileManager.default.fileExists(atPath: targetURL.path) {
+        let targetURL = try brushTipCacheDirectory(fileClient: fileClient).appendingPathComponent(fileName, isDirectory: false)
+        if fileClient.fileExists(targetURL.path) {
             return targetURL
         }
 
         let brushTipFile = try BrushTipFile.importPNG(data: pngData, suggestedName: sanitizedName)
-        try brushTipFile.encodedData().write(to: targetURL, options: .atomic)
+        try fileClient.writeData(brushTipFile.encodedData(), targetURL, .atomic)
         return targetURL
     }
 
@@ -208,12 +208,12 @@ enum BrushTipLibrary {
         try PhotoshopBrushFile.importABR(from: sourceURL)
     }
 
-    private static func brushTipCacheDirectory() throws -> URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    private static func brushTipCacheDirectory(fileClient: FileClient) throws -> URL {
+        let base = fileClient.urls(.applicationSupportDirectory, .userDomainMask)[0]
         let directory = base
             .appendingPathComponent("primo", isDirectory: true)
             .appendingPathComponent("BrushTips", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 }

@@ -171,7 +171,7 @@ extension PaintDocumentSession {
         let frameURL = timelapseDirectoryURL.appendingPathComponent(String(format: "frame-%06d.jpg", nextTimelapseFrameID))
         nextTimelapseFrameID += 1
         do {
-            try jpegData.write(to: frameURL, options: .atomic)
+            try fileClient.writeData(jpegData, frameURL, .atomic)
         } catch {
             Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
             return
@@ -181,14 +181,14 @@ extension PaintDocumentSession {
         timelapseFrames.append(frame)
         if timelapseFrames.count > Self.maxTimelapseFrames {
             let removed = timelapseFrames.remove(at: 1)
-            try? FileManager.default.removeItem(at: removed.imageURL)
+            try? fileClient.removeItem(removed.imageURL)
         }
     }
 
-    static func makeTimelapseDirectoryURL() -> URL {
-        FileManager.default.temporaryDirectory
+    static func makeTimelapseDirectoryURL(fileClient: FileClient, uuidClient: UUIDClient) -> URL {
+        fileClient.temporaryDirectory()
             .appendingPathComponent("primo-timelapse", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            .appendingPathComponent(uuidClient.generate().uuidString, isDirectory: true)
     }
 
     func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
@@ -248,7 +248,7 @@ extension PaintDocumentSession {
 
     func resetTimelapseHistory() {
         for frame in timelapseFrames {
-            try? FileManager.default.removeItem(at: frame.imageURL)
+            try? fileClient.removeItem(frame.imageURL)
         }
         timelapseFrames.removeAll(keepingCapacity: false)
         timelapseEvents.removeAll(keepingCapacity: false)

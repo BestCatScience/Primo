@@ -8,8 +8,8 @@ struct ImportedPhotoshopBrush: Equatable, Sendable {
 }
 
 enum PhotoshopBrushFile {
-    static func importABR(from sourceURL: URL) throws -> [ImportedPhotoshopBrush] {
-        let data = try Data(contentsOf: sourceURL)
+    static func importABR(from sourceURL: URL, fileClient: FileClient = .live) throws -> [ImportedPhotoshopBrush] {
+        let data = try fileClient.readData(sourceURL)
         try validateABRHeader(data)
         let parser = ABRParser(data: data, sourceName: sourceURL.deletingPathExtension().lastPathComponent)
         return try parser.parse().enumerated().map { index, sample in

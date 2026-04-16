@@ -62,6 +62,8 @@
 		A000000000000000000000C2 /* PaintDocumentSession+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */; };
 		A000000000000000000000C4 /* PaintDocumentSession+Timelapse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */; };
 		A000000000000000000000C6 /* PaintDocumentSession+BridgeFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */; };
+		A000000000000000000000C8 /* SystemClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C9 /* SystemClients.swift */; };
+		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -124,6 +126,8 @@
 		A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Persistence.swift"; sourceTree = "<group>"; };
 		A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Timelapse.swift"; sourceTree = "<group>"; };
 		A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+BridgeFacade.swift"; sourceTree = "<group>"; };
+		A000000000000000000000C9 /* SystemClients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemClients.swift; sourceTree = "<group>"; };
+		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -260,6 +264,8 @@
 			children = (
 				A0000000000000000000000A /* primo-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
+				A000000000000000000000C9 /* SystemClients.swift */,
+				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
 				A00000000000000000000095 /* BrushPresetStore.swift */,
 				A0000000000000000000004D /* BrushTipFile.swift */,
 				A0000000000000000000004F /* PhotoshopBrushFile.swift */,
@@ -429,6 +435,8 @@
 				A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */,
 				A00000000000000000000094 /* BrushPresetStore.swift in Sources */,
 				A0000000000000000000004C /* BrushTipFile.swift in Sources */,
+				A000000000000000000000C8 /* SystemClients.swift in Sources */,
+				A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */,
 				A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */,
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,

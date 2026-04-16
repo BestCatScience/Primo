@@ -15,6 +15,11 @@ extension AppFeature {
         return workspaceClient
     }
 
+    private var workspaceUUIDClient: UUIDClient {
+        @Dependency(\.uuidClient) var uuidClient
+        return uuidClient
+    }
+
     @discardableResult
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
         guard let activeTab = state.activeTab else { return false }
@@ -65,7 +70,7 @@ extension AppFeature {
         title: String,
         sourceProjectURL: URL?
     ) {
-        let tabID = UUID()
+        let tabID = workspaceUUIDClient.generate()
         guard let backingStoreURL = try? workspaceClient.createTabBackingStoreURL(tabID) else {
             state.bannerMessage = state.appLanguage.localized("Could not create a tab")
             return

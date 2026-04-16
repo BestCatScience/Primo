@@ -18,8 +18,16 @@ struct DocumentWorkspaceClient: Sendable {
     var persistSaveHistorySnapshot: @Sendable (URL, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
     var removeWorkspaceItem: @Sendable (URL) throws -> Void
 
-    static let live: DocumentWorkspaceClient = {
-        let storage = DocumentWorkspaceStorage()
+    static func live(
+        fileClient: FileClient,
+        dateClient: DateClient,
+        uuidClient: UUIDClient
+    ) -> DocumentWorkspaceClient {
+        let storage = DocumentWorkspaceStorage(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
         return DocumentWorkspaceClient(
             createTabBackingStoreURL: { try storage.createTabBackingStoreURL(for: $0) },
             createProjectURL: { try storage.createProjectURL() },
@@ -36,11 +44,16 @@ struct DocumentWorkspaceClient: Sendable {
             persistSaveHistorySnapshot: { try storage.persistSaveHistorySnapshot(from: $0, tab: $1, trigger: $2) },
             removeWorkspaceItem: { try storage.removeWorkspaceItem(at: $0) }
         )
-    }()
+    }
 }
 
 private enum DocumentWorkspaceClientKey: DependencyKey {
-    static let liveValue = DocumentWorkspaceClient.live
+    static var liveValue: DocumentWorkspaceClient {
+        @Dependency(\.fileClient) var fileClient
+        @Dependency(\.dateClient) var dateClient
+        @Dependency(\.uuidClient) var uuidClient
+        return .live(fileClient: fileClient, dateClient: dateClient, uuidClient: uuidClient)
+    }
 }
 
 extension DependencyValues {
@@ -62,18 +75,18 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     private static let manifestFilename = "manifest.json"
     private static let saveHistoryLimit = 20
 
-    private let fileManager: FileManager
-    private let now: @Sendable () -> Date
-    private let makeUUID: @Sendable () -> UUID
+    private let fileClient: FileClient
+    private let dateClient: DateClient
+    private let uuidClient: UUIDClient
 
     init(
-        fileManager: FileManager = .default,
-        now: @escaping @Sendable () -> Date = Date.init,
-        makeUUID: @escaping @Sendable () -> UUID = UUID.init
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
     ) {
-        self.fileManager = fileManager
-        self.now = now
-        self.makeUUID = makeUUID
+        self.fileClient = fileClient
+        self.dateClient = dateClient
+        self.uuidClient = uuidClient
     }
 
     func createTabBackingStoreURL(for tabID: UUID) throws -> URL {
@@ -81,20 +94,20 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     }
 
     func createProjectURL() throws -> URL {
-        try appProjectsDirectory().appendingPathComponent(projectFilename(for: now()), isDirectory: true)
+        try appProjectsDirectory().appendingPathComponent(projectFilename(for: dateClient.now()), isDirectory: true)
     }
 
     func writePNGToTemporaryDirectory(data: Data) throws -> URL {
-        let directory = fileManager.temporaryDirectory
+        let directory = fileClient.temporaryDirectory()
             .appendingPathComponent(Self.exportDirectoryName, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent(exportFilename(for: now()), isDirectory: false)
-        try data.write(to: url, options: .atomic)
+        try fileClient.createDirectory(directory, true)
+        let url = directory.appendingPathComponent(exportFilename(for: dateClient.now()), isDirectory: false)
+        try fileClient.writeData(data, url, .atomic)
         return url
     }
 
     func timelapseTemporaryDirectory() -> URL {
-        fileManager.temporaryDirectory
+        fileClient.temporaryDirectory()
             .appendingPathComponent(Self.exportDirectoryName, isDirectory: true)
             .appendingPathComponent(Self.timelapseDirectoryName, isDirectory: true)
     }
@@ -104,7 +117,12 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         let projectURLs = try discoverProjectDirectories(in: rootDirectory)
 
         return projectURLs.compactMap { projectURL in
-            guard let loaded = try? PaintDocumentSession.loadProject(from: projectURL) else {
+            guard let loaded = try? PaintDocumentSession.loadProject(
+                from: projectURL,
+                fileClient: fileClient,
+                dateClient: dateClient,
+                uuidClient: uuidClient
+            ) else {
                 return nil
             }
             let presentation = loaded.presentation()
@@ -128,40 +146,45 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         let rootDirectory = try appProjectsDirectory()
         let relativePath = try RelativeProjectFolderPath(validating: relativeFolderPath)
         let destinationDirectory = relativePath.appending(to: rootDirectory)
-        try fileManager.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(destinationDirectory, true)
 
         let destinationURL = destinationDirectory.appendingPathComponent(url.lastPathComponent, isDirectory: true)
         guard destinationURL.standardizedFileURL != url.standardizedFileURL else {
             return url
         }
-        if fileManager.fileExists(atPath: destinationURL.path) {
+        if fileClient.fileExists(destinationURL.path) {
             throw DocumentWorkspaceError.destinationAlreadyExists(destinationURL)
         }
-        try fileManager.moveItem(at: url, to: destinationURL)
+        try fileClient.moveItem(url, destinationURL)
         try relocateWorkspaceArtifacts(from: url, to: destinationURL)
         return destinationURL
     }
 
     func loadAutosaveRecoveryItems() throws -> [AutosaveRecoveryItem] {
         let directory = try autosavesDirectory()
-        let entryURLs = try fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+        let entryURLs = try fileClient.contentsOfDirectory(
+            directory,
+            [.isDirectoryKey],
+            [.skipsHiddenFiles]
         )
 
         return try entryURLs.compactMap { entryURL -> AutosaveRecoveryItem? in
             guard try isDirectory(entryURL) else { return nil }
 
             let metadataURL = metadataURL(in: entryURL)
-            guard let data = try? Data(contentsOf: metadataURL) else { return nil }
+            guard let data = try? fileClient.readData(metadataURL) else { return nil }
             let metadata = try JSONDecoder().decode(StoredAutosaveMetadata.self, from: data)
             let identifier = try StorageIdentifier(validating: metadata.id)
             let projectURL = projectURL(in: entryURL)
-            guard fileManager.fileExists(atPath: projectURL.path) else { return nil }
+            guard fileClient.fileExists(projectURL.path) else { return nil }
 
             let previewImageData: Data? = {
-                guard let session = try? PaintDocumentSession.loadProject(from: projectURL) else { return nil }
+                guard let session = try? PaintDocumentSession.loadProject(
+                    from: projectURL,
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient
+                ) else { return nil }
                 return session.compositePNGData(paperStyle: session.currentPaperStyle)
             }()
 
@@ -197,7 +220,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             id: identifier.rawValue,
             title: tab.title,
             sourceProjectPath: tab.sourceProjectURL?.standardizedFileURL.path,
-            updatedAt: now()
+            updatedAt: dateClient.now()
         )
         try writeMetadata(metadata, to: metadataURL(in: entryDirectory))
     }
@@ -210,24 +233,29 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
 
     func loadSaveHistoryEntries(for tab: OpenDocumentTab) throws -> [SaveHistoryEntry] {
         let directory = try saveHistoryEntriesDirectory(for: historyIdentifier(for: tab))
-        let entryURLs = try fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+        let entryURLs = try fileClient.contentsOfDirectory(
+            directory,
+            [.isDirectoryKey],
+            [.skipsHiddenFiles]
         )
 
         return try entryURLs.compactMap { entryURL -> SaveHistoryEntry? in
             guard try isDirectory(entryURL) else { return nil }
 
             let metadataURL = metadataURL(in: entryURL)
-            guard let data = try? Data(contentsOf: metadataURL) else { return nil }
+            guard let data = try? fileClient.readData(metadataURL) else { return nil }
             let metadata = try JSONDecoder().decode(StoredSaveHistoryMetadata.self, from: data)
             let identifier = try StorageIdentifier(validating: metadata.id)
             let projectURL = projectURL(in: entryURL)
-            guard fileManager.fileExists(atPath: projectURL.path) else { return nil }
+            guard fileClient.fileExists(projectURL.path) else { return nil }
 
             let previewImageData: Data? = {
-                guard let session = try? PaintDocumentSession.loadProject(from: projectURL) else { return nil }
+                guard let session = try? PaintDocumentSession.loadProject(
+                    from: projectURL,
+                    fileClient: fileClient,
+                    dateClient: dateClient,
+                    uuidClient: uuidClient
+                ) else { return nil }
                 return session.compositePNGData(paperStyle: session.currentPaperStyle)
             }()
 
@@ -245,7 +273,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
 
     func persistSaveHistorySnapshot(from backingStoreURL: URL, tab: OpenDocumentTab, trigger: SaveHistoryTrigger) throws {
         let historyID = historyIdentifier(for: tab)
-        let entryID = StorageIdentifier(unchecked: makeUUID().uuidString.lowercased())
+        let entryID = StorageIdentifier(unchecked: uuidClient.generate().uuidString.lowercased())
         let entryDirectory = try saveHistoryEntryDirectory(for: historyID, entryID: entryID)
         let destinationProjectURL = projectURL(in: entryDirectory)
         try replaceProjectDirectory(from: backingStoreURL, to: destinationProjectURL)
@@ -254,7 +282,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         let metadata = StoredSaveHistoryMetadata(
             id: entryID.rawValue,
             title: title,
-            createdAt: now(),
+            createdAt: dateClient.now(),
             trigger: trigger
         )
         try writeMetadata(metadata, to: metadataURL(in: entryDirectory))
@@ -266,52 +294,52 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     }
 
     private func tabProjectsDirectory() throws -> URL {
-        let directory = fileManager.temporaryDirectory
+        let directory = fileClient.temporaryDirectory()
             .appendingPathComponent(Self.tabProjectsDirectoryName, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func autosavesDirectory() throws -> URL {
         let directory = try appProjectsDirectory()
             .appendingPathComponent(Self.autosavesDirectoryName, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func autosaveEntryDirectory(for identifier: StorageIdentifier) throws -> URL {
         let directory = try autosavesDirectory()
             .appendingPathComponent(identifier.rawValue, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func saveHistoryDirectory() throws -> URL {
         let directory = try appProjectsDirectory()
             .appendingPathComponent(Self.saveHistoryDirectoryName, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func saveHistoryEntriesDirectory(for identifier: StorageIdentifier) throws -> URL {
         let directory = try saveHistoryDirectory()
             .appendingPathComponent(identifier.rawValue, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func saveHistoryEntryDirectory(for identifier: StorageIdentifier, entryID: StorageIdentifier) throws -> URL {
         let directory = try saveHistoryEntriesDirectory(for: identifier)
             .appendingPathComponent(entryID.rawValue, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
     private func appProjectsDirectory() throws -> URL {
-        let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let documentsDirectory = fileClient.urls(.documentDirectory, .userDomainMask)[0]
         let directory = documentsDirectory
             .appendingPathComponent(Self.appProjectsDirectoryName, isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try fileClient.createDirectory(directory, true)
         return directory
     }
 
@@ -337,20 +365,11 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     }
 
     private func discoverProjectDirectories(in rootDirectory: URL) throws -> [URL] {
-        guard let enumerator = fileManager.enumerator(
-            at: rootDirectory,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
         var projectURLs: [URL] = []
-        while let url = enumerator.nextObject() as? URL {
+        for url in fileClient.enumerateURLs(rootDirectory, [.isDirectoryKey], [.skipsHiddenFiles]) {
             guard try isDirectory(url) else { continue }
             if try containsProjectManifest(at: url) {
                 projectURLs.append(url)
-                enumerator.skipDescendants()
             }
         }
         return projectURLs
@@ -369,10 +388,10 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     private func trimSaveHistoryEntries(for identifier: StorageIdentifier, limit: Int) throws {
         guard limit > 0 else { return }
         let directory = try saveHistoryEntriesDirectory(for: identifier)
-        let entryURLs = try fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
+        let entryURLs = try fileClient.contentsOfDirectory(
+            directory,
+            [.isDirectoryKey, .contentModificationDateKey],
+            [.skipsHiddenFiles]
         )
         let sortedEntryURLs = entryURLs.sorted { lhs, rhs in
             let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
@@ -409,7 +428,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
 
     private func writeMetadata<T: Encodable>(_ metadata: T, to url: URL) throws {
         let data = try JSONEncoder().encode(metadata)
-        try data.write(to: url, options: .atomic)
+        try fileClient.writeData(data, url, .atomic)
     }
 
     private func replaceProjectDirectory(from sourceURL: URL, to destinationURL: URL) throws {
@@ -417,13 +436,13 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         guard sourceURL.standardizedFileURL != destinationURL.standardizedFileURL else {
             return
         }
-        try fileManager.createDirectory(at: destinationURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fileClient.createDirectory(destinationURL.deletingLastPathComponent(), true)
         try removeItemIfExists(at: destinationURL)
-        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        try fileClient.copyItem(sourceURL, destinationURL)
     }
 
     private func requireProjectDirectory(at url: URL, label: String) throws {
-        guard fileManager.fileExists(atPath: url.path) else {
+        guard fileClient.fileExists(url.path) else {
             throw DocumentWorkspaceError.missingProjectDirectory(label, url)
         }
         guard try isDirectory(url), try containsProjectManifest(at: url) else {
@@ -433,7 +452,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
 
     private func containsProjectManifest(at url: URL) throws -> Bool {
         let manifestURL = url.appendingPathComponent(Self.manifestFilename, isDirectory: false)
-        return fileManager.fileExists(atPath: manifestURL.path)
+        return fileClient.fileExists(manifestURL.path)
     }
 
     private func isDirectory(_ url: URL) throws -> Bool {
@@ -441,15 +460,15 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
     }
 
     private func removeItemIfExists(at url: URL) throws {
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
+        if fileClient.fileExists(url.path) {
+            try fileClient.removeItem(url)
         }
     }
 
     private func moveDirectoryIfPresent(from sourceURL: URL, to destinationURL: URL) throws {
-        guard fileManager.fileExists(atPath: sourceURL.path) else { return }
-        guard !fileManager.fileExists(atPath: destinationURL.path) else { return }
-        try fileManager.moveItem(at: sourceURL, to: destinationURL)
+        guard fileClient.fileExists(sourceURL.path) else { return }
+        guard !fileClient.fileExists(destinationURL.path) else { return }
+        try fileClient.moveItem(sourceURL, destinationURL)
     }
 
     private func exportFilename(for date: Date) -> String {

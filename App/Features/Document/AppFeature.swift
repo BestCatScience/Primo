@@ -9,8 +9,13 @@ import UIKit
 import os
 
 struct ShareExport: Equatable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let url: URL
+
+    init(id: UUID = UUIDClient.live.generate(), url: URL) {
+        self.id = id
+        self.url = url
+    }
 }
 
 struct TimelapseExportPreview: Equatable {
@@ -654,6 +659,9 @@ struct AppFeature {
     @Dependency(\.paintDocumentClient) var paintDocumentClient
     @Dependency(\.nanoBananaClient) var nanoBananaClient
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
+    @Dependency(\.fileClient) var fileClient
+    @Dependency(\.dateClient) var dateClient
+    @Dependency(\.uuidClient) var uuidClient
 
     var body: some ReducerOf<Self> {
         CombineReducers {
@@ -715,7 +723,7 @@ struct AppFeature {
 
             case .homeProjectsLoadRequested:
                 state.isLoadingHomeProjects = true
-                return .run { [documentWorkspaceClient] send in
+                return .run { [documentWorkspaceClient, fileClient, dateClient] send in
                     let projects = (try? documentWorkspaceClient.loadSavedProjects()) ?? []
                     await send(.homeProjectsLoaded(projects))
                 }
@@ -1522,9 +1530,11 @@ struct AppFeature {
                     do {
                         let url = try TimelapseExporter.exportVideo(
                             from: capture,
-                            to: documentWorkspaceClient.timelapseTemporaryDirectory()
+                            to: documentWorkspaceClient.timelapseTemporaryDirectory(),
+                            fileClient: fileClient,
+                            dateClient: dateClient
                         ) { progress, previewURL in
-                            let previewData = try? Data(contentsOf: previewURL)
+                            let previewData = try? fileClient.readData(previewURL)
                             Task {
                                 await send(.timelapseExportProgressUpdated(progress, previewData))
                             }
@@ -1606,7 +1616,7 @@ struct AppFeature {
                     outputMode: request.outputMode,
                     maskSettings: request.maskSettings
                 )
-                let jobID = UUID()
+                let jobID = uuidClient.generate()
                 state.isNanoBananaGenerating = true
                 state.nanoBananaPreview = nil
                 state.pendingNanoBananaRequest = normalizedRequest
@@ -1616,7 +1626,7 @@ struct AppFeature {
                     NanoBananaJob(
                         id: jobID,
                         request: normalizedRequest,
-                        createdAt: Date(),
+                        createdAt: dateClient.now(),
                         status: .running,
                         message: nil
                     ),
@@ -1715,9 +1725,9 @@ struct AppFeature {
                 state.isNanoBananaGenerating = false
                 state.nanoBananaHistory.insert(
                     NanoBananaHistoryItem(
-                        id: UUID(),
+                        id: uuidClient.generate(),
                         request: preview.request,
-                        createdAt: Date(),
+                        createdAt: dateClient.now(),
                         previewImageData: preview.afterPreviewImageData
                     ),
                     at: 0

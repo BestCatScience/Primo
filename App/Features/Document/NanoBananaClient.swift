@@ -157,7 +157,8 @@ struct NanoBananaRequestConfig: Equatable, Sendable {
 struct NanoBananaClient: Sendable {
     var editImage: @Sendable (_ inputPNGData: Data, _ prompt: String, _ config: NanoBananaRequestConfig, _ model: NanoBananaModel) async throws -> Data
 
-    static let live = NanoBananaClient { inputPNGData, prompt, config, model in
+    static func live(httpClient: HTTPClient) -> NanoBananaClient {
+        NanoBananaClient { inputPNGData, prompt, config, model in
         let primaryPrompt = enforcedImageEditingPrompt(from: prompt)
         let retryPrompt = strictRetryImageEditingPrompt(from: prompt)
         var lastError: Error?
@@ -175,7 +176,8 @@ struct NanoBananaClient: Sendable {
                         inputPNGData: inputPNGData,
                         prompt: primaryPrompt,
                         config: config,
-                        model: candidateModel
+                        model: candidateModel,
+                        httpClient: httpClient
                     ) {
                         return imageData
                     }
@@ -184,7 +186,8 @@ struct NanoBananaClient: Sendable {
                         inputPNGData: inputPNGData,
                         prompt: retryPrompt,
                         config: config,
-                        model: candidateModel
+                        model: candidateModel,
+                        httpClient: httpClient
                     ) {
                         return imageData
                     }
@@ -201,6 +204,7 @@ struct NanoBananaClient: Sendable {
             throw lastError
         }
         throw NanoBananaError.missingImageData("Nano Banana did not return decodable image bytes.")
+    }
     }
 
     private static func enforcedImageEditingPrompt(from prompt: String) -> String {
@@ -253,7 +257,8 @@ struct NanoBananaClient: Sendable {
         inputPNGData: Data,
         prompt: String,
         config: NanoBananaRequestConfig,
-        model: NanoBananaModel
+        model: NanoBananaModel,
+        httpClient: HTTPClient
     ) async throws -> Data? {
         switch config.accessMode {
         case .userAPIKey:
@@ -265,7 +270,7 @@ struct NanoBananaClient: Sendable {
                 model: model
             ) {
                 do {
-                    let (data, response) = try await URLSession.shared.data(for: request)
+                    let (data, response) = try await httpClient.data(request)
                     guard let httpResponse = response as? HTTPURLResponse else {
                         throw NanoBananaError.invalidResponse
                     }
@@ -296,7 +301,7 @@ struct NanoBananaClient: Sendable {
                 endpoint: config.endpoint,
                 model: model
             )
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await httpClient.data(request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw NanoBananaError.invalidResponse
             }
@@ -661,7 +666,10 @@ enum NanoBananaError: LocalizedError {
 }
 
 private enum NanoBananaClientKey: DependencyKey {
-    static let liveValue = NanoBananaClient.live
+    static var liveValue: NanoBananaClient {
+        @Dependency(\.httpClient) var httpClient
+        return .live(httpClient: httpClient)
+    }
 }
 
 extension DependencyValues {
