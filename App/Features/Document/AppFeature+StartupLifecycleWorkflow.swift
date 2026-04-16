@@ -3,10 +3,7 @@ import Foundation
 
 extension AppFeature {
     func handleTask(state: inout State) -> Effect<Action> {
-        state.isHydrating = true
-        state.showsHome = true
-        state.isLoadingHomeProjects = true
-        state.appLanguage = appLanguageClient.load()
+        state.application.beginStartup(language: appLanguageClient.load())
         paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
@@ -43,7 +40,7 @@ extension AppFeature {
     }
 
     func handleHomeProjectsLoadRequest(state: inout State) -> Effect<Action> {
-        state.isLoadingHomeProjects = true
+        state.application.beginLoadingHomeProjects()
         return .run { [documentWorkspaceClient] send in
             let projects = (try? documentWorkspaceClient.loadSavedProjects()) ?? []
             await send(.homeProjectsLoaded(projects))
@@ -54,8 +51,7 @@ extension AppFeature {
         state: inout State,
         projects: [SavedProjectSummary]
     ) {
-        state.homeProjects = projects
-        state.isLoadingHomeProjects = false
+        state.application.finishLoadingHomeProjects(projects)
     }
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {
@@ -70,8 +66,7 @@ extension AppFeature {
                 persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
             }
         }
-        state.showsHome = true
-        state.homeSection = .home
+        state.application.showHome()
         return .send(.homeProjectsLoadRequested)
     }
 

@@ -1,135 +1,140 @@
+import CoreGraphics
 import Foundation
 
-extension AppFeature {
-    struct AppFeatureWorkspaceStateCoordinator {
-        func selectedTabID(for pane: WorkspacePane, in state: AppFeature.State) -> OpenDocumentTab.ID? {
-            switch pane {
-            case .primary:
-                return state.primarySelectedTabID
-            case .secondary:
-                return state.secondarySelectedTabID
-            }
+extension AppFeature.WorkspaceState {
+    var activeTabIndex: Int? {
+        guard let activeTabID else { return nil }
+        return openTabs.firstIndex(where: { $0.id == activeTabID })
+    }
+
+    var activeTab: OpenDocumentTab? {
+        guard let activeTabIndex else { return nil }
+        return openTabs[activeTabIndex]
+    }
+
+    func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
+        switch pane {
+        case .primary:
+            return primarySelectedTabID
+        case .secondary:
+            return secondarySelectedTabID
+        }
+    }
+
+    mutating func setSelectedTabID(
+        _ tabID: OpenDocumentTab.ID?,
+        for pane: WorkspacePane
+    ) {
+        switch pane {
+        case .primary:
+            primarySelectedTabID = tabID
+        case .secondary:
+            secondarySelectedTabID = tabID
+        }
+    }
+
+    func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
+        openTabs.filter { $0.pane == pane }
+    }
+
+    func selectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
+        guard let tabID = selectedTabID(for: pane) else { return nil }
+        return openTabs.first(where: { $0.id == tabID })
+    }
+
+    func hasTabs(in pane: WorkspacePane) -> Bool {
+        openTabs.contains(where: { $0.pane == pane })
+    }
+
+    func tabID(
+        forSourceProjectURL sourceProjectURL: DocumentProjectPath
+    ) -> OpenDocumentTab.ID? {
+        openTabs.first { $0.sourceProjectURL == sourceProjectURL }?.id
+    }
+
+    mutating func updateActiveTabMetadata(
+        title: String? = nil,
+        sourceProjectURL: DocumentProjectPath? = nil,
+        previewImageData: Data? = nil,
+        canvasSize: CGSize
+    ) {
+        guard let activeTabIndex else { return }
+        if let title {
+            openTabs[activeTabIndex].title = title
+        }
+        if let sourceProjectURL {
+            openTabs[activeTabIndex].sourceProjectURL = sourceProjectURL
+        }
+        if let previewImageData {
+            openTabs[activeTabIndex].previewImageData = previewImageData
+        }
+        openTabs[activeTabIndex].canvasSize = canvasSize
+    }
+
+    mutating func setActiveTabDirty(_ isDirty: Bool) {
+        guard let activeTabIndex else { return }
+        openTabs[activeTabIndex].isDirty = isDirty
+    }
+
+    mutating func reorderTabs(
+        moving movingID: OpenDocumentTab.ID,
+        before targetID: OpenDocumentTab.ID
+    ) {
+        guard
+            let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }),
+            let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }),
+            sourceIndex != destinationIndex
+        else {
+            return
+        }
+        let tab = openTabs.remove(at: sourceIndex)
+        let adjustedDestination = sourceIndex < destinationIndex ? max(destinationIndex - 1, 0) : destinationIndex
+        openTabs.insert(tab, at: adjustedDestination)
+    }
+
+    mutating func moveTab(
+        _ movingID: OpenDocumentTab.ID,
+        to pane: WorkspacePane,
+        before targetID: OpenDocumentTab.ID?
+    ) {
+        guard let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }) else { return }
+        let sourcePane = openTabs[sourceIndex].pane
+        var tab = openTabs.remove(at: sourceIndex)
+        tab.pane = pane
+
+        if let targetID, let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }) {
+            openTabs.insert(tab, at: destinationIndex)
+        } else {
+            openTabs.append(tab)
         }
 
-        func setSelectedTabID(
-            _ tabID: OpenDocumentTab.ID?,
-            for pane: WorkspacePane,
-            in state: inout AppFeature.State
-        ) {
-            switch pane {
-            case .primary:
-                state.primarySelectedTabID = tabID
-            case .secondary:
-                state.secondarySelectedTabID = tabID
-            }
+        setSelectedTabID(tab.id, for: pane)
+        if selectedTabID(for: sourcePane) == movingID {
+            setSelectedTabID(tabs(in: sourcePane).first?.id, for: sourcePane)
         }
-
-        func tabs(in pane: WorkspacePane, state: AppFeature.State) -> [OpenDocumentTab] {
-            state.openTabs.filter { $0.pane == pane }
+        if activeTabID == movingID {
+            focusedWorkspacePane = pane
         }
+        workspaceLayout = hasTabs(in: .secondary) ? .split : .single
+    }
 
-        func selectedTab(in pane: WorkspacePane, state: AppFeature.State) -> OpenDocumentTab? {
-            guard let tabID = selectedTabID(for: pane, in: state) else { return nil }
-            return state.openTabs.first(where: { $0.id == tabID })
+    mutating func ensureSelectionIntegrity() {
+        if primarySelectedTabID != nil,
+           openTabs.contains(where: { $0.id == primarySelectedTabID && $0.pane == .primary }) == false {
+            primarySelectedTabID = tabs(in: .primary).first?.id
         }
-
-        func hasTabs(in pane: WorkspacePane, state: AppFeature.State) -> Bool {
-            state.openTabs.contains(where: { $0.pane == pane })
+        if secondarySelectedTabID != nil,
+           openTabs.contains(where: { $0.id == secondarySelectedTabID && $0.pane == .secondary }) == false {
+            secondarySelectedTabID = tabs(in: .secondary).first?.id
         }
-
-        func tabID(
-            forSourceProjectURL sourceProjectURL: DocumentProjectPath,
-            in state: AppFeature.State
-        ) -> OpenDocumentTab.ID? {
-            state.openTabs.first { $0.sourceProjectURL == sourceProjectURL }?.id
+        if primarySelectedTabID == nil {
+            primarySelectedTabID = tabs(in: .primary).first?.id
         }
-
-        func updateActiveTabMetadata(
-            title: String? = nil,
-            sourceProjectURL: DocumentProjectPath? = nil,
-            previewImageData: Data? = nil,
-            in state: inout AppFeature.State
-        ) {
-            guard let activeTabIndex = state.activeTabIndex else { return }
-            if let title {
-                state.openTabs[activeTabIndex].title = title
-            }
-            if let sourceProjectURL {
-                state.openTabs[activeTabIndex].sourceProjectURL = sourceProjectURL
-            }
-            if let previewImageData {
-                state.openTabs[activeTabIndex].previewImageData = previewImageData
-            }
-            state.openTabs[activeTabIndex].canvasSize = state.canvas.canvasSize
-        }
-
-        func setActiveTabDirty(_ isDirty: Bool, in state: inout AppFeature.State) {
-            guard let activeTabIndex = state.activeTabIndex else { return }
-            state.openTabs[activeTabIndex].isDirty = isDirty
-        }
-
-        func reorderTabs(
-            moving movingID: OpenDocumentTab.ID,
-            before targetID: OpenDocumentTab.ID,
-            in state: inout AppFeature.State
-        ) {
-            guard
-                let sourceIndex = state.openTabs.firstIndex(where: { $0.id == movingID }),
-                let destinationIndex = state.openTabs.firstIndex(where: { $0.id == targetID }),
-                sourceIndex != destinationIndex
-            else {
-                return
-            }
-            let tab = state.openTabs.remove(at: sourceIndex)
-            let adjustedDestination = sourceIndex < destinationIndex ? max(destinationIndex - 1, 0) : destinationIndex
-            state.openTabs.insert(tab, at: adjustedDestination)
-        }
-
-        func moveTab(
-            _ movingID: OpenDocumentTab.ID,
-            to pane: WorkspacePane,
-            before targetID: OpenDocumentTab.ID?,
-            in state: inout AppFeature.State
-        ) {
-            guard let sourceIndex = state.openTabs.firstIndex(where: { $0.id == movingID }) else { return }
-            let sourcePane = state.openTabs[sourceIndex].pane
-            var tab = state.openTabs.remove(at: sourceIndex)
-            tab.pane = pane
-
-            if let targetID, let destinationIndex = state.openTabs.firstIndex(where: { $0.id == targetID }) {
-                state.openTabs.insert(tab, at: destinationIndex)
-            } else {
-                state.openTabs.append(tab)
-            }
-
-            setSelectedTabID(tab.id, for: pane, in: &state)
-            if selectedTabID(for: sourcePane, in: state) == movingID {
-                setSelectedTabID(tabs(in: sourcePane, state: state).first?.id, for: sourcePane, in: &state)
-            }
-            if state.activeTabID == movingID {
-                state.focusedWorkspacePane = pane
-            }
-            state.workspaceLayout = hasTabs(in: .secondary, state: state) ? .split : .single
-        }
-
-        func ensureWorkspaceSelectionIntegrity(state: inout AppFeature.State) {
-            if state.primarySelectedTabID != nil,
-               state.openTabs.contains(where: { $0.id == state.primarySelectedTabID && $0.pane == .primary }) == false {
-                state.primarySelectedTabID = tabs(in: .primary, state: state).first?.id
-            }
-            if state.secondarySelectedTabID != nil,
-               state.openTabs.contains(where: { $0.id == state.secondarySelectedTabID && $0.pane == .secondary }) == false {
-                state.secondarySelectedTabID = tabs(in: .secondary, state: state).first?.id
-            }
-            if state.primarySelectedTabID == nil {
-                state.primarySelectedTabID = tabs(in: .primary, state: state).first?.id
-            }
-            if !hasTabs(in: .secondary, state: state) {
-                state.secondarySelectedTabID = nil
-                state.workspaceLayout = .single
-                if state.focusedWorkspacePane == .secondary {
-                    state.focusedWorkspacePane = .primary
-                }
+        if !hasTabs(in: .secondary) {
+            secondarySelectedTabID = nil
+            workspaceLayout = .single
+            if focusedWorkspacePane == .secondary {
+                focusedWorkspacePane = .primary
             }
         }
     }

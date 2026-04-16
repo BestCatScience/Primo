@@ -8,7 +8,7 @@ extension AppFeature {
         data: Data
     ) {
         guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
-            state.bannerMessage = state.appLanguage.localized("Could not import photo")
+            state.application.presentBanner(state.appLanguage.localized("Could not import photo"))
             return
         }
         let nextNumber = state.layerSidebar.layers.count + 1
@@ -26,7 +26,7 @@ extension AppFeature {
         state.canvas.selectionPreviewPoints = []
         state.canvas.resetTransformPreview()
         applyDirtyPresentation(state: &state)
-        state.bannerMessage = state.appLanguage.localized("Photo imported to a new layer")
+        state.application.presentBanner(state.appLanguage.localized("Photo imported to a new layer"))
     }
 
     func handleApplyText(
@@ -71,7 +71,7 @@ extension AppFeature {
         }
 
         guard layerWorkflowService.paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
-            state.bannerMessage = state.appLanguage.localized("テキストをレイヤーに適用できませんでした")
+            state.application.presentBanner(state.appLanguage.localized("テキストをレイヤーに適用できませんでした"))
             return
         }
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
@@ -95,11 +95,11 @@ extension AppFeature {
     func handleCreateLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
-            state.bannerMessage = state.appLanguage.localized("選択範囲を作成してからマスクを追加してください")
+            state.application.presentBanner(state.appLanguage.localized("選択範囲を作成してからマスクを追加してください"))
             return
         }
         guard layerWorkflowService.paintDocumentClient.replaceLayerMask(activeLayerIndex, maskData) else {
-            state.bannerMessage = state.appLanguage.localized("レイヤーマスクを作成できませんでした")
+            state.application.presentBanner(state.appLanguage.localized("レイヤーマスクを作成できませんでした"))
             return
         }
         applyDirtyPresentation(state: &state)
@@ -116,7 +116,7 @@ extension AppFeature {
     func handleApplyLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard layerWorkflowService.paintDocumentClient.applyLayerMask(activeLayerIndex) else {
-            state.bannerMessage = state.appLanguage.localized("レイヤーマスクを適用できませんでした")
+            state.application.presentBanner(state.appLanguage.localized("レイヤーマスクを適用できませんでした"))
             return
         }
         if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {

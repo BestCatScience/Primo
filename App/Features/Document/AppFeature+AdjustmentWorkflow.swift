@@ -74,7 +74,7 @@ extension AppFeature {
     ) -> Bool {
         state.canvas.adjustmentPreviewPixelData = nil
         guard adjustmentWorkflowService.applyLayerProcessing(apply) else {
-            state.bannerMessage = failureMessage
+            state.application.presentBanner(failureMessage)
             return false
         }
         if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
@@ -108,7 +108,7 @@ extension AppFeature {
     ) -> Bool {
         state.canvas.adjustmentPreviewPixelData = nil
         guard let adjustedPixels else {
-            state.bannerMessage = failureMessage
+            state.application.presentBanner(failureMessage)
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)

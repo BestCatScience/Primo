@@ -7,8 +7,13 @@ extension PaintDocumentSession {
         return renderedCompositeImage(paperStyle: paperStyle)?.pngData()
     }
 
-    func saveProject(to url: URL) throws {
-        let snapshot = makePersistenceSnapshot()
+    func saveProject(
+        to url: URL,
+        paperStyle: CanvasPaperStyle? = nil
+    ) throws {
+        let snapshot = makePersistenceSnapshot(
+            paperStyle: paperStyle ?? paperStyleValue
+        )
         try persistenceService.prepareProjectDirectory(at: url)
         let directories = try persistenceService.createProjectSubdirectories(
             in: url,
@@ -56,7 +61,9 @@ extension PaintDocumentSession {
         return session
     }
 
-    private func makePersistenceSnapshot() -> PaintDocumentPersistenceSnapshot {
+    private func makePersistenceSnapshot(
+        paperStyle: CanvasPaperStyle
+    ) -> PaintDocumentPersistenceSnapshot {
         let layerInfos = bridgeLayerInfos()
         let folderInfos = bridgeFolderInfos()
         let layerPayloads = layerInfos.enumerated().map { index, layerInfo in
@@ -115,7 +122,7 @@ extension PaintDocumentSession {
             canvasWidth: bridgeCanvasWidth,
             canvasHeight: bridgeCanvasHeight,
             activeLayerIndex: .unchecked(bridgeActiveLayerIndex()),
-            paperStyle: paperStyleValue,
+            paperStyle: paperStyle,
             layers: layerPayloads,
             folders: storedFolders,
             timelapseFrames: timelapseFramePayloads,

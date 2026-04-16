@@ -10,14 +10,14 @@ extension AppFeature {
         state: inout State,
         autosaveID: WorkspaceItemID
     ) -> Effect<Action> {
-        guard let item = state.autosaveRecoveryItems.first(where: { $0.id == autosaveID }) else {
+        guard let item = state.recovery.items.first(where: { $0.id == autosaveID }) else {
             return .none
         }
         if !state.showsHome {
             _ = persistActiveTabToBackingStore(state: &state)
         }
-        state.isHydrating = true
-        state.isShowingAutosaveRecovery = false
+        state.application.isHydrating = true
+        state.recovery.dismiss()
         return workspaceTabCoordinator.restoreAutosaveEffect(item: item)
     }
 
@@ -36,19 +36,17 @@ extension AppFeature {
         state.setActiveTabDirty(true)
         _ = persistActiveTabToBackingStore(state: &state)
         persistActiveTabAutosave(state: &state)
-        state.isHydrating = false
-        state.showsHome = false
-        state.autosaveRecoveryItems.removeAll { $0.id == item.id }
-        state.isShowingAutosaveRecovery = false
-        state.bannerMessage = state.appLanguage.localized("自動保存から復元しました")
+        state.application.finishHydration(showingHome: false)
+        state.recovery.removeItem(id: item.id)
+        state.recovery.dismiss()
+        state.application.presentBanner(state.appLanguage.localized("自動保存から復元しました"))
     }
 
     func handleAutosaveRecoveryDiscardRequest(
         state: inout State,
         autosaveID: WorkspaceItemID
     ) {
-        state.autosaveRecoveryItems.removeAll { $0.id == autosaveID }
-        state.isShowingAutosaveRecovery = !state.autosaveRecoveryItems.isEmpty
+        state.recovery.removeItem(id: autosaveID)
         try? documentWorkspaceClient.discardAutosaveEntry(autosaveID)
     }
 }

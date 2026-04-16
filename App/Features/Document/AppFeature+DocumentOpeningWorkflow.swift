@@ -9,12 +9,14 @@ extension AppFeature {
     ) -> Effect<Action> {
         do {
             let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
-            if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL == url }) {
-                state.openTabs[openTabIndex].sourceProjectURL = destinationURL
+            if let openTabIndex = state.workspace.openTabs.firstIndex(where: { $0.sourceProjectURL == url }) {
+                state.workspace.openTabs[openTabIndex].sourceProjectURL = destinationURL
             }
             return .send(.homeProjectsLoadRequested)
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Move failed") : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.appLanguage.localized("Move failed") : error.localizedDescription
+            )
             return .none
         }
     }
@@ -25,14 +27,14 @@ extension AppFeature {
         removesStagedWorkspaceItem: Bool
     ) -> Effect<Action> {
         if let existingTabID = state.tabID(forSourceProjectURL: url) {
-            state.showsHome = false
-            state.isHydrating = false
+            state.application.showWorkspace()
+            state.application.finishHydration()
             return .send(.tabSelected(existingTabID))
         }
         if !state.showsHome {
             _ = persistActiveTabToBackingStore(state: &state)
         }
-        state.isHydrating = true
+        state.application.isHydrating = true
         return workspaceTabCoordinator.openProjectEffect(
             at: url,
             removeWorkspaceItemAfterLoad: removesStagedWorkspaceItem
@@ -45,9 +47,8 @@ extension AppFeature {
         sourceURL: DocumentProjectPath
     ) -> Effect<Action> {
         if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
-            state.activeTabID = existingTabID
-            state.isHydrating = false
-            state.showsHome = false
+            state.workspace.activeTabID = existingTabID
+            state.application.finishHydration(showingHome: false)
             return .send(.tabSelected(existingTabID))
         }
         state.applyLoadedProject(loaded)
@@ -56,9 +57,10 @@ extension AppFeature {
             title: sourceURL.displayName,
             sourceProjectURL: sourceURL
         )
-        state.isHydrating = false
-        state.showsHome = false
-        state.bannerMessage = StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
+        state.application.finishHydration(showingHome: false)
+        state.application.presentBanner(
+            StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.appLanguage)
+        )
         return .none
     }
 }

@@ -78,8 +78,7 @@ struct PaintDocumentClient: Sendable {
             timelapseCapture: { sessionBox.withSession { $0.timelapseCapture() } },
             saveProject: { url, paperStyle in
                 try sessionBox.withSession { session in
-                    session.setPaperStyle(paperStyle)
-                    try session.saveProject(to: url)
+                    try session.saveProject(to: url, paperStyle: paperStyle)
                 }
             },
             loadProject: { url in

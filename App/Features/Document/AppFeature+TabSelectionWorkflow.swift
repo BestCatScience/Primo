@@ -6,7 +6,7 @@ extension AppFeature {
         state: inout State,
         tabID: OpenDocumentTab.ID
     ) {
-        guard let targetTab = state.openTabs.first(where: { $0.id == tabID }) else {
+        guard let targetTab = state.workspace.openTabs.first(where: { $0.id == tabID }) else {
             return
         }
         if !state.showsHome, state.activeTabID != tabID {
@@ -14,13 +14,15 @@ extension AppFeature {
         }
         do {
             let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL.fileURL)
-            state.activeTabID = tabID
-            state.setSelectedTabID(tabID, for: targetTab.pane)
-            state.focusedWorkspacePane = targetTab.pane
+            state.workspace.activeTabID = tabID
+            state.workspace.setSelectedTabID(tabID, for: targetTab.pane)
+            state.workspace.focusedWorkspacePane = targetTab.pane
             state.applyLoadedProject(loaded)
-            state.showsHome = false
+            state.application.showWorkspace()
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+            )
         }
     }
 
@@ -28,35 +30,37 @@ extension AppFeature {
         state: inout State,
         tabID: OpenDocumentTab.ID
     ) {
-        guard let closingIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else {
+        guard let closingIndex = state.workspace.openTabs.firstIndex(where: { $0.id == tabID }) else {
             return
         }
-        let closingTab = state.openTabs[closingIndex]
-        let wasActive = state.activeTabID == tabID
-        state.openTabs.remove(at: closingIndex)
+        let closingTab = state.workspace.openTabs[closingIndex]
+        let wasActive = state.workspace.activeTabID == tabID
+        state.workspace.openTabs.remove(at: closingIndex)
         clearAutosave(for: closingTab)
         try? documentWorkspaceClient.removeWorkspaceItem(closingTab.backingStoreURL)
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.ensureSelectionIntegrity()
 
         guard wasActive else { return }
-        let replacement = state.selectedTab(in: closingTab.pane)
-            ?? state.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
+        let replacement = state.workspace.selectedTab(in: closingTab.pane)
+            ?? state.workspace.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
         guard let replacement else {
-            state.activeTabID = nil
-            state.showsHome = true
+            state.workspace.activeTabID = nil
+            state.application.showHome()
             return
         }
 
         do {
             let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL.fileURL)
-            state.activeTabID = replacement.id
-            state.focusedWorkspacePane = replacement.pane
+            state.workspace.activeTabID = replacement.id
+            state.workspace.focusedWorkspacePane = replacement.pane
             state.applyLoadedProject(loaded)
-            state.showsHome = false
+            state.application.showWorkspace()
         } catch {
-            state.activeTabID = nil
-            state.showsHome = true
-            state.bannerMessage = error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+            state.workspace.activeTabID = nil
+            state.application.showHome()
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.appLanguage) : error.localizedDescription
+            )
         }
     }
 
@@ -64,19 +68,19 @@ extension AppFeature {
         state: inout State,
         retaining tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
-        let retainedTabs = state.openTabs.filter { $0.id == tabID }
-        let removedTabs = state.openTabs.filter { $0.id != tabID }
+        let retainedTabs = state.workspace.openTabs.filter { $0.id == tabID }
+        let removedTabs = state.workspace.openTabs.filter { $0.id != tabID }
         removedTabs.forEach {
             clearAutosave(for: $0)
             try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
         }
-        state.openTabs = retainedTabs
-        state.primarySelectedTabID = retainedTabs.first(where: { $0.pane == .primary })?.id
-        state.secondarySelectedTabID = retainedTabs.first(where: { $0.pane == .secondary })?.id
-        if state.activeTabID != tabID {
+        state.workspace.openTabs = retainedTabs
+        state.workspace.primarySelectedTabID = retainedTabs.first(where: { $0.pane == .primary })?.id
+        state.workspace.secondarySelectedTabID = retainedTabs.first(where: { $0.pane == .secondary })?.id
+        if state.workspace.activeTabID != tabID {
             return .send(.tabSelected(tabID))
         }
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.ensureSelectionIntegrity()
         return .none
     }
 
@@ -84,17 +88,17 @@ extension AppFeature {
         state: inout State,
         tabID: OpenDocumentTab.ID
     ) {
-        guard let tabIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else { return }
-        let tab = state.openTabs[tabIndex]
-        let paneTabs = state.openTabs.enumerated().filter { $0.element.pane == tab.pane }
+        guard let tabIndex = state.workspace.openTabs.firstIndex(where: { $0.id == tabID }) else { return }
+        let tab = state.workspace.openTabs[tabIndex]
+        let paneTabs = state.workspace.openTabs.enumerated().filter { $0.element.pane == tab.pane }
         guard let paneIndex = paneTabs.firstIndex(where: { $0.element.id == tabID }) else { return }
         let idsToRemove = Set(paneTabs.dropFirst(paneIndex + 1).map(\.element.id))
-        let removedTabs = state.openTabs.filter { idsToRemove.contains($0.id) }
+        let removedTabs = state.workspace.openTabs.filter { idsToRemove.contains($0.id) }
         removedTabs.forEach {
             clearAutosave(for: $0)
             try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
         }
-        state.openTabs.removeAll { idsToRemove.contains($0.id) }
-        state.ensureWorkspaceSelectionIntegrity()
+        state.workspace.openTabs.removeAll { idsToRemove.contains($0.id) }
+        state.workspace.ensureSelectionIntegrity()
     }
 }

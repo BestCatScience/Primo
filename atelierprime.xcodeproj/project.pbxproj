@@ -139,6 +139,7 @@
 		D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000006 /* PaintDocumentTimelapseService.swift */; };
 		D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000008 /* PaintDocumentGeometryService.swift */; };
 		D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5000000000000000000000A /* PaintDocumentBlurService.swift */; };
+		E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AppFeature+DomainState.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -278,6 +279,7 @@
 		D50000000000000000000006 /* PaintDocumentTimelapseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentTimelapseService.swift; sourceTree = "<group>"; };
 		D50000000000000000000008 /* PaintDocumentGeometryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentGeometryService.swift; sourceTree = "<group>"; };
 		D5000000000000000000000A /* PaintDocumentBlurService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBlurService.swift; sourceTree = "<group>"; };
+		E10000000000000000000002 /* AppFeature+DomainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DomainState.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -455,6 +457,7 @@
 				A00000000000000000000003 /* AppFeature.swift */,
 				A000000000000000000000D5 /* AppFeatureModels.swift */,
 				A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */,
+				E10000000000000000000002 /* AppFeature+DomainState.swift */,
 				77EBC82C12B64F77B9A28170 /* AppFeature+WorkspaceStateCoordinator.swift */,
 				9BCCBE365E364E1783DD6EC2 /* AppFeature+ToolPanelStateCoordinator.swift */,
 				85DE8EA2D3D64DFFA55C9F18 /* AppFeature+CanvasUIStateCoordinator.swift */,
@@ -637,6 +640,7 @@
 			files = (
 				A000000000000000000000D4 /* AppFeatureModels.swift in Sources */,
 				A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */,
+				E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */,
 				8DA458906F8C4AC69D670CEB /* AppFeature+WorkspaceStateCoordinator.swift in Sources */,
 				7ADC402731884EF58613CCC6 /* AppFeature+ToolPanelStateCoordinator.swift in Sources */,
 				25A873499A1348AA99A538DF /* AppFeature+CanvasUIStateCoordinator.swift in Sources */,

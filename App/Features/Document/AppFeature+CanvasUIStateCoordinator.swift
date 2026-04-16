@@ -33,7 +33,7 @@ extension AppFeature {
                 state.canvas.pendingIncrementalUpdate = nil
                 state.canvas.activeStrokeBaseSnapshot = nil
                 state.canvas.activeStrokePreviewLayerPixelData = nil
-                state.isHydrating = false
+                state.application.finishHydration()
                 if !state.canvas.isStrokeActive &&
                     state.canvas.isAwaitingCommittedRender &&
                     renderSnapshot.revision > previousRevision {
@@ -72,7 +72,7 @@ extension AppFeature {
             state.canvas.resetTransformPreview()
             state.canvas.adjustmentPreviewPixelData = nil
             applyPresentation(loaded.presentation, to: &state)
-            state.isHydrating = false
+            state.application.finishHydration()
         }
 
         func syncTextEditorWithActiveLayer(state: inout AppFeature.State) {

@@ -63,7 +63,7 @@ extension AppFeature {
 
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
         guard let activeTab = state.activeTab else { return .none }
-        state.isShowingSaveHistory = true
+        state.saveHistory.isPresented = true
         return documentWorkflowCoordinator.loadSaveHistoryEffect(for: activeTab)
     }
 
@@ -75,7 +75,7 @@ extension AppFeature {
         if !state.showsHome {
             persistActiveTabToBackingStore(state: &state)
         }
-        state.isHydrating = true
+        state.application.isHydrating = true
         return documentWorkflowCoordinator.restoreSaveHistoryEffect(
             projectURL: projectURL,
             openInNewTab: openInNewTab
@@ -109,10 +109,9 @@ extension AppFeature {
         state.setActiveTabDirty(true)
         persistActiveTabToBackingStore(state: &state)
         persistActiveTabAutosave(state: &state)
-        state.isHydrating = false
-        state.showsHome = false
-        state.isShowingSaveHistory = false
-        state.bannerMessage = state.appLanguage.localized("保存履歴を復元しました")
+        state.application.finishHydration(showingHome: false)
+        state.saveHistory.dismiss()
+        state.application.presentBanner(state.appLanguage.localized("保存履歴を復元しました"))
     }
 
     func handleSaveDocumentRequest(
@@ -125,7 +124,9 @@ extension AppFeature {
         ) else {
             return .none
         }
-        state.bannerMessage = StudioStrings.savedDocument(savedURL.fileURL.lastPathComponent, state.appLanguage)
+        state.application.presentBanner(
+            StudioStrings.savedDocument(savedURL.fileURL.lastPathComponent, state.appLanguage)
+        )
         if let activeTab = state.activeTab {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
@@ -134,13 +135,12 @@ extension AppFeature {
 
     func handleTimelapseExportRequest(state: inout State) -> Effect<Action> {
         guard let capture = paintDocumentClient.timelapseCapture() else {
-            state.bannerMessage = state.appLanguage.localized("Not enough drawing history for timelapse yet")
+            state.application.presentBanner(
+                state.appLanguage.localized("Not enough drawing history for timelapse yet")
+            )
             return .none
         }
-        state.timelapseExportPreview = TimelapseExportPreview(
-            progress: 0,
-            previewImageData: capture.previewImageData
-        )
+        state.export.startTimelapsePreview(from: capture)
         return documentWorkflowCoordinator.makeTimelapseExportEffect(
             capture: capture,
             failureMessage: state.appLanguage.localized("Timelapse export failed")

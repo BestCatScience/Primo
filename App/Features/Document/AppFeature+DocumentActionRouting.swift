@@ -37,12 +37,11 @@ extension AppFeature {
             return handleSaveHistoryRequest(state: &state)
 
         case let .saveHistoryLoaded(entries):
-            state.saveHistoryEntries = entries
-            state.isShowingSaveHistory = true
+            state.saveHistory.present(entries: entries)
             return .none
 
         case .saveHistoryDismissed:
-            state.isShowingSaveHistory = false
+            state.saveHistory.dismiss()
             return .none
 
         case let .saveHistoryRestoreRequested(projectURL, openInNewTab):

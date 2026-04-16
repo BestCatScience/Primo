@@ -38,7 +38,7 @@ extension AppFeature {
                 layers: layerSnapshots
             )
             state.canvas.pendingIncrementalUpdate = nil
-            state.isHydrating = false
+            state.application.finishHydration()
         }
 
         func applyLiveStrokePreview(
@@ -78,7 +78,7 @@ extension AppFeature {
             )
             state.canvas.activeStrokePreviewLayerPixelData = adjustedActiveLayerPixels
             state.canvas.pendingIncrementalUpdate = nil
-            state.isHydrating = false
+            state.application.finishHydration()
         }
     }
 }

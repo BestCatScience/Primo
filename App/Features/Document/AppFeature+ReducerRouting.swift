@@ -7,7 +7,7 @@ extension AppFeature {
         presentation: PaintDocumentPresentation
     ) {
         state.applyPresentation(presentation)
-        state.isHydrating = false
+        state.application.finishHydration()
         Self.startupLogger.debug("Bootstrap presentation applied; initial UI is ready")
     }
 
@@ -15,19 +15,18 @@ extension AppFeature {
         state: inout State,
         items: [AutosaveRecoveryItem]
     ) {
-        state.autosaveRecoveryItems = items
-        state.isShowingAutosaveRecovery = !items.isEmpty
+        state.recovery.present(items: items)
     }
 
     func handleAutosaveRecoveryDismissed(state: inout State) {
-        state.isShowingAutosaveRecovery = false
+        state.recovery.dismiss()
     }
 
     func handleHomeSectionSelected(
         state: inout State,
         section: HomeSidebarSection
     ) {
-        state.homeSection = section
+        state.application.homeSection = section
     }
 
     func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
@@ -37,7 +36,9 @@ extension AppFeature {
             state.pendingCloseConfirmation = nil
             return performCloseOperation(state: &state, operation: confirmation.operation)
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            )
             state.pendingCloseConfirmation = nil
             return .none
         }
@@ -118,7 +119,9 @@ extension AppFeature {
         state: inout State,
         message: String
     ) {
-        state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
+        state.application.presentBanner(
+            message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
+        )
     }
 
     func handleNanoBananaPreviewDiscarded(state: inout State) {
@@ -145,48 +148,48 @@ extension AppFeature {
         progress: Double,
         previewData: Data?
     ) {
-        state.timelapseExportPreview = TimelapseExportPreview(
-            progress: progress,
-            previewImageData: previewData ?? state.timelapseExportPreview?.previewImageData
-        )
+        state.export.updateTimelapsePreview(progress: progress, previewData: previewData)
     }
 
     func handleTimelapseExportSucceeded(
         state: inout State,
         url: URL
     ) {
-        state.timelapseExportPreview = nil
-        state.exportSheet = makeShareExport(url: url)
+        state.export.completeTimelapseExport(with: makeShareExport(url: url))
     }
 
     func handleTimelapseExportFailed(
         state: inout State,
         message: String
     ) {
-        state.timelapseExportPreview = nil
-        state.bannerMessage = message
+        state.export.failTimelapseExport()
+        state.application.presentBanner(message)
     }
 
     func handleExportSheetDismissed(state: inout State) {
-        state.exportSheet = nil
+        state.export.dismissShareSheet()
     }
 
     func handleBannerDismissed(state: inout State) {
-        state.bannerMessage = nil
+        state.application.clearBanner()
     }
 
     func handleOpenDocumentFailed(
         state: inout State,
         message: String
     ) {
-        state.isHydrating = false
-        state.bannerMessage = message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
+        state.application.finishHydration()
+        state.application.presentBanner(
+            message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
+        )
     }
 
     func handlePhotoImportFailed(
         state: inout State,
         message: String
     ) {
-        state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not import photo") : message
+        state.application.presentBanner(
+            message.isEmpty ? state.appLanguage.localized("Could not import photo") : message
+        )
     }
 }

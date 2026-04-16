@@ -22,15 +22,18 @@ extension AppFeature {
 
     @discardableResult
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
-        guard let activeTab = state.activeTab else { return false }
+        guard let activeTab = state.workspace.activeTab else { return false }
         do {
             try paintDocumentClient.saveProject(activeTab.backingStoreURL.fileURL, state.resolvedPaperStyle())
-            state.updateActiveTabMetadata(
-                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+            state.workspace.updateActiveTabMetadata(
+                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                canvasSize: state.canvas.canvasSize
             )
             return true
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            )
             return false
         }
     }
@@ -39,7 +42,7 @@ extension AppFeature {
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?
     ) -> DocumentProjectPath? {
-        guard let activeTab = state.activeTab else { return nil }
+        guard let activeTab = state.workspace.activeTab else { return nil }
         guard persistActiveTabToBackingStore(state: &state) else { return nil }
 
         do {
@@ -48,19 +51,22 @@ extension AppFeature {
                 preferredDestinationURL
             )
             let previousTab = activeTab
-            state.updateActiveTabMetadata(
+            state.workspace.updateActiveTabMetadata(
                 title: savedURL.displayName,
                 sourceProjectURL: savedURL,
-                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                canvasSize: state.canvas.canvasSize
             )
-            state.setActiveTabDirty(false)
+            state.workspace.setActiveTabDirty(false)
             clearAutosave(for: previousTab)
-            if let refreshedTab = state.activeTab {
+            if let refreshedTab = state.workspace.activeTab {
                 clearAutosave(for: refreshedTab)
             }
             return savedURL
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            )
             return nil
         }
     }
@@ -72,7 +78,7 @@ extension AppFeature {
     ) {
         let tabID = workspaceUUIDClient.generate()
         guard let backingStoreURL = try? workspaceClient.createTabBackingStoreURL(tabID) else {
-            state.bannerMessage = state.appLanguage.localized("Could not create a tab")
+            state.application.presentBanner(state.appLanguage.localized("Could not create a tab"))
             return
         }
         let tab = OpenDocumentTab(
@@ -85,26 +91,28 @@ extension AppFeature {
             pane: state.focusedWorkspacePane,
             previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
         )
-        state.openTabs.append(tab)
-        state.activeTabID = tabID
-        state.setSelectedTabID(tabID, for: state.focusedWorkspacePane)
+        state.workspace.openTabs.append(tab)
+        state.workspace.activeTabID = tabID
+        state.workspace.setSelectedTabID(tabID, for: state.focusedWorkspacePane)
         _ = persistActiveTabToBackingStore(state: &state)
     }
 
     func applyDirtyPresentation(state: inout State) {
         state.applyPresentation(paintDocumentClient.presentation())
-        state.setActiveTabDirty(true)
+        state.workspace.setActiveTabDirty(true)
         guard persistActiveTabToBackingStore(state: &state) else { return }
         persistActiveTabAutosave(state: &state)
     }
 
     func persistActiveTabAutosave(state: inout State) {
-        guard let activeTab = state.activeTab else { return }
+        guard let activeTab = state.workspace.activeTab else { return }
 
         do {
             try workspaceClient.persistAutosaveSnapshot(activeTab.backingStoreURL, activeTab)
         } catch {
-            state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+            )
         }
     }
 
@@ -132,16 +140,16 @@ extension AppFeature {
             case let .tab(tabID):
                 return [tabID]
             case let .closeOtherTabs(tabID):
-                return state.openTabs.filter { $0.id != tabID }.map(\.id)
+                return state.workspace.openTabs.filter { $0.id != tabID }.map(\.id)
             case let .closeTabsToRight(tabID):
-                guard let tab = state.openTabs.first(where: { $0.id == tabID }) else { return [] }
-                let paneTabs = state.openTabs.filter { $0.pane == tab.pane }
+                guard let tab = state.workspace.openTabs.first(where: { $0.id == tabID }) else { return [] }
+                let paneTabs = state.workspace.openTabs.filter { $0.pane == tab.pane }
                 guard let index = paneTabs.firstIndex(where: { $0.id == tabID }) else { return [] }
                 return Array(paneTabs.dropFirst(index + 1).map(\.id))
             }
         }()
 
-        let dirtyTabs = state.openTabs.filter { tabIDs.contains($0.id) && $0.isDirty }
+        let dirtyTabs = state.workspace.openTabs.filter { tabIDs.contains($0.id) && $0.isDirty }
         guard !dirtyTabs.isEmpty else {
             return performCloseOperation(state: &state, operation: operation)
         }
@@ -175,29 +183,30 @@ extension AppFeature {
         if let activeTabID = state.activeTabID, tabIDs.contains(activeTabID),
            !persistActiveTabToBackingStore(state: &state) {
             throw WorkspaceOperationError(
-                message: state.bannerMessage ?? state.appLanguage.localized("Save failed")
+                message: state.application.bannerMessage ?? state.appLanguage.localized("Save failed")
             )
         }
         for tabID in tabIDs {
-            guard let tabIndex = state.openTabs.firstIndex(where: { $0.id == tabID }) else { continue }
-            let previousTab = state.openTabs[tabIndex]
+            guard let tabIndex = state.workspace.openTabs.firstIndex(where: { $0.id == tabID }) else { continue }
+            let previousTab = state.workspace.openTabs[tabIndex]
             let destinationURL = try workspaceClient.persistProjectSnapshot(
                 previousTab.backingStoreURL,
                 previousTab.sourceProjectURL
             )
-            state.openTabs[tabIndex].sourceProjectURL = destinationURL
-            state.openTabs[tabIndex].title = destinationURL.displayName
-            state.openTabs[tabIndex].isDirty = false
+            state.workspace.openTabs[tabIndex].sourceProjectURL = destinationURL
+            state.workspace.openTabs[tabIndex].title = destinationURL.displayName
+            state.workspace.openTabs[tabIndex].isDirty = false
             if tabID == state.activeTabID {
-                state.updateActiveTabMetadata(
+                state.workspace.updateActiveTabMetadata(
                     title: destinationURL.displayName,
                     sourceProjectURL: destinationURL,
-                    previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+                    previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                    canvasSize: state.canvas.canvasSize
                 )
             }
             clearAutosave(for: previousTab)
-            clearAutosave(for: state.openTabs[tabIndex])
-            persistSaveHistorySnapshot(for: state.openTabs[tabIndex], trigger: .closeSave)
+            clearAutosave(for: state.workspace.openTabs[tabIndex])
+            persistSaveHistorySnapshot(for: state.workspace.openTabs[tabIndex], trigger: .closeSave)
         }
     }
 

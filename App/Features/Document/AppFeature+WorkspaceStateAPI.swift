@@ -2,37 +2,35 @@ import Foundation
 
 extension AppFeature.State {
     var activeTabIndex: Int? {
-        guard let activeTabID else { return nil }
-        return openTabs.firstIndex(where: { $0.id == activeTabID })
+        workspace.activeTabIndex
     }
 
     var activeTab: OpenDocumentTab? {
-        guard let activeTabIndex else { return nil }
-        return openTabs[activeTabIndex]
+        workspace.activeTab
     }
 
     func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
-        AppFeature.workspaceStateCoordinator.selectedTabID(for: pane, in: self)
+        workspace.selectedTabID(for: pane)
     }
 
     mutating func setSelectedTabID(_ tabID: OpenDocumentTab.ID?, for pane: WorkspacePane) {
-        AppFeature.workspaceStateCoordinator.setSelectedTabID(tabID, for: pane, in: &self)
+        workspace.setSelectedTabID(tabID, for: pane)
     }
 
     func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
-        AppFeature.workspaceStateCoordinator.tabs(in: pane, state: self)
+        workspace.tabs(in: pane)
     }
 
     func selectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
-        AppFeature.workspaceStateCoordinator.selectedTab(in: pane, state: self)
+        workspace.selectedTab(in: pane)
     }
 
     func hasTabs(in pane: WorkspacePane) -> Bool {
-        AppFeature.workspaceStateCoordinator.hasTabs(in: pane, state: self)
+        workspace.hasTabs(in: pane)
     }
 
     func tabID(forSourceProjectURL sourceProjectURL: DocumentProjectPath) -> OpenDocumentTab.ID? {
-        AppFeature.workspaceStateCoordinator.tabID(forSourceProjectURL: sourceProjectURL, in: self)
+        workspace.tabID(forSourceProjectURL: sourceProjectURL)
     }
 
     mutating func updateActiveTabMetadata(
@@ -40,27 +38,27 @@ extension AppFeature.State {
         sourceProjectURL: DocumentProjectPath? = nil,
         previewImageData: Data? = nil
     ) {
-        AppFeature.workspaceStateCoordinator.updateActiveTabMetadata(
+        workspace.updateActiveTabMetadata(
             title: title,
             sourceProjectURL: sourceProjectURL,
             previewImageData: previewImageData,
-            in: &self
+            canvasSize: canvas.canvasSize
         )
     }
 
     mutating func setActiveTabDirty(_ isDirty: Bool) {
-        AppFeature.workspaceStateCoordinator.setActiveTabDirty(isDirty, in: &self)
+        workspace.setActiveTabDirty(isDirty)
     }
 
     mutating func reorderTabs(moving movingID: OpenDocumentTab.ID, before targetID: OpenDocumentTab.ID) {
-        AppFeature.workspaceStateCoordinator.reorderTabs(moving: movingID, before: targetID, in: &self)
+        workspace.reorderTabs(moving: movingID, before: targetID)
     }
 
     mutating func moveTab(_ movingID: OpenDocumentTab.ID, to pane: WorkspacePane, before targetID: OpenDocumentTab.ID?) {
-        AppFeature.workspaceStateCoordinator.moveTab(movingID, to: pane, before: targetID, in: &self)
+        workspace.moveTab(movingID, to: pane, before: targetID)
     }
 
     mutating func ensureWorkspaceSelectionIntegrity() {
-        AppFeature.workspaceStateCoordinator.ensureWorkspaceSelectionIntegrity(state: &self)
+        workspace.ensureSelectionIntegrity()
     }
 }

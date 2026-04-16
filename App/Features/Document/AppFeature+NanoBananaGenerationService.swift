@@ -27,22 +27,22 @@ extension AppFeature {
             let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedPrompt.isEmpty else {
-                state.bannerMessage = state.appLanguage.localized("Enter a prompt for Nano Banana")
+                state.application.presentBanner(state.appLanguage.localized("Enter a prompt for Nano Banana"))
                 return nil
             }
             guard request.config.accessMode == .appManaged || !trimmedCredential.isEmpty else {
-                state.bannerMessage = state.appLanguage.localized("Enter your Gemini API key")
+                state.application.presentBanner(state.appLanguage.localized("Enter your Gemini API key"))
                 return nil
             }
             guard request.config.accessMode == .userAPIKey || !trimmedEndpoint.isEmpty else {
-                state.bannerMessage = state.appLanguage.localized("Enter your app server endpoint")
+                state.application.presentBanner(state.appLanguage.localized("Enter your app server endpoint"))
                 return nil
             }
             guard
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
             else {
-                state.bannerMessage = state.appLanguage.localized("Could not prepare the active layer for Nano Banana")
+                state.application.presentBanner(state.appLanguage.localized("Could not prepare the active layer for Nano Banana"))
                 return nil
             }
 
@@ -55,7 +55,7 @@ extension AppFeature {
                 )
                 : nil
             if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
-                state.bannerMessage = state.appLanguage.localized("Create a selection to use inpaint")
+                state.application.presentBanner(state.appLanguage.localized("Create a selection to use inpaint"))
                 return nil
             }
 
@@ -270,7 +270,7 @@ extension AppFeature {
             state.activeNanoBananaJobID = nil
             state.pendingNanoBananaOutputMode = .replaceCurrentLayer
             state.applyPresentation(paintDocumentClient.presentation())
-            state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
+            state.application.presentBanner(state.appLanguage.localized("Nano Banana edit applied"))
         }
 
         func applyFailure(state: inout State, message: String) {
@@ -280,9 +280,11 @@ extension AppFeature {
                 state.nanoBananaJobs[jobIndex].status = .failed
                 state.nanoBananaJobs[jobIndex].message = message
             }
-            state.bannerMessage = message.isEmpty
-                ? state.appLanguage.localized("Nano Banana edit failed")
-                : message
+            state.application.presentBanner(
+                message.isEmpty
+                    ? state.appLanguage.localized("Nano Banana edit failed")
+                    : message
+            )
         }
 
         func cancel(state: inout State) -> Effect<Action> {
@@ -292,7 +294,7 @@ extension AppFeature {
                 state.nanoBananaJobs[jobIndex].status = .canceled
                 state.nanoBananaJobs[jobIndex].message = state.appLanguage.localized("Nano Banana generation canceled")
             }
-            state.bannerMessage = state.appLanguage.localized("Nano Banana generation canceled")
+            state.application.presentBanner(state.appLanguage.localized("Nano Banana generation canceled"))
             return .cancel(id: CancelID.nanoBananaEdit)
         }
     }
