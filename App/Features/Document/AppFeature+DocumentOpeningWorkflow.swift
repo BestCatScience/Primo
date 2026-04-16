@@ -26,7 +26,7 @@ extension AppFeature {
         url: DocumentProjectPath,
         removesStagedWorkspaceItem: Bool
     ) -> Effect<Action> {
-        if let existingTabID = state.tabID(forSourceProjectURL: url) {
+        if let existingTabID = state.workspace.tabID(forSourceProjectURL: url) {
             state.application.showWorkspace()
             state.application.finishHydration()
             return .send(.tabSelected(existingTabID))
@@ -46,11 +46,11 @@ extension AppFeature {
         loaded: LoadedPaintProject,
         sourceURL: DocumentProjectPath
     ) -> Effect<Action> {
-        if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
+        if let existingTabID = state.workspace.tabID(forSourceProjectURL: sourceURL) {
             state.application.finishHydration(showingHome: false)
             return .send(.tabSelected(existingTabID))
         }
-        state.applyLoadedProject(loaded)
+        applyLoadedProject(loaded, state: &state)
         activateNewTab(
             state: &state,
             title: sourceURL.displayName,

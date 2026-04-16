@@ -67,7 +67,7 @@ extension AppFeature {
         case .saveDocumentRequested:
             return handleSaveDocumentRequest(
                 state: &state,
-                preferredDestinationURL: state.activeTab?.sourceProjectURL
+                preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
             )
 
         case .saveDocumentCopyRequested:

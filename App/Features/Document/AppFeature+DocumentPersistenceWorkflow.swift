@@ -62,7 +62,7 @@ extension AppFeature {
     }
 
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
-        guard let activeTab = state.activeTab else { return .none }
+        guard let activeTab = state.workspace.activeTab else { return .none }
         state.saveHistory.beginPresentation()
         return documentWorkflowCoordinator.loadSaveHistoryEffect(for: activeTab)
     }
@@ -89,24 +89,25 @@ extension AppFeature {
         openInNewTab: Bool
     ) {
         let restoredTitle = projectURL.displayName
-        if openInNewTab || state.activeTab == nil {
-            state.applyLoadedProject(loaded)
+        if openInNewTab || state.workspace.activeTab == nil {
+            applyLoadedProject(loaded, state: &state)
             activateNewTab(
                 state: &state,
                 title: "\(restoredTitle) Snapshot",
                 sourceProjectURL: nil
             )
         } else {
-            let existingSourceURL = state.activeTab?.sourceProjectURL
-            let existingTitle = state.activeTab?.title ?? restoredTitle
-            state.applyLoadedProject(loaded)
-            state.updateActiveTabMetadata(
+            let existingSourceURL = state.workspace.activeTab?.sourceProjectURL
+            let existingTitle = state.workspace.activeTab?.title ?? restoredTitle
+            applyLoadedProject(loaded, state: &state)
+            state.workspace.updateActiveTabMetadata(
                 title: existingTitle,
                 sourceProjectURL: existingSourceURL,
-                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
+                canvasSize: state.canvas.canvasSize
             )
         }
-        state.setActiveTabDirty(true)
+        state.workspace.setActiveTabDirty(true)
         persistActiveTabToBackingStore(state: &state)
         persistActiveTabAutosave(state: &state)
         state.application.finishHydration(showingHome: false)
@@ -127,7 +128,7 @@ extension AppFeature {
         state.application.presentBanner(
             StudioStrings.savedDocument(savedURL.fileURL.lastPathComponent, state.application.appLanguage)
         )
-        if let activeTab = state.activeTab {
+        if let activeTab = state.workspace.activeTab {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
         return .send(.homeProjectsLoadRequested)

@@ -7,7 +7,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
@@ -24,9 +24,9 @@ extension AppFeature {
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetIndex)
-        state.canvas.activeLayerIndex = targetIndex
-        state.canvas.selection = nil
-        state.applyPresentation(paintDocumentClient.presentation())
+        state.canvas.activateLayer(targetIndex)
+        state.canvas.clearSelection()
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
     }
 
     func handleLayerOpacityChange(
@@ -35,7 +35,7 @@ extension AppFeature {
         opacity: Double
     ) {
         layerWorkflowService.paintDocumentClient.setLayerOpacity(index, opacity)
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
@@ -80,9 +80,9 @@ extension AppFeature {
         index: Int
     ) {
         layerWorkflowService.paintDocumentClient.setActiveLayer(index)
-        state.canvas.activeLayerIndex = index
-        state.canvas.selection = nil
-        state.applyPresentation(paintDocumentClient.presentation())
+        state.canvas.activateLayer(index)
+        state.canvas.clearSelection()
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
     }
 
     func handleLayerVisibilityToggle(
@@ -93,7 +93,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerVisibility(index, !layer.visible)
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
@@ -103,7 +103,7 @@ extension AppFeature {
         isExpanded: Bool
     ) {
         layerWorkflowService.paintDocumentClient.setFolderExpanded(folderID, isExpanded)
-        state.applyPresentation(paintDocumentClient.presentation())
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
     }
 
     func handleFolderVisibilityToggle(
@@ -137,7 +137,7 @@ extension AppFeature {
         blendMode: LayerBlendMode
     ) {
         layerWorkflowService.paintDocumentClient.setLayerBlendMode(index, blendMode)
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 

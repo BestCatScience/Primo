@@ -239,12 +239,10 @@ extension AppFeature {
 
             paintDocumentClient.setActiveLayer(targetLayerIndex)
             paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
-            if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
-                state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-            }
-            state.canvas.selection = nil
+            state.canvas.discardBufferedStrokes(for: targetLayerIndex, incrementsRevision: true)
+            state.canvas.clearSelection()
             state.nanoBanana.completeAppliedEdit(request: preview.request)
-            state.applyPresentation(paintDocumentClient.presentation())
+            applyPresentation(paintDocumentClient.presentation(), state: &state)
             state.application.presentBanner(state.application.appLanguage.localized("Nano Banana edit applied"))
         }
 

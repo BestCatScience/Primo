@@ -24,9 +24,9 @@ extension AppFeature {
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
         guard let activeTab = state.workspace.activeTab else { return false }
         do {
-            try paintDocumentClient.saveProject(activeTab.backingStoreURL.fileURL, state.resolvedPaperStyle())
+            try paintDocumentClient.saveProject(activeTab.backingStoreURL.fileURL, resolvedPaperStyle(for: state))
             state.workspace.updateActiveTabMetadata(
-                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                 canvasSize: state.canvas.canvasSize
             )
             return true
@@ -54,7 +54,7 @@ extension AppFeature {
             state.workspace.updateActiveTabMetadata(
                 title: savedURL.displayName,
                 sourceProjectURL: savedURL,
-                previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                 canvasSize: state.canvas.canvasSize
             )
             state.workspace.setActiveTabDirty(false)
@@ -89,7 +89,7 @@ extension AppFeature {
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
             pane: state.workspace.focusedWorkspacePane,
-            previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
+            previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state))
         )
         state.workspace.appendTab(tab)
         state.workspace.activateTab(tabID, pane: state.workspace.focusedWorkspacePane)
@@ -97,7 +97,7 @@ extension AppFeature {
     }
 
     func applyDirtyPresentation(state: inout State) {
-        state.applyPresentation(paintDocumentClient.presentation())
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
         state.workspace.setActiveTabDirty(true)
         guard persistActiveTabToBackingStore(state: &state) else { return }
         persistActiveTabAutosave(state: &state)
@@ -194,7 +194,7 @@ extension AppFeature {
                 state.workspace.updateActiveTabMetadata(
                     title: destinationURL.displayName,
                     sourceProjectURL: destinationURL,
-                    previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle()),
+                    previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                     canvasSize: state.canvas.canvasSize
                 )
             }

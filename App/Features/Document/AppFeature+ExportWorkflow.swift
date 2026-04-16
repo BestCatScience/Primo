@@ -2,7 +2,7 @@ import Foundation
 
 extension AppFeature {
     func handleExportDocumentRequest(state: inout State) {
-        guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
+        guard let pngData = paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)) else {
             state.application.presentBanner(state.application.appLanguage.localized("Export failed"))
             return
         }

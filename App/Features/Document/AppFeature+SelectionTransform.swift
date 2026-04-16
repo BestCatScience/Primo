@@ -54,11 +54,8 @@ extension AppFeature {
             return .none
         }
         paintDocumentClient.replaceLayerPixels(activeLayerIndex, transformed)
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
-            state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-            state.canvas.localBufferRevision += 1
-        }
-        state.canvas.selection = Self.transformedSelection(
+        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
+        state.canvas.setSelection(Self.transformedSelection(
             state.canvas.selection,
             translation: translation,
             scaleX: scaleX,
@@ -68,7 +65,7 @@ extension AppFeature {
             mode: transformMode,
             quadOffsets: quadOffsets,
             canvasSize: state.canvas.canvasSize
-        )
+        ))
         state.canvas.resetTransformPreview()
         applyDirtyPresentation(state: &state)
         return .none

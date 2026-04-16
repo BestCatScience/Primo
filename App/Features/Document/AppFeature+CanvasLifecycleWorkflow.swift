@@ -17,17 +17,17 @@ extension AppFeature {
         paintDocumentClient.prewarmDrawingResources()
         state.application.showWorkspace()
         state.canvas = CanvasFeature.State()
-        state.canvas.canvasSize = CGSize(width: width, height: height)
+        state.canvas.setCanvasSize(CGSize(width: width, height: height))
         state.layerSidebar = LayerSidebarFeature.State()
         state.brushPalette = BrushPaletteFeature.State()
         state.brushPanel = StudioPanelLayoutState()
         state.layerPanel = StudioPanelLayoutState()
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.clearAdjustmentPreview()
         state.export.clearOutputs()
         state.application.clearBanner()
         state.application.finishHydration()
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-        state.applyPresentation(paintDocumentClient.presentation())
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
         activateNewTab(
             state: &state,
             title: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
@@ -52,10 +52,7 @@ extension AppFeature {
             return
         }
         paintDocumentClient.resizeCanvas(width, height)
-        state.canvas.selection = nil
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.resetTransientEditingState()
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Image resolution updated"))
     }
@@ -73,10 +70,7 @@ extension AppFeature {
             return
         }
         paintDocumentClient.resizeCanvasExtent(width, height)
-        state.canvas.selection = nil
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.resetTransientEditingState()
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Canvas size updated"))
     }
@@ -104,16 +98,16 @@ extension AppFeature {
         paintDocumentClient.prewarmDrawingResources()
         state.application.showWorkspace()
         state.canvas = CanvasFeature.State()
-        state.canvas.canvasSize = CGSize(width: width, height: height)
+        state.canvas.setCanvasSize(CGSize(width: width, height: height))
         state.layerSidebar = LayerSidebarFeature.State()
         state.brushPalette = BrushPaletteFeature.State()
         state.brushPanel = StudioPanelLayoutState()
         state.layerPanel = StudioPanelLayoutState()
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.clearAdjustmentPreview()
         state.export.clearOutputs()
         state.application.clearBanner()
         state.application.finishHydration()
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
         paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
         let nextName = {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -121,7 +115,7 @@ extension AppFeature {
         }()
         paintDocumentClient.setLayerName(0, nextName)
         paintDocumentClient.setActiveLayer(0)
-        state.applyPresentation(paintDocumentClient.presentation())
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
         activateNewTab(
             state: &state,
             title: nextName,
@@ -142,7 +136,7 @@ extension AppFeature {
         guard paintDocumentClient.undo() else {
             return
         }
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
@@ -154,7 +148,7 @@ extension AppFeature {
         guard paintDocumentClient.redo() else {
             return
         }
-        state.canvas.selection = nil
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 }

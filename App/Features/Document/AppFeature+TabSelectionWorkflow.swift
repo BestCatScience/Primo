@@ -15,7 +15,7 @@ extension AppFeature {
         do {
             let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL.fileURL)
             state.workspace.activateTab(tabID, pane: targetTab.pane)
-            state.applyLoadedProject(loaded)
+            applyLoadedProject(loaded, state: &state)
             state.application.showWorkspace()
         } catch {
             state.application.presentBanner(
@@ -45,7 +45,7 @@ extension AppFeature {
         do {
             let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL.fileURL)
             state.workspace.activateTab(replacement.id, pane: replacement.pane)
-            state.applyLoadedProject(loaded)
+            applyLoadedProject(loaded, state: &state)
             state.application.showWorkspace()
         } catch {
             state.workspace.clearActiveTab()

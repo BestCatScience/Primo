@@ -27,13 +27,13 @@ extension AppFeature {
         item: AutosaveRecoveryItem
     ) {
         try? documentWorkspaceClient.discardAutosaveEntry(item.id)
-        state.applyLoadedProject(loaded)
+        applyLoadedProject(loaded, state: &state)
         activateNewTab(
             state: &state,
             title: item.title,
             sourceProjectURL: item.sourceProjectURL
         )
-        state.setActiveTabDirty(true)
+        state.workspace.setActiveTabDirty(true)
         _ = persistActiveTabToBackingStore(state: &state)
         persistActiveTabAutosave(state: &state)
         state.application.finishHydration(showingHome: false)

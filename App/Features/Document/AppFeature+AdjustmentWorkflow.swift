@@ -60,10 +60,10 @@ extension AppFeature {
                 adjustedActiveLayerPixels: adjustedPixels
             )
         else {
-            state.canvas.adjustmentPreviewPixelData = nil
+            state.canvas.clearAdjustmentPreview()
             return
         }
-        state.canvas.adjustmentPreviewPixelData = composite
+        state.canvas.setAdjustmentPreviewPixelData(composite)
     }
 
     @discardableResult
@@ -72,15 +72,13 @@ extension AppFeature {
         failureMessage: String,
         apply: () -> Bool
     ) -> Bool {
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.clearAdjustmentPreview()
         guard adjustmentWorkflowService.applyLayerProcessing(apply) else {
             state.application.presentBanner(failureMessage)
             return false
         }
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-            state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-        }
-        state.canvas.selection = nil
+        state.canvas.discardBufferedStrokes(for: state.canvas.activeLayerIndex)
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
         return true
     }
@@ -106,16 +104,14 @@ extension AppFeature {
         adjustedPixels: Data?,
         failureMessage: String
     ) -> Bool {
-        state.canvas.adjustmentPreviewPixelData = nil
+        state.canvas.clearAdjustmentPreview()
         guard let adjustedPixels else {
             state.application.presentBanner(failureMessage)
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == state.canvas.activeLayerIndex }) {
-            state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-        }
-        state.canvas.selection = nil
+        state.canvas.discardBufferedStrokes(for: state.canvas.activeLayerIndex)
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
         return true
     }

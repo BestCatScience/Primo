@@ -21,10 +21,8 @@ extension AppFeature {
         let targetLayerIndex = state.layerSidebar.layers.count
         layerWorkflowService.paintDocumentClient.replaceLayerPixels(targetLayerIndex, importedPixelData)
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
-        state.canvas.activeLayerIndex = targetLayerIndex
-        state.canvas.selection = nil
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
+        state.canvas.activateLayer(targetLayerIndex)
+        state.canvas.clearSelectionState()
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Photo imported to a new layer"))
     }
@@ -79,8 +77,8 @@ extension AppFeature {
             return
         }
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
-        state.canvas.activeLayerIndex = targetLayerIndex
-        state.canvas.currentTool = .text
+        state.canvas.activateLayer(targetLayerIndex)
+        state.canvas.activateTool(.text)
         state.brushPalette.text.targetLayerIndex = targetLayerIndex
         applyDirtyPresentation(state: &state)
     }
@@ -88,11 +86,8 @@ extension AppFeature {
     func handleClearActiveLayer(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         layerWorkflowService.paintDocumentClient.clearLayer(activeLayerIndex)
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
-            state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-            state.canvas.localBufferRevision += 1
-        }
-        state.canvas.selection = nil
+        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
@@ -123,11 +118,8 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを適用できませんでした"))
             return
         }
-        if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == activeLayerIndex }) {
-            state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
-            state.canvas.localBufferRevision += 1
-        }
-        state.canvas.selection = nil
+        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 }

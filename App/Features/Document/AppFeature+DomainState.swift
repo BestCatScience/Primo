@@ -127,6 +127,11 @@ extension AppFeature.ExportState {
 }
 
 extension AppFeature.NanoBananaState {
+    var progress: Double? {
+        guard isGenerating else { return nil }
+        return 0.6
+    }
+
     mutating func beginGeneration(
         request: NanoBananaGenerationRequest,
         jobID: UUID,

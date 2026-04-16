@@ -6,7 +6,7 @@ extension AppFeature {
         state: inout State,
         presentation: PaintDocumentPresentation
     ) {
-        state.applyPresentation(presentation)
+        applyPresentation(presentation, state: &state)
         state.application.finishHydration()
         Self.startupLogger.debug("Bootstrap presentation applied; initial UI is ready")
     }
@@ -109,7 +109,7 @@ extension AppFeature {
         presentation: PaintDocumentPresentation
     ) {
         guard !state.canvas.isStrokeActive else { return }
-        state.applyPresentation(presentation)
+        applyPresentation(presentation, state: &state)
         Self.startupLogger.debug("Full presentation applied")
     }
 

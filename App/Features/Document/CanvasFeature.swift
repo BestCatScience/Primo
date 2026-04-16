@@ -94,6 +94,169 @@ struct CanvasFeature {
             transformMode = .standard
             transformQuadOffsets = .zero
         }
+
+        mutating func setCanvasSize(_ size: CGSize) {
+            canvasSize = size
+        }
+
+        mutating func activateLayer(_ index: Int) {
+            activeLayerIndex = index
+        }
+
+        mutating func replaceLayerBuffers(_ layerBuffers: [LayerCanvasBuffer]) {
+            self.layerBuffers = layerBuffers
+        }
+
+        mutating func activateTool(_ tool: StudioToolKind) {
+            currentTool = tool
+        }
+
+        mutating func selectTool(
+            _ tool: StudioToolKind,
+            selectionMode: SelectionToolMode,
+            shapeMode: ShapeToolMode,
+            eyedropperSamplingSource: EyedropperSamplingSource
+        ) {
+            activateTool(tool)
+            updateInteractionModes(
+                selectionMode: selectionMode,
+                shapeMode: shapeMode,
+                eyedropperSamplingSource: eyedropperSamplingSource
+            )
+            clearSelectionPreview()
+            resetTransformPreview()
+            if tool != .select && tool != .move {
+                clearSelection()
+            }
+        }
+
+        mutating func setSelection(_ selection: CanvasSelection?) {
+            self.selection = selection
+        }
+
+        mutating func clearSelection() {
+            selection = nil
+        }
+
+        mutating func replaceSelection(_ selection: CanvasSelection?) {
+            self.selection = selection
+            clearSelectionPreview()
+            resetTransformPreview()
+        }
+
+        mutating func clearSelectionPreview() {
+            selectionPreviewPoints = []
+        }
+
+        mutating func clearSelectionState() {
+            selection = nil
+            selectionPreviewPoints = []
+            resetTransformPreview()
+        }
+
+        mutating func clearAdjustmentPreview() {
+            adjustmentPreviewPixelData = nil
+        }
+
+        mutating func setAdjustmentPreviewPixelData(_ pixelData: Data?) {
+            adjustmentPreviewPixelData = pixelData
+        }
+
+        mutating func resetTransientEditingState() {
+            clearSelectionState()
+            clearAdjustmentPreview()
+        }
+
+        mutating func captureStrokeBaseSnapshot(_ snapshot: MetalDocumentSnapshot) {
+            activeStrokeBaseSnapshot = snapshot
+        }
+
+        mutating func setStrokePreviewLayerPixelData(_ pixelData: Data?) {
+            activeStrokePreviewLayerPixelData = pixelData
+        }
+
+        mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
+            pendingIncrementalUpdate = update
+        }
+
+        mutating func clearPendingIncrementalUpdate() {
+            pendingIncrementalUpdate = nil
+        }
+
+        mutating func applyCommittedRenderSnapshot(
+            _ renderSnapshot: MetalDocumentSnapshot,
+            previousRevision: Int
+        ) {
+            self.renderSnapshot = renderSnapshot
+            lastCommittedRenderRevision = renderSnapshot.revision
+            resetStrokePreview()
+            if !isStrokeActive &&
+                isAwaitingCommittedRender &&
+                renderSnapshot.revision > previousRevision {
+                isAwaitingCommittedRender = false
+                lastRenderedLocalBufferRevision = localBufferRevision
+            }
+        }
+
+        mutating func applyPreviewRenderSnapshot(
+            _ renderSnapshot: MetalDocumentSnapshot,
+            previewLayerPixelData: Data? = nil
+        ) {
+            self.renderSnapshot = renderSnapshot
+            if let previewLayerPixelData {
+                setStrokePreviewLayerPixelData(previewLayerPixelData)
+            }
+            clearPendingIncrementalUpdate()
+        }
+
+        mutating func resetStrokePreview() {
+            activeStrokeBaseSnapshot = nil
+            activeStrokePreviewLayerPixelData = nil
+            pendingIncrementalUpdate = nil
+        }
+
+        mutating func setActiveTextLayer(_ textLayer: TextLayerData?) {
+            activeTextLayer = textLayer
+        }
+
+        mutating func updateInteractionModes(
+            selectionMode: SelectionToolMode,
+            shapeMode: ShapeToolMode,
+            eyedropperSamplingSource: EyedropperSamplingSource
+        ) {
+            self.selectionMode = selectionMode
+            self.shapeMode = shapeMode
+            self.eyedropperSamplingSource = eyedropperSamplingSource
+        }
+
+        mutating func updateInteractionStyle(
+            previewStyle: PreviewStrokeStyle,
+            paperStyle: CanvasPaperStyle
+        ) {
+            self.previewStyle = previewStyle
+            self.paperStyle = paperStyle
+        }
+
+        mutating func updatePreviewStyle(_ previewStyle: PreviewStrokeStyle) {
+            self.previewStyle = previewStyle
+        }
+
+        mutating func updatePaperStyle(_ paperStyle: CanvasPaperStyle) {
+            self.paperStyle = paperStyle
+        }
+
+        mutating func discardBufferedStrokes(
+            for layerIndex: Int,
+            incrementsRevision: Bool = false
+        ) {
+            guard let bufferIndex = layerBuffers.firstIndex(where: { $0.index == layerIndex }) else {
+                return
+            }
+            layerBuffers[bufferIndex].strokes.removeAll()
+            if incrementsRevision {
+                localBufferRevision += 1
+            }
+        }
     }
 
     enum Action: Equatable {
@@ -169,20 +332,18 @@ struct CanvasFeature {
                 return .none
 
             case let .selectionPathEnded(points):
-                state.selectionPreviewPoints = []
+                state.clearSelectionPreview()
                 return .send(.delegate(.lassoSelect(points)))
 
             case let .autoSelectionRequested(sample):
-                state.selectionPreviewPoints = []
+                state.clearSelectionPreview()
                 return .send(.delegate(.autoSelect(sample)))
 
             case let .textPlacementRequested(point):
                 return .send(.delegate(.placeText(point)))
 
             case let .selectionUpdated(selection):
-                state.selection = selection
-                state.selectionPreviewPoints = []
-                state.resetTransformPreview()
+                state.replaceSelection(selection)
                 return .none
 
             case .transformGestureBegan:

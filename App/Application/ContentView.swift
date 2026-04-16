@@ -390,7 +390,7 @@ struct ContentView: View {
                     progress: preview.progress,
                     language: language
                 )
-            } else if let progress = store.nanoBananaProgress, nanoBananaState.isGenerating {
+            } else if let progress = nanoBananaState.progress {
                 ZStack {
                     Color.black.opacity(0.24)
                         .ignoresSafeArea()

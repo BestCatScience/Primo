@@ -4,7 +4,7 @@ import Foundation
 extension AppFeature {
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: appLanguageClient.load())
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
             .run { [paintDocumentClient] send in
@@ -55,14 +55,14 @@ extension AppFeature {
     }
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {
-        if state.activeTab != nil {
+        if state.workspace.activeTab != nil {
             guard persistActiveProjectToWorkspace(
                 state: &state,
-                preferredDestinationURL: state.activeTab?.sourceProjectURL
+                preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
             ) != nil else {
                 return .none
             }
-            if let activeTab = state.activeTab {
+            if let activeTab = state.workspace.activeTab {
                 persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
             }
         }
@@ -78,7 +78,7 @@ extension AppFeature {
     }
 
     func handleRefreshPresentationRequest(state: inout State) {
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
         applyDirtyPresentation(state: &state)
     }
 

@@ -17,10 +17,10 @@ extension AppFeature {
     ) {
         guard mutation() else { return }
         if clearsSelection {
-            state.canvas.selection = nil
+            state.canvas.clearSelection()
         }
         if updatesPresentationDirectly {
-            state.applyPresentation(paintDocumentClient.presentation())
+            applyPresentation(paintDocumentClient.presentation(), state: &state)
         } else {
             applyDirtyPresentation(state: &state)
         }

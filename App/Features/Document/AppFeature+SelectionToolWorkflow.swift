@@ -8,17 +8,14 @@ extension AppFeature {
         tool: StudioToolKind,
         showsBrushSettingsPopover: Bool
     ) {
-        state.syncToolSpecificBrushSize()
-        state.canvas.currentTool = tool
-        state.applyToolSpecificBrushSize(for: tool)
-        state.canvas.selectionMode = state.brushPalette.selection.toolMode
-        state.canvas.shapeMode = state.brushPalette.shape.mode
-        state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
-        if tool != .select && tool != .move {
-            state.canvas.selection = nil
-        }
+        syncToolSpecificBrushSize(state: &state)
+        state.canvas.selectTool(
+            tool,
+            selectionMode: state.brushPalette.selection.toolMode,
+            shapeMode: state.brushPalette.shape.mode,
+            eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
+        )
+        applyToolSpecificBrushSize(for: tool, state: &state)
         if tool == .text {
             state.brushPanel.isCollapsed = false
             if state.brushPalette.text.position == nil {
@@ -27,29 +24,27 @@ extension AppFeature {
                     y: state.canvas.canvasSize.height * 0.12
                 )
             }
-            state.syncTextEditorWithActiveLayer()
+            syncTextEditorWithActiveLayer(state: &state)
         }
         if showsBrushSettingsPopover {
             state.brushPanel.isCollapsed = false
             state.brushPalette.ui.showsBrushSettingsPopover = true
         }
-        state.canvas.previewStyle = state.previewStrokeStyle()
+        state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
     }
 
     func handleClearSelection(state: inout State) {
-        state.canvas.selection = nil
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
+        state.canvas.clearSelectionState()
     }
 
     func handleInvertSelection(state: inout State) {
-        state.canvas.selection = Self.invertedSelection(
-            state.canvas.selection,
-            canvasSize: state.canvas.canvasSize,
-            mode: state.canvas.selectionMode
+        state.canvas.replaceSelection(
+            Self.invertedSelection(
+                state.canvas.selection,
+                canvasSize: state.canvas.canvasSize,
+                mode: state.canvas.selectionMode
+            )
         )
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
     }
 
     func handleAdjustSelection(
@@ -57,14 +52,14 @@ extension AppFeature {
         expansion: Int
     ) {
         guard state.canvas.selection != nil else { return }
-        state.canvas.selection = Self.adjustedSelection(
-            state.canvas.selection,
-            canvasSize: state.canvas.canvasSize,
-            expansion: expansion,
-            isInverted: false
+        state.canvas.replaceSelection(
+            Self.adjustedSelection(
+                state.canvas.selection,
+                canvasSize: state.canvas.canvasSize,
+                expansion: expansion,
+                isInverted: false
+            )
         )
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
     }
 
     func handleFeatherSelection(
@@ -72,13 +67,13 @@ extension AppFeature {
         radius: Int
     ) {
         guard state.canvas.selection != nil else { return }
-        state.canvas.selection = Self.featheredSelection(
-            state.canvas.selection,
-            canvasSize: state.canvas.canvasSize,
-            radius: radius
+        state.canvas.replaceSelection(
+            Self.featheredSelection(
+                state.canvas.selection,
+                canvasSize: state.canvas.canvasSize,
+                radius: radius
+            )
         )
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
     }
 
     func handleColorRangeSelectionRequest(
@@ -97,8 +92,6 @@ extension AppFeature {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
         return .send(.canvas(.selectionUpdated(selection)))
     }
 
@@ -111,20 +104,24 @@ extension AppFeature {
     }
 
     func handleBrushPaletteStateRefresh(state: inout State) {
-        state.syncToolSpecificBrushSize()
-        state.canvas.selectionMode = state.brushPalette.selection.toolMode
-        state.canvas.shapeMode = state.brushPalette.shape.mode
-        state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-        state.canvas.previewStyle = state.previewStrokeStyle()
-        state.canvas.paperStyle = state.resolvedPaperStyle()
+        syncToolSpecificBrushSize(state: &state)
+        state.canvas.updateInteractionModes(
+            selectionMode: state.brushPalette.selection.toolMode,
+            shapeMode: state.brushPalette.shape.mode,
+            eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
+        )
+        state.canvas.updateInteractionStyle(
+            previewStyle: previewStrokeStyle(for: state),
+            paperStyle: resolvedPaperStyle(for: state)
+        )
         state.layerSidebar.paperColor = state.brushPalette.paper.color
         state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
     }
 
     func handlePaperBindingSync(state: inout State) {
-        state.canvas.paperStyle = state.resolvedPaperStyle()
-        paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
+        state.canvas.updatePaperStyle(resolvedPaperStyle(for: state))
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
     }
 
     func handlePaperColorBindingChanged(state: inout State) {
@@ -186,21 +183,19 @@ extension AppFeature {
         }
         state.brushPalette.brush.setSelectedSlotColor(sampled)
         state.brushPalette.library.selectedBrush = nil
-        state.canvas.previewStyle = state.previewStrokeStyle()
+        state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
     }
 
     func handleToggleBrushAndEraser(state: inout State) {
-        state.syncToolSpecificBrushSize()
+        syncToolSpecificBrushSize(state: &state)
         let nextTool: StudioToolKind = state.canvas.currentTool == .erase ? .brush : .erase
-        state.canvas.currentTool = nextTool
-        state.applyToolSpecificBrushSize(for: nextTool)
-        state.canvas.selectionMode = state.brushPalette.selection.toolMode
-        state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-        state.canvas.selectionPreviewPoints = []
-        state.canvas.resetTransformPreview()
-        if nextTool != .select && nextTool != .move {
-            state.canvas.selection = nil
-        }
-        state.canvas.previewStyle = state.previewStrokeStyle()
+        state.canvas.selectTool(
+            nextTool,
+            selectionMode: state.brushPalette.selection.toolMode,
+            shapeMode: state.brushPalette.shape.mode,
+            eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
+        )
+        applyToolSpecificBrushSize(for: nextTool, state: &state)
+        state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
     }
 }

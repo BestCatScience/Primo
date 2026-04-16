@@ -3,8 +3,8 @@ import Foundation
 extension AppFeature {
     func handleAddLayer(state: inout State) {
         layerWorkflowService.paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
-        state.canvas.activeLayerIndex = state.layerSidebar.layers.count
-        state.canvas.selection = nil
+        state.canvas.activateLayer(state.layerSidebar.layers.count)
+        state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 

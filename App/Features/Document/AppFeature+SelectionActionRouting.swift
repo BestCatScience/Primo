@@ -24,7 +24,7 @@ extension AppFeature {
             return .none
 
         case let .panelCollapseToggled(panel):
-            state.toggleCollapse(for: panel)
+            togglePanelCollapse(for: panel, state: &state)
             return .none
 
         case .brushPalette(.delegate(.clearSelection)):

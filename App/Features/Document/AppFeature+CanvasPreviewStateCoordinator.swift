@@ -30,14 +30,13 @@ extension AppFeature {
             }
 
             let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.renderSnapshot = MetalDocumentSnapshot(
+            state.canvas.applyPreviewRenderSnapshot(MetalDocumentSnapshot(
                 width: width,
                 height: height,
                 revision: nextRevision,
                 compositePixelData: compositePixelData,
                 layers: layerSnapshots
-            )
-            state.canvas.pendingIncrementalUpdate = nil
+            ))
             state.application.finishHydration()
         }
 
@@ -69,15 +68,16 @@ extension AppFeature {
             }
 
             let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.renderSnapshot = MetalDocumentSnapshot(
-                width: baseSnapshot.width,
-                height: baseSnapshot.height,
-                revision: nextRevision,
-                compositePixelData: composite,
-                layers: nextLayers
+            state.canvas.applyPreviewRenderSnapshot(
+                MetalDocumentSnapshot(
+                    width: baseSnapshot.width,
+                    height: baseSnapshot.height,
+                    revision: nextRevision,
+                    compositePixelData: composite,
+                    layers: nextLayers
+                ),
+                previewLayerPixelData: adjustedActiveLayerPixels
             )
-            state.canvas.activeStrokePreviewLayerPixelData = adjustedActiveLayerPixels
-            state.canvas.pendingIncrementalUpdate = nil
             state.application.finishHydration()
         }
     }
