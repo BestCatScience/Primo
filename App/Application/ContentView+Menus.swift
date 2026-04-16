@@ -383,6 +383,85 @@ extension ContentView {
         }
     }
 
+    var transformNumericSheet: some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("位置")) {
+                    LabeledContent("X") {
+                        TextField("0", text: $transformOffsetXText)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
+                    LabeledContent("Y") {
+                        TextField("0", text: $transformOffsetYText)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
+                }
+
+                Section(language.localized("スケール")) {
+                    if store.canvas.transformMode == .standard {
+                        LabeledContent("X") {
+                            TextField("100", text: $transformScaleXText)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numbersAndPunctuation)
+                        }
+                        LabeledContent("Y") {
+                            TextField("100", text: $transformScaleYText)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numbersAndPunctuation)
+                        }
+                        Toggle(language.localized("縦横比を固定"), isOn: $transformLocksAspectRatio)
+                    } else {
+                        Text(language.localized("自由変形では四隅や辺を直接動かしてゆがませます。"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if store.canvas.transformMode == .standard {
+                    Section(language.localized("回転")) {
+                        TextField("0", text: $transformRotationText)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
+
+                    Section(language.localized("回転中心")) {
+                        LabeledContent("X") {
+                            TextField("0", text: $transformPivotXText)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numbersAndPunctuation)
+                        }
+                        LabeledContent("Y") {
+                            TextField("0", text: $transformPivotYText)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.numbersAndPunctuation)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(language.localized("変形の数値入力"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(StudioStrings.cancel(language)) {
+                        showsTransformNumericSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("適用")) {
+                        applyTransformNumericDraft()
+                        showsTransformNumericSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.height(420)])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            syncTransformNumericDraft()
+        }
+    }
+
     @ViewBuilder
     func selectionPixelAmountSheet(
         title: String,
@@ -419,6 +498,70 @@ extension ContentView {
         }
         .presentationDetents([.height(220)])
         .presentationDragIndicator(.visible)
+    }
+
+    func syncTransformNumericDraft() {
+        transformOffsetXText = String(Int(store.canvas.transformPreviewOffset.width.rounded()))
+        transformOffsetYText = String(Int(store.canvas.transformPreviewOffset.height.rounded()))
+        transformScaleXText = String(Int((store.canvas.transformPreviewScaleX * 100).rounded()))
+        transformScaleYText = String(Int((store.canvas.transformPreviewScaleY * 100).rounded()))
+        transformRotationText = String(Int(store.canvas.transformPreviewRotationDegrees.rounded()))
+        transformLocksAspectRatio = store.canvas.transformLocksAspectRatio
+        let visualPivot = currentTransformVisualPivot()
+        transformPivotXText = String(Int(visualPivot.x.rounded()))
+        transformPivotYText = String(Int(visualPivot.y.rounded()))
+    }
+
+    func currentTransformBounds() -> CGRect? {
+        if let selection = store.canvas.selection, !selection.isEmpty {
+            return selection.bounds
+        }
+        guard
+            let snapshot = store.canvas.renderSnapshot,
+            let layer = snapshot.layers.first(where: { $0.index == store.canvas.activeLayerIndex })
+        else {
+            return nil
+        }
+        return AppFeature.transformationBounds(
+            selection: nil,
+            sourceBytes: [UInt8](layer.pixelData),
+            canvasWidth: snapshot.width,
+            canvasHeight: snapshot.height
+        )
+    }
+
+    func currentTransformVisualPivot() -> CGPoint {
+        let translation = store.canvas.transformPreviewOffset
+        if let pivot = store.canvas.transformPivot {
+            return CGPoint(x: pivot.x + translation.width, y: pivot.y + translation.height)
+        }
+        let fallback = currentTransformBounds().map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero
+        return CGPoint(x: fallback.x + translation.width, y: fallback.y + translation.height)
+    }
+
+    func applyTransformNumericDraft() {
+        let offsetX = Double(transformOffsetXText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let offsetY = Double(transformOffsetYText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let scaleXPercent = Double(transformScaleXText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 100
+        let scaleYPercent = Double(transformScaleYText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 100
+        let rotation = Double(transformRotationText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let pivotX = Double(transformPivotXText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let pivotY = Double(transformPivotYText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+        let offset = CGSize(width: offsetX, height: offsetY)
+        let resolvedScaleYPercent = (store.canvas.transformMode == .standard && transformLocksAspectRatio) ? scaleXPercent : scaleYPercent
+        store.send(.canvas(.transformOffsetSet(offset)))
+        store.send(.canvas(.transformAspectRatioLockChanged(transformLocksAspectRatio)))
+        if store.canvas.transformMode == .standard {
+            store.send(.canvas(.transformScaleSet(
+                x: CGFloat(scaleXPercent / 100.0),
+                y: CGFloat(resolvedScaleYPercent / 100.0)
+            )))
+            store.send(.canvas(.transformRotationSet(rotation)))
+            store.send(.canvas(.transformPivotSet(CGPoint(
+                x: pivotX - offsetX,
+                y: pivotY - offsetY
+            ))))
+        }
     }
 
     var colorRangeSelectionSheet: some View {

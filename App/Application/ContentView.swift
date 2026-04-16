@@ -38,6 +38,7 @@ struct ContentView: View {
     @State var showsContractSelectionSheet = false
     @State var showsFeatherSelectionSheet = false
     @State var showsColorRangeSelectionSheet = false
+    @State var showsTransformNumericSheet = false
     @State var showsNanoBananaSheet = false
     @State var showsNanoBananaPaywall = false
     @State var newCanvasWidthText = ""
@@ -58,6 +59,14 @@ struct ContentView: View {
     @State var selectionExpansionText = "4"
     @State var selectionContractionText = "4"
     @State var selectionFeatherRadiusText = "8"
+    @State var transformOffsetXText = "0"
+    @State var transformOffsetYText = "0"
+    @State var transformScaleXText = "100"
+    @State var transformScaleYText = "100"
+    @State var transformRotationText = "0"
+    @State var transformPivotXText = "0"
+    @State var transformPivotYText = "0"
+    @State var transformLocksAspectRatio = true
     @State var colorRangeTolerance = 0.12
     @State var colorRangeMinimumAlpha = 0.05
     @State var colorRangeExpansion = 0.0
@@ -156,6 +165,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsColorRangeSelectionSheet) {
             colorRangeSelectionSheet
+        }
+        .sheet(isPresented: $showsTransformNumericSheet) {
+            transformNumericSheet
         }
         .sheet(isPresented: $showsNanoBananaSheet) {
             nanoBananaSheet
@@ -327,8 +339,11 @@ struct ContentView: View {
                             currentTool: store.canvas.currentTool,
                             hasSelection: store.canvas.selection != nil,
                             transformPreviewOffset: store.canvas.transformPreviewOffset,
-                            transformPreviewScale: store.canvas.transformPreviewScale,
+                            transformPreviewScaleX: store.canvas.transformPreviewScaleX,
+                            transformPreviewScaleY: store.canvas.transformPreviewScaleY,
                             transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
+                            transformMode: store.canvas.transformMode,
+                            transformLocksAspectRatio: store.canvas.transformLocksAspectRatio,
                             language: language,
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
@@ -342,6 +357,16 @@ struct ContentView: View {
                             onRequestContractSelection: {
                                 selectionContractionText = "4"
                                 showsContractSelectionSheet = true
+                            },
+                            onRequestTransformNumericInput: {
+                                syncTransformNumericDraft()
+                                showsTransformNumericSheet = true
+                            },
+                            onSetTransformMode: { mode in
+                                store.send(.canvas(.transformModeChanged(mode)))
+                            },
+                            onSetTransformAspectRatioLock: { isLocked in
+                                store.send(.canvas(.transformAspectRatioLockChanged(isLocked)))
                             }
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)

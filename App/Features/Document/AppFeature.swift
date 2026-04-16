@@ -328,9 +328,7 @@ struct AppFeature {
             brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
             canvas.selection = nil
             canvas.selectionPreviewPoints = []
-            canvas.transformPreviewOffset = .zero
-            canvas.transformPreviewScale = 1.0
-            canvas.transformPreviewRotationDegrees = 0
+            canvas.resetTransformPreview()
             canvas.adjustmentPreviewPixelData = nil
             applyPresentation(loaded.presentation)
             isHydrating = false
@@ -1040,9 +1038,7 @@ struct AppFeature {
                 paintDocumentClient.resizeCanvas(width, height)
                 state.canvas.selection = nil
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 state.canvas.adjustmentPreviewPixelData = nil
                 applyDirtyPresentation(state: &state)
                 state.bannerMessage = state.appLanguage.localized("Image resolution updated")
@@ -1059,9 +1055,7 @@ struct AppFeature {
                 paintDocumentClient.resizeCanvasExtent(width, height)
                 state.canvas.selection = nil
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 state.canvas.adjustmentPreviewPixelData = nil
                 applyDirtyPresentation(state: &state)
                 state.bannerMessage = state.appLanguage.localized("Canvas size updated")
@@ -1905,9 +1899,7 @@ struct AppFeature {
                 state.canvas.activeLayerIndex = targetLayerIndex
                 state.canvas.selection = nil
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 applyDirtyPresentation(state: &state)
                 state.bannerMessage = state.appLanguage.localized("Photo imported to a new layer")
                 return .none
@@ -1924,9 +1916,7 @@ struct AppFeature {
                 state.canvas.shapeMode = state.brushPalette.shape.mode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 if tool != .select {
                     if tool != .move {
                         state.canvas.selection = nil
@@ -1952,9 +1942,7 @@ struct AppFeature {
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 if tool != .select {
                     if tool != .move {
                         state.canvas.selection = nil
@@ -1974,9 +1962,7 @@ struct AppFeature {
             case .brushPalette(.delegate(.clearSelection)):
                 state.canvas.selection = nil
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case .brushPalette(.delegate(.invertSelection)):
@@ -1986,9 +1972,7 @@ struct AppFeature {
                     mode: state.canvas.selectionMode
                 )
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case let .brushPalette(.delegate(.expandSelection(expansion))):
@@ -2000,9 +1984,7 @@ struct AppFeature {
                     isInverted: false
                 )
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case let .brushPalette(.delegate(.contractSelection(contraction))):
@@ -2014,9 +1996,7 @@ struct AppFeature {
                     isInverted: false
                 )
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case let .featherSelectionRequested(radius):
@@ -2027,9 +2007,7 @@ struct AppFeature {
                     radius: max(radius, 1)
                 )
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case let .colorRangeSelectionRequested(request):
@@ -2046,15 +2024,11 @@ struct AppFeature {
                     canvasSize: state.canvas.canvasSize
                 )
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .send(.canvas(.selectionUpdated(selection)))
 
             case .brushPalette(.delegate(.cancelTransform)):
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 return .none
 
             case .brushPalette(.delegate(.applyTransform)):
@@ -2730,9 +2704,7 @@ struct AppFeature {
                 state.canvas.selectionMode = state.brushPalette.selection.toolMode
                 state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
                 state.canvas.selectionPreviewPoints = []
-                state.canvas.transformPreviewOffset = .zero
-                state.canvas.transformPreviewScale = 1.0
-                state.canvas.transformPreviewRotationDegrees = 0
+                state.canvas.resetTransformPreview()
                 if nextTool != .select && nextTool != .move {
                     state.canvas.selection = nil
                 }

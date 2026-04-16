@@ -174,11 +174,13 @@ extension BrushPaletteView {
                             metricRow(language.localized("対象"), value: hasSelection ? language.localized("選択設定") : language.localized("レイヤー"))
                             metricRow("Offset X", value: "\(Int(transformPreviewOffset.width.rounded())) px")
                             metricRow("Offset Y", value: "\(Int(transformPreviewOffset.height.rounded())) px")
-                            metricRow(language.localized("拡大率"), value: "\(Int((transformPreviewScale * 100).rounded()))%")
+                            metricRow(language.localized("拡大 X"), value: "\(Int((transformPreviewScaleX * 100).rounded()))%")
+                            metricRow(language.localized("拡大 Y"), value: "\(Int((transformPreviewScaleY * 100).rounded()))%")
                             metricRow(language.localized("回転"), value: "\(Int(transformPreviewRotationDegrees.rounded()))°")
+                            metricRow(language.localized("モード"), value: transformMode.title(language))
                             metricRow(
                                 language.localized("状態"),
-                                value: transformPreviewOffset == .zero && abs(transformPreviewScale - 1.0) <= 0.001 && abs(transformPreviewRotationDegrees) <= 0.001
+                                value: transformPreviewOffset == .zero && abs(transformPreviewScaleX - 1.0) <= 0.001 && abs(transformPreviewScaleY - 1.0) <= 0.001 && abs(transformPreviewRotationDegrees) <= 0.001
                                     ? language.localized("待機")
                                     : language.localized("未確定")
                             )

@@ -266,8 +266,11 @@ extension ContentView {
                     currentTool: store.canvas.currentTool,
                     hasSelection: store.canvas.selection != nil,
                     transformPreviewOffset: store.canvas.transformPreviewOffset,
-                    transformPreviewScale: store.canvas.transformPreviewScale,
+                    transformPreviewScaleX: store.canvas.transformPreviewScaleX,
+                    transformPreviewScaleY: store.canvas.transformPreviewScaleY,
                     transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
+                    transformMode: store.canvas.transformMode,
+                    transformLocksAspectRatio: store.canvas.transformLocksAspectRatio,
                     language: language,
                     showsTitle: false,
                     onSelectTool: { tool in
@@ -280,6 +283,16 @@ extension ContentView {
                     onRequestContractSelection: {
                         selectionContractionText = "4"
                         showsContractSelectionSheet = true
+                    },
+                    onRequestTransformNumericInput: {
+                        syncTransformNumericDraft()
+                        showsTransformNumericSheet = true
+                    },
+                    onSetTransformMode: { mode in
+                        store.send(.canvas(.transformModeChanged(mode)))
+                    },
+                    onSetTransformAspectRatioLock: { isLocked in
+                        store.send(.canvas(.transformAspectRatioLockChanged(isLocked)))
                     }
                 )
             case .layers:

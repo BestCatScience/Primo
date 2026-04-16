@@ -332,6 +332,57 @@ extension BrushPaletteView {
                             .font(StudioTheme.Typography.body(11))
                             .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
 
+                        segmentedModeRow(
+                            title: language.localized("変形モード"),
+                            selectedTitle: transformMode.title(language)
+                        ) {
+                            Picker(language.localized("変形モード"), selection: Binding(
+                                get: { transformMode },
+                                set: { onSetTransformMode($0) }
+                            )) {
+                                ForEach(CanvasTransformMode.allCases) { mode in
+                                    Text(mode.title(language)).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+
+                        if transformMode == .standard {
+                            Toggle(isOn: Binding(
+                                get: { transformLocksAspectRatio },
+                                set: { onSetTransformAspectRatioLock($0) }
+                            )) {
+                                Text(language.localized("縦横比を固定"))
+                                    .font(StudioTheme.Typography.label(12))
+                                    .foregroundStyle(panelPrimaryTextStyle)
+                            }
+                            .toggleStyle(.switch)
+                        }
+
+                        Button {
+                            onRequestTransformNumericInput()
+                        } label: {
+                            HStack {
+                                Image(systemName: "number.square")
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(language.localized("数値入力"))
+                                    .font(StudioTheme.Typography.label(12))
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(panelPrimaryTextStyle)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(panelCardFillStrong)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(panelCardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
                         HStack(spacing: 8) {
                             Button {
                                 store.send(.applyTransformButtonTapped)
