@@ -2,19 +2,19 @@ import Foundation
 
 extension AppFeature.State {
     mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
-        AppFeature.canvasUIStateCoordinator.applyPresentation(presentation, to: &self)
+        AppFeature.canvasPresentationStateCoordinator.applyPresentation(presentation, to: &self)
     }
 
     mutating func applyLoadedProject(_ loaded: LoadedPaintProject) {
-        AppFeature.canvasUIStateCoordinator.applyLoadedProject(loaded, to: &self)
+        AppFeature.canvasPresentationStateCoordinator.applyLoadedProject(loaded, to: &self)
     }
 
     mutating func syncTextEditorWithActiveLayer() {
-        AppFeature.canvasUIStateCoordinator.syncTextEditorWithActiveLayer(state: &self)
+        AppFeature.canvasPresentationStateCoordinator.syncTextEditorWithActiveLayer(state: &self)
     }
 
     mutating func applyLiveCompositePixelData(_ compositePixelData: Data) {
-        AppFeature.canvasUIStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &self)
+        AppFeature.canvasPreviewStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &self)
     }
 
     mutating func applyLiveStrokePreview(
@@ -22,7 +22,7 @@ extension AppFeature.State {
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) {
-        AppFeature.canvasUIStateCoordinator.applyLiveStrokePreview(
+        AppFeature.canvasPreviewStateCoordinator.applyLiveStrokePreview(
             baseSnapshot: baseSnapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,
@@ -31,14 +31,14 @@ extension AppFeature.State {
     }
 
     func resolvedBrushSettings() -> BrushRuntimeSettings {
-        AppFeature.canvasUIStateCoordinator.resolvedBrushSettings(for: self)
+        AppFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: self)
     }
 
     func previewStrokeStyle() -> PreviewStrokeStyle {
-        AppFeature.canvasUIStateCoordinator.previewStrokeStyle(for: self)
+        AppFeature.canvasToolStateCoordinator.previewStrokeStyle(for: self)
     }
 
     func resolvedPaperStyle() -> CanvasPaperStyle {
-        AppFeature.canvasUIStateCoordinator.resolvedPaperStyle(for: self)
+        AppFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: self)
     }
 }

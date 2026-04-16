@@ -100,6 +100,17 @@
 		7809F783FBA6462F8B4AB560 /* AppFeature+WorkspaceStateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4DA0A273464F3484E9CBFF /* AppFeature+WorkspaceStateAPI.swift */; };
 		09F42F3811F647AF96672EDC /* AppFeature+CanvasStateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934115DE766E43A6979CF389 /* AppFeature+CanvasStateAPI.swift */; };
 		10B17628B50749EE85EFC09A /* AppFeature+ToolPanelStateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EB4137334B43D4B1932C1C /* AppFeature+ToolPanelStateAPI.swift */; };
+		D30000000000000000000001 /* AppFeature+CanvasPreviewStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */; };
+		D30000000000000000000003 /* AppFeature+CanvasToolStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */; };
+		D40000000000000000000001 /* AppFeature+StartupLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000002 /* AppFeature+StartupLifecycleWorkflow.swift */; };
+		D40000000000000000000003 /* AppFeature+CanvasLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000004 /* AppFeature+CanvasLifecycleWorkflow.swift */; };
+		D40000000000000000000005 /* AppFeature+ExportWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000006 /* AppFeature+ExportWorkflow.swift */; };
+		D40000000000000000000007 /* AppFeature+AutosaveRecoveryWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000008 /* AppFeature+AutosaveRecoveryWorkflow.swift */; };
+		D40000000000000000000009 /* AppFeature+TabSelectionWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000A /* AppFeature+TabSelectionWorkflow.swift */; };
+		D4000000000000000000000B /* AppFeature+DocumentOpeningWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000C /* AppFeature+DocumentOpeningWorkflow.swift */; };
+		D4000000000000000000000D /* AppFeature+LayerContentWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */; };
+		D4000000000000000000000F /* AppFeature+LayerStructureWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */; };
+		D40000000000000000000011 /* AppFeature+LayerPropertiesWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */; };
 		A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */; };
 		A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000ED /* PaintDocumentSessionModels.swift */; };
 		C10000000000000000000001 /* PaintDocumentTimelapseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* PaintDocumentTimelapseOperation.swift */; };
@@ -108,12 +119,22 @@
 		C10000000000000000000007 /* PaintDocumentSessionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000008 /* PaintDocumentSessionError.swift */; };
 		A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */; };
 		A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */; };
+		D30000000000000000000005 /* PaintDocumentSession+FolderEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */; };
+		D30000000000000000000007 /* PaintDocumentSession+LayerPropertiesEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */; };
+		D30000000000000000000009 /* PaintDocumentSession+LayerPixelEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */; };
 		A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */; };
+		D3000000000000000000000B /* PaintDocumentSession+TimelapseReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */; };
+		D3000000000000000000000D /* PaintDocumentSession+TimelapseFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */; };
 		A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F5 /* AppFeature+StateAPI.swift */; };
 		A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* AppFeature+ActionRouting.swift */; };
 		A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F9 /* PaintDocumentBridgeService.swift */; };
 		A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FB /* PaintDocumentRasterServices.swift */; };
 		A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */; };
+		D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */; };
+		D50000000000000000000003 /* PaintDocumentPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000004 /* PaintDocumentPersistenceService.swift */; };
+		D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000006 /* PaintDocumentTimelapseService.swift */; };
+		D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000008 /* PaintDocumentGeometryService.swift */; };
+		D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5000000000000000000000A /* PaintDocumentBlurService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -195,6 +216,17 @@
 		77EBC82C12B64F77B9A28170 /* AppFeature+WorkspaceStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceStateCoordinator.swift"; sourceTree = "<group>"; };
 		9BCCBE365E364E1783DD6EC2 /* AppFeature+ToolPanelStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ToolPanelStateCoordinator.swift"; sourceTree = "<group>"; };
 		85DE8EA2D3D64DFFA55C9F18 /* AppFeature+CanvasUIStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasUIStateCoordinator.swift"; sourceTree = "<group>"; };
+		D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasPreviewStateCoordinator.swift"; sourceTree = "<group>"; };
+		D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasToolStateCoordinator.swift"; sourceTree = "<group>"; };
+		D40000000000000000000002 /* AppFeature+StartupLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StartupLifecycleWorkflow.swift"; sourceTree = "<group>"; };
+		D40000000000000000000004 /* AppFeature+CanvasLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasLifecycleWorkflow.swift"; sourceTree = "<group>"; };
+		D40000000000000000000006 /* AppFeature+ExportWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ExportWorkflow.swift"; sourceTree = "<group>"; };
+		D40000000000000000000008 /* AppFeature+AutosaveRecoveryWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+AutosaveRecoveryWorkflow.swift"; sourceTree = "<group>"; };
+		D4000000000000000000000A /* AppFeature+TabSelectionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+TabSelectionWorkflow.swift"; sourceTree = "<group>"; };
+		D4000000000000000000000C /* AppFeature+DocumentOpeningWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentOpeningWorkflow.swift"; sourceTree = "<group>"; };
+		D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerContentWorkflow.swift"; sourceTree = "<group>"; };
+		D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerStructureWorkflow.swift"; sourceTree = "<group>"; };
+		D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerPropertiesWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentPersistenceWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceTabWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StartupHomeWorkflow.swift"; sourceTree = "<group>"; };
@@ -222,12 +254,22 @@
 		C10000000000000000000008 /* PaintDocumentSessionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionError.swift; sourceTree = "<group>"; };
 		A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+StrokeEditing.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerEditing.swift"; sourceTree = "<group>"; };
+		D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+FolderEditing.swift"; sourceTree = "<group>"; };
+		D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerPropertiesEditing.swift"; sourceTree = "<group>"; };
+		D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerPixelEditing.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+CanvasGeometry.swift"; sourceTree = "<group>"; };
+		D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TimelapseReplay.swift"; sourceTree = "<group>"; };
+		D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TimelapseFrames.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F5 /* AppFeature+StateAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StateAPI.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* AppFeature+ActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ActionRouting.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F9 /* PaintDocumentBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeService.swift; sourceTree = "<group>"; };
 		A000000000000000000000FB /* PaintDocumentRasterServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentRasterServices.swift; sourceTree = "<group>"; };
 		A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionSideEffectServices.swift; sourceTree = "<group>"; };
+		D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentEditingLifecycleService.swift; sourceTree = "<group>"; };
+		D50000000000000000000004 /* PaintDocumentPersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPersistenceService.swift; sourceTree = "<group>"; };
+		D50000000000000000000006 /* PaintDocumentTimelapseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentTimelapseService.swift; sourceTree = "<group>"; };
+		D50000000000000000000008 /* PaintDocumentGeometryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentGeometryService.swift; sourceTree = "<group>"; };
+		D5000000000000000000000A /* PaintDocumentBlurService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBlurService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -408,6 +450,17 @@
 				77EBC82C12B64F77B9A28170 /* AppFeature+WorkspaceStateCoordinator.swift */,
 				9BCCBE365E364E1783DD6EC2 /* AppFeature+ToolPanelStateCoordinator.swift */,
 				85DE8EA2D3D64DFFA55C9F18 /* AppFeature+CanvasUIStateCoordinator.swift */,
+				D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */,
+				D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */,
+				D40000000000000000000002 /* AppFeature+StartupLifecycleWorkflow.swift */,
+				D40000000000000000000004 /* AppFeature+CanvasLifecycleWorkflow.swift */,
+				D40000000000000000000006 /* AppFeature+ExportWorkflow.swift */,
+				D40000000000000000000008 /* AppFeature+AutosaveRecoveryWorkflow.swift */,
+				D4000000000000000000000A /* AppFeature+TabSelectionWorkflow.swift */,
+				D4000000000000000000000C /* AppFeature+DocumentOpeningWorkflow.swift */,
+				D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */,
+				D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */,
+				D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */,
 				A000000000000000000000F5 /* AppFeature+StateAPI.swift */,
 				0A4DA0A273464F3484E9CBFF /* AppFeature+WorkspaceStateAPI.swift */,
 				934115DE766E43A6979CF389 /* AppFeature+CanvasStateAPI.swift */,
@@ -447,11 +500,21 @@
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
 				A000000000000000000000F9 /* PaintDocumentBridgeService.swift */,
 				A000000000000000000000FB /* PaintDocumentRasterServices.swift */,
+				D50000000000000000000008 /* PaintDocumentGeometryService.swift */,
+				D5000000000000000000000A /* PaintDocumentBlurService.swift */,
 				A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */,
+				D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */,
+				D50000000000000000000004 /* PaintDocumentPersistenceService.swift */,
+				D50000000000000000000006 /* PaintDocumentTimelapseService.swift */,
 				A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */,
 				A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */,
 				A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */,
+				D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */,
+				D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */,
+				D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */,
 				A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */,
+				D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */,
+				D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */,
 				A000000000000000000000ED /* PaintDocumentSessionModels.swift */,
 				C10000000000000000000002 /* PaintDocumentTimelapseOperation.swift */,
 				C10000000000000000000004 /* PaintDocumentBrushStorageModels.swift */,
@@ -565,6 +628,17 @@
 				8DA458906F8C4AC69D670CEB /* AppFeature+WorkspaceStateCoordinator.swift in Sources */,
 				7ADC402731884EF58613CCC6 /* AppFeature+ToolPanelStateCoordinator.swift in Sources */,
 				25A873499A1348AA99A538DF /* AppFeature+CanvasUIStateCoordinator.swift in Sources */,
+				D30000000000000000000001 /* AppFeature+CanvasPreviewStateCoordinator.swift in Sources */,
+				D30000000000000000000003 /* AppFeature+CanvasToolStateCoordinator.swift in Sources */,
+				D40000000000000000000001 /* AppFeature+StartupLifecycleWorkflow.swift in Sources */,
+				D40000000000000000000003 /* AppFeature+CanvasLifecycleWorkflow.swift in Sources */,
+				D40000000000000000000005 /* AppFeature+ExportWorkflow.swift in Sources */,
+				D40000000000000000000007 /* AppFeature+AutosaveRecoveryWorkflow.swift in Sources */,
+				D40000000000000000000009 /* AppFeature+TabSelectionWorkflow.swift in Sources */,
+				D4000000000000000000000B /* AppFeature+DocumentOpeningWorkflow.swift in Sources */,
+				D4000000000000000000000D /* AppFeature+LayerContentWorkflow.swift in Sources */,
+				D4000000000000000000000F /* AppFeature+LayerStructureWorkflow.swift in Sources */,
+				D40000000000000000000011 /* AppFeature+LayerPropertiesWorkflow.swift in Sources */,
 				A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */,
 				7809F783FBA6462F8B4AB560 /* AppFeature+WorkspaceStateAPI.swift in Sources */,
 				09F42F3811F647AF96672EDC /* AppFeature+CanvasStateAPI.swift in Sources */,
@@ -635,10 +709,20 @@
 				A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */,
 				A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */,
 				A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */,
+				D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */,
+				D50000000000000000000003 /* PaintDocumentPersistenceService.swift in Sources */,
+				D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */,
+				D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */,
+				D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */,
 				A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */,
 				A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */,
 				A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */,
+				D30000000000000000000005 /* PaintDocumentSession+FolderEditing.swift in Sources */,
+				D30000000000000000000007 /* PaintDocumentSession+LayerPropertiesEditing.swift in Sources */,
+				D30000000000000000000009 /* PaintDocumentSession+LayerPixelEditing.swift in Sources */,
 				A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */,
+				D3000000000000000000000B /* PaintDocumentSession+TimelapseReplay.swift in Sources */,
+				D3000000000000000000000D /* PaintDocumentSession+TimelapseFrames.swift in Sources */,
 				A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */,
 				C10000000000000000000001 /* PaintDocumentTimelapseOperation.swift in Sources */,
 				C10000000000000000000003 /* PaintDocumentBrushStorageModels.swift in Sources */,

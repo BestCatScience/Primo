@@ -1,9 +1,8 @@
 import Foundation
 import SwiftUI
-import UIKit
 
 extension AppFeature {
-    struct AppFeatureCanvasUIStateCoordinator {
+    struct AppFeatureCanvasPresentationStateCoordinator {
         func applyPresentation(
             _ presentation: PaintDocumentPresentation,
             to state: inout AppFeature.State
@@ -48,11 +47,11 @@ extension AppFeature {
             state.layerSidebar.activeLayerIndex = presentation.activeLayerIndex
             state.layerSidebar.paperColor = state.brushPalette.paper.color
             state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
-            state.canvas.previewStyle = previewStrokeStyle(for: state)
+            state.canvas.previewStyle = state.previewStrokeStyle()
             state.canvas.selectionMode = state.brushPalette.selection.toolMode
             state.canvas.shapeMode = state.brushPalette.shape.mode
             state.canvas.eyedropperSamplingSource = state.brushPalette.sampling.eyedropperSource
-            state.canvas.paperStyle = resolvedPaperStyle(for: state)
+            state.canvas.paperStyle = state.resolvedPaperStyle()
             state.canvas.activeTextLayer = presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
             syncTextEditorWithActiveLayer(state: &state)
         }
@@ -97,166 +96,6 @@ extension AppFeature {
                 state.brushPalette.text.scale = 1.0
                 state.brushPalette.text.rotationDegrees = 0
             }
-        }
-
-        func applyLiveCompositePixelData(
-            _ compositePixelData: Data,
-            to state: inout AppFeature.State
-        ) {
-            let width = state.canvas.renderSnapshot?.width ?? max(Int(state.canvas.canvasSize.width.rounded()), 1)
-            let height = state.canvas.renderSnapshot?.height ?? max(Int(state.canvas.canvasSize.height.rounded()), 1)
-            guard compositePixelData.count == width * height * 4 else {
-                return
-            }
-
-            let layerSnapshots: [MetalLayerSnapshot]
-            if let existingLayers = state.canvas.renderSnapshot?.layers, !existingLayers.isEmpty {
-                layerSnapshots = existingLayers
-            } else {
-                layerSnapshots = state.canvas.layerBuffers.map { buffer in
-                    MetalLayerSnapshot(
-                        index: buffer.index,
-                        opacity: Float(buffer.opacity),
-                        visible: buffer.visible,
-                        isClipped: false,
-                        blendMode: buffer.blendMode,
-                        thumbnailData: nil,
-                        pixelData: Data()
-                    )
-                }
-            }
-
-            let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.renderSnapshot = MetalDocumentSnapshot(
-                width: width,
-                height: height,
-                revision: nextRevision,
-                compositePixelData: compositePixelData,
-                layers: layerSnapshots
-            )
-            state.canvas.pendingIncrementalUpdate = nil
-            state.isHydrating = false
-        }
-
-        func applyLiveStrokePreview(
-            baseSnapshot: MetalDocumentSnapshot,
-            activeLayerIndex: Int,
-            adjustedActiveLayerPixels: Data,
-            to state: inout AppFeature.State
-        ) {
-            guard let composite = AppFeature.compositedPreviewPixelData(
-                snapshot: baseSnapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedActiveLayerPixels
-            ) else {
-                return
-            }
-
-            let nextLayers = baseSnapshot.layers.map { layer in
-                guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: layer.visible,
-                    isClipped: layer.isClipped,
-                    blendMode: layer.blendMode,
-                    thumbnailData: layer.thumbnailData,
-                    pixelData: adjustedActiveLayerPixels
-                )
-            }
-
-            let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.renderSnapshot = MetalDocumentSnapshot(
-                width: baseSnapshot.width,
-                height: baseSnapshot.height,
-                revision: nextRevision,
-                compositePixelData: composite,
-                layers: nextLayers
-            )
-            state.canvas.activeStrokePreviewLayerPixelData = adjustedActiveLayerPixels
-            state.canvas.pendingIncrementalUpdate = nil
-            state.isHydrating = false
-        }
-
-        func resolvedBrushSettings(for state: AppFeature.State) -> BrushRuntimeSettings {
-            var settings = state.brushPalette.runtimeSettings
-            if settings.tipKind == .oil {
-                settings.stabilization = max(settings.stabilization, 0.34)
-            }
-            if state.canvas.currentTool == .erase || (state.canvas.currentTool == .brush && state.brushPalette.brush.usesTransparentColor) {
-                settings.isEraser = true
-            }
-            return settings
-        }
-
-        func previewStrokeStyle(for state: AppFeature.State) -> PreviewStrokeStyle {
-            let resolvedRuntimeSettings: BrushRuntimeSettings = {
-                var settings = state.brushPalette.runtimeSettings
-                if settings.tipKind == .oil {
-                    settings.stabilization = max(settings.stabilization, 0.34)
-                }
-                return settings
-            }()
-
-            if state.canvas.currentTool == .erase || (state.canvas.currentTool == .brush && state.brushPalette.brush.usesTransparentColor) {
-                return PreviewStrokeStyle(
-                    tipKind: .ink,
-                    isEraser: true,
-                    radius: CGFloat(resolvedRuntimeSettings.radius),
-                    opacity: 0.78,
-                    flow: CGFloat(resolvedRuntimeSettings.flow),
-                    hardness: 0.95,
-                    roundness: CGFloat(resolvedRuntimeSettings.roundness),
-                    angle: CGFloat(resolvedRuntimeSettings.angle),
-                    followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
-                    pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
-                    stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
-                    customTip: resolvedRuntimeSettings.customTip,
-                    color: CGColor(
-                        red: 0.92,
-                        green: 0.95,
-                        blue: 0.98,
-                        alpha: 1.0
-                    )
-                )
-            }
-
-            return PreviewStrokeStyle(
-                tipKind: resolvedRuntimeSettings.tipKind,
-                isEraser: false,
-                radius: CGFloat(resolvedRuntimeSettings.radius),
-                opacity: CGFloat(resolvedRuntimeSettings.opacity),
-                flow: CGFloat(resolvedRuntimeSettings.flow),
-                hardness: CGFloat(resolvedRuntimeSettings.hardness),
-                roundness: CGFloat(resolvedRuntimeSettings.roundness),
-                angle: CGFloat(resolvedRuntimeSettings.angle),
-                followsStrokeAngle: resolvedRuntimeSettings.angleMode == .strokeDirection,
-                pressureSensitivity: CGFloat(resolvedRuntimeSettings.pressureSensitivity),
-                stabilization: CGFloat(resolvedRuntimeSettings.stabilization),
-                customTip: resolvedRuntimeSettings.customTip,
-                color: CGColor(
-                    red: CGFloat(resolvedRuntimeSettings.red) / 255.0,
-                    green: CGFloat(resolvedRuntimeSettings.green) / 255.0,
-                    blue: CGFloat(resolvedRuntimeSettings.blue) / 255.0,
-                    alpha: 1.0
-                )
-            )
-        }
-
-        func resolvedPaperStyle(for state: AppFeature.State) -> CanvasPaperStyle {
-            let resolved = UIColor(state.brushPalette.paper.color)
-            var red: CGFloat = 0
-            var green: CGFloat = 0
-            var blue: CGFloat = 0
-            var alpha: CGFloat = 0
-            resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-            return CanvasPaperStyle(
-                red: Float(red),
-                green: Float(green),
-                blue: Float(blue),
-                alpha: Float(alpha),
-                isTransparent: state.brushPalette.paper.isTransparent
-            )
         }
     }
 }
