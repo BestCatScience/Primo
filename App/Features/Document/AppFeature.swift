@@ -653,6 +653,7 @@ struct AppFeature {
 
     @Dependency(\.paintDocumentClient) var paintDocumentClient
     @Dependency(\.nanoBananaClient) var nanoBananaClient
+    @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
 
     var body: some ReducerOf<Self> {
         CombineReducers {
@@ -714,8 +715,8 @@ struct AppFeature {
 
             case .homeProjectsLoadRequested:
                 state.isLoadingHomeProjects = true
-                return .run { send in
-                    let projects = (try? Self.savedProjects()) ?? []
+                return .run { [documentWorkspaceClient] send in
+                    let projects = (try? documentWorkspaceClient.loadSavedProjects()) ?? []
                     await send(.homeProjectsLoaded(projects))
                 }
 
@@ -725,8 +726,8 @@ struct AppFeature {
                 return .none
 
             case .autosaveRecoveryLoadRequested:
-                return .run { send in
-                    let items = (try? Self.loadAutosaveRecoveryItems()) ?? []
+                return .run { [documentWorkspaceClient] send in
+                    let items = (try? documentWorkspaceClient.loadAutosaveRecoveryItems()) ?? []
                     await send(.autosaveRecoveryLoaded(items))
                 }
 
@@ -740,7 +741,7 @@ struct AppFeature {
                     return .none
                 }
                 if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
+                    _ = persistActiveTabToBackingStore(state: &state)
                 }
                 state.isHydrating = true
                 state.isShowingAutosaveRecovery = false
@@ -754,7 +755,7 @@ struct AppFeature {
                 }
 
             case let .autosaveRecoveryOpened(loaded, item):
-                try? Self.discardAutosaveEntry(id: item.id)
+                try? documentWorkspaceClient.discardAutosaveEntry(item.id)
                 state.applyLoadedProject(loaded)
                 activateNewTab(
                     state: &state,
@@ -762,7 +763,7 @@ struct AppFeature {
                     sourceProjectURL: item.sourceProjectURL
                 )
                 state.setActiveTabDirty(true)
-                persistActiveTabToBackingStore(state: &state)
+                _ = persistActiveTabToBackingStore(state: &state)
                 persistActiveTabAutosave(state: &state)
                 state.isHydrating = false
                 state.showsHome = false
@@ -774,7 +775,7 @@ struct AppFeature {
             case let .autosaveRecoveryDiscardRequested(autosaveID):
                 state.autosaveRecoveryItems.removeAll { $0.id == autosaveID }
                 state.isShowingAutosaveRecovery = !state.autosaveRecoveryItems.isEmpty
-                try? Self.discardAutosaveEntry(id: autosaveID)
+                try? documentWorkspaceClient.discardAutosaveEntry(autosaveID)
                 return .none
 
             case .autosaveRecoveryDismissed:
@@ -790,7 +791,7 @@ struct AppFeature {
                     return .none
                 }
                 if !state.showsHome, state.activeTabID != tabID {
-                    persistActiveTabToBackingStore(state: &state)
+                    _ = persistActiveTabToBackingStore(state: &state)
                 }
                 do {
                     let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL)
@@ -842,7 +843,7 @@ struct AppFeature {
                 let wasActive = state.activeTabID == tabID
                 state.openTabs.remove(at: closingIndex)
                 clearAutosave(for: closingTab)
-                try? FileManager.default.removeItem(at: closingTab.backingStoreURL)
+                try? documentWorkspaceClient.removeWorkspaceItem(closingTab.backingStoreURL)
                 state.ensureWorkspaceSelectionIntegrity()
 
                 if wasActive {
@@ -872,7 +873,7 @@ struct AppFeature {
                 let removedTabs = state.openTabs.filter { $0.id != tabID }
                 removedTabs.forEach {
                     clearAutosave(for: $0)
-                    try? FileManager.default.removeItem(at: $0.backingStoreURL)
+                    try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
                 }
                 state.openTabs = retainedTabs
                 state.primarySelectedTabID = retainedTabs.first(where: { $0.pane == .primary })?.id
@@ -892,7 +893,7 @@ struct AppFeature {
                 let removedTabs = state.openTabs.filter { idsToRemove.contains($0.id) }
                 removedTabs.forEach {
                     clearAutosave(for: $0)
-                    try? FileManager.default.removeItem(at: $0.backingStoreURL)
+                    try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
                 }
                 state.openTabs.removeAll { idsToRemove.contains($0.id) }
                 state.ensureWorkspaceSelectionIntegrity()
@@ -938,7 +939,7 @@ struct AppFeature {
 
             case let .moveSavedProject(url, relativeFolderPath):
                 do {
-                    let destinationURL = try Self.moveSavedProject(at: url, toRelativeFolderPath: relativeFolderPath)
+                    let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
                     if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL?.standardizedFileURL == url.standardizedFileURL }) {
                         state.openTabs[openTabIndex].sourceProjectURL = destinationURL
                     }
@@ -949,24 +950,16 @@ struct AppFeature {
                 }
 
             case .homeReturnRequested:
-                do {
-                    let url = try Self.projectURLInDocuments()
-                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
-                    state.updateActiveTabMetadata(
-                        title: url.deletingPathExtension().lastPathComponent,
-                        sourceProjectURL: url,
-                        previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
-                    )
-                    state.setActiveTabDirty(false)
-                    if let activeTab = state.activeTab {
-                        clearAutosave(for: activeTab)
+                if state.activeTab != nil {
+                    guard persistActiveProjectToWorkspace(
+                        state: &state,
+                        preferredDestinationURL: state.activeTab?.sourceProjectURL
+                    ) != nil else {
+                        return .none
                     }
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
-                }
-                persistActiveTabToBackingStore(state: &state)
-                if let activeTab = state.activeTab {
-                    persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
+                    if let activeTab = state.activeTab {
+                        persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
+                    }
                 }
                 state.showsHome = true
                 state.homeSection = .home
@@ -1139,9 +1132,11 @@ struct AppFeature {
 
             case .saveHistoryRequested:
                 guard let activeTab = state.activeTab else { return .none }
-                state.saveHistoryEntries = (try? Self.loadSaveHistoryEntries(for: activeTab)) ?? []
                 state.isShowingSaveHistory = true
-                return .none
+                return .run { [documentWorkspaceClient] send in
+                    let entries = (try? documentWorkspaceClient.loadSaveHistoryEntries(activeTab)) ?? []
+                    await send(.saveHistoryLoaded(entries))
+                }
 
             case let .saveHistoryLoaded(entries):
                 state.saveHistoryEntries = entries
@@ -1483,7 +1478,7 @@ struct AppFeature {
                     return .none
                 }
                 do {
-                    let url = try Self.writePNGToTemporaryDirectory(data: pngData)
+                    let url = try documentWorkspaceClient.writePNGToTemporaryDirectory(pngData)
                     state.exportSheet = ShareExport(url: url)
                 } catch {
                     state.bannerMessage = state.appLanguage.localized("Export failed")
@@ -1491,48 +1486,28 @@ struct AppFeature {
                 return .none
 
             case .saveDocumentRequested:
-                do {
-                    let url = try state.activeTab?.sourceProjectURL ?? Self.projectURLInDocuments()
-                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
-                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
-                    state.updateActiveTabMetadata(
-                        title: url.deletingPathExtension().lastPathComponent,
-                        sourceProjectURL: url,
-                        previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
-                    )
-                    state.setActiveTabDirty(false)
-                    if let activeTab = state.activeTab {
-                        clearAutosave(for: activeTab)
-                    }
-                    persistActiveTabToBackingStore(state: &state)
-                    if let activeTab = state.activeTab {
-                        persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
-                    }
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                guard let savedURL = persistActiveProjectToWorkspace(
+                    state: &state,
+                    preferredDestinationURL: state.activeTab?.sourceProjectURL
+                ) else {
+                    return .none
+                }
+                state.bannerMessage = StudioStrings.savedDocument(savedURL.lastPathComponent, state.appLanguage)
+                if let activeTab = state.activeTab {
+                    persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
                 }
                 return .send(.homeProjectsLoadRequested)
 
             case .saveDocumentCopyRequested:
-                do {
-                    let url = try Self.projectURLInDocuments()
-                    try paintDocumentClient.saveProject(url, state.resolvedPaperStyle())
-                    state.bannerMessage = StudioStrings.savedDocument(url.lastPathComponent, state.appLanguage)
-                    state.updateActiveTabMetadata(
-                        title: url.deletingPathExtension().lastPathComponent,
-                        sourceProjectURL: url,
-                        previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
-                    )
-                    state.setActiveTabDirty(false)
-                    if let activeTab = state.activeTab {
-                        clearAutosave(for: activeTab)
-                    }
-                    persistActiveTabToBackingStore(state: &state)
-                    if let activeTab = state.activeTab {
-                        persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
-                    }
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
+                guard let savedURL = persistActiveProjectToWorkspace(
+                    state: &state,
+                    preferredDestinationURL: nil
+                ) else {
+                    return .none
+                }
+                state.bannerMessage = StudioStrings.savedDocument(savedURL.lastPathComponent, state.appLanguage)
+                if let activeTab = state.activeTab {
+                    persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
                 }
                 return .send(.homeProjectsLoadRequested)
 
@@ -1543,11 +1518,11 @@ struct AppFeature {
                 }
                 state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.previewImageData)
                 let failureMessage = state.appLanguage.localized("Timelapse export failed")
-                return .run { send in
+                return .run { [documentWorkspaceClient] send in
                     do {
                         let url = try TimelapseExporter.exportVideo(
                             from: capture,
-                            to: Self.timelapseTemporaryDirectory()
+                            to: documentWorkspaceClient.timelapseTemporaryDirectory()
                         ) { progress, previewURL in
                             let previewData = try? Data(contentsOf: previewURL)
                             Task {
@@ -1828,14 +1803,14 @@ struct AppFeature {
                     persistActiveTabToBackingStore(state: &state)
                 }
                 state.isHydrating = true
-                return .run { [paintDocumentClient] send in
+                return .run { [paintDocumentClient, documentWorkspaceClient] send in
                     do {
                         let loaded = try paintDocumentClient.loadProject(url)
                         await send(.openDocumentLoaded(loaded, url))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
                     }
-                    try? FileManager.default.removeItem(at: url)
+                    try? documentWorkspaceClient.removeWorkspaceItem(url)
                 }
 
             case let .homeProjectSelected(url):

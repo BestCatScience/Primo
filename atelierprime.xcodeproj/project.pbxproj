@@ -44,7 +44,7 @@
 		A0000000000000000000009C /* BrushPaletteControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009D /* BrushPaletteControls.swift */; };
 		A0000000000000000000009E /* BrushPaletteView+Bindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009F /* BrushPaletteView+Bindings.swift */; };
 		A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A1 /* BrushPaletteView+Sections.swift */; };
-		A000000000000000000000A4 /* AppFeature+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A5 /* AppFeature+Helpers.swift */; };
+		A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A5 /* AppFeature+PureImageOps.swift */; };
 		A000000000000000000000A6 /* TimelapseExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A7 /* TimelapseExporter.swift */; };
 		A000000000000000000000A8 /* ContentView+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A9 /* ContentView+Menus.swift */; };
 		A000000000000000000000AA /* ContentView+Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AB /* ContentView+Workspace.swift */; };
@@ -55,6 +55,8 @@
 		A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B5 /* LayerSidebarView+Support.swift */; };
 		A000000000000000000000B6 /* NanoBananaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B7 /* NanoBananaClient.swift */; };
 		A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B9 /* NanoBananaCommerce.swift */; };
+		A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */; };
+		A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BD /* AppFeature+SelectionTransform.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,7 +102,7 @@
 		A0000000000000000000009D /* BrushPaletteControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteControls.swift; sourceTree = "<group>"; };
 		A0000000000000000000009F /* BrushPaletteView+Bindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Bindings.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A1 /* BrushPaletteView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Sections.swift"; sourceTree = "<group>"; };
-		A000000000000000000000A5 /* AppFeature+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+Helpers.swift"; sourceTree = "<group>"; };
+		A000000000000000000000A5 /* AppFeature+PureImageOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+PureImageOps.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* TimelapseExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseExporter.swift; sourceTree = "<group>"; };
 		A000000000000000000000AB /* ContentView+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Workspace.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AD /* BrushPaletteView+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Controls.swift"; sourceTree = "<group>"; };
@@ -110,6 +112,8 @@
 		A000000000000000000000B5 /* LayerSidebarView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Support.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B7 /* NanoBananaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaClient.swift; sourceTree = "<group>"; };
 		A000000000000000000000B9 /* NanoBananaCommerce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaCommerce.swift; sourceTree = "<group>"; };
+		A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
+		A000000000000000000000BD /* AppFeature+SelectionTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionTransform.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -283,7 +287,9 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000003 /* AppFeature.swift */,
-				A000000000000000000000A5 /* AppFeature+Helpers.swift */,
+				A000000000000000000000A5 /* AppFeature+PureImageOps.swift */,
+				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
+				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
@@ -383,7 +389,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A000000000000000000000A4 /* AppFeature+Helpers.swift in Sources */,
+				A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */,
+				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
+				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,
 				A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */,
