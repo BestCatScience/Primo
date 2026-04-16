@@ -14,7 +14,7 @@ extension PaintDocumentSession {
         bridge.setLayerVisible(isVisible, at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerVisibility(index: index, isVisible: isVisible)
+                recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
             )
         )
     }
@@ -23,7 +23,7 @@ extension PaintDocumentSession {
         bridge.setLayerLocked(isLocked, at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerLocked(index: index, isLocked: isLocked)
+                recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
             )
         )
     }
@@ -32,7 +32,7 @@ extension PaintDocumentSession {
         bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
+                recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
             )
         )
     }
@@ -41,7 +41,7 @@ extension PaintDocumentSession {
         bridge.setLayerClipped(isClipped, at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerClipped(index: index, isClipped: isClipped),
+                recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped),
                 invalidating: .layer(index)
             )
         )
@@ -55,7 +55,7 @@ extension PaintDocumentSession {
         bridge.setLayerOpacity(CGFloat(opacity), at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerOpacity(index: index, opacity: opacity),
+                recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity),
                 invalidating: .layer(index)
             )
         )
@@ -65,7 +65,7 @@ extension PaintDocumentSession {
         bridge.setLayerBlendMode(blendMode.rawValue, at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setLayerBlendMode(index: index, blendMode: blendMode),
+                recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode),
                 invalidating: .layer(index)
             )
         )

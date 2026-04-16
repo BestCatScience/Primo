@@ -1,6 +1,92 @@
 import CoreGraphics
 import Foundation
 
+struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Comparable {
+    let rawValue: Int
+
+    init(validating rawValue: Int) throws {
+        guard rawValue >= 0 else {
+            throw DocumentWorkspaceError.invalidLayerIndex(rawValue)
+        }
+        self.rawValue = rawValue
+    }
+
+    init(unchecked rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    static func unchecked(_ rawValue: Int) -> Self {
+        Self(unchecked: rawValue)
+    }
+
+    var id: Int { rawValue }
+
+    static func < (lhs: DocumentLayerIndex, rhs: DocumentLayerIndex) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(Int.self)
+        do {
+            try self.init(validating: rawValue)
+        } catch {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid layer index: \(rawValue)"
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
+struct DocumentFolderID: Hashable, Codable, Sendable, Identifiable, Comparable {
+    let rawValue: Int
+
+    init(validating rawValue: Int) throws {
+        guard rawValue >= 0 else {
+            throw DocumentWorkspaceError.invalidFolderID(rawValue)
+        }
+        self.rawValue = rawValue
+    }
+
+    init(unchecked rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    static func unchecked(_ rawValue: Int) -> Self {
+        Self(unchecked: rawValue)
+    }
+
+    var id: Int { rawValue }
+
+    static func < (lhs: DocumentFolderID, rhs: DocumentFolderID) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(Int.self)
+        do {
+            try self.init(validating: rawValue)
+        } catch {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Invalid folder ID: \(rawValue)"
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
 struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
     let fileURL: URL
 
@@ -88,6 +174,8 @@ struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
 enum DocumentWorkspaceError: LocalizedError {
     case invalidIdentifier(String)
     case invalidRelativeFolderPath(String)
+    case invalidLayerIndex(Int)
+    case invalidFolderID(Int)
     case missingProjectDirectory(String, URL)
     case invalidProjectDirectory(String, URL)
     case destinationAlreadyExists(URL)
@@ -98,6 +186,10 @@ enum DocumentWorkspaceError: LocalizedError {
             return "Invalid workspace identifier: \(value)"
         case let .invalidRelativeFolderPath(value):
             return "Invalid destination folder path: \(value)"
+        case let .invalidLayerIndex(value):
+            return "Invalid layer index: \(value)"
+        case let .invalidFolderID(value):
+            return "Invalid folder ID: \(value)"
         case let .missingProjectDirectory(label, url):
             return "Missing \(label) at \(url.lastPathComponent)"
         case let .invalidProjectDirectory(label, url):

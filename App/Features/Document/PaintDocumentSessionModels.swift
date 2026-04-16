@@ -10,7 +10,7 @@ struct StoredPrimoDocument: Codable {
     }
 
     struct Layer: Codable {
-        let index: Int
+        let index: DocumentLayerIndex
         let name: String
         let visible: Bool
         let locked: Bool
@@ -18,7 +18,7 @@ struct StoredPrimoDocument: Codable {
         let clipped: Bool
         let opacity: Double
         let blendMode: String
-        let folderID: Int?
+        let folderID: DocumentFolderID?
         let textLayer: TextLayerData?
         let pixelFilename: String
         let maskFilename: String?
@@ -39,7 +39,7 @@ struct StoredPrimoDocument: Codable {
         }
 
         init(
-            index: Int,
+            index: DocumentLayerIndex,
             name: String,
             visible: Bool,
             locked: Bool,
@@ -47,7 +47,7 @@ struct StoredPrimoDocument: Codable {
             clipped: Bool,
             opacity: Double,
             blendMode: String,
-            folderID: Int?,
+            folderID: DocumentFolderID?,
             textLayer: TextLayerData?,
             pixelFilename: String,
             maskFilename: String?
@@ -68,7 +68,7 @@ struct StoredPrimoDocument: Codable {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            index = try container.decode(Int.self, forKey: .index)
+            index = try container.decode(DocumentLayerIndex.self, forKey: .index)
             name = try container.decode(String.self, forKey: .name)
             visible = try container.decode(Bool.self, forKey: .visible)
             locked = try container.decodeIfPresent(Bool.self, forKey: .locked) ?? false
@@ -76,7 +76,7 @@ struct StoredPrimoDocument: Codable {
             clipped = try container.decodeIfPresent(Bool.self, forKey: .clipped) ?? false
             opacity = try container.decode(Double.self, forKey: .opacity)
             blendMode = try container.decode(String.self, forKey: .blendMode)
-            folderID = try container.decodeIfPresent(Int.self, forKey: .folderID)
+            folderID = try container.decodeIfPresent(DocumentFolderID.self, forKey: .folderID)
             textLayer = try container.decodeIfPresent(TextLayerData.self, forKey: .textLayer)
             pixelFilename = try container.decode(String.self, forKey: .pixelFilename)
             maskFilename = try container.decodeIfPresent(String.self, forKey: .maskFilename)
@@ -84,11 +84,11 @@ struct StoredPrimoDocument: Codable {
     }
 
     struct Folder: Codable {
-        let id: Int
+        let id: DocumentFolderID
         let name: String
         let visible: Bool
         let expanded: Bool
-        let anchorLayerIndex: Int?
+        let anchorLayerIndex: DocumentLayerIndex?
     }
 
     struct TimelapseFrame: Codable {
@@ -100,7 +100,7 @@ struct StoredPrimoDocument: Codable {
     let version: Int
     let canvasWidth: Int
     let canvasHeight: Int
-    let activeLayerIndex: Int
+    let activeLayerIndex: DocumentLayerIndex
     let paperStyle: PaperStyle
     let layers: [Layer]
     let folders: [Folder]
@@ -123,7 +123,7 @@ struct StoredPrimoDocument: Codable {
         version: Int,
         canvasWidth: Int,
         canvasHeight: Int,
-        activeLayerIndex: Int,
+        activeLayerIndex: DocumentLayerIndex,
         paperStyle: PaperStyle,
         layers: [Layer],
         folders: [Folder],
@@ -146,7 +146,7 @@ struct StoredPrimoDocument: Codable {
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         canvasWidth = try container.decode(Int.self, forKey: .canvasWidth)
         canvasHeight = try container.decode(Int.self, forKey: .canvasHeight)
-        activeLayerIndex = try container.decode(Int.self, forKey: .activeLayerIndex)
+        activeLayerIndex = try container.decode(DocumentLayerIndex.self, forKey: .activeLayerIndex)
         paperStyle = try container.decode(PaperStyle.self, forKey: .paperStyle)
         layers = try container.decode([Layer].self, forKey: .layers)
         folders = try container.decodeIfPresent([Folder].self, forKey: .folders) ?? []

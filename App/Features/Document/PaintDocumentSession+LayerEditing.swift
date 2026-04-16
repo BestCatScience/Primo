@@ -53,7 +53,7 @@ extension PaintDocumentSession {
             }
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .duplicateLayer(index: index, name: name),
+                    recording: .duplicateLayer(index: .unchecked(index), name: name),
                     invalidating: .all
                 )
             )
@@ -68,7 +68,7 @@ extension PaintDocumentSession {
             textLayers = remappedTextLayersForDeletion(of: index)
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .deleteLayer(index: index),
+                    recording: .deleteLayer(index: .unchecked(index)),
                     invalidating: .all
                 )
             )
@@ -83,7 +83,7 @@ extension PaintDocumentSession {
             textLayers = remappedTextLayersForMove(from: index, to: destinationIndex)
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .moveLayer(index: index, destinationIndex: destinationIndex),
+                    recording: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)),
                     invalidating: .all
                 )
             )

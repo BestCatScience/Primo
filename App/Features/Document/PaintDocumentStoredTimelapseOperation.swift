@@ -30,10 +30,10 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     }
 
     let kind: Kind
-    var layerIndex: Int?
-    var destinationIndex: Int?
-    var folderID: Int?
-    var anchorLayerIndex: Int?
+    var layerIndex: DocumentLayerIndex?
+    var destinationIndex: DocumentLayerIndex?
+    var folderID: DocumentFolderID?
+    var anchorLayerIndex: DocumentLayerIndex?
     var name: String?
     var isVisible: Bool?
     var isLocked: Bool?
@@ -49,10 +49,10 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
 
     init(
         kind: Kind,
-        layerIndex: Int? = nil,
-        destinationIndex: Int? = nil,
-        folderID: Int? = nil,
-        anchorLayerIndex: Int? = nil,
+        layerIndex: DocumentLayerIndex? = nil,
+        destinationIndex: DocumentLayerIndex? = nil,
+        folderID: DocumentFolderID? = nil,
+        anchorLayerIndex: DocumentLayerIndex? = nil,
         name: String? = nil,
         isVisible: Bool? = nil,
         isLocked: Bool? = nil,

@@ -49,7 +49,10 @@ final class PaintDocumentSession: @unchecked Sendable {
     var persistenceService: PaintDocumentPersistenceService { services.persistence }
     var timelapseService: PaintDocumentTimelapseService { services.timelapse }
     var editingLifecycleService: PaintDocumentEditingLifecycleService { services.editingLifecycle }
-    var bridgeService: PaintDocumentBridgeService { services.bridge }
+    var bridgeQueryService: PaintDocumentBridgeQueryService { services.bridge.queries }
+    var bridgePixelService: PaintDocumentBridgePixelService { services.bridge.pixels }
+    var bridgeDescriptorService: PaintDocumentBridgeDescriptorService { services.bridge.descriptors }
+    var bridgeStrokeService: PaintDocumentBridgeStrokeService { services.bridge.strokePoints }
     var geometryService: PaintDocumentGeometryService { services.geometry }
     var blurService: PaintDocumentBlurService { services.blur }
 

@@ -207,7 +207,7 @@ enum TimelapseExporter {
             height: max(Int(capture.canvasSize.height.rounded()), 1),
             fileClient: fileClient
         )
-        var folderIDMap: [Int: Int] = [:]
+        var folderIDMap: [DocumentFolderID: Int] = [:]
         var finalImage: CGImage?
 
         for (index, operation) in operations.enumerated() {

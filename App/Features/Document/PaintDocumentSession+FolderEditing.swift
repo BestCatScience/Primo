@@ -7,9 +7,9 @@ extension PaintDocumentSession {
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .createFolder(
-                    folderID: folderID,
+                    folderID: .unchecked(folderID),
                     name: name,
-                    anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil
+                    anchorLayerIndex: layerIndex >= 0 ? .unchecked(layerIndex) : nil
                 ),
                 captureFrame: false
             )
@@ -22,7 +22,7 @@ extension PaintDocumentSession {
         let didDelete = bridge.deleteFolder(id: folderID)
         if didDelete {
             applyLifecycleMutation(
-                editingLifecycleService.mutation(recording: .deleteFolder(folderID: folderID))
+                editingLifecycleService.mutation(recording: .deleteFolder(folderID: .unchecked(folderID)))
             )
         }
         return didDelete
@@ -32,7 +32,7 @@ extension PaintDocumentSession {
         bridge.setFolderVisible(isVisible, folderID: folderID)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .setFolderVisibility(folderID: folderID, isVisible: isVisible)
+                recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
             )
         )
     }
@@ -51,7 +51,10 @@ extension PaintDocumentSession {
         if didAssign {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .assignLayerToFolder(index: index, folderID: folderID >= 0 ? folderID : nil)
+                    recording: .assignLayerToFolder(
+                        index: .unchecked(index),
+                        folderID: folderID >= 0 ? .unchecked(folderID) : nil
+                    )
                 )
             )
         }

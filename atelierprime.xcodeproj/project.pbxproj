@@ -128,6 +128,10 @@
 		A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F5 /* AppFeature+StateAPI.swift */; };
 		A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* AppFeature+ActionRouting.swift */; };
 		A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F9 /* PaintDocumentBridgeService.swift */; };
+		D60000000000000000000001 /* PaintDocumentBridgeQueryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */; };
+		D60000000000000000000003 /* PaintDocumentBridgePixelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */; };
+		D60000000000000000000005 /* PaintDocumentBridgeDescriptorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */; };
+		D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */; };
 		A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FB /* PaintDocumentRasterServices.swift */; };
 		A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */; };
 		D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */; };
@@ -263,6 +267,10 @@
 		A000000000000000000000F5 /* AppFeature+StateAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StateAPI.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* AppFeature+ActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ActionRouting.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F9 /* PaintDocumentBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeService.swift; sourceTree = "<group>"; };
+		D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeQueryService.swift; sourceTree = "<group>"; };
+		D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgePixelService.swift; sourceTree = "<group>"; };
+		D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeDescriptorService.swift; sourceTree = "<group>"; };
+		D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeStrokeService.swift; sourceTree = "<group>"; };
 		A000000000000000000000FB /* PaintDocumentRasterServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentRasterServices.swift; sourceTree = "<group>"; };
 		A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionSideEffectServices.swift; sourceTree = "<group>"; };
 		D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentEditingLifecycleService.swift; sourceTree = "<group>"; };
@@ -499,6 +507,10 @@
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
 				A000000000000000000000F9 /* PaintDocumentBridgeService.swift */,
+				D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */,
+				D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */,
+				D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */,
+				D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */,
 				A000000000000000000000FB /* PaintDocumentRasterServices.swift */,
 				D50000000000000000000008 /* PaintDocumentGeometryService.swift */,
 				D5000000000000000000000A /* PaintDocumentBlurService.swift */,
@@ -707,6 +719,10 @@
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
 				A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */,
+				D60000000000000000000001 /* PaintDocumentBridgeQueryService.swift in Sources */,
+				D60000000000000000000003 /* PaintDocumentBridgePixelService.swift in Sources */,
+				D60000000000000000000005 /* PaintDocumentBridgeDescriptorService.swift in Sources */,
+				D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */,
 				A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */,
 				A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */,
 				D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */,

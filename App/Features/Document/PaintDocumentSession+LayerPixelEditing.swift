@@ -25,7 +25,7 @@ extension PaintDocumentSession {
             let pixelData = bridge.pixelDataForLayer(at: index) as Data
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .replaceLayerPixels(index: index, data: pixelData),
+                    recording: .replaceLayerPixels(index: .unchecked(index), data: pixelData),
                     invalidating: .layer(index)
                 )
             )
@@ -101,7 +101,7 @@ extension PaintDocumentSession {
         }
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .replaceLayerPixels(index: index, data: adjustedData),
+                recording: .replaceLayerPixels(index: .unchecked(index), data: adjustedData),
                 invalidating: .layer(index)
             )
         )
@@ -115,7 +115,7 @@ extension PaintDocumentSession {
         bridge.replaceLayerMask(at: index, data: maskData)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .replaceLayerMask(index: index, data: maskData),
+                recording: .replaceLayerMask(index: .unchecked(index), data: maskData),
                 invalidating: .layer(index)
             )
         )
@@ -130,7 +130,7 @@ extension PaintDocumentSession {
         bridge.clearLayerMask(at: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
-                recording: .clearLayerMask(index: index),
+                recording: .clearLayerMask(index: .unchecked(index)),
                 invalidating: .layer(index)
             )
         )
@@ -146,8 +146,8 @@ extension PaintDocumentSession {
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: [
-                    .applyLayerMask(index: index),
-                    .replaceLayerPixels(index: index, data: pixelData)
+                    .applyLayerMask(index: .unchecked(index)),
+                    .replaceLayerPixels(index: .unchecked(index), data: pixelData)
                 ],
                 invalidating: .layer(index)
             )
@@ -164,7 +164,7 @@ extension PaintDocumentSession {
         if didApply {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
-                    recording: .clearLayer(index: index),
+                    recording: .clearLayer(index: .unchecked(index)),
                     invalidating: .layer(index)
                 )
             )

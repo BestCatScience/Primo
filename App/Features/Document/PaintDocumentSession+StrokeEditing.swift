@@ -22,7 +22,7 @@ extension PaintDocumentSession {
                                                    let brush = activeStrokeBrush,
                                                    !activeStrokeSamples.isEmpty {
             TimelapseOperation.stroke(
-                layerIndex: layerIndex,
+                layerIndex: .unchecked(layerIndex),
                 brush: brush,
                 samples: activeStrokeSamples
             )
@@ -70,7 +70,7 @@ extension PaintDocumentSession {
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .fill(
-                    layerIndex: layerIndex,
+                    layerIndex: .unchecked(layerIndex),
                     brush: brush,
                     sample: sample
                 ),
@@ -105,7 +105,7 @@ extension PaintDocumentSession {
                                                    let brush = activeBlurStrokeBrush,
                                                    !activeBlurStrokeSamples.isEmpty {
             TimelapseOperation.blurStroke(
-                layerIndex: layerIndex,
+                layerIndex: .unchecked(layerIndex),
                 brush: brush,
                 samples: activeBlurStrokeSamples
             )

@@ -35,7 +35,7 @@ extension PaintDocumentSession {
                 maskFilename = nil
             }
             return StoredPrimoDocument.Layer(
-                index: index,
+                index: .unchecked(index),
                 name: layerInfo.name,
                 visible: layerInfo.visible,
                 locked: layerInfo.locked,
@@ -43,7 +43,7 @@ extension PaintDocumentSession {
                 clipped: layerInfo.clipped,
                 opacity: layerInfo.opacity,
                 blendMode: layerInfo.blendMode,
-                folderID: layerInfo.folderID >= 0 ? Int(layerInfo.folderID) : nil,
+                folderID: layerInfo.folderID >= 0 ? .unchecked(Int(layerInfo.folderID)) : nil,
                 textLayer: textLayers[index],
                 pixelFilename: "Layers/\(filename)",
                 maskFilename: maskFilename
@@ -52,11 +52,11 @@ extension PaintDocumentSession {
 
         let storedFolders = folderInfos.map { folderInfo in
             StoredPrimoDocument.Folder(
-                id: Int(folderInfo.folderID),
+                id: .unchecked(Int(folderInfo.folderID)),
                 name: folderInfo.name,
                 visible: folderInfo.visible,
                 expanded: folderInfo.expanded,
-                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? Int(folderInfo.anchorLayerIndex) : nil
+                anchorLayerIndex: folderInfo.anchorLayerIndex >= 0 ? .unchecked(Int(folderInfo.anchorLayerIndex)) : nil
             )
         }
 
@@ -86,7 +86,7 @@ extension PaintDocumentSession {
             version: 5,
             canvasWidth: Int(bridge.width),
             canvasHeight: Int(bridge.height),
-            activeLayerIndex: Int(bridge.activeLayerIndex),
+            activeLayerIndex: .unchecked(Int(bridge.activeLayerIndex)),
             paperStyle: StoredPrimoDocument.PaperStyle(
                 red: Double(paperStyle.red),
                 green: Double(paperStyle.green),
@@ -146,28 +146,28 @@ extension PaintDocumentSession {
         for layer in document.layers.sorted(by: { $0.index < $1.index }) {
             let pixelURL = url.appendingPathComponent(layer.pixelFilename, isDirectory: false)
             let pixelData = try services.persistence.loadData(from: pixelURL)
-            session.bridge.replaceLayerPixelsTransient(at: layer.index, data: pixelData)
+            session.bridge.replaceLayerPixelsTransient(at: layer.index.rawValue, data: pixelData)
             if let maskFilename = layer.maskFilename {
                 let maskData = try services.persistence.loadData(from: url.appendingPathComponent(maskFilename, isDirectory: false))
-                session.bridge.replaceLayerMask(at: layer.index, data: maskData)
+                session.bridge.replaceLayerMask(at: layer.index.rawValue, data: maskData)
             } else {
-                session.bridge.clearLayerMask(at: layer.index)
+                session.bridge.clearLayerMask(at: layer.index.rawValue)
             }
-            session.bridge.setLayerName(layer.name, at: layer.index)
-            session.bridge.setLayerVisible(layer.visible, at: layer.index)
-            session.bridge.setLayerLocked(layer.locked, at: layer.index)
-            session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
-            session.bridge.setLayerClipped(layer.clipped, at: layer.index)
-            session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
-            session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
+            session.bridge.setLayerName(layer.name, at: layer.index.rawValue)
+            session.bridge.setLayerVisible(layer.visible, at: layer.index.rawValue)
+            session.bridge.setLayerLocked(layer.locked, at: layer.index.rawValue)
+            session.bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index.rawValue)
+            session.bridge.setLayerClipped(layer.clipped, at: layer.index.rawValue)
+            session.bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index.rawValue)
+            session.bridge.setLayerBlendMode(layer.blendMode, at: layer.index.rawValue)
             if let textLayer = layer.textLayer {
-                session.textLayers[layer.index] = textLayer
+                session.textLayers[layer.index.rawValue] = textLayer
             }
         }
 
-        var folderIDMap: [Int: Int] = [:]
+        var folderIDMap: [DocumentFolderID: Int] = [:]
         for folder in document.folders {
-            let newFolderID = Int(session.bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1))
+            let newFolderID = Int(session.bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex?.rawValue ?? -1))
             folderIDMap[folder.id] = newFolderID
             session.bridge.setFolderVisible(folder.visible, folderID: newFolderID)
             session.bridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
@@ -175,10 +175,10 @@ extension PaintDocumentSession {
 
         for layer in document.layers {
             guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = session.bridge.setLayerFolder(at: layer.index, folderID: resolvedFolderID)
+            _ = session.bridge.setLayerFolder(at: layer.index.rawValue, folderID: resolvedFolderID)
         }
 
-        session.bridge.activeLayerIndex = min(max(document.activeLayerIndex, 0), document.layers.count - 1)
+        session.bridge.activeLayerIndex = min(max(document.activeLayerIndex.rawValue, 0), document.layers.count - 1)
 
         session.timelapseFrames.removeAll(keepingCapacity: true)
         session.timelapseEvents.removeAll(keepingCapacity: true)

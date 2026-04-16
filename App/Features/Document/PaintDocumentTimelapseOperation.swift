@@ -1,30 +1,30 @@
 import Foundation
 
 enum TimelapseOperation: Equatable, Sendable {
-    case stroke(layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])
-    case blurStroke(layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])
-    case fill(layerIndex: Int, brush: BrushRuntimeSettings, sample: StylusSample)
+    case stroke(layerIndex: DocumentLayerIndex, brush: BrushRuntimeSettings, samples: [StylusSample])
+    case blurStroke(layerIndex: DocumentLayerIndex, brush: BrushRuntimeSettings, samples: [StylusSample])
+    case fill(layerIndex: DocumentLayerIndex, brush: BrushRuntimeSettings, sample: StylusSample)
     case undo
     case redo
     case addLayer(name: String)
-    case duplicateLayer(index: Int, name: String)
-    case deleteLayer(index: Int)
-    case moveLayer(index: Int, destinationIndex: Int)
-    case createFolder(folderID: Int, name: String, anchorLayerIndex: Int?)
-    case deleteFolder(folderID: Int)
-    case setFolderVisibility(folderID: Int, isVisible: Bool)
-    case assignLayerToFolder(index: Int, folderID: Int?)
-    case setLayerVisibility(index: Int, isVisible: Bool)
-    case setLayerLocked(index: Int, isLocked: Bool)
-    case setLayerAlphaLocked(index: Int, isAlphaLocked: Bool)
-    case setLayerClipped(index: Int, isClipped: Bool)
-    case setLayerOpacity(index: Int, opacity: Double)
-    case setLayerBlendMode(index: Int, blendMode: LayerBlendMode)
-    case replaceLayerPixels(index: Int, data: Data)
-    case replaceLayerMask(index: Int, data: Data)
-    case clearLayerMask(index: Int)
-    case applyLayerMask(index: Int)
-    case clearLayer(index: Int)
+    case duplicateLayer(index: DocumentLayerIndex, name: String)
+    case deleteLayer(index: DocumentLayerIndex)
+    case moveLayer(index: DocumentLayerIndex, destinationIndex: DocumentLayerIndex)
+    case createFolder(folderID: DocumentFolderID, name: String, anchorLayerIndex: DocumentLayerIndex?)
+    case deleteFolder(folderID: DocumentFolderID)
+    case setFolderVisibility(folderID: DocumentFolderID, isVisible: Bool)
+    case assignLayerToFolder(index: DocumentLayerIndex, folderID: DocumentFolderID?)
+    case setLayerVisibility(index: DocumentLayerIndex, isVisible: Bool)
+    case setLayerLocked(index: DocumentLayerIndex, isLocked: Bool)
+    case setLayerAlphaLocked(index: DocumentLayerIndex, isAlphaLocked: Bool)
+    case setLayerClipped(index: DocumentLayerIndex, isClipped: Bool)
+    case setLayerOpacity(index: DocumentLayerIndex, opacity: Double)
+    case setLayerBlendMode(index: DocumentLayerIndex, blendMode: LayerBlendMode)
+    case replaceLayerPixels(index: DocumentLayerIndex, data: Data)
+    case replaceLayerMask(index: DocumentLayerIndex, data: Data)
+    case clearLayerMask(index: DocumentLayerIndex)
+    case applyLayerMask(index: DocumentLayerIndex)
+    case clearLayer(index: DocumentLayerIndex)
     case setPaperStyle(CanvasPaperStyle)
 
     func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live) throws -> StoredTimelapseOperation {
@@ -213,7 +213,7 @@ enum TimelapseOperation: Equatable, Sendable {
             let data = try fileClient.readData(baseURL.appendingPathComponent(dataFilename, isDirectory: false))
             self = .replaceLayerMask(index: layerIndex, data: data)
         case .clearLayerMask:
-            guard let layerIndex: Int = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .clearLayerMask(index: layerIndex)
         case .applyLayerMask:
             guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
