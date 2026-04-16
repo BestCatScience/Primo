@@ -3,16 +3,16 @@ import Foundation
 
 extension PaintDocumentSession {
     func canUndo() -> Bool {
-        bridge.canUndo()
+        bridgeCanUndo()
     }
 
     func canRedo() -> Bool {
-        bridge.canRedo()
+        bridgeCanRedo()
     }
 
     @discardableResult
     func undo() -> Bool {
-        let didUndo = bridge.undo()
+        let didUndo = bridgeUndo()
         if didUndo {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(recording: .undo, invalidating: .all)
@@ -23,7 +23,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func redo() -> Bool {
-        let didRedo = bridge.redo()
+        let didRedo = bridgeRedo()
         if didRedo {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(recording: .redo, invalidating: .all)
@@ -33,23 +33,24 @@ extension PaintDocumentSession {
     }
 
     func addLayer(name: String) {
-        bridge.activeLayerIndex = bridge.addLayer(name: name)
+        setBridgeActiveLayerIndex(bridgeAddLayer(name: name))
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .addLayer(name: name),
-                invalidating: .layer(Int(bridge.activeLayerIndex))
+                invalidating: .layer(bridgeActiveLayerIndex())
             )
         )
     }
 
     @discardableResult
     func duplicateLayer(index: Int, name: String) -> Int {
-        let duplicatedIndex = Int(bridge.duplicateLayer(at: index, name: name))
+        requireExistingLayerIndex(index)
+        let duplicatedIndex = bridgeDuplicateLayer(index: index, name: name)
         if duplicatedIndex >= 0 {
-            if let textLayer = sessionState.textLayers.data(at: index) {
-                sessionState.textLayers.remapForDuplication(of: index, duplicatedIndex: duplicatedIndex, duplicate: textLayer)
+            if let textLayer = storedTextLayer(at: index) {
+                remapStoredTextLayersForDuplication(of: index, duplicatedIndex: duplicatedIndex, duplicate: textLayer)
             } else {
-                sessionState.textLayers.remapForInsertion(at: duplicatedIndex)
+                remapStoredTextLayersForInsertion(at: duplicatedIndex)
             }
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
@@ -63,9 +64,10 @@ extension PaintDocumentSession {
 
     @discardableResult
     func deleteLayer(index: Int) -> Bool {
-        let didDelete = bridge.deleteLayer(at: index)
+        requireExistingLayerIndex(index)
+        let didDelete = bridgeDeleteLayer(index: index)
         if didDelete {
-            sessionState.textLayers.remapForDeletion(of: index)
+            remapStoredTextLayersForDeletion(of: index)
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
                     recording: .deleteLayer(index: .unchecked(index)),
@@ -78,9 +80,11 @@ extension PaintDocumentSession {
 
     @discardableResult
     func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
-        let didMove = bridge.moveLayer(at: index, to: destinationIndex)
+        requireExistingLayerIndex(index)
+        requireExistingLayerIndex(destinationIndex)
+        let didMove = bridgeMoveLayer(from: index, to: destinationIndex)
         if didMove {
-            sessionState.textLayers.remapForMove(from: index, to: destinationIndex)
+            remapStoredTextLayersForMove(from: index, to: destinationIndex)
             applyLifecycleMutation(
                 editingLifecycleService.mutation(
                     recording: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)),

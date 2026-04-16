@@ -4,8 +4,8 @@ import UIKit
 
 extension PaintDocumentSession {
     func setPaperStyle(_ style: CanvasPaperStyle) {
-        guard sessionState.presentation.paperStyle != style else { return }
-        sessionState.presentation.setPaperStyle(style)
+        guard paperStyleValue != style else { return }
+        setStoredPaperStyle(style)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setPaperStyle(style),
@@ -16,27 +16,27 @@ extension PaintDocumentSession {
 
     func timelapseCapture() -> TimelapseCapture? {
         let previewData = makeTimelapseThumbnail()?.jpegData(compressionQuality: 0.72)
-        if sessionState.timelapse.usesOperationPersistence, !sessionState.timelapse.events.isEmpty {
+        if timelapseUsesOperationPersistence, !timelapseEventsSnapshot.isEmpty {
             return TimelapseCapture(
-                canvasSize: CGSize(width: bridge.width, height: bridge.height),
-                paperStyle: sessionState.presentation.paperStyle,
+                canvasSize: bridgeCanvasSize,
+                paperStyle: paperStyleValue,
                 previewImageData: previewData,
-                source: .operations(sessionState.timelapse.events),
+                source: .operations(timelapseEventsSnapshot),
                 framesPerSecond: 24
             )
         }
 
-        guard sessionState.timelapse.frames.count >= 2 else { return nil }
+        guard timelapseFramesSnapshot.count >= 2 else { return nil }
         return TimelapseCapture(
-            canvasSize: CGSize(width: bridge.width, height: bridge.height),
-            paperStyle: sessionState.presentation.paperStyle,
+            canvasSize: bridgeCanvasSize,
+            paperStyle: paperStyleValue,
             previewImageData: previewData,
-            source: .frames(sessionState.timelapse.frames),
+            source: .frames(timelapseFramesSnapshot),
             framesPerSecond: 24
         )
     }
 
     func timelapseCompositeImage() -> UIImage? {
-        renderedCompositeImage(paperStyle: sessionState.presentation.paperStyle)
+        renderedCompositeImage(paperStyle: paperStyleValue)
     }
 }

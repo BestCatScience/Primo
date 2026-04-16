@@ -9,9 +9,9 @@ extension PaintDocumentSession {
     }
 
     func makeTimelapseThumbnail() -> UIImage? {
-        guard let sourceImage = renderedCompositeImage(paperStyle: sessionState.presentation.paperStyle) else { return nil }
+        guard let sourceImage = renderedCompositeImage(paperStyle: paperStyleValue) else { return nil }
         let targetSize = timelapseFrameSize(
-            for: CGSize(width: bridge.width, height: bridge.height),
+            for: bridgeCanvasSize,
             maxDimension: 512
         )
         let renderer = UIGraphicsImageRenderer(size: targetSize)
@@ -22,7 +22,7 @@ extension PaintDocumentSession {
 
     func appendTimelapseFrame(image: UIImage) {
         guard let jpegData = image.jpegData(compressionQuality: 0.72) else { return }
-        let frameURL = sessionState.timelapse.reserveNextFrameURL(using: timelapseService)
+        let frameURL = reserveNextTimelapseFrameURL()
         do {
             try timelapseService.persistFrameData(jpegData, to: frameURL)
         } catch {
@@ -31,7 +31,7 @@ extension PaintDocumentSession {
         }
 
         let frame = TimelapseFrame(imageURL: frameURL, size: image.size)
-        if let removed = sessionState.timelapse.appendFrame(frame, maxFrameCount: Self.maxTimelapseFrames) {
+        if let removed = appendStoredTimelapseFrame(frame) {
             try? timelapseService.removeFrame(at: removed.imageURL)
         }
     }
@@ -53,9 +53,9 @@ extension PaintDocumentSession {
     }
 
     func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> UIImage? {
-        guard let imageRef = bridge.makeCompositeImage() else { return nil }
+        guard let imageRef = bridgeCompositeImageRef() else { return nil }
         let compositeImage = UIImage(cgImage: imageRef)
-        let size = CGSize(width: bridge.width, height: bridge.height)
+        let size = bridgeCanvasSize
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = !paperStyle.isTransparent
@@ -75,19 +75,19 @@ extension PaintDocumentSession {
     }
 
     func cachedLayerThumbnailData(index: Int) -> Data? {
-        if let cached = sessionState.presentation.cachedThumbnailData(for: index) {
+        if let cached = cachedThumbnailData(for: index) {
             return cached
         }
         let thumbnail = makeLayerThumbnailData(index: index)
-        sessionState.presentation.storeThumbnailData(thumbnail, for: index)
+        storeThumbnailData(thumbnail, for: index)
         return thumbnail
     }
 
     func makeLayerThumbnailData(index: Int) -> Data? {
-        guard let imageRef = bridge.makeImageForLayer(at: index) else { return nil }
+        guard let imageRef = bridgeImageRefForLayer(index: index) else { return nil }
         let sourceImage = UIImage(cgImage: imageRef)
         let targetSize = timelapseFrameSize(
-            for: CGSize(width: bridge.width, height: bridge.height),
+            for: bridgeCanvasSize,
             maxDimension: 96
         )
         let renderer = UIGraphicsImageRenderer(size: targetSize)
@@ -98,12 +98,12 @@ extension PaintDocumentSession {
     }
 
     func resetTimelapseHistory() {
-        for frame in sessionState.timelapse.resetHistory() {
+        for frame in resetStoredTimelapseHistory() {
             try? timelapseService.removeFrame(at: frame.imageURL)
         }
     }
 
     func invalidateThumbnailCache(for index: Int? = nil) {
-        sessionState.presentation.invalidateThumbnailCache(for: index)
+        invalidateStoredThumbnailCache(for: index)
     }
 }

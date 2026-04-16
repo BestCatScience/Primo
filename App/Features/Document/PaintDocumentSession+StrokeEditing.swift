@@ -2,21 +2,21 @@ import Foundation
 
 extension PaintDocumentSession {
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
-        let activeLayerIndex = Int(bridge.activeLayerIndex)
-        sessionState.editing.stroke.begin(on: activeLayerIndex, brush: brush, sample: sample)
+        let activeLayerIndex = bridgeActiveLayerIndex()
+        beginTrackedStroke(on: activeLayerIndex, brush: brush, sample: sample)
         clearTextLayerData(index: activeLayerIndex)
-        bridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
+        bridgeBeginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
     }
 
     func appendStroke(sample: StylusSample) {
-        sessionState.editing.stroke.append(sample)
-        bridge.appendStroke(point: makeStrokePoint(from: sample))
+        appendTrackedStroke(sample)
+        bridgeAppendStroke(point: makeStrokePoint(from: sample))
     }
 
     func endStroke() {
-        let activeLayerIndex = Int(bridge.activeLayerIndex)
-        let recordedEvent = sessionState.editing.stroke.takeRecordedOperation()
-        bridge.endStroke()
+        let activeLayerIndex = bridgeActiveLayerIndex()
+        let recordedEvent = finishTrackedStroke()
+        bridgeEndStroke()
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: recordedEvent.map { [$0] } ?? [],
@@ -26,9 +26,9 @@ extension PaintDocumentSession {
     }
 
     func cancelStroke() {
-        let activeLayerIndex = Int(bridge.activeLayerIndex)
-        bridge.cancelStroke()
-        sessionState.editing.stroke.reset()
+        let activeLayerIndex = bridgeActiveLayerIndex()
+        bridgeCancelStroke()
+        resetTrackedStroke()
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 invalidating: .layer(activeLayerIndex),
@@ -38,10 +38,10 @@ extension PaintDocumentSession {
     }
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
-        let layerIndex = Int(bridge.activeLayerIndex)
+        let layerIndex = bridgeActiveLayerIndex()
         guard !isLayerLocked(index: layerIndex) else { return }
         clearTextLayerData(index: layerIndex)
-        bridge.fill(
+        bridgeFill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
         )
@@ -52,7 +52,7 @@ extension PaintDocumentSession {
                     brush: brush,
                     sample: sample
                 ),
-                invalidating: .layer(Int(bridge.activeLayerIndex))
+                invalidating: .layer(bridgeActiveLayerIndex())
             )
         )
     }
@@ -61,15 +61,15 @@ extension PaintDocumentSession {
         guard !samples.isEmpty else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
         clearTextLayerData(index: layerIndex)
-        sessionState.editing.blurStroke.beginOrContinue(on: layerIndex, brush: brush)
-        sessionState.editing.blurStroke.append(contentsOf: samples)
+        beginOrContinueTrackedBlurStroke(on: layerIndex, brush: brush)
+        appendTrackedBlurSamples(samples)
         applyBlurStroke(
             samples: samples,
             brush: brush,
             layerIndex: layerIndex,
-            transient: sessionState.editing.blurStroke.shouldApplyTransiently
+            transient: shouldApplyTrackedBlurTransiently
         )
-        sessionState.editing.blurStroke.markHistoryCaptured()
+        markTrackedBlurHistoryCaptured()
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 invalidating: .layer(layerIndex),
@@ -79,7 +79,7 @@ extension PaintDocumentSession {
     }
 
     func endBlurStroke() {
-        let recordedEvent = sessionState.editing.blurStroke.takeRecordedOperation()
+        let recordedEvent = finishTrackedBlurStroke()
         applyLifecycleMutation(
             editingLifecycleService.mutation(recording: recordedEvent.map { [$0] } ?? [])
         )
@@ -87,12 +87,13 @@ extension PaintDocumentSession {
 
     @discardableResult
     func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> Bool {
+        requireExistingLayerIndex(layerIndex)
         guard !isLayerLocked(index: layerIndex) else { return false }
-        let basePixelData = bridge.pixelDataForLayer(at: layerIndex) as Data
+        let basePixelData = pixelDataForLayer(index: layerIndex)
         guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
-            canvasWidth: Int(bridge.width),
-            canvasHeight: Int(bridge.height),
+            canvasWidth: bridgeCanvasWidth,
+            canvasHeight: bridgeCanvasHeight,
             samples: samples,
             brush: brush,
             preserveAlphaLockedPixels: isLayerAlphaLocked(index: layerIndex)
@@ -105,9 +106,10 @@ extension PaintDocumentSession {
 
     func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
+        requireExistingLayerIndex(layerIndex)
         guard !isLayerLocked(index: layerIndex) else { return }
-        let canvasSize = PaintDocumentCanvasSize(width: Int(bridge.width), height: Int(bridge.height))
-        let sourceData = bridge.pixelDataForLayer(at: layerIndex) as Data
+        let canvasSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
+        let sourceData = pixelDataForLayer(index: layerIndex)
         guard sourceData.count == canvasSize.rgbaByteCount else { return }
 
         let original = [UInt8](sourceData)
@@ -125,10 +127,6 @@ extension PaintDocumentSession {
         let outputData = isLayerAlphaLocked(index: layerIndex)
             ? Self.pixelDataByPreservingExistingAlpha(source: Data(blended), existing: sourceData)
             : Data(blended)
-        if transient {
-            bridge.replaceLayerPixelsTransient(at: layerIndex, data: outputData)
-        } else {
-            bridge.replaceLayerPixels(at: layerIndex, data: outputData)
-        }
+        bridgeReplaceLayerPixels(index: layerIndex, data: outputData, transient: transient)
     }
 }

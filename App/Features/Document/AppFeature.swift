@@ -19,40 +19,199 @@ struct AppFeature {
         case nanoBananaEdit
     }
 
-    @ObservableState
-    struct State: Equatable {
+    struct ApplicationState: Equatable {
         var isHydrating = true
         var showsHome = true
         var homeSection: HomeSidebarSection = .home
         var homeProjects: [SavedProjectSummary] = []
+        var isLoadingHomeProjects = true
+        var bannerMessage: String?
+        var appLanguage: AppLanguage = .japanese
+    }
+
+    struct WorkspaceState: Equatable {
         var openTabs: [OpenDocumentTab] = []
         var activeTabID: OpenDocumentTab.ID?
         var primarySelectedTabID: OpenDocumentTab.ID?
         var secondarySelectedTabID: OpenDocumentTab.ID?
         var focusedWorkspacePane: WorkspacePane = .primary
         var workspaceLayout: WorkspaceLayoutMode = .single
-        var isLoadingHomeProjects = true
+        var pendingCloseConfirmation: PendingCloseConfirmationState?
+    }
+
+    struct RecoveryState: Equatable {
+        var items: [AutosaveRecoveryItem] = []
+        var isPresented = false
+    }
+
+    struct SaveHistoryState: Equatable {
+        var entries: [SaveHistoryEntry] = []
+        var isPresented = false
+    }
+
+    struct ExportState: Equatable {
+        var shareSheet: ShareExport?
+        var timelapsePreview: TimelapseExportPreview?
+    }
+
+    struct NanoBananaState: Equatable {
+        var isGenerating = false
+        var preview: NanoBananaPreviewState?
+        var jobs: [NanoBananaJob] = []
+        var history: [NanoBananaHistoryItem] = []
+        var pendingRequest: NanoBananaGenerationRequest?
+        var activeJobID: UUID?
+        var pendingOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
+    }
+
+    @ObservableState
+    struct State: Equatable {
+        var application = ApplicationState()
+        var workspace = WorkspaceState()
+        var recovery = RecoveryState()
+        var saveHistory = SaveHistoryState()
+        var export = ExportState()
+        var nanoBanana = NanoBananaState()
         var brushPalette = BrushPaletteFeature.State()
         var layerSidebar = LayerSidebarFeature.State()
         var canvas = CanvasFeature.State()
         var brushPanel = StudioPanelLayoutState()
         var layerPanel = StudioPanelLayoutState()
-        var exportSheet: ShareExport?
-        var bannerMessage: String?
-        var timelapseExportPreview: TimelapseExportPreview?
-        var isNanoBananaGenerating = false
-        var nanoBananaPreview: NanoBananaPreviewState?
-        var nanoBananaJobs: [NanoBananaJob] = []
-        var nanoBananaHistory: [NanoBananaHistoryItem] = []
-        var pendingNanoBananaRequest: NanoBananaGenerationRequest?
-        var activeNanoBananaJobID: UUID?
-        var pendingNanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
-        var appLanguage: AppLanguage = .japanese
-        var pendingCloseConfirmation: PendingCloseConfirmationState?
-        var autosaveRecoveryItems: [AutosaveRecoveryItem] = []
-        var isShowingAutosaveRecovery = false
-        var saveHistoryEntries: [SaveHistoryEntry] = []
-        var isShowingSaveHistory = false
+
+        var isHydrating: Bool {
+            get { application.isHydrating }
+            set { application.isHydrating = newValue }
+        }
+
+        var showsHome: Bool {
+            get { application.showsHome }
+            set { application.showsHome = newValue }
+        }
+
+        var homeSection: HomeSidebarSection {
+            get { application.homeSection }
+            set { application.homeSection = newValue }
+        }
+
+        var homeProjects: [SavedProjectSummary] {
+            get { application.homeProjects }
+            set { application.homeProjects = newValue }
+        }
+
+        var isLoadingHomeProjects: Bool {
+            get { application.isLoadingHomeProjects }
+            set { application.isLoadingHomeProjects = newValue }
+        }
+
+        var bannerMessage: String? {
+            get { application.bannerMessage }
+            set { application.bannerMessage = newValue }
+        }
+
+        var appLanguage: AppLanguage {
+            get { application.appLanguage }
+            set { application.appLanguage = newValue }
+        }
+
+        var openTabs: [OpenDocumentTab] {
+            get { workspace.openTabs }
+            set { workspace.openTabs = newValue }
+        }
+
+        var activeTabID: OpenDocumentTab.ID? {
+            get { workspace.activeTabID }
+            set { workspace.activeTabID = newValue }
+        }
+
+        var primarySelectedTabID: OpenDocumentTab.ID? {
+            get { workspace.primarySelectedTabID }
+            set { workspace.primarySelectedTabID = newValue }
+        }
+
+        var secondarySelectedTabID: OpenDocumentTab.ID? {
+            get { workspace.secondarySelectedTabID }
+            set { workspace.secondarySelectedTabID = newValue }
+        }
+
+        var focusedWorkspacePane: WorkspacePane {
+            get { workspace.focusedWorkspacePane }
+            set { workspace.focusedWorkspacePane = newValue }
+        }
+
+        var workspaceLayout: WorkspaceLayoutMode {
+            get { workspace.workspaceLayout }
+            set { workspace.workspaceLayout = newValue }
+        }
+
+        var pendingCloseConfirmation: PendingCloseConfirmationState? {
+            get { workspace.pendingCloseConfirmation }
+            set { workspace.pendingCloseConfirmation = newValue }
+        }
+
+        var autosaveRecoveryItems: [AutosaveRecoveryItem] {
+            get { recovery.items }
+            set { recovery.items = newValue }
+        }
+
+        var isShowingAutosaveRecovery: Bool {
+            get { recovery.isPresented }
+            set { recovery.isPresented = newValue }
+        }
+
+        var saveHistoryEntries: [SaveHistoryEntry] {
+            get { saveHistory.entries }
+            set { saveHistory.entries = newValue }
+        }
+
+        var isShowingSaveHistory: Bool {
+            get { saveHistory.isPresented }
+            set { saveHistory.isPresented = newValue }
+        }
+
+        var exportSheet: ShareExport? {
+            get { export.shareSheet }
+            set { export.shareSheet = newValue }
+        }
+
+        var timelapseExportPreview: TimelapseExportPreview? {
+            get { export.timelapsePreview }
+            set { export.timelapsePreview = newValue }
+        }
+
+        var isNanoBananaGenerating: Bool {
+            get { nanoBanana.isGenerating }
+            set { nanoBanana.isGenerating = newValue }
+        }
+
+        var nanoBananaPreview: NanoBananaPreviewState? {
+            get { nanoBanana.preview }
+            set { nanoBanana.preview = newValue }
+        }
+
+        var nanoBananaJobs: [NanoBananaJob] {
+            get { nanoBanana.jobs }
+            set { nanoBanana.jobs = newValue }
+        }
+
+        var nanoBananaHistory: [NanoBananaHistoryItem] {
+            get { nanoBanana.history }
+            set { nanoBanana.history = newValue }
+        }
+
+        var pendingNanoBananaRequest: NanoBananaGenerationRequest? {
+            get { nanoBanana.pendingRequest }
+            set { nanoBanana.pendingRequest = newValue }
+        }
+
+        var activeNanoBananaJobID: UUID? {
+            get { nanoBanana.activeJobID }
+            set { nanoBanana.activeJobID = newValue }
+        }
+
+        var pendingNanoBananaOutputMode: NanoBananaOutputMode {
+            get { nanoBanana.pendingOutputMode }
+            set { nanoBanana.pendingOutputMode = newValue }
+        }
     }
 
     enum Action: Equatable {

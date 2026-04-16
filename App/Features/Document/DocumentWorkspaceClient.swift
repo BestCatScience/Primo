@@ -63,7 +63,7 @@ extension DependencyValues {
     }
 }
 
-private final class DocumentWorkspaceStorage: @unchecked Sendable {
+private struct DocumentWorkspaceStorage: Sendable {
     private static let appProjectsDirectoryName = "primo-projects"
     private static let tabProjectsDirectoryName = "primo-tabs"
     private static let autosavesDirectoryName = ".primo-autosaves"

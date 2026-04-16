@@ -4,7 +4,6 @@ import UIKit
 
 extension PaintDocumentSession {
     func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
-        sessionState.presentation.setPaperStyle(paperStyle)
         return renderedCompositeImage(paperStyle: paperStyle)?.pngData()
     }
 
@@ -58,12 +57,12 @@ extension PaintDocumentSession {
     }
 
     private func makePersistenceSnapshot() -> PaintDocumentPersistenceSnapshot {
-        let layerInfos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
+        let layerInfos = bridgeLayerInfos()
+        let folderInfos = bridgeFolderInfos()
         let layerPayloads = layerInfos.enumerated().map { index, layerInfo in
             let pixelFilename = String(format: "layer-%04d.rgba", index)
-            let pixelData = bridge.pixelDataForLayer(at: index) as Data
-            let maskData = bridge.layerMaskDataForLayer(at: index) as Data?
+            let pixelData = pixelDataForLayer(index: index)
+            let maskData = bridgeMaskDataForLayer(index: index)
             let maskFilename = maskData == nil ? nil : String(format: "layer-mask-%04d.mask", index)
             return PaintDocumentPersistenceSnapshot.LayerPayload(
                 manifest: StoredPrimoDocument.Layer(
@@ -76,7 +75,7 @@ extension PaintDocumentSession {
                     opacity: layerInfo.opacity,
                     blendMode: layerInfo.blendMode,
                     folderID: layerInfo.folderID >= 0 ? .unchecked(Int(layerInfo.folderID)) : nil,
-                    textLayer: sessionState.textLayers.data(at: index),
+                    textLayer: storedTextLayer(at: index),
                     pixelFilename: "Layers/\(pixelFilename)",
                     maskFilename: maskFilename.map { "Layers/\($0)" }
                 ),
@@ -97,9 +96,9 @@ extension PaintDocumentSession {
             )
         }
 
-        let timelapseFramePayloads: [PaintDocumentPersistenceSnapshot.TimelapseFramePayload] = sessionState.timelapse.usesOperationPersistence
+        let timelapseFramePayloads: [PaintDocumentPersistenceSnapshot.TimelapseFramePayload] = timelapseUsesOperationPersistence
             ? []
-            : sessionState.timelapse.frames.enumerated().map { index, frame in
+            : timelapseFramesSnapshot.enumerated().map { index, frame in
                 let relativeFilename = String(format: "frame-%06d.jpg", index)
                 return PaintDocumentPersistenceSnapshot.TimelapseFramePayload(
                     sourceURL: frame.imageURL,
@@ -113,15 +112,15 @@ extension PaintDocumentSession {
             }
 
         return PaintDocumentPersistenceSnapshot(
-            canvasWidth: Int(bridge.width),
-            canvasHeight: Int(bridge.height),
-            activeLayerIndex: .unchecked(Int(bridge.activeLayerIndex)),
-            paperStyle: sessionState.presentation.paperStyle,
+            canvasWidth: bridgeCanvasWidth,
+            canvasHeight: bridgeCanvasHeight,
+            activeLayerIndex: .unchecked(bridgeActiveLayerIndex()),
+            paperStyle: paperStyleValue,
             layers: layerPayloads,
             folders: storedFolders,
             timelapseFrames: timelapseFramePayloads,
-            timelapseEvents: sessionState.timelapse.events,
-            usesOperationTimelapsePersistence: sessionState.timelapse.usesOperationPersistence
+            timelapseEvents: timelapseEventsSnapshot,
+            usesOperationTimelapsePersistence: timelapseUsesOperationPersistence
         )
     }
 
@@ -129,62 +128,62 @@ extension PaintDocumentSession {
         _ restorationPlan: PaintDocumentRestorePlan,
         persistenceService: PaintDocumentPersistenceService
     ) throws {
-        sessionState.presentation.setPaperStyle(restorationPlan.paperStyle)
-        sessionState.textLayers.replaceAll(with: [:])
+        setStoredPaperStyle(restorationPlan.paperStyle)
+        replaceStoredTextLayers(with: [:])
 
-        while Int(bridge.layerInfos().count) < restorationPlan.layers.count {
-            _ = bridge.addLayer(name: "Layer \(Int(bridge.layerInfos().count) + 1)")
+        while bridgeLayerInfos().count < restorationPlan.layers.count {
+            _ = bridgeAddLayer(name: "Layer \(bridgeLayerInfos().count + 1)")
         }
 
         for layer in restorationPlan.layers {
-            bridge.replaceLayerPixelsTransient(at: layer.index, data: layer.pixelData)
+            bridgeReplaceLayerPixels(index: layer.index, data: layer.pixelData, transient: true)
             if let maskData = layer.maskData {
-                bridge.replaceLayerMask(at: layer.index, data: maskData)
+                bridgeReplaceLayerMask(index: layer.index, data: maskData)
             } else {
-                bridge.clearLayerMask(at: layer.index)
+                bridgeClearLayerMask(index: layer.index)
             }
-            bridge.setLayerName(layer.name, at: layer.index)
-            bridge.setLayerVisible(layer.visible, at: layer.index)
-            bridge.setLayerLocked(layer.locked, at: layer.index)
-            bridge.setLayerAlphaLocked(layer.alphaLocked, at: layer.index)
-            bridge.setLayerClipped(layer.clipped, at: layer.index)
-            bridge.setLayerOpacity(CGFloat(layer.opacity), at: layer.index)
-            bridge.setLayerBlendMode(layer.blendMode, at: layer.index)
+            bridgeSetLayerName(layer.name, index: layer.index)
+            bridgeSetLayerVisible(layer.visible, index: layer.index)
+            bridgeSetLayerLocked(layer.locked, index: layer.index)
+            bridgeSetLayerAlphaLocked(layer.alphaLocked, index: layer.index)
+            bridgeSetLayerClipped(layer.clipped, index: layer.index)
+            bridgeSetLayerOpacity(CGFloat(layer.opacity), index: layer.index)
+            bridgeSetLayerBlendMode(layer.blendMode, index: layer.index)
             if let textLayer = layer.textLayer {
-                sessionState.textLayers.set(textLayer, at: layer.index)
+                setStoredTextLayer(textLayer, at: layer.index)
             }
         }
 
         var folderIDMap: [DocumentFolderID: Int] = [:]
         for folder in restorationPlan.folders {
-            let newFolderID = Int(bridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1))
+            let newFolderID = bridgeCreateFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1)
             folderIDMap[folder.id] = newFolderID
-            bridge.setFolderVisible(folder.visible, folderID: newFolderID)
-            bridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
+            bridgeSetFolderVisible(folder.visible, folderID: newFolderID)
+            bridgeSetFolderExpanded(folder.expanded, folderID: newFolderID)
         }
 
         for layer in restorationPlan.layers {
             guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = bridge.setLayerFolder(at: layer.index, folderID: resolvedFolderID)
+            _ = bridgeSetLayerFolder(index: layer.index, folderID: resolvedFolderID)
         }
 
-        bridge.activeLayerIndex = restorationPlan.activeLayerIndex
+        setBridgeActiveLayerIndex(restorationPlan.activeLayerIndex)
 
         switch restorationPlan.timelapse {
         case let .operations(events):
-            sessionState.timelapse.restoreOperations(events)
+            restoreStoredTimelapseOperations(events)
         case let .frames(frames):
             let restoredFrames = try frames.enumerated().map { index, frame in
                 let destinationURL = timelapseService.makeFrameURL(in: timelapseDirectoryURL, frameID: index)
                 try persistenceService.replaceItemIfNeeded(at: destinationURL, with: frame.sourceURL)
                 return TimelapseFrame(imageURL: destinationURL, size: frame.size)
             }
-            sessionState.timelapse.restoreFrames(restoredFrames)
+            restoreStoredTimelapseFrames(restoredFrames)
         }
 
-        sessionState.presentation.invalidateThumbnailCache()
-        sessionState.editing.resetAll()
-        bridge.clearHistory()
+        invalidateStoredThumbnailCache()
+        resetTrackedEditingState()
+        bridgeClearHistory()
     }
 }
 
@@ -296,6 +295,8 @@ private struct PaintDocumentPersistenceContract {
             throw PrimoDocumentError.contractViolation("Document contract failed: at least one layer is required.")
         }
 
+        try Self.validatePaperStyle(document.paperStyle, label: "document paper style")
+
         let expectedLayerIndices = Array(0..<document.layers.count)
         let actualLayerIndices = document.layers.map(\.index.rawValue).sorted()
         guard actualLayerIndices == expectedLayerIndices else {
@@ -323,6 +324,10 @@ private struct PaintDocumentPersistenceContract {
             throw PrimoDocumentError.contractViolation("Document contract failed: folder anchor indices must resolve to existing layers.")
         }
 
+        try document.layers.forEach { layer in
+            try Self.validateLayer(layer, canvasWidth: document.canvasWidth, canvasHeight: document.canvasHeight)
+        }
+
         guard document.timelapseFrames.isEmpty || document.timelapseOperations.isEmpty else {
             throw PrimoDocumentError.contractViolation("Document contract failed: timelapse data must use either frames or operations, not both.")
         }
@@ -331,8 +336,134 @@ private struct PaintDocumentPersistenceContract {
             throw PrimoDocumentError.contractViolation("Document contract failed: timelapse frame sizes must be positive.")
         }
 
+        try document.timelapseFrames.forEach { frame in
+            try Self.validateRelativePath(frame.filename, requiredPrefix: "Timelapse/", label: "timelapse frame filename")
+        }
+
+        try document.timelapseOperations.forEach(Self.validateTimelapseOperation)
+
         self.canvasWidth = document.canvasWidth
         self.canvasHeight = document.canvasHeight
+    }
+
+    private static func validateLayer(
+        _ layer: StoredPrimoDocument.Layer,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) throws {
+        try validateUnitInterval(layer.opacity, label: "layer \(layer.index.rawValue) opacity")
+        guard LayerBlendMode(rawValue: layer.blendMode) != nil else {
+            throw PrimoDocumentError.contractViolation(
+                "Document contract failed: layer \(layer.index.rawValue) blend mode is invalid."
+            )
+        }
+        try validateRelativePath(
+            layer.pixelFilename,
+            requiredPrefix: "Layers/",
+            label: "layer \(layer.index.rawValue) pixel filename"
+        )
+        if let maskFilename = layer.maskFilename {
+            try validateRelativePath(
+                maskFilename,
+                requiredPrefix: "Layers/",
+                label: "layer \(layer.index.rawValue) mask filename"
+            )
+        }
+        if let textLayer = layer.textLayer {
+            try validateTextLayer(
+                textLayer,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                label: "layer \(layer.index.rawValue) text layer"
+            )
+        }
+    }
+
+    private static func validateTimelapseOperation(_ operation: StoredTimelapseOperation) throws {
+        if let opacity = operation.opacity {
+            try validateUnitInterval(opacity, label: "timelapse operation opacity")
+        }
+        if let blendMode = operation.blendMode, LayerBlendMode(rawValue: blendMode) == nil {
+            throw PrimoDocumentError.contractViolation("Document contract failed: timelapse operation blend mode is invalid.")
+        }
+        if let dataFilename = operation.dataFilename {
+            try validateRelativePath(
+                dataFilename,
+                requiredPrefix: "TimelapseData/",
+                label: "timelapse operation data filename"
+            )
+        }
+        if let paperStyle = operation.paperStyle {
+            try validatePaperStyle(paperStyle, label: "timelapse operation paper style")
+        }
+    }
+
+    private static func validateTextLayer(
+        _ textLayer: TextLayerData,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        label: String
+    ) throws {
+        let finiteValues: [(Double, String)] = [
+            (textLayer.positionX, "\(label) positionX"),
+            (textLayer.positionY, "\(label) positionY"),
+            (textLayer.fontSize, "\(label) fontSize"),
+            (textLayer.scale, "\(label) scale"),
+            (textLayer.rotationDegrees, "\(label) rotationDegrees")
+        ]
+        for (value, valueLabel) in finiteValues where !value.isFinite {
+            throw PrimoDocumentError.contractViolation("Document contract failed: \(valueLabel) must be finite.")
+        }
+        guard textLayer.fontSize > 0 else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: \(label) fontSize must be positive.")
+        }
+        guard textLayer.scale > 0 else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: \(label) scale must be positive.")
+        }
+        try validateUnitInterval(textLayer.red, label: "\(label) red")
+        try validateUnitInterval(textLayer.green, label: "\(label) green")
+        try validateUnitInterval(textLayer.blue, label: "\(label) blue")
+        try validateUnitInterval(textLayer.alpha, label: "\(label) alpha")
+
+        let horizontalRange = Double(-canvasWidth)...Double(canvasWidth * 2)
+        let verticalRange = Double(-canvasHeight)...Double(canvasHeight * 2)
+        guard horizontalRange.contains(textLayer.positionX), verticalRange.contains(textLayer.positionY) else {
+            throw PrimoDocumentError.contractViolation(
+                "Document contract failed: \(label) position is implausibly far outside the canvas."
+            )
+        }
+    }
+
+    private static func validatePaperStyle(
+        _ paperStyle: StoredPrimoDocument.PaperStyle,
+        label: String
+    ) throws {
+        try validateUnitInterval(paperStyle.red, label: "\(label) red")
+        try validateUnitInterval(paperStyle.green, label: "\(label) green")
+        try validateUnitInterval(paperStyle.blue, label: "\(label) blue")
+        try validateUnitInterval(paperStyle.alpha, label: "\(label) alpha")
+    }
+
+    private static func validateUnitInterval(_ value: Double, label: String) throws {
+        guard value.isFinite, (0...1).contains(value) else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: \(label) must be in 0...1.")
+        }
+    }
+
+    private static func validateRelativePath(
+        _ path: String,
+        requiredPrefix: String,
+        label: String
+    ) throws {
+        let components = path.split(separator: "/")
+        guard
+            !path.isEmpty,
+            !path.hasPrefix("/"),
+            path.hasPrefix(requiredPrefix),
+            !components.contains("..")
+        else {
+            throw PrimoDocumentError.contractViolation("Document contract failed: \(label) is invalid.")
+        }
     }
 }
 

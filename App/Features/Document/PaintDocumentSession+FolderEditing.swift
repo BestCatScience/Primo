@@ -3,7 +3,8 @@ import Foundation
 extension PaintDocumentSession {
     @discardableResult
     func createFolder(name: String, layerIndex: Int) -> Int {
-        let folderID = Int(bridge.createFolder(name: name, layerIndex: layerIndex))
+        requireValidLayerAnchor(layerIndex, label: "Folder anchor index")
+        let folderID = bridgeCreateFolder(name: name, layerIndex: layerIndex)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .createFolder(
@@ -19,7 +20,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func deleteFolder(folderID: Int) -> Bool {
-        let didDelete = bridge.deleteFolder(id: folderID)
+        let didDelete = bridgeDeleteFolder(id: folderID)
         if didDelete {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(recording: .deleteFolder(folderID: .unchecked(folderID)))
@@ -29,7 +30,7 @@ extension PaintDocumentSession {
     }
 
     func setFolderVisibility(folderID: Int, isVisible: Bool) {
-        bridge.setFolderVisible(isVisible, folderID: folderID)
+        bridgeSetFolderVisible(isVisible, folderID: folderID)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
@@ -38,16 +39,17 @@ extension PaintDocumentSession {
     }
 
     func setFolderName(folderID: Int, name: String) {
-        bridge.setFolderName(name, folderID: folderID)
+        bridgeSetFolderName(name, folderID: folderID)
     }
 
     func setFolderExpanded(folderID: Int, isExpanded: Bool) {
-        bridge.setFolderExpanded(isExpanded, folderID: folderID)
+        bridgeSetFolderExpanded(isExpanded, folderID: folderID)
     }
 
     @discardableResult
     func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
-        let didAssign = bridge.setLayerFolder(at: index, folderID: folderID)
+        requireExistingLayerIndex(index)
+        let didAssign = bridgeSetLayerFolder(index: index, folderID: folderID)
         if didAssign {
             applyLifecycleMutation(
                 editingLifecycleService.mutation(

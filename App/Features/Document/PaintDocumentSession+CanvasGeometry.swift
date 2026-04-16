@@ -3,16 +3,17 @@ import Foundation
 
 extension PaintDocumentSession {
     func resizeCanvas(width: Int, height: Int) {
+        precondition(width > 0 && height > 0, "Canvas dimensions must be positive.")
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        let sourceSize = PaintDocumentCanvasSize(width: Int(bridge.width), height: Int(bridge.height))
+        let sourceSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
         guard targetSize != sourceSize else { return }
 
-        let layerInfos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
-        let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
-        let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
-        let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
-        let sourceTextLayers = sessionState.textLayers.snapshot()
+        let layerInfos = bridgeLayerInfos()
+        let folderInfos = bridgeFolderInfos()
+        let activeLayerIndex = min(max(bridgeActiveLayerIndex(), 0), max(layerInfos.count - 1, 0))
+        let sourcePixels = layerInfos.indices.map { pixelDataForLayer(index: $0) }
+        let sourceMasks = layerInfos.indices.map { bridgeMaskDataForLayer(index: $0) }
+        let sourceTextLayers = storedTextLayerSnapshot()
         let widthScale = CGFloat(targetSize.width) / CGFloat(sourceSize.width)
         let heightScale = CGFloat(targetSize.height) / CGFloat(sourceSize.height)
         let textScale = min(widthScale, heightScale)
@@ -39,13 +40,13 @@ extension PaintDocumentSession {
         })
 
         for (index, info) in layerInfos.enumerated() {
-            applyLayerMetadata(info, at: index, to: resizeContext.bridge, folderIDMap: resizeContext.folderIDMap)
+            applyLayerMetadata(info, at: index, to: resizeContext.targetBridge, folderIDMap: resizeContext.folderIDMap)
             if let resizedPixels = geometryService.scaledLayerPixelData(
                 sourcePixels[index],
                 from: sourceSize,
                 to: targetSize
             ) {
-                resizeContext.bridge.replaceLayerPixels(at: index, data: resizedPixels)
+                resizeContext.targetBridge.replaceLayerPixels(at: index, data: resizedPixels)
             }
             if let maskData = sourceMasks[index],
                let resizedMask = geometryService.scaledLayerMaskData(
@@ -53,28 +54,29 @@ extension PaintDocumentSession {
                 from: sourceSize,
                 to: targetSize
                ) {
-                resizeContext.bridge.replaceLayerMask(at: index, data: resizedMask)
+                resizeContext.targetBridge.replaceLayerMask(at: index, data: resizedMask)
             }
         }
 
         finalizeResizedBridge(
-            resizeContext.bridge,
+            resizeContext.targetBridge,
             textLayers: resizedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
     }
 
     func resizeCanvasExtent(width: Int, height: Int) {
+        precondition(width > 0 && height > 0, "Canvas dimensions must be positive.")
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        let sourceSize = PaintDocumentCanvasSize(width: Int(bridge.width), height: Int(bridge.height))
+        let sourceSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
         guard targetSize != sourceSize else { return }
 
-        let layerInfos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
-        let activeLayerIndex = min(max(Int(bridge.activeLayerIndex), 0), max(layerInfos.count - 1, 0))
-        let sourcePixels = layerInfos.indices.map { bridge.pixelDataForLayer(at: $0) as Data }
-        let sourceMasks = layerInfos.indices.map { bridge.layerMaskDataForLayer(at: $0) as Data? }
-        let sourceTextLayers = sessionState.textLayers.snapshot()
+        let layerInfos = bridgeLayerInfos()
+        let folderInfos = bridgeFolderInfos()
+        let activeLayerIndex = min(max(bridgeActiveLayerIndex(), 0), max(layerInfos.count - 1, 0))
+        let sourcePixels = layerInfos.indices.map { pixelDataForLayer(index: $0) }
+        let sourceMasks = layerInfos.indices.map { bridgeMaskDataForLayer(index: $0) }
+        let sourceTextLayers = storedTextLayerSnapshot()
         let offsetX = (targetSize.width - sourceSize.width) / 2
         let offsetY = (targetSize.height - sourceSize.height) / 2
 
@@ -100,7 +102,7 @@ extension PaintDocumentSession {
         })
 
         for (index, info) in layerInfos.enumerated() {
-            applyLayerMetadata(info, at: index, to: resizeContext.bridge, folderIDMap: resizeContext.folderIDMap)
+            applyLayerMetadata(info, at: index, to: resizeContext.targetBridge, folderIDMap: resizeContext.folderIDMap)
             if let translatedPixels = geometryService.translatedLayerPixelData(
                 sourcePixels[index],
                 from: sourceSize,
@@ -108,7 +110,7 @@ extension PaintDocumentSession {
                 offsetX: offsetX,
                 offsetY: offsetY
             ) {
-                resizeContext.bridge.replaceLayerPixels(at: index, data: translatedPixels)
+                resizeContext.targetBridge.replaceLayerPixels(at: index, data: translatedPixels)
             }
             if let maskData = sourceMasks[index],
                let translatedMask = geometryService.translatedLayerMaskData(
@@ -118,12 +120,12 @@ extension PaintDocumentSession {
                 offsetX: offsetX,
                 offsetY: offsetY
                ) {
-                resizeContext.bridge.replaceLayerMask(at: index, data: translatedMask)
+                resizeContext.targetBridge.replaceLayerMask(at: index, data: translatedMask)
             }
         }
 
         finalizeResizedBridge(
-            resizeContext.bridge,
+            resizeContext.targetBridge,
             textLayers: shiftedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
@@ -133,46 +135,46 @@ extension PaintDocumentSession {
         targetSize: PaintDocumentCanvasSize,
         layerInfos: [APPaintLayerInfo],
         folderInfos: [APPaintFolderInfo]
-    ) -> (bridge: APPaintDocumentBridge, folderIDMap: [Int: Int]) {
-        let resizedBridge = APPaintDocumentBridge(width: targetSize.width, height: targetSize.height)
+    ) -> (targetBridge: APPaintDocumentBridge, folderIDMap: [Int: Int]) {
+        let targetBridge = APPaintDocumentBridge(width: targetSize.width, height: targetSize.height)
         if layerInfos.count > 1 {
             for index in 1..<layerInfos.count {
-                _ = resizedBridge.addLayer(name: layerInfos[index].name)
+                _ = targetBridge.addLayer(name: layerInfos[index].name)
             }
         }
 
         var folderIDMap: [Int: Int] = [:]
         for folder in folderInfos {
             let createdFolderID = Int(
-                resizedBridge.createFolder(
+                targetBridge.createFolder(
                     name: folder.name,
                     layerIndex: folder.anchorLayerIndex >= 0 ? Int(folder.anchorLayerIndex) : -1
                 )
             )
             folderIDMap[Int(folder.folderID)] = createdFolderID
-            resizedBridge.setFolderVisible(folder.visible, folderID: createdFolderID)
-            resizedBridge.setFolderExpanded(folder.expanded, folderID: createdFolderID)
-            resizedBridge.setFolderName(folder.name, folderID: createdFolderID)
+            targetBridge.setFolderVisible(folder.visible, folderID: createdFolderID)
+            targetBridge.setFolderExpanded(folder.expanded, folderID: createdFolderID)
+            targetBridge.setFolderName(folder.name, folderID: createdFolderID)
         }
 
-        return (resizedBridge, folderIDMap)
+        return (targetBridge, folderIDMap)
     }
 
     private func applyLayerMetadata(
         _ info: APPaintLayerInfo,
         at index: Int,
-        to bridge: APPaintDocumentBridge,
+        to targetBridge: APPaintDocumentBridge,
         folderIDMap: [Int: Int]
     ) {
-        bridge.setLayerName(info.name, at: index)
-        bridge.setLayerVisible(info.visible, at: index)
-        bridge.setLayerLocked(info.locked, at: index)
-        bridge.setLayerAlphaLocked(info.alphaLocked, at: index)
-        bridge.setLayerClipped(info.clipped, at: index)
-        bridge.setLayerOpacity(info.opacity, at: index)
-        bridge.setLayerBlendMode(info.blendMode, at: index)
+        targetBridge.setLayerName(info.name, at: index)
+        targetBridge.setLayerVisible(info.visible, at: index)
+        targetBridge.setLayerLocked(info.locked, at: index)
+        targetBridge.setLayerAlphaLocked(info.alphaLocked, at: index)
+        targetBridge.setLayerClipped(info.clipped, at: index)
+        targetBridge.setLayerOpacity(info.opacity, at: index)
+        targetBridge.setLayerBlendMode(info.blendMode, at: index)
         if info.folderID >= 0, let mappedFolderID = folderIDMap[Int(info.folderID)] {
-            _ = bridge.setLayerFolder(at: index, folderID: mappedFolderID)
+            _ = targetBridge.setLayerFolder(at: index, folderID: mappedFolderID)
         }
     }
 
@@ -181,14 +183,14 @@ extension PaintDocumentSession {
         textLayers resizedTextLayers: [Int: TextLayerData],
         activeLayerIndex: Int
     ) {
-        bridge = resizedBridge
-        sessionState.textLayers.replaceAll(with: resizedTextLayers)
+        replaceBridge(with: resizedBridge)
+        replaceStoredTextLayers(with: resizedTextLayers)
         for (index, textLayer) in resizedTextLayers {
             guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { continue }
-            bridge.replaceLayerPixels(at: index, data: rasterized)
+            bridgeReplaceLayerPixels(index: index, data: rasterized)
         }
-        bridge.activeLayerIndex = activeLayerIndex
-        sessionState.editing.resetAll()
+        setBridgeActiveLayerIndex(activeLayerIndex)
+        resetTrackedEditingState()
         resetTimelapseHistory()
         applyLifecycleMutation(editingLifecycleService.mutation(invalidating: .all))
     }

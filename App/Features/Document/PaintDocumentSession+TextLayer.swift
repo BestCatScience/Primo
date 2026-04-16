@@ -4,26 +4,27 @@ import UIKit
 
 extension PaintDocumentSession {
     func textLayerData(index: Int) -> TextLayerData? {
-        sessionState.textLayers.data(at: index)
+        storedTextLayer(at: index)
     }
 
     @discardableResult
     func setTextLayer(index: Int, textLayer: TextLayerData) -> Bool {
+        requireExistingLayerIndex(index)
         guard !isLayerLocked(index: index) else { return false }
-        let existingPixelData = bridge.pixelDataForLayer(at: index) as Data
+        let existingPixelData = pixelDataForLayer(index: index)
         guard !existingPixelData.isEmpty else { return false }
         guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }
-        sessionState.textLayers.set(textLayer, at: index)
+        setStoredTextLayer(textLayer, at: index)
         replaceLayerPixels(index: index, data: rasterized, preservesTextLayerMetadata: true)
         return true
     }
 
     func clearTextLayerData(index: Int) {
-        sessionState.textLayers.remove(at: index)
+        removeStoredTextLayer(at: index)
     }
 
     func rasterizedTextLayerPixelData(_ textLayer: TextLayerData) -> Data? {
-        let canvasSize = CGSize(width: bridge.width, height: bridge.height)
+        let canvasSize = bridgeCanvasSize
         guard
             canvasSize.width > 0,
             canvasSize.height > 0,

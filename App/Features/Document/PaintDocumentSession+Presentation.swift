@@ -11,7 +11,7 @@ extension PaintDocumentSession {
         case .all:
             invalidateThumbnailCache()
         }
-        sessionState.timelapse.record(events: mutation.timelapseEvents)
+        recordTimelapseEvents(mutation.timelapseEvents)
         if mutation.shouldCaptureTimelapseFrame {
             captureTimelapseFrame()
         }
@@ -20,14 +20,14 @@ extension PaintDocumentSession {
     func lightweightPresentation() -> PaintDocumentPresentation {
         let clock = ContinuousClock()
         let start = clock.now
-        let infos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
+        let infos = bridgeLayerInfos()
+        let folderInfos = bridgeFolderInfos()
         let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
-            canvasSize: CGSize(width: bridge.width, height: bridge.height),
-            activeLayerIndex: bridge.activeLayerIndex,
+            canvasSize: bridgeCanvasSize,
+            activeLayerIndex: bridgeActiveLayerIndex(),
             layerRows: rows,
             layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: nil
@@ -37,11 +37,11 @@ extension PaintDocumentSession {
     func presentation() -> PaintDocumentPresentation {
         let clock = ContinuousClock()
         let start = clock.now
-        let revision = sessionState.presentation.advanceRevision()
-        let infos = bridge.layerInfos()
-        let folderInfos = bridge.folderInfos()
+        let revision = advancePresentationRevision()
+        let infos = bridgeLayerInfos()
+        let folderInfos = bridgeFolderInfos()
         let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
-        let compositePixelData = bridge.compositePixelData() as Data
+        let compositePixelData = bridgeCompositePixelData()
         let snapshots = infos.enumerated().map { element in
             let index = element.offset
             let info = element.element
@@ -52,7 +52,7 @@ extension PaintDocumentSession {
                 isClipped: info.clipped,
                 blendMode: LayerBlendMode(rawValue: info.blendMode) ?? .normal,
                 thumbnailData: cachedLayerThumbnailData(index: index),
-                pixelData: bridge.pixelDataForLayer(at: index) as Data
+                pixelData: pixelDataForLayer(index: index)
             )
         }
         let rows = buildLayerRows(from: infos)
@@ -60,13 +60,13 @@ extension PaintDocumentSession {
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
         Self.logger.debug("presentation produced revision \(revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
-            canvasSize: CGSize(width: bridge.width, height: bridge.height),
-            activeLayerIndex: bridge.activeLayerIndex,
+            canvasSize: bridgeCanvasSize,
+            activeLayerIndex: bridgeActiveLayerIndex(),
             layerRows: rows,
             layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: MetalDocumentSnapshot(
-                width: bridge.width,
-                height: bridge.height,
+                width: bridgeCanvasWidth,
+                height: bridgeCanvasHeight,
                 revision: revision,
                 compositePixelData: compositePixelData,
                 layers: snapshots
@@ -75,11 +75,11 @@ extension PaintDocumentSession {
     }
 
     func prewarmDrawingResources() {
-        _ = bridge.compositePixelData()
+        _ = bridgeCompositePixelData()
     }
 
     func compositePixelData() -> Data {
-        bridge.compositePixelData() as Data
+        bridgeCompositePixelData()
     }
 
     private func buildLayerRows(from infos: [APPaintLayerInfo]) -> [LayerRowModel] {
@@ -95,8 +95,8 @@ extension PaintDocumentSession {
                 blendMode: LayerBlendMode(rawValue: layer.blendMode) ?? .normal,
                 folderID: layer.folderID >= 0 ? Int(layer.folderID) : nil,
                 hasMask: layer.hasMask,
-                isTextLayer: sessionState.textLayers.contains(index),
-                textLayer: sessionState.textLayers.data(at: index)
+                isTextLayer: hasStoredTextLayer(at: index),
+                textLayer: storedTextLayer(at: index)
             )
         }.reversed())
     }

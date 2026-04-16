@@ -3,15 +3,18 @@ import Foundation
 
 extension PaintDocumentSession {
     func setActiveLayer(index: Int) {
-        bridge.activeLayerIndex = index
+        requireExistingLayerIndex(index, label: "Active layer index")
+        setBridgeActiveLayerIndex(index)
     }
 
     func setLayerName(index: Int, name: String) {
-        bridge.setLayerName(name, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerName(name, index: index)
     }
 
     func setLayerVisibility(index: Int, isVisible: Bool) {
-        bridge.setLayerVisible(isVisible, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerVisible(isVisible, index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
@@ -20,7 +23,8 @@ extension PaintDocumentSession {
     }
 
     func setLayerLocked(index: Int, isLocked: Bool) {
-        bridge.setLayerLocked(isLocked, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerLocked(isLocked, index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
@@ -29,7 +33,8 @@ extension PaintDocumentSession {
     }
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) {
-        bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerAlphaLocked(isAlphaLocked, index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
@@ -38,7 +43,8 @@ extension PaintDocumentSession {
     }
 
     func setLayerClipped(index: Int, isClipped: Bool) {
-        bridge.setLayerClipped(isClipped, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerClipped(isClipped, index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped),
@@ -48,11 +54,14 @@ extension PaintDocumentSession {
     }
 
     func revealLayerForEditing(index: Int) {
-        bridge.setLayerVisible(true, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerVisible(true, index: index)
     }
 
     func setLayerOpacity(index: Int, opacity: Double) {
-        bridge.setLayerOpacity(CGFloat(opacity), at: index)
+        requireExistingLayerIndex(index)
+        precondition((0...1).contains(opacity), "Layer opacity must be in 0...1.")
+        bridgeSetLayerOpacity(CGFloat(opacity), index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity),
@@ -62,7 +71,8 @@ extension PaintDocumentSession {
     }
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) {
-        bridge.setLayerBlendMode(blendMode.rawValue, at: index)
+        requireExistingLayerIndex(index)
+        bridgeSetLayerBlendMode(blendMode.rawValue, index: index)
         applyLifecycleMutation(
             editingLifecycleService.mutation(
                 recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode),

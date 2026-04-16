@@ -63,22 +63,23 @@ struct PaintDocumentClient: Sendable {
         dateClient: DateClient,
         uuidClient: UUIDClient
     ) -> PaintDocumentClient {
-        let sessionBox = PaintDocumentSessionBox()
-        sessionBox.session = PaintDocumentSession(
+        let sessionBox = PaintDocumentSessionBox(session: PaintDocumentSession(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
-        )
+        ))
         return PaintDocumentClient(
-            lightweightPresentation: { sessionBox.session.lightweightPresentation() },
-            presentation: { sessionBox.session.presentation() },
-            compositePixelData: { sessionBox.session.compositePixelData() },
-            prewarmDrawingResources: { sessionBox.session.prewarmDrawingResources() },
-            compositePNGData: { style in sessionBox.session.compositePNGData(paperStyle: style) },
-            timelapseCapture: { sessionBox.session.timelapseCapture() },
+            lightweightPresentation: { sessionBox.withSession { $0.lightweightPresentation() } },
+            presentation: { sessionBox.withSession { $0.presentation() } },
+            compositePixelData: { sessionBox.withSession { $0.compositePixelData() } },
+            prewarmDrawingResources: { sessionBox.withSession { $0.prewarmDrawingResources() } },
+            compositePNGData: { style in sessionBox.withSession { $0.compositePNGData(paperStyle: style) } },
+            timelapseCapture: { sessionBox.withSession { $0.timelapseCapture() } },
             saveProject: { url, paperStyle in
-                sessionBox.session.setPaperStyle(paperStyle)
-                try sessionBox.session.saveProject(to: url)
+                try sessionBox.withSession { session in
+                    session.setPaperStyle(paperStyle)
+                    try session.saveProject(to: url)
+                }
             },
             loadProject: { url in
                 let session = try PaintDocumentSession.loadProject(
@@ -87,81 +88,103 @@ struct PaintDocumentClient: Sendable {
                     dateClient: dateClient,
                     uuidClient: uuidClient
                 )
-                sessionBox.session = session
-                return LoadedPaintProject(
+                let loadedProject = LoadedPaintProject(
                     presentation: session.presentation(),
                     paperStyle: session.currentPaperStyle
                 )
+                sessionBox.replaceSession(with: session)
+                return loadedProject
             },
-            setPaperStyle: { style in sessionBox.session.setPaperStyle(style) },
+            setPaperStyle: { style in sessionBox.withSession { $0.setPaperStyle(style) } },
             newCanvas: { width, height in
-                sessionBox.session = PaintDocumentSession(
+                sessionBox.replaceSession(with: PaintDocumentSession(
                     width: width,
                     height: height,
                     fileClient: fileClient,
                     dateClient: dateClient,
                     uuidClient: uuidClient
-                )
+                ))
             },
             resizeCanvas: { width, height in
-                sessionBox.session.resizeCanvas(width: width, height: height)
+                sessionBox.withSession { $0.resizeCanvas(width: width, height: height) }
             },
             resizeCanvasExtent: { width, height in
-                sessionBox.session.resizeCanvasExtent(width: width, height: height)
+                sessionBox.withSession { $0.resizeCanvasExtent(width: width, height: height) }
             },
-            beginStroke: { sample, brush in sessionBox.session.beginStroke(sample: sample, brush: brush) },
-            appendStroke: { sample in sessionBox.session.appendStroke(sample: sample) },
-            endStroke: { sessionBox.session.endStroke() },
-            cancelStroke: { sessionBox.session.cancelStroke() },
+            beginStroke: { sample, brush in sessionBox.withSession { $0.beginStroke(sample: sample, brush: brush) } },
+            appendStroke: { sample in sessionBox.withSession { $0.appendStroke(sample: sample) } },
+            endStroke: { sessionBox.withSession { $0.endStroke() } },
+            cancelStroke: { sessionBox.withSession { $0.cancelStroke() } },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                sessionBox.session.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
+                sessionBox.withSession {
+                    $0.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
+                }
             },
-            endBlurStroke: { sessionBox.session.endBlurStroke() },
-            fill: { sample, brush in sessionBox.session.fill(sample: sample, brush: brush) },
-            canUndo: { sessionBox.session.canUndo() },
-            canRedo: { sessionBox.session.canRedo() },
-            undo: { sessionBox.session.undo() },
-            redo: { sessionBox.session.redo() },
-            addLayer: { name in sessionBox.session.addLayer(name: name) },
-            duplicateLayer: { index, name in sessionBox.session.duplicateLayer(index: index, name: name) },
-            deleteLayer: { index in sessionBox.session.deleteLayer(index: index) },
-            moveLayer: { index, destination in sessionBox.session.moveLayer(from: index, to: destination) },
-            createFolder: { name, layerIndex in sessionBox.session.createFolder(name: name, layerIndex: layerIndex) },
-            deleteFolder: { folderID in sessionBox.session.deleteFolder(folderID: folderID) },
-            setFolderVisibility: { folderID, isVisible in sessionBox.session.setFolderVisibility(folderID: folderID, isVisible: isVisible) },
-            setFolderName: { folderID, name in sessionBox.session.setFolderName(folderID: folderID, name: name) },
-            setFolderExpanded: { folderID, isExpanded in sessionBox.session.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) },
-            assignLayerToFolder: { index, folderID in sessionBox.session.assignLayer(index: index, toFolder: folderID) },
-            setActiveLayer: { index in sessionBox.session.setActiveLayer(index: index) },
-            setLayerName: { index, name in sessionBox.session.setLayerName(index: index, name: name) },
-            setLayerVisibility: { index, isVisible in sessionBox.session.setLayerVisibility(index: index, isVisible: isVisible) },
-            setLayerLocked: { index, isLocked in sessionBox.session.setLayerLocked(index: index, isLocked: isLocked) },
-            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.session.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) },
-            setLayerClipped: { index, isClipped in sessionBox.session.setLayerClipped(index: index, isClipped: isClipped) },
-            revealLayerForEditing: { index in sessionBox.session.revealLayerForEditing(index: index) },
-            setLayerOpacity: { index, opacity in sessionBox.session.setLayerOpacity(index: index, opacity: opacity) },
-            setLayerBlendMode: { index, blendMode in sessionBox.session.setLayerBlendMode(index: index, blendMode: blendMode) },
-            mergeLayerDown: { index in sessionBox.session.mergeLayerDown(index: index) },
-            textLayerData: { index in sessionBox.session.textLayerData(index: index) },
-            setTextLayer: { index, textLayer in sessionBox.session.setTextLayer(index: index, textLayer: textLayer) },
-            clearTextLayerData: { index in sessionBox.session.clearTextLayerData(index: index) },
-            applyLayerProcessing: { index, request in sessionBox.session.applyLayerProcessing(index: index, request: request) },
+            endBlurStroke: { sessionBox.withSession { $0.endBlurStroke() } },
+            fill: { sample, brush in sessionBox.withSession { $0.fill(sample: sample, brush: brush) } },
+            canUndo: { sessionBox.withSession { $0.canUndo() } },
+            canRedo: { sessionBox.withSession { $0.canRedo() } },
+            undo: { sessionBox.withSession { $0.undo() } },
+            redo: { sessionBox.withSession { $0.redo() } },
+            addLayer: { name in sessionBox.withSession { $0.addLayer(name: name) } },
+            duplicateLayer: { index, name in sessionBox.withSession { $0.duplicateLayer(index: index, name: name) } },
+            deleteLayer: { index in sessionBox.withSession { $0.deleteLayer(index: index) } },
+            moveLayer: { index, destination in sessionBox.withSession { $0.moveLayer(from: index, to: destination) } },
+            createFolder: { name, layerIndex in sessionBox.withSession { $0.createFolder(name: name, layerIndex: layerIndex) } },
+            deleteFolder: { folderID in sessionBox.withSession { $0.deleteFolder(folderID: folderID) } },
+            setFolderVisibility: { folderID, isVisible in sessionBox.withSession { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) } },
+            setFolderName: { folderID, name in sessionBox.withSession { $0.setFolderName(folderID: folderID, name: name) } },
+            setFolderExpanded: { folderID, isExpanded in sessionBox.withSession { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) } },
+            assignLayerToFolder: { index, folderID in sessionBox.withSession { $0.assignLayer(index: index, toFolder: folderID) } },
+            setActiveLayer: { index in sessionBox.withSession { $0.setActiveLayer(index: index) } },
+            setLayerName: { index, name in sessionBox.withSession { $0.setLayerName(index: index, name: name) } },
+            setLayerVisibility: { index, isVisible in sessionBox.withSession { $0.setLayerVisibility(index: index, isVisible: isVisible) } },
+            setLayerLocked: { index, isLocked in sessionBox.withSession { $0.setLayerLocked(index: index, isLocked: isLocked) } },
+            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withSession { $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) } },
+            setLayerClipped: { index, isClipped in sessionBox.withSession { $0.setLayerClipped(index: index, isClipped: isClipped) } },
+            revealLayerForEditing: { index in sessionBox.withSession { $0.revealLayerForEditing(index: index) } },
+            setLayerOpacity: { index, opacity in sessionBox.withSession { $0.setLayerOpacity(index: index, opacity: opacity) } },
+            setLayerBlendMode: { index, blendMode in sessionBox.withSession { $0.setLayerBlendMode(index: index, blendMode: blendMode) } },
+            mergeLayerDown: { index in sessionBox.withSession { $0.mergeLayerDown(index: index) } },
+            textLayerData: { index in sessionBox.withSession { $0.textLayerData(index: index) } },
+            setTextLayer: { index, textLayer in sessionBox.withSession { $0.setTextLayer(index: index, textLayer: textLayer) } },
+            clearTextLayerData: { index in sessionBox.withSession { $0.clearTextLayerData(index: index) } },
+            applyLayerProcessing: { index, request in sessionBox.withSession { $0.applyLayerProcessing(index: index, request: request) } },
             applySoftwareStroke: { samples, brush, layerIndex in
-                sessionBox.session.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
+                sessionBox.withSession {
+                    $0.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
+                }
             },
-            pixelDataForLayer: { index in sessionBox.session.pixelDataForLayer(index: index) },
-            replaceLayerPixels: { index, data in sessionBox.session.replaceLayerPixels(index: index, data: data) },
-            replaceLayerMask: { index, data in sessionBox.session.replaceLayerMask(index: index, maskData: data) },
-            clearLayerMask: { index in sessionBox.session.clearLayerMask(index: index) },
-            applyLayerMask: { index in sessionBox.session.applyLayerMask(index: index) },
-            clearLayer: { index in sessionBox.session.clearLayer(index: index) },
-            consumeDirtyUpdate: { sessionBox.session.consumeDirtyUpdate() }
+            pixelDataForLayer: { index in sessionBox.withSession { $0.pixelDataForLayer(index: index) } },
+            replaceLayerPixels: { index, data in sessionBox.withSession { $0.replaceLayerPixels(index: index, data: data) } },
+            replaceLayerMask: { index, data in sessionBox.withSession { $0.replaceLayerMask(index: index, maskData: data) } },
+            clearLayerMask: { index in sessionBox.withSession { $0.clearLayerMask(index: index) } },
+            applyLayerMask: { index in sessionBox.withSession { $0.applyLayerMask(index: index) } },
+            clearLayer: { index in sessionBox.withSession { $0.clearLayer(index: index) } },
+            consumeDirtyUpdate: { sessionBox.withSession { $0.consumeDirtyUpdate() } }
         )
     }
 }
 
 private final class PaintDocumentSessionBox: @unchecked Sendable {
-    var session = PaintDocumentSession()
+    private let lock = NSRecursiveLock()
+    private var session: PaintDocumentSession
+
+    init(session: PaintDocumentSession = PaintDocumentSession()) {
+        self.session = session
+    }
+
+    func withSession<T>(_ body: (PaintDocumentSession) throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body(session)
+    }
+
+    func replaceSession(with session: PaintDocumentSession) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.session = session
+    }
 }
 
 private enum PaintDocumentClientKey: DependencyKey {
