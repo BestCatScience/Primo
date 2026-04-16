@@ -18,20 +18,6 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
         }
     }
 
-    static func load() -> AppLanguage {
-        guard
-            let rawValue = UserDefaults.standard.string(forKey: storageKey),
-            let language = AppLanguage(rawValue: rawValue)
-        else {
-            return .japanese
-        }
-        return language
-    }
-
-    func persist() {
-        UserDefaults.standard.set(rawValue, forKey: Self.storageKey)
-    }
-
     func localized(_ text: String) -> String {
         switch self {
         case .english:

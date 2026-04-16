@@ -1,6 +1,11 @@
 import Foundation
 
 extension AppFeature {
+    struct ActiveLayerPixelContext {
+        let index: Int
+        let pixelData: Data
+    }
+
     struct AdjustmentWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -15,6 +20,31 @@ extension AppFeature {
 
     var adjustmentWorkflowService: AdjustmentWorkflowService {
         AdjustmentWorkflowService(paintDocumentClient: paintDocumentClient)
+    }
+
+    func activeLayerPixelContext(in state: State) -> ActiveLayerPixelContext? {
+        guard let snapshot = state.canvas.renderSnapshot,
+              let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
+        else {
+            return nil
+        }
+        return ActiveLayerPixelContext(index: layer.index, pixelData: layer.pixelData)
+    }
+
+    func previewAdjustedActiveLayer(
+        state: inout State,
+        transform: (Data) -> Data?
+    ) {
+        let adjustedPixels = activeLayerPixelContext(in: state)
+            .flatMap { transform($0.pixelData) }
+        handleAdjustmentPreview(state: &state, adjustedPixels: adjustedPixels)
+    }
+
+    func adjustedActiveLayerPixels(
+        in state: State,
+        transform: (Data) -> Data?
+    ) -> Data? {
+        activeLayerPixelContext(in: state).flatMap { transform($0.pixelData) }
     }
 
     func handleAdjustmentPreview(

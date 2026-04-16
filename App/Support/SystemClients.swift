@@ -3,13 +3,13 @@ import Foundation
 struct DateClient: Sendable {
     var now: @Sendable () -> Date
 
-    static let live = DateClient(now: Date.init)
+    static let live = DateClient(now: { Date() })
 }
 
 struct UUIDClient: Sendable {
     var generate: @Sendable () -> UUID
 
-    static let live = UUIDClient(generate: UUID.init)
+    static let live = UUIDClient(generate: { UUID() })
 }
 
 struct FileClient: Sendable {

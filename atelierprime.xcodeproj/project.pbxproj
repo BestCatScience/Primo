@@ -76,6 +76,13 @@
 		A000000000000000000000E0 /* AppFeature+LayerEditingWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */; };
 		A000000000000000000000E2 /* AppFeature+CanvasStrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */; };
 		A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */; };
+		A000000000000000000000E6 /* AppFeature+ReducerRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */; };
+		A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */; };
+		A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000ED /* PaintDocumentSessionModels.swift */; };
+		A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */; };
+		A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */; };
+		A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */; };
+		A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F5 /* AppFeature+StateAPI.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -152,6 +159,13 @@
 		A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerEditingWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasStrokeWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionToolWorkflow.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ReducerRouting.swift"; sourceTree = "<group>"; };
+		A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Presentation.swift"; sourceTree = "<group>"; };
+		A000000000000000000000ED /* PaintDocumentSessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionModels.swift; sourceTree = "<group>"; };
+		A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+StrokeEditing.swift"; sourceTree = "<group>"; };
+		A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerEditing.swift"; sourceTree = "<group>"; };
+		A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+CanvasGeometry.swift"; sourceTree = "<group>"; };
+		A000000000000000000000F5 /* AppFeature+StateAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StateAPI.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -329,6 +343,7 @@
 				A00000000000000000000003 /* AppFeature.swift */,
 				A000000000000000000000D5 /* AppFeatureModels.swift */,
 				A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */,
+				A000000000000000000000F5 /* AppFeature+StateAPI.swift */,
 				A000000000000000000000A5 /* AppFeature+PureImageOps.swift */,
 				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
 				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
@@ -339,10 +354,16 @@
 				A000000000000000000000E1 /* AppFeature+LayerEditingWorkflow.swift */,
 				A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */,
 				A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */,
+				A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */,
 				A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
+				A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */,
+				A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */,
+				A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */,
+				A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */,
+				A000000000000000000000ED /* PaintDocumentSessionModels.swift */,
 				A000000000000000000000CD /* PaintDocumentSessionState.swift */,
 				A000000000000000000000CF /* PaintDocumentSessionServices.swift */,
 				A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */,
@@ -448,6 +469,7 @@
 			files = (
 				A000000000000000000000D4 /* AppFeatureModels.swift in Sources */,
 				A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */,
+				A000000000000000000000F4 /* AppFeature+StateAPI.swift in Sources */,
 				A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */,
 				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
 				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
@@ -458,6 +480,7 @@
 				A000000000000000000000E0 /* AppFeature+LayerEditingWorkflow.swift in Sources */,
 				A000000000000000000000E2 /* AppFeature+CanvasStrokeWorkflow.swift in Sources */,
 				A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */,
+				A000000000000000000000E6 /* AppFeature+ReducerRouting.swift in Sources */,
 				A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,
@@ -492,6 +515,11 @@
 				A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
+				A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */,
+				A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */,
+				A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */,
+				A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */,
+				A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */,
 				A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */,
 				A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */,
 				A000000000000000000000C0 /* PaintDocumentSession+TextLayer.swift in Sources */,

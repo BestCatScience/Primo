@@ -53,135 +53,6 @@ struct AppFeature {
         var isShowingAutosaveRecovery = false
         var saveHistoryEntries: [SaveHistoryEntry] = []
         var isShowingSaveHistory = false
-
-        var nanoBananaProgress: Double? {
-            guard isNanoBananaGenerating else { return nil }
-            return 0.6
-        }
-
-        var activeTabIndex: Int? {
-            guard let activeTabID else { return nil }
-            return openTabs.firstIndex(where: { $0.id == activeTabID })
-        }
-
-        var activeTab: OpenDocumentTab? {
-            guard let activeTabIndex else { return nil }
-            return openTabs[activeTabIndex]
-        }
-
-        func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
-            AppFeature.stateCoordinator.selectedTabID(for: pane, in: self)
-        }
-
-        mutating func setSelectedTabID(_ tabID: OpenDocumentTab.ID?, for pane: WorkspacePane) {
-            AppFeature.stateCoordinator.setSelectedTabID(tabID, for: pane, in: &self)
-        }
-
-        func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
-            AppFeature.stateCoordinator.tabs(in: pane, state: self)
-        }
-
-        func selectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
-            AppFeature.stateCoordinator.selectedTab(in: pane, state: self)
-        }
-
-        func hasTabs(in pane: WorkspacePane) -> Bool {
-            AppFeature.stateCoordinator.hasTabs(in: pane, state: self)
-        }
-
-        func tabID(forSourceProjectURL sourceProjectURL: DocumentProjectPath) -> OpenDocumentTab.ID? {
-            AppFeature.stateCoordinator.tabID(forSourceProjectURL: sourceProjectURL, in: self)
-        }
-
-        mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
-            AppFeature.uiStateCoordinator.applyPresentation(presentation, to: &self)
-        }
-
-        mutating func updateActiveTabMetadata(
-            title: String? = nil,
-            sourceProjectURL: DocumentProjectPath? = nil,
-            previewImageData: Data? = nil
-        ) {
-            AppFeature.stateCoordinator.updateActiveTabMetadata(
-                title: title,
-                sourceProjectURL: sourceProjectURL,
-                previewImageData: previewImageData,
-                in: &self
-            )
-        }
-
-        mutating func setActiveTabDirty(_ isDirty: Bool) {
-            AppFeature.stateCoordinator.setActiveTabDirty(isDirty, in: &self)
-        }
-
-        mutating func reorderTabs(moving movingID: OpenDocumentTab.ID, before targetID: OpenDocumentTab.ID) {
-            AppFeature.stateCoordinator.reorderTabs(moving: movingID, before: targetID, in: &self)
-        }
-
-        mutating func moveTab(_ movingID: OpenDocumentTab.ID, to pane: WorkspacePane, before targetID: OpenDocumentTab.ID?) {
-            AppFeature.stateCoordinator.moveTab(movingID, to: pane, before: targetID, in: &self)
-        }
-
-        mutating func ensureWorkspaceSelectionIntegrity() {
-            AppFeature.stateCoordinator.ensureWorkspaceSelectionIntegrity(state: &self)
-        }
-
-        mutating func applyLoadedProject(_ loaded: LoadedPaintProject) {
-            AppFeature.uiStateCoordinator.applyLoadedProject(loaded, to: &self)
-        }
-
-        mutating func syncTextEditorWithActiveLayer() {
-            AppFeature.uiStateCoordinator.syncTextEditorWithActiveLayer(state: &self)
-        }
-
-        mutating func applyLiveCompositePixelData(_ compositePixelData: Data) {
-            AppFeature.uiStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &self)
-        }
-
-        mutating func applyLiveStrokePreview(
-            baseSnapshot: MetalDocumentSnapshot,
-            activeLayerIndex: Int,
-            adjustedActiveLayerPixels: Data
-        ) {
-            AppFeature.uiStateCoordinator.applyLiveStrokePreview(
-                baseSnapshot: baseSnapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedActiveLayerPixels,
-                to: &self
-            )
-        }
-
-        func resolvedBrushSettings() -> BrushRuntimeSettings {
-            AppFeature.uiStateCoordinator.resolvedBrushSettings(for: self)
-        }
-
-        func previewStrokeStyle() -> PreviewStrokeStyle {
-            AppFeature.uiStateCoordinator.previewStrokeStyle(for: self)
-        }
-
-        func resolvedPaperStyle() -> CanvasPaperStyle {
-            AppFeature.uiStateCoordinator.resolvedPaperStyle(for: self)
-        }
-
-        func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
-            AppFeature.stateCoordinator.panelState(for: panel, in: self)
-        }
-
-        mutating func setPanelState(_ panelState: StudioPanelLayoutState, for panel: StudioPanelKind) {
-            AppFeature.stateCoordinator.setPanelState(panelState, for: panel, in: &self)
-        }
-
-        mutating func toggleCollapse(for panel: StudioPanelKind) {
-            AppFeature.stateCoordinator.toggleCollapse(for: panel, in: &self)
-        }
-
-        mutating func syncToolSpecificBrushSize() {
-            AppFeature.stateCoordinator.syncToolSpecificBrushSize(state: &self)
-        }
-
-        mutating func applyToolSpecificBrushSize(for tool: StudioToolKind) {
-            AppFeature.stateCoordinator.applyToolSpecificBrushSize(for: tool, state: &self)
-        }
     }
 
     enum Action: Equatable {
@@ -315,9 +186,7 @@ struct AppFeature {
                 return handleTask(state: &state)
 
             case let .bootstrapPresentationLoaded(presentation):
-                state.applyPresentation(presentation)
-                state.isHydrating = false
-                Self.startupLogger.debug("Bootstrap presentation applied; initial UI is ready")
+                handleBootstrapPresentationLoaded(state: &state, presentation: presentation)
                 return .none
 
             case .loadPresentationAfterLaunch:
@@ -334,8 +203,7 @@ struct AppFeature {
                 return handleAutosaveRecoveryLoadRequest()
 
             case let .autosaveRecoveryLoaded(items):
-                state.autosaveRecoveryItems = items
-                state.isShowingAutosaveRecovery = !items.isEmpty
+                handleAutosaveRecoveryLoaded(state: &state, items: items)
                 return .none
 
             case let .autosaveRecoveryRestoreRequested(autosaveID):
@@ -350,11 +218,11 @@ struct AppFeature {
                 return .none
 
             case .autosaveRecoveryDismissed:
-                state.isShowingAutosaveRecovery = false
+                handleAutosaveRecoveryDismissed(state: &state)
                 return .none
 
             case let .homeSectionSelected(section):
-                state.homeSection = section
+                handleHomeSectionSelected(state: &state, section: section)
                 return .none
 
             case let .tabSelected(tabID):
@@ -371,24 +239,13 @@ struct AppFeature {
                 return requestCloseOperation(state: &state, operation: .closeTabsToRight(tabID))
 
             case .pendingCloseSaveConfirmed:
-                guard let confirmation = state.pendingCloseConfirmation else { return .none }
-                do {
-                    try saveTabsForClose(confirmation.tabIDs, state: &state)
-                    state.pendingCloseConfirmation = nil
-                    return performCloseOperation(state: &state, operation: confirmation.operation)
-                } catch {
-                    state.bannerMessage = error.localizedDescription.isEmpty ? state.appLanguage.localized("Save failed") : error.localizedDescription
-                    state.pendingCloseConfirmation = nil
-                    return .none
-                }
+                return handlePendingCloseSaveConfirmed(state: &state)
 
             case .pendingCloseDiscardConfirmed:
-                guard let confirmation = state.pendingCloseConfirmation else { return .none }
-                state.pendingCloseConfirmation = nil
-                return performCloseOperation(state: &state, operation: confirmation.operation)
+                return handlePendingCloseDiscardConfirmed(state: &state)
 
             case .pendingCloseCancelled:
-                state.pendingCloseConfirmation = nil
+                handlePendingCloseCancelled(state: &state)
                 return .none
 
             case let .tabClosed(tabID):
@@ -403,42 +260,27 @@ struct AppFeature {
                 return .none
 
             case let .moveTabToSecondaryPane(tabID):
-                state.workspaceLayout = .split
-                state.moveTab(tabID, to: .secondary, before: nil)
-                state.ensureWorkspaceSelectionIntegrity()
+                handleMoveTabToSecondaryPane(state: &state, tabID: tabID)
                 return .none
 
             case let .tabReordered(movingID, targetID):
-                state.reorderTabs(moving: movingID, before: targetID)
+                handleTabReordered(state: &state, movingID: movingID, targetID: targetID)
                 return .none
 
             case let .tabDropped(movingID, pane, targetID):
-                state.moveTab(movingID, to: pane, before: targetID)
+                handleTabDropped(state: &state, movingID: movingID, pane: pane, targetID: targetID)
                 return .none
 
             case .splitActiveTabIntoSecondaryPane:
-                state.workspaceLayout = .split
-                state.ensureWorkspaceSelectionIntegrity()
+                handleSplitActiveTabIntoSecondaryPane(state: &state)
                 return .none
 
             case .mergeWorkspacePanes:
-                let secondaryTabs = state.tabs(in: .secondary).map(\.id)
-                for tabID in secondaryTabs {
-                    state.moveTab(tabID, to: .primary, before: nil)
-                }
-                state.workspaceLayout = .single
-                state.secondarySelectedTabID = nil
-                state.focusedWorkspacePane = .primary
-                state.ensureWorkspaceSelectionIntegrity()
+                handleMergeWorkspacePanes(state: &state)
                 return .none
 
             case let .workspacePaneActivated(pane):
-                state.focusedWorkspacePane = pane
-                guard let tabID = state.selectedTabID(for: pane) else { return .none }
-                if state.activeTabID == tabID {
-                    return .none
-                }
-                return .send(.tabSelected(tabID))
+                return handleWorkspacePaneActivated(state: &state, pane: pane)
 
             case let .moveSavedProject(url, relativeFolderPath):
                 return handleSavedProjectMove(
@@ -451,11 +293,7 @@ struct AppFeature {
                 return handleHomeReturnRequest(state: &state)
 
             case let .presentationLoaded(presentation):
-                guard !state.canvas.isStrokeActive else {
-                    return .none
-                }
-                state.applyPresentation(presentation)
-                Self.startupLogger.debug("Full presentation applied")
+                handlePresentationLoaded(state: &state, presentation: presentation)
                 return .none
 
             case .deferredPresentationRefresh:
@@ -484,7 +322,7 @@ struct AppFeature {
                 return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
 
             case let .newCanvasFromImageFailed(message):
-                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
+                handleNewCanvasFromImageFailed(state: &state, message: message)
                 return .none
 
             case .undoRequested:
@@ -532,23 +370,15 @@ struct AppFeature {
                 return .none
 
             case let .gradientMapPreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.gradientMappedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.gradientMappedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(
-                    state: &state,
-                    adjustedPixels: adjusted
-                )
                 return .none
 
             case let .gradientMapApplied(settings):
-                let adjusted = state.canvas.renderSnapshot
-                    .flatMap { snapshot in
-                        snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
-                            .flatMap { Self.gradientMappedLayerPixels(source: $0.pixelData, settings: settings) }
-                    }
+                let adjusted = adjustedActiveLayerPixels(in: state) {
+                    Self.gradientMappedLayerPixels(source: $0, settings: settings)
+                }
                 _ = handleAdjustmentApplyUsingPixels(
                     state: &state,
                     adjustedPixels: adjusted,
@@ -557,12 +387,9 @@ struct AppFeature {
                 return .none
 
             case let .hueSaturationBrightnessPreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.hueSaturationBrightnessAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.hueSaturationBrightnessAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .hueSaturationBrightnessApplied(settings):
@@ -574,12 +401,9 @@ struct AppFeature {
                 return .none
 
             case let .brightnessContrastPreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.brightnessContrastAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.brightnessContrastAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .brightnessContrastApplied(settings):
@@ -591,12 +415,9 @@ struct AppFeature {
                 return .none
 
             case let .levelsPreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.levelsAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.levelsAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .levelsApplied(settings):
@@ -608,12 +429,9 @@ struct AppFeature {
                 return .none
 
             case let .toneCurvePreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.toneCurveAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.toneCurveAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .toneCurveApplied(settings):
@@ -625,12 +443,9 @@ struct AppFeature {
                 return .none
 
             case let .colorBalancePreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.colorBalanceAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.colorBalanceAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .colorBalanceApplied(settings):
@@ -642,12 +457,9 @@ struct AppFeature {
                 return .none
 
             case let .thresholdPreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.thresholdAdjustedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.thresholdAdjustedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .thresholdApplied(settings):
@@ -659,12 +471,9 @@ struct AppFeature {
                 return .none
 
             case let .posterizePreviewChanged(settings):
-                let adjusted = settings.flatMap { settings in
-                    state.canvas.renderSnapshot
-                        .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                        .flatMap { Self.posterizedLayerPixels(source: $0.pixelData, settings: settings) }
+                previewAdjustedActiveLayer(state: &state) { source in
+                    settings.flatMap { Self.posterizedLayerPixels(source: source, settings: $0) }
                 }
-                handleAdjustmentPreview(state: &state, adjustedPixels: adjusted)
                 return .none
 
             case let .posterizeApplied(settings):
@@ -676,9 +485,9 @@ struct AppFeature {
                 return .none
 
             case .luminanceToAlphaRequested:
-                let adjusted = state.canvas.renderSnapshot
-                    .flatMap { $0.layers.first(where: { $0.index == state.canvas.activeLayerIndex }) }
-                    .flatMap { Self.luminanceToAlphaLayerPixels(source: $0.pixelData) }
+                let adjusted = adjustedActiveLayerPixels(in: state) {
+                    Self.luminanceToAlphaLayerPixels(source: $0)
+                }
                 _ = handleAdjustmentApplyUsingPixels(
                     state: &state,
                     adjustedPixels: adjusted,
@@ -724,39 +533,33 @@ struct AppFeature {
                 return .none
 
             case .nanoBananaPreviewDiscarded:
-                state.nanoBananaPreview = nil
-                state.activeNanoBananaJobID = nil
+                handleNanoBananaPreviewDiscarded(state: &state)
                 return .none
 
             case .nanoBananaRegenerateRequested:
-                guard let request = state.nanoBananaPreview?.request ?? state.pendingNanoBananaRequest else { return .none }
-                state.nanoBananaPreview = nil
-                return .send(.nanoBananaEditRequested(request))
+                return handleNanoBananaRegenerateRequested(state: &state)
 
             case let .nanoBananaRetryJob(jobID):
-                guard let job = state.nanoBananaJobs.first(where: { $0.id == jobID }) else { return .none }
-                return .send(.nanoBananaEditRequested(job.request))
+                return handleNanoBananaRetryJob(state: &state, jobID: jobID)
 
             case let .timelapseExportProgressUpdated(progress, previewData):
-                state.timelapseExportPreview = TimelapseExportPreview(progress: progress, previewImageData: previewData ?? state.timelapseExportPreview?.previewImageData)
+                handleTimelapseExportProgressUpdated(state: &state, progress: progress, previewData: previewData)
                 return .none
 
             case let .timelapseExportSucceeded(url):
-                state.timelapseExportPreview = nil
-                state.exportSheet = makeShareExport(url: url)
+                handleTimelapseExportSucceeded(state: &state, url: url)
                 return .none
 
             case let .timelapseExportFailed(message):
-                state.timelapseExportPreview = nil
-                state.bannerMessage = message
+                handleTimelapseExportFailed(state: &state, message: message)
                 return .none
 
             case .exportSheetDismissed:
-                state.exportSheet = nil
+                handleExportSheetDismissed(state: &state)
                 return .none
 
             case .bannerDismissed:
-                state.bannerMessage = nil
+                handleBannerDismissed(state: &state)
                 return .none
 
             case let .openDocumentSelected(url):
@@ -781,8 +584,7 @@ struct AppFeature {
                 )
 
             case let .openDocumentFailed(message):
-                state.isHydrating = false
-                state.bannerMessage = message.isEmpty ? StudioStrings.openFailed(state.appLanguage) : message
+                handleOpenDocumentFailed(state: &state, message: message)
                 return .none
 
             case let .photoImportReceived(name, data):
@@ -790,7 +592,7 @@ struct AppFeature {
                 return .none
 
             case let .photoImportFailed(message):
-                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not import photo") : message
+                handlePhotoImportFailed(state: &state, message: message)
                 return .none
 
             case let .toolSelected(tool):
