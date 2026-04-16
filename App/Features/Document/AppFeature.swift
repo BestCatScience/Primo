@@ -339,9 +339,10 @@ struct AppFeature {
                 CanvasFeature()
             }
 
-            Reduce { (state: inout State, action: Action) -> Effect<Action> in
-                handleAction(state: &state, action: action)
-            }
+            AppFeatureApplicationReducer(feature: self)
+            AppFeatureWorkspaceReducer(feature: self)
+            AppFeatureDocumentReducer(feature: self)
+            AppFeatureEditingReducer(feature: self)
         }
     }
 }

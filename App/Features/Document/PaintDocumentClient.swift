@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import Synchronization
 
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
@@ -166,24 +167,23 @@ struct PaintDocumentClient: Sendable {
     }
 }
 
-private final class PaintDocumentSessionBox: @unchecked Sendable {
-    private let lock = NSRecursiveLock()
-    private var session: PaintDocumentSession
+private final class PaintDocumentSessionBox: Sendable {
+    private let storage: Mutex<PaintDocumentSession>
 
     init(session: PaintDocumentSession = PaintDocumentSession()) {
-        self.session = session
+        self.storage = Mutex(session)
     }
 
     func withSession<T>(_ body: (PaintDocumentSession) throws -> T) rethrows -> T {
-        lock.lock()
-        defer { lock.unlock() }
-        return try body(session)
+        try storage.withLock { session in
+            try body(session)
+        }
     }
 
     func replaceSession(with session: PaintDocumentSession) {
-        lock.lock()
-        defer { lock.unlock() }
-        self.session = session
+        storage.withLock { currentSession in
+            currentSession = session
+        }
     }
 }
 

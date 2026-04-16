@@ -1,20 +1,46 @@
 import ComposableArchitecture
 import Foundation
 
-extension AppFeature {
-    func handleAction(state: inout State, action: Action) -> Effect<Action> {
-        if let effect = routeApplicationAction(state: &state, action: action) {
-            return effect
-        }
-        if let effect = routeWorkspaceAction(state: &state, action: action) {
-            return effect
-        }
-        if let effect = routeDocumentAction(state: &state, action: action) {
-            return effect
-        }
-        if let effect = routeEditingAction(state: &state, action: action) {
-            return effect
-        }
-        return .none
+struct AppFeatureApplicationReducer: Reducer {
+    typealias State = AppFeature.State
+    typealias Action = AppFeature.Action
+
+    let feature: AppFeature
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        feature.routeApplicationAction(state: &state, action: action) ?? .none
+    }
+}
+
+struct AppFeatureWorkspaceReducer: Reducer {
+    typealias State = AppFeature.State
+    typealias Action = AppFeature.Action
+
+    let feature: AppFeature
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        feature.routeWorkspaceAction(state: &state, action: action) ?? .none
+    }
+}
+
+struct AppFeatureDocumentReducer: Reducer {
+    typealias State = AppFeature.State
+    typealias Action = AppFeature.Action
+
+    let feature: AppFeature
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        feature.routeDocumentAction(state: &state, action: action) ?? .none
+    }
+}
+
+struct AppFeatureEditingReducer: Reducer {
+    typealias State = AppFeature.State
+    typealias Action = AppFeature.Action
+
+    let feature: AppFeature
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        feature.routeEditingAction(state: &state, action: action) ?? .none
     }
 }
