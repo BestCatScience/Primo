@@ -3,20 +3,20 @@ import CryptoKit
 import Foundation
 
 struct DocumentWorkspaceClient: Sendable {
-    var createTabBackingStoreURL: @Sendable (UUID) throws -> URL
-    var createProjectURL: @Sendable () throws -> URL
+    var createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
+    var createProjectURL: @Sendable () throws -> DocumentProjectPath
     var writePNGToTemporaryDirectory: @Sendable (Data) throws -> URL
     var timelapseTemporaryDirectory: @Sendable () -> URL
     var loadSavedProjects: @Sendable () throws -> [SavedProjectSummary]
-    var moveSavedProject: @Sendable (URL, String?) throws -> URL
+    var moveSavedProject: @Sendable (DocumentProjectPath, RelativeProjectFolderPath?) throws -> DocumentProjectPath
     var loadAutosaveRecoveryItems: @Sendable () throws -> [AutosaveRecoveryItem]
-    var discardAutosaveEntry: @Sendable (String) throws -> Void
+    var discardAutosaveEntry: @Sendable (WorkspaceItemID) throws -> Void
     var discardAutosaveSnapshot: @Sendable (OpenDocumentTab) throws -> Void
-    var persistAutosaveSnapshot: @Sendable (URL, OpenDocumentTab) throws -> Void
-    var persistProjectSnapshot: @Sendable (URL, URL?) throws -> URL
+    var persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
+    var persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
     var loadSaveHistoryEntries: @Sendable (OpenDocumentTab) throws -> [SaveHistoryEntry]
-    var persistSaveHistorySnapshot: @Sendable (URL, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
-    var removeWorkspaceItem: @Sendable (URL) throws -> Void
+    var persistSaveHistorySnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
+    var removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
 
     static func live(
         fileClient: FileClient,
@@ -89,12 +89,14 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         self.uuidClient = uuidClient
     }
 
-    func createTabBackingStoreURL(for tabID: UUID) throws -> URL {
-        try tabProjectsDirectory().appendingPathComponent(tabID.uuidString, isDirectory: true)
+    func createTabBackingStoreURL(for tabID: UUID) throws -> DocumentProjectPath {
+        DocumentProjectPath(try tabProjectsDirectory().appendingPathComponent(tabID.uuidString, isDirectory: true))
     }
 
-    func createProjectURL() throws -> URL {
-        try appProjectsDirectory().appendingPathComponent(projectFilename(for: dateClient.now()), isDirectory: true)
+    func createProjectURL() throws -> DocumentProjectPath {
+        DocumentProjectPath(
+            try appProjectsDirectory().appendingPathComponent(projectFilename(for: dateClient.now()), isDirectory: true)
+        )
     }
 
     func writePNGToTemporaryDirectory(data: Data) throws -> URL {
@@ -129,8 +131,8 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             let previewData = loaded.compositePNGData(paperStyle: loaded.currentPaperStyle)
             let values = try? projectURL.resourceValues(forKeys: [.contentModificationDateKey])
             return SavedProjectSummary(
-                url: projectURL,
-                name: projectURL.deletingPathExtension().lastPathComponent,
+                url: DocumentProjectPath(projectURL),
+                name: DocumentProjectPath(projectURL).displayName,
                 relativeFolderPath: relativeFolderPath(for: projectURL, rootDirectory: rootDirectory),
                 modifiedAt: values?.contentModificationDate ?? .distantPast,
                 canvasSize: presentation.canvasSize,
@@ -141,23 +143,23 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         .sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
-    func moveSavedProject(at url: URL, toRelativeFolderPath relativeFolderPath: String?) throws -> URL {
-        try requireProjectDirectory(at: url, label: "saved project")
+    func moveSavedProject(at url: DocumentProjectPath, toRelativeFolderPath relativeFolderPath: RelativeProjectFolderPath?) throws -> DocumentProjectPath {
+        try requireProjectDirectory(at: url.fileURL, label: "saved project")
         let rootDirectory = try appProjectsDirectory()
-        let relativePath = try RelativeProjectFolderPath(validating: relativeFolderPath)
+        let relativePath = relativeFolderPath ?? RelativeProjectFolderPath(components: [])
         let destinationDirectory = relativePath.appending(to: rootDirectory)
         try fileClient.createDirectory(destinationDirectory, true)
 
-        let destinationURL = destinationDirectory.appendingPathComponent(url.lastPathComponent, isDirectory: true)
-        guard destinationURL.standardizedFileURL != url.standardizedFileURL else {
+        let destinationURL = destinationDirectory.appendingPathComponent(url.fileURL.lastPathComponent, isDirectory: true)
+        guard destinationURL.standardizedFileURL != url.fileURL.standardizedFileURL else {
             return url
         }
         if fileClient.fileExists(destinationURL.path) {
             throw DocumentWorkspaceError.destinationAlreadyExists(destinationURL)
         }
-        try fileClient.moveItem(url, destinationURL)
-        try relocateWorkspaceArtifacts(from: url, to: destinationURL)
-        return destinationURL
+        try fileClient.moveItem(url.fileURL, destinationURL)
+        try relocateWorkspaceArtifacts(from: url.fileURL, to: destinationURL)
+        return DocumentProjectPath(destinationURL)
     }
 
     func loadAutosaveRecoveryItems() throws -> [AutosaveRecoveryItem] {
@@ -174,7 +176,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             let metadataURL = metadataURL(in: entryURL)
             guard let data = try? fileClient.readData(metadataURL) else { return nil }
             let metadata = try JSONDecoder().decode(StoredAutosaveMetadata.self, from: data)
-            let identifier = try StorageIdentifier(validating: metadata.id)
+            let identifier = try WorkspaceItemID(validating: metadata.id)
             let projectURL = projectURL(in: entryURL)
             guard fileClient.fileExists(projectURL.path) else { return nil }
 
@@ -189,10 +191,10 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             }()
 
             return AutosaveRecoveryItem(
-                id: identifier.rawValue,
+                id: identifier,
                 title: metadata.title,
-                sourceProjectURL: metadata.sourceProjectPath.map { URL(fileURLWithPath: $0) },
-                autosaveProjectURL: projectURL,
+                sourceProjectURL: metadata.sourceProjectPath.map { DocumentProjectPath(URL(fileURLWithPath: $0)) },
+                autosaveProjectURL: DocumentProjectPath(projectURL),
                 updatedAt: metadata.updatedAt,
                 previewImageData: previewImageData
             )
@@ -200,34 +202,37 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         .sorted { $0.updatedAt > $1.updatedAt }
     }
 
-    func discardAutosaveEntry(id: String) throws {
-        let identifier = try StorageIdentifier(validating: id)
+    func discardAutosaveEntry(id: WorkspaceItemID) throws {
+        let identifier = id
         let directory = try autosavesDirectory().appendingPathComponent(identifier.rawValue, isDirectory: true)
         try removeItemIfExists(at: directory)
     }
 
     func discardAutosaveSnapshot(for tab: OpenDocumentTab) throws {
-        try discardAutosaveEntry(id: autosaveIdentifier(for: tab).rawValue)
+        try discardAutosaveEntry(id: autosaveIdentifier(for: tab))
     }
 
-    func persistAutosaveSnapshot(from backingStoreURL: URL, tab: OpenDocumentTab) throws {
+    func persistAutosaveSnapshot(from backingStoreURL: DocumentProjectPath, tab: OpenDocumentTab) throws {
         let identifier = autosaveIdentifier(for: tab)
         let entryDirectory = try autosaveEntryDirectory(for: identifier)
         let destinationProjectURL = projectURL(in: entryDirectory)
-        try replaceProjectDirectory(from: backingStoreURL, to: destinationProjectURL)
+        try replaceProjectDirectory(from: backingStoreURL.fileURL, to: destinationProjectURL)
 
         let metadata = StoredAutosaveMetadata(
             id: identifier.rawValue,
             title: tab.title,
-            sourceProjectPath: tab.sourceProjectURL?.standardizedFileURL.path,
+            sourceProjectPath: tab.sourceProjectURL?.path,
             updatedAt: dateClient.now()
         )
         try writeMetadata(metadata, to: metadataURL(in: entryDirectory))
     }
 
-    func persistProjectSnapshot(from sourceProjectURL: URL, to preferredDestinationURL: URL?) throws -> URL {
+    func persistProjectSnapshot(
+        from sourceProjectURL: DocumentProjectPath,
+        to preferredDestinationURL: DocumentProjectPath?
+    ) throws -> DocumentProjectPath {
         let destinationURL = try preferredDestinationURL ?? createProjectURL()
-        try replaceProjectDirectory(from: sourceProjectURL, to: destinationURL)
+        try replaceProjectDirectory(from: sourceProjectURL.fileURL, to: destinationURL.fileURL)
         return destinationURL
     }
 
@@ -245,7 +250,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             let metadataURL = metadataURL(in: entryURL)
             guard let data = try? fileClient.readData(metadataURL) else { return nil }
             let metadata = try JSONDecoder().decode(StoredSaveHistoryMetadata.self, from: data)
-            let identifier = try StorageIdentifier(validating: metadata.id)
+            let identifier = try WorkspaceItemID(validating: metadata.id)
             let projectURL = projectURL(in: entryURL)
             guard fileClient.fileExists(projectURL.path) else { return nil }
 
@@ -260,9 +265,9 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
             }()
 
             return SaveHistoryEntry(
-                id: identifier.rawValue,
+                id: identifier,
                 title: metadata.title,
-                projectURL: projectURL,
+                projectURL: DocumentProjectPath(projectURL),
                 createdAt: metadata.createdAt,
                 trigger: metadata.trigger,
                 previewImageData: previewImageData
@@ -271,14 +276,18 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         .sorted { $0.createdAt > $1.createdAt }
     }
 
-    func persistSaveHistorySnapshot(from backingStoreURL: URL, tab: OpenDocumentTab, trigger: SaveHistoryTrigger) throws {
+    func persistSaveHistorySnapshot(
+        from backingStoreURL: DocumentProjectPath,
+        tab: OpenDocumentTab,
+        trigger: SaveHistoryTrigger
+    ) throws {
         let historyID = historyIdentifier(for: tab)
-        let entryID = StorageIdentifier(unchecked: uuidClient.generate().uuidString.lowercased())
+        let entryID = WorkspaceItemID(unchecked: uuidClient.generate().uuidString.lowercased())
         let entryDirectory = try saveHistoryEntryDirectory(for: historyID, entryID: entryID)
         let destinationProjectURL = projectURL(in: entryDirectory)
-        try replaceProjectDirectory(from: backingStoreURL, to: destinationProjectURL)
+        try replaceProjectDirectory(from: backingStoreURL.fileURL, to: destinationProjectURL)
 
-        let title = (tab.sourceProjectURL ?? tab.backingStoreURL).deletingPathExtension().lastPathComponent
+        let title = (tab.sourceProjectURL ?? tab.backingStoreURL).displayName
         let metadata = StoredSaveHistoryMetadata(
             id: entryID.rawValue,
             title: title,
@@ -289,8 +298,8 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         try trimSaveHistoryEntries(for: historyID, limit: Self.saveHistoryLimit)
     }
 
-    func removeWorkspaceItem(at url: URL) throws {
-        try removeItemIfExists(at: url)
+    func removeWorkspaceItem(at url: DocumentProjectPath) throws {
+        try removeItemIfExists(at: url.fileURL)
     }
 
     private func tabProjectsDirectory() throws -> URL {
@@ -307,7 +316,7 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         return directory
     }
 
-    private func autosaveEntryDirectory(for identifier: StorageIdentifier) throws -> URL {
+    private func autosaveEntryDirectory(for identifier: WorkspaceItemID) throws -> URL {
         let directory = try autosavesDirectory()
             .appendingPathComponent(identifier.rawValue, isDirectory: true)
         try fileClient.createDirectory(directory, true)
@@ -321,14 +330,14 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         return directory
     }
 
-    private func saveHistoryEntriesDirectory(for identifier: StorageIdentifier) throws -> URL {
+    private func saveHistoryEntriesDirectory(for identifier: WorkspaceItemID) throws -> URL {
         let directory = try saveHistoryDirectory()
             .appendingPathComponent(identifier.rawValue, isDirectory: true)
         try fileClient.createDirectory(directory, true)
         return directory
     }
 
-    private func saveHistoryEntryDirectory(for identifier: StorageIdentifier, entryID: StorageIdentifier) throws -> URL {
+    private func saveHistoryEntryDirectory(for identifier: WorkspaceItemID, entryID: WorkspaceItemID) throws -> URL {
         let directory = try saveHistoryEntriesDirectory(for: identifier)
             .appendingPathComponent(entryID.rawValue, isDirectory: true)
         try fileClient.createDirectory(directory, true)
@@ -343,25 +352,25 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         return directory
     }
 
-    private func autosaveIdentifier(for tab: OpenDocumentTab) -> StorageIdentifier {
+    private func autosaveIdentifier(for tab: OpenDocumentTab) -> WorkspaceItemID {
         storageIdentifier(for: tab)
     }
 
-    private func historyIdentifier(for tab: OpenDocumentTab) -> StorageIdentifier {
+    private func historyIdentifier(for tab: OpenDocumentTab) -> WorkspaceItemID {
         storageIdentifier(for: tab)
     }
 
-    private func storageIdentifier(for sourceProjectURL: URL) -> StorageIdentifier {
+    private func storageIdentifier(for sourceProjectURL: URL) -> WorkspaceItemID {
         let digest = SHA256.hash(data: Data(sourceProjectURL.standardizedFileURL.path.utf8))
         let stableIdentifier = digest.map { String(format: "%02x", $0) }.joined()
-        return StorageIdentifier(unchecked: "saved-\(stableIdentifier)")
+        return WorkspaceItemID(unchecked: "saved-\(stableIdentifier)")
     }
 
-    private func storageIdentifier(for tab: OpenDocumentTab) -> StorageIdentifier {
-        if let sourceProjectURL = tab.sourceProjectURL?.standardizedFileURL {
+    private func storageIdentifier(for tab: OpenDocumentTab) -> WorkspaceItemID {
+        if let sourceProjectURL = tab.sourceProjectURL?.fileURL {
             return storageIdentifier(for: sourceProjectURL)
         }
-        return StorageIdentifier(unchecked: "untitled-\(tab.id.uuidString.lowercased())")
+        return WorkspaceItemID(unchecked: "untitled-\(tab.id.uuidString.lowercased())")
     }
 
     private func discoverProjectDirectories(in rootDirectory: URL) throws -> [URL] {
@@ -375,17 +384,18 @@ private final class DocumentWorkspaceStorage: @unchecked Sendable {
         return projectURLs
     }
 
-    private func relativeFolderPath(for projectURL: URL, rootDirectory: URL) -> String? {
+    private func relativeFolderPath(for projectURL: URL, rootDirectory: URL) -> RelativeProjectFolderPath? {
         let parentPath = projectURL.deletingLastPathComponent().standardizedFileURL.path
         let rootPath = rootDirectory.standardizedFileURL.path
         guard parentPath != rootPath else { return nil }
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
         guard parentPath.hasPrefix(prefix) else { return nil }
         let relativePath = String(parentPath.dropFirst(prefix.count))
-        return relativePath.isEmpty ? nil : relativePath
+        guard !relativePath.isEmpty else { return nil }
+        return try? RelativeProjectFolderPath(validating: relativePath)
     }
 
-    private func trimSaveHistoryEntries(for identifier: StorageIdentifier, limit: Int) throws {
+    private func trimSaveHistoryEntries(for identifier: WorkspaceItemID, limit: Int) throws {
         guard limit > 0 else { return }
         let directory = try saveHistoryEntriesDirectory(for: identifier)
         let entryURLs = try fileClient.contentsOfDirectory(
@@ -499,89 +509,4 @@ private struct StoredSaveHistoryMetadata: Codable {
     let title: String
     let createdAt: Date
     let trigger: SaveHistoryTrigger
-}
-
-private struct StorageIdentifier: Hashable, Sendable {
-    let rawValue: String
-
-    init(validating rawValue: String) throws {
-        let normalized = rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        guard !normalized.isEmpty else {
-            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
-        }
-        guard normalized.unicodeScalars.allSatisfy(StorageIdentifier.isAllowedScalar(_:)) else {
-            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
-        }
-        self.rawValue = normalized
-    }
-
-    init(unchecked rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    private static func isAllowedScalar(_ scalar: UnicodeScalar) -> Bool {
-        switch scalar.value {
-        case 45, 48...57, 97...122:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-private struct RelativeProjectFolderPath: Sendable {
-    let components: [String]
-
-    init(validating rawValue: String?) throws {
-        let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty else {
-            self.components = []
-            return
-        }
-        guard !trimmed.hasPrefix("/") else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-
-        let components = trimmed
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .map(String.init)
-        guard !components.isEmpty else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-        guard components.allSatisfy({ $0 != "." && $0 != ".." }) else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-        self.components = components
-    }
-
-    func appending(to rootDirectory: URL) -> URL {
-        components.reduce(rootDirectory) { partialResult, component in
-            partialResult.appendingPathComponent(component, isDirectory: true)
-        }
-    }
-}
-
-private enum DocumentWorkspaceError: LocalizedError {
-    case invalidIdentifier(String)
-    case invalidRelativeFolderPath(String)
-    case missingProjectDirectory(String, URL)
-    case invalidProjectDirectory(String, URL)
-    case destinationAlreadyExists(URL)
-
-    var errorDescription: String? {
-        switch self {
-        case let .invalidIdentifier(value):
-            return "Invalid workspace identifier: \(value)"
-        case let .invalidRelativeFolderPath(value):
-            return "Invalid destination folder path: \(value)"
-        case let .missingProjectDirectory(label, url):
-            return "Missing \(label) at \(url.lastPathComponent)"
-        case let .invalidProjectDirectory(label, url):
-            return "Invalid \(label) at \(url.lastPathComponent)"
-        case let .destinationAlreadyExists(url):
-            return "A project already exists at \(url.lastPathComponent)"
-        }
-    }
 }

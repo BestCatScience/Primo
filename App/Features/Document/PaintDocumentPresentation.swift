@@ -1,16 +1,123 @@
 import CoreGraphics
 import Foundation
 
+struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
+    let fileURL: URL
+
+    init(_ fileURL: URL) {
+        self.fileURL = fileURL.standardizedFileURL
+    }
+
+    var id: URL { fileURL }
+    var displayName: String { fileURL.deletingPathExtension().lastPathComponent }
+    var path: String { fileURL.path }
+}
+
+struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
+    let rawValue: String
+
+    init(validating rawValue: String) throws {
+        let normalized = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalized.isEmpty else {
+            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
+        }
+        guard normalized.unicodeScalars.allSatisfy(WorkspaceItemID.isAllowedScalar(_:)) else {
+            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
+        }
+        self.rawValue = normalized
+    }
+
+    init(unchecked rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    var id: String { rawValue }
+
+    private static func isAllowedScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 45, 48...57, 97...122:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
+    let components: [String]
+
+    init(components: [String]) {
+        self.components = components
+    }
+
+    init(validating rawValue: String?) throws {
+        let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else {
+            self.components = []
+            return
+        }
+        guard !trimmed.hasPrefix("/") else {
+            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
+        }
+
+        let components = trimmed
+            .split(separator: "/", omittingEmptySubsequences: true)
+            .map(String.init)
+        guard !components.isEmpty else {
+            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
+        }
+        guard components.allSatisfy({ $0 != "." && $0 != ".." }) else {
+            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
+        }
+        self.components = components
+    }
+
+    var rawValue: String {
+        components.joined(separator: "/")
+    }
+
+    func appending(to rootDirectory: URL) -> URL {
+        components.reduce(rootDirectory) { partialResult, component in
+            partialResult.appendingPathComponent(component, isDirectory: true)
+        }
+    }
+}
+
+enum DocumentWorkspaceError: LocalizedError {
+    case invalidIdentifier(String)
+    case invalidRelativeFolderPath(String)
+    case missingProjectDirectory(String, URL)
+    case invalidProjectDirectory(String, URL)
+    case destinationAlreadyExists(URL)
+
+    var errorDescription: String? {
+        switch self {
+        case let .invalidIdentifier(value):
+            return "Invalid workspace identifier: \(value)"
+        case let .invalidRelativeFolderPath(value):
+            return "Invalid destination folder path: \(value)"
+        case let .missingProjectDirectory(label, url):
+            return "Missing \(label) at \(url.lastPathComponent)"
+        case let .invalidProjectDirectory(label, url):
+            return "Invalid \(label) at \(url.lastPathComponent)"
+        case let .destinationAlreadyExists(url):
+            return "A project already exists at \(url.lastPathComponent)"
+        }
+    }
+}
+
 struct SavedProjectSummary: Equatable, Sendable, Identifiable {
-    let url: URL
+    let url: DocumentProjectPath
     let name: String
-    let relativeFolderPath: String?
+    let relativeFolderPath: RelativeProjectFolderPath?
     let modifiedAt: Date
     let canvasSize: CGSize
     let layerCount: Int
     let previewImageData: Data?
 
-    var id: URL { url }
+    var id: DocumentProjectPath { url }
 }
 
 struct PaintDocumentPresentation: Equatable, Sendable {
@@ -39,8 +146,8 @@ enum WorkspaceLayoutMode: Equatable, Sendable {
 struct OpenDocumentTab: Equatable, Sendable, Identifiable {
     let id: UUID
     var title: String
-    var backingStoreURL: URL
-    var sourceProjectURL: URL?
+    var backingStoreURL: DocumentProjectPath
+    var sourceProjectURL: DocumentProjectPath?
     var canvasSize: CGSize
     var isDirty: Bool
     var pane: WorkspacePane
@@ -48,10 +155,10 @@ struct OpenDocumentTab: Equatable, Sendable, Identifiable {
 }
 
 struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
-    let id: String
+    let id: WorkspaceItemID
     let title: String
-    let sourceProjectURL: URL?
-    let autosaveProjectURL: URL
+    let sourceProjectURL: DocumentProjectPath?
+    let autosaveProjectURL: DocumentProjectPath
     let updatedAt: Date
     let previewImageData: Data?
 }
@@ -74,9 +181,9 @@ enum SaveHistoryTrigger: String, Codable, Equatable, Sendable {
 }
 
 struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
-    let id: String
+    let id: WorkspaceItemID
     let title: String
-    let projectURL: URL
+    let projectURL: DocumentProjectPath
     let createdAt: Date
     let trigger: SaveHistoryTrigger
     let previewImageData: Data?

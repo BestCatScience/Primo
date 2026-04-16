@@ -24,7 +24,7 @@ extension AppFeature {
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
         guard let activeTab = state.activeTab else { return false }
         do {
-            try paintDocumentClient.saveProject(activeTab.backingStoreURL, state.resolvedPaperStyle())
+            try paintDocumentClient.saveProject(activeTab.backingStoreURL.fileURL, state.resolvedPaperStyle())
             state.updateActiveTabMetadata(
                 previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
             )
@@ -37,8 +37,8 @@ extension AppFeature {
 
     func persistActiveProjectToWorkspace(
         state: inout State,
-        preferredDestinationURL: URL?
-    ) -> URL? {
+        preferredDestinationURL: DocumentProjectPath?
+    ) -> DocumentProjectPath? {
         guard let activeTab = state.activeTab else { return nil }
         guard persistActiveTabToBackingStore(state: &state) else { return nil }
 
@@ -49,7 +49,7 @@ extension AppFeature {
             )
             let previousTab = activeTab
             state.updateActiveTabMetadata(
-                title: savedURL.deletingPathExtension().lastPathComponent,
+                title: savedURL.displayName,
                 sourceProjectURL: savedURL,
                 previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
             )
@@ -68,7 +68,7 @@ extension AppFeature {
     func activateNewTab(
         state: inout State,
         title: String,
-        sourceProjectURL: URL?
+        sourceProjectURL: DocumentProjectPath?
     ) {
         let tabID = workspaceUUIDClient.generate()
         guard let backingStoreURL = try? workspaceClient.createTabBackingStoreURL(tabID) else {
@@ -186,11 +186,11 @@ extension AppFeature {
                 previousTab.sourceProjectURL
             )
             state.openTabs[tabIndex].sourceProjectURL = destinationURL
-            state.openTabs[tabIndex].title = destinationURL.deletingPathExtension().lastPathComponent
+            state.openTabs[tabIndex].title = destinationURL.displayName
             state.openTabs[tabIndex].isDirty = false
             if tabID == state.activeTabID {
                 state.updateActiveTabMetadata(
-                    title: destinationURL.deletingPathExtension().lastPathComponent,
+                    title: destinationURL.displayName,
                     sourceProjectURL: destinationURL,
                     previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
                 )

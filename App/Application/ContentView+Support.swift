@@ -267,8 +267,8 @@ struct BannerToast: View {
 struct AutosaveRecoverySheet: View {
     let items: [AutosaveRecoveryItem]
     let language: AppLanguage
-    let onRestore: (String) -> Void
-    let onDiscard: (String) -> Void
+    let onRestore: (WorkspaceItemID) -> Void
+    let onDiscard: (WorkspaceItemID) -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -346,8 +346,8 @@ struct SaveHistorySheet: View {
     let title: String
     let entries: [SaveHistoryEntry]
     let language: AppLanguage
-    let onRestoreCurrent: (URL) -> Void
-    let onOpenNewTab: (URL) -> Void
+    let onRestoreCurrent: (DocumentProjectPath) -> Void
+    let onOpenNewTab: (DocumentProjectPath) -> Void
     let onClose: () -> Void
 
     var body: some View {

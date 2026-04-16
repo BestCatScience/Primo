@@ -168,9 +168,8 @@ struct AppFeature {
             openTabs.contains(where: { $0.pane == pane })
         }
 
-        func tabID(forSourceProjectURL sourceProjectURL: URL) -> OpenDocumentTab.ID? {
-            let normalizedURL = sourceProjectURL.standardizedFileURL
-            return openTabs.first { $0.sourceProjectURL?.standardizedFileURL == normalizedURL }?.id
+        func tabID(forSourceProjectURL sourceProjectURL: DocumentProjectPath) -> OpenDocumentTab.ID? {
+            openTabs.first { $0.sourceProjectURL == sourceProjectURL }?.id
         }
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
@@ -223,7 +222,11 @@ struct AppFeature {
             syncTextEditorWithActiveLayer()
         }
 
-        mutating func updateActiveTabMetadata(title: String? = nil, sourceProjectURL: URL? = nil, previewImageData: Data? = nil) {
+        mutating func updateActiveTabMetadata(
+            title: String? = nil,
+            sourceProjectURL: DocumentProjectPath? = nil,
+            previewImageData: Data? = nil
+        ) {
             guard let activeTabIndex else { return }
             if let title {
                 openTabs[activeTabIndex].title = title
@@ -560,9 +563,9 @@ struct AppFeature {
         case homeProjectsLoaded([SavedProjectSummary])
         case autosaveRecoveryLoadRequested
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
-        case autosaveRecoveryRestoreRequested(String)
+        case autosaveRecoveryRestoreRequested(WorkspaceItemID)
         case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem)
-        case autosaveRecoveryDiscardRequested(String)
+        case autosaveRecoveryDiscardRequested(WorkspaceItemID)
         case autosaveRecoveryDismissed
         case homeSectionSelected(HomeSidebarSection)
         case tabSelected(OpenDocumentTab.ID)
@@ -581,8 +584,8 @@ struct AppFeature {
         case splitActiveTabIntoSecondaryPane
         case mergeWorkspacePanes
         case workspacePaneActivated(WorkspacePane)
-        case homeProjectSelected(URL)
-        case moveSavedProject(URL, String?)
+        case homeProjectSelected(DocumentProjectPath)
+        case moveSavedProject(DocumentProjectPath, RelativeProjectFolderPath?)
         case homeReturnRequested
         case deferredPresentationRefresh
         case refreshPresentationRequested
@@ -592,8 +595,8 @@ struct AppFeature {
         case saveHistoryRequested
         case saveHistoryLoaded([SaveHistoryEntry])
         case saveHistoryDismissed
-        case saveHistoryRestoreRequested(URL, Bool)
-        case saveHistoryOpened(LoadedPaintProject, URL, Bool)
+        case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
+        case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool)
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
         case saveDocumentRequested
@@ -608,8 +611,8 @@ struct AppFeature {
         case nanoBananaPreviewDiscarded
         case nanoBananaRegenerateRequested
         case nanoBananaRetryJob(UUID)
-        case openDocumentSelected(URL)
-        case openDocumentLoaded(LoadedPaintProject, URL)
+        case openDocumentSelected(DocumentProjectPath)
+        case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath)
         case openDocumentFailed(String)
         case photoImportReceived(name: String?, data: Data)
         case photoImportFailed(String)
@@ -755,7 +758,7 @@ struct AppFeature {
                 state.isShowingAutosaveRecovery = false
                 return .run { [paintDocumentClient] send in
                     do {
-                        let loaded = try paintDocumentClient.loadProject(item.autosaveProjectURL)
+                        let loaded = try paintDocumentClient.loadProject(item.autosaveProjectURL.fileURL)
                         await send(.autosaveRecoveryOpened(loaded, item))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
@@ -802,7 +805,7 @@ struct AppFeature {
                     _ = persistActiveTabToBackingStore(state: &state)
                 }
                 do {
-                    let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL)
+                    let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL.fileURL)
                     state.activeTabID = tabID
                     state.setSelectedTabID(tabID, for: targetTab.pane)
                     state.focusedWorkspacePane = targetTab.pane
@@ -859,7 +862,7 @@ struct AppFeature {
                         ?? state.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
                     if let replacement {
                         do {
-                            let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL)
+                            let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL.fileURL)
                             state.activeTabID = replacement.id
                             state.focusedWorkspacePane = replacement.pane
                             state.applyLoadedProject(loaded)
@@ -948,7 +951,7 @@ struct AppFeature {
             case let .moveSavedProject(url, relativeFolderPath):
                 do {
                     let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
-                    if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL?.standardizedFileURL == url.standardizedFileURL }) {
+                    if let openTabIndex = state.openTabs.firstIndex(where: { $0.sourceProjectURL == url }) {
                         state.openTabs[openTabIndex].sourceProjectURL = destinationURL
                     }
                     return .send(.homeProjectsLoadRequested)
@@ -1543,7 +1546,7 @@ struct AppFeature {
                 state.isHydrating = true
                 return .run { [paintDocumentClient, documentWorkspaceClient] send in
                     do {
-                        let loaded = try paintDocumentClient.loadProject(url)
+                        let loaded = try paintDocumentClient.loadProject(url.fileURL)
                         await send(.openDocumentLoaded(loaded, url))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
@@ -1563,7 +1566,7 @@ struct AppFeature {
                 state.isHydrating = true
                 return .run { [paintDocumentClient] send in
                     do {
-                        let loaded = try paintDocumentClient.loadProject(url)
+                        let loaded = try paintDocumentClient.loadProject(url.fileURL)
                         await send(.openDocumentLoaded(loaded, url))
                     } catch {
                         await send(.openDocumentFailed(error.localizedDescription))
@@ -1578,7 +1581,7 @@ struct AppFeature {
                     return .send(.tabSelected(existingTabID))
                 }
                 state.applyLoadedProject(loaded)
-                let title = sourceURL.deletingPathExtension().lastPathComponent
+                let title = sourceURL.displayName
                 activateNewTab(
                     state: &state,
                     title: title,

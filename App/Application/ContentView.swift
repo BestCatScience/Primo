@@ -211,7 +211,7 @@ struct ContentView: View {
         ) { result in
             guard case let .success(urls) = result, let sourceURL = urls.first else { return }
             guard let stagedURL = stageImportedDocument(from: sourceURL) else { return }
-            store.send(.openDocumentSelected(stagedURL))
+            store.send(.openDocumentSelected(DocumentProjectPath(stagedURL)))
         }
         .photosPicker(
             isPresented: $showsPhotoLayerImporter,

@@ -15,10 +15,10 @@ extension AppFeature {
             }
         }
 
-        func restoreSaveHistoryEffect(projectURL: URL, openInNewTab: Bool) -> Effect<Action> {
+        func restoreSaveHistoryEffect(projectURL: DocumentProjectPath, openInNewTab: Bool) -> Effect<Action> {
             .run { [paintDocumentClient] send in
                 do {
-                    let loaded = try paintDocumentClient.loadProject(projectURL)
+                    let loaded = try paintDocumentClient.loadProject(projectURL.fileURL)
                     await send(.saveHistoryOpened(loaded, projectURL, openInNewTab))
                 } catch {
                     await send(.openDocumentFailed(error.localizedDescription))
@@ -69,7 +69,7 @@ extension AppFeature {
 
     func handleSaveHistoryRestoreRequest(
         state: inout State,
-        projectURL: URL,
+        projectURL: DocumentProjectPath,
         openInNewTab: Bool
     ) -> Effect<Action> {
         if !state.showsHome {
@@ -85,10 +85,10 @@ extension AppFeature {
     func handleSaveHistoryOpened(
         state: inout State,
         loaded: LoadedPaintProject,
-        projectURL: URL,
+        projectURL: DocumentProjectPath,
         openInNewTab: Bool
     ) {
-        let restoredTitle = projectURL.deletingPathExtension().lastPathComponent
+        let restoredTitle = projectURL.displayName
         if openInNewTab || state.activeTab == nil {
             state.applyLoadedProject(loaded)
             activateNewTab(
@@ -117,7 +117,7 @@ extension AppFeature {
 
     func handleSaveDocumentRequest(
         state: inout State,
-        preferredDestinationURL: URL?
+        preferredDestinationURL: DocumentProjectPath?
     ) -> Effect<Action> {
         guard let savedURL = persistActiveProjectToWorkspace(
             state: &state,
@@ -125,7 +125,7 @@ extension AppFeature {
         ) else {
             return .none
         }
-        state.bannerMessage = StudioStrings.savedDocument(savedURL.lastPathComponent, state.appLanguage)
+        state.bannerMessage = StudioStrings.savedDocument(savedURL.fileURL.lastPathComponent, state.appLanguage)
         if let activeTab = state.activeTab {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
