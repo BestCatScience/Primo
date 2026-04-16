@@ -12,7 +12,7 @@ struct ShareExport: Equatable, Identifiable {
     let id: UUID
     let url: URL
 
-    init(id: UUID = UUIDClient.live.generate(), url: URL) {
+    init(id: UUID, url: URL) {
         self.id = id
         self.url = url
     }
@@ -78,7 +78,7 @@ struct PendingCloseConfirmationState: Equatable {
 
 @Reducer
 struct AppFeature {
-    private static let startupLogger = Logger(subsystem: "com.primo.app", category: "Startup")
+    static let startupLogger = Logger(subsystem: "com.primo.app", category: "Startup")
 
     enum CancelID {
         case deferredPresentationRefresh
@@ -115,7 +115,7 @@ struct AppFeature {
         var pendingNanoBananaRequest: NanoBananaGenerationRequest?
         var activeNanoBananaJobID: UUID?
         var pendingNanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
-        var appLanguage: AppLanguage = .load()
+        var appLanguage: AppLanguage = .japanese
         var pendingCloseConfirmation: PendingCloseConfirmationState?
         var autosaveRecoveryItems: [AutosaveRecoveryItem] = []
         var isShowingAutosaveRecovery = false
@@ -138,38 +138,27 @@ struct AppFeature {
         }
 
         func selectedTabID(for pane: WorkspacePane) -> OpenDocumentTab.ID? {
-            switch pane {
-            case .primary:
-                return primarySelectedTabID
-            case .secondary:
-                return secondarySelectedTabID
-            }
+            AppFeature.stateCoordinator.selectedTabID(for: pane, in: self)
         }
 
         mutating func setSelectedTabID(_ tabID: OpenDocumentTab.ID?, for pane: WorkspacePane) {
-            switch pane {
-            case .primary:
-                primarySelectedTabID = tabID
-            case .secondary:
-                secondarySelectedTabID = tabID
-            }
+            AppFeature.stateCoordinator.setSelectedTabID(tabID, for: pane, in: &self)
         }
 
         func tabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
-            openTabs.filter { $0.pane == pane }
+            AppFeature.stateCoordinator.tabs(in: pane, state: self)
         }
 
         func selectedTab(in pane: WorkspacePane) -> OpenDocumentTab? {
-            guard let tabID = selectedTabID(for: pane) else { return nil }
-            return openTabs.first(where: { $0.id == tabID })
+            AppFeature.stateCoordinator.selectedTab(in: pane, state: self)
         }
 
         func hasTabs(in pane: WorkspacePane) -> Bool {
-            openTabs.contains(where: { $0.pane == pane })
+            AppFeature.stateCoordinator.hasTabs(in: pane, state: self)
         }
 
         func tabID(forSourceProjectURL sourceProjectURL: DocumentProjectPath) -> OpenDocumentTab.ID? {
-            openTabs.first { $0.sourceProjectURL == sourceProjectURL }?.id
+            AppFeature.stateCoordinator.tabID(forSourceProjectURL: sourceProjectURL, in: self)
         }
 
         mutating func applyPresentation(_ presentation: PaintDocumentPresentation) {
@@ -181,103 +170,28 @@ struct AppFeature {
             sourceProjectURL: DocumentProjectPath? = nil,
             previewImageData: Data? = nil
         ) {
-            guard let activeTabIndex else { return }
-            if let title {
-                openTabs[activeTabIndex].title = title
-            }
-            if let sourceProjectURL {
-                openTabs[activeTabIndex].sourceProjectURL = sourceProjectURL
-            }
-            if let previewImageData {
-                openTabs[activeTabIndex].previewImageData = previewImageData
-            }
-            openTabs[activeTabIndex].canvasSize = canvas.canvasSize
-        }
-
-        mutating func applyNanoBananaPreview(
-            _ preview: NanoBananaPreviewState,
-            paintDocumentClient: PaintDocumentClient
-        ) {
-            let targetLayerIndex: Int
-            switch preview.request.outputMode {
-            case .replaceCurrentLayer:
-                targetLayerIndex = preview.outputLayerIndex
-            case .newLayer:
-                paintDocumentClient.addLayer("Nano Banana \(layerSidebar.layers.count + 1)")
-                targetLayerIndex = paintDocumentClient.presentation().activeLayerIndex
-            }
-
-            paintDocumentClient.setActiveLayer(targetLayerIndex)
-            paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
-            if let bufferIndex = canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
-                canvas.layerBuffers[bufferIndex].strokes.removeAll()
-            }
-            canvas.selection = nil
-            nanoBananaPreview = nil
-            pendingNanoBananaRequest = preview.request
-            activeNanoBananaJobID = nil
-            pendingNanoBananaOutputMode = .replaceCurrentLayer
-            applyPresentation(paintDocumentClient.presentation())
-            bannerMessage = appLanguage.localized("Nano Banana edit applied")
+            AppFeature.stateCoordinator.updateActiveTabMetadata(
+                title: title,
+                sourceProjectURL: sourceProjectURL,
+                previewImageData: previewImageData,
+                in: &self
+            )
         }
 
         mutating func setActiveTabDirty(_ isDirty: Bool) {
-            guard let activeTabIndex else { return }
-            openTabs[activeTabIndex].isDirty = isDirty
+            AppFeature.stateCoordinator.setActiveTabDirty(isDirty, in: &self)
         }
 
         mutating func reorderTabs(moving movingID: OpenDocumentTab.ID, before targetID: OpenDocumentTab.ID) {
-            guard
-                let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }),
-                let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }),
-                sourceIndex != destinationIndex
-            else {
-                return
-            }
-            let tab = openTabs.remove(at: sourceIndex)
-            let adjustedDestination = sourceIndex < destinationIndex ? max(destinationIndex - 1, 0) : destinationIndex
-            openTabs.insert(tab, at: adjustedDestination)
+            AppFeature.stateCoordinator.reorderTabs(moving: movingID, before: targetID, in: &self)
         }
 
         mutating func moveTab(_ movingID: OpenDocumentTab.ID, to pane: WorkspacePane, before targetID: OpenDocumentTab.ID?) {
-            guard let sourceIndex = openTabs.firstIndex(where: { $0.id == movingID }) else { return }
-            let sourcePane = openTabs[sourceIndex].pane
-            var tab = openTabs.remove(at: sourceIndex)
-            tab.pane = pane
-
-            if let targetID, let destinationIndex = openTabs.firstIndex(where: { $0.id == targetID }) {
-                openTabs.insert(tab, at: destinationIndex)
-            } else {
-                openTabs.append(tab)
-            }
-
-            setSelectedTabID(tab.id, for: pane)
-            if selectedTabID(for: sourcePane) == movingID {
-                setSelectedTabID(tabs(in: sourcePane).first?.id, for: sourcePane)
-            }
-            if activeTabID == movingID {
-                focusedWorkspacePane = pane
-            }
-            workspaceLayout = hasTabs(in: .secondary) ? .split : .single
+            AppFeature.stateCoordinator.moveTab(movingID, to: pane, before: targetID, in: &self)
         }
 
         mutating func ensureWorkspaceSelectionIntegrity() {
-            if primarySelectedTabID != nil, openTabs.contains(where: { $0.id == primarySelectedTabID && $0.pane == .primary }) == false {
-                primarySelectedTabID = tabs(in: .primary).first?.id
-            }
-            if secondarySelectedTabID != nil, openTabs.contains(where: { $0.id == secondarySelectedTabID && $0.pane == .secondary }) == false {
-                secondarySelectedTabID = tabs(in: .secondary).first?.id
-            }
-            if primarySelectedTabID == nil {
-                primarySelectedTabID = tabs(in: .primary).first?.id
-            }
-            if !hasTabs(in: .secondary) {
-                secondarySelectedTabID = nil
-                workspaceLayout = .single
-                if focusedWorkspacePane == .secondary {
-                    focusedWorkspacePane = .primary
-                }
-            }
+            AppFeature.stateCoordinator.ensureWorkspaceSelectionIntegrity(state: &self)
         }
 
         mutating func applyLoadedProject(_ loaded: LoadedPaintProject) {
@@ -318,35 +232,23 @@ struct AppFeature {
         }
 
         func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
-            switch panel {
-            case .brush:
-                return brushPanel
-            case .layers:
-                return layerPanel
-            }
+            AppFeature.stateCoordinator.panelState(for: panel, in: self)
         }
 
         mutating func setPanelState(_ panelState: StudioPanelLayoutState, for panel: StudioPanelKind) {
-            switch panel {
-            case .brush:
-                brushPanel = panelState
-            case .layers:
-                layerPanel = panelState
-            }
+            AppFeature.stateCoordinator.setPanelState(panelState, for: panel, in: &self)
         }
 
         mutating func toggleCollapse(for panel: StudioPanelKind) {
-            var current = panelState(for: panel)
-            current.isCollapsed.toggle()
-            setPanelState(current, for: panel)
+            AppFeature.stateCoordinator.toggleCollapse(for: panel, in: &self)
         }
 
         mutating func syncToolSpecificBrushSize() {
-            brushPalette.brush.storeCurrentRadius(for: canvas.currentTool)
+            AppFeature.stateCoordinator.syncToolSpecificBrushSize(state: &self)
         }
 
         mutating func applyToolSpecificBrushSize(for tool: StudioToolKind) {
-            brushPalette.brush.applyStoredRadius(for: tool)
+            AppFeature.stateCoordinator.applyToolSpecificBrushSize(for: tool, state: &self)
         }
     }
 
@@ -477,28 +379,7 @@ struct AppFeature {
             Reduce { (state: inout State, action: Action) -> Effect<Action> in
                 switch action {
             case .task:
-                state.isHydrating = true
-                state.showsHome = true
-                state.isLoadingHomeProjects = true
-                state.appLanguage = .load()
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-                Self.startupLogger.debug("AppFeature.task started")
-                return .merge(
-                    .run { [paintDocumentClient] send in
-                        let startupClock = ContinuousClock()
-                        let bootstrapStart = startupClock.now
-
-                        Self.startupLogger.debug("Loading lightweight presentation")
-                        let lightweightPresentation = paintDocumentClient.lightweightPresentation()
-                        let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
-                        Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
-                        await send(.bootstrapPresentationLoaded(lightweightPresentation))
-                        paintDocumentClient.prewarmDrawingResources()
-                        await send(.loadPresentationAfterLaunch)
-                    },
-                    .send(.homeProjectsLoadRequested),
-                    .send(.autosaveRecoveryLoadRequested)
-                )
+                return handleTask(state: &state)
 
             case let .bootstrapPresentationLoaded(presentation):
                 state.applyPresentation(presentation)
@@ -507,29 +388,13 @@ struct AppFeature {
                 return .none
 
             case .loadPresentationAfterLaunch:
-                return .run { [paintDocumentClient] send in
-                    let clock = ContinuousClock()
-                    try? await Task.sleep(for: .milliseconds(600))
-
-                    let presentationStart = clock.now
-                    Self.startupLogger.debug("Loading full presentation after initial launch")
-                    let presentation = paintDocumentClient.presentation()
-                    let presentationDuration = presentationStart.duration(to: clock.now)
-                    Self.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
-                    await send(.presentationLoaded(presentation))
-                }
-                .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
+                return handleLoadPresentationAfterLaunch()
 
             case .homeProjectsLoadRequested:
-                state.isLoadingHomeProjects = true
-                return .run { [documentWorkspaceClient] send in
-                    let projects = (try? documentWorkspaceClient.loadSavedProjects()) ?? []
-                    await send(.homeProjectsLoaded(projects))
-                }
+                return handleHomeProjectsLoadRequest(state: &state)
 
             case let .homeProjectsLoaded(projects):
-                state.homeProjects = projects
-                state.isLoadingHomeProjects = false
+                handleHomeProjectsLoaded(state: &state, projects: projects)
                 return .none
 
             case .autosaveRecoveryLoadRequested:
@@ -650,20 +515,7 @@ struct AppFeature {
                 )
 
             case .homeReturnRequested:
-                if state.activeTab != nil {
-                    guard persistActiveProjectToWorkspace(
-                        state: &state,
-                        preferredDestinationURL: state.activeTab?.sourceProjectURL
-                    ) != nil else {
-                        return .none
-                    }
-                    if let activeTab = state.activeTab {
-                        persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
-                    }
-                }
-                state.showsHome = true
-                state.homeSection = .home
-                return .send(.homeProjectsLoadRequested)
+                return handleHomeReturnRequest(state: &state)
 
             case let .presentationLoaded(presentation):
                 guard !state.canvas.isStrokeActive else {
@@ -674,160 +526,40 @@ struct AppFeature {
                 return .none
 
             case .deferredPresentationRefresh:
-                return .run { [paintDocumentClient] send in
-                    await send(.presentationLoaded(paintDocumentClient.presentation()))
-                }
-                .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+                return handleDeferredPresentationRefresh()
 
             case .refreshPresentationRequested:
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-                applyDirtyPresentation(state: &state)
+                handleRefreshPresentationRequest(state: &state)
                 return .none
 
             case let .languageChanged(language):
-                state.appLanguage = language
-                language.persist()
+                handleLanguageChanged(state: &state, language: language)
                 return .none
 
             case let .newCanvasRequested(width, height):
-                if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
-                }
-                let width = max(width, 1)
-                let height = max(height, 1)
-                paintDocumentClient.newCanvas(width, height)
-                paintDocumentClient.prewarmDrawingResources()
-                state.showsHome = false
-                state.canvas = CanvasFeature.State()
-                state.canvas.canvasSize = CGSize(width: width, height: height)
-                state.layerSidebar = LayerSidebarFeature.State()
-                state.brushPalette = BrushPaletteFeature.State()
-                state.brushPanel = StudioPanelLayoutState()
-                state.layerPanel = StudioPanelLayoutState()
-                state.canvas.adjustmentPreviewPixelData = nil
-                state.exportSheet = nil
-                state.bannerMessage = nil
-                state.isHydrating = false
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-                state.applyPresentation(paintDocumentClient.presentation())
-                activateNewTab(
-                    state: &state,
-                    title: Self.nextUntitledTabTitle(existingTabs: state.openTabs),
-                    sourceProjectURL: nil
-                )
-                return .merge(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleNewCanvasRequest(state: &state, width: width, height: height)
 
             case let .resizeCanvasRequested(width, height):
-                let width = max(width, 1)
-                let height = max(height, 1)
-                let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
-                let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
-                guard width != currentWidth || height != currentHeight else {
-                    return .none
-                }
-                paintDocumentClient.resizeCanvas(width, height)
-                state.canvas.selection = nil
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                state.canvas.adjustmentPreviewPixelData = nil
-                applyDirtyPresentation(state: &state)
-                state.bannerMessage = state.appLanguage.localized("Image resolution updated")
+                handleResizeCanvasRequest(state: &state, width: width, height: height)
                 return .none
 
             case let .resizeCanvasExtentRequested(width, height):
-                let width = max(width, 1)
-                let height = max(height, 1)
-                let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
-                let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
-                guard width != currentWidth || height != currentHeight else {
-                    return .none
-                }
-                paintDocumentClient.resizeCanvasExtent(width, height)
-                state.canvas.selection = nil
-                state.canvas.selectionPreviewPoints = []
-                state.canvas.resetTransformPreview()
-                state.canvas.adjustmentPreviewPixelData = nil
-                applyDirtyPresentation(state: &state)
-                state.bannerMessage = state.appLanguage.localized("Canvas size updated")
+                handleResizeCanvasExtentRequest(state: &state, width: width, height: height)
                 return .none
 
             case let .newCanvasFromImageReceived(name, data):
-                if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
-                }
-                guard let importedImage = Self.importedCanvasImage(from: data) else {
-                    state.bannerMessage = state.appLanguage.localized("Could not create canvas from image")
-                    return .none
-                }
-                let width = importedImage.width
-                let height = importedImage.height
-                guard (64...8192).contains(width), (64...8192).contains(height) else {
-                    state.bannerMessage = state.appLanguage.localized("Image size is not supported")
-                    return .none
-                }
-
-                paintDocumentClient.newCanvas(width, height)
-                paintDocumentClient.prewarmDrawingResources()
-                state.showsHome = false
-                state.canvas = CanvasFeature.State()
-                state.canvas.canvasSize = CGSize(width: width, height: height)
-                state.layerSidebar = LayerSidebarFeature.State()
-                state.brushPalette = BrushPaletteFeature.State()
-                state.brushPanel = StudioPanelLayoutState()
-                state.layerPanel = StudioPanelLayoutState()
-                state.canvas.adjustmentPreviewPixelData = nil
-                state.exportSheet = nil
-                state.bannerMessage = nil
-                state.isHydrating = false
-                paintDocumentClient.setPaperStyle(state.resolvedPaperStyle())
-                paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
-                let nextName = {
-                    let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    return trimmed.isEmpty ? (state.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
-                }()
-                paintDocumentClient.setLayerName(0, nextName)
-                paintDocumentClient.setActiveLayer(0)
-                state.applyPresentation(paintDocumentClient.presentation())
-                activateNewTab(
-                    state: &state,
-                    title: nextName,
-                    sourceProjectURL: nil
-                )
-                state.bannerMessage = state.appLanguage.localized("Canvas created from image")
-                return .merge(
-                    .cancel(id: CancelID.startupPresentationLoad),
-                    .cancel(id: CancelID.deferredPresentationRefresh)
-                )
+                return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
 
             case let .newCanvasFromImageFailed(message):
                 state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Could not create canvas from image") : message
                 return .none
 
             case .undoRequested:
-                guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = state.appLanguage.localized("Undo is unavailable while drawing")
-                    return .none
-                }
-                guard paintDocumentClient.undo() else {
-                    return .none
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleUndoRequested(state: &state)
                 return .none
 
             case .redoRequested:
-                guard !state.canvas.isStrokeActive else {
-                    state.bannerMessage = state.appLanguage.localized("Redo is unavailable while drawing")
-                    return .none
-                }
-                guard paintDocumentClient.redo() else {
-                    return .none
-                }
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleRedoRequested(state: &state)
                 return .none
 
             case .saveHistoryRequested:
@@ -859,14 +591,11 @@ struct AppFeature {
                 return .none
 
             case let .gradientMapSelected(preset):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply gradient map")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .gradientMap(preset))
-                }
+                    request: .gradientMap(preset),
+                    failureMessage: state.appLanguage.localized("Could not apply gradient map")
+                )
                 return .none
 
             case let .gradientMapPreviewChanged(settings):
@@ -904,14 +633,11 @@ struct AppFeature {
                 return .none
 
             case let .hueSaturationBrightnessApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .hueSaturationBrightness(settings))
-                }
+                    request: .hueSaturationBrightness(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .brightnessContrastPreviewChanged(settings):
@@ -924,14 +650,11 @@ struct AppFeature {
                 return .none
 
             case let .brightnessContrastApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .brightnessContrast(settings))
-                }
+                    request: .brightnessContrast(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .levelsPreviewChanged(settings):
@@ -944,14 +667,11 @@ struct AppFeature {
                 return .none
 
             case let .levelsApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .levels(settings))
-                }
+                    request: .levels(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .toneCurvePreviewChanged(settings):
@@ -964,14 +684,11 @@ struct AppFeature {
                 return .none
 
             case let .toneCurveApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .toneCurve(settings))
-                }
+                    request: .toneCurve(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .colorBalancePreviewChanged(settings):
@@ -984,14 +701,11 @@ struct AppFeature {
                 return .none
 
             case let .colorBalanceApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .colorBalance(settings))
-                }
+                    request: .colorBalance(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .thresholdPreviewChanged(settings):
@@ -1004,14 +718,11 @@ struct AppFeature {
                 return .none
 
             case let .thresholdApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .threshold(settings))
-                }
+                    request: .threshold(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case let .posterizePreviewChanged(settings):
@@ -1024,14 +735,11 @@ struct AppFeature {
                 return .none
 
             case let .posterizeApplied(settings):
-                let activeLayerIndex = state.canvas.activeLayerIndex
-                let failureMessage = state.appLanguage.localized("Could not apply color adjustment")
-                _ = handleAdjustmentApplyUsingProcessing(
+                _ = handleAdjustmentApplyRequest(
                     state: &state,
-                    failureMessage: failureMessage
-                ) {
-                    paintDocumentClient.applyLayerProcessing(activeLayerIndex, .posterize(settings))
-                }
+                    request: .posterize(settings),
+                    failureMessage: state.appLanguage.localized("Could not apply color adjustment")
+                )
                 return .none
 
             case .luminanceToAlphaRequested:
@@ -1046,16 +754,7 @@ struct AppFeature {
                 return .none
 
             case .exportDocumentRequested:
-                guard let pngData = paintDocumentClient.compositePNGData(state.resolvedPaperStyle()) else {
-                    state.bannerMessage = state.appLanguage.localized("Export failed")
-                    return .none
-                }
-                do {
-                    let url = try documentWorkspaceClient.writePNGToTemporaryDirectory(pngData)
-                    state.exportSheet = ShareExport(url: url)
-                } catch {
-                    state.bannerMessage = state.appLanguage.localized("Export failed")
-                }
+                handleExportDocumentRequest(state: &state)
                 return .none
 
             case .saveDocumentRequested:
@@ -1088,8 +787,7 @@ struct AppFeature {
                 return handleNanoBananaCancelRequested(state: &state)
 
             case .nanoBananaPreviewAccepted:
-                guard let preview = state.nanoBananaPreview else { return .none }
-                state.applyNanoBananaPreview(preview, paintDocumentClient: paintDocumentClient)
+                handleNanoBananaPreviewAccepted(state: &state)
                 return .none
 
             case .nanoBananaPreviewDiscarded:
@@ -1112,7 +810,7 @@ struct AppFeature {
 
             case let .timelapseExportSucceeded(url):
                 state.timelapseExportPreview = nil
-                state.exportSheet = ShareExport(url: url)
+                state.exportSheet = makeShareExport(url: url)
                 return .none
 
             case let .timelapseExportFailed(message):
@@ -1256,13 +954,11 @@ struct AppFeature {
                 return .none
 
             case .layerSidebar(.binding(\.paperColor)):
-                state.brushPalette.paper.color = state.layerSidebar.paperColor
-                handlePaperBindingSync(state: &state)
+                handlePaperColorBindingChanged(state: &state)
                 return .none
 
             case .layerSidebar(.binding(\.transparentPaper)):
-                state.brushPalette.paper.isTransparent = state.layerSidebar.transparentPaper
-                handlePaperBindingSync(state: &state)
+                handleTransparentPaperBindingChanged(state: &state)
                 return .none
 
             case .layerSidebar(.delegate(.addLayer)):
@@ -1274,132 +970,75 @@ struct AppFeature {
                 return .none
 
             case let .layerSidebar(.delegate(.deleteFolder(folderID))):
-                handleLayerMutation(state: &state) {
-                    layerWorkflowService.paintDocumentClient.deleteFolder(folderID)
-                }
+                handleFolderDeletion(state: &state, folderID: folderID)
                 return .none
 
             case let .layerSidebar(.delegate(.deleteLayer(index))):
-                handleLayerMutation(state: &state, clearsSelection: true) {
-                    layerWorkflowService.paintDocumentClient.deleteLayer(index)
-                }
+                handleLayerDeletion(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.duplicateLayer(index))):
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
-                    return .none
-                }
-                let duplicateName = state.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
-                handleLayerMutation(state: &state, clearsSelection: true) {
-                    layerWorkflowService.paintDocumentClient.duplicateLayer(index, duplicateName) >= 0
-                }
+                handleLayerDuplication(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
-                handleLayerMutation(state: &state, clearsSelection: true) {
-                    layerWorkflowService.paintDocumentClient.moveLayer(index, destinationIndex)
-                }
+                handleLayerMove(state: &state, index: index, destinationIndex: destinationIndex)
                 return .none
 
             case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
-                handleLayerMutation(state: &state) {
-                    layerWorkflowService.paintDocumentClient.assignLayerToFolder(index, folderID)
-                }
+                handleLayerFolderAssignment(state: &state, index: index, folderID: folderID)
                 return .none
 
             case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
-                handleLayerMutation(state: &state) {
-                    layerWorkflowService.paintDocumentClient.assignLayerToFolder(index, -1)
-                }
+                handleLayerFolderAssignment(state: &state, index: index, folderID: -1)
                 return .none
 
             case let .layerSidebar(.delegate(.setOpacity(index, opacity))):
-                layerWorkflowService.paintDocumentClient.setLayerOpacity(index, opacity)
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleLayerOpacityChange(state: &state, index: index, opacity: opacity)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleLayerLock(index))):
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
-                    return .none
-                }
-                layerWorkflowService.paintDocumentClient.setLayerLocked(index, !layer.isLocked)
-                applyDirtyPresentation(state: &state)
+                handleLayerLockToggle(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleAlphaLock(index))):
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
-                    return .none
-                }
-                layerWorkflowService.paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
-                applyDirtyPresentation(state: &state)
+                handleLayerAlphaLockToggle(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleClippingMask(index))):
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
-                    return .none
-                }
-                guard layer.isClipped || index > 0 else {
-                    return .none
-                }
-                layerWorkflowService.paintDocumentClient.setLayerClipped(index, !layer.isClipped)
-                applyDirtyPresentation(state: &state)
+                handleLayerClippingToggle(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.mergeDown(index))):
-                handleLayerMutation(state: &state, clearsSelection: true) {
-                    layerWorkflowService.paintDocumentClient.mergeLayerDown(index)
-                }
+                handleLayerMergeDown(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.selectLayer(index))):
-                layerWorkflowService.paintDocumentClient.setActiveLayer(index)
-                state.canvas.activeLayerIndex = index
-                state.canvas.selection = nil
-                state.applyPresentation(paintDocumentClient.presentation())
+                handleLayerSelection(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleVisibility(index))):
-                guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
-                    return .none
-                }
-                layerWorkflowService.paintDocumentClient.setLayerVisibility(index, !layer.visible)
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleLayerVisibilityToggle(state: &state, index: index)
                 return .none
 
             case let .layerSidebar(.delegate(.setFolderExpanded(folderID, isExpanded))):
-                layerWorkflowService.paintDocumentClient.setFolderExpanded(folderID, isExpanded)
-                state.applyPresentation(paintDocumentClient.presentation())
+                handleFolderExpandedChange(state: &state, folderID: folderID, isExpanded: isExpanded)
                 return .none
 
             case let .layerSidebar(.delegate(.toggleFolderVisibility(folderID))):
-                guard let folder = state.layerSidebar.rows.compactMap({ row -> LayerFolderModel? in
-                    if case let .folder(folder) = row, folder.id == folderID {
-                        return folder
-                    }
-                    return nil
-                }).first else {
-                    return .none
-                }
-                layerWorkflowService.paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
-                applyDirtyPresentation(state: &state)
+                handleFolderVisibilityToggle(state: &state, folderID: folderID)
                 return .none
 
             case let .layerSidebar(.delegate(.renameFolder(folderID, name))):
-                layerWorkflowService.paintDocumentClient.setFolderName(folderID, name)
-                applyDirtyPresentation(state: &state)
+                handleFolderRename(state: &state, folderID: folderID, name: name)
                 return .none
 
             case let .layerSidebar(.delegate(.setBlendMode(index, blendMode))):
-                layerWorkflowService.paintDocumentClient.setLayerBlendMode(index, blendMode)
-                state.canvas.selection = nil
-                applyDirtyPresentation(state: &state)
+                handleLayerBlendModeChange(state: &state, index: index, blendMode: blendMode)
                 return .none
 
             case let .layerSidebar(.delegate(.renameLayer(index, name))):
-                layerWorkflowService.paintDocumentClient.setLayerName(index, name)
-                applyDirtyPresentation(state: &state)
+                handleLayerRename(state: &state, index: index, name: name)
                 return .none
 
             case let .canvas(.delegate(.beginStroke(sample))):
@@ -1446,35 +1085,10 @@ struct AppFeature {
                 return handleFill(state: &state, sample: sample)
 
             case let .canvas(.delegate(.lassoSelect(points))):
-                let incomingSelection = Self.makeLassoSelection(
-                    from: points,
-                    canvasSize: state.canvas.canvasSize
-                )
-                let selection = Self.combinedSelection(
-                    existing: state.canvas.selection,
-                    incoming: incomingSelection,
-                    mode: state.brushPalette.selection.combineMode,
-                    canvasSize: state.canvas.canvasSize
-                )
-                return .send(.canvas(.selectionUpdated(selection)))
+                return handleLassoSelection(state: &state, points: points)
 
             case let .canvas(.delegate(.autoSelect(sample))):
-                let incomingSelection = Self.makeAutoSelection(
-                    at: sample.point,
-                    snapshot: state.canvas.renderSnapshot,
-                    layerIndex: state.canvas.activeLayerIndex,
-                    thresholdMode: state.brushPalette.selection.thresholdMode,
-                    opacityTolerance: state.brushPalette.selection.opacityTolerance,
-                    colorTolerance: state.brushPalette.selection.colorTolerance,
-                    expansion: Int(state.brushPalette.selection.expansion.rounded())
-                )
-                let selection = Self.combinedSelection(
-                    existing: state.canvas.selection,
-                    incoming: incomingSelection,
-                    mode: state.brushPalette.selection.combineMode,
-                    canvasSize: state.canvas.canvasSize
-                )
-                return .send(.canvas(.selectionUpdated(selection)))
+                return handleAutoSelection(state: &state, sample: sample)
 
             case .canvas(.delegate(.requestUndo)):
                 return .send(.undoRequested)
@@ -1487,13 +1101,7 @@ struct AppFeature {
                 return .none
 
             case let .canvas(.colorSampled(sampledColor)):
-                let sampled = Self.color(from: sampledColor)
-                if state.brushPalette.brush.selectedColorSlot == .transparent {
-                    state.brushPalette.brush.selectedColorSlot = .primary
-                }
-                state.brushPalette.brush.setSelectedSlotColor(sampled)
-                state.brushPalette.library.selectedBrush = nil
-                state.canvas.previewStyle = state.previewStrokeStyle()
+                handleColorSampled(state: &state, sampledColor: sampledColor)
                 return .none
 
                 case .layerSidebar, .canvas:

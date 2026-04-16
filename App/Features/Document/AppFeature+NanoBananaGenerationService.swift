@@ -242,7 +242,35 @@ extension AppFeature {
                 state.nanoBananaJobs[jobIndex].status = .succeeded
                 state.nanoBananaJobs[jobIndex].message = nil
             }
-            state.applyNanoBananaPreview(preview, paintDocumentClient: paintDocumentClient)
+            applyPreview(state: &state, preview: preview, paintDocumentClient: paintDocumentClient)
+        }
+
+        func applyPreview(
+            state: inout State,
+            preview: NanoBananaPreviewState,
+            paintDocumentClient: PaintDocumentClient
+        ) {
+            let targetLayerIndex: Int
+            switch preview.request.outputMode {
+            case .replaceCurrentLayer:
+                targetLayerIndex = preview.outputLayerIndex
+            case .newLayer:
+                paintDocumentClient.addLayer("Nano Banana \(state.layerSidebar.layers.count + 1)")
+                targetLayerIndex = paintDocumentClient.presentation().activeLayerIndex
+            }
+
+            paintDocumentClient.setActiveLayer(targetLayerIndex)
+            paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
+            if let bufferIndex = state.canvas.layerBuffers.firstIndex(where: { $0.index == targetLayerIndex }) {
+                state.canvas.layerBuffers[bufferIndex].strokes.removeAll()
+            }
+            state.canvas.selection = nil
+            state.nanoBananaPreview = nil
+            state.pendingNanoBananaRequest = preview.request
+            state.activeNanoBananaJobID = nil
+            state.pendingNanoBananaOutputMode = .replaceCurrentLayer
+            state.applyPresentation(paintDocumentClient.presentation())
+            state.bannerMessage = state.appLanguage.localized("Nano Banana edit applied")
         }
 
         func applyFailure(state: inout State, message: String) {
@@ -307,5 +335,14 @@ extension AppFeature {
 
     func handleNanoBananaCancelRequested(state: inout State) -> Effect<Action> {
         nanoBananaGenerationService.cancel(state: &state)
+    }
+
+    func handleNanoBananaPreviewAccepted(state: inout State) {
+        guard let preview = state.nanoBananaPreview else { return }
+        nanoBananaGenerationService.applyPreview(
+            state: &state,
+            preview: preview,
+            paintDocumentClient: paintDocumentClient
+        )
     }
 }
