@@ -66,6 +66,8 @@
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
 		A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CD /* PaintDocumentSessionState.swift */; };
 		A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CF /* PaintDocumentSessionServices.swift */; };
+		A000000000000000000000D0 /* AppFeature+DocumentWorkflowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */; };
+		A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -132,6 +134,8 @@
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
 		A000000000000000000000CD /* PaintDocumentSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionState.swift; sourceTree = "<group>"; };
 		A000000000000000000000CF /* PaintDocumentSessionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionServices.swift; sourceTree = "<group>"; };
+		A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentWorkflowCoordinator.swift"; sourceTree = "<group>"; };
+		A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+NanoBananaGenerationService.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -310,6 +314,8 @@
 				A000000000000000000000A5 /* AppFeature+PureImageOps.swift */,
 				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
 				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
+				A000000000000000000000D1 /* AppFeature+DocumentWorkflowCoordinator.swift */,
+				A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000017 /* PaintDocumentSession.swift */,
@@ -419,6 +425,8 @@
 				A000000000000000000000A4 /* AppFeature+PureImageOps.swift in Sources */,
 				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
 				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
+				A000000000000000000000D0 /* AppFeature+DocumentWorkflowCoordinator.swift in Sources */,
+				A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,
 				A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */,

@@ -80,7 +80,7 @@ struct PendingCloseConfirmationState: Equatable {
 struct AppFeature {
     private static let startupLogger = Logger(subsystem: "com.primo.app", category: "Startup")
 
-    private enum CancelID {
+    enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
         case timelapseExport
@@ -723,7 +723,7 @@ struct AppFeature {
 
             case .homeProjectsLoadRequested:
                 state.isLoadingHomeProjects = true
-                return .run { [documentWorkspaceClient, fileClient, dateClient] send in
+                return .run { [documentWorkspaceClient] send in
                     let projects = (try? documentWorkspaceClient.loadSavedProjects()) ?? []
                     await send(.homeProjectsLoaded(projects))
                 }
@@ -1139,12 +1139,7 @@ struct AppFeature {
                 return .none
 
             case .saveHistoryRequested:
-                guard let activeTab = state.activeTab else { return .none }
-                state.isShowingSaveHistory = true
-                return .run { [documentWorkspaceClient] send in
-                    let entries = (try? documentWorkspaceClient.loadSaveHistoryEntries(activeTab)) ?? []
-                    await send(.saveHistoryLoaded(entries))
-                }
+                return handleSaveHistoryRequest(state: &state)
 
             case let .saveHistoryLoaded(entries):
                 state.saveHistoryEntries = entries
@@ -1156,45 +1151,19 @@ struct AppFeature {
                 return .none
 
             case let .saveHistoryRestoreRequested(projectURL, openInNewTab):
-                if !state.showsHome {
-                    persistActiveTabToBackingStore(state: &state)
-                }
-                state.isHydrating = true
-                return .run { [paintDocumentClient] send in
-                    do {
-                        let loaded = try paintDocumentClient.loadProject(projectURL)
-                        await send(.saveHistoryOpened(loaded, projectURL, openInNewTab))
-                    } catch {
-                        await send(.openDocumentFailed(error.localizedDescription))
-                    }
-                }
+                return handleSaveHistoryRestoreRequest(
+                    state: &state,
+                    projectURL: projectURL,
+                    openInNewTab: openInNewTab
+                )
 
             case let .saveHistoryOpened(loaded, projectURL, openInNewTab):
-                let restoredTitle = projectURL.deletingPathExtension().lastPathComponent
-                if openInNewTab || state.activeTab == nil {
-                    state.applyLoadedProject(loaded)
-                    activateNewTab(
-                        state: &state,
-                        title: "\(restoredTitle) Snapshot",
-                        sourceProjectURL: nil
-                    )
-                } else {
-                    let existingSourceURL = state.activeTab?.sourceProjectURL
-                    let existingTitle = state.activeTab?.title ?? restoredTitle
-                    state.applyLoadedProject(loaded)
-                    state.updateActiveTabMetadata(
-                        title: existingTitle,
-                        sourceProjectURL: existingSourceURL,
-                        previewImageData: paintDocumentClient.compositePNGData(state.resolvedPaperStyle())
-                    )
-                }
-                state.setActiveTabDirty(true)
-                persistActiveTabToBackingStore(state: &state)
-                persistActiveTabAutosave(state: &state)
-                state.isHydrating = false
-                state.showsHome = false
-                state.isShowingSaveHistory = false
-                state.bannerMessage = state.appLanguage.localized("保存履歴を復元しました")
+                handleSaveHistoryOpened(
+                    state: &state,
+                    loaded: loaded,
+                    projectURL: projectURL,
+                    openInNewTab: openInNewTab
+                )
                 return .none
 
             case let .gradientMapSelected(preset):
@@ -1494,274 +1463,33 @@ struct AppFeature {
                 return .none
 
             case .saveDocumentRequested:
-                guard let savedURL = persistActiveProjectToWorkspace(
+                return handleSaveDocumentRequest(
                     state: &state,
                     preferredDestinationURL: state.activeTab?.sourceProjectURL
-                ) else {
-                    return .none
-                }
-                state.bannerMessage = StudioStrings.savedDocument(savedURL.lastPathComponent, state.appLanguage)
-                if let activeTab = state.activeTab {
-                    persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
-                }
-                return .send(.homeProjectsLoadRequested)
+                )
 
             case .saveDocumentCopyRequested:
-                guard let savedURL = persistActiveProjectToWorkspace(
+                return handleSaveDocumentRequest(
                     state: &state,
                     preferredDestinationURL: nil
-                ) else {
-                    return .none
-                }
-                state.bannerMessage = StudioStrings.savedDocument(savedURL.lastPathComponent, state.appLanguage)
-                if let activeTab = state.activeTab {
-                    persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
-                }
-                return .send(.homeProjectsLoadRequested)
+                )
 
             case .exportTimelapseRequested:
-                guard let capture = paintDocumentClient.timelapseCapture() else {
-                    state.bannerMessage = state.appLanguage.localized("Not enough drawing history for timelapse yet")
-                    return .none
-                }
-                state.timelapseExportPreview = TimelapseExportPreview(progress: 0, previewImageData: capture.previewImageData)
-                let failureMessage = state.appLanguage.localized("Timelapse export failed")
-                return .run { [documentWorkspaceClient] send in
-                    do {
-                        let url = try TimelapseExporter.exportVideo(
-                            from: capture,
-                            to: documentWorkspaceClient.timelapseTemporaryDirectory(),
-                            fileClient: fileClient,
-                            dateClient: dateClient
-                        ) { progress, previewURL in
-                            let previewData = try? fileClient.readData(previewURL)
-                            Task {
-                                await send(.timelapseExportProgressUpdated(progress, previewData))
-                            }
-                        }
-                        await send(.timelapseExportSucceeded(url))
-                    } catch {
-                        await send(.timelapseExportFailed(failureMessage))
-                    }
-                }
-                .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
+                return handleTimelapseExportRequest(state: &state)
 
             case let .nanoBananaEditRequested(request):
-                let trimmedPrompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
-                let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedPrompt.isEmpty else {
-                    state.bannerMessage = state.appLanguage.localized("Enter a prompt for Nano Banana")
-                    return .none
-                }
-                guard
-                    request.config.accessMode == .appManaged ||
-                    !trimmedCredential.isEmpty
-                else {
-                    state.bannerMessage = state.appLanguage.localized("Enter your Gemini API key")
-                    return .none
-                }
-                guard
-                    request.config.accessMode == .userAPIKey ||
-                    !trimmedEndpoint.isEmpty
-                else {
-                    state.bannerMessage = state.appLanguage.localized("Enter your app server endpoint")
-                    return .none
-                }
-                guard
-                    let snapshot = state.canvas.renderSnapshot,
-                    let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
-                else {
-                    state.bannerMessage = state.appLanguage.localized("Could not prepare the active layer for Nano Banana")
-                    return .none
-                }
-
-                let adjustedSelection = request.editScope == .selectedArea
-                    ? Self.adjustedSelection(
-                        state.canvas.selection,
-                        canvasSize: state.canvas.canvasSize,
-                        expansion: request.maskSettings.expansion,
-                        isInverted: request.maskSettings.isInverted
-                    )
-                    : nil
-                if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
-                    state.bannerMessage = state.appLanguage.localized("Create a selection to use inpaint")
-                    return .none
-                }
-
-                let outputLayerIndex = request.outputMode == .replaceCurrentLayer
-                    ? request.inputLayerIndex
-                    : state.canvas.activeLayerIndex
-                let canvasWidth = snapshot.width
-                let canvasHeight = snapshot.height
-                let appLanguage = state.appLanguage
-                let sourceLayerPixelData = layer.pixelData
-                let beforePreviewImageData = Self.pngData(
-                    fromLayerPixelData: request.outputMode == .replaceCurrentLayer
-                        ? sourceLayerPixelData
-                        : Data(repeating: 0, count: canvasWidth * canvasHeight * 4),
-                    width: canvasWidth,
-                    height: canvasHeight
-                )
-                let normalizedRequest = NanoBananaGenerationRequest(
-                    prompt: trimmedPrompt,
-                    config: NanoBananaRequestConfig(
-                        accessMode: request.config.accessMode,
-                        credential: trimmedCredential,
-                        endpoint: trimmedEndpoint
-                    ),
-                    model: request.model,
-                    inputLayerIndex: request.inputLayerIndex,
-                    editScope: request.editScope,
-                    outputMode: request.outputMode,
-                    maskSettings: request.maskSettings
-                )
-                let jobID = uuidClient.generate()
-                state.isNanoBananaGenerating = true
-                state.nanoBananaPreview = nil
-                state.pendingNanoBananaRequest = normalizedRequest
-                state.activeNanoBananaJobID = jobID
-                state.pendingNanoBananaOutputMode = request.outputMode
-                state.nanoBananaJobs.insert(
-                    NanoBananaJob(
-                        id: jobID,
-                        request: normalizedRequest,
-                        createdAt: dateClient.now(),
-                        status: .running,
-                        message: nil
-                    ),
-                    at: 0
-                )
-                state.nanoBananaJobs = Array(state.nanoBananaJobs.prefix(12))
-
-                return .run { [nanoBananaClient] send in
-                        do {
-                            let requestPrompt = normalizedRequest.editScope == .selectedArea
-                                ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(trimmedPrompt)"
-                                : trimmedPrompt
-
-                            let finalPixelData: Data?
-                            switch normalizedRequest.editScope {
-                            case .wholeLayer:
-                                guard let inputPNGData = Self.pngData(
-                                    fromLayerPixelData: sourceLayerPixelData,
-                                    width: canvasWidth,
-                                    height: canvasHeight
-                                ) else {
-                                    finalPixelData = nil
-                                    break
-                                }
-                                let outputPNGData = try await nanoBananaClient.editImage(inputPNGData, requestPrompt, normalizedRequest.config, normalizedRequest.model)
-                                finalPixelData = Self.rawLayerPixelData(
-                                    fromPNGData: outputPNGData,
-                                    width: canvasWidth,
-                                    height: canvasHeight
-                                )
-
-                            case .selectedArea:
-                                guard
-                                    let adjustedSelection,
-                                    let crop = Self.inpaintCrop(
-                                        source: sourceLayerPixelData,
-                                        canvasWidth: canvasWidth,
-                                        canvasHeight: canvasHeight,
-                                        selection: adjustedSelection
-                                    ),
-                                    let cropPNGData = Self.pngData(
-                                        fromLayerPixelData: crop.pixelData,
-                                        width: crop.width,
-                                        height: crop.height
-                                    )
-                                else {
-                                    finalPixelData = nil
-                                    break
-                                }
-
-                                let outputPNGData = try await nanoBananaClient.editImage(cropPNGData, requestPrompt, normalizedRequest.config, normalizedRequest.model)
-                                guard let editedCropPixelData = Self.rawLayerPixelData(
-                                    fromPNGData: outputPNGData,
-                                    width: crop.width,
-                                    height: crop.height
-                                ) else {
-                                    finalPixelData = nil
-                                    break
-                                }
-
-                                let baseLayerPixelData = normalizedRequest.outputMode == .replaceCurrentLayer
-                                    ? sourceLayerPixelData
-                                    : Data(repeating: 0, count: canvasWidth * canvasHeight * 4)
-                                finalPixelData = Self.applyingInpaintCrop(
-                                    editedCropPixelData,
-                                    to: baseLayerPixelData,
-                                    canvasWidth: canvasWidth,
-                                    canvasHeight: canvasHeight,
-                                    crop: crop
-                                )
-                            }
-
-                            guard let finalPixelData else {
-                                await send(.nanoBananaEditFailed("Nano Banana returned an unsupported image."))
-                                return
-                            }
-                            let preview = NanoBananaPreviewState(
-                                request: normalizedRequest,
-                                outputLayerIndex: outputLayerIndex,
-                                pixelData: finalPixelData,
-                                beforePreviewImageData: beforePreviewImageData,
-                                afterPreviewImageData: Self.pngData(
-                                    fromLayerPixelData: finalPixelData,
-                                    width: canvasWidth,
-                                    height: canvasHeight
-                                )
-                            )
-                            await send(.nanoBananaEditSucceeded(preview))
-                        } catch {
-                            await send(.nanoBananaEditFailed(Self.localizedNanoBananaErrorMessage(error.localizedDescription, language: appLanguage)))
-                        }
-                    }
-                    .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
+                return handleNanoBananaEditRequest(state: &state, request: request)
 
             case let .nanoBananaEditSucceeded(preview):
-                state.isNanoBananaGenerating = false
-                state.nanoBananaHistory.insert(
-                    NanoBananaHistoryItem(
-                        id: uuidClient.generate(),
-                        request: preview.request,
-                        createdAt: dateClient.now(),
-                        previewImageData: preview.afterPreviewImageData
-                    ),
-                    at: 0
-                )
-                state.nanoBananaHistory = Array(state.nanoBananaHistory.prefix(12))
-                if let activeJobID = state.activeNanoBananaJobID,
-                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                    state.nanoBananaJobs[jobIndex].status = .succeeded
-                    state.nanoBananaJobs[jobIndex].message = nil
-                }
-                state.applyNanoBananaPreview(preview, paintDocumentClient: paintDocumentClient)
+                handleNanoBananaEditSucceeded(state: &state, preview: preview)
                 return .none
 
             case let .nanoBananaEditFailed(message):
-                state.isNanoBananaGenerating = false
-                if let activeJobID = state.activeNanoBananaJobID,
-                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                    state.nanoBananaJobs[jobIndex].status = .failed
-                    state.nanoBananaJobs[jobIndex].message = message
-                }
-                state.bannerMessage = message.isEmpty ? state.appLanguage.localized("Nano Banana edit failed") : message
+                handleNanoBananaEditFailed(state: &state, message: message)
                 return .none
 
             case .nanoBananaCancelRequested:
-                state.isNanoBananaGenerating = false
-                if let activeJobID = state.activeNanoBananaJobID,
-                   let jobIndex = state.nanoBananaJobs.firstIndex(where: { $0.id == activeJobID }) {
-                    state.nanoBananaJobs[jobIndex].status = .canceled
-                    state.nanoBananaJobs[jobIndex].message = state.appLanguage.localized("Nano Banana generation canceled")
-                }
-                state.bannerMessage = state.appLanguage.localized("Nano Banana generation canceled")
-                return .merge(
-                    .cancel(id: CancelID.nanoBananaEdit)
-                )
+                return handleNanoBananaCancelRequested(state: &state)
 
             case .nanoBananaPreviewAccepted:
                 guard let preview = state.nanoBananaPreview else { return .none }
