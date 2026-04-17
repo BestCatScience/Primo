@@ -24,26 +24,26 @@ extension AppFeature {
         )
     }
 
-    static func localizedNanoBananaErrorMessage(_ message: String, language: AppLanguage) -> String {
+    static func nanoBananaErrorFeedback(_ message: String) -> ApplicationFeedback {
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            return language.localized("Nano Banana edit failed")
+            return .nanoBananaEditFailed(nil)
         }
 
         let normalized = trimmed.lowercased()
         if normalized.contains("invalid response") {
-            return language.localized("Nano Banana returned an invalid response")
+            return .nanoBananaInvalidResponse
         }
         if normalized.contains("invalid endpoint") {
-            return language.localized("Nano Banana endpoint is invalid")
+            return .nanoBananaInvalidEndpoint
         }
         if normalized.contains("missing image")
             || normalized.contains("did not return decodable image")
             || normalized.contains("returned text instead of an image")
         {
-            return language.localized("Nano Banana did not return an image")
+            return .nanoBananaMissingImage
         }
 
-        return trimmed
+        return .nanoBananaEditFailed(trimmed)
     }
 }

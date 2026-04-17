@@ -76,7 +76,7 @@ struct NanoBananaProgressHUD: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(language.localized("Generating with Nano Banana"))
+                Text(language.localized("Nano Banana で生成中"))
                     .font(StudioTheme.Typography.title(16))
                     .foregroundStyle(.white.opacity(0.94))
 
@@ -88,7 +88,7 @@ struct NanoBananaProgressHUD: View {
                     .foregroundStyle(.white.opacity(0.62))
 
                 Button(action: onCancel) {
-                    Text(language.localized("Cancel"))
+                    Text(language.localized("キャンセル"))
                         .font(StudioTheme.Typography.label(13))
                         .foregroundStyle(.white.opacity(0.94))
                         .frame(maxWidth: .infinity)

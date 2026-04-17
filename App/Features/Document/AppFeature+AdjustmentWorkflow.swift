@@ -72,12 +72,12 @@ extension AppFeature {
     @discardableResult
     func handleAdjustmentApplyUsingProcessing(
         state: inout State,
-        failureMessage: String,
+        failureFeedback: ApplicationFeedback,
         apply: () -> Bool
     ) -> Bool {
         state.canvas.clearAdjustmentPreview()
         guard apply() else {
-            state.application.presentFeedback(.message(failureMessage))
+            state.application.presentFeedback(failureFeedback)
             return false
         }
         state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
@@ -89,12 +89,12 @@ extension AppFeature {
     func handleAdjustmentApplyRequest(
         state: inout State,
         request: LayerProcessingRequest,
-        failureMessage: String
+        failureFeedback: ApplicationFeedback
     ) -> Bool {
         let activeLayerIndex = state.canvas.activeLayerIndex
         return handleAdjustmentApplyUsingProcessing(
             state: &state,
-            failureMessage: failureMessage
+            failureFeedback: failureFeedback
         ) {
             adjustmentWorkflowService.applyLayerProcessing(
                 activeLayerIndex,
@@ -107,11 +107,11 @@ extension AppFeature {
     func handleAdjustmentApplyUsingPixels(
         state: inout State,
         adjustedPixels: Data?,
-        failureMessage: String
+        failureFeedback: ApplicationFeedback
     ) -> Bool {
         state.canvas.clearAdjustmentPreview()
         guard let adjustedPixels else {
-            state.application.presentFeedback(.message(failureMessage))
+            state.application.presentFeedback(failureFeedback)
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)

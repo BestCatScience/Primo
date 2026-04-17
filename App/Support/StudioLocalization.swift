@@ -207,6 +207,15 @@ enum StudioStrings {
         "Edit Scope": "編集範囲",
         "Whole Layer": "レイヤー全体",
         "Selected Area Only": "選択範囲のみ",
+        "Subscription product is unavailable.": "サブスクリプション商品は利用できません",
+        "Move failed": "移動に失敗しました",
+        "Could not restore autosave": "自動保存を復元できませんでした",
+        "Could not restore save history": "保存履歴を復元できませんでした",
+        "Could not create a tab": "タブを作成できませんでした",
+        "Canvas size is not supported": "このキャンバスサイズはサポートされていません",
+        "Image resolution updated": "画像の解像度を更新しました",
+        "Canvas size updated": "キャンバスサイズを更新しました",
+        "Selected Area": "選択範囲",
         "Create a selection to enable inpaint": "インペイントを使うには選択範囲を作成してください",
         "Create a selection to use inpaint": "インペイント用の選択範囲を作成してください",
         "Create Mask From Selection": "選択範囲からマスク作成",
@@ -216,6 +225,8 @@ enum StudioStrings {
         "Create a selection before adding a mask": "選択範囲を作成してからマスクを追加してください",
         "Could not create layer mask": "レイヤーマスクを作成できませんでした",
         "Could not apply layer mask": "レイヤーマスクを適用できませんでした",
+        "Could not apply gradient map": "グラデーションマップを適用できませんでした",
+        "Could not apply color adjustment": "色補正を適用できませんでした",
         "Mask Expansion": "マスク拡張",
         "Invert Mask": "マスクを反転",
         "Jobs": "ジョブ",
@@ -251,8 +262,13 @@ enum StudioStrings {
         "Enter your Gemini API key": "Gemini API キーを入力してください",
         "Enter your app server endpoint": "アプリサーバーのエンドポイントを入力してください",
         "Could not prepare the active layer for Nano Banana": "Nano Banana 用にアクティブレイヤーを準備できませんでした",
+        "Could not apply Nano Banana edit": "Nano Banana の編集結果を適用できませんでした",
         "Nano Banana edit applied": "Nano Banana の編集結果を適用しました",
         "Nano Banana edit failed": "Nano Banana の編集に失敗しました",
+        "Nano Banana returned an invalid response": "Nano Banana から不正な応答が返されました",
+        "Nano Banana endpoint is invalid": "Nano Banana のエンドポイントが不正です",
+        "Nano Banana did not return an image": "Nano Banana が画像を返しませんでした",
+        "Nano Banana returned an unsupported image": "Nano Banana が未対応の画像を返しました",
         "Moving": "移動",
         "Multiply": "乗算",
         "No presets yet.": "まだプリセットがありません。",
@@ -403,7 +419,7 @@ enum StudioStrings {
 
     static func appName(_ language: AppLanguage) -> String { "Primo" }
 
-    private static func localized(_ language: AppLanguage, english: String, japanese: String) -> String {
+    private static func localized(_ language: AppLanguage, japanese: String, english: String) -> String {
         switch language {
         case .english:
             return english
@@ -413,15 +429,15 @@ enum StudioStrings {
     }
 
     static func savedDocument(_ filename: String, _ language: AppLanguage) -> String {
-        localized(language, english: "Saved: \(filename)", japanese: "保存しました: \(filename)")
+        localized(language, japanese: "保存しました: \(filename)", english: "Saved: \(filename)")
     }
 
     static func openedDocument(_ layerCount: Int, _ language: AppLanguage) -> String {
-        localized(language, english: "Opened document with \(layerCount) layers", japanese: "\(layerCount)レイヤーの書類を開きました")
+        localized(language, japanese: "\(layerCount)レイヤーの書類を開きました", english: "Opened document with \(layerCount) layers")
     }
 
     static func openFailed(_ language: AppLanguage) -> String {
-        localized(language, english: "Open failed", japanese: "開くことができませんでした")
+        localized(language, japanese: "開くことができませんでした", english: "Open failed")
     }
 
     static func settingsMenu(_ language: AppLanguage) -> String { language.localized("設定") }
@@ -490,43 +506,43 @@ enum StudioStrings {
     static func cancel(_ language: AppLanguage) -> String { language.localized("キャンセル") }
     static func create(_ language: AppLanguage) -> String { language.localized("作成") }
     static func homeProjectsTitle(_ language: AppLanguage) -> String {
-        localized(language, english: "Projects", japanese: "プロジェクト")
+        localized(language, japanese: "プロジェクト", english: "Projects")
     }
     static func homeProjectsSubtitle(_ language: AppLanguage) -> String {
-        localized(language, english: "Continue from your saved canvases or start a fresh composition.", japanese: "保存済みのキャンバスを続きから開くか、新しい作品を始められます。")
+        localized(language, japanese: "保存済みのキャンバスを続きから開くか、新しい作品を始められます。", english: "Continue from your saved canvases or start a fresh composition.")
     }
     static func homeSettingsTitle(_ language: AppLanguage) -> String {
-        localized(language, english: "Preferences", japanese: "設定")
+        localized(language, japanese: "設定", english: "Preferences")
     }
     static func homeSettingsSubtitle(_ language: AppLanguage) -> String {
-        localized(language, english: "Adjust the app language and review your workspace.", japanese: "アプリ言語や作業環境の状態を確認できます。")
+        localized(language, japanese: "アプリ言語や作業環境の状態を確認できます。", english: "Adjust the app language and review your workspace.")
     }
     static func recentProjects(_ language: AppLanguage) -> String {
-        localized(language, english: "Recent Projects", japanese: "最近のプロジェクト")
+        localized(language, japanese: "最近のプロジェクト", english: "Recent Projects")
     }
     static func noProjectsTitle(_ language: AppLanguage) -> String {
-        localized(language, english: "No saved projects yet", japanese: "保存済みプロジェクトはまだありません")
+        localized(language, japanese: "保存済みプロジェクトはまだありません", english: "No saved projects yet")
     }
     static func noProjectsMessage(_ language: AppLanguage) -> String {
-        localized(language, english: "Create your first canvas and it will appear here.", japanese: "最初のキャンバスを作成すると、ここに表示されます。")
+        localized(language, japanese: "最初のキャンバスを作成すると、ここに表示されます。", english: "Create your first canvas and it will appear here.")
     }
     static func createCanvasCTA(_ language: AppLanguage) -> String {
-        localized(language, english: "Create Canvas", japanese: "キャンバスを作成")
+        localized(language, japanese: "キャンバスを作成", english: "Create Canvas")
     }
     static func openFileCTA(_ language: AppLanguage) -> String {
-        localized(language, english: "Open File", japanese: "ファイルを開く")
+        localized(language, japanese: "ファイルを開く", english: "Open File")
     }
     static func appLanguageTitle(_ language: AppLanguage) -> String {
-        localized(language, english: "App Language", japanese: "アプリの言語")
+        localized(language, japanese: "アプリの言語", english: "App Language")
     }
     static func storageSummary(_ count: Int, _ language: AppLanguage) -> String {
-        localized(language, english: "\(count) saved projects in local storage", japanese: "ローカル保存済みプロジェクト \(count) 件")
+        localized(language, japanese: "ローカル保存済みプロジェクト \(count) 件", english: "\(count) saved projects in local storage")
     }
     static func canvasSizeValue(_ size: CGSize, _ language: AppLanguage) -> String {
         localized(
             language,
-            english: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px",
-            japanese: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px"
+            japanese: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px",
+            english: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) px"
         )
     }
     static func updatedAt(_ date: Date, _ language: AppLanguage) -> String {
@@ -535,23 +551,23 @@ enum StudioStrings {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         let value = formatter.string(from: date)
-        return localized(language, english: "Updated \(value)", japanese: "更新 \(value)")
+        return localized(language, japanese: "更新 \(value)", english: "Updated \(value)")
     }
 
     static func layers(_ count: Int, _ language: AppLanguage) -> String {
-        localized(language, english: "\(count) Layers", japanese: "\(count) レイヤー")
+        localized(language, japanese: "\(count) レイヤー", english: "\(count) Layers")
     }
 
     static func folderName(_ count: Int, _ language: AppLanguage) -> String {
-        localized(language, english: "Folder \(count)", japanese: "フォルダ \(count)")
+        localized(language, japanese: "フォルダ \(count)", english: "Folder \(count)")
     }
 
     static func moveOutOfFolder(_ language: AppLanguage) -> String {
-        localized(language, english: "Move Out Of Folder", japanese: "フォルダ外へ戻す")
+        localized(language, japanese: "フォルダ外へ戻す", english: "Move Out Of Folder")
     }
 
     static func dropToMoveOutOfFolder(_ language: AppLanguage) -> String {
-        localized(language, english: "Drop here to move out of folder", japanese: "ここにドロップでフォルダ外へ戻す")
+        localized(language, japanese: "ここにドロップでフォルダ外へ戻す", english: "Drop here to move out of folder")
     }
 
     static func layersTitle(_ language: AppLanguage) -> String { language.localized("レイヤー") }
@@ -561,13 +577,13 @@ enum StudioStrings {
     static func standby(_ language: AppLanguage) -> String { language.localized("待機") }
 
     static func opacityValue(_ value: Int, _ language: AppLanguage) -> String {
-        localized(language, english: "Opacity \(value)%", japanese: "不透明度 \(value)%")
+        localized(language, japanese: "不透明度 \(value)%", english: "Opacity \(value)%")
     }
 
     static func exportingTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し中…") }
 
     static func dynamicControlOff(_ language: AppLanguage) -> String {
-        localized(language, english: "Off", japanese: "なし")
+        localized(language, japanese: "なし", english: "Off")
     }
 
     static func dynamicControlPressure(_ language: AppLanguage) -> String { language.localized("筆圧") }
@@ -579,10 +595,10 @@ enum StudioStrings {
     static func brushSettingsCategoryScatter(_ language: AppLanguage) -> String { language.localized("散布") }
 
     static func brushSettingsCategoryStroke(_ language: AppLanguage) -> String {
-        localized(language, english: "Stroke", japanese: "描画")
+        localized(language, japanese: "描画", english: "Stroke")
     }
 
     static func brushSettingsCategoryTexture(_ language: AppLanguage) -> String {
-        localized(language, english: "Texture", japanese: "質感")
+        localized(language, japanese: "質感", english: "Texture")
     }
 }

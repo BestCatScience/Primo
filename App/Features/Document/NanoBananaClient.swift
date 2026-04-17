@@ -10,9 +10,9 @@ enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiabl
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .wholeLayer:
-            return language.localized("Whole Layer")
+            return language.localized("レイヤー全体")
         case .selectedArea:
-            return language.localized("Selected Area")
+            return language.localized("選択範囲")
         }
     }
 }
@@ -26,9 +26,9 @@ enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiab
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .replaceCurrentLayer:
-            return language.localized("Replace Current Layer")
+            return language.localized("現在のレイヤーを置き換え")
         case .newLayer:
-            return language.localized("New Layer")
+            return language.localized("新規レイヤー")
         }
     }
 }
@@ -89,26 +89,26 @@ enum NanoBananaPromptPreset: String, CaseIterable, Equatable, Sendable, Identifi
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .retouch:
-            return language.localized("Retouch")
+            return language.localized("整える")
         case .relight:
-            return language.localized("Relight")
+            return language.localized("ライティング変更")
         case .cleanup:
-            return language.localized("Cleanup")
+            return language.localized("ノイズ除去")
         case .variant:
-            return language.localized("Variant")
+            return language.localized("バリエーション")
         }
     }
 
     func prompt(_ language: AppLanguage) -> String {
         switch self {
         case .retouch:
-            return language.localized("Refine this artwork with cleaner edges, improved detail, and polished shading.")
+            return language.localized("線や輪郭を整え、細部を少し描き込み、自然できれいな陰影にしてください。")
         case .relight:
-            return language.localized("Keep the composition the same, but change the lighting to feel more dramatic and cinematic.")
+            return language.localized("構図はそのままにして、よりドラマチックでシネマティックな光に変えてください。")
         case .cleanup:
-            return language.localized("Clean up artifacts and unwanted marks while preserving the original style and colors.")
+            return language.localized("元の絵柄と色を保ったまま、不要な汚れやノイズ、乱れを取り除いてください。")
         case .variant:
-            return language.localized("Create a close variation of this image while preserving the overall composition and subject.")
+            return language.localized("全体の構図と被写体を保ったまま、この画像の近いバリエーションを作ってください。")
         }
     }
 }
@@ -141,9 +141,9 @@ enum NanoBananaAccessMode: String, CaseIterable, Equatable, Sendable, Identifiab
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .userAPIKey:
-            return language.localized("User API Key")
+            return language.localized("ユーザー API キー")
         case .appManaged:
-            return language.localized("App Subscription")
+            return language.localized("アプリ課金プラン")
         }
     }
 }

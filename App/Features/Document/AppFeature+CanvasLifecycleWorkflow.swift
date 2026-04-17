@@ -155,18 +155,14 @@ extension AppFeature {
     static func importedCanvasPlan(
         name: String?,
         data: Data,
-        language: AppLanguage
+        namingPolicy: DocumentNamingPolicy
     ) -> Result<ImportedCanvasPlan, CanvasLifecycleContractFailure> {
         switch importedCanvasRequest(from: data) {
         case let .success(request):
-            let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let layerName = trimmedName.isEmpty
-                ? (language == .japanese ? "画像 1" : "Image 1")
-                : trimmedName
             return .success(
                 ImportedCanvasPlan(
                     request: request,
-                    layerName: layerName
+                    layerName: namingPolicy.importedCanvasLayerName(from: name)
                 )
             )
         case let .failure(error):
@@ -337,11 +333,12 @@ extension AppFeature {
         name: String?,
         data: Data
     ) -> Effect<Action> {
+        let namingPolicy = namingPolicy(for: state)
         let importedPlan: ImportedCanvasPlan
         switch Self.importedCanvasPlan(
             name: name,
             data: data,
-            language: state.application.appLanguage
+            namingPolicy: namingPolicy
         ) {
         case let .success(plan):
             importedPlan = plan

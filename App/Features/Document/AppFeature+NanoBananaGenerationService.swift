@@ -10,56 +10,35 @@ extension AppFeature {
         let canvasHeight: Int
         let sourceLayerPixelData: Data
         let beforePreviewImageData: Data?
-        let appLanguage: AppLanguage
         let trimmedPrompt: String
     }
 
-    private struct NanoBananaValidationError: LocalizedError {
-        let message: String
-
-        var errorDescription: String? {
-            message
-        }
+    private struct NanoBananaValidationFailure: Error, Equatable {
+        let feedback: ApplicationFeedback
     }
 
     private struct NanoBananaRequestContract {
         func validate(
             request: NanoBananaGenerationRequest,
             state: AppFeature.State
-        ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationError> {
+        ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationFailure> {
             let trimmedPrompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
             let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedPrompt.isEmpty else {
-                return .failure(
-                    NanoBananaValidationError(
-                        message: state.application.appLanguage.localized("Enter a prompt for Nano Banana")
-                    )
-                )
+                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPromptRequired))
             }
             guard request.config.accessMode == .appManaged || !trimmedCredential.isEmpty else {
-                return .failure(
-                    NanoBananaValidationError(
-                        message: state.application.appLanguage.localized("Enter your Gemini API key")
-                    )
-                )
+                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaAPIKeyRequired))
             }
             guard request.config.accessMode == .userAPIKey || !trimmedEndpoint.isEmpty else {
-                return .failure(
-                    NanoBananaValidationError(
-                        message: state.application.appLanguage.localized("Enter your app server endpoint")
-                    )
-                )
+                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaEndpointRequired))
             }
             guard
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
             else {
-                return .failure(
-                    NanoBananaValidationError(
-                        message: state.application.appLanguage.localized("Could not prepare the active layer for Nano Banana")
-                    )
-                )
+                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
             }
 
             let adjustedSelection = request.editScope == .selectedArea
@@ -71,11 +50,7 @@ extension AppFeature {
                 )
                 : nil
             if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
-                return .failure(
-                    NanoBananaValidationError(
-                        message: state.application.appLanguage.localized("Create a selection to use inpaint")
-                    )
-                )
+                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaSelectionRequired))
             }
 
             let normalizedRequest = NanoBananaGenerationRequest(
@@ -114,7 +89,6 @@ extension AppFeature {
                     canvasHeight: canvasHeight,
                     sourceLayerPixelData: sourceLayerPixelData,
                     beforePreviewImageData: beforePreviewImageData,
-                    appLanguage: state.application.appLanguage,
                     trimmedPrompt: trimmedPrompt
                 )
             )
@@ -135,15 +109,12 @@ extension AppFeature {
         func validate(
             preview: NanoBananaPreviewState,
             state: AppFeature.State
-        ) -> Result<NanoBananaPreviewApplicationPlan, NanoBananaValidationError> {
+        ) -> Result<NanoBananaPreviewApplicationPlan, NanoBananaValidationFailure> {
+            let namingPolicy = AppFeature.DocumentNamingPolicy(language: state.application.appLanguage)
             switch preview.request.outputMode {
             case .replaceCurrentLayer:
                 guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
-                    return .failure(
-                        NanoBananaValidationError(
-                            message: state.application.appLanguage.localized("Could not apply Nano Banana edit")
-                        )
-                    )
+                    return .failure(NanoBananaValidationFailure(feedback: .nanoBananaApplyFailed))
                 }
                 return .success(
                     NanoBananaPreviewApplicationPlan(
@@ -156,7 +127,7 @@ extension AppFeature {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .newLayer(name: state.layerSidebar.numberedLayerName(prefix: "Nano Banana"))
+                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar))
                     )
                 )
             }
@@ -289,9 +260,7 @@ extension AppFeature {
                     guard let finalPixelData else {
                         await send(
                             .nanoBananaEditFailed(
-                                .nanoBananaEditFailed(
-                                    prepared.appLanguage.localized("Nano Banana returned an unsupported image")
-                                )
+                                .nanoBananaUnsupportedImage
                             )
                         )
                         return
@@ -312,12 +281,7 @@ extension AppFeature {
                 } catch {
                     await send(
                         .nanoBananaEditFailed(
-                            .nanoBananaEditFailed(
-                                AppFeature.localizedNanoBananaErrorMessage(
-                                    error.localizedDescription,
-                                    language: prepared.appLanguage
-                                )
-                            )
+                            AppFeature.nanoBananaErrorFeedback(error.localizedDescription)
                         )
                     )
                 }
@@ -384,9 +348,7 @@ extension AppFeature {
         let validatedEdit: NanoBananaValidatedEdit
         switch nanoBananaRequestContract.validate(request: request, state: state) {
         case let .failure(error):
-            state.application.presentFeedback(
-                .nanoBananaEditFailed(Self.optionalErrorMessage(error))
-            )
+            state.application.presentFeedback(error.feedback)
             return .none
         case let .success(edit):
             validatedEdit = edit
@@ -407,7 +369,7 @@ extension AppFeature {
         case let .failure(error):
             nanoBananaGenerationService.applyFailure(
                 state: &state,
-                feedback: .nanoBananaEditFailed(error.message)
+                feedback: error.feedback
             )
             return
         case let .success(plan):

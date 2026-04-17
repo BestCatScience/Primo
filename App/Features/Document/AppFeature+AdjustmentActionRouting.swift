@@ -11,7 +11,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .gradientMap(preset),
-                failureMessage: state.application.appLanguage.localized("Could not apply gradient map")
+                failureFeedback: .gradientMapApplyFailed
             )
             return .none
 
@@ -28,7 +28,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyUsingPixels(
                 state: &state,
                 adjustedPixels: adjusted,
-                failureMessage: state.application.appLanguage.localized("Could not apply gradient map")
+                failureFeedback: .gradientMapApplyFailed
             )
             return .none
 
@@ -42,7 +42,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .hueSaturationBrightness(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -56,7 +56,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .brightnessContrast(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -70,7 +70,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .levels(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -84,7 +84,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .toneCurve(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -98,7 +98,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .colorBalance(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -112,7 +112,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .threshold(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -126,7 +126,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyRequest(
                 state: &state,
                 request: .posterize(settings),
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 
@@ -137,7 +137,7 @@ extension AppFeature {
             _ = handleAdjustmentApplyUsingPixels(
                 state: &state,
                 adjustedPixels: adjusted,
-                failureMessage: state.application.appLanguage.localized("Could not apply color adjustment")
+                failureFeedback: .colorAdjustmentApplyFailed
             )
             return .none
 

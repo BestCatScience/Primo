@@ -2,14 +2,6 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    private struct WorkspaceOperationError: LocalizedError {
-        let message: String
-
-        var errorDescription: String? {
-            message
-        }
-    }
-
     struct WorkspacePersistenceFailure: Error, Equatable {
         let feedback: ApplicationFeedback
     }
@@ -532,23 +524,30 @@ extension AppFeature {
     func saveTabsForClose(
         _ tabIDs: [OpenDocumentTab.ID],
         state: inout State
-    ) throws {
+    ) -> Result<Void, WorkspacePersistenceFailure> {
         if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID) {
             switch persistActiveTabToBackingStore(state: &state) {
             case .success:
                 break
             case let .failure(failure):
-                throw WorkspaceOperationError(
-                    message: failure.feedback.message(for: state.application.appLanguage)
-                )
+                return .failure(failure)
             }
         }
         for tabID in tabIDs {
             guard let previousTab = state.workspace.tab(withID: tabID) else { continue }
-            let destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
-                previousTab.backingStoreURL,
-                preferredDestinationURL: previousTab.sourceProjectURL
-            )
+            let destinationURL: DocumentProjectPath
+            do {
+                destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
+                    previousTab.backingStoreURL,
+                    preferredDestinationURL: previousTab.sourceProjectURL
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        feedback: .saveFailed(Self.optionalErrorMessage(error))
+                    )
+                )
+            }
             let updatedTab = state.workspace.updateTab(
                 id: tabID,
                 title: destinationURL.displayName,
@@ -569,6 +568,7 @@ extension AppFeature {
                 persistSaveHistorySnapshot(for: updatedTab, trigger: .closeSave)
             }
         }
+        return .success(())
     }
 
     static func nextUntitledTabTitle(existingTabs: [OpenDocumentTab]) -> String {

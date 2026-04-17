@@ -440,7 +440,7 @@ extension ContentView {
 
     var workspaceNanoBananaPromptEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(language.localized("Prompt"))
+            Text(language.localized("プロンプト"))
                 .font(StudioTheme.Typography.label(12))
                 .foregroundStyle(.white.opacity(0.55))
 
@@ -449,7 +449,7 @@ extension ContentView {
                     .fill(Color.white)
 
                 if nanoBananaPrompt.isEmpty {
-                    Text(language.localized("Describe how Nano Banana should edit the active layer"))
+                    Text(language.localized("Nano Banana にどう編集させたいか入力してください"))
                         .font(StudioTheme.Typography.body(13))
                         .foregroundStyle(Color.black.opacity(0.38))
                         .padding(.horizontal, 10)
@@ -485,23 +485,23 @@ extension ContentView {
                 alignment: .leading,
                 spacing: 10
             ) {
-                workspaceNanoBananaStatCard(label: language.localized("Input"), value: resolvedNanoBananaInputLayerName)
-                workspaceNanoBananaStatCard(label: language.localized("Scope"), value: nanoBananaEditScope.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("Output"), value: nanoBananaOutputMode.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("Model"), value: nanoBananaModel.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("入力"), value: resolvedNanoBananaInputLayerName)
+                workspaceNanoBananaStatCard(label: language.localized("対象"), value: nanoBananaEditScope.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("出力"), value: nanoBananaOutputMode.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("モデル"), value: nanoBananaModel.title(language))
             }
 
             if nanoBananaAccessMode == .appManaged && !nanoBananaCommerce.isSubscriptionActive {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(language.localized("Subscription Required"))
+                    Text(language.localized("サブスクリプションが必要です"))
                         .font(StudioTheme.Typography.label(12))
                         .foregroundStyle(.white.opacity(0.92))
-                    Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
+                    Text(language.localized("Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(.white.opacity(0.6))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Button(language.localized("Unlock Nano Banana")) {
+                    Button(language.localized("Nano Banana を有効化")) {
                         showsNanoBananaPaywall = true
                     }
                     .buttonStyle(.plain)
@@ -543,7 +543,7 @@ extension ContentView {
 
     var workspaceNanoBananaActions: some View {
         HStack(spacing: 8) {
-            Button(language.localized("Run")) {
+            Button(language.localized("実行")) {
                 requestNanoBananaGeneration(closeSheet: false)
             }
             .buttonStyle(.plain)
@@ -560,7 +560,7 @@ extension ContentView {
             )
             .disabled(nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
 
-            Button(language.localized("Open Full Panel")) {
+            Button(language.localized("フルパネルを開く")) {
                 showsNanoBananaSheet = true
             }
             .buttonStyle(.plain)

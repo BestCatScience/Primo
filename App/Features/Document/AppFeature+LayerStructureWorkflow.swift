@@ -2,21 +2,23 @@ import Foundation
 
 extension AppFeature {
     func handleAddLayer(state: inout State) {
+        let namingPolicy = namingPolicy(for: state)
         let newLayerIndex = layerWorkflowService.addLayer(
-            named: state.layerSidebar.numberedLayerName(prefix: "Layer")
+            named: namingPolicy.defaultLayerName(for: state.layerSidebar)
         )
         state.canvas.activateLayerForEditing(newLayerIndex)
         applyDirtyPresentation(state: &state)
     }
 
     func handleAddFolder(state: inout State) {
+        let namingPolicy = namingPolicy(for: state)
         let nextFolderNumber = state.layerSidebar.rows.reduce(into: 0) { partialResult, row in
             if case .folder = row {
                 partialResult += 1
             }
         } + 1
         _ = layerWorkflowService.createFolder(
-            named: StudioStrings.folderName(nextFolderNumber, state.application.appLanguage),
+            named: namingPolicy.folderName(forOrdinal: nextFolderNumber),
             afterLayerAt: state.layerSidebar.activeLayerIndex
         )
         applyDirtyPresentation(state: &state)
@@ -47,7 +49,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        let duplicateName = state.application.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
+        let duplicateName = namingPolicy(for: state).duplicatedLayerName(for: layer.name)
         handleLayerMutation(state: &state, clearsSelection: true) {
             layerWorkflowService.duplicateLayer(index, named: duplicateName) >= 0
         }

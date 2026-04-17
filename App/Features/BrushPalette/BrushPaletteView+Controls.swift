@@ -482,17 +482,17 @@ extension BrushPaletteView {
             )
             sliderRow(title: language.localized("サイズ量"), value: "\(Int(sizeAmountBinding.wrappedValue * 100))%", slider: Slider(value: sizeAmountBinding, in: 0.0...1.0))
             sliderRow(
-                title: language.localized("Speed Size"),
+                title: language.localized("速度でサイズ"),
                 value: "\(Int(speedSizeAmountBinding.wrappedValue.rounded()))",
                 slider: Slider(value: speedSizeAmountBinding, in: 0...200, step: 1)
             )
             sliderRow(
-                title: language.localized("Taper In"),
+                title: language.localized("入り"),
                 value: "\(Int(taperInAmountBinding.wrappedValue.rounded()))",
                 slider: Slider(value: taperInAmountBinding, in: 0...100, step: 1)
             )
             sliderRow(
-                title: language.localized("Taper Out"),
+                title: language.localized("抜き"),
                 value: "\(Int(taperOutAmountBinding.wrappedValue.rounded()))",
                 slider: Slider(value: taperOutAmountBinding, in: 0...100, step: 1)
             )

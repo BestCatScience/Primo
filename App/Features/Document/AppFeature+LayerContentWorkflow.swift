@@ -11,13 +11,11 @@ extension AppFeature {
             state.application.presentFeedback(.couldNotImportPhoto(nil))
             return
         }
-        let fallbackName = state.layerSidebar.numberedLayerName(
-            prefix: state.application.appLanguage == .japanese ? "写真" : "Photo"
+        let namingPolicy = namingPolicy(for: state)
+        let layerName = namingPolicy.photoLayerName(
+            proposedName: name,
+            layerSidebar: state.layerSidebar
         )
-        let layerName = {
-            let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return trimmed.isEmpty ? fallbackName : trimmed
-        }()
         let targetLayerIndex = layerWorkflowService.addLayer(named: layerName)
         layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
         layerWorkflowService.setActiveLayer(targetLayerIndex)
@@ -30,6 +28,7 @@ extension AppFeature {
         state: inout State,
         draft: TextLayerDraft
     ) {
+        let namingPolicy = namingPolicy(for: state)
         let fontOption = state.brushPalette.text.availableFonts.first(where: { $0.postScriptName == draft.fontPostScriptName })
             ?? state.brushPalette.text.availableFonts.first
         guard let position = draft.position else { return }
@@ -58,15 +57,7 @@ extension AppFeature {
         if let existingIndex = draft.targetLayerIndex {
             targetLayerIndex = existingIndex
         } else {
-            let layerName = draft.text
-                .components(separatedBy: CharacterSet.newlines)
-                .first?
-                .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-            let resolvedName = (
-                layerName?.isEmpty == false
-                ? layerName!
-                : (state.application.appLanguage == .japanese ? "テキスト" : "Text")
-            )
+            let resolvedName = namingPolicy.textLayerName(from: draft.text)
             targetLayerIndex = layerWorkflowService.addLayer(named: resolvedName)
         }
 

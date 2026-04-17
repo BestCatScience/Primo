@@ -76,17 +76,17 @@ extension ContentView {
 
     @ViewBuilder
     var nanoBananaSubscriptionControls: some View {
-        LabeledContent(language.localized("Status")) {
+        LabeledContent(language.localized("状態")) {
             Text(
                 nanoBananaCommerce.isSubscriptionActive
-                ? language.localized("Active")
-                : language.localized("Inactive")
+                ? language.localized("有効")
+                : language.localized("未購入")
             )
             .foregroundStyle(nanoBananaCommerce.isSubscriptionActive ? .green : .secondary)
         }
 
         if let product = nanoBananaCommerce.primaryProduct {
-            LabeledContent(language.localized("Plan")) {
+            LabeledContent(language.localized("プラン")) {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(product.displayName)
                     Text(product.displayPrice)
@@ -94,19 +94,19 @@ extension ContentView {
                 }
             }
         } else if nanoBananaCommerce.isLoading {
-            Text(language.localized("Loading subscription details…"))
+            Text(language.localized("サブスクリプション情報を読み込み中…"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
 
-        Button(language.localized("Purchase Subscription")) {
+        Button(language.localized("サブスクリプションを購入")) {
             Task {
                 await nanoBananaCommerce.purchasePrimaryProduct()
             }
         }
         .disabled(nanoBananaCommerce.isLoading || nanoBananaCommerce.isSubscriptionActive)
 
-        Button(language.localized("Restore Purchases")) {
+        Button(language.localized("購入を復元")) {
             Task {
                 await nanoBananaCommerce.restorePurchases()
             }
@@ -114,7 +114,7 @@ extension ContentView {
         .disabled(nanoBananaCommerce.isLoading)
 
         if let manageURL = nanoBananaCommerce.manageSubscriptionsURL {
-            Link(language.localized("Manage Subscription"), destination: manageURL)
+            Link(language.localized("サブスクリプションを管理"), destination: manageURL)
         }
 
         if let purchaseErrorMessage = nanoBananaCommerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
@@ -123,7 +123,7 @@ extension ContentView {
                 .foregroundStyle(.secondary)
         }
 
-        Text(language.localized("Use your own backend to inject the provider API key and verify entitlements"))
+        Text(language.localized("自社バックエンドでプロバイダ API キー注入と購入権限チェックを行う想定です"))
             .font(.footnote)
             .foregroundStyle(.secondary)
     }
@@ -133,22 +133,22 @@ extension ContentView {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(language.localized("Unlock Nano Banana"))
+                        Text(language.localized("Nano Banana を有効化"))
                             .font(.title3.weight(.semibold))
-                        Text(language.localized("Use Primo subscription to run Nano Banana without your own API key"))
+                        Text(language.localized("Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)
                 }
 
-                Section(language.localized("Included")) {
-                    Label(language.localized("Unlimited app-managed Nano Banana edits"), systemImage: "sparkles")
-                    Label(language.localized("Purchase state syncs automatically"), systemImage: "arrow.triangle.2.circlepath")
-                    Label(language.localized("Restore purchases on a new device"), systemImage: "icloud")
+                Section(language.localized("含まれる内容")) {
+                    Label(language.localized("アプリ管理の Nano Banana 編集を無制限で利用"), systemImage: "sparkles")
+                    Label(language.localized("購入状態を自動で同期"), systemImage: "arrow.triangle.2.circlepath")
+                    Label(language.localized("新しい端末でも購入を復元可能"), systemImage: "icloud")
                 }
 
-                Section(language.localized("Plan")) {
+                Section(language.localized("プラン")) {
                     if let product = nanoBananaCommerce.primaryProduct {
                         LabeledContent(product.displayName) {
                             Text(product.displayPrice)
@@ -156,18 +156,18 @@ extension ContentView {
                     } else {
                         Text(
                             nanoBananaCommerce.isLoading
-                            ? language.localized("Loading subscription details…")
-                            : language.localized("Subscription product is unavailable.")
+                            ? language.localized("サブスクリプション情報を読み込み中…")
+                            : language.localized("サブスクリプション商品は利用できません")
                         )
                         .foregroundStyle(.secondary)
                     }
                 }
 
-                Section(language.localized("App Subscription")) {
+                Section(language.localized("アプリ課金プラン")) {
                     nanoBananaSubscriptionControls
                 }
             }
-            .navigationTitle(language.localized("Subscription Required"))
+            .navigationTitle(language.localized("サブスクリプションが必要です"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1076,13 +1076,13 @@ extension ContentView {
                 Section(StudioStrings.nanoBanana(language)) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(StudioStrings.nanoBananaEdit(language))
-                        Text(language.localized("Describe how Nano Banana should edit the active layer"))
+                        Text(language.localized("Nano Banana にどう編集させたいか入力してください"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(language.localized("Prompt"))
+                        Text(language.localized("プロンプト"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
@@ -1129,7 +1129,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("入力")) {
-                    Picker(language.localized("Access"), selection: Binding(
+                    Picker(language.localized("接続方式"), selection: Binding(
                         get: { nanoBananaAccessMode },
                         set: { nanoBananaAccessMode = $0 }
                     )) {
@@ -1144,7 +1144,7 @@ extension ContentView {
                         }
                     }
 
-                    Picker(language.localized("Edit Scope"), selection: $nanoBananaEditScope) {
+                    Picker(language.localized("編集範囲"), selection: $nanoBananaEditScope) {
                         ForEach(NanoBananaEditScope.allCases) { scope in
                             Text(scope.title(language)).tag(scope)
                         }
@@ -1152,19 +1152,19 @@ extension ContentView {
                     .disabled(store.canvas.selection?.isEmpty != false)
 
                     if store.canvas.selection?.isEmpty != false {
-                        Text(language.localized("Create a selection to enable inpaint"))
+                        Text(language.localized("インペイントを使うには選択範囲を作成してください"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
                     if nanoBananaEditScope == .selectedArea {
                         Stepper(
-                            "\(language.localized("Mask Expansion")): \(nanoBananaMaskExpansion)",
+                            "\(language.localized("マスク拡張")): \(nanoBananaMaskExpansion)",
                             value: $nanoBananaMaskExpansion,
                             in: -24...48
                         )
 
-                        Toggle(language.localized("Invert Mask"), isOn: $nanoBananaInvertsMask)
+                        Toggle(language.localized("マスクを反転"), isOn: $nanoBananaInvertsMask)
                     }
 
                     Picker(language.localized("モデル"), selection: $nanoBananaModel) {
@@ -1174,9 +1174,9 @@ extension ContentView {
                     }
 
                     if nanoBananaAccessMode == .userAPIKey {
-                        SecureField(language.localized("Gemini API Key"), text: $nanoBananaAPIKey)
+                        SecureField(language.localized("Gemini API キー"), text: $nanoBananaAPIKey)
                             .focused($nanoBananaFocusedField, equals: .apiKey)
-                        Text(language.localized("Saved locally on this device"))
+                        Text(language.localized("この端末内に保存されます"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
@@ -1193,7 +1193,7 @@ extension ContentView {
                 }
 
                 if !nanoBananaState.jobs.isEmpty {
-                    Section(language.localized("Jobs")) {
+                    Section(language.localized("ジョブ")) {
                         ForEach(nanoBananaState.jobs.prefix(4)) { job in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
@@ -1207,7 +1207,7 @@ extension ContentView {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
                                 if job.status == .failed || job.status == .canceled {
-                                    Button(language.localized("Retry")) {
+                                    Button(language.localized("再試行")) {
                                         store.send(.nanoBananaRetryJob(job.id))
                                     }
                                     .buttonStyle(.borderless)
@@ -1218,7 +1218,7 @@ extension ContentView {
                 }
 
                 if !nanoBananaState.history.isEmpty {
-                    Section(language.localized("History")) {
+                    Section(language.localized("履歴")) {
                         ForEach(nanoBananaState.history.prefix(4)) { item in
                             Button {
                                 nanoBananaPrompt = item.request.prompt
@@ -1253,7 +1253,7 @@ extension ContentView {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(language.localized("Generate")) {
+                    Button(language.localized("生成")) {
                         requestNanoBananaGeneration(closeSheet: true)
                     }
                     .disabled(nanoBananaGenerateDisabled)
@@ -1590,7 +1590,7 @@ extension ContentView {
                 Button(StudioStrings.open(language)) {
                     showsOpenDocumentImporter = true
                 }
-                Button(language.localized("Import Photo to New Layer")) {
+                Button(language.localized("写真を新規レイヤーに読み込む")) {
                     showsPhotoLayerImporter = true
                 }
                 Button(StudioStrings.save(language)) {
@@ -1695,7 +1695,7 @@ extension ContentView {
                         showsPosterizeSheet = true
                     }
 
-                    Button(language.localized("Convert Luminance To Opacity")) {
+                    Button(language.localized("輝度を透明度に変換")) {
                         store.send(.luminanceToAlphaRequested)
                     }
 
@@ -1747,7 +1747,7 @@ extension ContentView {
                     store.send(.layerSidebar(.addLayerButtonTapped))
                 }
 
-                Button(language.localized("Import Photo to New Layer")) {
+                Button(language.localized("写真を新規レイヤーに読み込む")) {
                     showsPhotoLayerImporter = true
                 }
 

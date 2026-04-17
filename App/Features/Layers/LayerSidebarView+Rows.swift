@@ -25,7 +25,7 @@ extension LayerSidebarView {
                     systemImage: "arrow.turn.down.right",
                     rotationDegrees: 90,
                     isActive: activeLayer.isClipped,
-                    accessibilityLabel: language.localized("Clipping Mask")
+                    accessibilityLabel: language.localized("クリッピングマスク")
                 ) {
                     store.send(.clippingMaskButtonTapped(activeLayer.index))
                 }
@@ -42,7 +42,7 @@ extension LayerSidebarView {
                 layerStatusButton(
                     systemImage: "plus.square.on.square",
                     isActive: false,
-                    accessibilityLabel: language.localized("Duplicate Layer")
+                    accessibilityLabel: language.localized("レイヤーを複製")
                 ) {
                     store.send(.duplicateLayerButtonTapped(activeLayer.index))
                 }
@@ -273,7 +273,7 @@ extension LayerSidebarView {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.turn.down.right")
                                     .rotationEffect(.degrees(90))
-                                Text(language.localized("Clipping Mask"))
+                                Text(language.localized("クリッピングマスク"))
                             }
                         }
 

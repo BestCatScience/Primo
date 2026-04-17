@@ -56,12 +56,12 @@ extension AppFeature {
 
     func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
         guard let confirmation = state.workspace.consumeCloseConfirmation() else { return .none }
-        do {
-            try saveTabsForClose(confirmation.tabIDs, state: &state)
+        switch saveTabsForClose(confirmation.tabIDs, state: &state) {
+        case .success:
             return performCloseOperation(confirmation.operation)
-        } catch {
+        case let .failure(failure):
             state.application.presentFeedback(
-                .saveFailed(Self.optionalErrorMessage(error))
+                failure.feedback
             )
             return .none
         }
