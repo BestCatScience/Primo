@@ -26,32 +26,31 @@ struct FileClient: Sendable {
     var writeData: @Sendable (Data, URL, Data.WritingOptions) throws -> Void
 
     static let live: FileClient = {
-        let fileManager = FileManager.default
         return FileClient(
-            temporaryDirectory: { fileManager.temporaryDirectory },
-            urls: { directory, domain in fileManager.urls(for: directory, in: domain) },
-            fileExists: { path in fileManager.fileExists(atPath: path) },
+            temporaryDirectory: { FileManager.default.temporaryDirectory },
+            urls: { directory, domain in FileManager.default.urls(for: directory, in: domain) },
+            fileExists: { path in FileManager.default.fileExists(atPath: path) },
             createDirectory: { url, createIntermediates in
-                try fileManager.createDirectory(at: url, withIntermediateDirectories: createIntermediates)
+                try FileManager.default.createDirectory(at: url, withIntermediateDirectories: createIntermediates)
             },
             removeItem: { url in
-                try fileManager.removeItem(at: url)
+                try FileManager.default.removeItem(at: url)
             },
             copyItem: { sourceURL, destinationURL in
-                try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
             },
             moveItem: { sourceURL, destinationURL in
-                try fileManager.moveItem(at: sourceURL, to: destinationURL)
+                try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
             },
             contentsOfDirectory: { url, keys, options in
-                try fileManager.contentsOfDirectory(
+                try FileManager.default.contentsOfDirectory(
                     at: url,
                     includingPropertiesForKeys: keys,
                     options: options
                 )
             },
             enumerateURLs: { url, keys, options in
-                guard let enumerator = fileManager.enumerator(
+                guard let enumerator = FileManager.default.enumerator(
                     at: url,
                     includingPropertiesForKeys: keys,
                     options: options

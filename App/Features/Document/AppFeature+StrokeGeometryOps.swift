@@ -126,7 +126,7 @@ extension AppFeature {
     }
 
     static func averagedStylusSample(_ samples: [StylusSample]) -> StylusSample {
-        guard let first = samples.first else {
+        guard !samples.isEmpty else {
             return StylusSample(
                 point: .zero,
                 pressure: 1.0,

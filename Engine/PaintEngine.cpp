@@ -389,18 +389,6 @@ float jitterValue(float seedA, float seedB, float amount) {
     return ((hash2D(seedA, seedB) - 0.5F) * 2.0F) * amount;
 }
 
-float nextBrushSpacingDistance(const BrushSettings& brush, const StrokePoint& point) {
-    const float baseSpacing = brushSpacingDistance(brush);
-    const float jitteredSpacing = baseSpacing * (
-        1.0F + jitterValue(
-            point.x + (point.timestamp * 0.37F),
-            point.y - (point.timestamp * 0.21F),
-            brush.spacingJitter
-        )
-    );
-    return std::max(0.2F, jitteredSpacing);
-}
-
 float dualBrushMask(
     const BrushSettings& brush,
     float pointX,
