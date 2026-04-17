@@ -54,11 +54,15 @@ extension AppFeature {
                         title: "\(restoredTitle) Snapshot",
                         sourceProjectURL: nil
                     ),
-                    marksTabDirty: true,
-                    persistsToBackingStore: true,
-                    persistsAutosave: true,
-                    dismissesSaveHistory: true,
-                    bannerMessage: restorationMessage
+                    followUp: .init(
+                        marksTabDirty: true,
+                        persistsToBackingStore: true,
+                        persistsAutosave: true
+                    ),
+                    successEffects: .init(
+                        saveHistoryResolution: .completeRestore,
+                        bannerMessage: restorationMessage
+                    )
                 ),
                 state: &state
             )
@@ -72,11 +76,15 @@ extension AppFeature {
                         title: existingTitle,
                         sourceProjectURL: existingSourceURL
                     ),
-                    marksTabDirty: true,
-                    persistsToBackingStore: true,
-                    persistsAutosave: true,
-                    dismissesSaveHistory: true,
-                    bannerMessage: restorationMessage
+                    followUp: .init(
+                        marksTabDirty: true,
+                        persistsToBackingStore: true,
+                        persistsAutosave: true
+                    ),
+                    successEffects: .init(
+                        saveHistoryResolution: .completeRestore,
+                        bannerMessage: restorationMessage
+                    )
                 ),
                 state: &state
             )

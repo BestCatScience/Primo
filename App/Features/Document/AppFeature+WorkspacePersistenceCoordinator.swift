@@ -17,15 +17,44 @@ extension AppFeature {
             case activeTab(title: String?, sourceProjectURL: DocumentProjectPath?)
         }
 
+        struct FollowUp {
+            var marksTabDirty = false
+            var persistsToBackingStore = false
+            var persistsAutosave = false
+        }
+
+        enum RecoveryResolution {
+            case none
+            case removeItem(WorkspaceItemID)
+            case completeRestore(WorkspaceItemID)
+            case dismiss
+        }
+
+        enum SaveHistoryResolution {
+            case none
+            case completeRestore
+        }
+
+        struct SuccessEffects {
+            var discardedAutosaveEntryID: WorkspaceItemID?
+            var recoveryResolution: RecoveryResolution = .none
+            var saveHistoryResolution: SaveHistoryResolution = .none
+            var bannerMessage: String?
+        }
+
         let destination: Destination
-        var marksTabDirty = false
-        var persistsToBackingStore = false
-        var persistsAutosave = false
-        var discardedAutosaveEntryID: WorkspaceItemID?
-        var removedRecoveryItemID: WorkspaceItemID?
-        var dismissesRecovery = false
-        var dismissesSaveHistory = false
-        var bannerMessage: String?
+        var followUp = FollowUp()
+        var successEffects = SuccessEffects()
+
+        init(
+            destination: Destination,
+            followUp: FollowUp = FollowUp(),
+            successEffects: SuccessEffects = SuccessEffects()
+        ) {
+            self.destination = destination
+            self.followUp = followUp
+            self.successEffects = successEffects
+        }
     }
 
     struct WorkspaceBackingStoreService {
@@ -233,10 +262,6 @@ extension AppFeature {
         using plan: LoadedWorkspaceProjectPlan,
         state: inout State
     ) {
-        if let autosaveEntryID = plan.discardedAutosaveEntryID {
-            try? workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
-        }
-
         switch plan.destination {
         case let .selectedTab(tabID, pane):
             state.workspace.activateTab(tabID, pane: pane)
@@ -260,28 +285,19 @@ extension AppFeature {
             )
         }
 
-        if plan.marksTabDirty {
-            state.workspace.setActiveTabDirty(true)
+        let followUpSucceeded = applyLoadedWorkspaceFollowUp(
+            plan.followUp,
+            state: &state
+        )
+        if followUpSucceeded {
+            applyLoadedWorkspaceSuccessEffects(
+                plan.successEffects,
+                state: &state
+            )
         }
-        if plan.persistsToBackingStore {
-            _ = persistActiveTabToBackingStore(state: &state)
-        }
-        if plan.persistsAutosave {
-            persistActiveTabAutosave(state: &state)
-        }
-        if let recoveryItemID = plan.removedRecoveryItemID {
-            state.recovery.removeItem(id: recoveryItemID)
-        }
-        if plan.dismissesRecovery {
-            state.recovery.dismiss()
-        }
-        if plan.dismissesSaveHistory {
-            state.saveHistory.dismiss()
-        }
-        state.application.finishHydration(showingHome: false)
-        if let bannerMessage = plan.bannerMessage {
-            state.application.presentBanner(bannerMessage)
-        }
+        state.application.completeWorkspaceProjectLoad(
+            bannerMessage: followUpSucceeded ? plan.successEffects.bannerMessage : nil
+        )
     }
 
     func applyDirtyPresentation(state: inout State) {
@@ -291,18 +307,67 @@ extension AppFeature {
         persistActiveTabAutosave(state: &state)
     }
 
-    func persistActiveTabAutosave(state: inout State) {
-        guard let activeTab = state.workspace.activeTab else { return }
+    @discardableResult
+    func persistActiveTabAutosave(state: inout State) -> Bool {
+        guard let activeTab = state.workspace.activeTab else { return false }
 
         do {
             try workspaceBackingStoreService.persistAutosaveSnapshot(
                 activeTab.backingStoreURL,
                 activeTab
             )
+            return true
         } catch {
             state.application.presentBanner(
                 error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
             )
+            return false
+        }
+    }
+
+    @discardableResult
+    func applyLoadedWorkspaceFollowUp(
+        _ followUp: LoadedWorkspaceProjectPlan.FollowUp,
+        state: inout State
+    ) -> Bool {
+        if followUp.marksTabDirty {
+            state.workspace.setActiveTabDirty(true)
+        }
+        if followUp.persistsToBackingStore,
+           !persistActiveTabToBackingStore(state: &state) {
+            return false
+        }
+        if followUp.persistsAutosave,
+           !persistActiveTabAutosave(state: &state) {
+            return false
+        }
+        return true
+    }
+
+    func applyLoadedWorkspaceSuccessEffects(
+        _ successEffects: LoadedWorkspaceProjectPlan.SuccessEffects,
+        state: inout State
+    ) {
+        if let autosaveEntryID = successEffects.discardedAutosaveEntryID {
+            try? workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+        }
+
+        switch successEffects.recoveryResolution {
+        case .none:
+            break
+        case let .removeItem(id):
+            state.recovery.removeItem(id: id)
+        case let .completeRestore(id):
+            state.recovery.completeRestore(of: id)
+        case .dismiss:
+            state.recovery.dismiss()
+        }
+
+        switch successEffects.saveHistoryResolution {
+        case .none:
+            break
+        case .completeRestore:
+            state.saveHistory.completeRestore()
         }
     }
 

@@ -31,7 +31,7 @@ extension AppFeature {
     ) -> Effect<Action> {
         if let existingTabID = state.workspace.tabID(forSourceProjectURL: url) {
             state.application.showWorkspace()
-            state.application.finishHydration()
+            state.application.completeWorkspaceProjectLoad()
             return .send(.tabSelected(existingTabID))
         }
         return beginWorkspaceProjectLoad(
@@ -49,7 +49,7 @@ extension AppFeature {
         sourceURL: DocumentProjectPath
     ) -> Effect<Action> {
         if let existingTabID = state.workspace.tabID(forSourceProjectURL: sourceURL) {
-            state.application.finishHydration(showingHome: false)
+            state.application.completeWorkspaceProjectLoad()
             return .send(.tabSelected(existingTabID))
         }
         applyLoadedWorkspaceProject(
@@ -59,9 +59,11 @@ extension AppFeature {
                     title: sourceURL.displayName,
                     sourceProjectURL: sourceURL
                 ),
-                bannerMessage: StudioStrings.openedDocument(
-                    loaded.presentation.layerRows.count,
-                    state.application.appLanguage
+                successEffects: .init(
+                    bannerMessage: StudioStrings.openedDocument(
+                        loaded.presentation.layerRows.count,
+                        state.application.appLanguage
+                    )
                 )
             ),
             state: &state

@@ -33,13 +33,16 @@ extension AppFeature {
                     title: item.title,
                     sourceProjectURL: item.sourceProjectURL
                 ),
-                marksTabDirty: true,
-                persistsToBackingStore: true,
-                persistsAutosave: true,
-                discardedAutosaveEntryID: item.id,
-                removedRecoveryItemID: item.id,
-                dismissesRecovery: true,
-                bannerMessage: state.application.appLanguage.localized("自動保存から復元しました")
+                followUp: .init(
+                    marksTabDirty: true,
+                    persistsToBackingStore: true,
+                    persistsAutosave: true
+                ),
+                successEffects: .init(
+                    discardedAutosaveEntryID: item.id,
+                    recoveryResolution: .completeRestore(item.id),
+                    bannerMessage: state.application.appLanguage.localized("自動保存から復元しました")
+                )
             ),
             state: &state
         )

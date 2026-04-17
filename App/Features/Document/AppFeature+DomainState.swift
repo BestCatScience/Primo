@@ -27,6 +27,15 @@ extension AppFeature.ApplicationState {
         presentBanner(message)
     }
 
+    mutating func completeWorkspaceProjectLoad(
+        bannerMessage: String? = nil
+    ) {
+        finishHydration(showingHome: false)
+        if let bannerMessage {
+            presentBanner(bannerMessage)
+        }
+    }
+
     mutating func showHome(section: HomeSidebarSection = .home) {
         showsHome = true
         homeSection = section
@@ -80,6 +89,11 @@ extension AppFeature.RecoveryState {
         items.removeAll { $0.id == id }
         isPresented = !items.isEmpty
     }
+
+    mutating func completeRestore(of id: WorkspaceItemID) {
+        removeItem(id: id)
+        dismiss()
+    }
 }
 
 extension AppFeature.SaveHistoryState {
@@ -94,6 +108,10 @@ extension AppFeature.SaveHistoryState {
 
     mutating func dismiss() {
         isPresented = false
+    }
+
+    mutating func completeRestore() {
+        dismiss()
     }
 }
 
