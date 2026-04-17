@@ -33,9 +33,10 @@ extension PaintDocumentSession {
         )
     }
 
-    func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
+    @discardableResult
+    func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> Bool {
         let layerIndex = bridgeActiveLayerIndex()
-        guard beginPixelLayerMutation(at: layerIndex) else { return }
+        guard beginPixelLayerMutation(at: layerIndex) else { return false }
         bridgeFill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
@@ -48,11 +49,13 @@ extension PaintDocumentSession {
                 sample: sample
             )
         )
+        return true
     }
 
-    func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) {
-        guard !samples.isEmpty else { return }
-        guard beginPixelLayerMutation(at: layerIndex) else { return }
+    @discardableResult
+    func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> Bool {
+        guard !samples.isEmpty else { return false }
+        guard beginPixelLayerMutation(at: layerIndex) else { return false }
         beginOrContinueTrackedBlurStroke(on: layerIndex, brush: brush)
         appendTrackedBlurSamples(samples)
         applyBlurStroke(
@@ -66,6 +69,7 @@ extension PaintDocumentSession {
             at: layerIndex,
             captureFrame: captureTimelapse
         )
+        return true
     }
 
     func endBlurStroke() {
@@ -77,7 +81,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> Bool {
-        requireExistingLayerIndex(layerIndex)
+        guard containsLayerIndex(layerIndex) else { return false }
         guard !isLayerLocked(index: layerIndex) else { return false }
         let basePixelData = pixelDataForLayer(index: layerIndex)
         guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
@@ -95,7 +99,7 @@ extension PaintDocumentSession {
 
     func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
-        requireExistingLayerIndex(layerIndex)
+        guard containsLayerIndex(layerIndex) else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
         let canvasSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
         let sourceData = pixelDataForLayer(index: layerIndex)

@@ -17,10 +17,12 @@ extension AppFeature {
                 partialResult += 1
             }
         } + 1
-        _ = layerWorkflowService.createFolder(
+        guard layerWorkflowService.createFolder(
             named: namingPolicy.folderName(forOrdinal: nextFolderNumber),
             afterLayerAt: state.layerSidebar.activeLayerIndex
-        )
+        ) >= 0 else {
+            return
+        }
         completeDocumentMutation(state: &state)
     }
 

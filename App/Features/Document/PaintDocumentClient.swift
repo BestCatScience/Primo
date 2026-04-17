@@ -19,9 +19,9 @@ struct PaintDocumentClient: Sendable {
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
     var cancelStroke: @Sendable () -> Void
-    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> Void
+    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> Bool
     var endBlurStroke: @Sendable () -> Void
-    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
+    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Bool
     var canUndo: @Sendable () -> Bool
     var canRedo: @Sendable () -> Bool
     var undo: @Sendable () -> Bool
@@ -32,19 +32,19 @@ struct PaintDocumentClient: Sendable {
     var moveLayer: @Sendable (Int, Int) -> Bool
     var createFolder: @Sendable (String, Int) -> Int
     var deleteFolder: @Sendable (Int) -> Bool
-    var setFolderVisibility: @Sendable (Int, Bool) -> Void
-    var setFolderName: @Sendable (Int, String) -> Void
-    var setFolderExpanded: @Sendable (Int, Bool) -> Void
+    var setFolderVisibility: @Sendable (Int, Bool) -> Bool
+    var setFolderName: @Sendable (Int, String) -> Bool
+    var setFolderExpanded: @Sendable (Int, Bool) -> Bool
     var assignLayerToFolder: @Sendable (Int, Int) -> Bool
-    var setActiveLayer: @Sendable (Int) -> Void
-    var setLayerName: @Sendable (Int, String) -> Void
-    var setLayerVisibility: @Sendable (Int, Bool) -> Void
-    var setLayerLocked: @Sendable (Int, Bool) -> Void
-    var setLayerAlphaLocked: @Sendable (Int, Bool) -> Void
-    var setLayerClipped: @Sendable (Int, Bool) -> Void
-    var revealLayerForEditing: @Sendable (Int) -> Void
-    var setLayerOpacity: @Sendable (Int, Double) -> Void
-    var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Void
+    var setActiveLayer: @Sendable (Int) -> Bool
+    var setLayerName: @Sendable (Int, String) -> Bool
+    var setLayerVisibility: @Sendable (Int, Bool) -> Bool
+    var setLayerLocked: @Sendable (Int, Bool) -> Bool
+    var setLayerAlphaLocked: @Sendable (Int, Bool) -> Bool
+    var setLayerClipped: @Sendable (Int, Bool) -> Bool
+    var revealLayerForEditing: @Sendable (Int) -> Bool
+    var setLayerOpacity: @Sendable (Int, Double) -> Bool
+    var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Bool
     var mergeLayerDown: @Sendable (Int) -> Bool
     var textLayerData: @Sendable (Int) -> TextLayerData?
     var setTextLayer: @Sendable (Int, TextLayerData) -> Bool

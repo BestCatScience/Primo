@@ -3,7 +3,7 @@ import Foundation
 extension PaintDocumentSession {
     @discardableResult
     func createFolder(name: String, layerIndex: Int) -> Int {
-        requireValidLayerAnchor(layerIndex, label: "Folder anchor index")
+        guard containsValidLayerAnchor(layerIndex) else { return -1 }
         let folderID = bridgeCreateFolder(name: name, layerIndex: layerIndex)
         applyRecordedLifecycleMutation(
             recording: .createFolder(
@@ -27,24 +27,34 @@ extension PaintDocumentSession {
         return didDelete
     }
 
-    func setFolderVisibility(folderID: Int, isVisible: Bool) {
+    @discardableResult
+    func setFolderVisibility(folderID: Int, isVisible: Bool) -> Bool {
+        guard containsFolderID(folderID) else { return false }
         bridgeSetFolderVisible(isVisible, folderID: folderID)
         applyRecordedLifecycleMutation(
             recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
         )
+        return true
     }
 
-    func setFolderName(folderID: Int, name: String) {
+    @discardableResult
+    func setFolderName(folderID: Int, name: String) -> Bool {
+        guard containsFolderID(folderID) else { return false }
         bridgeSetFolderName(name, folderID: folderID)
+        return true
     }
 
-    func setFolderExpanded(folderID: Int, isExpanded: Bool) {
+    @discardableResult
+    func setFolderExpanded(folderID: Int, isExpanded: Bool) -> Bool {
+        guard containsFolderID(folderID) else { return false }
         bridgeSetFolderExpanded(isExpanded, folderID: folderID)
+        return true
     }
 
     @discardableResult
     func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
+        guard folderID < 0 || containsFolderID(folderID) else { return false }
         let didAssign = bridgeSetLayerFolder(index: index, folderID: folderID)
         if didAssign {
             applyRecordedLifecycleMutation(

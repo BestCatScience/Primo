@@ -108,7 +108,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func replaceLayerMask(index: Int, maskData: Data) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
         guard maskData.count == bridgeCanvasWidth * bridgeCanvasHeight else {
             return false
         }
@@ -122,7 +122,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func clearLayerMask(index: Int) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
         guard bridgeMaskDataForLayer(index: index) != nil else {
             return false
         }
@@ -136,7 +136,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func applyLayerMask(index: Int) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
         guard bridgeApplyLayerMask(index: index) else {
             return false
         }

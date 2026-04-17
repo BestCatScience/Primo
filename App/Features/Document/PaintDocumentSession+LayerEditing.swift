@@ -38,7 +38,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func duplicateLayer(index: Int, name: String) -> Int {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return -1 }
         let duplicatedIndex = bridgeDuplicateLayer(index: index, name: name)
         if duplicatedIndex >= 0 {
             if let textLayer = storedTextLayer(at: index) {
@@ -55,7 +55,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func deleteLayer(index: Int) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
         let didDelete = bridgeDeleteLayer(index: index)
         if didDelete {
             remapStoredTextLayersForDeletion(of: index)
@@ -68,8 +68,9 @@ extension PaintDocumentSession {
 
     @discardableResult
     func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
-        requireExistingLayerIndex(index)
-        requireExistingLayerIndex(destinationIndex)
+        guard containsLayerIndex(index), containsLayerIndex(destinationIndex) else {
+            return false
+        }
         let didMove = bridgeMoveLayer(from: index, to: destinationIndex)
         if didMove {
             remapStoredTextLayersForMove(from: index, to: destinationIndex)

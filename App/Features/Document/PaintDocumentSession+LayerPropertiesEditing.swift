@@ -2,73 +2,90 @@ import CoreGraphics
 import Foundation
 
 extension PaintDocumentSession {
-    func setActiveLayer(index: Int) {
-        requireExistingLayerIndex(index, label: "Active layer index")
+    @discardableResult
+    func setActiveLayer(index: Int) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         setBridgeActiveLayerIndex(index)
+        return true
     }
 
-    func setLayerName(index: Int, name: String) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerName(index: Int, name: String) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerName(name, index: index)
+        return true
     }
 
-    func setLayerVisibility(index: Int, isVisible: Bool) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerVisibility(index: Int, isVisible: Bool) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerVisible(isVisible, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
         )
+        return true
     }
 
-    func setLayerLocked(index: Int, isLocked: Bool) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerLocked(index: Int, isLocked: Bool) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerLocked(isLocked, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
         )
+        return true
     }
 
-    func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerAlphaLocked(isAlphaLocked, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
         )
+        return true
     }
 
-    func setLayerClipped(index: Int, isClipped: Bool) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerClipped(index: Int, isClipped: Bool) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerClipped(isClipped, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped)
         )
+        return true
     }
 
-    func revealLayerForEditing(index: Int) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func revealLayerForEditing(index: Int) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerVisible(true, index: index)
+        return true
     }
 
-    func setLayerOpacity(index: Int, opacity: Double) {
-        requireExistingLayerIndex(index)
-        precondition((0...1).contains(opacity), "Layer opacity must be in 0...1.")
+    @discardableResult
+    func setLayerOpacity(index: Int, opacity: Double) -> Bool {
+        guard containsLayerIndex(index), (0...1).contains(opacity) else { return false }
         bridgeSetLayerOpacity(CGFloat(opacity), index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity)
         )
+        return true
     }
 
-    func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) {
-        requireExistingLayerIndex(index)
+    @discardableResult
+    func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> Bool {
+        guard containsLayerIndex(index) else { return false }
         bridgeSetLayerBlendMode(blendMode.rawValue, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode)
         )
+        return true
     }
 }

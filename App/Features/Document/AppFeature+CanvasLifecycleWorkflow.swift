@@ -71,12 +71,20 @@ extension AppFeature {
         case redo
     }
 
+    struct FreshDocumentReplacementContract {
+        let canvasSize: CGSize
+        let tabTitle: String
+        var successFeedback: ApplicationFeedback? = nil
+        var mutationFailureFeedback: ApplicationFeedback? = nil
+    }
+
     struct CanvasLifecycleService {
         let paintDocumentClient: PaintDocumentClient
 
-        func createCanvas(_ dimensions: CanvasDimensions) {
+        func createCanvas(_ dimensions: CanvasDimensions) -> Bool {
             paintDocumentClient.newCanvas(dimensions.width, dimensions.height)
             paintDocumentClient.prewarmDrawingResources()
+            return true
         }
 
         func resizeCanvas(_ dimensions: CanvasDimensions) -> Bool {
@@ -90,11 +98,11 @@ extension AppFeature {
         func initializeImportedCanvas(
             _ request: ImportedCanvasRequest,
             layerName: String
-        ) {
-            createCanvas(request.dimensions)
-            _ = paintDocumentClient.replaceLayerPixels(0, request.pixelData)
-            paintDocumentClient.setLayerName(0, layerName)
-            paintDocumentClient.setActiveLayer(0)
+        ) -> Bool {
+            guard createCanvas(request.dimensions) else { return false }
+            guard paintDocumentClient.replaceLayerPixels(0, request.pixelData) else { return false }
+            guard paintDocumentClient.setLayerName(0, layerName) else { return false }
+            return paintDocumentClient.setActiveLayer(0)
         }
 
         func undo() -> Bool {
@@ -200,32 +208,23 @@ extension AppFeature {
         state.application.presentFeedback(failure.feedback)
     }
 
-    func completeFreshDocumentReplacement(
-        state: inout State,
+    func prepareFreshDocumentWorkspaceState(
         canvasSize: CGSize,
-        tabTitle: String,
-        successFeedback: ApplicationFeedback? = nil,
-        documentMutation: () -> Void
-    ) -> Effect<Action> {
-        let preparedTab: PreparedWorkspaceTab
-        switch prepareNewTabReservation(
-            title: tabTitle,
-            sourceProjectURL: nil,
-            state: state
-        ) {
-        case let .success(tab):
-            preparedTab = tab
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-            return .none
-        }
-        documentMutation()
+        state: inout State
+    ) {
         AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
             canvasSize: canvasSize,
             to: &state
         )
         syncPaperStyleToDocument(state: &state)
         applyCurrentDocumentPresentation(state: &state)
+    }
+
+    func completeFreshDocumentActivation(
+        state: inout State,
+        preparedTab: PreparedWorkspaceTab,
+        successFeedback: ApplicationFeedback?
+    ) -> Effect<Action> {
         let activationSucceeded: Bool
         if case let .failure(failure) = activatePreparedTab(preparedTab, state: &state) {
             state.application.presentFeedback(failure.feedback)
@@ -237,6 +236,40 @@ extension AppFeature {
             state.application.presentFeedback(successFeedback)
         }
         return cancelStartupPresentationEffects()
+    }
+
+    func completeFreshDocumentReplacement(
+        state: inout State,
+        contract: FreshDocumentReplacementContract,
+        documentMutation: () -> Bool
+    ) -> Effect<Action> {
+        let preparedTab: PreparedWorkspaceTab
+        switch prepareNewTabReservation(
+            title: contract.tabTitle,
+            sourceProjectURL: nil,
+            state: state
+        ) {
+        case let .success(tab):
+            preparedTab = tab
+        case let .failure(failure):
+            state.application.presentFeedback(failure.feedback)
+            return .none
+        }
+        guard documentMutation() else {
+            if let feedback = contract.mutationFailureFeedback {
+                state.application.presentFeedback(feedback)
+            }
+            return .none
+        }
+        prepareFreshDocumentWorkspaceState(
+            canvasSize: contract.canvasSize,
+            state: &state
+        )
+        return completeFreshDocumentActivation(
+            state: &state,
+            preparedTab: preparedTab,
+            successFeedback: contract.successFeedback
+        )
     }
 
     func handleHistoryMutationRequest(
@@ -278,8 +311,10 @@ extension AppFeature {
         }
         return completeFreshDocumentReplacement(
             state: &state,
-            canvasSize: dimensions.size,
-            tabTitle: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
+            contract: FreshDocumentReplacementContract(
+                canvasSize: dimensions.size,
+                tabTitle: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs)
+            ),
             documentMutation: { canvasLifecycleService.createCanvas(dimensions) }
         )
     }
@@ -369,9 +404,12 @@ extension AppFeature {
         }
         return completeFreshDocumentReplacement(
             state: &state,
-            canvasSize: importedPlan.request.dimensions.size,
-            tabTitle: importedPlan.layerName,
-            successFeedback: .canvasCreatedFromImage,
+            contract: FreshDocumentReplacementContract(
+                canvasSize: importedPlan.request.dimensions.size,
+                tabTitle: importedPlan.layerName,
+                successFeedback: .canvasCreatedFromImage,
+                mutationFailureFeedback: .couldNotCreateCanvasFromImage(nil)
+            ),
             documentMutation: {
                 canvasLifecycleService.initializeImportedCanvas(
                     importedPlan.request,

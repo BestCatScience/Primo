@@ -93,74 +93,74 @@ extension AppFeature {
         func setLayerVisibility(
             _ index: Int,
             visible: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerVisibility(index, visible)
         }
 
-        func setActiveLayer(_ index: Int) {
+        func setActiveLayer(_ index: Int) -> Bool {
             paintDocumentClient.setActiveLayer(index)
         }
 
         func setLayerOpacity(
             _ index: Int,
             opacity: Double
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerOpacity(index, opacity)
         }
 
         func setLayerLocked(
             _ index: Int,
             isLocked: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerLocked(index, isLocked)
         }
 
         func setLayerAlphaLocked(
             _ index: Int,
             isAlphaLocked: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked)
         }
 
         func setLayerClipped(
             _ index: Int,
             isClipped: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerClipped(index, isClipped)
         }
 
         func setFolderExpanded(
             _ folderID: Int,
             isExpanded: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setFolderExpanded(folderID, isExpanded)
         }
 
         func setFolderVisibility(
             _ folderID: Int,
             visible: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.setFolderVisibility(folderID, visible)
         }
 
         func setFolderName(
             _ folderID: Int,
             name: String
-        ) {
+        ) -> Bool {
             paintDocumentClient.setFolderName(folderID, name)
         }
 
         func setLayerBlendMode(
             _ index: Int,
             blendMode: LayerBlendMode
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerBlendMode(index, blendMode)
         }
 
         func setLayerName(
             _ index: Int,
             name: String
-        ) {
+        ) -> Bool {
             paintDocumentClient.setLayerName(index, name)
         }
 
@@ -250,6 +250,24 @@ extension AppFeature {
     ) -> Bool {
         guard mutation() else { return false }
         completeDocumentMutation(state: &state, contract: contract)
+        return true
+    }
+
+    @discardableResult
+    func handleDocumentMutation(
+        state: inout State,
+        contract: DocumentMutationContract = .dirty,
+        failureFeedback: ApplicationFeedback,
+        mutation: () -> Bool
+    ) -> Bool {
+        guard handleDocumentMutation(
+            state: &state,
+            contract: contract,
+            mutation: mutation
+        ) else {
+            state.application.presentFeedback(failureFeedback)
+            return false
+        }
         return true
     }
 

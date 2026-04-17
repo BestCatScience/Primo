@@ -144,22 +144,31 @@ extension AppFeature {
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
         ) -> AppliedPreview? {
-            let targetLayerIndex: Int
+            let resolvedTarget: (index: Int, createdNewLayer: Bool)
             switch plan.target {
             case let .existingLayer(index):
-                targetLayerIndex = index
+                resolvedTarget = (index, false)
             case let .newLayer(name):
                 paintDocumentClient.addLayer(name)
-                targetLayerIndex = paintDocumentClient.presentation().activeLayerIndex
+                resolvedTarget = (paintDocumentClient.presentation().activeLayerIndex, true)
             }
 
-            paintDocumentClient.setActiveLayer(targetLayerIndex)
-            guard paintDocumentClient.replaceLayerPixels(targetLayerIndex, plan.preview.pixelData) else {
+            guard paintDocumentClient.setActiveLayer(resolvedTarget.index) else {
+                rollbackResolvedTargetIfNeeded(resolvedTarget)
+                return nil
+            }
+            guard paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) else {
+                rollbackResolvedTargetIfNeeded(resolvedTarget)
                 return nil
             }
             return AppliedPreview(
-                targetLayerIndex: targetLayerIndex
+                targetLayerIndex: resolvedTarget.index
             )
+        }
+
+        private func rollbackResolvedTargetIfNeeded(_ resolvedTarget: (index: Int, createdNewLayer: Bool)) {
+            guard resolvedTarget.createdNewLayer else { return }
+            _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
         }
     }
 

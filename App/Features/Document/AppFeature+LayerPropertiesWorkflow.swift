@@ -6,11 +6,12 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {
             return
         }
-        layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
-        completeDocumentMutation(
+        _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
-        )
+        ) {
+            layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
+        }
     }
 
     func handleSelectAdjacentLayer(
@@ -25,7 +26,9 @@ extension AppFeature {
             return
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
-        layerWorkflowService.setActiveLayer(targetIndex)
+        guard layerWorkflowService.setActiveLayer(targetIndex) else {
+            return
+        }
         state.canvas.activateLayerForEditing(targetIndex)
         completeDocumentMutation(
             state: &state,
@@ -38,11 +41,12 @@ extension AppFeature {
         index: Int,
         opacity: Double
     ) {
-        layerWorkflowService.setLayerOpacity(index, opacity: opacity)
-        completeDocumentMutation(
+        _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
-        )
+        ) {
+            layerWorkflowService.setLayerOpacity(index, opacity: opacity)
+        }
     }
 
     func handleLayerLockToggle(
@@ -52,8 +56,9 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
+        }
     }
 
     func handleLayerAlphaLockToggle(
@@ -63,8 +68,9 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
+        }
     }
 
     func handleLayerClippingToggle(
@@ -77,15 +83,18 @@ extension AppFeature {
         guard layer.isClipped || index > 0 else {
             return
         }
-        layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
+        }
     }
 
     func handleLayerSelection(
         state: inout State,
         index: Int
     ) {
-        layerWorkflowService.setActiveLayer(index)
+        guard layerWorkflowService.setActiveLayer(index) else {
+            return
+        }
         state.canvas.activateLayerForEditing(index)
         completeDocumentMutation(
             state: &state,
@@ -100,11 +109,12 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
-        completeDocumentMutation(
+        _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
-        )
+        ) {
+            layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
+        }
     }
 
     func handleFolderExpandedChange(
@@ -112,11 +122,12 @@ extension AppFeature {
         folderID: Int,
         isExpanded: Bool
     ) {
-        layerWorkflowService.setFolderExpanded(folderID, isExpanded: isExpanded)
-        completeDocumentMutation(
+        _ = handleDocumentMutation(
             state: &state,
             contract: .currentPresentation
-        )
+        ) {
+            layerWorkflowService.setFolderExpanded(folderID, isExpanded: isExpanded)
+        }
     }
 
     func handleFolderVisibilityToggle(
@@ -126,8 +137,9 @@ extension AppFeature {
         guard let folder = state.layerSidebar.folder(withID: folderID) else {
             return
         }
-        layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
+        }
     }
 
     func handleFolderRename(
@@ -135,8 +147,9 @@ extension AppFeature {
         folderID: Int,
         name: String
     ) {
-        layerWorkflowService.setFolderName(folderID, name: name)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setFolderName(folderID, name: name)
+        }
     }
 
     func handleLayerBlendModeChange(
@@ -144,11 +157,12 @@ extension AppFeature {
         index: Int,
         blendMode: LayerBlendMode
     ) {
-        layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
-        completeDocumentMutation(
+        _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
-        )
+        ) {
+            layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
+        }
     }
 
     func handleLayerRename(
@@ -156,7 +170,8 @@ extension AppFeature {
         index: Int,
         name: String
     ) {
-        layerWorkflowService.setLayerName(index, name: name)
-        completeDocumentMutation(state: &state)
+        _ = handleDocumentMutation(state: &state) {
+            layerWorkflowService.setLayerName(index, name: name)
+        }
     }
 }

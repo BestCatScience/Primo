@@ -3,6 +3,76 @@ import SwiftUI
 
 extension AppFeature {
     struct AppFeatureCanvasPresentationStateCoordinator {
+        func rebuiltLayerBuffers(
+            from presentation: PaintDocumentPresentation,
+            existingBuffers: [LayerCanvasBuffer]
+        ) -> [LayerCanvasBuffer] {
+            let indexedBuffers = Dictionary(uniqueKeysWithValues: existingBuffers.map { ($0.index, $0) })
+            return presentation.layerRows.sorted(by: { $0.index < $1.index }).map { row in
+                var buffer = indexedBuffers[row.index] ?? LayerCanvasBuffer(
+                    index: row.index,
+                    name: row.name,
+                    visible: row.visible,
+                    opacity: row.opacity,
+                    blendMode: row.blendMode
+                )
+                buffer.name = row.name
+                buffer.visible = row.visible
+                buffer.opacity = row.opacity
+                buffer.blendMode = row.blendMode
+                return buffer
+            }
+        }
+
+        func applyRenderSnapshotIfAvailable(
+            from presentation: PaintDocumentPresentation,
+            previousRevision: Int,
+            to state: inout AppFeature.State
+        ) {
+            guard let renderSnapshot = presentation.renderSnapshot else { return }
+            state.canvas.applyCommittedRenderSnapshot(
+                renderSnapshot,
+                previousRevision: previousRevision
+            )
+            state.application.finishHydration()
+        }
+
+        func applyLayerSidebarPresentation(
+            from presentation: PaintDocumentPresentation,
+            to state: inout AppFeature.State
+        ) {
+            state.layerSidebar.applyPresentation(
+                layers: presentation.layerRows,
+                rows: presentation.layerSidebarRows,
+                layerBuffers: state.canvas.layerBuffers,
+                activeLayerIndex: presentation.activeLayerIndex,
+                paperColor: state.brushPalette.paper.color,
+                transparentPaper: state.brushPalette.paper.isTransparent
+            )
+        }
+
+        func syncCanvasInteractionState(state: inout AppFeature.State) {
+            state.canvas.updateInteractionStyle(
+                previewStyle: AppFeature.canvasToolStateCoordinator.previewStrokeStyle(for: state),
+                paperStyle: AppFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
+            )
+            state.canvas.updateInteractionModes(
+                selectionMode: state.brushPalette.selection.toolMode,
+                shapeMode: state.brushPalette.shape.mode,
+                eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
+            )
+        }
+
+        func syncActiveTextLayer(
+            from presentation: PaintDocumentPresentation,
+            state: inout AppFeature.State
+        ) {
+            state.canvas.setActiveTextLayer(
+                presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
+            )
+            syncTextEditorWithActiveLayer(state: &state)
+        }
+
         func prepareFreshDocument(
             canvasSize: CGSize,
             to state: inout AppFeature.State
@@ -25,51 +95,20 @@ extension AppFeature {
             state.canvas.setCanvasSize(presentation.canvasSize)
             state.canvas.activateLayer(presentation.activeLayerIndex)
             let previousRevision = state.canvas.renderSnapshot?.revision ?? state.canvas.lastCommittedRenderRevision
-            var nextBuffers: [LayerCanvasBuffer] = []
-            let existingBuffers = Dictionary(uniqueKeysWithValues: state.canvas.layerBuffers.map { ($0.index, $0) })
-            for row in presentation.layerRows.sorted(by: { $0.index < $1.index }) {
-                var buffer = existingBuffers[row.index] ?? LayerCanvasBuffer(
-                    index: row.index,
-                    name: row.name,
-                    visible: row.visible,
-                    opacity: row.opacity,
-                    blendMode: row.blendMode
+            state.canvas.replaceLayerBuffers(
+                rebuiltLayerBuffers(
+                    from: presentation,
+                    existingBuffers: state.canvas.layerBuffers
                 )
-                buffer.name = row.name
-                buffer.visible = row.visible
-                buffer.opacity = row.opacity
-                buffer.blendMode = row.blendMode
-                nextBuffers.append(buffer)
-            }
-            state.canvas.replaceLayerBuffers(nextBuffers)
-            if let renderSnapshot = presentation.renderSnapshot {
-                state.canvas.applyCommittedRenderSnapshot(
-                    renderSnapshot,
-                    previousRevision: previousRevision
-                )
-                state.application.finishHydration()
-            }
-            state.layerSidebar.applyPresentation(
-                layers: presentation.layerRows,
-                rows: presentation.layerSidebarRows,
-                layerBuffers: state.canvas.layerBuffers,
-                activeLayerIndex: presentation.activeLayerIndex,
-                paperColor: state.brushPalette.paper.color,
-                transparentPaper: state.brushPalette.paper.isTransparent
             )
-            state.canvas.updateInteractionStyle(
-                previewStyle: AppFeature.canvasToolStateCoordinator.previewStrokeStyle(for: state),
-                paperStyle: AppFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
+            applyRenderSnapshotIfAvailable(
+                from: presentation,
+                previousRevision: previousRevision,
+                to: &state
             )
-            state.canvas.updateInteractionModes(
-                selectionMode: state.brushPalette.selection.toolMode,
-                shapeMode: state.brushPalette.shape.mode,
-                eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
-            )
-            state.canvas.setActiveTextLayer(
-                presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
-            )
-            syncTextEditorWithActiveLayer(state: &state)
+            applyLayerSidebarPresentation(from: presentation, to: &state)
+            syncCanvasInteractionState(state: &state)
+            syncActiveTextLayer(from: presentation, state: &state)
         }
 
         func applyLoadedProject(

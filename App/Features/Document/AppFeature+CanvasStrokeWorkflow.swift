@@ -2,10 +2,16 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    struct StrokePreviewPlan {
+        let baseSnapshot: MetalDocumentSnapshot
+        let adjustedPixels: Data
+        let incrementalUpdate: IncrementalLayerUpdate?
+    }
+
     struct CanvasStrokeWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
-        func ensureLayerVisible(_ layerIndex: Int) {
+        func ensureLayerVisible(_ layerIndex: Int) -> Bool {
             paintDocumentClient.setLayerVisibility(layerIndex, true)
         }
 
@@ -47,7 +53,7 @@ extension AppFeature {
             paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex)
         }
 
-        func revealLayerForEditing(_ layerIndex: Int) {
+        func revealLayerForEditing(_ layerIndex: Int) -> Bool {
             paintDocumentClient.revealLayerForEditing(layerIndex)
         }
 
@@ -56,7 +62,7 @@ extension AppFeature {
             brush: BrushRuntimeSettings,
             layerIndex: Int,
             clearSelectionAfterBlur: Bool
-        ) {
+        ) -> Bool {
             paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
         }
 
@@ -67,7 +73,7 @@ extension AppFeature {
         func fill(
             _ sample: StylusSample,
             brush: BrushRuntimeSettings
-        ) {
+        ) -> Bool {
             paintDocumentClient.fill(sample, brush)
         }
     }
@@ -98,10 +104,88 @@ extension AppFeature {
         )
     }
 
-    func prepareCanvasStrokeEditing(state: inout State) {
-        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
+    func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
+        guard state.canvas.activeStrokeBaseSnapshot == nil else { return }
+        ensureCurrentCanvasPresentationLoaded(state: &state)
+        if let renderSnapshot = state.canvas.renderSnapshot {
+            state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
+        }
+    }
+
+    func prepareCanvasStrokeEditing(state: inout State) -> Bool {
+        guard canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
+            return false
+        }
         clearCanvasSelectionWithoutRefresh(state: &state)
         canvasStrokeWorkflowService.cancelStroke()
+        return true
+    }
+
+    func previewBrush(for brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
+        var previewBrush = brush
+        previewBrush.taperIn = 0
+        previewBrush.taperOut = 0
+        return previewBrush
+    }
+
+    func makeStrokePreviewPlan(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        basePixelData: Data,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool
+    ) -> StrokePreviewPlan? {
+        guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+            basePixelData: basePixelData,
+            canvasWidth: snapshot.width,
+            canvasHeight: snapshot.height,
+            samples: samples,
+            brush: brush,
+            preserveAlphaLockedPixels: preserveAlphaLockedPixels
+        ) else {
+            return nil
+        }
+        let incrementalUpdate: IncrementalLayerUpdate?
+        if Self.shouldUseIncrementalPreviewUpdate(for: brush),
+           let dirtyRect = Self.strokePreviewDirtyRect(
+            samples: samples,
+            brush: brush,
+            canvasWidth: snapshot.width,
+            canvasHeight: snapshot.height
+           ) {
+            incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerPixels: adjustedPixels,
+                dirtyRect: dirtyRect
+            )
+        } else {
+            incrementalUpdate = nil
+        }
+        return StrokePreviewPlan(
+            baseSnapshot: snapshot,
+            adjustedPixels: adjustedPixels,
+            incrementalUpdate: incrementalUpdate
+        )
+    }
+
+    func applyStrokePreviewPlan(
+        _ plan: StrokePreviewPlan,
+        activeLayerIndex: Int,
+        state: inout State
+    ) {
+        state.canvas.setStrokePreviewLayerPixelData(plan.adjustedPixels)
+        if let incrementalUpdate = plan.incrementalUpdate {
+            state.canvas.setPendingIncrementalUpdate(incrementalUpdate)
+        } else {
+            applyLiveStrokePreview(
+                baseSnapshot: plan.baseSnapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerPixels: plan.adjustedPixels,
+                state: &state
+            )
+        }
     }
 
     func commitStrokeUsingFallbackPixels(
@@ -161,54 +245,26 @@ extension AppFeature {
         guard let activeLayer = activeEditableCanvasLayer(in: state) else {
             return .none
         }
-        prepareCanvasStrokeEditing(state: &state)
-        if state.canvas.activeStrokeBaseSnapshot == nil {
-            ensureCurrentCanvasPresentationLoaded(state: &state)
-            if let renderSnapshot = state.canvas.renderSnapshot {
-                state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
-            }
+        guard prepareCanvasStrokeEditing(state: &state) else {
+            return .none
         }
-        let brush = resolvedBrushSettings(for: state)
-        var previewBrush = brush
-        previewBrush.taperIn = 0
-        previewBrush.taperOut = 0
-        if
-            let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-            let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                basePixelData: baseLayer.pixelData,
-                canvasWidth: baseSnapshot.width,
-                canvasHeight: baseSnapshot.height,
-                samples: [sample],
-                brush: previewBrush,
-                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
+        captureActiveStrokeBaseSnapshotIfNeeded(state: &state)
+        let previewBrush = previewBrush(for: resolvedBrushSettings(for: state))
+        if let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+           let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+           let previewPlan = makeStrokePreviewPlan(
+            snapshot: baseSnapshot,
+            activeLayerIndex: state.canvas.activeLayerIndex,
+            basePixelData: baseLayer.pixelData,
+            samples: [sample],
+            brush: previewBrush,
+            preserveAlphaLockedPixels: activeLayer.isAlphaLocked
+           ) {
+            applyStrokePreviewPlan(
+                previewPlan,
+                activeLayerIndex: state.canvas.activeLayerIndex,
+                state: &state
             )
-        {
-            state.canvas.setStrokePreviewLayerPixelData(adjustedPixels)
-            if
-                Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-                let dirtyRect = Self.strokePreviewDirtyRect(
-                    samples: [sample],
-                    brush: previewBrush,
-                    canvasWidth: baseSnapshot.width,
-                    canvasHeight: baseSnapshot.height
-                ),
-                let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                    snapshot: baseSnapshot,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedPixels,
-                    dirtyRect: dirtyRect
-                )
-            {
-                state.canvas.setPendingIncrementalUpdate(incrementalUpdate)
-            } else {
-                applyLiveStrokePreview(
-                    baseSnapshot: baseSnapshot,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedPixels,
-                    state: &state
-                )
-            }
         }
         return cancelStartupPresentationEffects()
     }
@@ -221,10 +277,7 @@ extension AppFeature {
         guard let activeLayer = activeEditableCanvasLayer(in: state) else {
             return
         }
-        let brush = resolvedBrushSettings(for: state)
-        var previewBrush = brush
-        previewBrush.taperIn = 0
-        previewBrush.taperOut = 0
+        let previewBrush = previewBrush(for: resolvedBrushSettings(for: state))
         if
             let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
             let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
@@ -234,51 +287,31 @@ extension AppFeature {
             let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
             let previewSamples = anchor.map { [$0] + samples } ?? samples
             let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
-            guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+            guard let previewPlan = makeStrokePreviewPlan(
+                snapshot: baseSnapshot,
+                activeLayerIndex: state.canvas.activeLayerIndex,
                 basePixelData: basePixelData,
-                canvasWidth: baseSnapshot.width,
-                canvasHeight: baseSnapshot.height,
                 samples: previewSamples,
                 brush: previewBrush,
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
             ) else {
                 return
             }
-            state.canvas.setStrokePreviewLayerPixelData(adjustedPixels)
-            if
-                Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-                let dirtyRect = Self.strokePreviewDirtyRect(
-                    samples: previewSamples,
-                    brush: previewBrush,
-                    canvasWidth: baseSnapshot.width,
-                    canvasHeight: baseSnapshot.height
-                ),
-                let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                    snapshot: baseSnapshot,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedPixels,
-                    dirtyRect: dirtyRect
-                )
-            {
-                state.canvas.setPendingIncrementalUpdate(incrementalUpdate)
-            } else {
-                applyLiveStrokePreview(
-                    baseSnapshot: baseSnapshot,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedPixels,
-                    state: &state
-                )
-            }
+            applyStrokePreviewPlan(
+                previewPlan,
+                activeLayerIndex: state.canvas.activeLayerIndex,
+                state: &state
+            )
             return
         }
 
         guard
             let snapshot = state.canvas.renderSnapshot,
             let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+            let previewPlan = makeStrokePreviewPlan(
+                snapshot: snapshot,
+                activeLayerIndex: state.canvas.activeLayerIndex,
                 basePixelData: baseLayer.pixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
                 samples: samples,
                 brush: previewBrush,
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
@@ -286,31 +319,11 @@ extension AppFeature {
         else { return }
 
         state.canvas.captureStrokeBaseSnapshot(snapshot)
-        state.canvas.setStrokePreviewLayerPixelData(adjustedPixels)
-        if
-            Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-            let dirtyRect = Self.strokePreviewDirtyRect(
-                samples: samples,
-                brush: previewBrush,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height
-            ),
-            let incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                snapshot: snapshot,
-                activeLayerIndex: state.canvas.activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedPixels,
-                dirtyRect: dirtyRect
-            )
-        {
-            state.canvas.setPendingIncrementalUpdate(incrementalUpdate)
-        } else {
-            applyLiveStrokePreview(
-                baseSnapshot: snapshot,
-                activeLayerIndex: state.canvas.activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedPixels,
-                state: &state
-            )
-        }
+        applyStrokePreviewPlan(
+            previewPlan,
+            activeLayerIndex: state.canvas.activeLayerIndex,
+            state: &state
+        )
     }
 
     func handlePreviewShapeStroke(
@@ -318,7 +331,9 @@ extension AppFeature {
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard let first = samples.first else { return .none }
-        prepareCanvasStrokeEditing(state: &state)
+        guard prepareCanvasStrokeEditing(state: &state) else {
+            return .none
+        }
         canvasStrokeWorkflowService.beginStroke(first, brush: resolvedBrushSettings(for: state))
         for sample in samples.dropFirst() {
             canvasStrokeWorkflowService.appendStroke(sample)
@@ -345,7 +360,10 @@ extension AppFeature {
         let brush = resolvedBrushSettings(for: state)
         let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
         if keepsSelectionCleared {
-            canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
+            guard canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
+                resetStrokePreviewState(state: &state)
+                return .none
+            }
             clearCanvasSelectionWithoutRefresh(state: &state)
         }
         let didCommit: Bool
@@ -401,13 +419,17 @@ extension AppFeature {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return
         }
-        canvasStrokeWorkflowService.revealLayerForEditing(state.canvas.activeLayerIndex)
-        canvasStrokeWorkflowService.blurStroke(
+        guard canvasStrokeWorkflowService.revealLayerForEditing(state.canvas.activeLayerIndex) else {
+            return
+        }
+        guard canvasStrokeWorkflowService.blurStroke(
             samples,
             brush: resolvedBrushSettings(for: state),
             layerIndex: state.canvas.activeLayerIndex,
             clearSelectionAfterBlur: false
-        )
+        ) else {
+            return
+        }
         completeDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
@@ -426,8 +448,12 @@ extension AppFeature {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
-        canvasStrokeWorkflowService.fill(sample, brush: resolvedBrushSettings(for: state))
+        guard canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
+            return .none
+        }
+        guard canvasStrokeWorkflowService.fill(sample, brush: resolvedBrushSettings(for: state)) else {
+            return .none
+        }
         return completeCanvasStrokeMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)

@@ -222,12 +222,16 @@ extension PaintDocumentSession {
         bridge.activeLayerIndex = index
     }
 
-    func requireExistingLayerIndex(_ index: Int, label: String = "Layer index") {
-        precondition(bridgeLayerInfos().indices.contains(index), "\(label) must resolve to an existing layer.")
+    func containsLayerIndex(_ index: Int) -> Bool {
+        bridgeLayerInfos().indices.contains(index)
     }
 
-    func requireValidLayerAnchor(_ index: Int, label: String = "Layer anchor index") {
-        precondition(index < 0 || bridgeLayerInfos().indices.contains(index), "\(label) must resolve to an existing layer or be -1.")
+    func containsValidLayerAnchor(_ index: Int) -> Bool {
+        index < 0 || containsLayerIndex(index)
+    }
+
+    func containsFolderID(_ folderID: Int) -> Bool {
+        bridgeFolderInfos().contains { Int($0.folderID) == folderID }
     }
 
     @discardableResult
@@ -235,7 +239,7 @@ extension PaintDocumentSession {
         at index: Int,
         preservesTextLayerMetadata: Bool = false
     ) -> Bool {
-        requireExistingLayerIndex(index)
+        guard containsLayerIndex(index) else { return false }
         guard !isLayerLocked(index: index) else { return false }
         if !preservesTextLayerMetadata {
             clearTextLayerData(index: index)

@@ -3,6 +3,11 @@ import CoreGraphics
 import Foundation
 
 extension AppFeature {
+    enum SelectionTransformCommit {
+        case text(layerIndex: Int, textLayer: TextLayerData)
+        case pixels(layerIndex: Int, pixelData: Data, selection: CanvasSelection?)
+    }
+
     struct SelectionTransformService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -39,7 +44,7 @@ extension AppFeature {
         )
     }
 
-    func applyTransform(state: inout State) -> Effect<Action> {
+    func selectionTransformCommit(in state: State) -> SelectionTransformCommit? {
         let translation = CGSize(
             width: state.canvas.transformPreviewOffset.width.rounded(),
             height: state.canvas.transformPreviewOffset.height.rounded()
@@ -50,30 +55,17 @@ extension AppFeature {
         let transformMode = state.canvas.transformMode
         let transformPivot = state.canvas.transformPivot
         let quadOffsets = state.canvas.transformQuadOffsets
-        guard state.canvas.transformHasPreview else { return .none }
-        if
-            state.canvas.selection == nil,
-            var textLayer = state.canvas.activeTextLayer
-        {
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        if state.canvas.selection == nil,
+           var textLayer = state.canvas.activeTextLayer {
             textLayer.position = CGPoint(
                 x: textLayer.position.x + translation.width,
                 y: textLayer.position.y + translation.height
             )
             textLayer.scale = min(max(textLayer.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
             textLayer.rotationDegrees += rotationDegrees
-            guard selectionTransformService.setTextLayer(state.canvas.activeLayerIndex, textLayer) else {
-                discardTransformPreview(state: &state)
-                return .none
-            }
-            completeDocumentMutation(
-                state: &state,
-                contract: DocumentMutationContract(
-                    canvasMutation: .resetTransformPreview
-                )
-            )
-            return .none
+            return .text(layerIndex: activeLayerIndex, textLayer: textLayer)
         }
-        let activeLayerIndex = state.canvas.activeLayerIndex
         let source = selectionTransformService.pixelDataForLayer(activeLayerIndex)
         let canvasWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
@@ -90,32 +82,62 @@ extension AppFeature {
             mode: transformMode,
             quadOffsets: quadOffsets
         ) else {
-            discardTransformPreview(state: &state)
-            return .none
+            return nil
         }
-        guard selectionTransformService.replaceLayerPixels(activeLayerIndex, transformed) else {
-            discardTransformPreview(state: &state)
-            return .none
-        }
-        completeDocumentMutation(
-            state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: .completeTransform(
-                    layerIndex: activeLayerIndex,
-                    selection: Self.transformedSelection(
-                        state.canvas.selection,
-                        translation: translation,
-                        scaleX: scaleX,
-                        scaleY: scaleY,
-                        rotationDegrees: rotationDegrees,
-                        pivot: transformPivot,
-                        mode: transformMode,
-                        quadOffsets: quadOffsets,
-                        canvasSize: state.canvas.canvasSize
-                    )
-                )
+        return .pixels(
+            layerIndex: activeLayerIndex,
+            pixelData: transformed,
+            selection: Self.transformedSelection(
+                state.canvas.selection,
+                translation: translation,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                rotationDegrees: rotationDegrees,
+                pivot: transformPivot,
+                mode: transformMode,
+                quadOffsets: quadOffsets,
+                canvasSize: state.canvas.canvasSize
             )
         )
+    }
+
+    func applyTransform(state: inout State) -> Effect<Action> {
+        guard state.canvas.transformHasPreview else { return .none }
+        guard let commit = selectionTransformCommit(in: state) else {
+            discardTransformPreview(state: &state)
+            return .none
+        }
+        switch commit {
+        case let .text(layerIndex, textLayer):
+            guard handleDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .resetTransformPreview
+                ),
+                mutation: {
+                    selectionTransformService.setTextLayer(layerIndex, textLayer)
+                }
+            ) else {
+                discardTransformPreview(state: &state)
+                return .none
+            }
+        case let .pixels(layerIndex, pixelData, selection):
+            guard handleDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .completeTransform(
+                        layerIndex: layerIndex,
+                        selection: selection
+                    )
+                ),
+                mutation: {
+                    selectionTransformService.replaceLayerPixels(layerIndex, pixelData)
+                }
+            ) else {
+                discardTransformPreview(state: &state)
+                return .none
+            }
+        }
         return .none
     }
 }
