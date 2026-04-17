@@ -26,7 +26,7 @@ extension AppFeature {
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetIndex)
         state.canvas.activateLayer(targetIndex)
         state.canvas.clearSelection()
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        applyCurrentDocumentPresentation(state: &state)
     }
 
     func handleLayerOpacityChange(
@@ -82,7 +82,7 @@ extension AppFeature {
         layerWorkflowService.paintDocumentClient.setActiveLayer(index)
         state.canvas.activateLayer(index)
         state.canvas.clearSelection()
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        applyCurrentDocumentPresentation(state: &state)
     }
 
     func handleLayerVisibilityToggle(
@@ -103,7 +103,7 @@ extension AppFeature {
         isExpanded: Bool
     ) {
         layerWorkflowService.paintDocumentClient.setFolderExpanded(folderID, isExpanded)
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        applyCurrentDocumentPresentation(state: &state)
     }
 
     func handleFolderVisibilityToggle(

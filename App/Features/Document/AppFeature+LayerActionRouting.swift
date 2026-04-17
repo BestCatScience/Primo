@@ -2,6 +2,12 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    private enum BrushPaletteSyncScope {
+        case none
+        case interaction
+        case paper
+    }
+
     func routeLayerEditingAction(
         state: inout State,
         action: Action
@@ -23,13 +29,15 @@ extension AppFeature {
             handleSelectAdjacentLayer(state: &state, direction: 1)
             return .none
 
-        case .brushPalette(.binding(\.paper.color)),
-             .brushPalette(.binding(\.paper.isTransparent)):
-            handleBrushPalettePaperBindingChanged(state: &state)
-            return .none
-
-        case .brushPalette:
-            handleBrushPaletteStateRefresh(state: &state)
+        case let .brushPalette(brushAction):
+            switch brushPaletteSyncScope(for: brushAction) {
+            case .paper:
+                handleBrushPalettePaperBindingChanged(state: &state)
+            case .interaction:
+                handleBrushPaletteInteractionRefresh(state: &state)
+            case .none:
+                break
+            }
             return .none
 
         case .layerSidebar(.binding(\.paperColor)):
@@ -125,6 +133,91 @@ extension AppFeature {
 
         default:
             return nil
+        }
+    }
+
+    private func brushPaletteSyncScope(for action: BrushPaletteFeature.Action) -> BrushPaletteSyncScope {
+        switch action {
+        case .binding(\.paper.color),
+             .binding(\.paper.isTransparent):
+            return .paper
+
+        case .binding(\.brush.radius),
+             .binding(\.brush.color),
+             .binding(\.brush.secondaryColor),
+             .binding(\.brush.selectedColorSlot),
+             .binding(\.brush.tipKind),
+             .binding(\.brush.sizeSpeedSensitivity),
+             .binding(\.brush.opacity),
+             .binding(\.brush.hardness),
+             .binding(\.brush.roundness),
+             .binding(\.brush.roundnessPressureSensitivity),
+             .binding(\.brush.roundnessTiltSensitivity),
+             .binding(\.brush.angle),
+             .binding(\.brush.anglePressureSensitivity),
+             .binding(\.brush.angleTiltSensitivity),
+             .binding(\.brush.angleMode),
+             .binding(\.brush.spacing),
+             .binding(\.brush.spacingJitter),
+             .binding(\.brush.scatterEnabled),
+             .binding(\.brush.scatterMode),
+             .binding(\.brush.scatterLateral),
+             .binding(\.brush.scatterLinear),
+             .binding(\.brush.count),
+             .binding(\.brush.countJitter),
+             .binding(\.brush.countSizeJitter),
+             .binding(\.brush.countOpacityJitter),
+             .binding(\.brush.angleJitter),
+             .binding(\.brush.roundnessJitter),
+             .binding(\.brush.textureMode),
+             .binding(\.brush.textureStrength),
+             .binding(\.brush.flow),
+             .binding(\.brush.flowPressureSensitivity),
+             .binding(\.brush.flowJitter),
+             .binding(\.brush.velocityInfluence),
+             .binding(\.brush.wetness),
+             .binding(\.brush.wetnessPressureSensitivity),
+             .binding(\.brush.opacityPressureSensitivity),
+             .binding(\.brush.colorMixStrength),
+             .binding(\.brush.paintLoad),
+             .binding(\.brush.loadPressureSensitivity),
+             .binding(\.brush.dualEnabled),
+             .binding(\.brush.dualTipKind),
+             .binding(\.brush.dualScale),
+             .binding(\.brush.dualSpacing),
+             .binding(\.brush.dualScatter),
+             .binding(\.brush.dualAngle),
+             .binding(\.brush.dualBlendMode),
+             .binding(\.brush.grainScale),
+             .binding(\.brush.grainContrast),
+             .binding(\.brush.paperScale),
+             .binding(\.brush.paperStrength),
+             .binding(\.brush.paperThreshold),
+             .binding(\.brush.flipX),
+             .binding(\.brush.flipY),
+             .binding(\.brush.pressureSensitivity),
+             .binding(\.brush.stabilization),
+             .binding(\.selection.toolMode),
+             .binding(\.selection.combineMode),
+             .binding(\.selection.thresholdMode),
+             .binding(\.selection.opacityTolerance),
+             .binding(\.selection.colorTolerance),
+             .binding(\.selection.expansion),
+             .binding(\.fill.thresholdMode),
+             .binding(\.fill.opacityTolerance),
+             .binding(\.fill.colorTolerance),
+             .binding(\.fill.expansion),
+             .binding(\.shape.mode),
+             .binding(\.sampling.eyedropperSource),
+             .selectPreset,
+             .importedPresets,
+             .resetCurrentBrushSettingsButtonTapped,
+             .deleteSavedPresetButtonTapped,
+             .renameSavedPresetButtonTapped:
+            return .interaction
+
+        default:
+            return .none
         }
     }
 }

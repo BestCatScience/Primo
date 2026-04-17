@@ -17,12 +17,12 @@ extension AppFeature {
         )
         applyToolSpecificBrushSize(for: tool, state: &state)
         if tool == .text {
-            state.brushPanel.isCollapsed = false
+            expandPanel(.brush, state: &state)
             state.brushPalette.ensureTextPlacement(in: state.canvas.canvasSize)
             syncTextEditorWithActiveLayer(state: &state)
         }
         if showsBrushSettingsPopover {
-            state.brushPanel.isCollapsed = false
+            expandPanel(.brush, state: &state)
             state.brushPalette.presentBrushSettingsPopover()
         }
         state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
@@ -95,30 +95,25 @@ extension AppFeature {
         point: CGPoint
     ) {
         state.brushPalette.setTextPlacement(point)
-        state.brushPanel.isCollapsed = false
+        expandPanel(.brush, state: &state)
     }
 
-    func handleBrushPaletteStateRefresh(state: inout State) {
+    func handleBrushPaletteInteractionRefresh(state: inout State) {
         syncToolSpecificBrushSize(state: &state)
         state.canvas.updateInteractionModes(
             selectionMode: state.brushPalette.selection.toolMode,
             shapeMode: state.brushPalette.shape.mode,
             eyedropperSamplingSource: state.brushPalette.sampling.eyedropperSource
         )
-        state.canvas.updateInteractionStyle(
-            previewStyle: previewStrokeStyle(for: state),
-            paperStyle: resolvedPaperStyle(for: state)
-        )
+        state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
+    }
+
+    func handlePaperBindingSync(state: inout State) {
         state.layerSidebar.syncPaper(
             color: state.brushPalette.paper.color,
             isTransparent: state.brushPalette.paper.isTransparent
         )
-    }
-
-    func handlePaperBindingSync(state: inout State) {
-        handleBrushPaletteStateRefresh(state: &state)
-        state.canvas.updatePaperStyle(resolvedPaperStyle(for: state))
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        syncPaperStyleToDocument(state: &state, updateCanvasPaper: true)
     }
 
     func handlePaperColorBindingChanged(state: inout State) {

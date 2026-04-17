@@ -103,7 +103,7 @@ extension AppFeature {
             state.workspace.updateActiveTabMetadata(
                 title: existingTitle,
                 sourceProjectURL: existingSourceURL,
-                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
+                previewImageData: compositePNGData(state: state),
                 canvasSize: state.canvas.canvasSize
             )
         }

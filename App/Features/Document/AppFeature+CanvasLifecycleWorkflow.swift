@@ -20,14 +20,13 @@ extension AppFeature {
         state.canvas.setCanvasSize(CGSize(width: width, height: height))
         state.layerSidebar = LayerSidebarFeature.State()
         state.brushPalette = BrushPaletteFeature.State()
-        state.brushPanel = StudioPanelLayoutState()
-        state.layerPanel = StudioPanelLayoutState()
+        resetPanels(state: &state)
         state.canvas.clearAdjustmentPreview()
         state.export.clearOutputs()
         state.application.clearBanner()
         state.application.finishHydration()
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        syncPaperStyleToDocument(state: &state)
+        applyCurrentDocumentPresentation(state: &state)
         activateNewTab(
             state: &state,
             title: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
@@ -101,13 +100,12 @@ extension AppFeature {
         state.canvas.setCanvasSize(CGSize(width: width, height: height))
         state.layerSidebar = LayerSidebarFeature.State()
         state.brushPalette = BrushPaletteFeature.State()
-        state.brushPanel = StudioPanelLayoutState()
-        state.layerPanel = StudioPanelLayoutState()
+        resetPanels(state: &state)
         state.canvas.clearAdjustmentPreview()
         state.export.clearOutputs()
         state.application.clearBanner()
         state.application.finishHydration()
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        syncPaperStyleToDocument(state: &state)
         paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
         let nextName = {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -115,7 +113,7 @@ extension AppFeature {
         }()
         paintDocumentClient.setLayerName(0, nextName)
         paintDocumentClient.setActiveLayer(0)
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        applyCurrentDocumentPresentation(state: &state)
         activateNewTab(
             state: &state,
             title: nextName,

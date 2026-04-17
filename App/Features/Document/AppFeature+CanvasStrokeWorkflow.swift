@@ -26,7 +26,7 @@ extension AppFeature {
         canvasStrokeWorkflowService.paintDocumentClient.cancelStroke()
         if state.canvas.activeStrokeBaseSnapshot == nil {
             if state.canvas.renderSnapshot == nil {
-                applyPresentation(paintDocumentClient.presentation(), state: &state)
+                applyCurrentDocumentPresentation(state: &state)
             }
             if let renderSnapshot = state.canvas.renderSnapshot {
                 state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
@@ -234,7 +234,7 @@ extension AppFeature {
             )
             if !didCommit {
                 if !refreshViaDirtyPresentation && state.canvas.renderSnapshot == nil {
-                    applyPresentation(paintDocumentClient.presentation(), state: &state)
+                    applyCurrentDocumentPresentation(state: &state)
                 }
                 let fallbackSnapshot = refreshViaDirtyPresentation
                     ? state.canvas.activeStrokeBaseSnapshot
@@ -257,7 +257,7 @@ extension AppFeature {
         if refreshViaDirtyPresentation {
             applyDirtyPresentation(state: &state)
         } else {
-            applyPresentation(paintDocumentClient.presentation(), state: &state)
+            applyCurrentDocumentPresentation(state: &state)
         }
         return .concatenate(
             .cancel(id: CancelID.startupPresentationLoad),
@@ -270,7 +270,7 @@ extension AppFeature {
             canvasStrokeWorkflowService.paintDocumentClient.cancelStroke()
         }
         resetStrokePreviewState(state: &state)
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+        applyCurrentDocumentPresentation(state: &state)
         return .concatenate(
             .cancel(id: CancelID.startupPresentationLoad),
             .cancel(id: CancelID.deferredPresentationRefresh)

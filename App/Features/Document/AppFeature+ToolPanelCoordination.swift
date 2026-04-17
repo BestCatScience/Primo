@@ -23,6 +23,17 @@ extension AppFeature {
         AppFeature.toolPanelStateCoordinator.toggleCollapse(for: panel, in: &state)
     }
 
+    func expandPanel(
+        _ panel: StudioPanelKind,
+        state: inout State
+    ) {
+        AppFeature.toolPanelStateCoordinator.expand(panel, in: &state)
+    }
+
+    func resetPanels(state: inout State) {
+        AppFeature.toolPanelStateCoordinator.resetPanels(in: &state)
+    }
+
     func syncToolSpecificBrushSize(state: inout State) {
         AppFeature.toolPanelStateCoordinator.syncToolSpecificBrushSize(state: &state)
     }

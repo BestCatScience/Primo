@@ -4,7 +4,7 @@ import Foundation
 extension AppFeature {
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: appLanguageClient.load())
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        syncPaperStyleToDocument(state: &state)
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
             .run { [paintDocumentClient] send in
@@ -78,7 +78,7 @@ extension AppFeature {
     }
 
     func handleRefreshPresentationRequest(state: inout State) {
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        syncPaperStyleToDocument(state: &state)
         applyDirtyPresentation(state: &state)
     }
 

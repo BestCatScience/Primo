@@ -20,7 +20,7 @@ extension AppFeature {
             state.canvas.clearSelection()
         }
         if updatesPresentationDirectly {
-            applyPresentation(paintDocumentClient.presentation(), state: &state)
+            applyCurrentDocumentPresentation(state: &state)
         } else {
             applyDirtyPresentation(state: &state)
         }

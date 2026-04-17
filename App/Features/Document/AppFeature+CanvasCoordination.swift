@@ -51,4 +51,27 @@ extension AppFeature {
     func resolvedPaperStyle(for state: State) -> CanvasPaperStyle {
         AppFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
     }
+
+    func currentDocumentPresentation() -> PaintDocumentPresentation {
+        paintDocumentClient.presentation()
+    }
+
+    func applyCurrentDocumentPresentation(state: inout State) {
+        applyPresentation(currentDocumentPresentation(), state: &state)
+    }
+
+    func syncPaperStyleToDocument(
+        state: inout State,
+        updateCanvasPaper: Bool = false
+    ) {
+        let paperStyle = resolvedPaperStyle(for: state)
+        if updateCanvasPaper {
+            state.canvas.updatePaperStyle(paperStyle)
+        }
+        paintDocumentClient.setPaperStyle(paperStyle)
+    }
+
+    func compositePNGData(state: State) -> Data? {
+        paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state))
+    }
 }
