@@ -64,12 +64,12 @@ extension PaintDocumentSession {
     private func makePersistenceSnapshot(
         paperStyle: CanvasPaperStyle
     ) -> PaintDocumentPersistenceSnapshot {
-        let layerInfos = queryBridge.layerInfos()
-        let folderInfos = queryBridge.folderInfos()
+        let layerInfos = documentGateway.queries.layerInfos()
+        let folderInfos = documentGateway.queries.folderInfos()
         let layerPayloads = layerInfos.enumerated().map { index, layerInfo in
             let pixelFilename = String(format: "layer-%04d.rgba", index)
             let pixelData = pixelDataForLayer(index: index)
-            let maskData = queryBridge.layerMaskDataForLayer(index: index)
+            let maskData = documentGateway.queries.layerMaskDataForLayer(index: index)
             let maskFilename = maskData == nil ? nil : String(format: "layer-mask-%04d.mask", index)
             return PaintDocumentPersistenceSnapshot.LayerPayload(
                 manifest: StoredPrimoDocument.Layer(
@@ -119,9 +119,9 @@ extension PaintDocumentSession {
             }
 
         return PaintDocumentPersistenceSnapshot(
-            canvasWidth: queryBridge.canvasWidth,
-            canvasHeight: queryBridge.canvasHeight,
-            activeLayerIndex: .unchecked(queryBridge.activeLayerIndex()),
+            canvasWidth: documentGateway.queries.canvasWidth,
+            canvasHeight: documentGateway.queries.canvasHeight,
+            activeLayerIndex: .unchecked(documentGateway.queries.activeLayerIndex()),
             paperStyle: paperStyle,
             layers: layerPayloads,
             folders: storedFolders,
@@ -138,24 +138,24 @@ extension PaintDocumentSession {
         setStoredPaperStyle(restorationPlan.paperStyle)
         replaceStoredTextLayers(with: [:])
 
-        while queryBridge.layerInfos().count < restorationPlan.layers.count {
-            _ = layerBridge.addLayer(name: "Layer \(queryBridge.layerInfos().count + 1)")
+        while documentGateway.queries.layerInfos().count < restorationPlan.layers.count {
+            _ = documentGateway.layers.addLayer(name: "Layer \(documentGateway.queries.layerInfos().count + 1)")
         }
 
         for layer in restorationPlan.layers {
-            layerBridge.replaceLayerPixels(index: layer.index, data: layer.pixelData, transient: true)
+            documentGateway.layers.replaceLayerPixels(index: layer.index, data: layer.pixelData, transient: true)
             if let maskData = layer.maskData {
-                layerBridge.replaceLayerMask(index: layer.index, data: maskData)
+                documentGateway.layers.replaceLayerMask(index: layer.index, data: maskData)
             } else {
-                layerBridge.clearLayerMask(index: layer.index)
+                documentGateway.layers.clearLayerMask(index: layer.index)
             }
-            layerBridge.setLayerName(layer.name, index: layer.index)
-            layerBridge.setLayerVisible(layer.visible, index: layer.index)
-            layerBridge.setLayerLocked(layer.locked, index: layer.index)
-            layerBridge.setLayerAlphaLocked(layer.alphaLocked, index: layer.index)
-            layerBridge.setLayerClipped(layer.clipped, index: layer.index)
-            layerBridge.setLayerOpacity(CGFloat(layer.opacity), index: layer.index)
-            layerBridge.setLayerBlendMode(layer.blendMode, index: layer.index)
+            documentGateway.layers.setLayerName(layer.name, index: layer.index)
+            documentGateway.layers.setLayerVisible(layer.visible, index: layer.index)
+            documentGateway.layers.setLayerLocked(layer.locked, index: layer.index)
+            documentGateway.layers.setLayerAlphaLocked(layer.alphaLocked, index: layer.index)
+            documentGateway.layers.setLayerClipped(layer.clipped, index: layer.index)
+            documentGateway.layers.setLayerOpacity(CGFloat(layer.opacity), index: layer.index)
+            documentGateway.layers.setLayerBlendMode(layer.blendMode, index: layer.index)
             if let textLayer = layer.textLayer {
                 setStoredTextLayer(textLayer, at: layer.index)
             }
@@ -163,18 +163,18 @@ extension PaintDocumentSession {
 
         var folderIDMap: [DocumentFolderID: Int] = [:]
         for folder in restorationPlan.folders {
-            let newFolderID = layerBridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1)
+            let newFolderID = documentGateway.layers.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1)
             folderIDMap[folder.id] = newFolderID
-            layerBridge.setFolderVisible(folder.visible, folderID: newFolderID)
-            layerBridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
+            documentGateway.layers.setFolderVisible(folder.visible, folderID: newFolderID)
+            documentGateway.layers.setFolderExpanded(folder.expanded, folderID: newFolderID)
         }
 
         for layer in restorationPlan.layers {
             guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = layerBridge.setLayerFolder(index: layer.index, folderID: resolvedFolderID)
+            _ = documentGateway.layers.setLayerFolder(index: layer.index, folderID: resolvedFolderID)
         }
 
-        layerBridge.setActiveLayerIndex(restorationPlan.activeLayerIndex)
+        documentGateway.layers.setActiveLayerIndex(restorationPlan.activeLayerIndex)
 
         switch restorationPlan.timelapse {
         case let .operations(events):
@@ -190,7 +190,7 @@ extension PaintDocumentSession {
 
         invalidateStoredThumbnailCache()
         resetTrackedEditingState()
-        historyBridge.clearHistory()
+        documentGateway.history.clearHistory()
     }
 }
 

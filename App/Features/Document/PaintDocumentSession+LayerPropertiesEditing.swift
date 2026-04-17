@@ -5,21 +5,21 @@ extension PaintDocumentSession {
     @discardableResult
     func setActiveLayer(index: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setActiveLayerIndex(index)
+        documentGateway.layers.setActiveLayerIndex(index)
         return true
     }
 
     @discardableResult
     func setLayerName(index: Int, name: String) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerName(name, index: index)
+        documentGateway.layers.setLayerName(name, index: index)
         return true
     }
 
     @discardableResult
     func setLayerVisibility(index: Int, isVisible: Bool) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerVisible(isVisible, index: index)
+        documentGateway.layers.setLayerVisible(isVisible, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
@@ -30,7 +30,7 @@ extension PaintDocumentSession {
     @discardableResult
     func setLayerLocked(index: Int, isLocked: Bool) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerLocked(isLocked, index: index)
+        documentGateway.layers.setLayerLocked(isLocked, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
@@ -41,7 +41,7 @@ extension PaintDocumentSession {
     @discardableResult
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerAlphaLocked(isAlphaLocked, index: index)
+        documentGateway.layers.setLayerAlphaLocked(isAlphaLocked, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
@@ -52,7 +52,7 @@ extension PaintDocumentSession {
     @discardableResult
     func setLayerClipped(index: Int, isClipped: Bool) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerClipped(isClipped, index: index)
+        documentGateway.layers.setLayerClipped(isClipped, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped)
@@ -63,14 +63,14 @@ extension PaintDocumentSession {
     @discardableResult
     func revealLayerForEditing(index: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerVisible(true, index: index)
+        documentGateway.layers.setLayerVisible(true, index: index)
         return true
     }
 
     @discardableResult
     func setLayerOpacity(index: Int, opacity: Double) -> Bool {
         guard containsLayerIndex(index), (0...1).contains(opacity) else { return false }
-        layerBridge.setLayerOpacity(CGFloat(opacity), index: index)
+        documentGateway.layers.setLayerOpacity(CGFloat(opacity), index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity)
@@ -81,7 +81,7 @@ extension PaintDocumentSession {
     @discardableResult
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        layerBridge.setLayerBlendMode(blendMode.rawValue, index: index)
+        documentGateway.layers.setLayerBlendMode(blendMode.rawValue, index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode)

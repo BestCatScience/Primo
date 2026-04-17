@@ -6,14 +6,17 @@ extension PaintDocumentSession {
     func resizeCanvas(width: Int, height: Int) -> Bool {
         guard width > 0 && height > 0 else { return false }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        let sourceSize = PaintDocumentCanvasSize(width: queryBridge.canvasWidth, height: queryBridge.canvasHeight)
+        let sourceSize = PaintDocumentCanvasSize(
+            width: documentGateway.queries.canvasWidth,
+            height: documentGateway.queries.canvasHeight
+        )
         guard targetSize != sourceSize else { return false }
 
-        let layerInfos = queryBridge.layerInfos()
-        let folderInfos = queryBridge.folderInfos()
-        let activeLayerIndex = min(max(queryBridge.activeLayerIndex(), 0), max(layerInfos.count - 1, 0))
+        let layerInfos = documentGateway.queries.layerInfos()
+        let folderInfos = documentGateway.queries.folderInfos()
+        let activeLayerIndex = min(max(documentGateway.queries.activeLayerIndex(), 0), max(layerInfos.count - 1, 0))
         let sourcePixels = layerInfos.indices.map { pixelDataForLayer(index: $0) }
-        let sourceMasks = layerInfos.indices.map { queryBridge.layerMaskDataForLayer(index: $0) }
+        let sourceMasks = layerInfos.indices.map { documentGateway.queries.layerMaskDataForLayer(index: $0) }
         let sourceTextLayers = storedTextLayerSnapshot()
         let widthScale = CGFloat(targetSize.width) / CGFloat(sourceSize.width)
         let heightScale = CGFloat(targetSize.height) / CGFloat(sourceSize.height)
@@ -71,14 +74,17 @@ extension PaintDocumentSession {
     func resizeCanvasExtent(width: Int, height: Int) -> Bool {
         guard width > 0 && height > 0 else { return false }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        let sourceSize = PaintDocumentCanvasSize(width: queryBridge.canvasWidth, height: queryBridge.canvasHeight)
+        let sourceSize = PaintDocumentCanvasSize(
+            width: documentGateway.queries.canvasWidth,
+            height: documentGateway.queries.canvasHeight
+        )
         guard targetSize != sourceSize else { return false }
 
-        let layerInfos = queryBridge.layerInfos()
-        let folderInfos = queryBridge.folderInfos()
-        let activeLayerIndex = min(max(queryBridge.activeLayerIndex(), 0), max(layerInfos.count - 1, 0))
+        let layerInfos = documentGateway.queries.layerInfos()
+        let folderInfos = documentGateway.queries.folderInfos()
+        let activeLayerIndex = min(max(documentGateway.queries.activeLayerIndex(), 0), max(layerInfos.count - 1, 0))
         let sourcePixels = layerInfos.indices.map { pixelDataForLayer(index: $0) }
-        let sourceMasks = layerInfos.indices.map { queryBridge.layerMaskDataForLayer(index: $0) }
+        let sourceMasks = layerInfos.indices.map { documentGateway.queries.layerMaskDataForLayer(index: $0) }
         let sourceTextLayers = storedTextLayerSnapshot()
         let offsetX = (targetSize.width - sourceSize.width) / 2
         let offsetY = (targetSize.height - sourceSize.height) / 2
@@ -191,9 +197,9 @@ extension PaintDocumentSession {
         replaceStoredTextLayers(with: resizedTextLayers)
         for (index, textLayer) in resizedTextLayers {
             guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { continue }
-            layerBridge.replaceLayerPixels(index: index, data: rasterized)
+            documentGateway.layers.replaceLayerPixels(index: index, data: rasterized)
         }
-        layerBridge.setActiveLayerIndex(activeLayerIndex)
+        documentGateway.layers.setActiveLayerIndex(activeLayerIndex)
         resetTrackedEditingState()
         resetTimelapseHistory()
         applyLifecycleMutation(editingLifecycleService.mutation(invalidating: .all))

@@ -6,12 +6,12 @@ extension PaintDocumentSession {
         switch operation {
         case let .stroke(layerIndex, brush, samples):
             guard let first = samples.first else { return }
-            layerBridge.setActiveLayerIndex(layerIndex.rawValue)
-            strokeBridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: first))
+            documentGateway.layers.setActiveLayerIndex(layerIndex.rawValue)
+            documentGateway.strokes.begin(sample: first, brush: brush)
             for sample in samples.dropFirst() {
-                strokeBridge.appendStroke(point: makeStrokePoint(from: sample))
+                documentGateway.strokes.append(sample: sample)
             }
-            strokeBridge.endStroke()
+            documentGateway.strokes.end()
             invalidateThumbnailCache(for: layerIndex.rawValue)
 
         case let .blurStroke(layerIndex, brush, samples):
@@ -19,96 +19,96 @@ extension PaintDocumentSession {
             invalidateThumbnailCache(for: layerIndex.rawValue)
 
         case let .fill(layerIndex, brush, sample):
-            layerBridge.setActiveLayerIndex(layerIndex.rawValue)
-            strokeBridge.fill(at: sample.point, brush: makeBrushDescriptor(from: brush))
+            documentGateway.layers.setActiveLayerIndex(layerIndex.rawValue)
+            documentGateway.strokes.fill(sample: sample, brush: brush)
             invalidateThumbnailCache(for: layerIndex.rawValue)
 
         case .undo:
-            _ = historyBridge.undo()
+            _ = documentGateway.history.undo()
             invalidateThumbnailCache()
 
         case .redo:
-            _ = historyBridge.redo()
+            _ = documentGateway.history.redo()
             invalidateThumbnailCache()
 
         case let .addLayer(name):
-            layerBridge.setActiveLayerIndex(layerBridge.addLayer(name: name))
+            documentGateway.layers.setActiveLayerIndex(documentGateway.layers.addLayer(name: name))
             invalidateThumbnailCache()
 
         case let .duplicateLayer(index, name):
-            layerBridge.setActiveLayerIndex(layerBridge.duplicateLayer(index: index.rawValue, name: name))
+            documentGateway.layers.setActiveLayerIndex(documentGateway.layers.duplicateLayer(index: index.rawValue, name: name))
             invalidateThumbnailCache()
 
         case let .deleteLayer(index):
-            _ = layerBridge.deleteLayer(index: index.rawValue)
+            _ = documentGateway.layers.deleteLayer(index: index.rawValue)
             invalidateThumbnailCache()
 
         case let .moveLayer(index, destinationIndex):
-            _ = layerBridge.moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
+            _ = documentGateway.layers.moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
             invalidateThumbnailCache()
 
         case let .createFolder(folderID, name, anchorLayerIndex):
-            let createdID = layerBridge.createFolder(name: name, layerIndex: anchorLayerIndex?.rawValue ?? -1)
+            let createdID = documentGateway.layers.createFolder(name: name, layerIndex: anchorLayerIndex?.rawValue ?? -1)
             folderIDMap[folderID] = createdID
 
         case let .deleteFolder(folderID):
             if let resolved = folderIDMap[folderID] {
-                _ = layerBridge.deleteFolder(id: resolved)
+                _ = documentGateway.layers.deleteFolder(id: resolved)
                 folderIDMap.removeValue(forKey: folderID)
             }
 
         case let .setFolderVisibility(folderID, isVisible):
             if let resolved = folderIDMap[folderID] {
-                layerBridge.setFolderVisible(isVisible, folderID: resolved)
+                documentGateway.layers.setFolderVisible(isVisible, folderID: resolved)
             }
 
         case let .assignLayerToFolder(index, folderID):
             let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
-            _ = layerBridge.setLayerFolder(index: index.rawValue, folderID: resolvedFolderID)
+            _ = documentGateway.layers.setLayerFolder(index: index.rawValue, folderID: resolvedFolderID)
             invalidateThumbnailCache()
 
         case let .setLayerVisibility(index, isVisible):
-            layerBridge.setLayerVisible(isVisible, index: index.rawValue)
+            documentGateway.layers.setLayerVisible(isVisible, index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setLayerLocked(index, isLocked):
-            layerBridge.setLayerLocked(isLocked, index: index.rawValue)
+            documentGateway.layers.setLayerLocked(isLocked, index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setLayerAlphaLocked(index, isAlphaLocked):
-            layerBridge.setLayerAlphaLocked(isAlphaLocked, index: index.rawValue)
+            documentGateway.layers.setLayerAlphaLocked(isAlphaLocked, index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setLayerClipped(index, isClipped):
-            layerBridge.setLayerClipped(isClipped, index: index.rawValue)
+            documentGateway.layers.setLayerClipped(isClipped, index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setLayerOpacity(index, opacity):
-            layerBridge.setLayerOpacity(CGFloat(opacity), index: index.rawValue)
+            documentGateway.layers.setLayerOpacity(CGFloat(opacity), index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setLayerBlendMode(index, blendMode):
-            layerBridge.setLayerBlendMode(blendMode.rawValue, index: index.rawValue)
+            documentGateway.layers.setLayerBlendMode(blendMode.rawValue, index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .replaceLayerPixels(index, data):
-            layerBridge.replaceLayerPixels(index: index.rawValue, data: data)
+            documentGateway.layers.replaceLayerPixels(index: index.rawValue, data: data)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .replaceLayerMask(index, data):
-            layerBridge.replaceLayerMask(index: index.rawValue, data: data)
+            documentGateway.layers.replaceLayerMask(index: index.rawValue, data: data)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .clearLayerMask(index):
-            layerBridge.clearLayerMask(index: index.rawValue)
+            documentGateway.layers.clearLayerMask(index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .applyLayerMask(index):
-            _ = layerBridge.applyLayerMask(index: index.rawValue)
+            _ = documentGateway.layers.applyLayerMask(index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .clearLayer(index):
-            layerBridge.clearLayer(index: index.rawValue)
+            documentGateway.layers.clearLayer(index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .setPaperStyle(style):

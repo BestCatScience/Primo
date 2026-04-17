@@ -41,6 +41,63 @@ extension AppFeature {
         static let currentPresentation = DocumentMutationContract(refresh: .current)
     }
 
+    struct DocumentCanvasMutationCoordinator {
+        func apply(
+            _ mutation: DocumentCanvasMutation,
+            to state: inout State
+        ) {
+            switch mutation {
+            case .none:
+                break
+            case .clearSelection:
+                state.canvas.clearSelection()
+            case let .finalizeLayer(finalization):
+                state.canvas.finalizeLayerMutation(
+                    at: finalization.index,
+                    incrementsRevision: finalization.incrementsRevision,
+                    clearsSelection: finalization.clearsSelection
+                )
+            case let .completeTransform(layerIndex, selection):
+                state.canvas.completeTransformMutation(
+                    at: layerIndex,
+                    selection: selection
+                )
+            case .resetTransientEditingState:
+                state.canvas.resetTransientEditingState()
+            case .resetTransformPreview:
+                state.canvas.resetTransformPreview()
+            }
+        }
+    }
+
+    struct DocumentPresentationRefreshCoordinator {
+        func apply(
+            _ refresh: DocumentPresentationRefresh,
+            to state: inout State,
+            applyCurrentPresentation: (inout State) -> Void,
+            applyDirtyPresentation: (inout State) -> Void
+        ) {
+            switch refresh {
+            case .none:
+                break
+            case .current:
+                applyCurrentPresentation(&state)
+            case .dirty:
+                applyDirtyPresentation(&state)
+            }
+        }
+    }
+
+    struct DocumentMutationFeedbackCoordinator {
+        func apply(
+            _ feedback: ApplicationFeedback?,
+            to state: inout State
+        ) {
+            guard let feedback else { return }
+            state.application.presentFeedback(feedback)
+        }
+    }
+
     struct LayerWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -201,44 +258,40 @@ extension AppFeature {
         LayerWorkflowService(paintDocumentClient: paintDocumentClient)
     }
 
+    var documentCanvasMutationCoordinator: DocumentCanvasMutationCoordinator {
+        DocumentCanvasMutationCoordinator()
+    }
+
+    var documentPresentationRefreshCoordinator: DocumentPresentationRefreshCoordinator {
+        DocumentPresentationRefreshCoordinator()
+    }
+
+    var documentMutationFeedbackCoordinator: DocumentMutationFeedbackCoordinator {
+        DocumentMutationFeedbackCoordinator()
+    }
+
     func completeDocumentMutation(
         state: inout State,
         contract: DocumentMutationContract = .dirty
     ) {
-        switch contract.canvasMutation {
-        case .none:
-            break
-        case .clearSelection:
-            state.canvas.clearSelection()
-        case let .finalizeLayer(finalization):
-            state.canvas.finalizeLayerMutation(
-                at: finalization.index,
-                incrementsRevision: finalization.incrementsRevision,
-                clearsSelection: finalization.clearsSelection
-            )
-        case let .completeTransform(layerIndex, selection):
-            state.canvas.completeTransformMutation(
-                at: layerIndex,
-                selection: selection
-            )
-        case .resetTransientEditingState:
-            state.canvas.resetTransientEditingState()
-        case .resetTransformPreview:
-            state.canvas.resetTransformPreview()
-        }
-
-        switch contract.refresh {
-        case .none:
-            break
-        case .current:
-            applyCurrentDocumentPresentation(state: &state)
-        case .dirty:
-            applyDirtyPresentation(state: &state)
-        }
-
-        if let successFeedback = contract.successFeedback {
-            state.application.presentFeedback(successFeedback)
-        }
+        documentCanvasMutationCoordinator.apply(
+            contract.canvasMutation,
+            to: &state
+        )
+        documentPresentationRefreshCoordinator.apply(
+            contract.refresh,
+            to: &state,
+            applyCurrentPresentation: { state in
+                applyCurrentDocumentPresentation(state: &state)
+            },
+            applyDirtyPresentation: { state in
+                applyDirtyPresentation(state: &state)
+            }
+        )
+        documentMutationFeedbackCoordinator.apply(
+            contract.successFeedback,
+            to: &state
+        )
     }
 
     @discardableResult

@@ -83,6 +83,96 @@ extension AppFeature {
         let preparedTab: PreparedWorkspaceTab
     }
 
+    struct FreshDocumentReservationCoordinator {
+        func prepare(
+            contract: FreshDocumentReplacementContract,
+            state: inout State,
+            reserveTab: (String, DocumentProjectPath?, State) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure>
+        ) -> PreparedFreshDocumentReplacement? {
+            switch reserveTab(
+                contract.tabTitle,
+                nil,
+                state
+            ) {
+            case let .success(preparedTab):
+                return PreparedFreshDocumentReplacement(
+                    contract: contract,
+                    preparedTab: preparedTab
+                )
+            case let .failure(failure):
+                state.application.presentFeedback(failure.feedback)
+                return nil
+            }
+        }
+    }
+
+    struct FreshDocumentWorkspaceCoordinator {
+        func apply(
+            _ preparedReplacement: PreparedFreshDocumentReplacement,
+            to state: inout State,
+            prepareFreshDocument: (CGSize, inout State) -> Void,
+            syncPaperStyleToDocument: (inout State) -> Void,
+            applyCurrentPresentation: (inout State) -> Void
+        ) {
+            prepareFreshDocument(
+                preparedReplacement.contract.canvasSize,
+                &state
+            )
+            syncPaperStyleToDocument(&state)
+            applyCurrentPresentation(&state)
+        }
+    }
+
+    struct FreshDocumentActivationCoordinator {
+        func activate(
+            _ preparedReplacement: PreparedFreshDocumentReplacement,
+            state: inout State,
+            activatePreparedTab: (PreparedWorkspaceTab, inout State) -> Result<Void, WorkspacePersistenceFailure>,
+            cancelEffects: () -> Effect<Action>
+        ) -> Effect<Action> {
+            let activationSucceeded: Bool
+            if case let .failure(failure) = activatePreparedTab(
+                preparedReplacement.preparedTab,
+                &state
+            ) {
+                state.application.presentFeedback(failure.feedback)
+                activationSucceeded = false
+            } else {
+                activationSucceeded = true
+            }
+            if activationSucceeded, let successFeedback = preparedReplacement.contract.successFeedback {
+                state.application.presentFeedback(successFeedback)
+            }
+            return cancelEffects()
+        }
+    }
+
+    struct FreshDocumentReplacementCoordinator {
+        func complete(
+            state: inout State,
+            contract: FreshDocumentReplacementContract,
+            documentMutation: () -> Bool,
+            prepareReplacement: (FreshDocumentReplacementContract, inout State) -> PreparedFreshDocumentReplacement?,
+            applyWorkspaceState: (PreparedFreshDocumentReplacement, inout State) -> Void,
+            activateReplacement: (PreparedFreshDocumentReplacement, inout State) -> Effect<Action>
+        ) -> Effect<Action> {
+            guard let preparedReplacement = prepareReplacement(
+                contract,
+                &state
+            ) else {
+                return .none
+            }
+            guard documentMutation() else {
+                if let feedback = preparedReplacement.contract.mutationFailureFeedback {
+                    state.application.presentFeedback(feedback)
+                }
+                return .none
+            }
+            applyWorkspaceState(preparedReplacement, &state)
+            return activateReplacement(preparedReplacement, &state)
+        }
+    }
+
     struct CanvasLifecycleService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -121,6 +211,22 @@ extension AppFeature {
 
     var canvasLifecycleService: CanvasLifecycleService {
         CanvasLifecycleService(paintDocumentClient: paintDocumentClient)
+    }
+
+    var freshDocumentReservationCoordinator: FreshDocumentReservationCoordinator {
+        FreshDocumentReservationCoordinator()
+    }
+
+    var freshDocumentWorkspaceCoordinator: FreshDocumentWorkspaceCoordinator {
+        FreshDocumentWorkspaceCoordinator()
+    }
+
+    var freshDocumentActivationCoordinator: FreshDocumentActivationCoordinator {
+        FreshDocumentActivationCoordinator()
+    }
+
+    var freshDocumentReplacementCoordinator: FreshDocumentReplacementCoordinator {
+        FreshDocumentReplacementCoordinator()
     }
 
     func validatedCanvasDimensions(
@@ -217,49 +323,55 @@ extension AppFeature {
         _ preparedReplacement: PreparedFreshDocumentReplacement,
         state: inout State
     ) {
-        AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
-            canvasSize: preparedReplacement.contract.canvasSize,
-            to: &state
+        freshDocumentWorkspaceCoordinator.apply(
+            preparedReplacement,
+            to: &state,
+            prepareFreshDocument: { canvasSize, state in
+                AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
+                    canvasSize: canvasSize,
+                    to: &state
+                )
+            },
+            syncPaperStyleToDocument: { state in
+                syncPaperStyleToDocument(state: &state)
+            },
+            applyCurrentPresentation: { state in
+                applyCurrentDocumentPresentation(state: &state)
+            }
         )
-        syncPaperStyleToDocument(state: &state)
-        applyCurrentDocumentPresentation(state: &state)
     }
 
     func prepareFreshDocumentReplacement(
         contract: FreshDocumentReplacementContract,
         state: inout State
     ) -> PreparedFreshDocumentReplacement? {
-        switch prepareNewTabReservation(
-            title: contract.tabTitle,
-            sourceProjectURL: nil,
-            state: state
-        ) {
-        case let .success(preparedTab):
-            return PreparedFreshDocumentReplacement(
-                contract: contract,
-                preparedTab: preparedTab
-            )
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-            return nil
-        }
+        freshDocumentReservationCoordinator.prepare(
+            contract: contract,
+            state: &state,
+            reserveTab: { title, sourceProjectURL, state in
+                prepareNewTabReservation(
+                    title: title,
+                    sourceProjectURL: sourceProjectURL,
+                    state: state
+                )
+            }
+        )
     }
 
     func activateFreshDocumentReplacement(
         _ preparedReplacement: PreparedFreshDocumentReplacement,
         state: inout State
     ) -> Effect<Action> {
-        let activationSucceeded: Bool
-        if case let .failure(failure) = activatePreparedTab(preparedReplacement.preparedTab, state: &state) {
-            state.application.presentFeedback(failure.feedback)
-            activationSucceeded = false
-        } else {
-            activationSucceeded = true
-        }
-        if activationSucceeded, let successFeedback = preparedReplacement.contract.successFeedback {
-            state.application.presentFeedback(successFeedback)
-        }
-        return cancelStartupPresentationEffects()
+        freshDocumentActivationCoordinator.activate(
+            preparedReplacement,
+            state: &state,
+            activatePreparedTab: { preparedTab, state in
+                activatePreparedTab(preparedTab, state: &state)
+            },
+            cancelEffects: {
+                cancelStartupPresentationEffects()
+            }
+        )
     }
 
     func completeFreshDocumentReplacement(
@@ -267,23 +379,29 @@ extension AppFeature {
         contract: FreshDocumentReplacementContract,
         documentMutation: () -> Bool
     ) -> Effect<Action> {
-        guard let preparedReplacement = prepareFreshDocumentReplacement(
+        freshDocumentReplacementCoordinator.complete(
+            state: &state,
             contract: contract,
-            state: &state
-        ) else {
-            return .none
-        }
-        guard documentMutation() else {
-            if let feedback = preparedReplacement.contract.mutationFailureFeedback {
-                state.application.presentFeedback(feedback)
+            documentMutation: documentMutation,
+            prepareReplacement: { contract, state in
+                prepareFreshDocumentReplacement(
+                    contract: contract,
+                    state: &state
+                )
+            },
+            applyWorkspaceState: { preparedReplacement, state in
+                applyFreshDocumentWorkspaceState(
+                    preparedReplacement,
+                    state: &state
+                )
+            },
+            activateReplacement: { preparedReplacement, state in
+                activateFreshDocumentReplacement(
+                    preparedReplacement,
+                    state: &state
+                )
             }
-            return .none
-        }
-        applyFreshDocumentWorkspaceState(
-            preparedReplacement,
-            state: &state
         )
-        return activateFreshDocumentReplacement(preparedReplacement, state: &state)
     }
 
     func handleHistoryMutationRequest(

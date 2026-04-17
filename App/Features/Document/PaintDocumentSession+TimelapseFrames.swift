@@ -11,7 +11,7 @@ extension PaintDocumentSession {
     func makeTimelapseThumbnail() -> UIImage? {
         guard let sourceImage = renderedCompositeImage(paperStyle: paperStyleValue) else { return nil }
         let targetSize = timelapseFrameSize(
-            for: queryBridge.canvasSize,
+            for: documentGateway.queries.canvasSize,
             maxDimension: 512
         )
         let renderer = UIGraphicsImageRenderer(size: targetSize)
@@ -53,9 +53,9 @@ extension PaintDocumentSession {
     }
 
     func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> UIImage? {
-        guard let imageRef = queryBridge.compositeImageRef() else { return nil }
+        guard let imageRef = documentGateway.queries.compositeImageRef() else { return nil }
         let compositeImage = UIImage(cgImage: imageRef)
-        let size = queryBridge.canvasSize
+        let size = documentGateway.queries.canvasSize
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = !paperStyle.isTransparent
@@ -84,10 +84,10 @@ extension PaintDocumentSession {
     }
 
     func makeLayerThumbnailData(index: Int) -> Data? {
-        guard let imageRef = queryBridge.imageRefForLayer(index: index) else { return nil }
+        guard let imageRef = documentGateway.queries.imageRefForLayer(index: index) else { return nil }
         let sourceImage = UIImage(cgImage: imageRef)
         let targetSize = timelapseFrameSize(
-            for: queryBridge.canvasSize,
+            for: documentGateway.queries.canvasSize,
             maxDimension: 96
         )
         let renderer = UIGraphicsImageRenderer(size: targetSize)

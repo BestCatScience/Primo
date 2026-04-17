@@ -3,16 +3,16 @@ import Foundation
 
 extension PaintDocumentSession {
     func canUndo() -> Bool {
-        historyBridge.canUndo()
+        documentGateway.history.canUndo()
     }
 
     func canRedo() -> Bool {
-        historyBridge.canRedo()
+        documentGateway.history.canRedo()
     }
 
     @discardableResult
     func undo() -> Bool {
-        let didUndo = historyBridge.undo()
+        let didUndo = documentGateway.history.undo()
         if didUndo {
             applyDocumentLifecycleMutation(recording: .undo)
         }
@@ -21,7 +21,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func redo() -> Bool {
-        let didRedo = historyBridge.redo()
+        let didRedo = documentGateway.history.redo()
         if didRedo {
             applyDocumentLifecycleMutation(recording: .redo)
         }
@@ -30,8 +30,8 @@ extension PaintDocumentSession {
 
     @discardableResult
     func addLayer(name: String) -> Int {
-        let createdIndex = layerBridge.addLayer(name: name)
-        layerBridge.setActiveLayerIndex(createdIndex)
+        let createdIndex = documentGateway.layers.addLayer(name: name)
+        documentGateway.layers.setActiveLayerIndex(createdIndex)
         applyLayerLifecycleMutation(
             at: createdIndex,
             recording: .addLayer(name: name)
@@ -42,7 +42,7 @@ extension PaintDocumentSession {
     @discardableResult
     func duplicateLayer(index: Int, name: String) -> Int {
         guard containsLayerIndex(index) else { return -1 }
-        let duplicatedIndex = layerBridge.duplicateLayer(index: index, name: name)
+        let duplicatedIndex = documentGateway.layers.duplicateLayer(index: index, name: name)
         if duplicatedIndex >= 0 {
             if let textLayer = storedTextLayer(at: index) {
                 remapStoredTextLayersForDuplication(of: index, duplicatedIndex: duplicatedIndex, duplicate: textLayer)
@@ -59,7 +59,7 @@ extension PaintDocumentSession {
     @discardableResult
     func deleteLayer(index: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        let didDelete = layerBridge.deleteLayer(index: index)
+        let didDelete = documentGateway.layers.deleteLayer(index: index)
         if didDelete {
             remapStoredTextLayersForDeletion(of: index)
             applyDocumentLifecycleMutation(
@@ -74,7 +74,7 @@ extension PaintDocumentSession {
         guard containsLayerIndex(index), containsLayerIndex(destinationIndex) else {
             return false
         }
-        let didMove = layerBridge.moveLayer(from: index, to: destinationIndex)
+        let didMove = documentGateway.layers.moveLayer(from: index, to: destinationIndex)
         if didMove {
             remapStoredTextLayersForMove(from: index, to: destinationIndex)
             applyDocumentLifecycleMutation(
@@ -86,5 +86,4 @@ extension PaintDocumentSession {
         }
         return didMove
     }
-
 }

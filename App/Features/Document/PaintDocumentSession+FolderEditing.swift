@@ -4,7 +4,7 @@ extension PaintDocumentSession {
     @discardableResult
     func createFolder(name: String, layerIndex: Int) -> Int {
         guard containsValidLayerAnchor(layerIndex) else { return -1 }
-        let folderID = layerBridge.createFolder(name: name, layerIndex: layerIndex)
+        let folderID = documentGateway.layers.createFolder(name: name, layerIndex: layerIndex)
         applyRecordedLifecycleMutation(
             recording: .createFolder(
                 folderID: .unchecked(folderID),
@@ -18,7 +18,7 @@ extension PaintDocumentSession {
 
     @discardableResult
     func deleteFolder(folderID: Int) -> Bool {
-        let didDelete = layerBridge.deleteFolder(id: folderID)
+        let didDelete = documentGateway.layers.deleteFolder(id: folderID)
         if didDelete {
             applyRecordedLifecycleMutation(
                 recording: .deleteFolder(folderID: .unchecked(folderID))
@@ -30,7 +30,7 @@ extension PaintDocumentSession {
     @discardableResult
     func setFolderVisibility(folderID: Int, isVisible: Bool) -> Bool {
         guard containsFolderID(folderID) else { return false }
-        layerBridge.setFolderVisible(isVisible, folderID: folderID)
+        documentGateway.layers.setFolderVisible(isVisible, folderID: folderID)
         applyRecordedLifecycleMutation(
             recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
         )
@@ -40,14 +40,14 @@ extension PaintDocumentSession {
     @discardableResult
     func setFolderName(folderID: Int, name: String) -> Bool {
         guard containsFolderID(folderID) else { return false }
-        layerBridge.setFolderName(name, folderID: folderID)
+        documentGateway.layers.setFolderName(name, folderID: folderID)
         return true
     }
 
     @discardableResult
     func setFolderExpanded(folderID: Int, isExpanded: Bool) -> Bool {
         guard containsFolderID(folderID) else { return false }
-        layerBridge.setFolderExpanded(isExpanded, folderID: folderID)
+        documentGateway.layers.setFolderExpanded(isExpanded, folderID: folderID)
         return true
     }
 
@@ -55,7 +55,7 @@ extension PaintDocumentSession {
     func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
         guard folderID < 0 || containsFolderID(folderID) else { return false }
-        let didAssign = layerBridge.setLayerFolder(index: index, folderID: folderID)
+        let didAssign = documentGateway.layers.setLayerFolder(index: index, folderID: folderID)
         if didAssign {
             applyRecordedLifecycleMutation(
                 recording: .assignLayerToFolder(

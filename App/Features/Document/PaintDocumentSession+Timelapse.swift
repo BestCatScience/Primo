@@ -18,7 +18,7 @@ extension PaintDocumentSession {
         let previewData = makeTimelapseThumbnail()?.jpegData(compressionQuality: 0.72)
         if timelapseUsesOperationPersistence, !timelapseEventsSnapshot.isEmpty {
             return TimelapseCapture(
-                canvasSize: queryBridge.canvasSize,
+                canvasSize: documentGateway.queries.canvasSize,
                 paperStyle: paperStyleValue,
                 previewImageData: previewData,
                 source: .operations(timelapseEventsSnapshot),
@@ -28,7 +28,7 @@ extension PaintDocumentSession {
 
         guard timelapseFramesSnapshot.count >= 2 else { return nil }
         return TimelapseCapture(
-            canvasSize: queryBridge.canvasSize,
+            canvasSize: documentGateway.queries.canvasSize,
             paperStyle: paperStyleValue,
             previewImageData: previewData,
             source: .frames(timelapseFramesSnapshot),
