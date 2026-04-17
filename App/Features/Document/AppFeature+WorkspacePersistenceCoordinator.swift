@@ -10,21 +10,72 @@ extension AppFeature {
         }
     }
 
-    private var workspaceClient: DocumentWorkspaceClient {
-        @Dependency(\.documentWorkspaceClient) var workspaceClient
-        return workspaceClient
+    private struct WorkspacePersistenceService {
+        let paintDocumentClient: PaintDocumentClient
+        let documentWorkspaceClient: DocumentWorkspaceClient
+        let uuidClient: UUIDClient
+
+        func saveProject(
+            at fileURL: URL,
+            paperStyle: CanvasPaperStyle
+        ) throws {
+            try paintDocumentClient.saveProject(fileURL, paperStyle)
+        }
+
+        func persistProjectSnapshot(
+            _ sourceURL: DocumentProjectPath,
+            preferredDestinationURL: DocumentProjectPath?
+        ) throws -> DocumentProjectPath {
+            try documentWorkspaceClient.persistProjectSnapshot(
+                sourceURL,
+                preferredDestinationURL
+            )
+        }
+
+        func createTabBackingStoreURL(_ tabID: OpenDocumentTab.ID) throws -> DocumentProjectPath {
+            try documentWorkspaceClient.createTabBackingStoreURL(tabID)
+        }
+
+        func persistAutosaveSnapshot(
+            _ backingStoreURL: DocumentProjectPath,
+            _ tab: OpenDocumentTab
+        ) throws {
+            try documentWorkspaceClient.persistAutosaveSnapshot(backingStoreURL, tab)
+        }
+
+        func discardAutosaveSnapshot(_ tab: OpenDocumentTab) throws {
+            try documentWorkspaceClient.discardAutosaveSnapshot(tab)
+        }
+
+        func persistSaveHistorySnapshot(
+            _ backingStoreURL: DocumentProjectPath,
+            _ tab: OpenDocumentTab,
+            _ trigger: SaveHistoryTrigger
+        ) throws {
+            try documentWorkspaceClient.persistSaveHistorySnapshot(backingStoreURL, tab, trigger)
+        }
+
+        func generateTabID() -> OpenDocumentTab.ID {
+            uuidClient.generate()
+        }
     }
 
-    private var workspaceUUIDClient: UUIDClient {
-        @Dependency(\.uuidClient) var uuidClient
-        return uuidClient
+    private var workspacePersistenceService: WorkspacePersistenceService {
+        WorkspacePersistenceService(
+            paintDocumentClient: paintDocumentClient,
+            documentWorkspaceClient: documentWorkspaceClient,
+            uuidClient: uuidClient
+        )
     }
 
     @discardableResult
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
         guard let activeTab = state.workspace.activeTab else { return false }
         do {
-            try paintDocumentClient.saveProject(activeTab.backingStoreURL.fileURL, resolvedPaperStyle(for: state))
+            try workspacePersistenceService.saveProject(
+                at: activeTab.backingStoreURL.fileURL,
+                paperStyle: resolvedPaperStyle(for: state)
+            )
             state.workspace.updateActiveTabMetadata(
                 previewImageData: compositePNGData(state: state),
                 canvasSize: state.canvas.canvasSize
@@ -46,9 +97,9 @@ extension AppFeature {
         guard persistActiveTabToBackingStore(state: &state) else { return nil }
 
         do {
-            let savedURL = try workspaceClient.persistProjectSnapshot(
+            let savedURL = try workspacePersistenceService.persistProjectSnapshot(
                 activeTab.backingStoreURL,
-                preferredDestinationURL
+                preferredDestinationURL: preferredDestinationURL
             )
             let previousTab = activeTab
             state.workspace.updateActiveTabMetadata(
@@ -76,8 +127,8 @@ extension AppFeature {
         title: String,
         sourceProjectURL: DocumentProjectPath?
     ) {
-        let tabID = workspaceUUIDClient.generate()
-        guard let backingStoreURL = try? workspaceClient.createTabBackingStoreURL(tabID) else {
+        let tabID = workspacePersistenceService.generateTabID()
+        guard let backingStoreURL = try? workspacePersistenceService.createTabBackingStoreURL(tabID) else {
             state.application.presentBanner(state.application.appLanguage.localized("Could not create a tab"))
             return
         }
@@ -107,7 +158,10 @@ extension AppFeature {
         guard let activeTab = state.workspace.activeTab else { return }
 
         do {
-            try workspaceClient.persistAutosaveSnapshot(activeTab.backingStoreURL, activeTab)
+            try workspacePersistenceService.persistAutosaveSnapshot(
+                activeTab.backingStoreURL,
+                activeTab
+            )
         } catch {
             state.application.presentBanner(
                 error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
@@ -116,7 +170,7 @@ extension AppFeature {
     }
 
     func clearAutosave(for tab: OpenDocumentTab) {
-        try? workspaceClient.discardAutosaveSnapshot(tab)
+        try? workspacePersistenceService.discardAutosaveSnapshot(tab)
     }
 
     func persistSaveHistorySnapshot(
@@ -124,7 +178,11 @@ extension AppFeature {
         trigger: SaveHistoryTrigger
     ) {
         do {
-            try workspaceClient.persistSaveHistorySnapshot(tab.backingStoreURL, tab, trigger)
+            try workspacePersistenceService.persistSaveHistorySnapshot(
+                tab.backingStoreURL,
+                tab,
+                trigger
+            )
         } catch {
             // Save history is a resilience feature. Keep editing even if a snapshot could not be recorded.
         }
@@ -180,9 +238,9 @@ extension AppFeature {
         }
         for tabID in tabIDs {
             guard let previousTab = state.workspace.tab(withID: tabID) else { continue }
-            let destinationURL = try workspaceClient.persistProjectSnapshot(
+            let destinationURL = try workspacePersistenceService.persistProjectSnapshot(
                 previousTab.backingStoreURL,
-                previousTab.sourceProjectURL
+                preferredDestinationURL: previousTab.sourceProjectURL
             )
             let updatedTab = state.workspace.updateTab(
                 id: tabID,

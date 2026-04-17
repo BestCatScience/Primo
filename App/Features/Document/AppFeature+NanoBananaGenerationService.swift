@@ -16,6 +16,7 @@ extension AppFeature {
         }
 
         let nanoBananaClient: NanoBananaClient
+        let paintDocumentClient: PaintDocumentClient
         let uuidClient: UUIDClient
         let dateClient: DateClient
 
@@ -212,21 +213,19 @@ extension AppFeature {
 
         func applySuccess(
             state: inout State,
-            preview: NanoBananaPreviewState,
-            paintDocumentClient: PaintDocumentClient
+            preview: NanoBananaPreviewState
         ) {
             state.nanoBanana.recordSucceededGeneration(
                 preview: preview,
                 historyID: uuidClient.generate(),
                 createdAt: dateClient.now()
             )
-            applyPreview(state: &state, preview: preview, paintDocumentClient: paintDocumentClient)
+            applyPreview(state: &state, preview: preview)
         }
 
         func applyPreview(
             state: inout State,
-            preview: NanoBananaPreviewState,
-            paintDocumentClient: PaintDocumentClient
+            preview: NanoBananaPreviewState
         ) {
             let targetLayerIndex: Int
             switch preview.request.outputMode {
@@ -269,6 +268,7 @@ extension AppFeature {
     private var nanoBananaGenerationService: NanoBananaGenerationService {
         NanoBananaGenerationService(
             nanoBananaClient: nanoBananaClient,
+            paintDocumentClient: paintDocumentClient,
             uuidClient: uuidClient,
             dateClient: dateClient
         )
@@ -290,8 +290,7 @@ extension AppFeature {
     ) {
         nanoBananaGenerationService.applySuccess(
             state: &state,
-            preview: preview,
-            paintDocumentClient: paintDocumentClient
+            preview: preview
         )
     }
 

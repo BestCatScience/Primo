@@ -17,10 +17,10 @@ extension AppFeature {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return trimmed.isEmpty ? fallbackName : trimmed
         }()
-        layerWorkflowService.paintDocumentClient.addLayer(layerName)
+        layerWorkflowService.addLayer(named: layerName)
         let targetLayerIndex = state.layerSidebar.layers.count
-        layerWorkflowService.paintDocumentClient.replaceLayerPixels(targetLayerIndex, importedPixelData)
-        layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
+        layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
+        layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayer(targetLayerIndex)
         state.canvas.clearSelectionState()
         applyDirtyPresentation(state: &state)
@@ -68,15 +68,15 @@ extension AppFeature {
                 ? layerName!
                 : (state.application.appLanguage == .japanese ? "テキスト" : "Text")
             )
-            layerWorkflowService.paintDocumentClient.addLayer(resolvedName)
+            layerWorkflowService.addLayer(named: resolvedName)
             targetLayerIndex = state.layerSidebar.layers.count
         }
 
-        guard layerWorkflowService.paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
+        guard layerWorkflowService.setTextLayer(targetLayerIndex, textLayer: textLayer) else {
             state.application.presentBanner(state.application.appLanguage.localized("テキストをレイヤーに適用できませんでした"))
             return
         }
-        layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
+        layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayer(targetLayerIndex)
         state.canvas.activateTool(.text)
         state.brushPalette.setTextTargetLayer(targetLayerIndex)
@@ -85,7 +85,7 @@ extension AppFeature {
 
     func handleClearActiveLayer(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        layerWorkflowService.paintDocumentClient.clearLayer(activeLayerIndex)
+        layerWorkflowService.clearLayer(activeLayerIndex)
         state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
@@ -97,7 +97,7 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("選択範囲を作成してからマスクを追加してください"))
             return
         }
-        guard layerWorkflowService.paintDocumentClient.replaceLayerMask(activeLayerIndex, maskData) else {
+        guard layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData) else {
             state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを作成できませんでした"))
             return
         }
@@ -106,7 +106,7 @@ extension AppFeature {
 
     func handleClearLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard layerWorkflowService.paintDocumentClient.clearLayerMask(activeLayerIndex) else {
+        guard layerWorkflowService.clearLayerMask(activeLayerIndex) else {
             return
         }
         applyDirtyPresentation(state: &state)
@@ -114,7 +114,7 @@ extension AppFeature {
 
     func handleApplyLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard layerWorkflowService.paintDocumentClient.applyLayerMask(activeLayerIndex) else {
+        guard layerWorkflowService.applyLayerMask(activeLayerIndex) else {
             state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを適用できませんでした"))
             return
         }

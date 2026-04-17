@@ -2,7 +2,7 @@ import Foundation
 
 extension AppFeature {
     func handleAddLayer(state: inout State) {
-        layerWorkflowService.paintDocumentClient.addLayer("Layer \(state.layerSidebar.layers.count + 1)")
+        layerWorkflowService.addLayer(named: "Layer \(state.layerSidebar.layers.count + 1)")
         state.canvas.activateLayer(state.layerSidebar.layers.count)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
@@ -14,9 +14,9 @@ extension AppFeature {
                 partialResult += 1
             }
         } + 1
-        _ = layerWorkflowService.paintDocumentClient.createFolder(
-            StudioStrings.folderName(nextFolderNumber, state.application.appLanguage),
-            state.layerSidebar.activeLayerIndex
+        _ = layerWorkflowService.createFolder(
+            named: StudioStrings.folderName(nextFolderNumber, state.application.appLanguage),
+            afterLayerAt: state.layerSidebar.activeLayerIndex
         )
         applyDirtyPresentation(state: &state)
     }
@@ -26,7 +26,7 @@ extension AppFeature {
         folderID: Int
     ) {
         handleLayerMutation(state: &state) {
-            layerWorkflowService.paintDocumentClient.deleteFolder(folderID)
+            layerWorkflowService.deleteFolder(folderID)
         }
     }
 
@@ -35,7 +35,7 @@ extension AppFeature {
         index: Int
     ) {
         handleLayerMutation(state: &state, clearsSelection: true) {
-            layerWorkflowService.paintDocumentClient.deleteLayer(index)
+            layerWorkflowService.deleteLayer(index)
         }
     }
 
@@ -48,7 +48,7 @@ extension AppFeature {
         }
         let duplicateName = state.application.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
         handleLayerMutation(state: &state, clearsSelection: true) {
-            layerWorkflowService.paintDocumentClient.duplicateLayer(index, duplicateName) >= 0
+            layerWorkflowService.duplicateLayer(index, named: duplicateName) >= 0
         }
     }
 
@@ -58,7 +58,7 @@ extension AppFeature {
         destinationIndex: Int
     ) {
         handleLayerMutation(state: &state, clearsSelection: true) {
-            layerWorkflowService.paintDocumentClient.moveLayer(index, destinationIndex)
+            layerWorkflowService.moveLayer(index, to: destinationIndex)
         }
     }
 
@@ -68,7 +68,7 @@ extension AppFeature {
         folderID: Int
     ) {
         handleLayerMutation(state: &state) {
-            layerWorkflowService.paintDocumentClient.assignLayerToFolder(index, folderID)
+            layerWorkflowService.assignLayer(index, toFolder: folderID)
         }
     }
 
@@ -77,7 +77,7 @@ extension AppFeature {
         index: Int
     ) {
         handleLayerMutation(state: &state, clearsSelection: true) {
-            layerWorkflowService.paintDocumentClient.mergeLayerDown(index)
+            layerWorkflowService.mergeLayerDown(index)
         }
     }
 }

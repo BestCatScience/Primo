@@ -2,41 +2,64 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    struct StartupPresentationService {
+        let paintDocumentClient: PaintDocumentClient
+
+        func bootstrapPresentationEffect() -> Effect<Action> {
+            .run { [paintDocumentClient] send in
+                let startupClock = ContinuousClock()
+                let bootstrapStart = startupClock.now
+
+                AppFeature.startupLogger.debug("Loading lightweight presentation")
+                let lightweightPresentation = paintDocumentClient.lightweightPresentation()
+                let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
+                AppFeature.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
+                await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                paintDocumentClient.prewarmDrawingResources()
+                await send(.loadPresentationAfterLaunch)
+            }
+        }
+
+        func deferredPresentationLoadEffect() -> Effect<Action> {
+            .run { [paintDocumentClient] send in
+                let clock = ContinuousClock()
+                try? await Task.sleep(for: .milliseconds(600))
+
+                let presentationStart = clock.now
+                AppFeature.startupLogger.debug("Loading full presentation after initial launch")
+                let presentation = paintDocumentClient.presentation()
+                let presentationDuration = presentationStart.duration(to: clock.now)
+                AppFeature.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
+                await send(.presentationLoaded(presentation))
+            }
+            .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
+        }
+
+        func deferredPresentationRefreshEffect() -> Effect<Action> {
+            .run { [paintDocumentClient] send in
+                await send(.presentationLoaded(paintDocumentClient.presentation()))
+            }
+            .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+        }
+    }
+
+    var startupPresentationService: StartupPresentationService {
+        StartupPresentationService(paintDocumentClient: paintDocumentClient)
+    }
+
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: appLanguageClient.load())
         syncPaperStyleToDocument(state: &state)
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
-            .run { [paintDocumentClient] send in
-                let startupClock = ContinuousClock()
-                let bootstrapStart = startupClock.now
-
-                Self.startupLogger.debug("Loading lightweight presentation")
-                let lightweightPresentation = paintDocumentClient.lightweightPresentation()
-                let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
-                Self.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
-                await send(.bootstrapPresentationLoaded(lightweightPresentation))
-                paintDocumentClient.prewarmDrawingResources()
-                await send(.loadPresentationAfterLaunch)
-            },
+            startupPresentationService.bootstrapPresentationEffect(),
             .send(.homeProjectsLoadRequested),
             .send(.autosaveRecoveryLoadRequested)
         )
     }
 
     func handleLoadPresentationAfterLaunch() -> Effect<Action> {
-        .run { [paintDocumentClient] send in
-            let clock = ContinuousClock()
-            try? await Task.sleep(for: .milliseconds(600))
-
-            let presentationStart = clock.now
-            Self.startupLogger.debug("Loading full presentation after initial launch")
-            let presentation = paintDocumentClient.presentation()
-            let presentationDuration = presentationStart.duration(to: clock.now)
-            Self.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
-            await send(.presentationLoaded(presentation))
-        }
-        .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
+        startupPresentationService.deferredPresentationLoadEffect()
     }
 
     func handleHomeProjectsLoadRequest(state: inout State) -> Effect<Action> {
@@ -71,10 +94,7 @@ extension AppFeature {
     }
 
     func handleDeferredPresentationRefresh() -> Effect<Action> {
-        .run { [paintDocumentClient] send in
-            await send(.presentationLoaded(paintDocumentClient.presentation()))
-        }
-        .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+        startupPresentationService.deferredPresentationRefreshEffect()
     }
 
     func handleRefreshPresentationRequest(state: inout State) {

@@ -1,6 +1,26 @@
 import Foundation
 
 extension AppFeature {
+    struct DocumentPresentationService {
+        let paintDocumentClient: PaintDocumentClient
+
+        func presentation() -> PaintDocumentPresentation {
+            paintDocumentClient.presentation()
+        }
+
+        func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+            paintDocumentClient.setPaperStyle(paperStyle)
+        }
+
+        func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
+            paintDocumentClient.compositePNGData(paperStyle)
+        }
+    }
+
+    var documentPresentationService: DocumentPresentationService {
+        DocumentPresentationService(paintDocumentClient: paintDocumentClient)
+    }
+
     func applyPresentation(
         _ presentation: PaintDocumentPresentation,
         state: inout State
@@ -53,7 +73,7 @@ extension AppFeature {
     }
 
     func currentDocumentPresentation() -> PaintDocumentPresentation {
-        paintDocumentClient.presentation()
+        documentPresentationService.presentation()
     }
 
     func applyCurrentDocumentPresentation(state: inout State) {
@@ -68,10 +88,12 @@ extension AppFeature {
         if updateCanvasPaper {
             state.canvas.updatePaperStyle(paperStyle)
         }
-        paintDocumentClient.setPaperStyle(paperStyle)
+        documentPresentationService.setPaperStyle(paperStyle)
     }
 
     func compositePNGData(state: State) -> Data? {
-        paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state))
+        documentPresentationService.compositePNGData(
+            paperStyle: resolvedPaperStyle(for: state)
+        )
     }
 }

@@ -3,9 +3,14 @@ import Foundation
 
 extension AppFeature {
     private struct DocumentWorkflowCoordinator {
+        let paintDocumentClient: PaintDocumentClient
         let documentWorkspaceClient: DocumentWorkspaceClient
         let fileClient: FileClient
         let dateClient: DateClient
+
+        func timelapseCapture() -> TimelapseCapture? {
+            paintDocumentClient.timelapseCapture()
+        }
 
         func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
             .run { [documentWorkspaceClient] send in
@@ -42,6 +47,7 @@ extension AppFeature {
 
     private var documentWorkflowCoordinator: DocumentWorkflowCoordinator {
         DocumentWorkflowCoordinator(
+            paintDocumentClient: paintDocumentClient,
             documentWorkspaceClient: documentWorkspaceClient,
             fileClient: fileClient,
             dateClient: dateClient
@@ -123,7 +129,7 @@ extension AppFeature {
     }
 
     func handleTimelapseExportRequest(state: inout State) -> Effect<Action> {
-        guard let capture = paintDocumentClient.timelapseCapture() else {
+        guard let capture = documentWorkflowCoordinator.timelapseCapture() else {
             state.application.presentBanner(
                 state.application.appLanguage.localized("Not enough drawing history for timelapse yet")
             )

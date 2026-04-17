@@ -3,6 +3,21 @@ import SwiftUI
 
 extension AppFeature {
     struct AppFeatureCanvasPresentationStateCoordinator {
+        func prepareFreshDocument(
+            canvasSize: CGSize,
+            to state: inout AppFeature.State
+        ) {
+            state.application.showWorkspace()
+            state.canvas = CanvasFeature.State()
+            state.canvas.setCanvasSize(canvasSize)
+            state.layerSidebar = LayerSidebarFeature.State()
+            state.brushPalette = BrushPaletteFeature.State()
+            AppFeature.toolPanelStateCoordinator.resetPanels(in: &state)
+            state.export.clearOutputs()
+            state.application.clearBanner()
+            state.application.finishHydration()
+        }
+
         func applyPresentation(
             _ presentation: PaintDocumentPresentation,
             to state: inout AppFeature.State

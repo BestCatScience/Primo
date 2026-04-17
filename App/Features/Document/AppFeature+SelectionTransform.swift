@@ -3,6 +3,32 @@ import CoreGraphics
 import Foundation
 
 extension AppFeature {
+    struct SelectionTransformService {
+        let paintDocumentClient: PaintDocumentClient
+
+        func setTextLayer(
+            _ layerIndex: Int,
+            _ textLayer: TextLayerData
+        ) -> Bool {
+            paintDocumentClient.setTextLayer(layerIndex, textLayer)
+        }
+
+        func pixelDataForLayer(_ layerIndex: Int) -> Data {
+            paintDocumentClient.pixelDataForLayer(layerIndex)
+        }
+
+        func replaceLayerPixels(
+            _ layerIndex: Int,
+            _ pixelData: Data
+        ) {
+            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+        }
+    }
+
+    var selectionTransformService: SelectionTransformService {
+        SelectionTransformService(paintDocumentClient: paintDocumentClient)
+    }
+
     func applyTransform(state: inout State) -> Effect<Action> {
         let translation = CGSize(
             width: state.canvas.transformPreviewOffset.width.rounded(),
@@ -25,7 +51,7 @@ extension AppFeature {
             )
             textLayer.scale = min(max(textLayer.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
             textLayer.rotationDegrees += rotationDegrees
-            guard paintDocumentClient.setTextLayer(state.canvas.activeLayerIndex, textLayer) else {
+            guard selectionTransformService.setTextLayer(state.canvas.activeLayerIndex, textLayer) else {
                 state.canvas.resetTransformPreview()
                 return .none
             }
@@ -34,7 +60,7 @@ extension AppFeature {
             return .none
         }
         let activeLayerIndex = state.canvas.activeLayerIndex
-        let source = paintDocumentClient.pixelDataForLayer(activeLayerIndex)
+        let source = selectionTransformService.pixelDataForLayer(activeLayerIndex)
         let canvasWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
         guard let transformed = Self.transformedLayerPixels(
@@ -53,7 +79,7 @@ extension AppFeature {
             state.canvas.resetTransformPreview()
             return .none
         }
-        paintDocumentClient.replaceLayerPixels(activeLayerIndex, transformed)
+        selectionTransformService.replaceLayerPixels(activeLayerIndex, transformed)
         state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
         state.canvas.setSelection(Self.transformedSelection(
             state.canvas.selection,

@@ -9,8 +9,11 @@ extension AppFeature {
     struct AdjustmentWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
-        func applyLayerProcessing(_ apply: () -> Bool) -> Bool {
-            apply()
+        func applyLayerProcessing(
+            _ layerIndex: Int,
+            request: LayerProcessingRequest
+        ) -> Bool {
+            paintDocumentClient.applyLayerProcessing(layerIndex, request)
         }
 
         func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) {
@@ -73,7 +76,7 @@ extension AppFeature {
         apply: () -> Bool
     ) -> Bool {
         state.canvas.clearAdjustmentPreview()
-        guard adjustmentWorkflowService.applyLayerProcessing(apply) else {
+        guard apply() else {
             state.application.presentBanner(failureMessage)
             return false
         }
@@ -94,7 +97,10 @@ extension AppFeature {
             state: &state,
             failureMessage: failureMessage
         ) {
-            paintDocumentClient.applyLayerProcessing(activeLayerIndex, request)
+            adjustmentWorkflowService.applyLayerProcessing(
+                activeLayerIndex,
+                request: request
+            )
         }
     }
 

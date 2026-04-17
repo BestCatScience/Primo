@@ -4,6 +4,72 @@ import Foundation
 extension AppFeature {
     struct CanvasStrokeWorkflowService {
         let paintDocumentClient: PaintDocumentClient
+
+        func ensureLayerVisible(_ layerIndex: Int) {
+            paintDocumentClient.setLayerVisibility(layerIndex, true)
+        }
+
+        func cancelStroke() {
+            paintDocumentClient.cancelStroke()
+        }
+
+        func beginStroke(
+            _ sample: StylusSample,
+            brush: BrushRuntimeSettings
+        ) {
+            paintDocumentClient.beginStroke(sample, brush)
+        }
+
+        func appendStroke(_ sample: StylusSample) {
+            paintDocumentClient.appendStroke(sample)
+        }
+
+        func compositePixelData() -> Data {
+            paintDocumentClient.compositePixelData()
+        }
+
+        func endStroke() {
+            paintDocumentClient.endStroke()
+        }
+
+        func replaceLayerPixels(
+            _ layerIndex: Int,
+            pixelData: Data
+        ) {
+            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+        }
+
+        func applySoftwareStroke(
+            _ samples: [StylusSample],
+            brush: BrushRuntimeSettings,
+            layerIndex: Int
+        ) -> Bool {
+            paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex)
+        }
+
+        func revealLayerForEditing(_ layerIndex: Int) {
+            paintDocumentClient.revealLayerForEditing(layerIndex)
+        }
+
+        func blurStroke(
+            _ samples: [StylusSample],
+            brush: BrushRuntimeSettings,
+            layerIndex: Int,
+            clearSelectionAfterBlur: Bool
+        ) {
+            paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+        }
+
+        func endBlurStroke() {
+            paintDocumentClient.endBlurStroke()
+        }
+
+        func fill(
+            _ sample: StylusSample,
+            brush: BrushRuntimeSettings
+        ) {
+            paintDocumentClient.fill(sample, brush)
+        }
     }
 
     var canvasStrokeWorkflowService: CanvasStrokeWorkflowService {
@@ -21,9 +87,9 @@ extension AppFeature {
         guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
             return .none
         }
-        canvasStrokeWorkflowService.paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
+        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
         state.canvas.clearSelection()
-        canvasStrokeWorkflowService.paintDocumentClient.cancelStroke()
+        canvasStrokeWorkflowService.cancelStroke()
         if state.canvas.activeStrokeBaseSnapshot == nil {
             if state.canvas.renderSnapshot == nil {
                 applyCurrentDocumentPresentation(state: &state)
@@ -185,14 +251,14 @@ extension AppFeature {
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard let first = samples.first else { return .none }
-        canvasStrokeWorkflowService.paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
+        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
         state.canvas.clearSelection()
-        canvasStrokeWorkflowService.paintDocumentClient.cancelStroke()
-        canvasStrokeWorkflowService.paintDocumentClient.beginStroke(first, resolvedBrushSettings(for: state))
+        canvasStrokeWorkflowService.cancelStroke()
+        canvasStrokeWorkflowService.beginStroke(first, brush: resolvedBrushSettings(for: state))
         for sample in samples.dropFirst() {
-            canvasStrokeWorkflowService.paintDocumentClient.appendStroke(sample)
+            canvasStrokeWorkflowService.appendStroke(sample)
         }
-        applyLiveCompositePixelData(paintDocumentClient.compositePixelData(), state: &state)
+        applyLiveCompositePixelData(canvasStrokeWorkflowService.compositePixelData(), state: &state)
         return .concatenate(
             .cancel(id: CancelID.startupPresentationLoad),
             .cancel(id: CancelID.deferredPresentationRefresh)
@@ -200,7 +266,7 @@ extension AppFeature {
     }
 
     func handleCommitPreviewShapeStroke(state: inout State) -> Effect<Action> {
-        canvasStrokeWorkflowService.paintDocumentClient.endStroke()
+        canvasStrokeWorkflowService.endStroke()
         applyDirtyPresentation(state: &state)
         return .concatenate(
             .cancel(id: CancelID.startupPresentationLoad),
@@ -221,16 +287,19 @@ extension AppFeature {
         let brush = resolvedBrushSettings(for: state)
         let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
         if keepsSelectionCleared {
-            canvasStrokeWorkflowService.paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
+            canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
             state.canvas.clearSelection()
         }
         if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-            canvasStrokeWorkflowService.paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, previewPixels)
+            canvasStrokeWorkflowService.replaceLayerPixels(
+                state.canvas.activeLayerIndex,
+                pixelData: previewPixels
+            )
         } else {
-            let didCommit = canvasStrokeWorkflowService.paintDocumentClient.applySoftwareStroke(
+            let didCommit = canvasStrokeWorkflowService.applySoftwareStroke(
                 samples,
-                brush,
-                state.canvas.activeLayerIndex
+                brush: brush,
+                layerIndex: state.canvas.activeLayerIndex
             )
             if !didCommit {
                 if !refreshViaDirtyPresentation && state.canvas.renderSnapshot == nil {
@@ -249,7 +318,10 @@ extension AppFeature {
                         brush: brush,
                         preserveAlphaLockedPixels: activeLayer.isAlphaLocked
                    ) {
-                    canvasStrokeWorkflowService.paintDocumentClient.replaceLayerPixels(state.canvas.activeLayerIndex, adjustedPixels)
+                    canvasStrokeWorkflowService.replaceLayerPixels(
+                        state.canvas.activeLayerIndex,
+                        pixelData: adjustedPixels
+                    )
                 }
             }
         }
@@ -267,7 +339,7 @@ extension AppFeature {
 
     func handleCancelStroke(state: inout State) -> Effect<Action> {
         if state.canvas.currentTool == .shape {
-            canvasStrokeWorkflowService.paintDocumentClient.cancelStroke()
+            canvasStrokeWorkflowService.cancelStroke()
         }
         resetStrokePreviewState(state: &state)
         applyCurrentDocumentPresentation(state: &state)
@@ -285,14 +357,19 @@ extension AppFeature {
         guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
             return
         }
-        canvasStrokeWorkflowService.paintDocumentClient.revealLayerForEditing(state.canvas.activeLayerIndex)
-        canvasStrokeWorkflowService.paintDocumentClient.blurStroke(samples, resolvedBrushSettings(for: state), state.canvas.activeLayerIndex, false)
+        canvasStrokeWorkflowService.revealLayerForEditing(state.canvas.activeLayerIndex)
+        canvasStrokeWorkflowService.blurStroke(
+            samples,
+            brush: resolvedBrushSettings(for: state),
+            layerIndex: state.canvas.activeLayerIndex,
+            clearSelectionAfterBlur: false
+        )
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
 
     func handleEndBlurStroke(state: inout State) {
-        canvasStrokeWorkflowService.paintDocumentClient.endBlurStroke()
+        canvasStrokeWorkflowService.endBlurStroke()
         applyDirtyPresentation(state: &state)
     }
 
@@ -303,8 +380,8 @@ extension AppFeature {
         guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
             return .none
         }
-        canvasStrokeWorkflowService.paintDocumentClient.setLayerVisibility(state.canvas.activeLayerIndex, true)
-        canvasStrokeWorkflowService.paintDocumentClient.fill(sample, resolvedBrushSettings(for: state))
+        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
+        canvasStrokeWorkflowService.fill(sample, brush: resolvedBrushSettings(for: state))
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
         return .concatenate(

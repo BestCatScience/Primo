@@ -6,7 +6,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
+        layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
@@ -23,7 +23,7 @@ extension AppFeature {
             return
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
-        layerWorkflowService.paintDocumentClient.setActiveLayer(targetIndex)
+        layerWorkflowService.setActiveLayer(targetIndex)
         state.canvas.activateLayer(targetIndex)
         state.canvas.clearSelection()
         applyCurrentDocumentPresentation(state: &state)
@@ -34,7 +34,7 @@ extension AppFeature {
         index: Int,
         opacity: Double
     ) {
-        layerWorkflowService.paintDocumentClient.setLayerOpacity(index, opacity)
+        layerWorkflowService.setLayerOpacity(index, opacity: opacity)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
@@ -46,7 +46,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setLayerLocked(index, !layer.isLocked)
+        layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
         applyDirtyPresentation(state: &state)
     }
 
@@ -57,7 +57,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
+        layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
         applyDirtyPresentation(state: &state)
     }
 
@@ -71,7 +71,7 @@ extension AppFeature {
         guard layer.isClipped || index > 0 else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setLayerClipped(index, !layer.isClipped)
+        layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
         applyDirtyPresentation(state: &state)
     }
 
@@ -79,7 +79,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        layerWorkflowService.paintDocumentClient.setActiveLayer(index)
+        layerWorkflowService.setActiveLayer(index)
         state.canvas.activateLayer(index)
         state.canvas.clearSelection()
         applyCurrentDocumentPresentation(state: &state)
@@ -92,7 +92,7 @@ extension AppFeature {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setLayerVisibility(index, !layer.visible)
+        layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
@@ -102,7 +102,7 @@ extension AppFeature {
         folderID: Int,
         isExpanded: Bool
     ) {
-        layerWorkflowService.paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+        layerWorkflowService.setFolderExpanded(folderID, isExpanded: isExpanded)
         applyCurrentDocumentPresentation(state: &state)
     }
 
@@ -113,7 +113,7 @@ extension AppFeature {
         guard let folder = state.layerSidebar.folder(withID: folderID) else {
             return
         }
-        layerWorkflowService.paintDocumentClient.setFolderVisibility(folderID, !folder.visible)
+        layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
         applyDirtyPresentation(state: &state)
     }
 
@@ -122,7 +122,7 @@ extension AppFeature {
         folderID: Int,
         name: String
     ) {
-        layerWorkflowService.paintDocumentClient.setFolderName(folderID, name)
+        layerWorkflowService.setFolderName(folderID, name: name)
         applyDirtyPresentation(state: &state)
     }
 
@@ -131,7 +131,7 @@ extension AppFeature {
         index: Int,
         blendMode: LayerBlendMode
     ) {
-        layerWorkflowService.paintDocumentClient.setLayerBlendMode(index, blendMode)
+        layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
         state.canvas.clearSelection()
         applyDirtyPresentation(state: &state)
     }
@@ -141,7 +141,7 @@ extension AppFeature {
         index: Int,
         name: String
     ) {
-        layerWorkflowService.paintDocumentClient.setLayerName(index, name)
+        layerWorkflowService.setLayerName(index, name: name)
         applyDirtyPresentation(state: &state)
     }
 }

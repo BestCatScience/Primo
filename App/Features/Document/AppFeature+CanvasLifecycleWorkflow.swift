@@ -3,28 +3,134 @@ import CoreGraphics
 import Foundation
 
 extension AppFeature {
+    struct CanvasDimensions: Equatable {
+        let width: Int
+        let height: Int
+
+        init?(width: Int, height: Int) {
+            guard width > 0, height > 0 else { return nil }
+            self.width = width
+            self.height = height
+        }
+
+        func isWithin(_ supportedRange: ClosedRange<Int>) -> Bool {
+            supportedRange.contains(width) && supportedRange.contains(height)
+        }
+
+        var size: CGSize {
+            CGSize(width: width, height: height)
+        }
+    }
+
+    struct ImportedCanvasRequest: Equatable {
+        let dimensions: CanvasDimensions
+        let pixelData: Data
+    }
+
+    enum ImportedCanvasRequestValidation {
+        case invalidImageData
+        case unsupportedSize
+        case valid(ImportedCanvasRequest)
+    }
+
+    struct CanvasLifecycleService {
+        let paintDocumentClient: PaintDocumentClient
+
+        func createCanvas(_ dimensions: CanvasDimensions) {
+            paintDocumentClient.newCanvas(dimensions.width, dimensions.height)
+            paintDocumentClient.prewarmDrawingResources()
+        }
+
+        func resizeCanvas(_ dimensions: CanvasDimensions) {
+            paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height)
+        }
+
+        func resizeCanvasExtent(_ dimensions: CanvasDimensions) {
+            paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height)
+        }
+
+        func initializeImportedCanvas(
+            _ request: ImportedCanvasRequest,
+            layerName: String
+        ) {
+            createCanvas(request.dimensions)
+            paintDocumentClient.replaceLayerPixels(0, request.pixelData)
+            paintDocumentClient.setLayerName(0, layerName)
+            paintDocumentClient.setActiveLayer(0)
+        }
+
+        func undo() -> Bool {
+            paintDocumentClient.undo()
+        }
+
+        func redo() -> Bool {
+            paintDocumentClient.redo()
+        }
+    }
+
+    var canvasLifecycleService: CanvasLifecycleService {
+        CanvasLifecycleService(paintDocumentClient: paintDocumentClient)
+    }
+
+    func validatedCanvasDimensions(
+        width: Int,
+        height: Int
+    ) -> CanvasDimensions? {
+        CanvasDimensions(width: width, height: height)
+    }
+
+    func currentCanvasDimensions(state: State) -> CanvasDimensions? {
+        CanvasDimensions(
+            width: Int(state.canvas.canvasSize.width.rounded()),
+            height: Int(state.canvas.canvasSize.height.rounded())
+        )
+    }
+
+    func cancelStartupPresentationEffects() -> Effect<Action> {
+        .merge(
+            .cancel(id: CancelID.startupPresentationLoad),
+            .cancel(id: CancelID.deferredPresentationRefresh)
+        )
+    }
+
+    static func importedCanvasRequest(from imageData: Data) -> ImportedCanvasRequestValidation {
+        guard let importedImage = importedCanvasImage(from: imageData) else {
+            return .invalidImageData
+        }
+        guard let dimensions = CanvasDimensions(
+            width: importedImage.width,
+            height: importedImage.height
+        ) else {
+            return .invalidImageData
+        }
+        guard dimensions.isWithin(64...8192) else {
+            return .unsupportedSize
+        }
+        return .valid(
+            ImportedCanvasRequest(
+                dimensions: dimensions,
+                pixelData: importedImage.pixelData
+            )
+        )
+    }
+
     func handleNewCanvasRequest(
         state: inout State,
         width: Int,
         height: Int
     ) -> Effect<Action> {
+        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+            return .none
+        }
         if !state.application.showsHome {
             persistActiveTabToBackingStore(state: &state)
         }
-        let width = max(width, 1)
-        let height = max(height, 1)
-        paintDocumentClient.newCanvas(width, height)
-        paintDocumentClient.prewarmDrawingResources()
-        state.application.showWorkspace()
-        state.canvas = CanvasFeature.State()
-        state.canvas.setCanvasSize(CGSize(width: width, height: height))
-        state.layerSidebar = LayerSidebarFeature.State()
-        state.brushPalette = BrushPaletteFeature.State()
-        resetPanels(state: &state)
-        state.canvas.clearAdjustmentPreview()
-        state.export.clearOutputs()
-        state.application.clearBanner()
-        state.application.finishHydration()
+        canvasLifecycleService.createCanvas(dimensions)
+        AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
+            canvasSize: dimensions.size,
+            to: &state
+        )
         syncPaperStyleToDocument(state: &state)
         applyCurrentDocumentPresentation(state: &state)
         activateNewTab(
@@ -32,10 +138,7 @@ extension AppFeature {
             title: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
             sourceProjectURL: nil
         )
-        return .merge(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
-        )
+        return cancelStartupPresentationEffects()
     }
 
     func handleResizeCanvasRequest(
@@ -43,14 +146,18 @@ extension AppFeature {
         width: Int,
         height: Int
     ) {
-        let width = max(width, 1)
-        let height = max(height, 1)
-        let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
-        let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
-        guard width != currentWidth || height != currentHeight else {
+        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
             return
         }
-        paintDocumentClient.resizeCanvas(width, height)
+        guard let currentDimensions = currentCanvasDimensions(state: state) else {
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+            return
+        }
+        guard dimensions != currentDimensions else {
+            return
+        }
+        canvasLifecycleService.resizeCanvas(dimensions)
         state.canvas.resetTransientEditingState()
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Image resolution updated"))
@@ -61,14 +168,18 @@ extension AppFeature {
         width: Int,
         height: Int
     ) {
-        let width = max(width, 1)
-        let height = max(height, 1)
-        let currentWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
-        let currentHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
-        guard width != currentWidth || height != currentHeight else {
+        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
             return
         }
-        paintDocumentClient.resizeCanvasExtent(width, height)
+        guard let currentDimensions = currentCanvasDimensions(state: state) else {
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+            return
+        }
+        guard dimensions != currentDimensions else {
+            return
+        }
+        canvasLifecycleService.resizeCanvasExtent(dimensions)
         state.canvas.resetTransientEditingState()
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Canvas size updated"))
@@ -82,48 +193,36 @@ extension AppFeature {
         if !state.application.showsHome {
             persistActiveTabToBackingStore(state: &state)
         }
-        guard let importedImage = Self.importedCanvasImage(from: data) else {
+        switch Self.importedCanvasRequest(from: data) {
+        case .invalidImageData:
             state.application.presentBanner(state.application.appLanguage.localized("Could not create canvas from image"))
             return .none
-        }
-        let width = importedImage.width
-        let height = importedImage.height
-        guard (64...8192).contains(width), (64...8192).contains(height) else {
+        case .unsupportedSize:
             state.application.presentBanner(state.application.appLanguage.localized("Image size is not supported"))
             return .none
+        case let .valid(request):
+            AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
+                canvasSize: request.dimensions.size,
+                to: &state
+            )
+            let nextName = {
+                let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                return trimmed.isEmpty ? (state.application.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
+            }()
+            canvasLifecycleService.initializeImportedCanvas(
+                request,
+                layerName: nextName
+            )
+            syncPaperStyleToDocument(state: &state)
+            applyCurrentDocumentPresentation(state: &state)
+            activateNewTab(
+                state: &state,
+                title: nextName,
+                sourceProjectURL: nil
+            )
+            state.application.presentBanner(state.application.appLanguage.localized("Canvas created from image"))
+            return cancelStartupPresentationEffects()
         }
-
-        paintDocumentClient.newCanvas(width, height)
-        paintDocumentClient.prewarmDrawingResources()
-        state.application.showWorkspace()
-        state.canvas = CanvasFeature.State()
-        state.canvas.setCanvasSize(CGSize(width: width, height: height))
-        state.layerSidebar = LayerSidebarFeature.State()
-        state.brushPalette = BrushPaletteFeature.State()
-        resetPanels(state: &state)
-        state.canvas.clearAdjustmentPreview()
-        state.export.clearOutputs()
-        state.application.clearBanner()
-        state.application.finishHydration()
-        syncPaperStyleToDocument(state: &state)
-        paintDocumentClient.replaceLayerPixels(0, importedImage.pixelData)
-        let nextName = {
-            let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return trimmed.isEmpty ? (state.application.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
-        }()
-        paintDocumentClient.setLayerName(0, nextName)
-        paintDocumentClient.setActiveLayer(0)
-        applyCurrentDocumentPresentation(state: &state)
-        activateNewTab(
-            state: &state,
-            title: nextName,
-            sourceProjectURL: nil
-        )
-        state.application.presentBanner(state.application.appLanguage.localized("Canvas created from image"))
-        return .merge(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
-        )
     }
 
     func handleUndoRequested(state: inout State) {
@@ -131,7 +230,7 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("Undo is unavailable while drawing"))
             return
         }
-        guard paintDocumentClient.undo() else {
+        guard canvasLifecycleService.undo() else {
             return
         }
         state.canvas.clearSelection()
@@ -143,7 +242,7 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("Redo is unavailable while drawing"))
             return
         }
-        guard paintDocumentClient.redo() else {
+        guard canvasLifecycleService.redo() else {
             return
         }
         state.canvas.clearSelection()
