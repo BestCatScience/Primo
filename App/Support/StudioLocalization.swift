@@ -199,7 +199,7 @@ enum StudioStrings {
         "Unlock Nano Banana": "Nano Banana を有効化",
         "Use Primo subscription to run Nano Banana without your own API key": "Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます",
         "Included": "含まれる内容",
-        "Unlimited app-managed Nano Banana edits": "アプリ管理の Nano Banana 編集を無制限で利用",
+        "Unlimited app-managed Nano Banana edits": "アプリ管理の Nano Banana 編集を利用可能",
         "Purchase state syncs automatically": "購入状態を自動で同期",
         "Restore purchases on a new device": "新しい端末でも購入を復元可能",
         "Loading subscription details…": "サブスクリプション情報を読み込み中…",

@@ -143,7 +143,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("含まれる内容")) {
-                    Label(language.localized("アプリ管理の Nano Banana 編集を無制限で利用"), systemImage: "sparkles")
+                    Label(language.localized("アプリ管理の Nano Banana 編集を利用可能"), systemImage: "sparkles")
                     Label(language.localized("購入状態を自動で同期"), systemImage: "arrow.triangle.2.circlepath")
                     Label(language.localized("新しい端末でも購入を復元可能"), systemImage: "icloud")
                 }

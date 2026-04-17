@@ -14,12 +14,12 @@
       "id" : "21482014",
       "localizations" : [
         {
-          "description" : "Unlimited Nano Banana access inside Primo.",
+          "description" : "Monthly subscription for app-managed Nano Banana access inside Primo.",
           "displayName" : "Primo Nano Banana",
           "locale" : "en_US"
         },
         {
-          "description" : "Primo で Nano Banana を無制限に利用できます。",
+          "description" : "Primo でアプリ管理の Nano Banana を利用するための月額サブスクリプションです。",
           "displayName" : "Primo Nano Banana",
           "locale" : "ja_JP"
         }
