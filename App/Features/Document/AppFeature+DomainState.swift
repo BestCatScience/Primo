@@ -121,6 +121,13 @@ extension AppFeature.ApplicationFeedback {
     }
 }
 
+extension AppFeature {
+    static func optionalErrorMessage(_ error: Error) -> String? {
+        let message = error.localizedDescription
+        return message.isEmpty ? nil : message
+    }
+}
+
 extension AppFeature.ApplicationState {
     mutating func beginStartup(language: AppLanguage) {
         isHydrating = true
@@ -138,14 +145,6 @@ extension AppFeature.ApplicationState {
         if let showingHome {
             showsHome = showingHome
         }
-    }
-
-    mutating func failHydration(
-        message: String,
-        showingHome: Bool? = nil
-    ) {
-        finishHydration(showingHome: showingHome)
-        presentBanner(message)
     }
 
     mutating func failHydration(
@@ -352,7 +351,11 @@ extension AppFeature.NanoBananaState {
         activeJobID = nil
     }
 
-    mutating func markFailed(message: String) {
+    mutating func markFailed(
+        feedback: AppFeature.ApplicationFeedback,
+        language: AppLanguage
+    ) {
+        let message = feedback.message(for: language)
         isGenerating = false
         if let activeJobID,
            let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
@@ -361,12 +364,16 @@ extension AppFeature.NanoBananaState {
         }
     }
 
-    mutating func markCanceled(localizedMessage: String) {
+    mutating func markCanceled(
+        feedback: AppFeature.ApplicationFeedback,
+        language: AppLanguage
+    ) {
+        let message = feedback.message(for: language)
         isGenerating = false
         if let activeJobID,
            let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
             jobs[jobIndex].status = .canceled
-            jobs[jobIndex].message = localizedMessage
+            jobs[jobIndex].message = message
         }
     }
 }

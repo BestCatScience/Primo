@@ -61,7 +61,7 @@ extension AppFeature {
             return performCloseOperation(confirmation.operation)
         } catch {
             state.application.presentFeedback(
-                .saveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
+                .saveFailed(Self.optionalErrorMessage(error))
             )
             return .none
         }
@@ -132,8 +132,8 @@ extension AppFeature {
             handleTabSelectionLoaded(state: &state, tabID: tabID, loaded: loaded)
             return .none
 
-        case let .tabSelectionFailed(message):
-            handleTabSelectionFailed(state: &state, message: message)
+        case let .tabSelectionFailed(feedback):
+            handleTabSelectionFailed(state: &state, feedback: feedback)
             return .none
 
         case let .tabCloseRequested(tabID):
@@ -218,8 +218,8 @@ extension AppFeature {
                 sourceURL: sourceURL
             )
 
-        case let .openDocumentFailed(message):
-            handleOpenDocumentFailed(state: &state, message: message)
+        case let .openDocumentFailed(feedback):
+            handleOpenDocumentFailed(state: &state, feedback: feedback)
             return .none
 
         default:

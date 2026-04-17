@@ -438,7 +438,11 @@ struct ContentView: View {
                 try fileManager.copyItem(at: sourceURL, to: destinationURL)
                 return destinationURL
             } catch {
-                store.send(.openDocumentFailed(error.localizedDescription))
+                store.send(
+                    .openDocumentFailed(
+                        .openFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
                 return nil
             }
         }
@@ -459,12 +463,16 @@ struct ContentView: View {
         defer { selectedPhotoLayerItem = nil }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                store.send(.photoImportFailed(language.localized("Could not import photo")))
+                store.send(.photoImportFailed(.couldNotImportPhoto(nil)))
                 return
             }
             store.send(.photoImportReceived(name: nil, data: data))
         } catch {
-            store.send(.photoImportFailed(error.localizedDescription))
+            store.send(
+                .photoImportFailed(
+                    .couldNotImportPhoto(AppFeature.optionalErrorMessage(error))
+                )
+            )
         }
     }
 
@@ -473,13 +481,17 @@ struct ContentView: View {
         defer { selectedNewCanvasPhotoItem = nil }
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                store.send(.newCanvasFromImageFailed(language.localized("Could not create canvas from image")))
+                store.send(.newCanvasFromImageFailed(.couldNotCreateCanvasFromImage(nil)))
                 return
             }
             store.send(.newCanvasFromImageReceived(name: nil, data: data))
             showsNewCanvasSheet = false
         } catch {
-            store.send(.newCanvasFromImageFailed(error.localizedDescription))
+            store.send(
+                .newCanvasFromImageFailed(
+                    .couldNotCreateCanvasFromImage(AppFeature.optionalErrorMessage(error))
+                )
+            )
         }
     }
 

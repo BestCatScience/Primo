@@ -17,7 +17,11 @@ extension AppFeature {
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
             onSuccess: { .autosaveRecoveryOpened($0, item) },
-            onFailure: { .autosaveRecoveryRestoreFailed($0) }
+            onFailure: {
+                .autosaveRecoveryRestoreFailed(
+                    .autosaveRestoreFailed(Self.optionalErrorMessage($0))
+                )
+            }
         )
     }
 
@@ -58,10 +62,8 @@ extension AppFeature {
 
     func handleAutosaveRecoveryRestoreFailed(
         state: inout State,
-        message: String
+        feedback: ApplicationFeedback
     ) {
-        state.application.failHydration(
-            feedback: .autosaveRestoreFailed(message.isEmpty ? nil : message)
-        )
+        state.application.failHydration(feedback: feedback)
     }
 }

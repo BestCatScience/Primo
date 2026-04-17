@@ -17,7 +17,11 @@ extension AppFeature {
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
             onSuccess: { .tabSelectionLoaded(tabID, $0) },
-            onFailure: { .tabSelectionFailed($0) }
+            onFailure: {
+                .tabSelectionFailed(
+                    .openFailed(Self.optionalErrorMessage($0))
+                )
+            }
         )
     }
 
@@ -41,10 +45,10 @@ extension AppFeature {
 
     func handleTabSelectionFailed(
         state: inout State,
-        message: String
+        feedback: ApplicationFeedback
     ) {
         state.application.failHydration(
-            message: message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message,
+            feedback: feedback,
             showingHome: state.workspace.activeTab == nil ? true : nil
         )
     }

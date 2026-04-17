@@ -18,7 +18,7 @@ extension AppFeature {
             return .send(.homeProjectsLoadRequested)
         } catch {
             state.application.presentFeedback(
-                .moveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
+                .moveFailed(Self.optionalErrorMessage(error))
             )
             return .none
         }
@@ -39,7 +39,11 @@ extension AppFeature {
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
             onSuccess: { .openDocumentLoaded($0, url) },
-            onFailure: { .openDocumentFailed($0) }
+            onFailure: {
+                .openDocumentFailed(
+                    .openFailed(Self.optionalErrorMessage($0))
+                )
+            }
         )
     }
 

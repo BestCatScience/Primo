@@ -88,13 +88,13 @@ struct AppFeature {
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
         case autosaveRecoveryRestoreRequested(WorkspaceItemID)
         case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem)
-        case autosaveRecoveryRestoreFailed(String)
+        case autosaveRecoveryRestoreFailed(ApplicationFeedback)
         case autosaveRecoveryDiscardRequested(WorkspaceItemID)
         case autosaveRecoveryDismissed
         case homeSectionSelected(HomeSidebarSection)
         case tabSelected(OpenDocumentTab.ID)
         case tabSelectionLoaded(OpenDocumentTab.ID, LoadedPaintProject)
-        case tabSelectionFailed(String)
+        case tabSelectionFailed(ApplicationFeedback)
         case tabCloseRequested(OpenDocumentTab.ID)
         case tabClosed(OpenDocumentTab.ID)
         case closeOtherTabsRequested(OpenDocumentTab.ID)
@@ -123,7 +123,7 @@ struct AppFeature {
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
         case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool)
-        case saveHistoryRestoreFailed(String)
+        case saveHistoryRestoreFailed(ApplicationFeedback)
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
         case saveDocumentRequested
@@ -132,18 +132,18 @@ struct AppFeature {
         case exportTimelapseRequested
         case nanoBananaEditRequested(NanoBananaGenerationRequest)
         case nanoBananaEditSucceeded(NanoBananaPreviewState)
-        case nanoBananaEditFailed(String)
+        case nanoBananaEditFailed(ApplicationFeedback)
         case nanoBananaCancelRequested
         case nanoBananaRegenerateRequested
         case nanoBananaRetryJob(UUID)
         case openDocumentSelected(DocumentProjectPath)
         case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath)
-        case openDocumentFailed(String)
+        case openDocumentFailed(ApplicationFeedback)
         case photoImportReceived(name: String?, data: Data)
-        case photoImportFailed(String)
+        case photoImportFailed(ApplicationFeedback)
         case timelapseExportProgressUpdated(Double, Data?)
         case timelapseExportSucceeded(URL)
-        case timelapseExportFailed(String)
+        case timelapseExportFailed(ApplicationFeedback)
         case exportSheetDismissed
         case bannerDismissed
         case languageChanged(AppLanguage)
@@ -152,7 +152,7 @@ struct AppFeature {
         case resizeCanvasRequested(width: Int, height: Int)
         case resizeCanvasExtentRequested(width: Int, height: Int)
         case newCanvasFromImageReceived(name: String?, data: Data)
-        case newCanvasFromImageFailed(String)
+        case newCanvasFromImageFailed(ApplicationFeedback)
         case clearActiveLayerButtonTapped
         case createLayerMaskFromSelectionRequested
         case clearLayerMaskRequested

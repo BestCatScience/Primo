@@ -287,9 +287,13 @@ extension AppFeature {
                     }
 
                     guard let finalPixelData else {
-                        await send(.nanoBananaEditFailed(
-                            prepared.appLanguage.localized("Nano Banana returned an unsupported image")
-                        ))
+                        await send(
+                            .nanoBananaEditFailed(
+                                .nanoBananaEditFailed(
+                                    prepared.appLanguage.localized("Nano Banana returned an unsupported image")
+                                )
+                            )
+                        )
                         return
                     }
 
@@ -306,12 +310,16 @@ extension AppFeature {
                     )
                     await send(.nanoBananaEditSucceeded(preview))
                 } catch {
-                    await send(.nanoBananaEditFailed(
-                        AppFeature.localizedNanoBananaErrorMessage(
-                            error.localizedDescription,
-                            language: prepared.appLanguage
+                    await send(
+                        .nanoBananaEditFailed(
+                            .nanoBananaEditFailed(
+                                AppFeature.localizedNanoBananaErrorMessage(
+                                    error.localizedDescription,
+                                    language: prepared.appLanguage
+                                )
+                            )
                         )
-                    ))
+                    )
                 }
             }
             .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
@@ -328,16 +336,22 @@ extension AppFeature {
             )
         }
 
-        func applyFailure(state: inout State, message: String) {
-            state.nanoBanana.markFailed(message: message)
-            state.application.presentFeedback(
-                .nanoBananaEditFailed(message.isEmpty ? nil : message)
+        func applyFailure(
+            state: inout State,
+            feedback: ApplicationFeedback
+        ) {
+            state.nanoBanana.markFailed(
+                feedback: feedback,
+                language: state.application.appLanguage
             )
+            state.application.presentFeedback(feedback)
         }
 
         func cancel(state: inout State) -> Effect<Action> {
-            let localizedMessage = state.application.appLanguage.localized("Nano Banana generation canceled")
-            state.nanoBanana.markCanceled(localizedMessage: localizedMessage)
+            state.nanoBanana.markCanceled(
+                feedback: .nanoBananaGenerationCanceled,
+                language: state.application.appLanguage
+            )
             state.application.presentFeedback(.nanoBananaGenerationCanceled)
             return .cancel(id: CancelID.nanoBananaEdit)
         }
@@ -371,7 +385,7 @@ extension AppFeature {
         switch nanoBananaRequestContract.validate(request: request, state: state) {
         case let .failure(error):
             state.application.presentFeedback(
-                .nanoBananaEditFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
+                .nanoBananaEditFailed(Self.optionalErrorMessage(error))
             )
             return .none
         case let .success(edit):
@@ -391,7 +405,10 @@ extension AppFeature {
         let applicationPlan: NanoBananaPreviewApplicationPlan
         switch nanoBananaPreviewApplicationContract.validate(preview: preview, state: state) {
         case let .failure(error):
-            nanoBananaGenerationService.applyFailure(state: &state, message: error.message)
+            nanoBananaGenerationService.applyFailure(
+                state: &state,
+                feedback: .nanoBananaEditFailed(error.message)
+            )
             return
         case let .success(plan):
             applicationPlan = plan
@@ -415,9 +432,9 @@ extension AppFeature {
 
     func handleNanoBananaEditFailed(
         state: inout State,
-        message: String
+        feedback: ApplicationFeedback
     ) {
-        nanoBananaGenerationService.applyFailure(state: &state, message: message)
+        nanoBananaGenerationService.applyFailure(state: &state, feedback: feedback)
     }
 
     func handleNanoBananaCancelRequested(state: inout State) -> Effect<Action> {

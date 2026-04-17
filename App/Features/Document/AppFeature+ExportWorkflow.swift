@@ -36,7 +36,13 @@ extension AppFeature {
                     }
                     await send(.timelapseExportSucceeded(url))
                 } catch {
-                    await send(.timelapseExportFailed(error.localizedDescription))
+                    await send(
+                        .timelapseExportFailed(
+                            .timelapseExportFailed(
+                                AppFeature.optionalErrorMessage(error)
+                            )
+                        )
+                    )
                 }
             }
             .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
@@ -97,10 +103,10 @@ extension AppFeature {
 
     func handleTimelapseExportFailed(
         state: inout State,
-        message: String
+        feedback: ApplicationFeedback
     ) {
         state.export.failTimelapseExport()
-        state.application.presentFeedback(.timelapseExportFailed(message.isEmpty ? nil : message))
+        state.application.presentFeedback(feedback)
     }
 
     func handleExportSheetDismissed(state: inout State) {

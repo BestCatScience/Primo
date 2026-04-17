@@ -10,7 +10,7 @@ extension AppFeature {
         func loadProjectEffect(
             from fileURL: URL,
             onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
-            onFailure: @escaping @Sendable (String) -> Action,
+            onFailure: @escaping @Sendable (Error) -> Action,
             removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil
         ) -> Effect<Action> {
             .run { [paintDocumentClient, workspaceBackingStoreService] send in
@@ -21,7 +21,7 @@ extension AppFeature {
                     }
                     await send(onSuccess(loaded))
                 } catch {
-                    await send(onFailure(error.localizedDescription))
+                    await send(onFailure(error))
                 }
             }
         }
@@ -48,7 +48,7 @@ extension AppFeature {
         persistCurrentTab: Bool = true,
         removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil,
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
-        onFailure: @escaping @Sendable (String) -> Action
+        onFailure: @escaping @Sendable (Error) -> Action
     ) -> Effect<Action> {
         if persistCurrentTab {
             switch prepareForDocumentReplacement(state: &state) {

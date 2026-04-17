@@ -34,7 +34,11 @@ extension AppFeature {
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
-            onFailure: { .saveHistoryRestoreFailed($0) }
+            onFailure: {
+                .saveHistoryRestoreFailed(
+                    .saveHistoryRestoreFailed(Self.optionalErrorMessage($0))
+                )
+            }
         )
     }
 
@@ -114,10 +118,8 @@ extension AppFeature {
 
     func handleSaveHistoryRestoreFailed(
         state: inout State,
-        message: String
+        feedback: ApplicationFeedback
     ) {
-        state.application.failHydration(
-            feedback: .saveHistoryRestoreFailed(message.isEmpty ? nil : message)
-        )
+        state.application.failHydration(feedback: feedback)
     }
 }

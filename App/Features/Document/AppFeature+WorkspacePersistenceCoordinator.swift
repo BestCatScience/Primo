@@ -191,7 +191,7 @@ extension AppFeature {
     }
 
     func saveFailureFeedback(_ error: Error) -> ApplicationFeedback {
-        .saveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
+        .saveFailed(Self.optionalErrorMessage(error))
     }
 
     func persistActiveTabToBackingStore(

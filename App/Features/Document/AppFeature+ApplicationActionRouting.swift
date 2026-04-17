@@ -78,8 +78,8 @@ extension AppFeature {
             handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item)
             return .none
 
-        case let .autosaveRecoveryRestoreFailed(message):
-            handleAutosaveRecoveryRestoreFailed(state: &state, message: message)
+        case let .autosaveRecoveryRestoreFailed(feedback):
+            handleAutosaveRecoveryRestoreFailed(state: &state, feedback: feedback)
             return .none
 
         case let .autosaveRecoveryDiscardRequested(autosaveID):
