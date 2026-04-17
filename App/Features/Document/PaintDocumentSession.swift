@@ -230,6 +230,90 @@ extension PaintDocumentSession {
         precondition(index < 0 || bridgeLayerInfos().indices.contains(index), "\(label) must resolve to an existing layer or be -1.")
     }
 
+    @discardableResult
+    func beginPixelLayerMutation(
+        at index: Int,
+        preservesTextLayerMetadata: Bool = false
+    ) -> Bool {
+        requireExistingLayerIndex(index)
+        guard !isLayerLocked(index: index) else { return false }
+        if !preservesTextLayerMetadata {
+            clearTextLayerData(index: index)
+        }
+        return true
+    }
+
+    func applyRecordedLifecycleMutation(
+        invalidating invalidation: PaintDocumentThumbnailInvalidation = .none,
+        recording events: [TimelapseOperation] = [],
+        captureFrame: Bool = true
+    ) {
+        applyLifecycleMutation(
+            editingLifecycleService.mutation(
+                recording: events,
+                invalidating: invalidation,
+                captureFrame: captureFrame
+            )
+        )
+    }
+
+    func applyRecordedLifecycleMutation(
+        invalidating invalidation: PaintDocumentThumbnailInvalidation = .none,
+        recording event: TimelapseOperation,
+        captureFrame: Bool = true
+    ) {
+        applyRecordedLifecycleMutation(
+            invalidating: invalidation,
+            recording: [event],
+            captureFrame: captureFrame
+        )
+    }
+
+    func applyLayerLifecycleMutation(
+        at index: Int,
+        recording events: [TimelapseOperation] = [],
+        captureFrame: Bool = true
+    ) {
+        applyRecordedLifecycleMutation(
+            invalidating: .layer(index),
+            recording: events,
+            captureFrame: captureFrame
+        )
+    }
+
+    func applyLayerLifecycleMutation(
+        at index: Int,
+        recording event: TimelapseOperation,
+        captureFrame: Bool = true
+    ) {
+        applyLayerLifecycleMutation(
+            at: index,
+            recording: [event],
+            captureFrame: captureFrame
+        )
+    }
+
+    func applyDocumentLifecycleMutation(
+        recording events: [TimelapseOperation] = [],
+        captureFrame: Bool = true
+    ) {
+        applyRecordedLifecycleMutation(
+            invalidating: .all,
+            recording: events,
+            captureFrame: captureFrame
+        )
+    }
+
+    func applyDocumentLifecycleMutation(
+        recording event: TimelapseOperation,
+        captureFrame: Bool = true
+    ) {
+        applyDocumentLifecycleMutation(
+            recording: [event],
+            captureFrame: captureFrame
+        )
+    }
+
     func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
         bridgeQueryService.consumeDirtyUpdate(from: bridge)
     }

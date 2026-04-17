@@ -7,8 +7,10 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(clearsSelection: true)
+        )
     }
 
     func handleSelectAdjacentLayer(
@@ -25,7 +27,10 @@ extension AppFeature {
         let targetIndex = state.layerSidebar.layers[targetPosition].index
         layerWorkflowService.setActiveLayer(targetIndex)
         state.canvas.activateLayerForEditing(targetIndex)
-        applyCurrentDocumentPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: .currentPresentation
+        )
     }
 
     func handleLayerOpacityChange(
@@ -34,8 +39,10 @@ extension AppFeature {
         opacity: Double
     ) {
         layerWorkflowService.setLayerOpacity(index, opacity: opacity)
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(clearsSelection: true)
+        )
     }
 
     func handleLayerLockToggle(
@@ -46,7 +53,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleLayerAlphaLockToggle(
@@ -57,7 +64,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleLayerClippingToggle(
@@ -71,7 +78,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleLayerSelection(
@@ -80,7 +87,10 @@ extension AppFeature {
     ) {
         layerWorkflowService.setActiveLayer(index)
         state.canvas.activateLayerForEditing(index)
-        applyCurrentDocumentPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: .currentPresentation
+        )
     }
 
     func handleLayerVisibilityToggle(
@@ -91,8 +101,10 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(clearsSelection: true)
+        )
     }
 
     func handleFolderExpandedChange(
@@ -101,7 +113,10 @@ extension AppFeature {
         isExpanded: Bool
     ) {
         layerWorkflowService.setFolderExpanded(folderID, isExpanded: isExpanded)
-        applyCurrentDocumentPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: .currentPresentation
+        )
     }
 
     func handleFolderVisibilityToggle(
@@ -112,7 +127,7 @@ extension AppFeature {
             return
         }
         layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleFolderRename(
@@ -121,7 +136,7 @@ extension AppFeature {
         name: String
     ) {
         layerWorkflowService.setFolderName(folderID, name: name)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleLayerBlendModeChange(
@@ -130,8 +145,10 @@ extension AppFeature {
         blendMode: LayerBlendMode
     ) {
         layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(clearsSelection: true)
+        )
     }
 
     func handleLayerRename(
@@ -140,6 +157,6 @@ extension AppFeature {
         name: String
     ) {
         layerWorkflowService.setLayerName(index, name: name)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 }

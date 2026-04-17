@@ -17,11 +17,9 @@ extension PaintDocumentSession {
         let activeLayerIndex = bridgeActiveLayerIndex()
         let recordedEvent = finishTrackedStroke()
         bridgeEndStroke()
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: recordedEvent.map { [$0] } ?? [],
-                invalidating: .layer(activeLayerIndex)
-            )
+        applyLayerLifecycleMutation(
+            at: activeLayerIndex,
+            recording: recordedEvent.map { [$0] } ?? []
         )
     }
 
@@ -29,38 +27,32 @@ extension PaintDocumentSession {
         let activeLayerIndex = bridgeActiveLayerIndex()
         bridgeCancelStroke()
         resetTrackedStroke()
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                invalidating: .layer(activeLayerIndex),
-                captureFrame: false
-            )
+        applyLayerLifecycleMutation(
+            at: activeLayerIndex,
+            captureFrame: false
         )
     }
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
         let layerIndex = bridgeActiveLayerIndex()
-        guard !isLayerLocked(index: layerIndex) else { return }
-        clearTextLayerData(index: layerIndex)
+        guard beginPixelLayerMutation(at: layerIndex) else { return }
         bridgeFill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
         )
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: .fill(
-                    layerIndex: .unchecked(layerIndex),
-                    brush: brush,
-                    sample: sample
-                ),
-                invalidating: .layer(bridgeActiveLayerIndex())
+        applyLayerLifecycleMutation(
+            at: layerIndex,
+            recording: .fill(
+                layerIndex: .unchecked(layerIndex),
+                brush: brush,
+                sample: sample
             )
         )
     }
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) {
         guard !samples.isEmpty else { return }
-        guard !isLayerLocked(index: layerIndex) else { return }
-        clearTextLayerData(index: layerIndex)
+        guard beginPixelLayerMutation(at: layerIndex) else { return }
         beginOrContinueTrackedBlurStroke(on: layerIndex, brush: brush)
         appendTrackedBlurSamples(samples)
         applyBlurStroke(
@@ -70,18 +62,16 @@ extension PaintDocumentSession {
             transient: shouldApplyTrackedBlurTransiently
         )
         markTrackedBlurHistoryCaptured()
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                invalidating: .layer(layerIndex),
-                captureFrame: captureTimelapse
-            )
+        applyLayerLifecycleMutation(
+            at: layerIndex,
+            captureFrame: captureTimelapse
         )
     }
 
     func endBlurStroke() {
         let recordedEvent = finishTrackedBlurStroke()
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(recording: recordedEvent.map { [$0] } ?? [])
+        applyRecordedLifecycleMutation(
+            recording: recordedEvent.map { [$0] } ?? []
         )
     }
 

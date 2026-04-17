@@ -1,6 +1,40 @@
 import Foundation
 
 extension AppFeature {
+    enum DocumentPresentationRefresh {
+        case none
+        case current
+        case dirty
+    }
+
+    struct LayerMutationFinalization {
+        let index: Int
+        var incrementsRevision = false
+        var clearsSelection = true
+    }
+
+    struct DocumentMutationContract {
+        var clearsSelection: Bool
+        var finalizedLayerMutation: LayerMutationFinalization?
+        var refresh: DocumentPresentationRefresh
+        var successFeedback: ApplicationFeedback?
+
+        init(
+            clearsSelection: Bool = false,
+            finalizedLayerMutation: LayerMutationFinalization? = nil,
+            refresh: DocumentPresentationRefresh = .dirty,
+            successFeedback: ApplicationFeedback? = nil
+        ) {
+            self.clearsSelection = clearsSelection
+            self.finalizedLayerMutation = finalizedLayerMutation
+            self.refresh = refresh
+            self.successFeedback = successFeedback
+        }
+
+        static let dirty = DocumentMutationContract()
+        static let currentPresentation = DocumentMutationContract(refresh: .current)
+    }
+
     struct LayerWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -138,7 +172,7 @@ extension AppFeature {
             paintDocumentClient.setTextLayer(index, textLayer)
         }
 
-        func clearLayer(_ index: Int) {
+        func clearLayer(_ index: Int) -> Bool {
             paintDocumentClient.clearLayer(index)
         }
 
@@ -162,20 +196,58 @@ extension AppFeature {
         LayerWorkflowService(paintDocumentClient: paintDocumentClient)
     }
 
+    func completeDocumentMutation(
+        state: inout State,
+        contract: DocumentMutationContract = .dirty
+    ) {
+        if let finalization = contract.finalizedLayerMutation {
+            state.canvas.finalizeLayerMutation(
+                at: finalization.index,
+                incrementsRevision: finalization.incrementsRevision,
+                clearsSelection: finalization.clearsSelection
+            )
+        } else if contract.clearsSelection {
+            state.canvas.clearSelection()
+        }
+
+        switch contract.refresh {
+        case .none:
+            break
+        case .current:
+            applyCurrentDocumentPresentation(state: &state)
+        case .dirty:
+            applyDirtyPresentation(state: &state)
+        }
+
+        if let successFeedback = contract.successFeedback {
+            state.application.presentFeedback(successFeedback)
+        }
+    }
+
+    @discardableResult
+    func handleDocumentMutation(
+        state: inout State,
+        contract: DocumentMutationContract = .dirty,
+        mutation: () -> Bool
+    ) -> Bool {
+        guard mutation() else { return false }
+        completeDocumentMutation(state: &state, contract: contract)
+        return true
+    }
+
     func handleLayerMutation(
         state: inout State,
         clearsSelection: Bool = false,
         updatesPresentationDirectly: Bool = false,
         mutation: () -> Bool
     ) {
-        guard mutation() else { return }
-        if clearsSelection {
-            state.canvas.clearSelection()
-        }
-        if updatesPresentationDirectly {
-            applyCurrentDocumentPresentation(state: &state)
-        } else {
-            applyDirtyPresentation(state: &state)
-        }
+        _ = handleDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                clearsSelection: clearsSelection,
+                refresh: updatesPresentationDirectly ? .current : .dirty
+            ),
+            mutation: mutation
+        )
     }
 }

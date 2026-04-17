@@ -9,8 +9,10 @@ extension PaintDocumentSession {
 
     @discardableResult
     func setTextLayer(index: Int, textLayer: TextLayerData) -> Bool {
-        requireExistingLayerIndex(index)
-        guard !isLayerLocked(index: index) else { return false }
+        guard beginPixelLayerMutation(
+            at: index,
+            preservesTextLayerMetadata: true
+        ) else { return false }
         let existingPixelData = pixelDataForLayer(index: index)
         guard !existingPixelData.isEmpty else { return false }
         guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }

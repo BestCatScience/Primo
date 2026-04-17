@@ -56,7 +56,7 @@ struct PaintDocumentClient: Sendable {
     var replaceLayerMask: @Sendable (Int, Data) -> Bool
     var clearLayerMask: @Sendable (Int) -> Bool
     var applyLayerMask: @Sendable (Int) -> Bool
-    var clearLayer: @Sendable (Int) -> Void
+    var clearLayer: @Sendable (Int) -> Bool
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
     static func live(

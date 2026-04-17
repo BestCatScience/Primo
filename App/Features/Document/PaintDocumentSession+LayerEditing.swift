@@ -14,9 +14,7 @@ extension PaintDocumentSession {
     func undo() -> Bool {
         let didUndo = bridgeUndo()
         if didUndo {
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(recording: .undo, invalidating: .all)
-            )
+            applyDocumentLifecycleMutation(recording: .undo)
         }
         return didUndo
     }
@@ -25,20 +23,16 @@ extension PaintDocumentSession {
     func redo() -> Bool {
         let didRedo = bridgeRedo()
         if didRedo {
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(recording: .redo, invalidating: .all)
-            )
+            applyDocumentLifecycleMutation(recording: .redo)
         }
         return didRedo
     }
 
     func addLayer(name: String) {
         setBridgeActiveLayerIndex(bridgeAddLayer(name: name))
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: .addLayer(name: name),
-                invalidating: .layer(bridgeActiveLayerIndex())
-            )
+        applyLayerLifecycleMutation(
+            at: bridgeActiveLayerIndex(),
+            recording: .addLayer(name: name)
         )
     }
 
@@ -52,11 +46,8 @@ extension PaintDocumentSession {
             } else {
                 remapStoredTextLayersForInsertion(at: duplicatedIndex)
             }
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(
-                    recording: .duplicateLayer(index: .unchecked(index), name: name),
-                    invalidating: .all
-                )
+            applyDocumentLifecycleMutation(
+                recording: .duplicateLayer(index: .unchecked(index), name: name)
             )
         }
         return duplicatedIndex
@@ -68,11 +59,8 @@ extension PaintDocumentSession {
         let didDelete = bridgeDeleteLayer(index: index)
         if didDelete {
             remapStoredTextLayersForDeletion(of: index)
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(
-                    recording: .deleteLayer(index: .unchecked(index)),
-                    invalidating: .all
-                )
+            applyDocumentLifecycleMutation(
+                recording: .deleteLayer(index: .unchecked(index))
             )
         }
         return didDelete
@@ -85,10 +73,10 @@ extension PaintDocumentSession {
         let didMove = bridgeMoveLayer(from: index, to: destinationIndex)
         if didMove {
             remapStoredTextLayersForMove(from: index, to: destinationIndex)
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(
-                    recording: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)),
-                    invalidating: .all
+            applyDocumentLifecycleMutation(
+                recording: .moveLayer(
+                    index: .unchecked(index),
+                    destinationIndex: .unchecked(destinationIndex)
                 )
             )
         }

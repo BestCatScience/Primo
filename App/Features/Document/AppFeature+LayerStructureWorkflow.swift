@@ -7,7 +7,7 @@ extension AppFeature {
             named: namingPolicy.defaultLayerName(for: state.layerSidebar)
         )
         state.canvas.activateLayerForEditing(newLayerIndex)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleAddFolder(state: inout State) {
@@ -21,7 +21,7 @@ extension AppFeature {
             named: namingPolicy.folderName(forOrdinal: nextFolderNumber),
             afterLayerAt: state.layerSidebar.activeLayerIndex
         )
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleFolderDeletion(

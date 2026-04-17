@@ -186,15 +186,29 @@ extension AppFeature {
         .saveFailed(Self.optionalErrorMessage(error))
     }
 
-    func persistActiveTabToBackingStore(
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
+    func requireActiveTab(
+        in state: State,
+        failureFeedback: ApplicationFeedback = .saveFailed(nil)
+    ) -> Result<OpenDocumentTab, WorkspacePersistenceFailure> {
         guard let activeTab = state.workspace.activeTab else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    feedback: .saveFailed(nil)
+                    feedback: failureFeedback
                 )
             )
+        }
+        return .success(activeTab)
+    }
+
+    func persistActiveTabToBackingStore(
+        state: inout State
+    ) -> Result<Void, WorkspacePersistenceFailure> {
+        let activeTab: OpenDocumentTab
+        switch requireActiveTab(in: state) {
+        case let .success(tab):
+            activeTab = tab
+        case let .failure(failure):
+            return .failure(failure)
         }
         do {
             try workspaceBackingStoreService.saveProject(
@@ -228,12 +242,12 @@ extension AppFeature {
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?
     ) -> Result<DocumentProjectPath, WorkspacePersistenceFailure> {
-        guard let activeTab = state.workspace.activeTab else {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: .saveFailed(nil)
-                )
-            )
+        let activeTab: OpenDocumentTab
+        switch requireActiveTab(in: state) {
+        case let .success(tab):
+            activeTab = tab
+        case let .failure(failure):
+            return .failure(failure)
         }
         switch persistActiveTabToBackingStore(state: &state) {
         case .success:
@@ -415,12 +429,12 @@ extension AppFeature {
     func persistActiveTabAutosave(
         state: inout State
     ) -> Result<Void, WorkspacePersistenceFailure> {
-        guard let activeTab = state.workspace.activeTab else {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: .saveFailed(nil)
-                )
-            )
+        let activeTab: OpenDocumentTab
+        switch requireActiveTab(in: state) {
+        case let .success(tab):
+            activeTab = tab
+        case let .failure(failure):
+            return .failure(failure)
         }
 
         do {

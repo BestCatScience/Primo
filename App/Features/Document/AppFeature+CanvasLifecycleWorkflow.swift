@@ -254,8 +254,10 @@ extension AppFeature {
         guard performMutation() else {
             return
         }
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(clearsSelection: true)
+        )
     }
 
     func handleNewCanvasRequest(

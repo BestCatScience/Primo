@@ -80,8 +80,14 @@ extension AppFeature {
             state.application.presentFeedback(failureFeedback)
             return false
         }
-        state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                finalizedLayerMutation: LayerMutationFinalization(
+                    index: state.canvas.activeLayerIndex
+                )
+            )
+        )
         return true
     }
 
@@ -115,8 +121,14 @@ extension AppFeature {
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)
-        state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                finalizedLayerMutation: LayerMutationFinalization(
+                    index: state.canvas.activeLayerIndex
+                )
+            )
+        )
         return true
     }
 }

@@ -20,8 +20,10 @@ extension AppFeature {
         layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
         layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayerForNewContent(targetLayerIndex)
-        applyDirtyPresentation(state: &state)
-        state.application.presentFeedback(.photoImportedToNewLayer)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(successFeedback: .photoImportedToNewLayer)
+        )
     }
 
     func handleApplyText(
@@ -69,14 +71,23 @@ extension AppFeature {
         state.canvas.activateLayer(targetLayerIndex)
         state.canvas.activateTool(.text)
         state.brushPalette.setTextTargetLayer(targetLayerIndex)
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleClearActiveLayer(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        layerWorkflowService.clearLayer(activeLayerIndex)
-        state.canvas.finalizeLayerMutation(at: activeLayerIndex, incrementsRevision: true)
-        applyDirtyPresentation(state: &state)
+        _ = handleDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                finalizedLayerMutation: LayerMutationFinalization(
+                    index: activeLayerIndex,
+                    incrementsRevision: true
+                )
+            ),
+            mutation: {
+                layerWorkflowService.clearLayer(activeLayerIndex)
+            }
+        )
     }
 
     func handleCreateLayerMask(state: inout State) {
@@ -85,28 +96,43 @@ extension AppFeature {
             state.application.presentFeedback(.createLayerMaskNeedsSelection)
             return
         }
-        guard layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData) else {
+        guard handleDocumentMutation(
+            state: &state,
+            mutation: {
+                layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData)
+            }
+        ) else {
             state.application.presentFeedback(.createLayerMaskFailed)
             return
         }
-        applyDirtyPresentation(state: &state)
     }
 
     func handleClearLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard layerWorkflowService.clearLayerMask(activeLayerIndex) else {
-            return
-        }
-        applyDirtyPresentation(state: &state)
+        _ = handleDocumentMutation(
+            state: &state,
+            mutation: {
+                layerWorkflowService.clearLayerMask(activeLayerIndex)
+            }
+        )
     }
 
     func handleApplyLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard layerWorkflowService.applyLayerMask(activeLayerIndex) else {
+        guard handleDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                finalizedLayerMutation: LayerMutationFinalization(
+                    index: activeLayerIndex,
+                    incrementsRevision: true
+                )
+            ),
+            mutation: {
+                layerWorkflowService.applyLayerMask(activeLayerIndex)
+            }
+        ) else {
             state.application.presentFeedback(.applyLayerMaskFailed)
             return
         }
-        state.canvas.finalizeLayerMutation(at: activeLayerIndex, incrementsRevision: true)
-        applyDirtyPresentation(state: &state)
     }
 }

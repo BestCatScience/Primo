@@ -17,18 +17,14 @@ extension PaintDocumentSession {
 
     @discardableResult
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
-        requireExistingLayerIndex(index)
-        guard !isLayerLocked(index: index) else { return false }
-        clearTextLayerData(index: index)
+        guard beginPixelLayerMutation(at: index) else { return false }
         let descriptor = makeProcessingDescriptor(from: request)
         let didApply = bridgeApplyLayerProcessing(index: index, descriptor: descriptor)
         if didApply {
             let pixelData = pixelDataForLayer(index: index)
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(
-                    recording: .replaceLayerPixels(index: .unchecked(index), data: pixelData),
-                    invalidating: .layer(index)
-                )
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .replaceLayerPixels(index: .unchecked(index), data: pixelData)
             )
         }
         return didApply
@@ -86,11 +82,10 @@ extension PaintDocumentSession {
     }
 
     func replaceLayerPixels(index: Int, data: Data, preservesTextLayerMetadata: Bool = false) {
-        requireExistingLayerIndex(index)
-        guard !isLayerLocked(index: index) else { return }
-        if !preservesTextLayerMetadata {
-            clearTextLayerData(index: index)
-        }
+        guard beginPixelLayerMutation(
+            at: index,
+            preservesTextLayerMetadata: preservesTextLayerMetadata
+        ) else { return }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.replacePixels
         let adjustedData = isLayerAlphaLocked(index: index)
@@ -101,11 +96,9 @@ extension PaintDocumentSession {
         if !didApply {
             bridgeReplaceLayerPixels(index: index, data: adjustedData, transient: true)
         }
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: .replaceLayerPixels(index: .unchecked(index), data: adjustedData),
-                invalidating: .layer(index)
-            )
+        applyLayerLifecycleMutation(
+            at: index,
+            recording: .replaceLayerPixels(index: .unchecked(index), data: adjustedData)
         )
     }
 
@@ -116,11 +109,9 @@ extension PaintDocumentSession {
             return false
         }
         bridgeReplaceLayerMask(index: index, data: maskData)
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: .replaceLayerMask(index: .unchecked(index), data: maskData),
-                invalidating: .layer(index)
-            )
+        applyLayerLifecycleMutation(
+            at: index,
+            recording: .replaceLayerMask(index: .unchecked(index), data: maskData)
         )
         return true
     }
@@ -132,11 +123,9 @@ extension PaintDocumentSession {
             return false
         }
         bridgeClearLayerMask(index: index)
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: .clearLayerMask(index: .unchecked(index)),
-                invalidating: .layer(index)
-            )
+        applyLayerLifecycleMutation(
+            at: index,
+            recording: .clearLayerMask(index: .unchecked(index))
         )
         return true
     }
@@ -148,32 +137,28 @@ extension PaintDocumentSession {
             return false
         }
         let pixelData = pixelDataForLayer(index: index)
-        applyLifecycleMutation(
-            editingLifecycleService.mutation(
-                recording: [
-                    .applyLayerMask(index: .unchecked(index)),
-                    .replaceLayerPixels(index: .unchecked(index), data: pixelData)
-                ],
-                invalidating: .layer(index)
-            )
+        applyLayerLifecycleMutation(
+            at: index,
+            recording: [
+                .applyLayerMask(index: .unchecked(index)),
+                .replaceLayerPixels(index: .unchecked(index), data: pixelData)
+            ]
         )
         return true
     }
 
-    func clearLayer(index: Int) {
-        requireExistingLayerIndex(index)
-        guard !isLayerLocked(index: index) else { return }
-        clearTextLayerData(index: index)
+    @discardableResult
+    func clearLayer(index: Int) -> Bool {
+        guard beginPixelLayerMutation(at: index) else { return false }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.clear
         let didApply = bridgeApplyLayerProcessing(index: index, descriptor: descriptor)
         if didApply {
-            applyLifecycleMutation(
-                editingLifecycleService.mutation(
-                    recording: .clearLayer(index: .unchecked(index)),
-                    invalidating: .layer(index)
-                )
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .clearLayer(index: .unchecked(index))
             )
         }
+        return didApply
     }
 }
