@@ -213,6 +213,16 @@ extension AppFeature {
         successMessage: String? = nil,
         documentMutation: () -> Void
     ) -> Effect<Action> {
+        guard let preparedTab = prepareNewTabReservation(
+            title: tabTitle,
+            sourceProjectURL: nil,
+            state: state
+        ) else {
+            state.application.presentBanner(
+                newTabCreationFailureMessage(language: state.application.appLanguage)
+            )
+            return .none
+        }
         documentMutation()
         AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
             canvasSize: canvasSize,
@@ -220,11 +230,7 @@ extension AppFeature {
         )
         syncPaperStyleToDocument(state: &state)
         applyCurrentDocumentPresentation(state: &state)
-        activateNewTab(
-            state: &state,
-            title: tabTitle,
-            sourceProjectURL: nil
-        )
+        activatePreparedTab(preparedTab, state: &state)
         if let successMessage {
             state.application.presentBanner(successMessage)
         }

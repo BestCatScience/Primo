@@ -153,6 +153,14 @@ extension AppFeature {
         }
     }
 
+    struct PreparedWorkspaceTab {
+        let id: OpenDocumentTab.ID
+        let title: String
+        let backingStoreURL: DocumentProjectPath
+        let sourceProjectURL: DocumentProjectPath?
+        let pane: WorkspacePane
+    }
+
     var workspaceBackingStoreService: WorkspaceBackingStoreService {
         WorkspaceBackingStoreService(
             paintDocumentClient: paintDocumentClient,
@@ -238,28 +246,42 @@ extension AppFeature {
         }
     }
 
-    func activateNewTab(
-        state: inout State,
+    func newTabCreationFailureMessage(language: AppLanguage) -> String {
+        language.localized("Could not create a tab")
+    }
+
+    func prepareNewTabReservation(
         title: String,
-        sourceProjectURL: DocumentProjectPath?
-    ) {
+        sourceProjectURL: DocumentProjectPath?,
+        state: State
+    ) -> PreparedWorkspaceTab? {
         let tabID = workspaceIdentityService.generateTabID()
-        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Could not create a tab"))
-            return
-        }
-        let tab = OpenDocumentTab(
+        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else { return nil }
+        return PreparedWorkspaceTab(
             id: tabID,
             title: title,
             backingStoreURL: backingStoreURL,
             sourceProjectURL: sourceProjectURL,
+            pane: state.workspace.focusedWorkspacePane
+        )
+    }
+
+    func activatePreparedTab(
+        _ preparedTab: PreparedWorkspaceTab,
+        state: inout State
+    ) {
+        let tab = OpenDocumentTab(
+            id: preparedTab.id,
+            title: preparedTab.title,
+            backingStoreURL: preparedTab.backingStoreURL,
+            sourceProjectURL: preparedTab.sourceProjectURL,
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
-            pane: state.workspace.focusedWorkspacePane,
+            pane: preparedTab.pane,
             previewImageData: compositePNGData(state: state)
         )
         state.workspace.appendTab(tab)
-        state.workspace.activateTab(tabID, pane: state.workspace.focusedWorkspacePane)
+        state.workspace.activateTab(preparedTab.id, pane: preparedTab.pane)
         _ = persistActiveTabToBackingStore(state: &state)
     }
 
@@ -268,18 +290,34 @@ extension AppFeature {
         using plan: LoadedWorkspaceProjectPlan,
         state: inout State
     ) {
+        let preparedTab: PreparedWorkspaceTab?
+        switch plan.destination {
+        case .selectedTab, .activeTab:
+            preparedTab = nil
+        case let .newTab(title, sourceProjectURL):
+            guard let reservation = prepareNewTabReservation(
+                title: title,
+                sourceProjectURL: sourceProjectURL,
+                state: state
+            ) else {
+                state.application.completeWorkspaceProjectLoad(
+                    bannerMessage: newTabCreationFailureMessage(language: state.application.appLanguage)
+                )
+                return
+            }
+            preparedTab = reservation
+        }
+
         switch plan.destination {
         case let .selectedTab(tabID, pane):
             state.workspace.activateTab(tabID, pane: pane)
             applyLoadedProject(loaded, state: &state)
 
-        case let .newTab(title, sourceProjectURL):
+        case .newTab:
             applyLoadedProject(loaded, state: &state)
-            activateNewTab(
-                state: &state,
-                title: title,
-                sourceProjectURL: sourceProjectURL
-            )
+            if let preparedTab {
+                activatePreparedTab(preparedTab, state: &state)
+            }
 
         case let .activeTab(title, sourceProjectURL):
             applyLoadedProject(loaded, state: &state)
