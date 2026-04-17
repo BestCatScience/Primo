@@ -79,10 +79,14 @@ extension AppFeature {
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {
         if state.workspace.activeTab != nil {
-            guard persistActiveProjectToWorkspace(
+            switch persistActiveProjectToWorkspace(
                 state: &state,
                 preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
-            ) != nil else {
+            ) {
+            case .success:
+                break
+            case let .failure(failure):
+                state.application.presentBanner(failure.message)
                 return .none
             }
             if let activeTab = state.workspace.activeTab {

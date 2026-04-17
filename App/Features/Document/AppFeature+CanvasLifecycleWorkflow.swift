@@ -213,13 +213,17 @@ extension AppFeature {
         successMessage: String? = nil,
         documentMutation: () -> Void
     ) -> Effect<Action> {
-        guard let preparedTab = prepareNewTabReservation(
+        let preparedTab: PreparedWorkspaceTab
+        switch prepareNewTabReservation(
             title: tabTitle,
             sourceProjectURL: nil,
             state: state
-        ) else {
+        ) {
+        case let .success(tab):
+            preparedTab = tab
+        case let .failure(failure):
             state.application.presentBanner(
-                newTabCreationFailureMessage(language: state.application.appLanguage)
+                failure.message
             )
             return .none
         }
@@ -230,8 +234,14 @@ extension AppFeature {
         )
         syncPaperStyleToDocument(state: &state)
         applyCurrentDocumentPresentation(state: &state)
-        activatePreparedTab(preparedTab, state: &state)
-        if let successMessage {
+        let activationSucceeded: Bool
+        if case let .failure(failure) = activatePreparedTab(preparedTab, state: &state) {
+            state.application.presentBanner(failure.message)
+            activationSucceeded = false
+        } else {
+            activationSucceeded = true
+        }
+        if activationSucceeded, let successMessage {
             state.application.presentBanner(successMessage)
         }
         return cancelStartupPresentationEffects()
@@ -265,7 +275,11 @@ extension AppFeature {
             presentCanvasLifecycleFailure(.unsupportedCanvasSize, state: &state)
             return .none
         }
-        guard prepareForDocumentReplacement(state: &state) else {
+        switch prepareForDocumentReplacement(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            state.application.presentBanner(failure.message)
             return .none
         }
         return completeFreshDocumentReplacement(
@@ -339,7 +353,11 @@ extension AppFeature {
             presentCanvasLifecycleFailure(error, state: &state)
             return .none
         }
-        guard prepareForDocumentReplacement(state: &state) else {
+        switch prepareForDocumentReplacement(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            state.application.presentBanner(failure.message)
             return .none
         }
         return completeFreshDocumentReplacement(

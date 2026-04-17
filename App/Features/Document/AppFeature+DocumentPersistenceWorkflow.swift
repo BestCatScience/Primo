@@ -95,10 +95,15 @@ extension AppFeature {
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?
     ) -> Effect<Action> {
-        guard let savedURL = persistActiveProjectToWorkspace(
+        let savedURL: DocumentProjectPath
+        switch persistActiveProjectToWorkspace(
             state: &state,
             preferredDestinationURL: preferredDestinationURL
-        ) else {
+        ) {
+        case let .success(url):
+            savedURL = url
+        case let .failure(failure):
+            state.application.presentBanner(failure.message)
             return .none
         }
         state.application.presentBanner(

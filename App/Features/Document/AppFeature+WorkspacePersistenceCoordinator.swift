@@ -10,6 +10,10 @@ extension AppFeature {
         }
     }
 
+    struct WorkspacePersistenceFailure: Error, Equatable {
+        let message: String
+    }
+
     struct LoadedWorkspaceProjectPlan {
         enum Destination {
             case selectedTab(tabID: OpenDocumentTab.ID, pane: WorkspacePane)
@@ -186,9 +190,23 @@ extension AppFeature {
         )
     }
 
-    @discardableResult
-    func persistActiveTabToBackingStore(state: inout State) -> Bool {
-        guard let activeTab = state.workspace.activeTab else { return false }
+    func saveFailureMessage(
+        _ error: Error,
+        language: AppLanguage
+    ) -> String {
+        error.localizedDescription.isEmpty ? language.localized("Save failed") : error.localizedDescription
+    }
+
+    func persistActiveTabToBackingStore(
+        state: inout State
+    ) -> Result<Void, WorkspacePersistenceFailure> {
+        guard let activeTab = state.workspace.activeTab else {
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: state.application.appLanguage.localized("Save failed")
+                )
+            )
+        }
         do {
             try workspaceBackingStoreService.saveProject(
                 at: activeTab.backingStoreURL.fileURL,
@@ -198,27 +216,43 @@ extension AppFeature {
                 previewImageData: compositePNGData(state: state),
                 canvasSize: state.canvas.canvasSize
             )
-            return true
+            return .success(())
         } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: saveFailureMessage(
+                        error,
+                        language: state.application.appLanguage
+                    )
+                )
             )
-            return false
         }
     }
 
-    @discardableResult
-    func prepareForDocumentReplacement(state: inout State) -> Bool {
-        guard !state.application.showsHome else { return true }
+    func prepareForDocumentReplacement(
+        state: inout State
+    ) -> Result<Void, WorkspacePersistenceFailure> {
+        guard !state.application.showsHome else { return .success(()) }
         return persistActiveTabToBackingStore(state: &state)
     }
 
     func persistActiveProjectToWorkspace(
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?
-    ) -> DocumentProjectPath? {
-        guard let activeTab = state.workspace.activeTab else { return nil }
-        guard persistActiveTabToBackingStore(state: &state) else { return nil }
+    ) -> Result<DocumentProjectPath, WorkspacePersistenceFailure> {
+        guard let activeTab = state.workspace.activeTab else {
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: state.application.appLanguage.localized("Save failed")
+                )
+            )
+        }
+        switch persistActiveTabToBackingStore(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            return .failure(failure)
+        }
 
         do {
             let savedURL = try workspaceBackingStoreService.persistProjectSnapshot(
@@ -237,12 +271,16 @@ extension AppFeature {
             if let refreshedTab = state.workspace.activeTab {
                 clearAutosave(for: refreshedTab)
             }
-            return savedURL
+            return .success(savedURL)
         } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: saveFailureMessage(
+                        error,
+                        language: state.application.appLanguage
+                    )
+                )
             )
-            return nil
         }
     }
 
@@ -254,22 +292,30 @@ extension AppFeature {
         title: String,
         sourceProjectURL: DocumentProjectPath?,
         state: State
-    ) -> PreparedWorkspaceTab? {
+    ) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure> {
         let tabID = workspaceIdentityService.generateTabID()
-        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else { return nil }
-        return PreparedWorkspaceTab(
-            id: tabID,
-            title: title,
-            backingStoreURL: backingStoreURL,
-            sourceProjectURL: sourceProjectURL,
-            pane: state.workspace.focusedWorkspacePane
+        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else {
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: newTabCreationFailureMessage(language: state.application.appLanguage)
+                )
+            )
+        }
+        return .success(
+            PreparedWorkspaceTab(
+                id: tabID,
+                title: title,
+                backingStoreURL: backingStoreURL,
+                sourceProjectURL: sourceProjectURL,
+                pane: state.workspace.focusedWorkspacePane
+            )
         )
     }
 
     func activatePreparedTab(
         _ preparedTab: PreparedWorkspaceTab,
         state: inout State
-    ) {
+    ) -> Result<Void, WorkspacePersistenceFailure> {
         let tab = OpenDocumentTab(
             id: preparedTab.id,
             title: preparedTab.title,
@@ -282,7 +328,7 @@ extension AppFeature {
         )
         state.workspace.appendTab(tab)
         state.workspace.activateTab(preparedTab.id, pane: preparedTab.pane)
-        _ = persistActiveTabToBackingStore(state: &state)
+        return persistActiveTabToBackingStore(state: &state)
     }
 
     func applyLoadedWorkspaceProject(
@@ -295,28 +341,34 @@ extension AppFeature {
         case .selectedTab, .activeTab:
             preparedTab = nil
         case let .newTab(title, sourceProjectURL):
-            guard let reservation = prepareNewTabReservation(
+            switch prepareNewTabReservation(
                 title: title,
                 sourceProjectURL: sourceProjectURL,
                 state: state
-            ) else {
+            ) {
+            case let .success(reservation):
+                preparedTab = reservation
+            case let .failure(failure):
                 state.application.completeWorkspaceProjectLoad(
-                    bannerMessage: newTabCreationFailureMessage(language: state.application.appLanguage)
+                    bannerMessage: failure.message
                 )
                 return
             }
-            preparedTab = reservation
         }
 
+        let activationResult: Result<Void, WorkspacePersistenceFailure>
         switch plan.destination {
         case let .selectedTab(tabID, pane):
             state.workspace.activateTab(tabID, pane: pane)
             applyLoadedProject(loaded, state: &state)
+            activationResult = .success(())
 
         case .newTab:
             applyLoadedProject(loaded, state: &state)
             if let preparedTab {
-                activatePreparedTab(preparedTab, state: &state)
+                activationResult = activatePreparedTab(preparedTab, state: &state)
+            } else {
+                activationResult = .success(())
             }
 
         case let .activeTab(title, sourceProjectURL):
@@ -327,65 +379,109 @@ extension AppFeature {
                 previewImageData: compositePNGData(state: state),
                 canvasSize: state.canvas.canvasSize
             )
+            activationResult = .success(())
         }
 
-        let followUpSucceeded = applyLoadedWorkspaceFollowUp(
+        switch activationResult {
+        case let .failure(failure):
+            state.application.completeWorkspaceProjectLoad(
+                bannerMessage: failure.message
+            )
+            return
+        case .success:
+            break
+        }
+
+        switch applyLoadedWorkspaceFollowUp(
             plan.followUp,
             state: &state
-        )
-        if followUpSucceeded {
+        ) {
+        case let .failure(failure):
+            state.application.completeWorkspaceProjectLoad(
+                bannerMessage: failure.message
+            )
+        case .success:
             applyLoadedWorkspaceSuccessEffects(
                 plan.successEffects,
                 state: &state
             )
+            state.application.completeWorkspaceProjectLoad(
+                bannerMessage: plan.successEffects.bannerMessage
+            )
         }
-        state.application.completeWorkspaceProjectLoad(
-            bannerMessage: followUpSucceeded ? plan.successEffects.bannerMessage : nil
-        )
     }
 
     func applyDirtyPresentation(state: inout State) {
         applyCurrentDocumentPresentation(state: &state)
         state.workspace.setActiveTabDirty(true)
-        guard persistActiveTabToBackingStore(state: &state) else { return }
-        persistActiveTabAutosave(state: &state)
+        switch persistActiveTabToBackingStore(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            state.application.presentBanner(failure.message)
+            return
+        }
+        switch persistActiveTabAutosave(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            state.application.presentBanner(failure.message)
+        }
     }
 
-    @discardableResult
-    func persistActiveTabAutosave(state: inout State) -> Bool {
-        guard let activeTab = state.workspace.activeTab else { return false }
+    func persistActiveTabAutosave(
+        state: inout State
+    ) -> Result<Void, WorkspacePersistenceFailure> {
+        guard let activeTab = state.workspace.activeTab else {
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: state.application.appLanguage.localized("Save failed")
+                )
+            )
+        }
 
         do {
             try workspaceBackingStoreService.persistAutosaveSnapshot(
                 activeTab.backingStoreURL,
                 activeTab
             )
-            return true
+            return .success(())
         } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
+            return .failure(
+                WorkspacePersistenceFailure(
+                    message: saveFailureMessage(
+                        error,
+                        language: state.application.appLanguage
+                    )
+                )
             )
-            return false
         }
     }
 
-    @discardableResult
     func applyLoadedWorkspaceFollowUp(
         _ followUp: LoadedWorkspaceProjectPlan.FollowUp,
         state: inout State
-    ) -> Bool {
+    ) -> Result<Void, WorkspacePersistenceFailure> {
         if followUp.marksTabDirty {
             state.workspace.setActiveTabDirty(true)
         }
-        if followUp.persistsToBackingStore,
-           !persistActiveTabToBackingStore(state: &state) {
-            return false
+        if followUp.persistsToBackingStore {
+            switch persistActiveTabToBackingStore(state: &state) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
+            }
         }
-        if followUp.persistsAutosave,
-           !persistActiveTabAutosave(state: &state) {
-            return false
+        if followUp.persistsAutosave {
+            switch persistActiveTabAutosave(state: &state) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
+            }
         }
-        return true
+        return .success(())
     }
 
     func applyLoadedWorkspaceSuccessEffects(
@@ -447,11 +543,13 @@ extension AppFeature {
         _ tabIDs: [OpenDocumentTab.ID],
         state: inout State
     ) throws {
-        if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID),
-           !persistActiveTabToBackingStore(state: &state) {
-            throw WorkspaceOperationError(
-                message: state.application.bannerMessage ?? state.application.appLanguage.localized("Save failed")
-            )
+        if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID) {
+            switch persistActiveTabToBackingStore(state: &state) {
+            case .success:
+                break
+            case let .failure(failure):
+                throw WorkspaceOperationError(message: failure.message)
+            }
         }
         for tabID in tabIDs {
             guard let previousTab = state.workspace.tab(withID: tabID) else { continue }

@@ -50,9 +50,14 @@ extension AppFeature {
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
         onFailure: @escaping @Sendable (String) -> Action
     ) -> Effect<Action> {
-        if persistCurrentTab,
-           !prepareForDocumentReplacement(state: &state) {
-            return .none
+        if persistCurrentTab {
+            switch prepareForDocumentReplacement(state: &state) {
+            case .success:
+                break
+            case let .failure(failure):
+                state.application.presentBanner(failure.message)
+                return .none
+            }
         }
         state.application.beginHydration()
         return workspaceTabCoordinator.loadProjectEffect(
