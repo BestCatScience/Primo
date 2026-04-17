@@ -282,7 +282,7 @@ extension AppFeature {
             contract.refresh,
             to: &state,
             applyCurrentPresentation: { state in
-                applyCurrentDocumentPresentation(state: &state)
+                applyPresentation(documentPresentationService.presentation(), state: &state)
             },
             applyDirtyPresentation: { state in
                 applyDirtyPresentation(state: &state)

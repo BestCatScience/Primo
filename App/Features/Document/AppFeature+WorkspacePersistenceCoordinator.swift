@@ -216,7 +216,7 @@ extension AppFeature {
                 paperStyle: resolvedPaperStyle(for: state)
             )
             state.workspace.updateActiveTabMetadata(
-                previewImageData: compositePNGData(state: state),
+                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                 canvasSize: state.canvas.canvasSize
             )
             return .success(())
@@ -265,7 +265,7 @@ extension AppFeature {
             state.workspace.updateActiveTabMetadata(
                 title: savedURL.displayName,
                 sourceProjectURL: savedURL,
-                previewImageData: compositePNGData(state: state),
+                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                 canvasSize: state.canvas.canvasSize
             )
             state.workspace.setActiveTabDirty(false)
@@ -321,7 +321,9 @@ extension AppFeature {
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
             pane: preparedTab.pane,
-            previewImageData: compositePNGData(state: state)
+            previewImageData: documentPresentationService.compositePNGData(
+                paperStyle: resolvedPaperStyle(for: state)
+            )
         )
         state.workspace.appendTab(tab)
         state.workspace.activateTab(preparedTab.id, pane: preparedTab.pane)
@@ -373,7 +375,9 @@ extension AppFeature {
             state.workspace.updateActiveTabMetadata(
                 title: title,
                 sourceProjectURL: sourceProjectURL,
-                previewImageData: compositePNGData(state: state),
+                previewImageData: documentPresentationService.compositePNGData(
+                    paperStyle: resolvedPaperStyle(for: state)
+                ),
                 canvasSize: state.canvas.canvasSize
             )
             activationResult = .success(())
@@ -409,7 +413,7 @@ extension AppFeature {
     }
 
     func applyDirtyPresentation(state: inout State) {
-        applyCurrentDocumentPresentation(state: &state)
+        applyPresentation(paintDocumentClient.presentation(), state: &state)
         state.workspace.setActiveTabDirty(true)
         switch persistActiveTabToBackingStore(state: &state) {
         case .success:
@@ -572,7 +576,7 @@ extension AppFeature {
                 state.workspace.updateActiveTabMetadata(
                     title: destinationURL.displayName,
                     sourceProjectURL: destinationURL,
-                    previewImageData: compositePNGData(state: state),
+                    previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
                     canvasSize: state.canvas.canvasSize
                 )
             }

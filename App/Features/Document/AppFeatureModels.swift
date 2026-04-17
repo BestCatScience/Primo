@@ -54,14 +54,6 @@ enum HomeSidebarSection: String, CaseIterable, Equatable {
 
 struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
-
-    mutating func expand() {
-        isCollapsed = false
-    }
-
-    mutating func reset() {
-        self = StudioPanelLayoutState()
-    }
 }
 
 enum PendingCloseOperation: Equatable {

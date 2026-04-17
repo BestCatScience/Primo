@@ -49,7 +49,7 @@ extension AppFeature {
 
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: appLanguageClient.load())
-        syncPaperStyleToDocument(state: &state)
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
             startupPresentationService.bootstrapPresentationEffect(),
@@ -102,7 +102,7 @@ extension AppFeature {
     }
 
     func handleRefreshPresentationRequest(state: inout State) {
-        syncPaperStyleToDocument(state: &state)
+        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
         applyDirtyPresentation(state: &state)
     }
 

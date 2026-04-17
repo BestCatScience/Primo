@@ -333,10 +333,11 @@ extension AppFeature {
                 )
             },
             syncPaperStyleToDocument: { state in
-                syncPaperStyleToDocument(state: &state)
+                let paperStyle = resolvedPaperStyle(for: state)
+                documentPresentationService.setPaperStyle(paperStyle)
             },
             applyCurrentPresentation: { state in
-                applyCurrentDocumentPresentation(state: &state)
+                applyPresentation(documentPresentationService.presentation(), state: &state)
             }
         )
     }

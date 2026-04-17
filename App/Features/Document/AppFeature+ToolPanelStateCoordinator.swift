@@ -30,17 +30,6 @@ extension AppFeature {
             setPanelState(current, for: panel, in: &state)
         }
 
-        func expand(_ panel: StudioPanelKind, in state: inout AppFeature.State) {
-            var current = panelState(for: panel, in: state)
-            current.expand()
-            setPanelState(current, for: panel, in: &state)
-        }
-
-        func resetPanels(in state: inout AppFeature.State) {
-            state.brushPanel.reset()
-            state.layerPanel.reset()
-        }
-
         func syncToolSpecificBrushSize(state: inout AppFeature.State) {
             state.brushPalette.brush.storeCurrentRadius(for: state.canvas.currentTool)
         }
