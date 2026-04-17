@@ -26,7 +26,7 @@ extension AppFeature {
         loaded: LoadedPaintProject,
         item: AutosaveRecoveryItem
     ) {
-        try? documentWorkspaceClient.discardAutosaveEntry(item.id)
+        try? workspaceStorageService.discardAutosaveEntry(item.id)
         applyLoadedProject(loaded, state: &state)
         activateNewTab(
             state: &state,
@@ -47,6 +47,6 @@ extension AppFeature {
         autosaveID: WorkspaceItemID
     ) {
         state.recovery.removeItem(id: autosaveID)
-        try? documentWorkspaceClient.discardAutosaveEntry(autosaveID)
+        try? workspaceStorageService.discardAutosaveEntry(autosaveID)
     }
 }

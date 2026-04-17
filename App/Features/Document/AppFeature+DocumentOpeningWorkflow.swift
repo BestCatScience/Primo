@@ -8,7 +8,10 @@ extension AppFeature {
         relativeFolderPath: RelativeProjectFolderPath?
     ) -> Effect<Action> {
         do {
-            let destinationURL = try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
+            let destinationURL = try workspaceStorageService.moveSavedProject(
+                url,
+                to: relativeFolderPath
+            )
             if let openTabID = state.workspace.tabID(forSourceProjectURL: url) {
                 state.workspace.updateTab(id: openTabID, sourceProjectURL: destinationURL)
             }

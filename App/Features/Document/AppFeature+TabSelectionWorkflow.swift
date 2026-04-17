@@ -56,7 +56,7 @@ extension AppFeature {
         let wasActive = state.workspace.isActiveTab(tabID)
         guard let closingTab = state.workspace.removeTab(id: tabID) else { return .none }
         clearAutosave(for: closingTab)
-        try? documentWorkspaceClient.removeWorkspaceItem(closingTab.backingStoreURL)
+        try? workspaceStorageService.removeWorkspaceItem(closingTab.backingStoreURL)
 
         guard wasActive else { return .none }
         let replacement = state.workspace.selectedTab(in: closingTab.pane)
@@ -77,7 +77,7 @@ extension AppFeature {
         let removedTabs = state.workspace.retainOnlyTab(id: tabID)
         removedTabs.forEach {
             clearAutosave(for: $0)
-            try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
+            try? workspaceStorageService.removeWorkspaceItem($0.backingStoreURL)
         }
         if state.workspace.isActiveTab(tabID) == false {
             return .send(.tabSelected(tabID))
@@ -93,7 +93,7 @@ extension AppFeature {
         let removedTabs = state.workspace.removeTabs(withIDs: idsToRemove)
         removedTabs.forEach {
             clearAutosave(for: $0)
-            try? documentWorkspaceClient.removeWorkspaceItem($0.backingStoreURL)
+            try? workspaceStorageService.removeWorkspaceItem($0.backingStoreURL)
         }
     }
 }

@@ -4,7 +4,7 @@ import Foundation
 extension AppFeature {
     private struct DocumentWorkflowCoordinator {
         let paintDocumentClient: PaintDocumentClient
-        let documentWorkspaceClient: DocumentWorkspaceClient
+        let workspaceStorageService: WorkspaceStorageService
         let fileClient: FileClient
         let dateClient: DateClient
 
@@ -13,8 +13,8 @@ extension AppFeature {
         }
 
         func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
-            .run { [documentWorkspaceClient] send in
-                let entries = (try? documentWorkspaceClient.loadSaveHistoryEntries(activeTab)) ?? []
+            .run { [workspaceStorageService] send in
+                let entries = (try? workspaceStorageService.loadSaveHistoryEntries(for: activeTab)) ?? []
                 await send(.saveHistoryLoaded(entries))
             }
         }
@@ -23,11 +23,11 @@ extension AppFeature {
             capture: TimelapseCapture,
             failureMessage: String
         ) -> Effect<Action> {
-            .run { [documentWorkspaceClient, fileClient, dateClient] send in
+            .run { [workspaceStorageService, fileClient, dateClient] send in
                 do {
                     let url = try TimelapseExporter.exportVideo(
                         from: capture,
-                        to: documentWorkspaceClient.timelapseTemporaryDirectory(),
+                        to: workspaceStorageService.timelapseTemporaryDirectory(),
                         fileClient: fileClient,
                         dateClient: dateClient
                     ) { progress, previewURL in
@@ -48,7 +48,7 @@ extension AppFeature {
     private var documentWorkflowCoordinator: DocumentWorkflowCoordinator {
         DocumentWorkflowCoordinator(
             paintDocumentClient: paintDocumentClient,
-            documentWorkspaceClient: documentWorkspaceClient,
+            workspaceStorageService: workspaceStorageService,
             fileClient: fileClient,
             dateClient: dateClient
         )

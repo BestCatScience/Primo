@@ -7,7 +7,7 @@ extension AppFeature {
             return
         }
         do {
-            let url = try documentWorkspaceClient.writePNGToTemporaryDirectory(pngData)
+            let url = try workspaceStorageService.writePNGToTemporaryDirectory(pngData)
             state.export.presentShareSheet(makeShareExport(url: url))
         } catch {
             state.application.presentBanner(state.application.appLanguage.localized("Export failed"))
