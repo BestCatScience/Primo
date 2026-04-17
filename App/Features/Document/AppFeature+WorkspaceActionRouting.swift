@@ -2,6 +2,124 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    func requestCloseOperation(
+        state: inout State,
+        operation: PendingCloseOperation
+    ) -> Effect<Action> {
+        let tabIDs: [OpenDocumentTab.ID] = {
+            switch operation {
+            case let .tab(tabID):
+                return [tabID]
+            case let .closeOtherTabs(tabID):
+                return state.workspace.tabIDs(excluding: tabID)
+            case let .closeTabsToRight(tabID):
+                return state.workspace.tabIDsToRight(of: tabID)
+            }
+        }()
+
+        let dirtyTabs = state.workspace.dirtyTabs(withIDs: tabIDs)
+        guard !dirtyTabs.isEmpty else {
+            return performCloseOperation(operation)
+        }
+
+        state.workspace.presentCloseConfirmation(operation: operation, dirtyTabs: dirtyTabs)
+        return .none
+    }
+
+    func performCloseOperation(
+        _ operation: PendingCloseOperation
+    ) -> Effect<Action> {
+        switch operation {
+        case let .tab(tabID):
+            return .send(.tabClosed(tabID))
+        case let .closeOtherTabs(tabID):
+            return .send(.closeOtherTabs(tabID))
+        case let .closeTabsToRight(tabID):
+            return .send(.closeTabsToRight(tabID))
+        }
+    }
+
+    func effect(
+        for closureDisposition: WorkspaceTabClosureDisposition,
+        state: inout State
+    ) -> Effect<Action> {
+        switch closureDisposition {
+        case .none:
+            return .none
+        case .showHome:
+            state.application.showHome()
+            return .none
+        case let .select(tabID):
+            return .send(.tabSelected(tabID))
+        }
+    }
+
+    func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
+        guard let confirmation = state.workspace.consumeCloseConfirmation() else { return .none }
+        do {
+            try saveTabsForClose(confirmation.tabIDs, state: &state)
+            return performCloseOperation(confirmation.operation)
+        } catch {
+            state.application.presentBanner(
+                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
+            )
+            return .none
+        }
+    }
+
+    func handlePendingCloseDiscardConfirmed(state: inout State) -> Effect<Action> {
+        guard let confirmation = state.workspace.consumeCloseConfirmation() else { return .none }
+        return performCloseOperation(confirmation.operation)
+    }
+
+    func handlePendingCloseCancelled(state: inout State) {
+        state.workspace.clearCloseConfirmation()
+    }
+
+    func handleMoveTabToSecondaryPane(
+        state: inout State,
+        tabID: OpenDocumentTab.ID
+    ) {
+        state.workspace.stageTabInSecondaryPane(tabID)
+    }
+
+    func handleTabReordered(
+        state: inout State,
+        movingID: OpenDocumentTab.ID,
+        targetID: OpenDocumentTab.ID
+    ) {
+        state.workspace.reorderTabs(moving: movingID, before: targetID)
+    }
+
+    func handleTabDropped(
+        state: inout State,
+        movingID: OpenDocumentTab.ID,
+        pane: WorkspacePane,
+        targetID: OpenDocumentTab.ID?
+    ) {
+        state.workspace.moveTab(movingID, to: pane, before: targetID)
+    }
+
+    func handleSplitActiveTabIntoSecondaryPane(state: inout State) {
+        state.workspace.splitIntoSecondaryPane()
+    }
+
+    func handleMergeWorkspacePanes(state: inout State) {
+        state.workspace.mergeIntoPrimaryPane()
+    }
+
+    func handleWorkspacePaneActivated(
+        state: inout State,
+        pane: WorkspacePane
+    ) -> Effect<Action> {
+        switch state.workspace.activatePane(pane) {
+        case .none:
+            return .none
+        case let .select(tabID):
+            return .send(.tabSelected(tabID))
+        }
+    }
+
     func routeWorkspaceAction(
         state: inout State,
         action: Action
@@ -44,8 +162,7 @@ extension AppFeature {
             return handleCloseOtherTabs(state: &state, retaining: tabID)
 
         case let .closeTabsToRight(tabID):
-            handleCloseTabsToRight(state: &state, tabID: tabID)
-            return .none
+            return handleCloseTabsToRight(state: &state, tabID: tabID)
 
         case let .moveTabToSecondaryPane(tabID):
             handleMoveTabToSecondaryPane(state: &state, tabID: tabID)

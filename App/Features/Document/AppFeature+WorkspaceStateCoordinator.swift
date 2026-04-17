@@ -1,6 +1,24 @@
 import CoreGraphics
 import Foundation
 
+extension AppFeature {
+    enum WorkspaceTabClosureDisposition {
+        case none
+        case showHome
+        case select(OpenDocumentTab.ID)
+    }
+
+    enum WorkspacePaneActivationDisposition {
+        case none
+        case select(OpenDocumentTab.ID)
+    }
+
+    struct WorkspaceTabClosureResult {
+        let removedTabs: [OpenDocumentTab]
+        let disposition: WorkspaceTabClosureDisposition
+    }
+}
+
 extension AppFeature.WorkspaceState {
     var activeTabIndex: Int? {
         guard let activeTabID else { return nil }
@@ -209,6 +227,12 @@ extension AppFeature.WorkspaceState {
         pendingCloseConfirmation = nil
     }
 
+    mutating func consumeCloseConfirmation() -> PendingCloseConfirmationState? {
+        let confirmation = pendingCloseConfirmation
+        pendingCloseConfirmation = nil
+        return confirmation
+    }
+
     @discardableResult
     mutating func removeTab(id tabID: OpenDocumentTab.ID) -> OpenDocumentTab? {
         guard let tabIndex = openTabs.firstIndex(where: { $0.id == tabID }) else { return nil }
@@ -233,6 +257,87 @@ extension AppFeature.WorkspaceState {
         secondarySelectedTabID = openTabs.first(where: { $0.pane == .secondary })?.id
         ensureSelectionIntegrity()
         return removedTabs
+    }
+
+    mutating func closeTab(
+        id tabID: OpenDocumentTab.ID
+    ) -> AppFeature.WorkspaceTabClosureResult? {
+        let wasActive = isActiveTab(tabID)
+        guard let closingTab = removeTab(id: tabID) else { return nil }
+
+        guard wasActive else {
+            return AppFeature.WorkspaceTabClosureResult(
+                removedTabs: [closingTab],
+                disposition: .none
+            )
+        }
+
+        let replacement = selectedTab(in: closingTab.pane)
+            ?? selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
+        guard let replacement else {
+            clearActiveTab()
+            return AppFeature.WorkspaceTabClosureResult(
+                removedTabs: [closingTab],
+                disposition: .showHome
+            )
+        }
+
+        clearActiveTab()
+        return AppFeature.WorkspaceTabClosureResult(
+            removedTabs: [closingTab],
+            disposition: .select(replacement.id)
+        )
+    }
+
+    mutating func closeOtherTabs(
+        retaining tabID: OpenDocumentTab.ID
+    ) -> AppFeature.WorkspaceTabClosureResult {
+        let removedTabs = retainOnlyTab(id: tabID)
+        return AppFeature.WorkspaceTabClosureResult(
+            removedTabs: removedTabs,
+            disposition: isActiveTab(tabID) ? .none : .select(tabID)
+        )
+    }
+
+    mutating func closeTabsToRight(
+        of tabID: OpenDocumentTab.ID
+    ) -> AppFeature.WorkspaceTabClosureResult {
+        let idsToRemove = Set(tabIDsToRight(of: tabID))
+        let removedActiveTab = activeTabID.map(idsToRemove.contains) ?? false
+        let removedTabs = removeTabs(withIDs: idsToRemove)
+        return AppFeature.WorkspaceTabClosureResult(
+            removedTabs: removedTabs,
+            disposition: removedActiveTab ? .select(tabID) : .none
+        )
+    }
+
+    mutating func stageTabInSecondaryPane(_ tabID: OpenDocumentTab.ID) {
+        beginSplitLayout()
+        moveTab(tabID, to: .secondary, before: nil)
+        ensureSelectionIntegrity()
+    }
+
+    mutating func splitIntoSecondaryPane() {
+        beginSplitLayout()
+        ensureSelectionIntegrity()
+    }
+
+    mutating func mergeIntoPrimaryPane() {
+        let secondaryTabs = tabs(in: .secondary).map(\.id)
+        for tabID in secondaryTabs {
+            moveTab(tabID, to: .primary, before: nil)
+        }
+        collapseToPrimaryLayout()
+        ensureSelectionIntegrity()
+    }
+
+    mutating func activatePane(
+        _ pane: WorkspacePane
+    ) -> AppFeature.WorkspacePaneActivationDisposition {
+        focus(on: pane)
+        guard let tabID = selectedTabID(for: pane) else { return .none }
+        guard isActiveTab(tabID) == false else { return .none }
+        return .select(tabID)
     }
 
     mutating func ensureSelectionIntegrity() {

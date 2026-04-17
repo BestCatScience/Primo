@@ -310,6 +310,15 @@ extension AppFeature {
         try? workspaceBackingStoreService.discardAutosaveSnapshot(tab)
     }
 
+    func discardTransientWorkspaceArtifacts(for tab: OpenDocumentTab) {
+        clearAutosave(for: tab)
+        try? workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
+    }
+
+    func discardTransientWorkspaceArtifacts(for tabs: [OpenDocumentTab]) {
+        tabs.forEach(discardTransientWorkspaceArtifacts(for:))
+    }
+
     func persistSaveHistorySnapshot(
         for tab: OpenDocumentTab,
         trigger: SaveHistoryTrigger
@@ -322,44 +331,6 @@ extension AppFeature {
             )
         } catch {
             // Save history is a resilience feature. Keep editing even if a snapshot could not be recorded.
-        }
-    }
-
-    func requestCloseOperation(
-        state: inout State,
-        operation: PendingCloseOperation
-    ) -> Effect<Action> {
-        let tabIDs: [OpenDocumentTab.ID] = {
-            switch operation {
-            case let .tab(tabID):
-                return [tabID]
-            case let .closeOtherTabs(tabID):
-                return state.workspace.tabIDs(excluding: tabID)
-            case let .closeTabsToRight(tabID):
-                return state.workspace.tabIDsToRight(of: tabID)
-            }
-        }()
-
-        let dirtyTabs = state.workspace.dirtyTabs(withIDs: tabIDs)
-        guard !dirtyTabs.isEmpty else {
-            return performCloseOperation(state: &state, operation: operation)
-        }
-
-        state.workspace.presentCloseConfirmation(operation: operation, dirtyTabs: dirtyTabs)
-        return .none
-    }
-
-    func performCloseOperation(
-        state: inout State,
-        operation: PendingCloseOperation
-    ) -> Effect<Action> {
-        switch operation {
-        case let .tab(tabID):
-            return .send(.tabClosed(tabID))
-        case let .closeOtherTabs(tabID):
-            return .send(.closeOtherTabs(tabID))
-        case let .closeTabsToRight(tabID):
-            return .send(.closeTabsToRight(tabID))
         }
     }
 

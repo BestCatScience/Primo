@@ -56,47 +56,26 @@ extension AppFeature {
         state: inout State,
         tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
-        let wasActive = state.workspace.isActiveTab(tabID)
-        guard let closingTab = state.workspace.removeTab(id: tabID) else { return .none }
-        clearAutosave(for: closingTab)
-        try? workspaceBackingStoreService.removeWorkspaceItem(closingTab.backingStoreURL)
-
-        guard wasActive else { return .none }
-        let replacement = state.workspace.selectedTab(in: closingTab.pane)
-            ?? state.workspace.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
-        guard let replacement else {
-            state.workspace.clearActiveTab()
-            state.application.showHome()
-            return .none
-        }
-        state.workspace.clearActiveTab()
-        return .send(.tabSelected(replacement.id))
+        guard let closure = state.workspace.closeTab(id: tabID) else { return .none }
+        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
+        return effect(for: closure.disposition, state: &state)
     }
 
     func handleCloseOtherTabs(
         state: inout State,
         retaining tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
-        let removedTabs = state.workspace.retainOnlyTab(id: tabID)
-        removedTabs.forEach {
-            clearAutosave(for: $0)
-            try? workspaceBackingStoreService.removeWorkspaceItem($0.backingStoreURL)
-        }
-        if state.workspace.isActiveTab(tabID) == false {
-            return .send(.tabSelected(tabID))
-        }
-        return .none
+        let closure = state.workspace.closeOtherTabs(retaining: tabID)
+        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
+        return effect(for: closure.disposition, state: &state)
     }
 
     func handleCloseTabsToRight(
         state: inout State,
         tabID: OpenDocumentTab.ID
-    ) {
-        let idsToRemove = Set(state.workspace.tabIDsToRight(of: tabID))
-        let removedTabs = state.workspace.removeTabs(withIDs: idsToRemove)
-        removedTabs.forEach {
-            clearAutosave(for: $0)
-            try? workspaceBackingStoreService.removeWorkspaceItem($0.backingStoreURL)
-        }
+    ) -> Effect<Action> {
+        let closure = state.workspace.closeTabsToRight(of: tabID)
+        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
+        return effect(for: closure.disposition, state: &state)
     }
 }
