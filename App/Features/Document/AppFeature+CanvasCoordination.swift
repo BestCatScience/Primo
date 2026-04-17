@@ -43,7 +43,9 @@ extension AppFeature {
         _ compositePixelData: Data,
         state: inout State
     ) {
-        AppFeature.canvasPreviewStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &state)
+        if AppFeature.canvasPreviewStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &state) {
+            state.application.finishHydration()
+        }
     }
 
     func applyLiveStrokePreview(
@@ -52,12 +54,14 @@ extension AppFeature {
         adjustedActiveLayerPixels: Data,
         state: inout State
     ) {
-        AppFeature.canvasPreviewStateCoordinator.applyLiveStrokePreview(
+        if AppFeature.canvasPreviewStateCoordinator.applyLiveStrokePreview(
             baseSnapshot: baseSnapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,
             to: &state
-        )
+        ) {
+            state.application.finishHydration()
+        }
     }
 
     func resolvedBrushSettings(for state: State) -> BrushRuntimeSettings {

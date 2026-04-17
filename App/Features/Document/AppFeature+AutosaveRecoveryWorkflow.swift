@@ -13,12 +13,13 @@ extension AppFeature {
         guard let item = state.recovery.items.first(where: { $0.id == autosaveID }) else {
             return .none
         }
-        if !state.application.showsHome {
-            _ = persistActiveTabToBackingStore(state: &state)
-        }
-        state.application.beginHydration()
-        state.recovery.dismiss()
-        return workspaceTabCoordinator.restoreAutosaveEffect(item: item)
+        return beginWorkspaceProjectLoad(
+            state: &state,
+            fileURL: item.autosaveProjectURL.fileURL,
+            dismissesRecovery: true,
+            onSuccess: { .autosaveRecoveryOpened($0, item) },
+            onFailure: { .openDocumentFailed($0) }
+        )
     }
 
     func handleAutosaveRecoveryOpened(

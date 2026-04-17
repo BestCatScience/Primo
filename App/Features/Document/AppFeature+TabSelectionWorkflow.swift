@@ -12,13 +12,12 @@ extension AppFeature {
         if state.workspace.isActiveTab(tabID), !state.application.showsHome {
             return .none
         }
-        if !state.application.showsHome, state.workspace.isActiveTab(tabID) == false {
-            _ = persistActiveTabToBackingStore(state: &state)
-        }
-        state.application.beginHydration()
-        return workspaceTabCoordinator.loadTabSelectionEffect(
-            tabID: tabID,
-            backingStoreURL: targetTab.backingStoreURL.fileURL
+        return beginWorkspaceProjectLoad(
+            state: &state,
+            fileURL: targetTab.backingStoreURL.fileURL,
+            persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
+            onSuccess: { .tabSelectionLoaded(tabID, $0) },
+            onFailure: { .tabSelectionFailed($0) }
         )
     }
 

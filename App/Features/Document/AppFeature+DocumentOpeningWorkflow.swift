@@ -34,13 +34,12 @@ extension AppFeature {
             state.application.finishHydration()
             return .send(.tabSelected(existingTabID))
         }
-        if !state.application.showsHome {
-            _ = persistActiveTabToBackingStore(state: &state)
-        }
-        state.application.beginHydration()
-        return workspaceTabCoordinator.openProjectEffect(
-            at: url,
-            removeWorkspaceItemAfterLoad: removesStagedWorkspaceItem
+        return beginWorkspaceProjectLoad(
+            state: &state,
+            fileURL: url.fileURL,
+            removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
+            onSuccess: { .openDocumentLoaded($0, url) },
+            onFailure: { .openDocumentFailed($0) }
         )
     }
 

@@ -30,12 +30,9 @@ extension AppFeature {
         projectURL: DocumentProjectPath,
         openInNewTab: Bool
     ) -> Effect<Action> {
-        if !state.application.showsHome {
-            persistActiveTabToBackingStore(state: &state)
-        }
-        state.application.beginHydration()
-        return workspaceTabCoordinator.loadProjectEffect(
-            from: projectURL.fileURL,
+        return beginWorkspaceProjectLoad(
+            state: &state,
+            fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
             onFailure: { .openDocumentFailed($0) }
         )

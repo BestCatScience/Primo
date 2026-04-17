@@ -10,11 +10,15 @@ extension AppFeature {
         func loadProjectEffect(
             from fileURL: URL,
             onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
-            onFailure: @escaping @Sendable (String) -> Action
+            onFailure: @escaping @Sendable (String) -> Action,
+            removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil
         ) -> Effect<Action> {
-            .run { [paintDocumentClient] send in
+            .run { [paintDocumentClient, workspaceBackingStoreService] send in
                 do {
                     let loaded = try paintDocumentClient.loadProject(fileURL)
+                    if let workspaceItemToRemove = removeWorkspaceItemOnSuccess {
+                        try? workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
+                    }
                     await send(onSuccess(loaded))
                 } catch {
                     await send(onFailure(error.localizedDescription))
@@ -28,42 +32,6 @@ extension AppFeature {
                 await send(.autosaveRecoveryLoaded(items))
             }
         }
-
-        func restoreAutosaveEffect(item: AutosaveRecoveryItem) -> Effect<Action> {
-            loadProjectEffect(
-                from: item.autosaveProjectURL.fileURL,
-                onSuccess: { .autosaveRecoveryOpened($0, item) },
-                onFailure: { .openDocumentFailed($0) }
-            )
-        }
-
-        func openProjectEffect(
-            at url: DocumentProjectPath,
-            removeWorkspaceItemAfterLoad: Bool
-        ) -> Effect<Action> {
-            .run { [paintDocumentClient, workspaceBackingStoreService] send in
-                do {
-                    let loaded = try paintDocumentClient.loadProject(url.fileURL)
-                    if removeWorkspaceItemAfterLoad {
-                        try? workspaceBackingStoreService.removeWorkspaceItem(url)
-                    }
-                    await send(.openDocumentLoaded(loaded, url))
-                } catch {
-                    await send(.openDocumentFailed(error.localizedDescription))
-                }
-            }
-        }
-
-        func loadTabSelectionEffect(
-            tabID: OpenDocumentTab.ID,
-            backingStoreURL: URL
-        ) -> Effect<Action> {
-            loadProjectEffect(
-                from: backingStoreURL,
-                onSuccess: { .tabSelectionLoaded(tabID, $0) },
-                onFailure: { .tabSelectionFailed($0) }
-            )
-        }
     }
 
     var workspaceTabCoordinator: WorkspaceTabCoordinator {
@@ -71,6 +39,30 @@ extension AppFeature {
             paintDocumentClient: paintDocumentClient,
             workspaceCatalogService: workspaceCatalogService,
             workspaceBackingStoreService: workspaceBackingStoreService
+        )
+    }
+
+    func beginWorkspaceProjectLoad(
+        state: inout State,
+        fileURL: URL,
+        persistCurrentTab: Bool = true,
+        dismissesRecovery: Bool = false,
+        removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil,
+        onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
+        onFailure: @escaping @Sendable (String) -> Action
+    ) -> Effect<Action> {
+        if persistCurrentTab, !state.application.showsHome {
+            _ = persistActiveTabToBackingStore(state: &state)
+        }
+        if dismissesRecovery {
+            state.recovery.dismiss()
+        }
+        state.application.beginHydration()
+        return workspaceTabCoordinator.loadProjectEffect(
+            from: fileURL,
+            onSuccess: onSuccess,
+            onFailure: onFailure,
+            removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
         )
     }
 }

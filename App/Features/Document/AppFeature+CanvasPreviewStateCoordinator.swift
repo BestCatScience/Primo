@@ -2,14 +2,15 @@ import Foundation
 
 extension AppFeature {
     struct AppFeatureCanvasPreviewStateCoordinator {
+        @discardableResult
         func applyLiveCompositePixelData(
             _ compositePixelData: Data,
             to state: inout AppFeature.State
-        ) {
+        ) -> Bool {
             let width = state.canvas.renderSnapshot?.width ?? max(Int(state.canvas.canvasSize.width.rounded()), 1)
             let height = state.canvas.renderSnapshot?.height ?? max(Int(state.canvas.canvasSize.height.rounded()), 1)
             guard compositePixelData.count == width * height * 4 else {
-                return
+                return false
             }
 
             let layerSnapshots: [MetalLayerSnapshot]
@@ -37,21 +38,22 @@ extension AppFeature {
                 compositePixelData: compositePixelData,
                 layers: layerSnapshots
             ))
-            state.application.finishHydration()
+            return true
         }
 
+        @discardableResult
         func applyLiveStrokePreview(
             baseSnapshot: MetalDocumentSnapshot,
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data,
             to state: inout AppFeature.State
-        ) {
+        ) -> Bool {
             guard let composite = AppFeature.compositedPreviewPixelData(
                 snapshot: baseSnapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerPixels: adjustedActiveLayerPixels
             ) else {
-                return
+                return false
             }
 
             let nextLayers = baseSnapshot.layers.map { layer in
@@ -78,7 +80,7 @@ extension AppFeature {
                 ),
                 previewLayerPixelData: adjustedActiveLayerPixels
             )
-            state.application.finishHydration()
+            return true
         }
     }
 }
