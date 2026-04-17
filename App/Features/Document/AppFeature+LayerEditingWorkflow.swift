@@ -4,8 +4,10 @@ extension AppFeature {
     struct LayerWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
-        func addLayer(named name: String) {
+        @discardableResult
+        func addLayer(named name: String) -> Int {
             paintDocumentClient.addLayer(name)
+            return paintDocumentClient.presentation().activeLayerIndex
         }
 
         func createFolder(

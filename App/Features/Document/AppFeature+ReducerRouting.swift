@@ -122,46 +122,6 @@ extension AppFeature {
         )
     }
 
-    func handleNanoBananaRegenerateRequested(state: inout State) -> Effect<Action> {
-        guard let request = state.nanoBanana.regenerationRequest() else { return .none }
-        return .send(.nanoBananaEditRequested(request))
-    }
-
-    func handleNanoBananaRetryJob(
-        state: inout State,
-        jobID: UUID
-    ) -> Effect<Action> {
-        guard let request = state.nanoBanana.retryRequest(for: jobID) else { return .none }
-        return .send(.nanoBananaEditRequested(request))
-    }
-
-    func handleTimelapseExportProgressUpdated(
-        state: inout State,
-        progress: Double,
-        previewData: Data?
-    ) {
-        state.export.updateTimelapsePreview(progress: progress, previewData: previewData)
-    }
-
-    func handleTimelapseExportSucceeded(
-        state: inout State,
-        url: URL
-    ) {
-        state.export.completeTimelapseExport(with: makeShareExport(url: url))
-    }
-
-    func handleTimelapseExportFailed(
-        state: inout State,
-        message: String
-    ) {
-        state.export.failTimelapseExport()
-        state.application.presentBanner(message)
-    }
-
-    func handleExportSheetDismissed(state: inout State) {
-        state.export.dismissShareSheet()
-    }
-
     func handleBannerDismissed(state: inout State) {
         state.application.clearBanner()
     }

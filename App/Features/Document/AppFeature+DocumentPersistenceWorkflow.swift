@@ -2,16 +2,8 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    private struct DocumentWorkflowCoordinator {
-        let paintDocumentClient: PaintDocumentClient
+    private struct SaveHistoryWorkflowCoordinator {
         let workspaceCatalogService: WorkspaceCatalogService
-        let workspaceArtifactService: WorkspaceArtifactService
-        let fileClient: FileClient
-        let dateClient: DateClient
-
-        func timelapseCapture() -> TimelapseCapture? {
-            paintDocumentClient.timelapseCapture()
-        }
 
         func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
             .run { [workspaceCatalogService] send in
@@ -19,47 +11,18 @@ extension AppFeature {
                 await send(.saveHistoryLoaded(entries))
             }
         }
-
-        func makeTimelapseExportEffect(
-            capture: TimelapseCapture,
-            failureMessage: String
-        ) -> Effect<Action> {
-            .run { [workspaceArtifactService, fileClient, dateClient] send in
-                do {
-                    let url = try TimelapseExporter.exportVideo(
-                        from: capture,
-                        to: workspaceArtifactService.timelapseTemporaryDirectory(),
-                        fileClient: fileClient,
-                        dateClient: dateClient
-                    ) { progress, previewURL in
-                        let previewData = try? fileClient.readData(previewURL)
-                        Task {
-                            await send(.timelapseExportProgressUpdated(progress, previewData))
-                        }
-                    }
-                    await send(.timelapseExportSucceeded(url))
-                } catch {
-                    await send(.timelapseExportFailed(failureMessage))
-                }
-            }
-            .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
-        }
     }
 
-    private var documentWorkflowCoordinator: DocumentWorkflowCoordinator {
-        DocumentWorkflowCoordinator(
-            paintDocumentClient: paintDocumentClient,
-            workspaceCatalogService: workspaceCatalogService,
-            workspaceArtifactService: workspaceArtifactService,
-            fileClient: fileClient,
-            dateClient: dateClient
+    private var saveHistoryWorkflowCoordinator: SaveHistoryWorkflowCoordinator {
+        SaveHistoryWorkflowCoordinator(
+            workspaceCatalogService: workspaceCatalogService
         )
     }
 
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
         guard let activeTab = state.workspace.activeTab else { return .none }
         state.saveHistory.beginPresentation()
-        return documentWorkflowCoordinator.loadSaveHistoryEffect(for: activeTab)
+        return saveHistoryWorkflowCoordinator.loadSaveHistoryEffect(for: activeTab)
     }
 
     func handleSaveHistoryRestoreRequest(
@@ -128,19 +91,5 @@ extension AppFeature {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
         return .send(.homeProjectsLoadRequested)
-    }
-
-    func handleTimelapseExportRequest(state: inout State) -> Effect<Action> {
-        guard let capture = documentWorkflowCoordinator.timelapseCapture() else {
-            state.application.presentBanner(
-                state.application.appLanguage.localized("Not enough drawing history for timelapse yet")
-            )
-            return .none
-        }
-        state.export.startTimelapsePreview(from: capture)
-        return documentWorkflowCoordinator.makeTimelapseExportEffect(
-            capture: capture,
-            failureMessage: state.application.appLanguage.localized("Timelapse export failed")
-        )
     }
 }

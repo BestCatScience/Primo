@@ -11,14 +11,14 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("Could not import photo"))
             return
         }
-        let nextNumber = state.layerSidebar.layers.count + 1
-        let fallbackName = state.application.appLanguage == .japanese ? "写真 \(nextNumber)" : "Photo \(nextNumber)"
+        let fallbackName = state.layerSidebar.numberedLayerName(
+            prefix: state.application.appLanguage == .japanese ? "写真" : "Photo"
+        )
         let layerName = {
             let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return trimmed.isEmpty ? fallbackName : trimmed
         }()
-        layerWorkflowService.addLayer(named: layerName)
-        let targetLayerIndex = state.layerSidebar.layers.count
+        let targetLayerIndex = layerWorkflowService.addLayer(named: layerName)
         layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
         layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayerForNewContent(targetLayerIndex)
@@ -67,8 +67,7 @@ extension AppFeature {
                 ? layerName!
                 : (state.application.appLanguage == .japanese ? "テキスト" : "Text")
             )
-            layerWorkflowService.addLayer(named: resolvedName)
-            targetLayerIndex = state.layerSidebar.layers.count
+            targetLayerIndex = layerWorkflowService.addLayer(named: resolvedName)
         }
 
         guard layerWorkflowService.setTextLayer(targetLayerIndex, textLayer: textLayer) else {

@@ -121,6 +121,48 @@ extension AppFeature {
         }
     }
 
+    private struct NanoBananaPreviewApplicationPlan {
+        enum Target {
+            case existingLayer(index: Int)
+            case newLayer(name: String)
+        }
+
+        let preview: NanoBananaPreviewState
+        let target: Target
+    }
+
+    private struct NanoBananaPreviewApplicationContract {
+        func validate(
+            preview: NanoBananaPreviewState,
+            state: AppFeature.State
+        ) -> Result<NanoBananaPreviewApplicationPlan, NanoBananaValidationError> {
+            switch preview.request.outputMode {
+            case .replaceCurrentLayer:
+                guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
+                    return .failure(
+                        NanoBananaValidationError(
+                            message: state.application.appLanguage.localized("Could not apply Nano Banana edit")
+                        )
+                    )
+                }
+                return .success(
+                    NanoBananaPreviewApplicationPlan(
+                        preview: preview,
+                        target: .existingLayer(index: preview.outputLayerIndex)
+                    )
+                )
+
+            case .newLayer:
+                return .success(
+                    NanoBananaPreviewApplicationPlan(
+                        preview: preview,
+                        target: .newLayer(name: state.layerSidebar.numberedLayerName(prefix: "Nano Banana"))
+                    )
+                )
+            }
+        }
+    }
+
     private struct NanoBananaDocumentService {
         struct AppliedPreview {
             let targetLayerIndex: Int
@@ -129,21 +171,20 @@ extension AppFeature {
 
         let paintDocumentClient: PaintDocumentClient
 
-        func applyPreview(
-            _ preview: NanoBananaPreviewState,
-            newLayerName: String
+        func apply(
+            _ plan: NanoBananaPreviewApplicationPlan
         ) -> AppliedPreview {
             let targetLayerIndex: Int
-            switch preview.request.outputMode {
-            case .replaceCurrentLayer:
-                targetLayerIndex = preview.outputLayerIndex
-            case .newLayer:
-                paintDocumentClient.addLayer(newLayerName)
+            switch plan.target {
+            case let .existingLayer(index):
+                targetLayerIndex = index
+            case let .newLayer(name):
+                paintDocumentClient.addLayer(name)
                 targetLayerIndex = paintDocumentClient.presentation().activeLayerIndex
             }
 
             paintDocumentClient.setActiveLayer(targetLayerIndex)
-            paintDocumentClient.replaceLayerPixels(targetLayerIndex, preview.pixelData)
+            paintDocumentClient.replaceLayerPixels(targetLayerIndex, plan.preview.pixelData)
             return AppliedPreview(
                 targetLayerIndex: targetLayerIndex,
                 presentation: paintDocumentClient.presentation()
@@ -246,7 +287,9 @@ extension AppFeature {
                     }
 
                     guard let finalPixelData else {
-                        await send(.nanoBananaEditFailed("Nano Banana returned an unsupported image."))
+                        await send(.nanoBananaEditFailed(
+                            prepared.appLanguage.localized("Nano Banana returned an unsupported image")
+                        ))
                         return
                     }
 
@@ -314,6 +357,10 @@ extension AppFeature {
         NanoBananaRequestContract()
     }
 
+    private var nanoBananaPreviewApplicationContract: NanoBananaPreviewApplicationContract {
+        NanoBananaPreviewApplicationContract()
+    }
+
     private var nanoBananaDocumentService: NanoBananaDocumentService {
         NanoBananaDocumentService(paintDocumentClient: paintDocumentClient)
     }
@@ -341,13 +388,18 @@ extension AppFeature {
         state: inout State,
         preview: NanoBananaPreviewState
     ) {
+        let applicationPlan: NanoBananaPreviewApplicationPlan
+        switch nanoBananaPreviewApplicationContract.validate(preview: preview, state: state) {
+        case let .failure(error):
+            nanoBananaGenerationService.applyFailure(state: &state, message: error.message)
+            return
+        case let .success(plan):
+            applicationPlan = plan
+        }
+        let appliedPreview = nanoBananaDocumentService.apply(applicationPlan)
         nanoBananaGenerationService.applySuccess(
             state: &state,
             preview: preview
-        )
-        let appliedPreview = nanoBananaDocumentService.applyPreview(
-            preview,
-            newLayerName: "Nano Banana \(state.layerSidebar.layers.count + 1)"
         )
         state.canvas.finalizeLayerMutation(
             at: appliedPreview.targetLayerIndex,
@@ -370,5 +422,18 @@ extension AppFeature {
 
     func handleNanoBananaCancelRequested(state: inout State) -> Effect<Action> {
         nanoBananaGenerationService.cancel(state: &state)
+    }
+
+    func handleNanoBananaRegenerateRequested(state: inout State) -> Effect<Action> {
+        guard let request = state.nanoBanana.regenerationRequest() else { return .none }
+        return .send(.nanoBananaEditRequested(request))
+    }
+
+    func handleNanoBananaRetryJob(
+        state: inout State,
+        jobID: UUID
+    ) -> Effect<Action> {
+        guard let request = state.nanoBanana.retryRequest(for: jobID) else { return .none }
+        return .send(.nanoBananaEditRequested(request))
     }
 }

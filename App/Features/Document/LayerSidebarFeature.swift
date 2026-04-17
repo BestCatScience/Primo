@@ -14,6 +14,10 @@ struct LayerSidebarFeature {
         var transparentPaper = false
         var showsPaperEditor = false
 
+        var nextLayerOrdinal: Int {
+            layers.count + 1
+        }
+
         func layer(withIndex index: Int) -> LayerRowModel? {
             layers.first(where: { $0.index == index })
         }
@@ -25,6 +29,10 @@ struct LayerSidebarFeature {
                 }
                 return nil
             }.first
+        }
+
+        func numberedLayerName(prefix: String) -> String {
+            "\(prefix) \(nextLayerOrdinal)"
         }
 
         mutating func activateLayer(_ index: Int) {

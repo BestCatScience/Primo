@@ -2,8 +2,10 @@ import Foundation
 
 extension AppFeature {
     func handleAddLayer(state: inout State) {
-        layerWorkflowService.addLayer(named: "Layer \(state.layerSidebar.layers.count + 1)")
-        state.canvas.activateLayerForEditing(state.layerSidebar.layers.count)
+        let newLayerIndex = layerWorkflowService.addLayer(
+            named: state.layerSidebar.numberedLayerName(prefix: "Layer")
+        )
+        state.canvas.activateLayerForEditing(newLayerIndex)
         applyDirtyPresentation(state: &state)
     }
 
