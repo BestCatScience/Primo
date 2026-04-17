@@ -20,14 +20,14 @@ extension PaintDocumentSession {
     func lightweightPresentation() -> PaintDocumentPresentation {
         let clock = ContinuousClock()
         let start = clock.now
-        let infos = bridgeLayerInfos()
-        let folderInfos = bridgeFolderInfos()
+        let infos = queryBridge.layerInfos()
+        let folderInfos = queryBridge.folderInfos()
         let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
-            canvasSize: bridgeCanvasSize,
-            activeLayerIndex: bridgeActiveLayerIndex(),
+            canvasSize: queryBridge.canvasSize,
+            activeLayerIndex: queryBridge.activeLayerIndex(),
             layerRows: rows,
             layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: nil
@@ -38,10 +38,10 @@ extension PaintDocumentSession {
         let clock = ContinuousClock()
         let start = clock.now
         let revision = advancePresentationRevision()
-        let infos = bridgeLayerInfos()
-        let folderInfos = bridgeFolderInfos()
+        let infos = queryBridge.layerInfos()
+        let folderInfos = queryBridge.folderInfos()
         let folderVisibilityByID = Dictionary(uniqueKeysWithValues: folderInfos.map { (Int($0.folderID), $0.visible) })
-        let compositePixelData = bridgeCompositePixelData()
+        let compositePixelData = queryBridge.compositePixelData()
         let snapshots = infos.enumerated().map { element in
             let index = element.offset
             let info = element.element
@@ -60,13 +60,13 @@ extension PaintDocumentSession {
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
         Self.logger.debug("presentation produced revision \(revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
         return PaintDocumentPresentation(
-            canvasSize: bridgeCanvasSize,
-            activeLayerIndex: bridgeActiveLayerIndex(),
+            canvasSize: queryBridge.canvasSize,
+            activeLayerIndex: queryBridge.activeLayerIndex(),
             layerRows: rows,
             layerSidebarRows: buildSidebarRows(layerInfos: infos, layerRows: rows, folderInfos: folderInfos),
             renderSnapshot: MetalDocumentSnapshot(
-                width: bridgeCanvasWidth,
-                height: bridgeCanvasHeight,
+                width: queryBridge.canvasWidth,
+                height: queryBridge.canvasHeight,
                 revision: revision,
                 compositePixelData: compositePixelData,
                 layers: snapshots
@@ -75,11 +75,11 @@ extension PaintDocumentSession {
     }
 
     func prewarmDrawingResources() {
-        _ = bridgeCompositePixelData()
+        _ = queryBridge.compositePixelData()
     }
 
     func compositePixelData() -> Data {
-        bridgeCompositePixelData()
+        queryBridge.compositePixelData()
     }
 
     private func buildLayerRows(from infos: [APPaintLayerInfo]) -> [LayerRowModel] {

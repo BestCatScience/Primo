@@ -21,7 +21,7 @@ extension PaintDocumentSession {
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
         guard beginPixelLayerMutation(at: index) else { return false }
         let descriptor = makeProcessingDescriptor(from: request)
-        let didApply = bridgeApplyLayerProcessing(index: index, descriptor: descriptor)
+        let didApply = layerBridge.applyLayerProcessing(index: index, descriptor: descriptor)
         if didApply {
             let pixelData = pixelDataForLayer(index: index)
             applyLayerLifecycleMutation(
@@ -33,7 +33,7 @@ extension PaintDocumentSession {
     }
 
     func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
-        let infos = bridgeLayerInfos()
+        let infos = queryBridge.layerInfos()
         guard infos.indices.contains(upperIndex), infos.indices.contains(lowerIndex) else {
             return nil
         }
@@ -43,7 +43,7 @@ extension PaintDocumentSession {
         let upperPixels = pixelDataForLayer(index: upperIndex)
         guard lowerPixels.count == upperPixels.count else { return nil }
 
-        let upperMask = bridgeMaskDataForLayer(index: upperIndex)
+        let upperMask = queryBridge.layerMaskDataForLayer(index: upperIndex)
         var maskedUpper = upperPixels
         if let upperMask, upperMask.count * 4 == upperPixels.count {
             maskedUpper.withUnsafeMutableBytes { upperBytes in
@@ -95,9 +95,9 @@ extension PaintDocumentSession {
             ? Self.pixelDataByPreservingExistingAlpha(source: data, existing: pixelDataForLayer(index: index))
             : data
         descriptor.pixelData = adjustedData
-        let didApply = bridgeApplyLayerProcessing(index: index, descriptor: descriptor)
+        let didApply = layerBridge.applyLayerProcessing(index: index, descriptor: descriptor)
         if !didApply {
-            bridgeReplaceLayerPixels(index: index, data: adjustedData, transient: true)
+            layerBridge.replaceLayerPixels(index: index, data: adjustedData, transient: true)
         }
         applyLayerLifecycleMutation(
             at: index,
@@ -109,10 +109,10 @@ extension PaintDocumentSession {
     @discardableResult
     func replaceLayerMask(index: Int, maskData: Data) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        guard maskData.count == bridgeCanvasWidth * bridgeCanvasHeight else {
+        guard maskData.count == queryBridge.canvasWidth * queryBridge.canvasHeight else {
             return false
         }
-        bridgeReplaceLayerMask(index: index, data: maskData)
+        layerBridge.replaceLayerMask(index: index, data: maskData)
         applyLayerLifecycleMutation(
             at: index,
             recording: .replaceLayerMask(index: .unchecked(index), data: maskData)
@@ -123,10 +123,10 @@ extension PaintDocumentSession {
     @discardableResult
     func clearLayerMask(index: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        guard bridgeMaskDataForLayer(index: index) != nil else {
+        guard queryBridge.layerMaskDataForLayer(index: index) != nil else {
             return false
         }
-        bridgeClearLayerMask(index: index)
+        layerBridge.clearLayerMask(index: index)
         applyLayerLifecycleMutation(
             at: index,
             recording: .clearLayerMask(index: .unchecked(index))
@@ -137,7 +137,7 @@ extension PaintDocumentSession {
     @discardableResult
     func applyLayerMask(index: Int) -> Bool {
         guard containsLayerIndex(index) else { return false }
-        guard bridgeApplyLayerMask(index: index) else {
+        guard layerBridge.applyLayerMask(index: index) else {
             return false
         }
         let pixelData = pixelDataForLayer(index: index)
@@ -156,7 +156,7 @@ extension PaintDocumentSession {
         guard beginPixelLayerMutation(at: index) else { return false }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.clear
-        let didApply = bridgeApplyLayerProcessing(index: index, descriptor: descriptor)
+        let didApply = layerBridge.applyLayerProcessing(index: index, descriptor: descriptor)
         if didApply {
             applyLayerLifecycleMutation(
                 at: index,

@@ -8,6 +8,23 @@ extension AppFeature {
         let incrementalUpdate: IncrementalLayerUpdate?
     }
 
+    struct CanvasStrokeContext {
+        let activeLayer: LayerRowModel
+        let activeLayerIndex: Int
+        let brush: BrushRuntimeSettings
+        let previewBrush: BrushRuntimeSettings
+    }
+
+    struct StrokePreviewResolution {
+        let plan: StrokePreviewPlan
+        var baseSnapshotToCapture: MetalDocumentSnapshot? = nil
+    }
+
+    enum StrokeCommitResolution {
+        case committed(DocumentMutationContract)
+        case failed
+    }
+
     struct CanvasStrokeWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
@@ -128,6 +145,164 @@ extension AppFeature {
         return previewBrush
     }
 
+    func canvasStrokeContext(in state: State) -> CanvasStrokeContext? {
+        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
+            return nil
+        }
+        let brush = resolvedBrushSettings(for: state)
+        return CanvasStrokeContext(
+            activeLayer: activeLayer,
+            activeLayerIndex: state.canvas.activeLayerIndex,
+            brush: brush,
+            previewBrush: previewBrush(for: brush)
+        )
+    }
+
+    func resolveInitialStrokePreview(
+        state: State,
+        sample: StylusSample,
+        context: CanvasStrokeContext
+    ) -> StrokePreviewResolution? {
+        guard let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+              let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex }),
+              let previewPlan = makeStrokePreviewPlan(
+                snapshot: baseSnapshot,
+                activeLayerIndex: context.activeLayerIndex,
+                basePixelData: baseLayer.pixelData,
+                samples: [sample],
+                brush: context.previewBrush,
+                preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked
+              )
+        else {
+            return nil
+        }
+        return StrokePreviewResolution(plan: previewPlan)
+    }
+
+    func resolveAppendedStrokePreview(
+        state: State,
+        samples: [StylusSample],
+        context: CanvasStrokeContext
+    ) -> StrokePreviewResolution? {
+        guard !samples.isEmpty else { return nil }
+        if
+            let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+            let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex })
+        {
+            let fullSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
+            let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
+            let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
+            let previewSamples = anchor.map { [$0] + samples } ?? samples
+            let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
+            guard let previewPlan = makeStrokePreviewPlan(
+                snapshot: baseSnapshot,
+                activeLayerIndex: context.activeLayerIndex,
+                basePixelData: basePixelData,
+                samples: previewSamples,
+                brush: context.previewBrush,
+                preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked
+            ) else {
+                return nil
+            }
+            return StrokePreviewResolution(plan: previewPlan)
+        }
+
+        guard
+            let snapshot = state.canvas.renderSnapshot,
+            let baseLayer = snapshot.layers.first(where: { $0.index == context.activeLayerIndex }),
+            let previewPlan = makeStrokePreviewPlan(
+                snapshot: snapshot,
+                activeLayerIndex: context.activeLayerIndex,
+                basePixelData: baseLayer.pixelData,
+                samples: samples,
+                brush: context.previewBrush,
+                preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked
+            )
+        else {
+            return nil
+        }
+        return StrokePreviewResolution(
+            plan: previewPlan,
+            baseSnapshotToCapture: snapshot
+        )
+    }
+
+    func applyStrokePreviewResolution(
+        _ resolution: StrokePreviewResolution,
+        activeLayerIndex: Int,
+        state: inout State
+    ) {
+        if let baseSnapshotToCapture = resolution.baseSnapshotToCapture {
+            state.canvas.captureStrokeBaseSnapshot(baseSnapshotToCapture)
+        }
+        applyStrokePreviewPlan(
+            resolution.plan,
+            activeLayerIndex: activeLayerIndex,
+            state: &state
+        )
+    }
+
+    func resolveStrokeCommit(
+        state: inout State,
+        samples: [StylusSample],
+        context: CanvasStrokeContext,
+        keepsSelectionCleared: Bool,
+        refreshViaDirtyPresentation: Bool
+    ) -> StrokeCommitResolution {
+        let shouldApplyTaperOnCommit = context.brush.taperIn > 0.001 || context.brush.taperOut > 0.001
+        if keepsSelectionCleared {
+            guard canvasStrokeWorkflowService.ensureLayerVisible(context.activeLayerIndex) else {
+                return .failed
+            }
+            clearCanvasSelectionWithoutRefresh(state: &state)
+        }
+        let didCommit: Bool
+        if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
+            didCommit = canvasStrokeWorkflowService.replaceLayerPixels(
+                context.activeLayerIndex,
+                pixelData: previewPixels
+            )
+        } else {
+            let committedInSession = canvasStrokeWorkflowService.applySoftwareStroke(
+                samples,
+                brush: context.brush,
+                layerIndex: context.activeLayerIndex
+            )
+            didCommit = committedInSession || commitStrokeUsingFallbackPixels(
+                state: &state,
+                samples: samples,
+                brush: context.brush,
+                activeLayer: context.activeLayer,
+                refreshViaDirtyPresentation: refreshViaDirtyPresentation
+            )
+        }
+        guard didCommit else {
+            return .failed
+        }
+        return .committed(
+            DocumentMutationContract(
+                canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
+                refresh: refreshViaDirtyPresentation ? .dirty : .current
+            )
+        )
+    }
+
+    func completeResolvedStrokeCommit(
+        _ resolution: StrokeCommitResolution,
+        state: inout State
+    ) -> Effect<Action> {
+        resetStrokePreviewState(state: &state)
+        switch resolution {
+        case let .committed(contract):
+            return completeCanvasStrokeMutation(
+                state: &state,
+                contract: contract
+            )
+        case .failed:
+            return cancelStartupPresentationEffects()
+        }
+    }
+
     func makeStrokePreviewPlan(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
@@ -242,27 +417,21 @@ extension AppFeature {
         state: inout State,
         sample: StylusSample
     ) -> Effect<Action> {
-        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
+        guard let context = canvasStrokeContext(in: state) else {
             return .none
         }
         guard prepareCanvasStrokeEditing(state: &state) else {
             return .none
         }
         captureActiveStrokeBaseSnapshotIfNeeded(state: &state)
-        let previewBrush = previewBrush(for: resolvedBrushSettings(for: state))
-        if let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-           let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-           let previewPlan = makeStrokePreviewPlan(
-            snapshot: baseSnapshot,
-            activeLayerIndex: state.canvas.activeLayerIndex,
-            basePixelData: baseLayer.pixelData,
-            samples: [sample],
-            brush: previewBrush,
-            preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-           ) {
-            applyStrokePreviewPlan(
-                previewPlan,
-                activeLayerIndex: state.canvas.activeLayerIndex,
+        if let previewResolution = resolveInitialStrokePreview(
+            state: state,
+            sample: sample,
+            context: context
+        ) {
+            applyStrokePreviewResolution(
+                previewResolution,
+                activeLayerIndex: context.activeLayerIndex,
                 state: &state
             )
         }
@@ -273,55 +442,17 @@ extension AppFeature {
         state: inout State,
         samples: [StylusSample]
     ) {
-        guard !samples.isEmpty else { return }
-        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
+        guard let context = canvasStrokeContext(in: state) else {
             return
         }
-        let previewBrush = previewBrush(for: resolvedBrushSettings(for: state))
-        if
-            let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-            let baseLayer = baseSnapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
-        {
-            let fullSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
-            let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
-            let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
-            let previewSamples = anchor.map { [$0] + samples } ?? samples
-            let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
-            guard let previewPlan = makeStrokePreviewPlan(
-                snapshot: baseSnapshot,
-                activeLayerIndex: state.canvas.activeLayerIndex,
-                basePixelData: basePixelData,
-                samples: previewSamples,
-                brush: previewBrush,
-                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-            ) else {
-                return
-            }
-            applyStrokePreviewPlan(
-                previewPlan,
-                activeLayerIndex: state.canvas.activeLayerIndex,
-                state: &state
-            )
-            return
-        }
-
-        guard
-            let snapshot = state.canvas.renderSnapshot,
-            let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-            let previewPlan = makeStrokePreviewPlan(
-                snapshot: snapshot,
-                activeLayerIndex: state.canvas.activeLayerIndex,
-                basePixelData: baseLayer.pixelData,
-                samples: samples,
-                brush: previewBrush,
-                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-            )
-        else { return }
-
-        state.canvas.captureStrokeBaseSnapshot(snapshot)
-        applyStrokePreviewPlan(
-            previewPlan,
-            activeLayerIndex: state.canvas.activeLayerIndex,
+        guard let previewResolution = resolveAppendedStrokePreview(
+            state: state,
+            samples: samples,
+            context: context
+        ) else { return }
+        applyStrokePreviewResolution(
+            previewResolution,
+            activeLayerIndex: context.activeLayerIndex,
             state: &state
         )
     }
@@ -353,50 +484,20 @@ extension AppFeature {
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> Effect<Action> {
-        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
+        guard let context = canvasStrokeContext(in: state) else {
             resetStrokePreviewState(state: &state)
             return .none
         }
-        let brush = resolvedBrushSettings(for: state)
-        let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
-        if keepsSelectionCleared {
-            guard canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
-                resetStrokePreviewState(state: &state)
-                return .none
-            }
-            clearCanvasSelectionWithoutRefresh(state: &state)
-        }
-        let didCommit: Bool
-        if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-            didCommit = canvasStrokeWorkflowService.replaceLayerPixels(
-                state.canvas.activeLayerIndex,
-                pixelData: previewPixels
-            )
-        } else {
-            let committedInSession = canvasStrokeWorkflowService.applySoftwareStroke(
-                samples,
-                brush: brush,
-                layerIndex: state.canvas.activeLayerIndex
-            )
-            didCommit = committedInSession || commitStrokeUsingFallbackPixels(
-                state: &state,
-                samples: samples,
-                brush: brush,
-                activeLayer: activeLayer,
-                refreshViaDirtyPresentation: refreshViaDirtyPresentation
-            )
-        }
-        guard didCommit else {
-            resetStrokePreviewState(state: &state)
-            return cancelStartupPresentationEffects()
-        }
-        resetStrokePreviewState(state: &state)
-        return completeCanvasStrokeMutation(
+        let commitResolution = resolveStrokeCommit(
             state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
-                refresh: refreshViaDirtyPresentation ? .dirty : .current
-            )
+            samples: samples,
+            context: context,
+            keepsSelectionCleared: keepsSelectionCleared,
+            refreshViaDirtyPresentation: refreshViaDirtyPresentation
+        )
+        return completeResolvedStrokeCommit(
+            commitResolution,
+            state: &state
         )
     }
 

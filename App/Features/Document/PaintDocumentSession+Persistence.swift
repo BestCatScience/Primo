@@ -64,12 +64,12 @@ extension PaintDocumentSession {
     private func makePersistenceSnapshot(
         paperStyle: CanvasPaperStyle
     ) -> PaintDocumentPersistenceSnapshot {
-        let layerInfos = bridgeLayerInfos()
-        let folderInfos = bridgeFolderInfos()
+        let layerInfos = queryBridge.layerInfos()
+        let folderInfos = queryBridge.folderInfos()
         let layerPayloads = layerInfos.enumerated().map { index, layerInfo in
             let pixelFilename = String(format: "layer-%04d.rgba", index)
             let pixelData = pixelDataForLayer(index: index)
-            let maskData = bridgeMaskDataForLayer(index: index)
+            let maskData = queryBridge.layerMaskDataForLayer(index: index)
             let maskFilename = maskData == nil ? nil : String(format: "layer-mask-%04d.mask", index)
             return PaintDocumentPersistenceSnapshot.LayerPayload(
                 manifest: StoredPrimoDocument.Layer(
@@ -119,9 +119,9 @@ extension PaintDocumentSession {
             }
 
         return PaintDocumentPersistenceSnapshot(
-            canvasWidth: bridgeCanvasWidth,
-            canvasHeight: bridgeCanvasHeight,
-            activeLayerIndex: .unchecked(bridgeActiveLayerIndex()),
+            canvasWidth: queryBridge.canvasWidth,
+            canvasHeight: queryBridge.canvasHeight,
+            activeLayerIndex: .unchecked(queryBridge.activeLayerIndex()),
             paperStyle: paperStyle,
             layers: layerPayloads,
             folders: storedFolders,
@@ -138,24 +138,24 @@ extension PaintDocumentSession {
         setStoredPaperStyle(restorationPlan.paperStyle)
         replaceStoredTextLayers(with: [:])
 
-        while bridgeLayerInfos().count < restorationPlan.layers.count {
-            _ = bridgeAddLayer(name: "Layer \(bridgeLayerInfos().count + 1)")
+        while queryBridge.layerInfos().count < restorationPlan.layers.count {
+            _ = layerBridge.addLayer(name: "Layer \(queryBridge.layerInfos().count + 1)")
         }
 
         for layer in restorationPlan.layers {
-            bridgeReplaceLayerPixels(index: layer.index, data: layer.pixelData, transient: true)
+            layerBridge.replaceLayerPixels(index: layer.index, data: layer.pixelData, transient: true)
             if let maskData = layer.maskData {
-                bridgeReplaceLayerMask(index: layer.index, data: maskData)
+                layerBridge.replaceLayerMask(index: layer.index, data: maskData)
             } else {
-                bridgeClearLayerMask(index: layer.index)
+                layerBridge.clearLayerMask(index: layer.index)
             }
-            bridgeSetLayerName(layer.name, index: layer.index)
-            bridgeSetLayerVisible(layer.visible, index: layer.index)
-            bridgeSetLayerLocked(layer.locked, index: layer.index)
-            bridgeSetLayerAlphaLocked(layer.alphaLocked, index: layer.index)
-            bridgeSetLayerClipped(layer.clipped, index: layer.index)
-            bridgeSetLayerOpacity(CGFloat(layer.opacity), index: layer.index)
-            bridgeSetLayerBlendMode(layer.blendMode, index: layer.index)
+            layerBridge.setLayerName(layer.name, index: layer.index)
+            layerBridge.setLayerVisible(layer.visible, index: layer.index)
+            layerBridge.setLayerLocked(layer.locked, index: layer.index)
+            layerBridge.setLayerAlphaLocked(layer.alphaLocked, index: layer.index)
+            layerBridge.setLayerClipped(layer.clipped, index: layer.index)
+            layerBridge.setLayerOpacity(CGFloat(layer.opacity), index: layer.index)
+            layerBridge.setLayerBlendMode(layer.blendMode, index: layer.index)
             if let textLayer = layer.textLayer {
                 setStoredTextLayer(textLayer, at: layer.index)
             }
@@ -163,18 +163,18 @@ extension PaintDocumentSession {
 
         var folderIDMap: [DocumentFolderID: Int] = [:]
         for folder in restorationPlan.folders {
-            let newFolderID = bridgeCreateFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1)
+            let newFolderID = layerBridge.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1)
             folderIDMap[folder.id] = newFolderID
-            bridgeSetFolderVisible(folder.visible, folderID: newFolderID)
-            bridgeSetFolderExpanded(folder.expanded, folderID: newFolderID)
+            layerBridge.setFolderVisible(folder.visible, folderID: newFolderID)
+            layerBridge.setFolderExpanded(folder.expanded, folderID: newFolderID)
         }
 
         for layer in restorationPlan.layers {
             guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = bridgeSetLayerFolder(index: layer.index, folderID: resolvedFolderID)
+            _ = layerBridge.setLayerFolder(index: layer.index, folderID: resolvedFolderID)
         }
 
-        setBridgeActiveLayerIndex(restorationPlan.activeLayerIndex)
+        layerBridge.setActiveLayerIndex(restorationPlan.activeLayerIndex)
 
         switch restorationPlan.timelapse {
         case let .operations(events):
@@ -190,7 +190,7 @@ extension PaintDocumentSession {
 
         invalidateStoredThumbnailCache()
         resetTrackedEditingState()
-        bridgeClearHistory()
+        historyBridge.clearHistory()
     }
 }
 

@@ -194,36 +194,24 @@ final class PaintDocumentSession {
 }
 
 extension PaintDocumentSession {
-    var bridgeCanvasWidth: Int {
-        Int(bridge.width)
+    var queryBridge: PaintDocumentSessionQueryBridge {
+        PaintDocumentSessionQueryBridge(bridge: bridge)
     }
 
-    var bridgeCanvasHeight: Int {
-        Int(bridge.height)
+    var layerBridge: PaintDocumentSessionLayerBridge {
+        PaintDocumentSessionLayerBridge(bridge: bridge)
     }
 
-    var bridgeCanvasSize: CGSize {
-        CGSize(width: bridge.width, height: bridge.height)
+    var strokeBridge: PaintDocumentSessionStrokeBridge {
+        PaintDocumentSessionStrokeBridge(bridge: bridge)
     }
 
-    func bridgeLayerInfos() -> [APPaintLayerInfo] {
-        bridge.layerInfos()
-    }
-
-    func bridgeFolderInfos() -> [APPaintFolderInfo] {
-        bridge.folderInfos()
-    }
-
-    func bridgeActiveLayerIndex() -> Int {
-        Int(bridge.activeLayerIndex)
-    }
-
-    func setBridgeActiveLayerIndex(_ index: Int) {
-        bridge.activeLayerIndex = index
+    var historyBridge: PaintDocumentSessionHistoryBridge {
+        PaintDocumentSessionHistoryBridge(bridge: bridge)
     }
 
     func containsLayerIndex(_ index: Int) -> Bool {
-        bridgeLayerInfos().indices.contains(index)
+        queryBridge.layerInfos().indices.contains(index)
     }
 
     func containsValidLayerAnchor(_ index: Int) -> Bool {
@@ -231,7 +219,7 @@ extension PaintDocumentSession {
     }
 
     func containsFolderID(_ folderID: Int) -> Bool {
-        bridgeFolderInfos().contains { Int($0.folderID) == folderID }
+        queryBridge.folderInfos().contains { Int($0.folderID) == folderID }
     }
 
     @discardableResult
@@ -319,27 +307,11 @@ extension PaintDocumentSession {
     }
 
     func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
-        bridgeQueryService.consumeDirtyUpdate(from: bridge)
+        queryBridge.consumeDirtyUpdate(queryService: bridgeQueryService)
     }
 
     func pixelDataForLayer(index: Int) -> Data {
         bridgeQueryService.pixelDataForLayer(index: index, bridge: bridge)
-    }
-
-    func bridgeMaskDataForLayer(index: Int) -> Data? {
-        bridge.layerMaskDataForLayer(at: index) as Data?
-    }
-
-    func bridgeCompositePixelData() -> Data {
-        bridge.compositePixelData() as Data
-    }
-
-    func bridgeCompositeImageRef() -> CGImage? {
-        bridge.makeCompositeImage()
-    }
-
-    func bridgeImageRefForLayer(index: Int) -> CGImage? {
-        bridge.makeImageForLayer(at: index)
     }
 
     func isLayerLocked(index: Int) -> Bool {
@@ -373,112 +345,180 @@ extension PaintDocumentSession {
     func normalizedPressure(_ pressure: CGFloat) -> CGFloat {
         bridgeStrokeService.normalizedPressure(pressure)
     }
+}
 
-    func bridgeBeginStroke(brush: APBrushDescriptor, point: APStrokePoint) {
-        bridge.beginStroke(brush: brush, point: point)
+struct PaintDocumentSessionQueryBridge {
+    fileprivate let bridge: APPaintDocumentBridge
+
+    var canvasWidth: Int {
+        Int(bridge.width)
     }
 
-    func bridgeAppendStroke(point: APStrokePoint) {
-        bridge.appendStroke(point: point)
+    var canvasHeight: Int {
+        Int(bridge.height)
     }
 
-    func bridgeEndStroke() {
-        bridge.endStroke()
+    var canvasSize: CGSize {
+        CGSize(width: bridge.width, height: bridge.height)
     }
 
-    func bridgeCancelStroke() {
-        bridge.cancelStroke()
+    func layerInfos() -> [APPaintLayerInfo] {
+        bridge.layerInfos()
     }
 
-    func bridgeFill(at point: CGPoint, brush: APBrushDescriptor) {
-        bridge.fill(at: point, brush: brush)
+    func folderInfos() -> [APPaintFolderInfo] {
+        bridge.folderInfos()
     }
 
-    func bridgeCanUndo() -> Bool {
+    func activeLayerIndex() -> Int {
+        Int(bridge.activeLayerIndex)
+    }
+
+    func layerMaskDataForLayer(index: Int) -> Data? {
+        bridge.layerMaskDataForLayer(at: index) as Data?
+    }
+
+    func compositePixelData() -> Data {
+        bridge.compositePixelData() as Data
+    }
+
+    func compositeImageRef() -> CGImage? {
+        bridge.makeCompositeImage()
+    }
+
+    func imageRefForLayer(index: Int) -> CGImage? {
+        bridge.makeImageForLayer(at: index)
+    }
+
+    func consumeDirtyUpdate(queryService: PaintDocumentBridgeQueryService) -> IncrementalLayerUpdate? {
+        queryService.consumeDirtyUpdate(from: bridge)
+    }
+}
+
+struct PaintDocumentSessionHistoryBridge {
+    fileprivate let bridge: APPaintDocumentBridge
+
+    func canUndo() -> Bool {
         bridge.canUndo()
     }
 
-    func bridgeCanRedo() -> Bool {
+    func canRedo() -> Bool {
         bridge.canRedo()
     }
 
-    func bridgeUndo() -> Bool {
+    func undo() -> Bool {
         bridge.undo()
     }
 
-    func bridgeRedo() -> Bool {
+    func redo() -> Bool {
         bridge.redo()
     }
 
-    func bridgeAddLayer(name: String) -> Int {
+    func clearHistory() {
+        bridge.clearHistory()
+    }
+}
+
+struct PaintDocumentSessionStrokeBridge {
+    fileprivate let bridge: APPaintDocumentBridge
+
+    func beginStroke(brush: APBrushDescriptor, point: APStrokePoint) {
+        bridge.beginStroke(brush: brush, point: point)
+    }
+
+    func appendStroke(point: APStrokePoint) {
+        bridge.appendStroke(point: point)
+    }
+
+    func endStroke() {
+        bridge.endStroke()
+    }
+
+    func cancelStroke() {
+        bridge.cancelStroke()
+    }
+
+    func fill(at point: CGPoint, brush: APBrushDescriptor) {
+        bridge.fill(at: point, brush: brush)
+    }
+}
+
+struct PaintDocumentSessionLayerBridge {
+    fileprivate let bridge: APPaintDocumentBridge
+
+    func setActiveLayerIndex(_ index: Int) {
+        bridge.activeLayerIndex = index
+    }
+
+    func addLayer(name: String) -> Int {
         Int(bridge.addLayer(name: name))
     }
 
-    func bridgeDuplicateLayer(index: Int, name: String) -> Int {
+    func duplicateLayer(index: Int, name: String) -> Int {
         Int(bridge.duplicateLayer(at: index, name: name))
     }
 
-    func bridgeDeleteLayer(index: Int) -> Bool {
+    func deleteLayer(index: Int) -> Bool {
         bridge.deleteLayer(at: index)
     }
 
-    func bridgeMoveLayer(from index: Int, to destinationIndex: Int) -> Bool {
+    func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
         bridge.moveLayer(at: index, to: destinationIndex)
     }
 
-    func bridgeCreateFolder(name: String, layerIndex: Int) -> Int {
+    func createFolder(name: String, layerIndex: Int) -> Int {
         Int(bridge.createFolder(name: name, layerIndex: layerIndex))
     }
 
-    func bridgeDeleteFolder(id folderID: Int) -> Bool {
+    func deleteFolder(id folderID: Int) -> Bool {
         bridge.deleteFolder(id: folderID)
     }
 
-    func bridgeSetFolderVisible(_ isVisible: Bool, folderID: Int) {
+    func setFolderVisible(_ isVisible: Bool, folderID: Int) {
         bridge.setFolderVisible(isVisible, folderID: folderID)
     }
 
-    func bridgeSetFolderName(_ name: String, folderID: Int) {
+    func setFolderName(_ name: String, folderID: Int) {
         bridge.setFolderName(name, folderID: folderID)
     }
 
-    func bridgeSetFolderExpanded(_ isExpanded: Bool, folderID: Int) {
+    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) {
         bridge.setFolderExpanded(isExpanded, folderID: folderID)
     }
 
-    func bridgeSetLayerFolder(index: Int, folderID: Int) -> Bool {
+    func setLayerFolder(index: Int, folderID: Int) -> Bool {
         bridge.setLayerFolder(at: index, folderID: folderID)
     }
 
-    func bridgeSetLayerName(_ name: String, index: Int) {
+    func setLayerName(_ name: String, index: Int) {
         bridge.setLayerName(name, at: index)
     }
 
-    func bridgeSetLayerVisible(_ isVisible: Bool, index: Int) {
+    func setLayerVisible(_ isVisible: Bool, index: Int) {
         bridge.setLayerVisible(isVisible, at: index)
     }
 
-    func bridgeSetLayerLocked(_ isLocked: Bool, index: Int) {
+    func setLayerLocked(_ isLocked: Bool, index: Int) {
         bridge.setLayerLocked(isLocked, at: index)
     }
 
-    func bridgeSetLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) {
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) {
         bridge.setLayerAlphaLocked(isAlphaLocked, at: index)
     }
 
-    func bridgeSetLayerClipped(_ isClipped: Bool, index: Int) {
+    func setLayerClipped(_ isClipped: Bool, index: Int) {
         bridge.setLayerClipped(isClipped, at: index)
     }
 
-    func bridgeSetLayerOpacity(_ opacity: CGFloat, index: Int) {
+    func setLayerOpacity(_ opacity: CGFloat, index: Int) {
         bridge.setLayerOpacity(opacity, at: index)
     }
 
-    func bridgeSetLayerBlendMode(_ blendMode: String, index: Int) {
+    func setLayerBlendMode(_ blendMode: String, index: Int) {
         bridge.setLayerBlendMode(blendMode, at: index)
     }
 
-    func bridgeReplaceLayerPixels(index: Int, data: Data, transient: Bool = false) {
+    func replaceLayerPixels(index: Int, data: Data, transient: Bool = false) {
         if transient {
             bridge.replaceLayerPixelsTransient(at: index, data: data)
         } else {
@@ -486,27 +526,23 @@ extension PaintDocumentSession {
         }
     }
 
-    func bridgeReplaceLayerMask(index: Int, data: Data) {
+    func replaceLayerMask(index: Int, data: Data) {
         bridge.replaceLayerMask(at: index, data: data)
     }
 
-    func bridgeClearLayerMask(index: Int) {
+    func clearLayerMask(index: Int) {
         bridge.clearLayerMask(at: index)
     }
 
-    func bridgeApplyLayerMask(index: Int) -> Bool {
+    func applyLayerMask(index: Int) -> Bool {
         bridge.applyLayerMask(at: index)
     }
 
-    func bridgeClearLayer(index: Int) {
+    func clearLayer(index: Int) {
         bridge.clearLayer(at: index)
     }
 
-    func bridgeApplyLayerProcessing(index: Int, descriptor: APPaintLayerProcessingDescriptor) -> Bool {
+    func applyLayerProcessing(index: Int, descriptor: APPaintLayerProcessingDescriptor) -> Bool {
         bridge.applyLayerProcessing(at: index, descriptor: descriptor)
-    }
-
-    func bridgeClearHistory() {
-        bridge.clearHistory()
     }
 }

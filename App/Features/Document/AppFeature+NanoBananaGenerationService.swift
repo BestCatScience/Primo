@@ -149,8 +149,7 @@ extension AppFeature {
             case let .existingLayer(index):
                 resolvedTarget = (index, false)
             case let .newLayer(name):
-                paintDocumentClient.addLayer(name)
-                resolvedTarget = (paintDocumentClient.presentation().activeLayerIndex, true)
+                resolvedTarget = (paintDocumentClient.addLayer(name), true)
             }
 
             guard paintDocumentClient.setActiveLayer(resolvedTarget.index) else {

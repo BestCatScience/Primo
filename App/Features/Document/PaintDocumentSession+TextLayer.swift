@@ -29,7 +29,7 @@ extension PaintDocumentSession {
     }
 
     func rasterizedTextLayerPixelData(_ textLayer: TextLayerData) -> Data? {
-        let canvasSize = bridgeCanvasSize
+        let canvasSize = queryBridge.canvasSize
         guard
             canvasSize.width > 0,
             canvasSize.height > 0,

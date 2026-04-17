@@ -55,8 +55,7 @@ extension AppFeature {
             case let .existingLayer(index):
                 return (index, false)
             case let .newLayer(name):
-                paintDocumentClient.addLayer(name)
-                return (paintDocumentClient.presentation().activeLayerIndex, true)
+                return (paintDocumentClient.addLayer(name), true)
             }
         }
 

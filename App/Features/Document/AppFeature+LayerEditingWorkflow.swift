@@ -47,7 +47,6 @@ extension AppFeature {
         @discardableResult
         func addLayer(named name: String) -> Int {
             paintDocumentClient.addLayer(name)
-            return paintDocumentClient.presentation().activeLayerIndex
         }
 
         func createFolder(

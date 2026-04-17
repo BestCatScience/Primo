@@ -26,7 +26,7 @@ struct PaintDocumentClient: Sendable {
     var canRedo: @Sendable () -> Bool
     var undo: @Sendable () -> Bool
     var redo: @Sendable () -> Bool
-    var addLayer: @Sendable (String) -> Void
+    var addLayer: @Sendable (String) -> Int
     var duplicateLayer: @Sendable (Int, String) -> Int
     var deleteLayer: @Sendable (Int) -> Bool
     var moveLayer: @Sendable (Int, Int) -> Bool

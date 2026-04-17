@@ -2,21 +2,21 @@ import Foundation
 
 extension PaintDocumentSession {
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
-        let activeLayerIndex = bridgeActiveLayerIndex()
+        let activeLayerIndex = queryBridge.activeLayerIndex()
         beginTrackedStroke(on: activeLayerIndex, brush: brush, sample: sample)
         clearTextLayerData(index: activeLayerIndex)
-        bridgeBeginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
+        strokeBridge.beginStroke(brush: makeBrushDescriptor(from: brush), point: makeStrokePoint(from: sample))
     }
 
     func appendStroke(sample: StylusSample) {
         appendTrackedStroke(sample)
-        bridgeAppendStroke(point: makeStrokePoint(from: sample))
+        strokeBridge.appendStroke(point: makeStrokePoint(from: sample))
     }
 
     func endStroke() {
-        let activeLayerIndex = bridgeActiveLayerIndex()
+        let activeLayerIndex = queryBridge.activeLayerIndex()
         let recordedEvent = finishTrackedStroke()
-        bridgeEndStroke()
+        strokeBridge.endStroke()
         applyLayerLifecycleMutation(
             at: activeLayerIndex,
             recording: recordedEvent.map { [$0] } ?? []
@@ -24,8 +24,8 @@ extension PaintDocumentSession {
     }
 
     func cancelStroke() {
-        let activeLayerIndex = bridgeActiveLayerIndex()
-        bridgeCancelStroke()
+        let activeLayerIndex = queryBridge.activeLayerIndex()
+        strokeBridge.cancelStroke()
         resetTrackedStroke()
         applyLayerLifecycleMutation(
             at: activeLayerIndex,
@@ -35,9 +35,9 @@ extension PaintDocumentSession {
 
     @discardableResult
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> Bool {
-        let layerIndex = bridgeActiveLayerIndex()
+        let layerIndex = queryBridge.activeLayerIndex()
         guard beginPixelLayerMutation(at: layerIndex) else { return false }
-        bridgeFill(
+        strokeBridge.fill(
             at: sample.point,
             brush: makeBrushDescriptor(from: brush)
         )
@@ -86,8 +86,8 @@ extension PaintDocumentSession {
         let basePixelData = pixelDataForLayer(index: layerIndex)
         guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
-            canvasWidth: bridgeCanvasWidth,
-            canvasHeight: bridgeCanvasHeight,
+            canvasWidth: queryBridge.canvasWidth,
+            canvasHeight: queryBridge.canvasHeight,
             samples: samples,
             brush: brush,
             preserveAlphaLockedPixels: isLayerAlphaLocked(index: layerIndex)
@@ -101,7 +101,7 @@ extension PaintDocumentSession {
         guard !samples.isEmpty else { return }
         guard containsLayerIndex(layerIndex) else { return }
         guard !isLayerLocked(index: layerIndex) else { return }
-        let canvasSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
+        let canvasSize = PaintDocumentCanvasSize(width: queryBridge.canvasWidth, height: queryBridge.canvasHeight)
         let sourceData = pixelDataForLayer(index: layerIndex)
         guard sourceData.count == canvasSize.rgbaByteCount else { return }
 
@@ -120,6 +120,6 @@ extension PaintDocumentSession {
         let outputData = isLayerAlphaLocked(index: layerIndex)
             ? Self.pixelDataByPreservingExistingAlpha(source: Data(blended), existing: sourceData)
             : Data(blended)
-        bridgeReplaceLayerPixels(index: layerIndex, data: outputData, transient: transient)
+        layerBridge.replaceLayerPixels(index: layerIndex, data: outputData, transient: transient)
     }
 }

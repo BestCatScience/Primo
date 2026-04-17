@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 extension AppFeature {
-    struct AppFeatureCanvasPresentationStateCoordinator {
+    struct AppFeatureCanvasRenderStateCoordinator {
         func rebuiltLayerBuffers(
             from presentation: PaintDocumentPresentation,
             existingBuffers: [LayerCanvasBuffer]
@@ -24,6 +24,26 @@ extension AppFeature {
             }
         }
 
+        func applyCanvasPresentation(
+            _ presentation: PaintDocumentPresentation,
+            to state: inout AppFeature.State
+        ) {
+            state.canvas.setCanvasSize(presentation.canvasSize)
+            state.canvas.activateLayer(presentation.activeLayerIndex)
+            let previousRevision = state.canvas.renderSnapshot?.revision ?? state.canvas.lastCommittedRenderRevision
+            state.canvas.replaceLayerBuffers(
+                rebuiltLayerBuffers(
+                    from: presentation,
+                    existingBuffers: state.canvas.layerBuffers
+                )
+            )
+            applyRenderSnapshotIfAvailable(
+                from: presentation,
+                previousRevision: previousRevision,
+                to: &state
+            )
+        }
+
         func applyRenderSnapshotIfAvailable(
             from presentation: PaintDocumentPresentation,
             previousRevision: Int,
@@ -36,9 +56,11 @@ extension AppFeature {
             )
             state.application.finishHydration()
         }
+    }
 
-        func applyLayerSidebarPresentation(
-            from presentation: PaintDocumentPresentation,
+    struct AppFeatureLayerSidebarPresentationCoordinator {
+        func applyPresentation(
+            _ presentation: PaintDocumentPresentation,
             to state: inout AppFeature.State
         ) {
             state.layerSidebar.applyPresentation(
@@ -49,6 +71,16 @@ extension AppFeature {
                 paperColor: state.brushPalette.paper.color,
                 transparentPaper: state.brushPalette.paper.isTransparent
             )
+        }
+    }
+
+    struct AppFeatureCanvasInteractionStateCoordinator {
+        func syncPresentation(
+            _ presentation: PaintDocumentPresentation,
+            state: inout AppFeature.State
+        ) {
+            syncCanvasInteractionState(state: &state)
+            syncActiveTextLayer(from: presentation, state: &state)
         }
 
         func syncCanvasInteractionState(state: inout AppFeature.State) {
@@ -73,7 +105,15 @@ extension AppFeature {
             syncTextEditorWithActiveLayer(state: &state)
         }
 
-        func prepareFreshDocument(
+        func syncTextEditorWithActiveLayer(state: inout AppFeature.State) {
+            state.brushPalette.syncTextEditor(
+                with: state.layerSidebar.layer(withIndex: state.layerSidebar.activeLayerIndex)
+            )
+        }
+    }
+
+    struct AppFeatureFreshDocumentStateCoordinator {
+        func prepare(
             canvasSize: CGSize,
             to state: inout AppFeature.State
         ) {
@@ -87,28 +127,28 @@ extension AppFeature {
             state.application.clearBanner()
             state.application.finishHydration()
         }
+    }
+
+    struct AppFeatureCanvasPresentationStateCoordinator {
+        let renderCoordinator = AppFeatureCanvasRenderStateCoordinator()
+        let layerSidebarCoordinator = AppFeatureLayerSidebarPresentationCoordinator()
+        let interactionCoordinator = AppFeatureCanvasInteractionStateCoordinator()
+        let freshDocumentCoordinator = AppFeatureFreshDocumentStateCoordinator()
+
+        func prepareFreshDocument(
+            canvasSize: CGSize,
+            to state: inout AppFeature.State
+        ) {
+            freshDocumentCoordinator.prepare(canvasSize: canvasSize, to: &state)
+        }
 
         func applyPresentation(
             _ presentation: PaintDocumentPresentation,
             to state: inout AppFeature.State
         ) {
-            state.canvas.setCanvasSize(presentation.canvasSize)
-            state.canvas.activateLayer(presentation.activeLayerIndex)
-            let previousRevision = state.canvas.renderSnapshot?.revision ?? state.canvas.lastCommittedRenderRevision
-            state.canvas.replaceLayerBuffers(
-                rebuiltLayerBuffers(
-                    from: presentation,
-                    existingBuffers: state.canvas.layerBuffers
-                )
-            )
-            applyRenderSnapshotIfAvailable(
-                from: presentation,
-                previousRevision: previousRevision,
-                to: &state
-            )
-            applyLayerSidebarPresentation(from: presentation, to: &state)
-            syncCanvasInteractionState(state: &state)
-            syncActiveTextLayer(from: presentation, state: &state)
+            renderCoordinator.applyCanvasPresentation(presentation, to: &state)
+            layerSidebarCoordinator.applyPresentation(presentation, to: &state)
+            interactionCoordinator.syncPresentation(presentation, state: &state)
         }
 
         func applyLoadedProject(
@@ -121,9 +161,7 @@ extension AppFeature {
         }
 
         func syncTextEditorWithActiveLayer(state: inout AppFeature.State) {
-            state.brushPalette.syncTextEditor(
-                with: state.layerSidebar.layer(withIndex: state.layerSidebar.activeLayerIndex)
-            )
+            interactionCoordinator.syncTextEditorWithActiveLayer(state: &state)
         }
     }
 }
