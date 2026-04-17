@@ -34,7 +34,7 @@ extension AppFeature {
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
-            onFailure: { .openDocumentFailed($0) }
+            onFailure: { .saveHistoryRestoreFailed($0) }
         )
     }
 
@@ -100,5 +100,16 @@ extension AppFeature {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
         return .send(.homeProjectsLoadRequested)
+    }
+
+    func handleSaveHistoryRestoreFailed(
+        state: inout State,
+        message: String
+    ) {
+        state.application.failHydration(
+            message: message.isEmpty
+                ? state.application.appLanguage.localized("Could not restore save history")
+                : message
+        )
     }
 }

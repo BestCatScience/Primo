@@ -10,15 +10,14 @@ extension AppFeature {
         state: inout State,
         autosaveID: WorkspaceItemID
     ) -> Effect<Action> {
-        guard let item = state.recovery.items.first(where: { $0.id == autosaveID }) else {
+        guard let item = state.recovery.item(id: autosaveID) else {
             return .none
         }
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
-            dismissesRecovery: true,
             onSuccess: { .autosaveRecoveryOpened($0, item) },
-            onFailure: { .openDocumentFailed($0) }
+            onFailure: { .autosaveRecoveryRestoreFailed($0) }
         )
     }
 
@@ -52,5 +51,16 @@ extension AppFeature {
     ) {
         state.recovery.removeItem(id: autosaveID)
         try? workspaceCatalogService.discardAutosaveEntry(autosaveID)
+    }
+
+    func handleAutosaveRecoveryRestoreFailed(
+        state: inout State,
+        message: String
+    ) {
+        state.application.failHydration(
+            message: message.isEmpty
+                ? state.application.appLanguage.localized("Could not restore autosave")
+                : message
+        )
     }
 }

@@ -19,6 +19,14 @@ extension AppFeature.ApplicationState {
         }
     }
 
+    mutating func failHydration(
+        message: String,
+        showingHome: Bool? = nil
+    ) {
+        finishHydration(showingHome: showingHome)
+        presentBanner(message)
+    }
+
     mutating func showHome(section: HomeSidebarSection = .home) {
         showsHome = true
         homeSection = section
@@ -55,6 +63,10 @@ extension AppFeature.ApplicationState {
 }
 
 extension AppFeature.RecoveryState {
+    func item(id: WorkspaceItemID) -> AutosaveRecoveryItem? {
+        items.first(where: { $0.id == id })
+    }
+
     mutating func present(items: [AutosaveRecoveryItem]) {
         self.items = items
         isPresented = !items.isEmpty

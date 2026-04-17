@@ -46,16 +46,12 @@ extension AppFeature {
         state: inout State,
         fileURL: URL,
         persistCurrentTab: Bool = true,
-        dismissesRecovery: Bool = false,
         removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil,
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
         onFailure: @escaping @Sendable (String) -> Action
     ) -> Effect<Action> {
         if persistCurrentTab, !state.application.showsHome {
             _ = persistActiveTabToBackingStore(state: &state)
-        }
-        if dismissesRecovery {
-            state.recovery.dismiss()
         }
         state.application.beginHydration()
         return workspaceTabCoordinator.loadProjectEffect(

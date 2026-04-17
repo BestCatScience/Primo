@@ -43,12 +43,9 @@ extension AppFeature {
         state: inout State,
         message: String
     ) {
-        state.application.finishHydration()
-        if state.workspace.activeTab == nil {
-            state.application.showHome()
-        }
-        state.application.presentBanner(
-            message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message
+        state.application.failHydration(
+            message: message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message,
+            showingHome: state.workspace.activeTab == nil ? true : nil
         )
     }
 

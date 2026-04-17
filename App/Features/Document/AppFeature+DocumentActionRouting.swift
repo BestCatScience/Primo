@@ -60,6 +60,10 @@ extension AppFeature {
             )
             return .none
 
+        case let .saveHistoryRestoreFailed(message):
+            handleSaveHistoryRestoreFailed(state: &state, message: message)
+            return .none
+
         case .exportDocumentRequested:
             handleExportDocumentRequest(state: &state)
             return .none

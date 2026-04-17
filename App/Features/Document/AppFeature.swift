@@ -88,6 +88,7 @@ struct AppFeature {
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
         case autosaveRecoveryRestoreRequested(WorkspaceItemID)
         case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem)
+        case autosaveRecoveryRestoreFailed(String)
         case autosaveRecoveryDiscardRequested(WorkspaceItemID)
         case autosaveRecoveryDismissed
         case homeSectionSelected(HomeSidebarSection)
@@ -122,6 +123,7 @@ struct AppFeature {
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
         case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool)
+        case saveHistoryRestoreFailed(String)
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
         case saveDocumentRequested

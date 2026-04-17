@@ -2,6 +2,46 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    func handleBootstrapPresentationLoaded(
+        state: inout State,
+        presentation: PaintDocumentPresentation
+    ) {
+        applyPresentation(presentation, state: &state)
+        state.application.finishHydration()
+        Self.startupLogger.debug("Bootstrap presentation applied; initial UI is ready")
+    }
+
+    func handleAutosaveRecoveryLoaded(
+        state: inout State,
+        items: [AutosaveRecoveryItem]
+    ) {
+        state.recovery.present(items: items)
+    }
+
+    func handleAutosaveRecoveryDismissed(state: inout State) {
+        state.recovery.dismiss()
+    }
+
+    func handleHomeSectionSelected(
+        state: inout State,
+        section: HomeSidebarSection
+    ) {
+        state.application.selectHomeSection(section)
+    }
+
+    func handlePresentationLoaded(
+        state: inout State,
+        presentation: PaintDocumentPresentation
+    ) {
+        guard !state.canvas.isStrokeActive else { return }
+        applyPresentation(presentation, state: &state)
+        Self.startupLogger.debug("Full presentation applied")
+    }
+
+    func handleBannerDismissed(state: inout State) {
+        state.application.clearBanner()
+    }
+
     func routeApplicationAction(
         state: inout State,
         action: Action
@@ -36,6 +76,10 @@ extension AppFeature {
 
         case let .autosaveRecoveryOpened(loaded, item):
             handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item)
+            return .none
+
+        case let .autosaveRecoveryRestoreFailed(message):
+            handleAutosaveRecoveryRestoreFailed(state: &state, message: message)
             return .none
 
         case let .autosaveRecoveryDiscardRequested(autosaveID):
