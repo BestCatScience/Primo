@@ -10,18 +10,18 @@ extension AppFeature {
         case undoUnavailableWhileDrawing
         case redoUnavailableWhileDrawing
 
-        func localizedMessage(for language: AppLanguage) -> String {
+        var feedback: ApplicationFeedback {
             switch self {
             case .unsupportedCanvasSize:
-                return language.localized("Canvas size is not supported")
+                return .canvasSizeUnsupported
             case .invalidImageData:
-                return language.localized("Could not create canvas from image")
+                return .couldNotCreateCanvasFromImage(nil)
             case .unsupportedImageSize:
-                return language.localized("Image size is not supported")
+                return .imageSizeUnsupported
             case .undoUnavailableWhileDrawing:
-                return language.localized("Undo is unavailable while drawing")
+                return .undoUnavailableWhileDrawing
             case .redoUnavailableWhileDrawing:
-                return language.localized("Redo is unavailable while drawing")
+                return .redoUnavailableWhileDrawing
             }
         }
     }
@@ -57,7 +57,7 @@ extension AppFeature {
 
     struct CanvasResizePlan: Equatable {
         let dimensions: CanvasDimensions
-        let successMessage: String
+        let successFeedback: ApplicationFeedback
     }
 
     enum CanvasResizeValidation: Equatable {
@@ -178,7 +178,7 @@ extension AppFeature {
         currentDimensions: CanvasDimensions?,
         width: Int,
         height: Int,
-        successMessage: String
+        successFeedback: ApplicationFeedback
     ) -> CanvasResizeValidation {
         guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
             return .invalid(.unsupportedCanvasSize)
@@ -192,7 +192,7 @@ extension AppFeature {
         return .valid(
             CanvasResizePlan(
                 dimensions: dimensions,
-                successMessage: successMessage
+                successFeedback: successFeedback
             )
         )
     }
@@ -201,16 +201,14 @@ extension AppFeature {
         _ failure: CanvasLifecycleContractFailure,
         state: inout State
     ) {
-        state.application.presentBanner(
-            failure.localizedMessage(for: state.application.appLanguage)
-        )
+        state.application.presentFeedback(failure.feedback)
     }
 
     func completeFreshDocumentReplacement(
         state: inout State,
         canvasSize: CGSize,
         tabTitle: String,
-        successMessage: String? = nil,
+        successFeedback: ApplicationFeedback? = nil,
         documentMutation: () -> Void
     ) -> Effect<Action> {
         let preparedTab: PreparedWorkspaceTab
@@ -222,9 +220,7 @@ extension AppFeature {
         case let .success(tab):
             preparedTab = tab
         case let .failure(failure):
-            state.application.presentBanner(
-                failure.message
-            )
+            state.application.presentFeedback(failure.feedback)
             return .none
         }
         documentMutation()
@@ -236,13 +232,13 @@ extension AppFeature {
         applyCurrentDocumentPresentation(state: &state)
         let activationSucceeded: Bool
         if case let .failure(failure) = activatePreparedTab(preparedTab, state: &state) {
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
             activationSucceeded = false
         } else {
             activationSucceeded = true
         }
-        if activationSucceeded, let successMessage {
-            state.application.presentBanner(successMessage)
+        if activationSucceeded, let successFeedback {
+            state.application.presentFeedback(successFeedback)
         }
         return cancelStartupPresentationEffects()
     }
@@ -279,7 +275,7 @@ extension AppFeature {
         case .success:
             break
         case let .failure(failure):
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
             return .none
         }
         return completeFreshDocumentReplacement(
@@ -299,7 +295,7 @@ extension AppFeature {
             currentDimensions: currentCanvasDimensions(state: state),
             width: width,
             height: height,
-            successMessage: state.application.appLanguage.localized("Image resolution updated")
+            successFeedback: .imageResolutionUpdated
         ) {
         case let .invalid(error):
             presentCanvasLifecycleFailure(error, state: &state)
@@ -309,7 +305,7 @@ extension AppFeature {
             canvasLifecycleService.resizeCanvas(plan.dimensions)
             state.canvas.resetTransientEditingState()
             applyDirtyPresentation(state: &state)
-            state.application.presentBanner(plan.successMessage)
+            state.application.presentFeedback(plan.successFeedback)
         }
     }
 
@@ -322,7 +318,7 @@ extension AppFeature {
             currentDimensions: currentCanvasDimensions(state: state),
             width: width,
             height: height,
-            successMessage: state.application.appLanguage.localized("Canvas size updated")
+            successFeedback: .canvasSizeUpdated
         ) {
         case let .invalid(error):
             presentCanvasLifecycleFailure(error, state: &state)
@@ -332,7 +328,7 @@ extension AppFeature {
             canvasLifecycleService.resizeCanvasExtent(plan.dimensions)
             state.canvas.resetTransientEditingState()
             applyDirtyPresentation(state: &state)
-            state.application.presentBanner(plan.successMessage)
+            state.application.presentFeedback(plan.successFeedback)
         }
     }
 
@@ -357,14 +353,14 @@ extension AppFeature {
         case .success:
             break
         case let .failure(failure):
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
             return .none
         }
         return completeFreshDocumentReplacement(
             state: &state,
             canvasSize: importedPlan.request.dimensions.size,
             tabTitle: importedPlan.layerName,
-            successMessage: state.application.appLanguage.localized("Canvas created from image"),
+            successFeedback: .canvasCreatedFromImage,
             documentMutation: {
                 canvasLifecycleService.initializeImportedCanvas(
                     importedPlan.request,

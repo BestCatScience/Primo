@@ -60,8 +60,8 @@ extension AppFeature {
             try saveTabsForClose(confirmation.tabIDs, state: &state)
             return performCloseOperation(confirmation.operation)
         } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Save failed") : error.localizedDescription
+            state.application.presentFeedback(
+                .saveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
             )
             return .none
         }

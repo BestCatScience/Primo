@@ -11,7 +11,7 @@ extension AppFeature {
     }
 
     struct WorkspacePersistenceFailure: Error, Equatable {
-        let message: String
+        let feedback: ApplicationFeedback
     }
 
     struct LoadedWorkspaceProjectPlan {
@@ -43,7 +43,7 @@ extension AppFeature {
             var discardedAutosaveEntryID: WorkspaceItemID?
             var recoveryResolution: RecoveryResolution = .none
             var saveHistoryResolution: SaveHistoryResolution = .none
-            var bannerMessage: String?
+            var feedback: ApplicationFeedback?
         }
 
         let destination: Destination
@@ -190,11 +190,8 @@ extension AppFeature {
         )
     }
 
-    func saveFailureMessage(
-        _ error: Error,
-        language: AppLanguage
-    ) -> String {
-        error.localizedDescription.isEmpty ? language.localized("Save failed") : error.localizedDescription
+    func saveFailureFeedback(_ error: Error) -> ApplicationFeedback {
+        .saveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
     }
 
     func persistActiveTabToBackingStore(
@@ -203,7 +200,7 @@ extension AppFeature {
         guard let activeTab = state.workspace.activeTab else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: state.application.appLanguage.localized("Save failed")
+                    feedback: .saveFailed(nil)
                 )
             )
         }
@@ -220,9 +217,8 @@ extension AppFeature {
         } catch {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: saveFailureMessage(
-                        error,
-                        language: state.application.appLanguage
+                    feedback: saveFailureFeedback(
+                        error
                     )
                 )
             )
@@ -243,7 +239,7 @@ extension AppFeature {
         guard let activeTab = state.workspace.activeTab else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: state.application.appLanguage.localized("Save failed")
+                    feedback: .saveFailed(nil)
                 )
             )
         }
@@ -275,17 +271,12 @@ extension AppFeature {
         } catch {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: saveFailureMessage(
-                        error,
-                        language: state.application.appLanguage
+                    feedback: saveFailureFeedback(
+                        error
                     )
                 )
             )
         }
-    }
-
-    func newTabCreationFailureMessage(language: AppLanguage) -> String {
-        language.localized("Could not create a tab")
     }
 
     func prepareNewTabReservation(
@@ -297,7 +288,7 @@ extension AppFeature {
         guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: newTabCreationFailureMessage(language: state.application.appLanguage)
+                    feedback: .couldNotCreateTab
                 )
             )
         }
@@ -350,7 +341,7 @@ extension AppFeature {
                 preparedTab = reservation
             case let .failure(failure):
                 state.application.completeWorkspaceProjectLoad(
-                    bannerMessage: failure.message
+                    feedback: failure.feedback
                 )
                 return
             }
@@ -385,7 +376,7 @@ extension AppFeature {
         switch activationResult {
         case let .failure(failure):
             state.application.completeWorkspaceProjectLoad(
-                bannerMessage: failure.message
+                feedback: failure.feedback
             )
             return
         case .success:
@@ -398,7 +389,7 @@ extension AppFeature {
         ) {
         case let .failure(failure):
             state.application.completeWorkspaceProjectLoad(
-                bannerMessage: failure.message
+                feedback: failure.feedback
             )
         case .success:
             applyLoadedWorkspaceSuccessEffects(
@@ -406,7 +397,7 @@ extension AppFeature {
                 state: &state
             )
             state.application.completeWorkspaceProjectLoad(
-                bannerMessage: plan.successEffects.bannerMessage
+                feedback: plan.successEffects.feedback
             )
         }
     }
@@ -418,14 +409,14 @@ extension AppFeature {
         case .success:
             break
         case let .failure(failure):
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
             return
         }
         switch persistActiveTabAutosave(state: &state) {
         case .success:
             break
         case let .failure(failure):
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
         }
     }
 
@@ -435,7 +426,7 @@ extension AppFeature {
         guard let activeTab = state.workspace.activeTab else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: state.application.appLanguage.localized("Save failed")
+                    feedback: .saveFailed(nil)
                 )
             )
         }
@@ -449,9 +440,8 @@ extension AppFeature {
         } catch {
             return .failure(
                 WorkspacePersistenceFailure(
-                    message: saveFailureMessage(
-                        error,
-                        language: state.application.appLanguage
+                    feedback: saveFailureFeedback(
+                        error
                     )
                 )
             )
@@ -548,7 +538,9 @@ extension AppFeature {
             case .success:
                 break
             case let .failure(failure):
-                throw WorkspaceOperationError(message: failure.message)
+                throw WorkspaceOperationError(
+                    message: failure.feedback.message(for: state.application.appLanguage)
+                )
             }
         }
         for tabID in tabIDs {

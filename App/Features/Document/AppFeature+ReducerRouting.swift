@@ -6,8 +6,8 @@ extension AppFeature {
         state: inout State,
         message: String
     ) {
-        state.application.presentBanner(
-            message.isEmpty ? state.application.appLanguage.localized("Could not create canvas from image") : message
+        state.application.presentFeedback(
+            .couldNotCreateCanvasFromImage(message.isEmpty ? nil : message)
         )
     }
 
@@ -16,7 +16,7 @@ extension AppFeature {
         message: String
     ) {
         state.application.failHydration(
-            message: message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message
+            feedback: .openFailed(message.isEmpty ? nil : message)
         )
     }
 
@@ -24,8 +24,8 @@ extension AppFeature {
         state: inout State,
         message: String
     ) {
-        state.application.presentBanner(
-            message.isEmpty ? state.application.appLanguage.localized("Could not import photo") : message
+        state.application.presentFeedback(
+            .couldNotImportPhoto(message.isEmpty ? nil : message)
         )
     }
 }

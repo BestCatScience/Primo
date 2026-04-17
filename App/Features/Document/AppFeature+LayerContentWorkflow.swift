@@ -8,7 +8,7 @@ extension AppFeature {
         data: Data
     ) {
         guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Could not import photo"))
+            state.application.presentFeedback(.couldNotImportPhoto(nil))
             return
         }
         let fallbackName = state.layerSidebar.numberedLayerName(
@@ -23,7 +23,7 @@ extension AppFeature {
         layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayerForNewContent(targetLayerIndex)
         applyDirtyPresentation(state: &state)
-        state.application.presentBanner(state.application.appLanguage.localized("Photo imported to a new layer"))
+        state.application.presentFeedback(.photoImportedToNewLayer)
     }
 
     func handleApplyText(
@@ -71,7 +71,7 @@ extension AppFeature {
         }
 
         guard layerWorkflowService.setTextLayer(targetLayerIndex, textLayer: textLayer) else {
-            state.application.presentBanner(state.application.appLanguage.localized("テキストをレイヤーに適用できませんでした"))
+            state.application.presentFeedback(.textLayerApplyFailed)
             return
         }
         layerWorkflowService.setActiveLayer(targetLayerIndex)
@@ -91,11 +91,11 @@ extension AppFeature {
     func handleCreateLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
-            state.application.presentBanner(state.application.appLanguage.localized("選択範囲を作成してからマスクを追加してください"))
+            state.application.presentFeedback(.createLayerMaskNeedsSelection)
             return
         }
         guard layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData) else {
-            state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを作成できませんでした"))
+            state.application.presentFeedback(.createLayerMaskFailed)
             return
         }
         applyDirtyPresentation(state: &state)
@@ -112,7 +112,7 @@ extension AppFeature {
     func handleApplyLayerMask(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard layerWorkflowService.applyLayerMask(activeLayerIndex) else {
-            state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを適用できませんでした"))
+            state.application.presentFeedback(.applyLayerMaskFailed)
             return
         }
         state.canvas.finalizeLayerMutation(at: activeLayerIndex, incrementsRevision: true)

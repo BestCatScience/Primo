@@ -17,8 +17,8 @@ extension AppFeature {
             }
             return .send(.homeProjectsLoadRequested)
         } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? state.application.appLanguage.localized("Move failed") : error.localizedDescription
+            state.application.presentFeedback(
+                .moveFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
             )
             return .none
         }
@@ -60,10 +60,7 @@ extension AppFeature {
                     sourceProjectURL: sourceURL
                 ),
                 successEffects: .init(
-                    bannerMessage: StudioStrings.openedDocument(
-                        loaded.presentation.layerRows.count,
-                        state.application.appLanguage
-                    )
+                    feedback: .openedDocument(loaded.presentation.layerRows.count)
                 )
             ),
             state: &state

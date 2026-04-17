@@ -330,17 +330,15 @@ extension AppFeature {
 
         func applyFailure(state: inout State, message: String) {
             state.nanoBanana.markFailed(message: message)
-            state.application.presentBanner(
-                message.isEmpty
-                    ? state.application.appLanguage.localized("Nano Banana edit failed")
-                    : message
+            state.application.presentFeedback(
+                .nanoBananaEditFailed(message.isEmpty ? nil : message)
             )
         }
 
         func cancel(state: inout State) -> Effect<Action> {
             let localizedMessage = state.application.appLanguage.localized("Nano Banana generation canceled")
             state.nanoBanana.markCanceled(localizedMessage: localizedMessage)
-            state.application.presentBanner(localizedMessage)
+            state.application.presentFeedback(.nanoBananaGenerationCanceled)
             return .cancel(id: CancelID.nanoBananaEdit)
         }
     }
@@ -372,7 +370,9 @@ extension AppFeature {
         let validatedEdit: NanoBananaValidatedEdit
         switch nanoBananaRequestContract.validate(request: request, state: state) {
         case let .failure(error):
-            state.application.presentBanner(error.localizedDescription)
+            state.application.presentFeedback(
+                .nanoBananaEditFailed(error.localizedDescription.isEmpty ? nil : error.localizedDescription)
+            )
             return .none
         case let .success(edit):
             validatedEdit = edit
@@ -410,7 +410,7 @@ extension AppFeature {
             appliedPreview.presentation,
             to: &state
         )
-        state.application.presentBanner(state.application.appLanguage.localized("Nano Banana edit applied"))
+        state.application.presentFeedback(.nanoBananaEditApplied)
     }
 
     func handleNanoBananaEditFailed(

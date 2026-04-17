@@ -1,5 +1,126 @@
 import Foundation
 
+extension AppFeature {
+    enum ApplicationFeedback: Equatable {
+        case message(String)
+        case saveFailed(String?)
+        case openFailed(String?)
+        case moveFailed(String?)
+        case autosaveRestoreFailed(String?)
+        case saveHistoryRestoreFailed(String?)
+        case couldNotCreateCanvasFromImage(String?)
+        case couldNotImportPhoto(String?)
+        case photoImportedToNewLayer
+        case textLayerApplyFailed
+        case createLayerMaskNeedsSelection
+        case createLayerMaskFailed
+        case applyLayerMaskFailed
+        case exportFailed
+        case timelapseHistoryUnavailable
+        case timelapseExportFailed(String?)
+        case nanoBananaEditFailed(String?)
+        case nanoBananaGenerationCanceled
+        case nanoBananaEditApplied
+        case couldNotCreateTab
+        case canvasSizeUnsupported
+        case imageResolutionUpdated
+        case canvasSizeUpdated
+        case imageSizeUnsupported
+        case canvasCreatedFromImage
+        case undoUnavailableWhileDrawing
+        case redoUnavailableWhileDrawing
+        case openedDocument(Int)
+        case savedDocument(String)
+        case restoredSaveHistory
+        case restoredAutosave
+    }
+}
+
+extension AppFeature.ApplicationFeedback {
+    func message(for language: AppLanguage) -> String {
+        switch self {
+        case let .message(message):
+            return message
+        case let .saveFailed(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Save failed")
+        case let .openFailed(message):
+            return (message?.isEmpty == false) ? message! : StudioStrings.openFailed(language)
+        case let .moveFailed(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Move failed")
+        case let .autosaveRestoreFailed(message):
+            return (message?.isEmpty == false)
+                ? message!
+                : language.localized("Could not restore autosave")
+        case let .saveHistoryRestoreFailed(message):
+            return (message?.isEmpty == false)
+                ? message!
+                : language.localized("Could not restore save history")
+        case let .couldNotCreateCanvasFromImage(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Could not create canvas from image")
+        case let .couldNotImportPhoto(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Could not import photo")
+        case .photoImportedToNewLayer:
+            return language.localized("Photo imported to a new layer")
+        case .textLayerApplyFailed:
+            return language == .japanese
+                ? "テキストをレイヤーに適用できませんでした"
+                : "Could not apply text to the layer"
+        case .createLayerMaskNeedsSelection:
+            return language == .japanese
+                ? "選択範囲を作成してからマスクを追加してください"
+                : "Create a selection before adding a mask"
+        case .createLayerMaskFailed:
+            return language == .japanese
+                ? "レイヤーマスクを作成できませんでした"
+                : "Could not create the layer mask"
+        case .applyLayerMaskFailed:
+            return language == .japanese
+                ? "レイヤーマスクを適用できませんでした"
+                : "Could not apply the layer mask"
+        case .exportFailed:
+            return language.localized("Export failed")
+        case .timelapseHistoryUnavailable:
+            return language.localized("Not enough drawing history for timelapse yet")
+        case let .timelapseExportFailed(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Timelapse export failed")
+        case let .nanoBananaEditFailed(message):
+            return (message?.isEmpty == false) ? message! : language.localized("Nano Banana edit failed")
+        case .nanoBananaGenerationCanceled:
+            return language.localized("Nano Banana generation canceled")
+        case .nanoBananaEditApplied:
+            return language.localized("Nano Banana edit applied")
+        case .couldNotCreateTab:
+            return language.localized("Could not create a tab")
+        case .canvasSizeUnsupported:
+            return language.localized("Canvas size is not supported")
+        case .imageResolutionUpdated:
+            return language.localized("Image resolution updated")
+        case .canvasSizeUpdated:
+            return language.localized("Canvas size updated")
+        case .imageSizeUnsupported:
+            return language.localized("Image size is not supported")
+        case .canvasCreatedFromImage:
+            return language.localized("Canvas created from image")
+        case .undoUnavailableWhileDrawing:
+            return language.localized("Undo is unavailable while drawing")
+        case .redoUnavailableWhileDrawing:
+            return language.localized("Redo is unavailable while drawing")
+        case let .openedDocument(layerCount):
+            return StudioStrings.openedDocument(layerCount, language)
+        case let .savedDocument(fileName):
+            return StudioStrings.savedDocument(fileName, language)
+        case .restoredSaveHistory:
+            return language == .japanese
+                ? "保存履歴を復元しました"
+                : "Restored from save history"
+        case .restoredAutosave:
+            return language == .japanese
+                ? "自動保存から復元しました"
+                : "Restored from autosave"
+        }
+    }
+}
+
 extension AppFeature.ApplicationState {
     mutating func beginStartup(language: AppLanguage) {
         isHydrating = true
@@ -27,12 +148,20 @@ extension AppFeature.ApplicationState {
         presentBanner(message)
     }
 
+    mutating func failHydration(
+        feedback: AppFeature.ApplicationFeedback,
+        showingHome: Bool? = nil
+    ) {
+        finishHydration(showingHome: showingHome)
+        presentFeedback(feedback)
+    }
+
     mutating func completeWorkspaceProjectLoad(
-        bannerMessage: String? = nil
+        feedback: AppFeature.ApplicationFeedback? = nil
     ) {
         finishHydration(showingHome: false)
-        if let bannerMessage {
-            presentBanner(bannerMessage)
+        if let feedback {
+            presentFeedback(feedback)
         }
     }
 
@@ -60,6 +189,10 @@ extension AppFeature.ApplicationState {
 
     mutating func presentBanner(_ message: String?) {
         bannerMessage = message
+    }
+
+    mutating func presentFeedback(_ feedback: AppFeature.ApplicationFeedback) {
+        presentBanner(feedback.message(for: appLanguage))
     }
 
     mutating func clearBanner() {

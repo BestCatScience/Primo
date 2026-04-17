@@ -77,7 +77,7 @@ extension AppFeature {
     ) -> Bool {
         state.canvas.clearAdjustmentPreview()
         guard apply() else {
-            state.application.presentBanner(failureMessage)
+            state.application.presentFeedback(.message(failureMessage))
             return false
         }
         state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
@@ -111,7 +111,7 @@ extension AppFeature {
     ) -> Bool {
         state.canvas.clearAdjustmentPreview()
         guard let adjustedPixels else {
-            state.application.presentBanner(failureMessage)
+            state.application.presentFeedback(.message(failureMessage))
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)

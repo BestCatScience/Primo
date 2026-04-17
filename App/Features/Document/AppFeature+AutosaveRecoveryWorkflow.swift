@@ -41,7 +41,7 @@ extension AppFeature {
                 successEffects: .init(
                     discardedAutosaveEntryID: item.id,
                     recoveryResolution: .completeRestore(item.id),
-                    bannerMessage: state.application.appLanguage.localized("自動保存から復元しました")
+                    feedback: .restoredAutosave
                 )
             ),
             state: &state
@@ -61,9 +61,7 @@ extension AppFeature {
         message: String
     ) {
         state.application.failHydration(
-            message: message.isEmpty
-                ? state.application.appLanguage.localized("Could not restore autosave")
-                : message
+            feedback: .autosaveRestoreFailed(message.isEmpty ? nil : message)
         )
     }
 }

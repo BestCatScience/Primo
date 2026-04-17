@@ -19,8 +19,7 @@ extension AppFeature {
         }
 
         func makeTimelapseExportEffect(
-            capture: TimelapseCapture,
-            failureMessage: String
+            capture: TimelapseCapture
         ) -> Effect<Action> {
             .run { [workspaceArtifactService, fileClient, dateClient] send in
                 do {
@@ -37,7 +36,7 @@ extension AppFeature {
                     }
                     await send(.timelapseExportSucceeded(url))
                 } catch {
-                    await send(.timelapseExportFailed(failureMessage))
+                    await send(.timelapseExportFailed(error.localizedDescription))
                 }
             }
             .cancellable(id: CancelID.timelapseExport, cancelInFlight: true)
@@ -60,7 +59,7 @@ extension AppFeature {
 
     func handleExportDocumentRequest(state: inout State) {
         guard let pngData = compositePNGData(state: state) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Export failed"))
+            state.application.presentFeedback(.exportFailed)
             return
         }
         do {
@@ -68,22 +67,17 @@ extension AppFeature {
                 try exportWorkflowService.makeDocumentShareExport(from: pngData)
             )
         } catch {
-            state.application.presentBanner(state.application.appLanguage.localized("Export failed"))
+            state.application.presentFeedback(.exportFailed)
         }
     }
 
     func handleTimelapseExportRequest(state: inout State) -> Effect<Action> {
         guard let capture = exportWorkflowService.timelapseCapture() else {
-            state.application.presentBanner(
-                state.application.appLanguage.localized("Not enough drawing history for timelapse yet")
-            )
+            state.application.presentFeedback(.timelapseHistoryUnavailable)
             return .none
         }
         state.export.startTimelapsePreview(from: capture)
-        return exportWorkflowService.makeTimelapseExportEffect(
-            capture: capture,
-            failureMessage: state.application.appLanguage.localized("Timelapse export failed")
-        )
+        return exportWorkflowService.makeTimelapseExportEffect(capture: capture)
     }
 
     func handleTimelapseExportProgressUpdated(
@@ -106,7 +100,7 @@ extension AppFeature {
         message: String
     ) {
         state.export.failTimelapseExport()
-        state.application.presentBanner(message)
+        state.application.presentFeedback(.timelapseExportFailed(message.isEmpty ? nil : message))
     }
 
     func handleExportSheetDismissed(state: inout State) {

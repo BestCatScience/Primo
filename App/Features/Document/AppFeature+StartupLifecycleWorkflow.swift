@@ -86,7 +86,7 @@ extension AppFeature {
             case .success:
                 break
             case let .failure(failure):
-                state.application.presentBanner(failure.message)
+                state.application.presentFeedback(failure.feedback)
                 return .none
             }
             if let activeTab = state.workspace.activeTab {

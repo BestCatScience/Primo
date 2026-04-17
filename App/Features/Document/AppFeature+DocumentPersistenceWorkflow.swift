@@ -45,7 +45,6 @@ extension AppFeature {
         openInNewTab: Bool
     ) {
         let restoredTitle = projectURL.displayName
-        let restorationMessage = state.application.appLanguage.localized("保存履歴を復元しました")
         if openInNewTab || state.workspace.activeTab == nil {
             applyLoadedWorkspaceProject(
                 loaded,
@@ -61,7 +60,7 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        bannerMessage: restorationMessage
+                        feedback: .restoredSaveHistory
                     )
                 ),
                 state: &state
@@ -83,7 +82,7 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        bannerMessage: restorationMessage
+                        feedback: .restoredSaveHistory
                     )
                 ),
                 state: &state
@@ -103,12 +102,10 @@ extension AppFeature {
         case let .success(url):
             savedURL = url
         case let .failure(failure):
-            state.application.presentBanner(failure.message)
+            state.application.presentFeedback(failure.feedback)
             return .none
         }
-        state.application.presentBanner(
-            StudioStrings.savedDocument(savedURL.fileURL.lastPathComponent, state.application.appLanguage)
-        )
+        state.application.presentFeedback(.savedDocument(savedURL.fileURL.lastPathComponent))
         if let activeTab = state.workspace.activeTab {
             persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
         }
@@ -120,9 +117,7 @@ extension AppFeature {
         message: String
     ) {
         state.application.failHydration(
-            message: message.isEmpty
-                ? state.application.appLanguage.localized("Could not restore save history")
-                : message
+            feedback: .saveHistoryRestoreFailed(message.isEmpty ? nil : message)
         )
     }
 }
