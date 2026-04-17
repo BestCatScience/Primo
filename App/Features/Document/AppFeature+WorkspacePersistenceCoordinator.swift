@@ -199,6 +199,12 @@ extension AppFeature {
         }
     }
 
+    @discardableResult
+    func prepareForDocumentReplacement(state: inout State) -> Bool {
+        guard !state.application.showsHome else { return true }
+        return persistActiveTabToBackingStore(state: &state)
+    }
+
     func persistActiveProjectToWorkspace(
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?

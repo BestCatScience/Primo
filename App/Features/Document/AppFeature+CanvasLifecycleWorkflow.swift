@@ -3,6 +3,29 @@ import CoreGraphics
 import Foundation
 
 extension AppFeature {
+    enum CanvasLifecycleContractFailure: Error, Equatable {
+        case unsupportedCanvasSize
+        case invalidImageData
+        case unsupportedImageSize
+        case undoUnavailableWhileDrawing
+        case redoUnavailableWhileDrawing
+
+        func localizedMessage(for language: AppLanguage) -> String {
+            switch self {
+            case .unsupportedCanvasSize:
+                return language.localized("Canvas size is not supported")
+            case .invalidImageData:
+                return language.localized("Could not create canvas from image")
+            case .unsupportedImageSize:
+                return language.localized("Image size is not supported")
+            case .undoUnavailableWhileDrawing:
+                return language.localized("Undo is unavailable while drawing")
+            case .redoUnavailableWhileDrawing:
+                return language.localized("Redo is unavailable while drawing")
+            }
+        }
+    }
+
     struct CanvasDimensions: Equatable {
         let width: Int
         let height: Int
@@ -27,10 +50,25 @@ extension AppFeature {
         let pixelData: Data
     }
 
-    enum ImportedCanvasRequestValidation {
-        case invalidImageData
-        case unsupportedSize
-        case valid(ImportedCanvasRequest)
+    struct ImportedCanvasPlan: Equatable {
+        let request: ImportedCanvasRequest
+        let layerName: String
+    }
+
+    struct CanvasResizePlan: Equatable {
+        let dimensions: CanvasDimensions
+        let successMessage: String
+    }
+
+    enum CanvasResizeValidation: Equatable {
+        case invalid(CanvasLifecycleContractFailure)
+        case unchanged
+        case valid(CanvasResizePlan)
+    }
+
+    enum CanvasHistoryOperation: Equatable {
+        case undo
+        case redo
     }
 
     struct CanvasLifecycleService {
@@ -93,25 +131,123 @@ extension AppFeature {
         )
     }
 
-    static func importedCanvasRequest(from imageData: Data) -> ImportedCanvasRequestValidation {
+    static func importedCanvasRequest(from imageData: Data) -> Result<ImportedCanvasRequest, CanvasLifecycleContractFailure> {
         guard let importedImage = importedCanvasImage(from: imageData) else {
-            return .invalidImageData
+            return .failure(.invalidImageData)
         }
         guard let dimensions = CanvasDimensions(
             width: importedImage.width,
             height: importedImage.height
         ) else {
-            return .invalidImageData
+            return .failure(.invalidImageData)
         }
         guard dimensions.isWithin(64...8192) else {
-            return .unsupportedSize
+            return .failure(.unsupportedImageSize)
         }
-        return .valid(
+        return .success(
             ImportedCanvasRequest(
                 dimensions: dimensions,
                 pixelData: importedImage.pixelData
             )
         )
+    }
+
+    static func importedCanvasPlan(
+        name: String?,
+        data: Data,
+        language: AppLanguage
+    ) -> Result<ImportedCanvasPlan, CanvasLifecycleContractFailure> {
+        switch importedCanvasRequest(from: data) {
+        case let .success(request):
+            let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let layerName = trimmedName.isEmpty
+                ? (language == .japanese ? "画像 1" : "Image 1")
+                : trimmedName
+            return .success(
+                ImportedCanvasPlan(
+                    request: request,
+                    layerName: layerName
+                )
+            )
+        case let .failure(error):
+            return .failure(error)
+        }
+    }
+
+    func validatedResizePlan(
+        currentDimensions: CanvasDimensions?,
+        width: Int,
+        height: Int,
+        successMessage: String
+    ) -> CanvasResizeValidation {
+        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
+            return .invalid(.unsupportedCanvasSize)
+        }
+        guard let currentDimensions else {
+            return .invalid(.unsupportedCanvasSize)
+        }
+        guard dimensions != currentDimensions else {
+            return .unchanged
+        }
+        return .valid(
+            CanvasResizePlan(
+                dimensions: dimensions,
+                successMessage: successMessage
+            )
+        )
+    }
+
+    func presentCanvasLifecycleFailure(
+        _ failure: CanvasLifecycleContractFailure,
+        state: inout State
+    ) {
+        state.application.presentBanner(
+            failure.localizedMessage(for: state.application.appLanguage)
+        )
+    }
+
+    func completeFreshDocumentReplacement(
+        state: inout State,
+        canvasSize: CGSize,
+        tabTitle: String,
+        successMessage: String? = nil,
+        documentMutation: () -> Void
+    ) -> Effect<Action> {
+        documentMutation()
+        AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
+            canvasSize: canvasSize,
+            to: &state
+        )
+        syncPaperStyleToDocument(state: &state)
+        applyCurrentDocumentPresentation(state: &state)
+        activateNewTab(
+            state: &state,
+            title: tabTitle,
+            sourceProjectURL: nil
+        )
+        if let successMessage {
+            state.application.presentBanner(successMessage)
+        }
+        return cancelStartupPresentationEffects()
+    }
+
+    func handleHistoryMutationRequest(
+        state: inout State,
+        operation: CanvasHistoryOperation,
+        performMutation: () -> Bool
+    ) {
+        if state.canvas.isStrokeActive {
+            presentCanvasLifecycleFailure(
+                operation == .undo ? .undoUnavailableWhileDrawing : .redoUnavailableWhileDrawing,
+                state: &state
+            )
+            return
+        }
+        guard performMutation() else {
+            return
+        }
+        state.canvas.clearSelection()
+        applyDirtyPresentation(state: &state)
     }
 
     func handleNewCanvasRequest(
@@ -120,25 +256,18 @@ extension AppFeature {
         height: Int
     ) -> Effect<Action> {
         guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+            presentCanvasLifecycleFailure(.unsupportedCanvasSize, state: &state)
             return .none
         }
-        if !state.application.showsHome {
-            persistActiveTabToBackingStore(state: &state)
+        guard prepareForDocumentReplacement(state: &state) else {
+            return .none
         }
-        canvasLifecycleService.createCanvas(dimensions)
-        AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
-            canvasSize: dimensions.size,
-            to: &state
-        )
-        syncPaperStyleToDocument(state: &state)
-        applyCurrentDocumentPresentation(state: &state)
-        activateNewTab(
+        return completeFreshDocumentReplacement(
             state: &state,
-            title: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
-            sourceProjectURL: nil
+            canvasSize: dimensions.size,
+            tabTitle: Self.nextUntitledTabTitle(existingTabs: state.workspace.openTabs),
+            documentMutation: { canvasLifecycleService.createCanvas(dimensions) }
         )
-        return cancelStartupPresentationEffects()
     }
 
     func handleResizeCanvasRequest(
@@ -146,21 +275,22 @@ extension AppFeature {
         width: Int,
         height: Int
     ) {
-        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+        switch validatedResizePlan(
+            currentDimensions: currentCanvasDimensions(state: state),
+            width: width,
+            height: height,
+            successMessage: state.application.appLanguage.localized("Image resolution updated")
+        ) {
+        case let .invalid(error):
+            presentCanvasLifecycleFailure(error, state: &state)
+        case .unchanged:
             return
+        case let .valid(plan):
+            canvasLifecycleService.resizeCanvas(plan.dimensions)
+            state.canvas.resetTransientEditingState()
+            applyDirtyPresentation(state: &state)
+            state.application.presentBanner(plan.successMessage)
         }
-        guard let currentDimensions = currentCanvasDimensions(state: state) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
-            return
-        }
-        guard dimensions != currentDimensions else {
-            return
-        }
-        canvasLifecycleService.resizeCanvas(dimensions)
-        state.canvas.resetTransientEditingState()
-        applyDirtyPresentation(state: &state)
-        state.application.presentBanner(state.application.appLanguage.localized("Image resolution updated"))
     }
 
     func handleResizeCanvasExtentRequest(
@@ -168,21 +298,22 @@ extension AppFeature {
         width: Int,
         height: Int
     ) {
-        guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
+        switch validatedResizePlan(
+            currentDimensions: currentCanvasDimensions(state: state),
+            width: width,
+            height: height,
+            successMessage: state.application.appLanguage.localized("Canvas size updated")
+        ) {
+        case let .invalid(error):
+            presentCanvasLifecycleFailure(error, state: &state)
+        case .unchanged:
             return
+        case let .valid(plan):
+            canvasLifecycleService.resizeCanvasExtent(plan.dimensions)
+            state.canvas.resetTransientEditingState()
+            applyDirtyPresentation(state: &state)
+            state.application.presentBanner(plan.successMessage)
         }
-        guard let currentDimensions = currentCanvasDimensions(state: state) else {
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas size is not supported"))
-            return
-        }
-        guard dimensions != currentDimensions else {
-            return
-        }
-        canvasLifecycleService.resizeCanvasExtent(dimensions)
-        state.canvas.resetTransientEditingState()
-        applyDirtyPresentation(state: &state)
-        state.application.presentBanner(state.application.appLanguage.localized("Canvas size updated"))
     }
 
     func handleNewCanvasFromImageReceived(
@@ -190,62 +321,48 @@ extension AppFeature {
         name: String?,
         data: Data
     ) -> Effect<Action> {
-        if !state.application.showsHome {
-            persistActiveTabToBackingStore(state: &state)
-        }
-        switch Self.importedCanvasRequest(from: data) {
-        case .invalidImageData:
-            state.application.presentBanner(state.application.appLanguage.localized("Could not create canvas from image"))
+        let importedPlan: ImportedCanvasPlan
+        switch Self.importedCanvasPlan(
+            name: name,
+            data: data,
+            language: state.application.appLanguage
+        ) {
+        case let .success(plan):
+            importedPlan = plan
+        case let .failure(error):
+            presentCanvasLifecycleFailure(error, state: &state)
             return .none
-        case .unsupportedSize:
-            state.application.presentBanner(state.application.appLanguage.localized("Image size is not supported"))
-            return .none
-        case let .valid(request):
-            AppFeature.canvasPresentationStateCoordinator.prepareFreshDocument(
-                canvasSize: request.dimensions.size,
-                to: &state
-            )
-            let nextName = {
-                let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                return trimmed.isEmpty ? (state.application.appLanguage == .japanese ? "画像 1" : "Image 1") : trimmed
-            }()
-            canvasLifecycleService.initializeImportedCanvas(
-                request,
-                layerName: nextName
-            )
-            syncPaperStyleToDocument(state: &state)
-            applyCurrentDocumentPresentation(state: &state)
-            activateNewTab(
-                state: &state,
-                title: nextName,
-                sourceProjectURL: nil
-            )
-            state.application.presentBanner(state.application.appLanguage.localized("Canvas created from image"))
-            return cancelStartupPresentationEffects()
         }
+        guard prepareForDocumentReplacement(state: &state) else {
+            return .none
+        }
+        return completeFreshDocumentReplacement(
+            state: &state,
+            canvasSize: importedPlan.request.dimensions.size,
+            tabTitle: importedPlan.layerName,
+            successMessage: state.application.appLanguage.localized("Canvas created from image"),
+            documentMutation: {
+                canvasLifecycleService.initializeImportedCanvas(
+                    importedPlan.request,
+                    layerName: importedPlan.layerName
+                )
+            }
+        )
     }
 
     func handleUndoRequested(state: inout State) {
-        guard !state.canvas.isStrokeActive else {
-            state.application.presentBanner(state.application.appLanguage.localized("Undo is unavailable while drawing"))
-            return
-        }
-        guard canvasLifecycleService.undo() else {
-            return
-        }
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        handleHistoryMutationRequest(
+            state: &state,
+            operation: .undo,
+            performMutation: { canvasLifecycleService.undo() }
+        )
     }
 
     func handleRedoRequested(state: inout State) {
-        guard !state.canvas.isStrokeActive else {
-            state.application.presentBanner(state.application.appLanguage.localized("Redo is unavailable while drawing"))
-            return
-        }
-        guard canvasLifecycleService.redo() else {
-            return
-        }
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        handleHistoryMutationRequest(
+            state: &state,
+            operation: .redo,
+            performMutation: { canvasLifecycleService.redo() }
+        )
     }
 }

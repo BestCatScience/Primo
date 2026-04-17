@@ -50,8 +50,9 @@ extension AppFeature {
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
         onFailure: @escaping @Sendable (String) -> Action
     ) -> Effect<Action> {
-        if persistCurrentTab, !state.application.showsHome {
-            _ = persistActiveTabToBackingStore(state: &state)
+        if persistCurrentTab,
+           !prepareForDocumentReplacement(state: &state) {
+            return .none
         }
         state.application.beginHydration()
         return workspaceTabCoordinator.loadProjectEffect(
