@@ -92,6 +92,8 @@ struct AppFeature {
         case autosaveRecoveryDismissed
         case homeSectionSelected(HomeSidebarSection)
         case tabSelected(OpenDocumentTab.ID)
+        case tabSelectionLoaded(OpenDocumentTab.ID, LoadedPaintProject)
+        case tabSelectionFailed(String)
         case tabCloseRequested(OpenDocumentTab.ID)
         case tabClosed(OpenDocumentTab.ID)
         case closeOtherTabsRequested(OpenDocumentTab.ID)

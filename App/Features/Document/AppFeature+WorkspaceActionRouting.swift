@@ -8,7 +8,14 @@ extension AppFeature {
     ) -> Effect<Action>? {
         switch action {
         case let .tabSelected(tabID):
-            handleTabSelection(state: &state, tabID: tabID)
+            return handleTabSelection(state: &state, tabID: tabID)
+
+        case let .tabSelectionLoaded(tabID, loaded):
+            handleTabSelectionLoaded(state: &state, tabID: tabID, loaded: loaded)
+            return .none
+
+        case let .tabSelectionFailed(message):
+            handleTabSelectionFailed(state: &state, message: message)
             return .none
 
         case let .tabCloseRequested(tabID):
@@ -31,8 +38,7 @@ extension AppFeature {
             return .none
 
         case let .tabClosed(tabID):
-            handleTabClosed(state: &state, tabID: tabID)
-            return .none
+            return handleTabClosed(state: &state, tabID: tabID)
 
         case let .closeOtherTabs(tabID):
             return handleCloseOtherTabs(state: &state, retaining: tabID)

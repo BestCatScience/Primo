@@ -5,55 +5,69 @@ extension AppFeature {
     func handleTabSelection(
         state: inout State,
         tabID: OpenDocumentTab.ID
-    ) {
+    ) -> Effect<Action> {
         guard let targetTab = state.workspace.tab(withID: tabID) else {
-            return
+            return .none
+        }
+        if state.workspace.isActiveTab(tabID), !state.application.showsHome {
+            return .none
         }
         if !state.application.showsHome, state.workspace.isActiveTab(tabID) == false {
             _ = persistActiveTabToBackingStore(state: &state)
         }
-        do {
-            let loaded = try paintDocumentClient.loadProject(targetTab.backingStoreURL.fileURL)
-            state.workspace.activateTab(tabID, pane: targetTab.pane)
-            applyLoadedProject(loaded, state: &state)
-            state.application.showWorkspace()
-        } catch {
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : error.localizedDescription
-            )
+        state.application.beginHydration()
+        return workspaceTabCoordinator.loadTabSelectionEffect(
+            tabID: tabID,
+            backingStoreURL: targetTab.backingStoreURL.fileURL
+        )
+    }
+
+    func handleTabSelectionLoaded(
+        state: inout State,
+        tabID: OpenDocumentTab.ID,
+        loaded: LoadedPaintProject
+    ) {
+        guard let targetTab = state.workspace.tab(withID: tabID) else {
+            state.application.finishHydration()
+            return
         }
+        state.workspace.activateTab(tabID, pane: targetTab.pane)
+        state.application.showWorkspace()
+        applyLoadedProject(loaded, state: &state)
+    }
+
+    func handleTabSelectionFailed(
+        state: inout State,
+        message: String
+    ) {
+        state.application.finishHydration()
+        if state.workspace.activeTab == nil {
+            state.application.showHome()
+        }
+        state.application.presentBanner(
+            message.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : message
+        )
     }
 
     func handleTabClosed(
         state: inout State,
         tabID: OpenDocumentTab.ID
-    ) {
+    ) -> Effect<Action> {
         let wasActive = state.workspace.isActiveTab(tabID)
-        guard let closingTab = state.workspace.removeTab(id: tabID) else { return }
+        guard let closingTab = state.workspace.removeTab(id: tabID) else { return .none }
         clearAutosave(for: closingTab)
         try? documentWorkspaceClient.removeWorkspaceItem(closingTab.backingStoreURL)
 
-        guard wasActive else { return }
+        guard wasActive else { return .none }
         let replacement = state.workspace.selectedTab(in: closingTab.pane)
             ?? state.workspace.selectedTab(in: closingTab.pane == .primary ? .secondary : .primary)
         guard let replacement else {
             state.workspace.clearActiveTab()
             state.application.showHome()
-            return
+            return .none
         }
-
-        do {
-            let loaded = try paintDocumentClient.loadProject(replacement.backingStoreURL.fileURL)
-            state.workspace.activateTab(replacement.id, pane: replacement.pane)
-            applyLoadedProject(loaded, state: &state)
-            state.application.showWorkspace()
-        } catch {
-            state.workspace.clearActiveTab()
-            state.application.showHome()
-            state.application.presentBanner(
-                error.localizedDescription.isEmpty ? StudioStrings.openFailed(state.application.appLanguage) : error.localizedDescription
-            )
-        }
+        state.workspace.clearActiveTab()
+        return .send(.tabSelected(replacement.id))
     }
 
     func handleCloseOtherTabs(

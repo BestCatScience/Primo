@@ -236,6 +236,10 @@ extension AppFeature.WorkspaceState {
     }
 
     mutating func ensureSelectionIntegrity() {
+        if let activeTabID,
+           openTabs.contains(where: { $0.id == activeTabID }) == false {
+            self.activeTabID = nil
+        }
         if primarySelectedTabID != nil,
            openTabs.contains(where: { $0.id == primarySelectedTabID && $0.pane == .primary }) == false {
             primarySelectedTabID = tabs(in: .primary).first?.id

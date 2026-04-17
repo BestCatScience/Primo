@@ -3,7 +3,6 @@ import Foundation
 
 extension AppFeature {
     private struct DocumentWorkflowCoordinator {
-        let paintDocumentClient: PaintDocumentClient
         let documentWorkspaceClient: DocumentWorkspaceClient
         let fileClient: FileClient
         let dateClient: DateClient
@@ -12,17 +11,6 @@ extension AppFeature {
             .run { [documentWorkspaceClient] send in
                 let entries = (try? documentWorkspaceClient.loadSaveHistoryEntries(activeTab)) ?? []
                 await send(.saveHistoryLoaded(entries))
-            }
-        }
-
-        func restoreSaveHistoryEffect(projectURL: DocumentProjectPath, openInNewTab: Bool) -> Effect<Action> {
-            .run { [paintDocumentClient] send in
-                do {
-                    let loaded = try paintDocumentClient.loadProject(projectURL.fileURL)
-                    await send(.saveHistoryOpened(loaded, projectURL, openInNewTab))
-                } catch {
-                    await send(.openDocumentFailed(error.localizedDescription))
-                }
             }
         }
 
@@ -54,7 +42,6 @@ extension AppFeature {
 
     private var documentWorkflowCoordinator: DocumentWorkflowCoordinator {
         DocumentWorkflowCoordinator(
-            paintDocumentClient: paintDocumentClient,
             documentWorkspaceClient: documentWorkspaceClient,
             fileClient: fileClient,
             dateClient: dateClient
@@ -76,9 +63,10 @@ extension AppFeature {
             persistActiveTabToBackingStore(state: &state)
         }
         state.application.beginHydration()
-        return documentWorkflowCoordinator.restoreSaveHistoryEffect(
-            projectURL: projectURL,
-            openInNewTab: openInNewTab
+        return workspaceTabCoordinator.loadProjectEffect(
+            from: projectURL.fileURL,
+            onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
+            onFailure: { .openDocumentFailed($0) }
         )
     }
 
