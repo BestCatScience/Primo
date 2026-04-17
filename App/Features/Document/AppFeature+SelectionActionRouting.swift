@@ -51,7 +51,7 @@ extension AppFeature {
             return handleColorRangeSelectionRequest(state: &state, request: request)
 
         case .brushPalette(.delegate(.cancelTransform)):
-            state.canvas.resetTransformPreview()
+            discardTransformPreview(state: &state)
             return .none
 
         case .brushPalette(.delegate(.applyTransform)):

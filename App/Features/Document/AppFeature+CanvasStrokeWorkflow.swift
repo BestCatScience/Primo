@@ -35,7 +35,7 @@ extension AppFeature {
         func replaceLayerPixels(
             _ layerIndex: Int,
             pixelData: Data
-        ) {
+        ) -> Bool {
             paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
 
@@ -80,20 +80,90 @@ extension AppFeature {
         state.canvas.resetStrokePreview()
     }
 
+    func clearCanvasSelectionWithoutRefresh(state: inout State) {
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .none
+            )
+        )
+    }
+
+    func ensureCurrentCanvasPresentationLoaded(state: inout State) {
+        guard state.canvas.renderSnapshot == nil else { return }
+        completeDocumentMutation(
+            state: &state,
+            contract: .currentPresentation
+        )
+    }
+
+    func prepareCanvasStrokeEditing(state: inout State) {
+        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
+        clearCanvasSelectionWithoutRefresh(state: &state)
+        canvasStrokeWorkflowService.cancelStroke()
+    }
+
+    func commitStrokeUsingFallbackPixels(
+        state: inout State,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        activeLayer: LayerRowModel,
+        refreshViaDirtyPresentation: Bool
+    ) -> Bool {
+        if !refreshViaDirtyPresentation {
+            ensureCurrentCanvasPresentationLoaded(state: &state)
+        }
+        let fallbackSnapshot = refreshViaDirtyPresentation
+            ? state.canvas.activeStrokeBaseSnapshot
+            : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
+        guard
+            let snapshot = fallbackSnapshot,
+            let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+                basePixelData: baseLayer.pixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                samples: samples,
+                brush: brush,
+                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
+            )
+        else {
+            return false
+        }
+        return canvasStrokeWorkflowService.replaceLayerPixels(
+            state.canvas.activeLayerIndex,
+            pixelData: adjustedPixels
+        )
+    }
+
+    func activeEditableCanvasLayer(in state: State) -> LayerRowModel? {
+        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
+              !activeLayer.isLocked
+        else {
+            return nil
+        }
+        return activeLayer
+    }
+
+    func completeCanvasStrokeMutation(
+        state: inout State,
+        contract: DocumentMutationContract = .dirty
+    ) -> Effect<Action> {
+        completeDocumentMutation(state: &state, contract: contract)
+        return cancelStartupPresentationEffects()
+    }
+
     func handleBeginStroke(
         state: inout State,
         sample: StylusSample
     ) -> Effect<Action> {
-        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
             return .none
         }
-        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
-        state.canvas.clearSelection()
-        canvasStrokeWorkflowService.cancelStroke()
+        prepareCanvasStrokeEditing(state: &state)
         if state.canvas.activeStrokeBaseSnapshot == nil {
-            if state.canvas.renderSnapshot == nil {
-                applyCurrentDocumentPresentation(state: &state)
-            }
+            ensureCurrentCanvasPresentationLoaded(state: &state)
             if let renderSnapshot = state.canvas.renderSnapshot {
                 state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
             }
@@ -140,10 +210,7 @@ extension AppFeature {
                 )
             }
         }
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
-        )
+        return cancelStartupPresentationEffects()
     }
 
     func handleAppendStrokeSamples(
@@ -151,7 +218,7 @@ extension AppFeature {
         samples: [StylusSample]
     ) {
         guard !samples.isEmpty else { return }
-        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
             return
         }
         let brush = resolvedBrushSettings(for: state)
@@ -251,27 +318,18 @@ extension AppFeature {
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard let first = samples.first else { return .none }
-        canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
-        state.canvas.clearSelection()
-        canvasStrokeWorkflowService.cancelStroke()
+        prepareCanvasStrokeEditing(state: &state)
         canvasStrokeWorkflowService.beginStroke(first, brush: resolvedBrushSettings(for: state))
         for sample in samples.dropFirst() {
             canvasStrokeWorkflowService.appendStroke(sample)
         }
         applyLiveCompositePixelData(canvasStrokeWorkflowService.compositePixelData(), state: &state)
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
-        )
+        return cancelStartupPresentationEffects()
     }
 
     func handleCommitPreviewShapeStroke(state: inout State) -> Effect<Action> {
         canvasStrokeWorkflowService.endStroke()
-        applyDirtyPresentation(state: &state)
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
-        )
+        return completeCanvasStrokeMutation(state: &state)
     }
 
     func handleFinishStroke(
@@ -280,7 +338,7 @@ extension AppFeature {
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> Effect<Action> {
-        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+        guard let activeLayer = activeEditableCanvasLayer(in: state) else {
             resetStrokePreviewState(state: &state)
             return .none
         }
@@ -288,52 +346,39 @@ extension AppFeature {
         let shouldApplyTaperOnCommit = brush.taperIn > 0.001 || brush.taperOut > 0.001
         if keepsSelectionCleared {
             canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
-            state.canvas.clearSelection()
+            clearCanvasSelectionWithoutRefresh(state: &state)
         }
+        let didCommit: Bool
         if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-            canvasStrokeWorkflowService.replaceLayerPixels(
+            didCommit = canvasStrokeWorkflowService.replaceLayerPixels(
                 state.canvas.activeLayerIndex,
                 pixelData: previewPixels
             )
         } else {
-            let didCommit = canvasStrokeWorkflowService.applySoftwareStroke(
+            let committedInSession = canvasStrokeWorkflowService.applySoftwareStroke(
                 samples,
                 brush: brush,
                 layerIndex: state.canvas.activeLayerIndex
             )
-            if !didCommit {
-                if !refreshViaDirtyPresentation && state.canvas.renderSnapshot == nil {
-                    applyCurrentDocumentPresentation(state: &state)
-                }
-                let fallbackSnapshot = refreshViaDirtyPresentation
-                    ? state.canvas.activeStrokeBaseSnapshot
-                    : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
-                if let snapshot = fallbackSnapshot,
-                   let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-                   let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                        basePixelData: baseLayer.pixelData,
-                        canvasWidth: snapshot.width,
-                        canvasHeight: snapshot.height,
-                        samples: samples,
-                        brush: brush,
-                        preserveAlphaLockedPixels: activeLayer.isAlphaLocked
-                   ) {
-                    canvasStrokeWorkflowService.replaceLayerPixels(
-                        state.canvas.activeLayerIndex,
-                        pixelData: adjustedPixels
-                    )
-                }
-            }
+            didCommit = committedInSession || commitStrokeUsingFallbackPixels(
+                state: &state,
+                samples: samples,
+                brush: brush,
+                activeLayer: activeLayer,
+                refreshViaDirtyPresentation: refreshViaDirtyPresentation
+            )
+        }
+        guard didCommit else {
+            resetStrokePreviewState(state: &state)
+            return cancelStartupPresentationEffects()
         }
         resetStrokePreviewState(state: &state)
-        if refreshViaDirtyPresentation {
-            applyDirtyPresentation(state: &state)
-        } else {
-            applyCurrentDocumentPresentation(state: &state)
-        }
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
+        return completeCanvasStrokeMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
+                refresh: refreshViaDirtyPresentation ? .dirty : .current
+            )
         )
     }
 
@@ -342,10 +387,9 @@ extension AppFeature {
             canvasStrokeWorkflowService.cancelStroke()
         }
         resetStrokePreviewState(state: &state)
-        applyCurrentDocumentPresentation(state: &state)
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
+        return completeCanvasStrokeMutation(
+            state: &state,
+            contract: .currentPresentation
         )
     }
 
@@ -354,7 +398,7 @@ extension AppFeature {
         samples: [StylusSample]
     ) {
         guard !samples.isEmpty else { return }
-        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+        guard activeEditableCanvasLayer(in: state) != nil else {
             return
         }
         canvasStrokeWorkflowService.revealLayerForEditing(state.canvas.activeLayerIndex)
@@ -364,29 +408,29 @@ extension AppFeature {
             layerIndex: state.canvas.activeLayerIndex,
             clearSelectionAfterBlur: false
         )
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
+        )
     }
 
     func handleEndBlurStroke(state: inout State) {
         canvasStrokeWorkflowService.endBlurStroke()
-        applyDirtyPresentation(state: &state)
+        completeDocumentMutation(state: &state)
     }
 
     func handleFill(
         state: inout State,
         sample: StylusSample
     ) -> Effect<Action> {
-        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }), !activeLayer.isLocked else {
+        guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
         canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex)
         canvasStrokeWorkflowService.fill(sample, brush: resolvedBrushSettings(for: state))
-        state.canvas.clearSelection()
-        applyDirtyPresentation(state: &state)
-        return .concatenate(
-            .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
+        return completeCanvasStrokeMutation(
+            state: &state,
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 }

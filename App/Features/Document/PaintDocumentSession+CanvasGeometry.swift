@@ -2,11 +2,12 @@ import CoreGraphics
 import Foundation
 
 extension PaintDocumentSession {
-    func resizeCanvas(width: Int, height: Int) {
-        precondition(width > 0 && height > 0, "Canvas dimensions must be positive.")
+    @discardableResult
+    func resizeCanvas(width: Int, height: Int) -> Bool {
+        guard width > 0 && height > 0 else { return false }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         let sourceSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
-        guard targetSize != sourceSize else { return }
+        guard targetSize != sourceSize else { return false }
 
         let layerInfos = bridgeLayerInfos()
         let folderInfos = bridgeFolderInfos()
@@ -63,13 +64,15 @@ extension PaintDocumentSession {
             textLayers: resizedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
+        return true
     }
 
-    func resizeCanvasExtent(width: Int, height: Int) {
-        precondition(width > 0 && height > 0, "Canvas dimensions must be positive.")
+    @discardableResult
+    func resizeCanvasExtent(width: Int, height: Int) -> Bool {
+        guard width > 0 && height > 0 else { return false }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         let sourceSize = PaintDocumentCanvasSize(width: bridgeCanvasWidth, height: bridgeCanvasHeight)
-        guard targetSize != sourceSize else { return }
+        guard targetSize != sourceSize else { return false }
 
         let layerInfos = bridgeLayerInfos()
         let folderInfos = bridgeFolderInfos()
@@ -129,6 +132,7 @@ extension PaintDocumentSession {
             textLayers: shiftedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
+        return true
     }
 
     private func makeResizedBridgeContext(

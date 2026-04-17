@@ -11,7 +11,9 @@ extension PaintDocumentSession {
         }
         clearTextLayerData(index: index)
         clearTextLayerData(index: index - 1)
-        replaceLayerPixels(index: index - 1, data: merged)
+        guard replaceLayerPixels(index: index - 1, data: merged) else {
+            return false
+        }
         return deleteLayer(index: index)
     }
 
@@ -81,11 +83,12 @@ extension PaintDocumentSession {
             : output
     }
 
-    func replaceLayerPixels(index: Int, data: Data, preservesTextLayerMetadata: Bool = false) {
+    @discardableResult
+    func replaceLayerPixels(index: Int, data: Data, preservesTextLayerMetadata: Bool = false) -> Bool {
         guard beginPixelLayerMutation(
             at: index,
             preservesTextLayerMetadata: preservesTextLayerMetadata
-        ) else { return }
+        ) else { return false }
         let descriptor = APPaintLayerProcessingDescriptor()
         descriptor.kind = APPaintLayerProcessingKind.replacePixels
         let adjustedData = isLayerAlphaLocked(index: index)
@@ -100,6 +103,7 @@ extension PaintDocumentSession {
             at: index,
             recording: .replaceLayerPixels(index: .unchecked(index), data: adjustedData)
         )
+        return true
     }
 
     @discardableResult

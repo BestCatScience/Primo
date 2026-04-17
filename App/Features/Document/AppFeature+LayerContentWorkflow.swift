@@ -17,7 +17,13 @@ extension AppFeature {
             layerSidebar: state.layerSidebar
         )
         let targetLayerIndex = layerWorkflowService.addLayer(named: layerName)
-        layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
+        guard layerWorkflowService.replaceLayerPixels(
+            targetLayerIndex,
+            pixelData: importedPixelData
+        ) else {
+            state.application.presentFeedback(.couldNotImportPhoto(nil))
+            return
+        }
         layerWorkflowService.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayerForNewContent(targetLayerIndex)
         completeDocumentMutation(
@@ -79,9 +85,11 @@ extension AppFeature {
         _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
-                finalizedLayerMutation: LayerMutationFinalization(
-                    index: activeLayerIndex,
-                    incrementsRevision: true
+                canvasMutation: .finalizeLayer(
+                    LayerMutationFinalization(
+                        index: activeLayerIndex,
+                        incrementsRevision: true
+                    )
                 )
             ),
             mutation: {
@@ -122,9 +130,11 @@ extension AppFeature {
         guard handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
-                finalizedLayerMutation: LayerMutationFinalization(
-                    index: activeLayerIndex,
-                    incrementsRevision: true
+                canvasMutation: .finalizeLayer(
+                    LayerMutationFinalization(
+                        index: activeLayerIndex,
+                        incrementsRevision: true
+                    )
                 )
             ),
             mutation: {

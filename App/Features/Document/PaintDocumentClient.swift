@@ -13,8 +13,8 @@ struct PaintDocumentClient: Sendable {
     var loadProject: @Sendable (URL) throws -> LoadedPaintProject
     var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
     var newCanvas: @Sendable (Int, Int) -> Void
-    var resizeCanvas: @Sendable (Int, Int) -> Void
-    var resizeCanvasExtent: @Sendable (Int, Int) -> Void
+    var resizeCanvas: @Sendable (Int, Int) -> Bool
+    var resizeCanvasExtent: @Sendable (Int, Int) -> Bool
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
@@ -52,7 +52,7 @@ struct PaintDocumentClient: Sendable {
     var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
     var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> Bool
     var pixelDataForLayer: @Sendable (Int) -> Data
-    var replaceLayerPixels: @Sendable (Int, Data) -> Void
+    var replaceLayerPixels: @Sendable (Int, Data) -> Bool
     var replaceLayerMask: @Sendable (Int, Data) -> Bool
     var clearLayerMask: @Sendable (Int) -> Bool
     var applyLayerMask: @Sendable (Int) -> Bool
@@ -156,7 +156,9 @@ struct PaintDocumentClient: Sendable {
                 }
             },
             pixelDataForLayer: { index in sessionBox.withSession { $0.pixelDataForLayer(index: index) } },
-            replaceLayerPixels: { index, data in sessionBox.withSession { $0.replaceLayerPixels(index: index, data: data) } },
+            replaceLayerPixels: { index, data in
+                sessionBox.withSession { $0.replaceLayerPixels(index: index, data: data) }
+            },
             replaceLayerMask: { index, data in sessionBox.withSession { $0.replaceLayerMask(index: index, maskData: data) } },
             clearLayerMask: { index in sessionBox.withSession { $0.clearLayerMask(index: index) } },
             applyLayerMask: { index in sessionBox.withSession { $0.applyLayerMask(index: index) } },

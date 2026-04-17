@@ -20,13 +20,23 @@ extension AppFeature {
         func replaceLayerPixels(
             _ layerIndex: Int,
             _ pixelData: Data
-        ) {
+        ) -> Bool {
             paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
     }
 
     var selectionTransformService: SelectionTransformService {
         SelectionTransformService(paintDocumentClient: paintDocumentClient)
+    }
+
+    func discardTransformPreview(state: inout State) {
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                canvasMutation: .resetTransformPreview,
+                refresh: .none
+            )
+        )
     }
 
     func applyTransform(state: inout State) -> Effect<Action> {
@@ -52,11 +62,15 @@ extension AppFeature {
             textLayer.scale = min(max(textLayer.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
             textLayer.rotationDegrees += rotationDegrees
             guard selectionTransformService.setTextLayer(state.canvas.activeLayerIndex, textLayer) else {
-                state.canvas.resetTransformPreview()
+                discardTransformPreview(state: &state)
                 return .none
             }
-            state.canvas.resetTransformPreview()
-            applyDirtyPresentation(state: &state)
+            completeDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .resetTransformPreview
+                )
+            )
             return .none
         }
         let activeLayerIndex = state.canvas.activeLayerIndex
@@ -76,25 +90,32 @@ extension AppFeature {
             mode: transformMode,
             quadOffsets: quadOffsets
         ) else {
-            state.canvas.resetTransformPreview()
+            discardTransformPreview(state: &state)
             return .none
         }
-        selectionTransformService.replaceLayerPixels(activeLayerIndex, transformed)
-        state.canvas.completeTransformMutation(
-            at: activeLayerIndex,
-            selection: Self.transformedSelection(
-                state.canvas.selection,
-                translation: translation,
-                scaleX: scaleX,
-                scaleY: scaleY,
-                rotationDegrees: rotationDegrees,
-                pivot: transformPivot,
-                mode: transformMode,
-                quadOffsets: quadOffsets,
-                canvasSize: state.canvas.canvasSize
+        guard selectionTransformService.replaceLayerPixels(activeLayerIndex, transformed) else {
+            discardTransformPreview(state: &state)
+            return .none
+        }
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                canvasMutation: .completeTransform(
+                    layerIndex: activeLayerIndex,
+                    selection: Self.transformedSelection(
+                        state.canvas.selection,
+                        translation: translation,
+                        scaleX: scaleX,
+                        scaleY: scaleY,
+                        rotationDegrees: rotationDegrees,
+                        pivot: transformPivot,
+                        mode: transformMode,
+                        quadOffsets: quadOffsets,
+                        canvasSize: state.canvas.canvasSize
+                    )
+                )
             )
         )
-        applyDirtyPresentation(state: &state)
         return .none
     }
 }

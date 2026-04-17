@@ -17,8 +17,11 @@ extension PaintDocumentSession {
         guard !existingPixelData.isEmpty else { return false }
         guard let rasterized = rasterizedTextLayerPixelData(textLayer) else { return false }
         setStoredTextLayer(textLayer, at: index)
-        replaceLayerPixels(index: index, data: rasterized, preservesTextLayerMetadata: true)
-        return true
+        return replaceLayerPixels(
+            index: index,
+            data: rasterized,
+            preservesTextLayerMetadata: true
+        )
     }
 
     func clearTextLayerData(index: Int) {

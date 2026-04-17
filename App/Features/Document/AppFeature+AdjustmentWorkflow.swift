@@ -16,7 +16,7 @@ extension AppFeature {
             paintDocumentClient.applyLayerProcessing(layerIndex, request)
         }
 
-        func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) {
+        func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) -> Bool {
             paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
     }
@@ -83,8 +83,8 @@ extension AppFeature {
         completeDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
-                finalizedLayerMutation: LayerMutationFinalization(
-                    index: state.canvas.activeLayerIndex
+                canvasMutation: .finalizeLayer(
+                    LayerMutationFinalization(index: state.canvas.activeLayerIndex)
                 )
             )
         )
@@ -120,12 +120,18 @@ extension AppFeature {
             state.application.presentFeedback(failureFeedback)
             return false
         }
-        adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)
+        guard adjustmentWorkflowService.replaceLayerPixels(
+            state.canvas.activeLayerIndex,
+            with: adjustedPixels
+        ) else {
+            state.application.presentFeedback(failureFeedback)
+            return false
+        }
         completeDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
-                finalizedLayerMutation: LayerMutationFinalization(
-                    index: state.canvas.activeLayerIndex
+                canvasMutation: .finalizeLayer(
+                    LayerMutationFinalization(index: state.canvas.activeLayerIndex)
                 )
             )
         )

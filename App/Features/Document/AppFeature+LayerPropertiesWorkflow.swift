@@ -9,7 +9,7 @@ extension AppFeature {
         layerWorkflowService.setLayerVisibility(activeLayerIndex, visible: !layer.visible)
         completeDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(clearsSelection: true)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 
@@ -41,7 +41,7 @@ extension AppFeature {
         layerWorkflowService.setLayerOpacity(index, opacity: opacity)
         completeDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(clearsSelection: true)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 
@@ -103,7 +103,7 @@ extension AppFeature {
         layerWorkflowService.setLayerVisibility(index, visible: !layer.visible)
         completeDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(clearsSelection: true)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 
@@ -147,7 +147,7 @@ extension AppFeature {
         layerWorkflowService.setLayerBlendMode(index, blendMode: blendMode)
         completeDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(clearsSelection: true)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 

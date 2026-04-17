@@ -79,11 +79,11 @@ extension AppFeature {
             paintDocumentClient.prewarmDrawingResources()
         }
 
-        func resizeCanvas(_ dimensions: CanvasDimensions) {
+        func resizeCanvas(_ dimensions: CanvasDimensions) -> Bool {
             paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height)
         }
 
-        func resizeCanvasExtent(_ dimensions: CanvasDimensions) {
+        func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> Bool {
             paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height)
         }
 
@@ -92,7 +92,7 @@ extension AppFeature {
             layerName: String
         ) {
             createCanvas(request.dimensions)
-            paintDocumentClient.replaceLayerPixels(0, request.pixelData)
+            _ = paintDocumentClient.replaceLayerPixels(0, request.pixelData)
             paintDocumentClient.setLayerName(0, layerName)
             paintDocumentClient.setActiveLayer(0)
         }
@@ -256,7 +256,7 @@ extension AppFeature {
         }
         completeDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(clearsSelection: true)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection)
         )
     }
 
@@ -300,10 +300,16 @@ extension AppFeature {
         case .unchanged:
             return
         case let .valid(plan):
-            canvasLifecycleService.resizeCanvas(plan.dimensions)
-            state.canvas.resetTransientEditingState()
-            applyDirtyPresentation(state: &state)
-            state.application.presentFeedback(plan.successFeedback)
+            guard canvasLifecycleService.resizeCanvas(plan.dimensions) else {
+                return
+            }
+            completeDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .resetTransientEditingState,
+                    successFeedback: plan.successFeedback
+                )
+            )
         }
     }
 
@@ -323,10 +329,16 @@ extension AppFeature {
         case .unchanged:
             return
         case let .valid(plan):
-            canvasLifecycleService.resizeCanvasExtent(plan.dimensions)
-            state.canvas.resetTransientEditingState()
-            applyDirtyPresentation(state: &state)
-            state.application.presentFeedback(plan.successFeedback)
+            guard canvasLifecycleService.resizeCanvasExtent(plan.dimensions) else {
+                return
+            }
+            completeDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .resetTransientEditingState,
+                    successFeedback: plan.successFeedback
+                )
+            )
         }
     }
 

@@ -90,8 +90,7 @@ extension PaintDocumentSession {
         ) else {
             return false
         }
-        replaceLayerPixels(index: layerIndex, data: rasterized)
-        return true
+        return replaceLayerPixels(index: layerIndex, data: rasterized)
     }
 
     func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {

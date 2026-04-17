@@ -1,6 +1,15 @@
 import Foundation
 
 extension AppFeature {
+    enum DocumentCanvasMutation {
+        case none
+        case clearSelection
+        case finalizeLayer(LayerMutationFinalization)
+        case completeTransform(layerIndex: Int, selection: CanvasSelection?)
+        case resetTransientEditingState
+        case resetTransformPreview
+    }
+
     enum DocumentPresentationRefresh {
         case none
         case current
@@ -14,19 +23,16 @@ extension AppFeature {
     }
 
     struct DocumentMutationContract {
-        var clearsSelection: Bool
-        var finalizedLayerMutation: LayerMutationFinalization?
+        var canvasMutation: DocumentCanvasMutation
         var refresh: DocumentPresentationRefresh
         var successFeedback: ApplicationFeedback?
 
         init(
-            clearsSelection: Bool = false,
-            finalizedLayerMutation: LayerMutationFinalization? = nil,
+            canvasMutation: DocumentCanvasMutation = .none,
             refresh: DocumentPresentationRefresh = .dirty,
             successFeedback: ApplicationFeedback? = nil
         ) {
-            self.clearsSelection = clearsSelection
-            self.finalizedLayerMutation = finalizedLayerMutation
+            self.canvasMutation = canvasMutation
             self.refresh = refresh
             self.successFeedback = successFeedback
         }
@@ -161,7 +167,7 @@ extension AppFeature {
         func replaceLayerPixels(
             _ index: Int,
             pixelData: Data
-        ) {
+        ) -> Bool {
             paintDocumentClient.replaceLayerPixels(index, pixelData)
         }
 
@@ -200,14 +206,26 @@ extension AppFeature {
         state: inout State,
         contract: DocumentMutationContract = .dirty
     ) {
-        if let finalization = contract.finalizedLayerMutation {
+        switch contract.canvasMutation {
+        case .none:
+            break
+        case .clearSelection:
+            state.canvas.clearSelection()
+        case let .finalizeLayer(finalization):
             state.canvas.finalizeLayerMutation(
                 at: finalization.index,
                 incrementsRevision: finalization.incrementsRevision,
                 clearsSelection: finalization.clearsSelection
             )
-        } else if contract.clearsSelection {
-            state.canvas.clearSelection()
+        case let .completeTransform(layerIndex, selection):
+            state.canvas.completeTransformMutation(
+                at: layerIndex,
+                selection: selection
+            )
+        case .resetTransientEditingState:
+            state.canvas.resetTransientEditingState()
+        case .resetTransformPreview:
+            state.canvas.resetTransformPreview()
         }
 
         switch contract.refresh {
@@ -244,7 +262,7 @@ extension AppFeature {
         _ = handleDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
-                clearsSelection: clearsSelection,
+                canvasMutation: clearsSelection ? .clearSelection : .none,
                 refresh: updatesPresentationDirectly ? .current : .dirty
             ),
             mutation: mutation

@@ -137,14 +137,13 @@ extension AppFeature {
     private struct NanoBananaDocumentService {
         struct AppliedPreview {
             let targetLayerIndex: Int
-            let presentation: PaintDocumentPresentation
         }
 
         let paintDocumentClient: PaintDocumentClient
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
-        ) -> AppliedPreview {
+        ) -> AppliedPreview? {
             let targetLayerIndex: Int
             switch plan.target {
             case let .existingLayer(index):
@@ -155,10 +154,11 @@ extension AppFeature {
             }
 
             paintDocumentClient.setActiveLayer(targetLayerIndex)
-            paintDocumentClient.replaceLayerPixels(targetLayerIndex, plan.preview.pixelData)
+            guard paintDocumentClient.replaceLayerPixels(targetLayerIndex, plan.preview.pixelData) else {
+                return nil
+            }
             return AppliedPreview(
-                targetLayerIndex: targetLayerIndex,
-                presentation: paintDocumentClient.presentation()
+                targetLayerIndex: targetLayerIndex
             )
         }
     }
@@ -375,21 +375,30 @@ extension AppFeature {
         case let .success(plan):
             applicationPlan = plan
         }
-        let appliedPreview = nanoBananaDocumentService.apply(applicationPlan)
+        guard let appliedPreview = nanoBananaDocumentService.apply(applicationPlan) else {
+            nanoBananaGenerationService.applyFailure(
+                state: &state,
+                feedback: .nanoBananaApplyFailed
+            )
+            return
+        }
         nanoBananaGenerationService.applySuccess(
             state: &state,
             preview: preview
         )
-        state.canvas.finalizeLayerMutation(
-            at: appliedPreview.targetLayerIndex,
-            incrementsRevision: true
-        )
         state.nanoBanana.completeAppliedEdit(request: preview.request)
-        AppFeature.canvasPresentationStateCoordinator.applyPresentation(
-            appliedPreview.presentation,
-            to: &state
+        completeDocumentMutation(
+            state: &state,
+            contract: DocumentMutationContract(
+                canvasMutation: .finalizeLayer(
+                    LayerMutationFinalization(
+                        index: appliedPreview.targetLayerIndex,
+                        incrementsRevision: true
+                    )
+                ),
+                successFeedback: .nanoBananaEditApplied
+            )
         )
-        state.application.presentFeedback(.nanoBananaEditApplied)
     }
 
     func handleNanoBananaEditFailed(
