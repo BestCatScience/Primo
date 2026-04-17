@@ -80,19 +80,20 @@ extension AppFeature {
             return .none
         }
         selectionTransformService.replaceLayerPixels(activeLayerIndex, transformed)
-        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
-        state.canvas.setSelection(Self.transformedSelection(
-            state.canvas.selection,
-            translation: translation,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: transformPivot,
-            mode: transformMode,
-            quadOffsets: quadOffsets,
-            canvasSize: state.canvas.canvasSize
-        ))
-        state.canvas.resetTransformPreview()
+        state.canvas.completeTransformMutation(
+            at: activeLayerIndex,
+            selection: Self.transformedSelection(
+                state.canvas.selection,
+                translation: translation,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                rotationDegrees: rotationDegrees,
+                pivot: transformPivot,
+                mode: transformMode,
+                quadOffsets: quadOffsets,
+                canvasSize: state.canvas.canvasSize
+            )
+        )
         applyDirtyPresentation(state: &state)
         return .none
     }

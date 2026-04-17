@@ -80,8 +80,7 @@ extension AppFeature {
             state.application.presentBanner(failureMessage)
             return false
         }
-        state.canvas.discardBufferedStrokes(for: state.canvas.activeLayerIndex)
-        state.canvas.clearSelection()
+        state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
         applyDirtyPresentation(state: &state)
         return true
     }
@@ -116,8 +115,7 @@ extension AppFeature {
             return false
         }
         adjustmentWorkflowService.replaceLayerPixels(state.canvas.activeLayerIndex, with: adjustedPixels)
-        state.canvas.discardBufferedStrokes(for: state.canvas.activeLayerIndex)
-        state.canvas.clearSelection()
+        state.canvas.finalizeLayerMutation(at: state.canvas.activeLayerIndex)
         applyDirtyPresentation(state: &state)
         return true
     }

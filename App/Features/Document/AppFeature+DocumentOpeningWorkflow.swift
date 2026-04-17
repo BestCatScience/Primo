@@ -8,7 +8,7 @@ extension AppFeature {
         relativeFolderPath: RelativeProjectFolderPath?
     ) -> Effect<Action> {
         do {
-            let destinationURL = try workspaceStorageService.moveSavedProject(
+            let destinationURL = try workspaceCatalogService.moveSavedProject(
                 url,
                 to: relativeFolderPath
             )

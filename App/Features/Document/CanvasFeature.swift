@@ -103,6 +103,16 @@ struct CanvasFeature {
             activeLayerIndex = index
         }
 
+        mutating func activateLayerForEditing(_ index: Int) {
+            activeLayerIndex = index
+            clearSelection()
+        }
+
+        mutating func activateLayerForNewContent(_ index: Int) {
+            activeLayerIndex = index
+            clearSelectionState()
+        }
+
         mutating func replaceLayerBuffers(_ layerBuffers: [LayerCanvasBuffer]) {
             self.layerBuffers = layerBuffers
         }
@@ -256,6 +266,26 @@ struct CanvasFeature {
             if incrementsRevision {
                 localBufferRevision += 1
             }
+        }
+
+        mutating func finalizeLayerMutation(
+            at layerIndex: Int,
+            incrementsRevision: Bool = false,
+            clearsSelection: Bool = true
+        ) {
+            discardBufferedStrokes(for: layerIndex, incrementsRevision: incrementsRevision)
+            if clearsSelection {
+                clearSelection()
+            }
+        }
+
+        mutating func completeTransformMutation(
+            at layerIndex: Int,
+            selection: CanvasSelection?
+        ) {
+            discardBufferedStrokes(for: layerIndex, incrementsRevision: true)
+            setSelection(selection)
+            resetTransformPreview()
         }
     }
 

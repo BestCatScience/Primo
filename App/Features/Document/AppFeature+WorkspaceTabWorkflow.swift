@@ -4,7 +4,8 @@ import Foundation
 extension AppFeature {
     struct WorkspaceTabCoordinator {
         let paintDocumentClient: PaintDocumentClient
-        let workspaceStorageService: WorkspaceStorageService
+        let workspaceCatalogService: WorkspaceCatalogService
+        let workspaceBackingStoreService: WorkspaceBackingStoreService
 
         func loadProjectEffect(
             from fileURL: URL,
@@ -22,8 +23,8 @@ extension AppFeature {
         }
 
         func loadAutosaveRecoveryEffect() -> Effect<Action> {
-            .run { [workspaceStorageService] send in
-                let items = (try? workspaceStorageService.loadAutosaveRecoveryItems()) ?? []
+            .run { [workspaceCatalogService] send in
+                let items = (try? workspaceCatalogService.loadAutosaveRecoveryItems()) ?? []
                 await send(.autosaveRecoveryLoaded(items))
             }
         }
@@ -46,9 +47,9 @@ extension AppFeature {
                     onSuccess: { .openDocumentLoaded($0, url) },
                     onFailure: { .openDocumentFailed($0) }
                 ),
-                .run { [workspaceStorageService] _ in
+                .run { [workspaceBackingStoreService] _ in
                     guard removeWorkspaceItemAfterLoad else { return }
-                    try? workspaceStorageService.removeWorkspaceItem(url)
+                    try? workspaceBackingStoreService.removeWorkspaceItem(url)
                 }
             )
         }
@@ -68,7 +69,8 @@ extension AppFeature {
     var workspaceTabCoordinator: WorkspaceTabCoordinator {
         WorkspaceTabCoordinator(
             paintDocumentClient: paintDocumentClient,
-            workspaceStorageService: workspaceStorageService
+            workspaceCatalogService: workspaceCatalogService,
+            workspaceBackingStoreService: workspaceBackingStoreService
         )
     }
 }

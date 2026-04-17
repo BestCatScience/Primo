@@ -24,8 +24,7 @@ extension AppFeature {
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
         layerWorkflowService.setActiveLayer(targetIndex)
-        state.canvas.activateLayer(targetIndex)
-        state.canvas.clearSelection()
+        state.canvas.activateLayerForEditing(targetIndex)
         applyCurrentDocumentPresentation(state: &state)
     }
 
@@ -80,8 +79,7 @@ extension AppFeature {
         index: Int
     ) {
         layerWorkflowService.setActiveLayer(index)
-        state.canvas.activateLayer(index)
-        state.canvas.clearSelection()
+        state.canvas.activateLayerForEditing(index)
         applyCurrentDocumentPresentation(state: &state)
     }
 

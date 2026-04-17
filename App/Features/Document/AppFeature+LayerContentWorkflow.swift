@@ -21,8 +21,7 @@ extension AppFeature {
         let targetLayerIndex = state.layerSidebar.layers.count
         layerWorkflowService.replaceLayerPixels(targetLayerIndex, pixelData: importedPixelData)
         layerWorkflowService.setActiveLayer(targetLayerIndex)
-        state.canvas.activateLayer(targetLayerIndex)
-        state.canvas.clearSelectionState()
+        state.canvas.activateLayerForNewContent(targetLayerIndex)
         applyDirtyPresentation(state: &state)
         state.application.presentBanner(state.application.appLanguage.localized("Photo imported to a new layer"))
     }
@@ -86,8 +85,7 @@ extension AppFeature {
     func handleClearActiveLayer(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         layerWorkflowService.clearLayer(activeLayerIndex)
-        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
-        state.canvas.clearSelection()
+        state.canvas.finalizeLayerMutation(at: activeLayerIndex, incrementsRevision: true)
         applyDirtyPresentation(state: &state)
     }
 
@@ -118,8 +116,7 @@ extension AppFeature {
             state.application.presentBanner(state.application.appLanguage.localized("レイヤーマスクを適用できませんでした"))
             return
         }
-        state.canvas.discardBufferedStrokes(for: activeLayerIndex, incrementsRevision: true)
-        state.canvas.clearSelection()
+        state.canvas.finalizeLayerMutation(at: activeLayerIndex, incrementsRevision: true)
         applyDirtyPresentation(state: &state)
     }
 }

@@ -4,7 +4,8 @@ import Foundation
 extension AppFeature {
     private struct DocumentWorkflowCoordinator {
         let paintDocumentClient: PaintDocumentClient
-        let workspaceStorageService: WorkspaceStorageService
+        let workspaceCatalogService: WorkspaceCatalogService
+        let workspaceArtifactService: WorkspaceArtifactService
         let fileClient: FileClient
         let dateClient: DateClient
 
@@ -13,8 +14,8 @@ extension AppFeature {
         }
 
         func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
-            .run { [workspaceStorageService] send in
-                let entries = (try? workspaceStorageService.loadSaveHistoryEntries(for: activeTab)) ?? []
+            .run { [workspaceCatalogService] send in
+                let entries = (try? workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)) ?? []
                 await send(.saveHistoryLoaded(entries))
             }
         }
@@ -23,11 +24,11 @@ extension AppFeature {
             capture: TimelapseCapture,
             failureMessage: String
         ) -> Effect<Action> {
-            .run { [workspaceStorageService, fileClient, dateClient] send in
+            .run { [workspaceArtifactService, fileClient, dateClient] send in
                 do {
                     let url = try TimelapseExporter.exportVideo(
                         from: capture,
-                        to: workspaceStorageService.timelapseTemporaryDirectory(),
+                        to: workspaceArtifactService.timelapseTemporaryDirectory(),
                         fileClient: fileClient,
                         dateClient: dateClient
                     ) { progress, previewURL in
@@ -48,7 +49,8 @@ extension AppFeature {
     private var documentWorkflowCoordinator: DocumentWorkflowCoordinator {
         DocumentWorkflowCoordinator(
             paintDocumentClient: paintDocumentClient,
-            workspaceStorageService: workspaceStorageService,
+            workspaceCatalogService: workspaceCatalogService,
+            workspaceArtifactService: workspaceArtifactService,
             fileClient: fileClient,
             dateClient: dateClient
         )

@@ -349,8 +349,10 @@ extension AppFeature {
             preview,
             newLayerName: "Nano Banana \(state.layerSidebar.layers.count + 1)"
         )
-        state.canvas.discardBufferedStrokes(for: appliedPreview.targetLayerIndex, incrementsRevision: true)
-        state.canvas.clearSelection()
+        state.canvas.finalizeLayerMutation(
+            at: appliedPreview.targetLayerIndex,
+            incrementsRevision: true
+        )
         state.nanoBanana.completeAppliedEdit(request: preview.request)
         AppFeature.canvasPresentationStateCoordinator.applyPresentation(
             appliedPreview.presentation,

@@ -10,10 +10,9 @@ extension AppFeature {
         }
     }
 
-    struct WorkspaceStorageService {
+    struct WorkspaceBackingStoreService {
         let paintDocumentClient: PaintDocumentClient
         let documentWorkspaceClient: DocumentWorkspaceClient
-        let uuidClient: UUIDClient
 
         func saveProject(
             at fileURL: URL,
@@ -55,6 +54,14 @@ extension AppFeature {
             try documentWorkspaceClient.persistSaveHistorySnapshot(backingStoreURL, tab, trigger)
         }
 
+        func removeWorkspaceItem(_ url: DocumentProjectPath) throws {
+            try documentWorkspaceClient.removeWorkspaceItem(url)
+        }
+    }
+
+    struct WorkspaceCatalogService {
+        let documentWorkspaceClient: DocumentWorkspaceClient
+
         func loadSavedProjects() throws -> [SavedProjectSummary] {
             try documentWorkspaceClient.loadSavedProjects()
         }
@@ -77,28 +84,49 @@ extension AppFeature {
         func loadSaveHistoryEntries(for tab: OpenDocumentTab) throws -> [SaveHistoryEntry] {
             try documentWorkspaceClient.loadSaveHistoryEntries(tab)
         }
+    }
+
+    struct WorkspaceArtifactService {
+        let documentWorkspaceClient: DocumentWorkspaceClient
 
         func timelapseTemporaryDirectory() -> URL {
             documentWorkspaceClient.timelapseTemporaryDirectory()
         }
 
-        func removeWorkspaceItem(_ url: DocumentProjectPath) throws {
-            try documentWorkspaceClient.removeWorkspaceItem(url)
-        }
-
         func writePNGToTemporaryDirectory(_ data: Data) throws -> URL {
             try documentWorkspaceClient.writePNGToTemporaryDirectory(data)
         }
+    }
+
+    struct WorkspaceIdentityService {
+        let uuidClient: UUIDClient
 
         func generateTabID() -> OpenDocumentTab.ID {
             uuidClient.generate()
         }
     }
 
-    var workspaceStorageService: WorkspaceStorageService {
-        WorkspaceStorageService(
+    var workspaceBackingStoreService: WorkspaceBackingStoreService {
+        WorkspaceBackingStoreService(
             paintDocumentClient: paintDocumentClient,
-            documentWorkspaceClient: documentWorkspaceClient,
+            documentWorkspaceClient: documentWorkspaceClient
+        )
+    }
+
+    var workspaceCatalogService: WorkspaceCatalogService {
+        WorkspaceCatalogService(
+            documentWorkspaceClient: documentWorkspaceClient
+        )
+    }
+
+    var workspaceArtifactService: WorkspaceArtifactService {
+        WorkspaceArtifactService(
+            documentWorkspaceClient: documentWorkspaceClient
+        )
+    }
+
+    var workspaceIdentityService: WorkspaceIdentityService {
+        WorkspaceIdentityService(
             uuidClient: uuidClient
         )
     }
@@ -107,7 +135,7 @@ extension AppFeature {
     func persistActiveTabToBackingStore(state: inout State) -> Bool {
         guard let activeTab = state.workspace.activeTab else { return false }
         do {
-            try workspaceStorageService.saveProject(
+            try workspaceBackingStoreService.saveProject(
                 at: activeTab.backingStoreURL.fileURL,
                 paperStyle: resolvedPaperStyle(for: state)
             )
@@ -132,7 +160,7 @@ extension AppFeature {
         guard persistActiveTabToBackingStore(state: &state) else { return nil }
 
         do {
-            let savedURL = try workspaceStorageService.persistProjectSnapshot(
+            let savedURL = try workspaceBackingStoreService.persistProjectSnapshot(
                 activeTab.backingStoreURL,
                 preferredDestinationURL: preferredDestinationURL
             )
@@ -162,8 +190,8 @@ extension AppFeature {
         title: String,
         sourceProjectURL: DocumentProjectPath?
     ) {
-        let tabID = workspaceStorageService.generateTabID()
-        guard let backingStoreURL = try? workspaceStorageService.createTabBackingStoreURL(tabID) else {
+        let tabID = workspaceIdentityService.generateTabID()
+        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else {
             state.application.presentBanner(state.application.appLanguage.localized("Could not create a tab"))
             return
         }
@@ -193,7 +221,7 @@ extension AppFeature {
         guard let activeTab = state.workspace.activeTab else { return }
 
         do {
-            try workspaceStorageService.persistAutosaveSnapshot(
+            try workspaceBackingStoreService.persistAutosaveSnapshot(
                 activeTab.backingStoreURL,
                 activeTab
             )
@@ -205,7 +233,7 @@ extension AppFeature {
     }
 
     func clearAutosave(for tab: OpenDocumentTab) {
-        try? workspaceStorageService.discardAutosaveSnapshot(tab)
+        try? workspaceBackingStoreService.discardAutosaveSnapshot(tab)
     }
 
     func persistSaveHistorySnapshot(
@@ -213,7 +241,7 @@ extension AppFeature {
         trigger: SaveHistoryTrigger
     ) {
         do {
-            try workspaceStorageService.persistSaveHistorySnapshot(
+            try workspaceBackingStoreService.persistSaveHistorySnapshot(
                 tab.backingStoreURL,
                 tab,
                 trigger
@@ -273,7 +301,7 @@ extension AppFeature {
         }
         for tabID in tabIDs {
             guard let previousTab = state.workspace.tab(withID: tabID) else { continue }
-            let destinationURL = try workspaceStorageService.persistProjectSnapshot(
+            let destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
                 previousTab.backingStoreURL,
                 preferredDestinationURL: previousTab.sourceProjectURL
             )
