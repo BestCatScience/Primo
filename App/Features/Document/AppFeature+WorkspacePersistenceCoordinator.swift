@@ -10,6 +10,24 @@ extension AppFeature {
         }
     }
 
+    struct LoadedWorkspaceProjectPlan {
+        enum Destination {
+            case selectedTab(tabID: OpenDocumentTab.ID, pane: WorkspacePane)
+            case newTab(title: String, sourceProjectURL: DocumentProjectPath?)
+            case activeTab(title: String?, sourceProjectURL: DocumentProjectPath?)
+        }
+
+        let destination: Destination
+        var marksTabDirty = false
+        var persistsToBackingStore = false
+        var persistsAutosave = false
+        var discardedAutosaveEntryID: WorkspaceItemID?
+        var removedRecoveryItemID: WorkspaceItemID?
+        var dismissesRecovery = false
+        var dismissesSaveHistory = false
+        var bannerMessage: String?
+    }
+
     struct WorkspaceBackingStoreService {
         let paintDocumentClient: PaintDocumentClient
         let documentWorkspaceClient: DocumentWorkspaceClient
@@ -208,6 +226,62 @@ extension AppFeature {
         state.workspace.appendTab(tab)
         state.workspace.activateTab(tabID, pane: state.workspace.focusedWorkspacePane)
         _ = persistActiveTabToBackingStore(state: &state)
+    }
+
+    func applyLoadedWorkspaceProject(
+        _ loaded: LoadedPaintProject,
+        using plan: LoadedWorkspaceProjectPlan,
+        state: inout State
+    ) {
+        if let autosaveEntryID = plan.discardedAutosaveEntryID {
+            try? workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+        }
+
+        switch plan.destination {
+        case let .selectedTab(tabID, pane):
+            state.workspace.activateTab(tabID, pane: pane)
+            applyLoadedProject(loaded, state: &state)
+
+        case let .newTab(title, sourceProjectURL):
+            applyLoadedProject(loaded, state: &state)
+            activateNewTab(
+                state: &state,
+                title: title,
+                sourceProjectURL: sourceProjectURL
+            )
+
+        case let .activeTab(title, sourceProjectURL):
+            applyLoadedProject(loaded, state: &state)
+            state.workspace.updateActiveTabMetadata(
+                title: title,
+                sourceProjectURL: sourceProjectURL,
+                previewImageData: compositePNGData(state: state),
+                canvasSize: state.canvas.canvasSize
+            )
+        }
+
+        if plan.marksTabDirty {
+            state.workspace.setActiveTabDirty(true)
+        }
+        if plan.persistsToBackingStore {
+            _ = persistActiveTabToBackingStore(state: &state)
+        }
+        if plan.persistsAutosave {
+            persistActiveTabAutosave(state: &state)
+        }
+        if let recoveryItemID = plan.removedRecoveryItemID {
+            state.recovery.removeItem(id: recoveryItemID)
+        }
+        if plan.dismissesRecovery {
+            state.recovery.dismiss()
+        }
+        if plan.dismissesSaveHistory {
+            state.saveHistory.dismiss()
+        }
+        state.application.finishHydration(showingHome: false)
+        if let bannerMessage = plan.bannerMessage {
+            state.application.presentBanner(bannerMessage)
+        }
     }
 
     func applyDirtyPresentation(state: inout State) {

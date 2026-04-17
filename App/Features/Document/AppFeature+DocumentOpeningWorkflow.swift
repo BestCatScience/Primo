@@ -53,15 +53,19 @@ extension AppFeature {
             state.application.finishHydration(showingHome: false)
             return .send(.tabSelected(existingTabID))
         }
-        applyLoadedProject(loaded, state: &state)
-        activateNewTab(
-            state: &state,
-            title: sourceURL.displayName,
-            sourceProjectURL: sourceURL
-        )
-        state.application.finishHydration(showingHome: false)
-        state.application.presentBanner(
-            StudioStrings.openedDocument(loaded.presentation.layerRows.count, state.application.appLanguage)
+        applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(
+                    title: sourceURL.displayName,
+                    sourceProjectURL: sourceURL
+                ),
+                bannerMessage: StudioStrings.openedDocument(
+                    loaded.presentation.layerRows.count,
+                    state.application.appLanguage
+                )
+            ),
+            state: &state
         )
         return .none
     }

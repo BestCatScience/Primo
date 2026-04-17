@@ -41,17 +41,17 @@ extension AppFeature {
             at url: DocumentProjectPath,
             removeWorkspaceItemAfterLoad: Bool
         ) -> Effect<Action> {
-            .concatenate(
-                loadProjectEffect(
-                    from: url.fileURL,
-                    onSuccess: { .openDocumentLoaded($0, url) },
-                    onFailure: { .openDocumentFailed($0) }
-                ),
-                .run { [workspaceBackingStoreService] _ in
-                    guard removeWorkspaceItemAfterLoad else { return }
-                    try? workspaceBackingStoreService.removeWorkspaceItem(url)
+            .run { [paintDocumentClient, workspaceBackingStoreService] send in
+                do {
+                    let loaded = try paintDocumentClient.loadProject(url.fileURL)
+                    if removeWorkspaceItemAfterLoad {
+                        try? workspaceBackingStoreService.removeWorkspaceItem(url)
+                    }
+                    await send(.openDocumentLoaded(loaded, url))
+                } catch {
+                    await send(.openDocumentFailed(error.localizedDescription))
                 }
-            )
+            }
         }
 
         func loadTabSelectionEffect(

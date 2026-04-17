@@ -26,20 +26,23 @@ extension AppFeature {
         loaded: LoadedPaintProject,
         item: AutosaveRecoveryItem
     ) {
-        try? workspaceCatalogService.discardAutosaveEntry(item.id)
-        applyLoadedProject(loaded, state: &state)
-        activateNewTab(
-            state: &state,
-            title: item.title,
-            sourceProjectURL: item.sourceProjectURL
+        applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(
+                    title: item.title,
+                    sourceProjectURL: item.sourceProjectURL
+                ),
+                marksTabDirty: true,
+                persistsToBackingStore: true,
+                persistsAutosave: true,
+                discardedAutosaveEntryID: item.id,
+                removedRecoveryItemID: item.id,
+                dismissesRecovery: true,
+                bannerMessage: state.application.appLanguage.localized("自動保存から復元しました")
+            ),
+            state: &state
         )
-        state.workspace.setActiveTabDirty(true)
-        _ = persistActiveTabToBackingStore(state: &state)
-        persistActiveTabAutosave(state: &state)
-        state.application.finishHydration(showingHome: false)
-        state.recovery.removeItem(id: item.id)
-        state.recovery.dismiss()
-        state.application.presentBanner(state.application.appLanguage.localized("自動保存から復元しました"))
     }
 
     func handleAutosaveRecoveryDiscardRequest(

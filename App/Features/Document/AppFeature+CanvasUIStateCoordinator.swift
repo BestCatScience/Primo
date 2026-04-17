@@ -79,7 +79,6 @@ extension AppFeature {
             state.brushPalette.applyLoadedPaperStyle(loaded.paperStyle)
             state.canvas.resetTransientEditingState()
             applyPresentation(loaded.presentation, to: &state)
-            state.application.finishHydration()
         }
 
         func syncTextEditorWithActiveLayer(state: inout AppFeature.State) {

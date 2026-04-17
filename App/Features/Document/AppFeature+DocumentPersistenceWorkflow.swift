@@ -48,30 +48,42 @@ extension AppFeature {
         openInNewTab: Bool
     ) {
         let restoredTitle = projectURL.displayName
+        let restorationMessage = state.application.appLanguage.localized("保存履歴を復元しました")
         if openInNewTab || state.workspace.activeTab == nil {
-            applyLoadedProject(loaded, state: &state)
-            activateNewTab(
-                state: &state,
-                title: "\(restoredTitle) Snapshot",
-                sourceProjectURL: nil
+            applyLoadedWorkspaceProject(
+                loaded,
+                using: LoadedWorkspaceProjectPlan(
+                    destination: .newTab(
+                        title: "\(restoredTitle) Snapshot",
+                        sourceProjectURL: nil
+                    ),
+                    marksTabDirty: true,
+                    persistsToBackingStore: true,
+                    persistsAutosave: true,
+                    dismissesSaveHistory: true,
+                    bannerMessage: restorationMessage
+                ),
+                state: &state
             )
         } else {
             let existingSourceURL = state.workspace.activeTab?.sourceProjectURL
             let existingTitle = state.workspace.activeTab?.title ?? restoredTitle
-            applyLoadedProject(loaded, state: &state)
-            state.workspace.updateActiveTabMetadata(
-                title: existingTitle,
-                sourceProjectURL: existingSourceURL,
-                previewImageData: compositePNGData(state: state),
-                canvasSize: state.canvas.canvasSize
+            applyLoadedWorkspaceProject(
+                loaded,
+                using: LoadedWorkspaceProjectPlan(
+                    destination: .activeTab(
+                        title: existingTitle,
+                        sourceProjectURL: existingSourceURL
+                    ),
+                    marksTabDirty: true,
+                    persistsToBackingStore: true,
+                    persistsAutosave: true,
+                    dismissesSaveHistory: true,
+                    bannerMessage: restorationMessage
+                ),
+                state: &state
             )
         }
-        state.workspace.setActiveTabDirty(true)
-        persistActiveTabToBackingStore(state: &state)
-        persistActiveTabAutosave(state: &state)
-        state.application.finishHydration(showingHome: false)
-        state.saveHistory.dismiss()
-        state.application.presentBanner(state.application.appLanguage.localized("保存履歴を復元しました"))
     }
 
     func handleSaveDocumentRequest(

@@ -31,9 +31,13 @@ extension AppFeature {
             state.application.finishHydration()
             return
         }
-        state.workspace.activateTab(tabID, pane: targetTab.pane)
-        state.application.showWorkspace()
-        applyLoadedProject(loaded, state: &state)
+        applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .selectedTab(tabID: tabID, pane: targetTab.pane)
+            ),
+            state: &state
+        )
     }
 
     func handleTabSelectionFailed(
