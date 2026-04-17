@@ -679,6 +679,83 @@ struct BrushPaletteFeature {
     }
 }
 
+extension BrushPaletteFeature.State {
+    mutating func syncPaper(
+        color: Color,
+        isTransparent: Bool
+    ) {
+        paper.color = color
+        paper.isTransparent = isTransparent
+    }
+
+    mutating func applyLoadedPaperStyle(_ paperStyle: CanvasPaperStyle) {
+        syncPaper(
+            color: Color(
+                red: Double(paperStyle.red),
+                green: Double(paperStyle.green),
+                blue: Double(paperStyle.blue),
+                opacity: Double(paperStyle.alpha)
+            ),
+            isTransparent: paperStyle.isTransparent
+        )
+    }
+
+    mutating func ensureTextPlacement(in canvasSize: CGSize) {
+        guard text.position == nil else { return }
+        text.position = CGPoint(
+            x: canvasSize.width * 0.12,
+            y: canvasSize.height * 0.12
+        )
+    }
+
+    mutating func setTextPlacement(_ point: CGPoint) {
+        text.position = point
+    }
+
+    mutating func syncTextEditor(with activeLayer: LayerRowModel?) {
+        guard let activeLayer else {
+            text.targetLayerIndex = nil
+            text.scale = 1.0
+            text.rotationDegrees = 0
+            return
+        }
+        guard let textLayer = activeLayer.textLayer else {
+            text.targetLayerIndex = nil
+            text.scale = 1.0
+            text.rotationDegrees = 0
+            return
+        }
+        text.content = textLayer.text
+        text.fontSize = textLayer.fontSize
+        text.position = textLayer.position
+        text.scale = textLayer.scale
+        text.rotationDegrees = textLayer.rotationDegrees
+        text.targetLayerIndex = activeLayer.index
+        text.selectedFontPostScriptName = textLayer.fontPostScriptName
+        text.selectedFontDisplayName = textLayer.fontDisplayName
+    }
+
+    mutating func setTextTargetLayer(_ index: Int?) {
+        text.targetLayerIndex = index
+    }
+
+    mutating func presentBrushSettingsPopover() {
+        ui.showsBrushSettingsPopover = true
+    }
+
+    mutating func clearSelectedPreset() {
+        library.selectedBrush = nil
+    }
+
+    mutating func applySampledColor(_ color: Color) {
+        if brush.selectedColorSlot == .transparent {
+            brush.selectedColorSlot = .primary
+        }
+        brush.setSelectedSlotColor(color)
+        clearSelectedPreset()
+    }
+}
+
 private extension BrushPaletteFeature.State {
     mutating func applyPreset(_ preset: BrushPreset) {
         library.selectedBrush = preset

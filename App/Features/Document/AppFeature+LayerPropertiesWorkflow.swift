@@ -3,7 +3,7 @@ import Foundation
 extension AppFeature {
     func handleActiveLayerVisibilityToggle(state: inout State) {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == activeLayerIndex }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerVisibility(activeLayerIndex, !layer.visible)
@@ -43,7 +43,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerLocked(index, !layer.isLocked)
@@ -54,7 +54,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerAlphaLocked(index, !layer.isAlphaLocked)
@@ -65,7 +65,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
         guard layer.isClipped || index > 0 else {
@@ -89,7 +89,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
         layerWorkflowService.paintDocumentClient.setLayerVisibility(index, !layer.visible)
@@ -110,12 +110,7 @@ extension AppFeature {
         state: inout State,
         folderID: Int
     ) {
-        guard let folder = state.layerSidebar.rows.compactMap({ row -> LayerFolderModel? in
-            if case let .folder(folder) = row, folder.id == folderID {
-                return folder
-            }
-            return nil
-        }).first else {
+        guard let folder = state.layerSidebar.folder(withID: folderID) else {
             return
         }
         layerWorkflowService.paintDocumentClient.setFolderVisibility(folderID, !folder.visible)

@@ -34,12 +34,14 @@ extension AppFeature {
                 )
                 state.application.finishHydration()
             }
-            state.layerSidebar.layers = presentation.layerRows
-            state.layerSidebar.rows = presentation.layerSidebarRows
-            state.layerSidebar.layerBuffers = state.canvas.layerBuffers
-            state.layerSidebar.activeLayerIndex = presentation.activeLayerIndex
-            state.layerSidebar.paperColor = state.brushPalette.paper.color
-            state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
+            state.layerSidebar.applyPresentation(
+                layers: presentation.layerRows,
+                rows: presentation.layerSidebarRows,
+                layerBuffers: state.canvas.layerBuffers,
+                activeLayerIndex: presentation.activeLayerIndex,
+                paperColor: state.brushPalette.paper.color,
+                transparentPaper: state.brushPalette.paper.isTransparent
+            )
             state.canvas.updateInteractionStyle(
                 previewStyle: AppFeature.canvasToolStateCoordinator.previewStrokeStyle(for: state),
                 paperStyle: AppFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
@@ -59,39 +61,16 @@ extension AppFeature {
             _ loaded: LoadedPaintProject,
             to state: inout AppFeature.State
         ) {
-            state.brushPalette.paper.color = Color(
-                red: Double(loaded.paperStyle.red),
-                green: Double(loaded.paperStyle.green),
-                blue: Double(loaded.paperStyle.blue),
-                opacity: Double(loaded.paperStyle.alpha)
-            )
-            state.brushPalette.paper.isTransparent = loaded.paperStyle.isTransparent
+            state.brushPalette.applyLoadedPaperStyle(loaded.paperStyle)
             state.canvas.resetTransientEditingState()
             applyPresentation(loaded.presentation, to: &state)
             state.application.finishHydration()
         }
 
         func syncTextEditorWithActiveLayer(state: inout AppFeature.State) {
-            guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.layerSidebar.activeLayerIndex }) else {
-                state.brushPalette.text.targetLayerIndex = nil
-                state.brushPalette.text.scale = 1.0
-                state.brushPalette.text.rotationDegrees = 0
-                return
-            }
-            if let textLayer = activeLayer.textLayer {
-                state.brushPalette.text.content = textLayer.text
-                state.brushPalette.text.fontSize = textLayer.fontSize
-                state.brushPalette.text.position = textLayer.position
-                state.brushPalette.text.scale = textLayer.scale
-                state.brushPalette.text.rotationDegrees = textLayer.rotationDegrees
-                state.brushPalette.text.targetLayerIndex = activeLayer.index
-                state.brushPalette.text.selectedFontPostScriptName = textLayer.fontPostScriptName
-                state.brushPalette.text.selectedFontDisplayName = textLayer.fontDisplayName
-            } else {
-                state.brushPalette.text.targetLayerIndex = nil
-                state.brushPalette.text.scale = 1.0
-                state.brushPalette.text.rotationDegrees = 0
-            }
+            state.brushPalette.syncTextEditor(
+                with: state.layerSidebar.layer(withIndex: state.layerSidebar.activeLayerIndex)
+            )
         }
     }
 }

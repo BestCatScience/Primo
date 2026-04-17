@@ -23,6 +23,11 @@ extension AppFeature {
             handleSelectAdjacentLayer(state: &state, direction: 1)
             return .none
 
+        case .brushPalette(.binding(\.paper.color)),
+             .brushPalette(.binding(\.paper.isTransparent)):
+            handleBrushPalettePaperBindingChanged(state: &state)
+            return .none
+
         case .brushPalette:
             handleBrushPaletteStateRefresh(state: &state)
             return .none

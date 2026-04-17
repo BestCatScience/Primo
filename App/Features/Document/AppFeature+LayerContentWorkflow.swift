@@ -79,7 +79,7 @@ extension AppFeature {
         layerWorkflowService.paintDocumentClient.setActiveLayer(targetLayerIndex)
         state.canvas.activateLayer(targetLayerIndex)
         state.canvas.activateTool(.text)
-        state.brushPalette.text.targetLayerIndex = targetLayerIndex
+        state.brushPalette.setTextTargetLayer(targetLayerIndex)
         applyDirtyPresentation(state: &state)
     }
 

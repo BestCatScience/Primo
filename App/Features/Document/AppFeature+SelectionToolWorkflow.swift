@@ -18,17 +18,12 @@ extension AppFeature {
         applyToolSpecificBrushSize(for: tool, state: &state)
         if tool == .text {
             state.brushPanel.isCollapsed = false
-            if state.brushPalette.text.position == nil {
-                state.brushPalette.text.position = CGPoint(
-                    x: state.canvas.canvasSize.width * 0.12,
-                    y: state.canvas.canvasSize.height * 0.12
-                )
-            }
+            state.brushPalette.ensureTextPlacement(in: state.canvas.canvasSize)
             syncTextEditorWithActiveLayer(state: &state)
         }
         if showsBrushSettingsPopover {
             state.brushPanel.isCollapsed = false
-            state.brushPalette.ui.showsBrushSettingsPopover = true
+            state.brushPalette.presentBrushSettingsPopover()
         }
         state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
     }
@@ -99,7 +94,7 @@ extension AppFeature {
         state: inout State,
         point: CGPoint
     ) {
-        state.brushPalette.text.position = point
+        state.brushPalette.setTextPlacement(point)
         state.brushPanel.isCollapsed = false
     }
 
@@ -114,23 +109,35 @@ extension AppFeature {
             previewStyle: previewStrokeStyle(for: state),
             paperStyle: resolvedPaperStyle(for: state)
         )
-        state.layerSidebar.paperColor = state.brushPalette.paper.color
-        state.layerSidebar.transparentPaper = state.brushPalette.paper.isTransparent
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        state.layerSidebar.syncPaper(
+            color: state.brushPalette.paper.color,
+            isTransparent: state.brushPalette.paper.isTransparent
+        )
     }
 
     func handlePaperBindingSync(state: inout State) {
+        handleBrushPaletteStateRefresh(state: &state)
         state.canvas.updatePaperStyle(resolvedPaperStyle(for: state))
         paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
     }
 
     func handlePaperColorBindingChanged(state: inout State) {
-        state.brushPalette.paper.color = state.layerSidebar.paperColor
+        state.brushPalette.syncPaper(
+            color: state.layerSidebar.paperColor,
+            isTransparent: state.layerSidebar.transparentPaper
+        )
         handlePaperBindingSync(state: &state)
     }
 
     func handleTransparentPaperBindingChanged(state: inout State) {
-        state.brushPalette.paper.isTransparent = state.layerSidebar.transparentPaper
+        state.brushPalette.syncPaper(
+            color: state.layerSidebar.paperColor,
+            isTransparent: state.layerSidebar.transparentPaper
+        )
+        handlePaperBindingSync(state: &state)
+    }
+
+    func handleBrushPalettePaperBindingChanged(state: inout State) {
         handlePaperBindingSync(state: &state)
     }
 
@@ -177,12 +184,7 @@ extension AppFeature {
         state: inout State,
         sampledColor: SampledColor
     ) {
-        let sampled = Self.color(from: sampledColor)
-        if state.brushPalette.brush.selectedColorSlot == .transparent {
-            state.brushPalette.brush.selectedColorSlot = .primary
-        }
-        state.brushPalette.brush.setSelectedSlotColor(sampled)
-        state.brushPalette.library.selectedBrush = nil
+        state.brushPalette.applySampledColor(Self.color(from: sampledColor))
         state.canvas.updatePreviewStyle(previewStrokeStyle(for: state))
     }
 

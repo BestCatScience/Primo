@@ -13,6 +13,54 @@ struct LayerSidebarFeature {
         var paperColor: Color = .white
         var transparentPaper = false
         var showsPaperEditor = false
+
+        func layer(withIndex index: Int) -> LayerRowModel? {
+            layers.first(where: { $0.index == index })
+        }
+
+        func folder(withID folderID: Int) -> LayerFolderModel? {
+            rows.compactMap { row -> LayerFolderModel? in
+                if case let .folder(folder) = row, folder.id == folderID {
+                    return folder
+                }
+                return nil
+            }.first
+        }
+
+        mutating func activateLayer(_ index: Int) {
+            activeLayerIndex = index
+        }
+
+        mutating func syncPaper(
+            color: Color,
+            isTransparent: Bool
+        ) {
+            paperColor = color
+            transparentPaper = isTransparent
+        }
+
+        mutating func applyPresentation(
+            layers: [LayerRowModel],
+            rows: [LayerSidebarRowModel],
+            layerBuffers: [LayerCanvasBuffer],
+            activeLayerIndex: Int,
+            paperColor: Color,
+            transparentPaper: Bool
+        ) {
+            self.layers = layers
+            self.rows = rows
+            self.layerBuffers = layerBuffers
+            self.activeLayerIndex = activeLayerIndex
+            syncPaper(color: paperColor, isTransparent: transparentPaper)
+        }
+
+        mutating func presentPaperEditor() {
+            showsPaperEditor = true
+        }
+
+        mutating func dismissPaperEditor() {
+            showsPaperEditor = false
+        }
     }
 
     enum Action: BindableAction, Equatable {
@@ -76,15 +124,10 @@ struct LayerSidebarFeature {
             case .addFolderButtonTapped:
                 return .send(.delegate(.addFolder))
             case let .layerTapped(index):
-                state.activeLayerIndex = index
+                state.activateLayer(index)
                 return .send(.delegate(.selectLayer(index)))
             case let .folderTapped(folderID):
-                guard let folder = state.rows.compactMap({ row -> LayerFolderModel? in
-                    if case let .folder(folder) = row, folder.id == folderID {
-                        return folder
-                    }
-                    return nil
-                }).first else {
+                guard let folder = state.folder(withID: folderID) else {
                     return .none
                 }
                 return .send(.delegate(.setFolderExpanded(folderID, !folder.isExpanded)))
@@ -132,10 +175,10 @@ struct LayerSidebarFeature {
             case let .moveLayerToFolderRequested(layerIndex, folderID):
                 return .send(.delegate(.moveLayerToFolder(layerIndex, folderID)))
             case .paperRowTapped:
-                state.showsPaperEditor = true
+                state.presentPaperEditor()
                 return .none
             case .paperEditorDismissed:
-                state.showsPaperEditor = false
+                state.dismissPaperEditor()
                 return .none
             case .delegate:
                 return .none

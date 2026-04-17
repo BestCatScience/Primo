@@ -242,7 +242,10 @@ extension AppFeature {
             state.canvas.discardBufferedStrokes(for: targetLayerIndex, incrementsRevision: true)
             state.canvas.clearSelection()
             state.nanoBanana.completeAppliedEdit(request: preview.request)
-            applyPresentation(paintDocumentClient.presentation(), state: &state)
+            AppFeature.canvasPresentationStateCoordinator.applyPresentation(
+                paintDocumentClient.presentation(),
+                to: &state
+            )
             state.application.presentBanner(state.application.appLanguage.localized("Nano Banana edit applied"))
         }
 

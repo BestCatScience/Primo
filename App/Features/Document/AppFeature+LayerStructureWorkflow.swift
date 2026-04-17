@@ -43,7 +43,7 @@ extension AppFeature {
         state: inout State,
         index: Int
     ) {
-        guard let layer = state.layerSidebar.layers.first(where: { $0.index == index }) else {
+        guard let layer = state.layerSidebar.layer(withIndex: index) else {
             return
         }
         let duplicateName = state.application.appLanguage == .japanese ? "\(layer.name) のコピー" : "\(layer.name) Copy"
