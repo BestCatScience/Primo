@@ -43,21 +43,14 @@ extension AppFeature {
         url: DocumentProjectPath,
         relativeFolderPath: RelativeProjectFolderPath?
     ) -> Effect<Action> {
-        do {
-            let destinationURL = try workspaceCatalogService.moveSavedProject(
-                url,
-                to: relativeFolderPath
+        let request = WorkspaceCatalogRequest.moveSavedProject(
+            WorkspaceSavedProjectMoveRequest(
+                sourceURL: url,
+                relativeFolderPath: relativeFolderPath,
+                openTabID: state.workspace.tabID(forSourceProjectURL: url)
             )
-            if let openTabID = state.workspace.tabID(forSourceProjectURL: url) {
-                state.workspace.updateTab(id: openTabID, sourceProjectURL: destinationURL)
-            }
-            return .send(.homeProjectsLoadRequested)
-        } catch {
-            state.application.presentFeedback(
-                .moveFailed(Self.optionalErrorMessage(error))
-            )
-            return .none
-        }
+        )
+        return .send(.workspaceCatalogRequested(request))
     }
 
     func handleOpenDocumentSelection(

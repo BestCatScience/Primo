@@ -39,6 +39,7 @@ struct AppFeature {
         var focusedWorkspacePane: WorkspacePane = .primary
         var workspaceLayout: WorkspaceLayoutMode = .single
         var pendingCloseConfirmation: PendingCloseConfirmationState?
+        var pendingLoadedWorkspaceProject: PendingLoadedWorkspaceProject?
     }
 
     struct RecoveryState: Equatable {
@@ -78,6 +79,9 @@ struct AppFeature {
         case workspacePersistenceRequested(WorkspacePersistenceRequest)
         case workspacePersistenceSucceeded(WorkspacePersistenceResult)
         case workspacePersistenceFailed(WorkspacePersistenceFailure)
+        case workspaceCatalogRequested(WorkspaceCatalogRequest)
+        case workspaceCatalogSucceeded(WorkspaceCatalogResult)
+        case workspaceCatalogFailed(WorkspaceCatalogFailure)
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch

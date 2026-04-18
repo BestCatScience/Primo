@@ -23,6 +23,11 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
             ),
             workspaceCatalogService: AppFeature.WorkspaceCatalogService(
                 documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C1")! }
+                )
             )
         )
         let useCase = AppFeature.WorkspaceProjectLoadUseCase(
@@ -96,6 +101,11 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 ),
                 workspaceCatalogService: AppFeature.WorkspaceCatalogService(
                     documentWorkspaceClient: documentWorkspaceClient
+                ),
+                workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                    uuidClient: UUIDClient(
+                        generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C2")! }
+                    )
                 )
             )
         )
@@ -146,6 +156,11 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 ),
                 workspaceCatalogService: AppFeature.WorkspaceCatalogService(
                     documentWorkspaceClient: documentWorkspaceClient
+                ),
+                workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                    uuidClient: UUIDClient(
+                        generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C3")! }
+                    )
                 )
             )
         )

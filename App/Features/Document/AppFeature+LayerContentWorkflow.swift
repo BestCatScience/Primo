@@ -12,50 +12,13 @@ extension AppFeature {
         let targetLayerIndex: Int
     }
 
-    struct LayerContentWorkflowService {
-        enum MutationFailure: Error, Equatable {
-            case createLayerFailed
-            case replacePixelsFailed(Int)
-            case setTextLayerFailed(Int)
-            case setActiveLayerFailed(Int)
-        }
-
+    struct LayerContentTransactionService {
         let paintDocumentClient: PaintDocumentClient
 
-        func applyPixels(
-            _ pixelData: Data,
-            to target: LayerContentMutationTarget
-        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
-            apply(target: target) { targetLayerIndex in
-                guard case .success = paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) else {
-                    return .failure(.replacePixelsFailed(targetLayerIndex))
-                }
-                guard case .success = paintDocumentClient.setActiveLayer(targetLayerIndex) else {
-                    return .failure(.setActiveLayerFailed(targetLayerIndex))
-                }
-                return .success(())
-            }
-        }
-
-        func applyTextLayer(
-            _ textLayer: TextLayerData,
-            to target: LayerContentMutationTarget
-        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
-            apply(target: target) { targetLayerIndex in
-                guard case .success = paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
-                    return .failure(.setTextLayerFailed(targetLayerIndex))
-                }
-                guard case .success = paintDocumentClient.setActiveLayer(targetLayerIndex) else {
-                    return .failure(.setActiveLayerFailed(targetLayerIndex))
-                }
-                return .success(())
-            }
-        }
-
-        private func apply(
+        func apply(
             target: LayerContentMutationTarget,
-            mutation: (Int) -> Result<Void, MutationFailure>
-        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
+            mutation: (Int) -> DocumentMutationResult
+        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
             let resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
             switch resolve(target) {
             case let .failure(failure):
@@ -68,14 +31,17 @@ extension AppFeature {
                 rollbackResolvedTargetIfNeeded(resolvedTarget)
                 return .failure(failure)
             case .success:
-                break
+                return .success(
+                    AppliedLayerContentMutation(
+                        targetLayerIndex: resolvedTarget.index
+                    )
+                )
             }
-            return .success(AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index))
         }
 
         private func resolve(
             _ target: LayerContentMutationTarget
-        ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), MutationFailure> {
+        ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), DocumentMutationFailure> {
             let originalActiveLayerIndex = paintDocumentClient.presentation().activeLayerIndex
             switch target {
             case let .existingLayer(index):
@@ -84,8 +50,8 @@ extension AppFeature {
                 switch paintDocumentClient.addLayer(name) {
                 case let .success(index):
                     return .success((index, true, originalActiveLayerIndex))
-                case .failure:
-                    return .failure(.createLayerFailed)
+                case let .failure(failure):
+                    return .failure(failure)
                 }
             }
         }
@@ -94,14 +60,56 @@ extension AppFeature {
             _ resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
         ) {
             if resolvedTarget.createdNewLayer, resolvedTarget.index >= 0 {
+                // Best-effort cleanup of a transient layer created for a failed content mutation.
                 _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
             }
+            // Best-effort restoration of the previously active layer after a failed content mutation.
             _ = paintDocumentClient.setActiveLayer(resolvedTarget.originalActiveLayerIndex)
         }
     }
 
+    struct LayerContentWorkflowService {
+        let paintDocumentClient: PaintDocumentClient
+        let layerContentTransactionService: LayerContentTransactionService
+
+        func applyPixels(
+            _ pixelData: Data,
+            to target: LayerContentMutationTarget
+        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
+            layerContentTransactionService.apply(target: target) { targetLayerIndex in
+                switch paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) {
+                case let .failure(failure):
+                    return .failure(failure)
+                case .success:
+                    return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                }
+            }
+        }
+
+        func applyTextLayer(
+            _ textLayer: TextLayerData,
+            to target: LayerContentMutationTarget
+        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
+            layerContentTransactionService.apply(target: target) { targetLayerIndex in
+                switch paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) {
+                case let .failure(failure):
+                    return .failure(failure)
+                case .success:
+                    return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                }
+            }
+        }
+    }
+
+    var layerContentTransactionService: LayerContentTransactionService {
+        LayerContentTransactionService(paintDocumentClient: paintDocumentClient)
+    }
+
     var layerContentWorkflowService: LayerContentWorkflowService {
-        LayerContentWorkflowService(paintDocumentClient: paintDocumentClient)
+        LayerContentWorkflowService(
+            paintDocumentClient: paintDocumentClient,
+            layerContentTransactionService: layerContentTransactionService
+        )
     }
 
     func handlePhotoImport(
@@ -125,8 +133,13 @@ extension AppFeature {
         ) {
         case let .success(mutation):
             appliedMutation = mutation
-        case .failure:
-            state.application.presentFeedback(.couldNotImportPhoto(nil))
+        case let .failure(failure):
+            state.application.presentFeedback(
+                documentMutationFeedbackMapper.feedback(
+                    for: failure,
+                    default: .couldNotImportPhoto(nil)
+                ) ?? .couldNotImportPhoto(nil)
+            )
             return .none
         }
         state.canvas.activateLayerForNewContent(appliedMutation.targetLayerIndex)
@@ -178,8 +191,13 @@ extension AppFeature {
         ) {
         case let .success(mutation):
             appliedMutation = mutation
-        case .failure:
-            state.application.presentFeedback(.textLayerApplyFailed)
+        case let .failure(failure):
+            state.application.presentFeedback(
+                documentMutationFeedbackMapper.feedback(
+                    for: failure,
+                    default: .textLayerApplyFailed
+                ) ?? .textLayerApplyFailed
+            )
             return .none
         }
         state.canvas.activateLayer(appliedMutation.targetLayerIndex)

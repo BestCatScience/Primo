@@ -27,6 +27,11 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             ),
             workspaceCatalogService: AppFeature.WorkspaceCatalogService(
                 documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A1")! }
+                )
             )
         )
 
@@ -75,6 +80,11 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             ),
             workspaceCatalogService: AppFeature.WorkspaceCatalogService(
                 documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A2")! }
+                )
             )
         )
 
@@ -93,6 +103,86 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
                     AppFeature.WorkspaceCloseTabsSaveResult(
                         operation: .tab(tab.id)
                     )
+                )
+            )
+        )
+    }
+
+    func testReserveNewTabBackingStoreReturnsPreparedTab() {
+        let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+        let reservedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/reserved-tab.atelier"))
+        let useCase = AppFeature.WorkspacePersistenceUseCase(
+            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                paintDocumentClient: .stub(),
+                documentWorkspaceClient: .stub(
+                    createTabBackingStoreURL: { _ in reservedURL }
+                )
+            ),
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: .stub()
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(generate: { reservedID })
+            )
+        )
+
+        let request = AppFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
+            AppFeature.WorkspaceTabReservationRequest(
+                title: "Imported",
+                sourceProjectURL: nil,
+                pane: .secondary
+            )
+        )
+
+        XCTAssertEqual(
+            useCase.execute(request),
+            .success(
+                .newTabBackingStoreReserved(
+                    AppFeature.PreparedWorkspaceTab(
+                        id: reservedID,
+                        title: "Imported",
+                        backingStoreURL: reservedURL,
+                        sourceProjectURL: nil,
+                        pane: .secondary
+                    )
+                )
+            )
+        )
+    }
+
+    func testReserveNewTabBackingStoreMapsCreateFailure() {
+        let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!
+        let useCase = AppFeature.WorkspacePersistenceUseCase(
+            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                paintDocumentClient: .stub(),
+                documentWorkspaceClient: .stub(
+                    createTabBackingStoreURL: { _ in
+                        throw TestError.expected("create tab failed")
+                    }
+                )
+            ),
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: .stub()
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(generate: { reservedID })
+            )
+        )
+
+        let request = AppFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
+            AppFeature.WorkspaceTabReservationRequest(
+                title: "Imported",
+                sourceProjectURL: nil,
+                pane: .primary
+            )
+        )
+
+        XCTAssertEqual(
+            useCase.execute(request),
+            .failure(
+                AppFeature.WorkspacePersistenceFailure(
+                    request: request,
+                    feedback: .couldNotCreateTab
                 )
             )
         )

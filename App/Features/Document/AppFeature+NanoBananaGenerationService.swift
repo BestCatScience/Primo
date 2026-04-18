@@ -96,14 +96,8 @@ extension AppFeature {
     }
 
     private struct NanoBananaPreviewApplicationPlan {
-        enum Target {
-            case existingLayer(index: Int)
-            case newLayer(name: String)
-        }
-
         let preview: NanoBananaPreviewState
-        let target: Target
-        let originalActiveLayerIndex: Int
+        let target: LayerContentMutationTarget
     }
 
     private struct NanoBananaPreviewApplicationContract {
@@ -120,8 +114,7 @@ extension AppFeature {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .existingLayer(index: preview.outputLayerIndex),
-                        originalActiveLayerIndex: state.canvas.activeLayerIndex
+                        target: .existingLayer(index: preview.outputLayerIndex)
                     )
                 )
 
@@ -129,8 +122,7 @@ extension AppFeature {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar)),
-                        originalActiveLayerIndex: state.canvas.activeLayerIndex
+                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar))
                     )
                 )
             }
@@ -143,52 +135,27 @@ extension AppFeature {
         }
 
         let paintDocumentClient: PaintDocumentClient
+        let layerContentTransactionService: LayerContentTransactionService
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
         ) -> Result<AppliedPreview, DocumentMutationFailure> {
-            let resolvedTarget: (index: Int, createdNewLayer: Bool)
-            switch plan.target {
-            case let .existingLayer(index):
-                resolvedTarget = (index, false)
-            case let .newLayer(name):
-                switch paintDocumentClient.addLayer(name) {
-                case let .success(index):
-                    resolvedTarget = (index, true)
+            layerContentTransactionService.apply(target: plan.target) { targetLayerIndex in
+                switch paintDocumentClient.setActiveLayer(targetLayerIndex) {
                 case let .failure(failure):
                     return .failure(failure)
+                case .success:
+                    return paintDocumentClient.replaceLayerPixels(
+                        targetLayerIndex,
+                        plan.preview.pixelData
+                    )
                 }
             }
-
-            switch paintDocumentClient.setActiveLayer(resolvedTarget.index) {
-            case .success:
-                break
-            case let .failure(failure):
-                rollback(plan: plan, resolvedTarget: resolvedTarget)
-                return .failure(failure)
-            }
-            switch paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) {
-            case .success:
-                break
-            case let .failure(failure):
-                rollback(plan: plan, resolvedTarget: resolvedTarget)
-                return .failure(failure)
-            }
-            return .success(
+            .map {
                 AppliedPreview(
-                    targetLayerIndex: resolvedTarget.index
+                    targetLayerIndex: $0.targetLayerIndex
                 )
-            )
-        }
-
-        private func rollback(
-            plan: NanoBananaPreviewApplicationPlan,
-            resolvedTarget: (index: Int, createdNewLayer: Bool)
-        ) {
-            if resolvedTarget.createdNewLayer {
-                _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
             }
-            _ = paintDocumentClient.setActiveLayer(plan.originalActiveLayerIndex)
         }
     }
 
@@ -392,7 +359,10 @@ extension AppFeature {
     }
 
     private var nanoBananaDocumentService: NanoBananaDocumentService {
-        NanoBananaDocumentService(paintDocumentClient: paintDocumentClient)
+        NanoBananaDocumentService(
+            paintDocumentClient: paintDocumentClient,
+            layerContentTransactionService: layerContentTransactionService
+        )
     }
 
     func handleNanoBananaEditRequest(

@@ -72,10 +72,38 @@ extension AppFeature {
         let tabs: [OpenDocumentTab]
     }
 
+    struct WorkspaceTabReservationRequest: Equatable, Sendable {
+        let title: String
+        let sourceProjectURL: DocumentProjectPath?
+        let pane: WorkspacePane
+    }
+
+    struct WorkspaceSavedProjectMoveRequest: Equatable, Sendable {
+        let sourceURL: DocumentProjectPath
+        let relativeFolderPath: RelativeProjectFolderPath?
+        let openTabID: OpenDocumentTab.ID?
+    }
+
+    struct WorkspaceSavedProjectMoveResult: Equatable, Sendable {
+        let sourceURL: DocumentProjectPath
+        let destinationURL: DocumentProjectPath
+        let openTabID: OpenDocumentTab.ID?
+    }
+
+    struct WorkspaceAutosaveEntryDiscardRequest: Equatable, Sendable {
+        let autosaveID: WorkspaceItemID
+    }
+
+    struct WorkspaceCatalogFailure: Error, Equatable {
+        let request: WorkspaceCatalogRequest
+        let feedback: ApplicationFeedback
+    }
+
     enum WorkspacePersistenceRequest: Equatable, Sendable {
         case dirtyPresentationRefreshed(WorkspaceDirtyPresentationRequest)
         case saveActiveDocument(WorkspaceDocumentSaveRequest)
         case prepareDocumentReplacement(WorkspaceDocumentReplacementRequest)
+        case reserveNewTabBackingStore(WorkspaceTabReservationRequest)
         case loadedWorkspaceFollowUp(LoadedWorkspaceFollowUpPersistenceRequest)
         case saveTabsForClose(WorkspaceCloseTabsSaveRequest)
         case discardAutosaveArtifacts(WorkspaceArtifactDiscardRequest)
@@ -85,12 +113,23 @@ extension AppFeature {
         case dirtyPresentationPersisted(OpenDocumentTab.ID)
         case activeDocumentSaved(WorkspaceDocumentSaveResult)
         case documentReplacementPrepared(OpenDocumentTab.ID)
+        case newTabBackingStoreReserved(PreparedWorkspaceTab)
         case loadedWorkspaceFollowUpApplied(LoadedWorkspaceFollowUpPersistenceResult)
         case tabsSavedForClose(WorkspaceCloseTabsSaveResult)
         case autosaveArtifactsDiscarded
     }
 
-    struct LoadedWorkspaceProjectPlan {
+    enum WorkspaceCatalogRequest: Equatable, Sendable {
+        case moveSavedProject(WorkspaceSavedProjectMoveRequest)
+        case discardAutosaveEntry(WorkspaceAutosaveEntryDiscardRequest)
+    }
+
+    enum WorkspaceCatalogResult: Equatable, Sendable {
+        case savedProjectMoved(WorkspaceSavedProjectMoveResult)
+        case autosaveEntryDiscarded(WorkspaceItemID)
+    }
+
+    struct LoadedWorkspaceProjectPlan: Equatable, Sendable {
         enum Destination: Equatable, Sendable {
             case selectedTab(tabID: OpenDocumentTab.ID, pane: WorkspacePane)
             case newTab(title: String, sourceProjectURL: DocumentProjectPath?)
@@ -189,6 +228,7 @@ extension AppFeature {
     struct WorkspacePersistenceUseCase: Sendable {
         let workspaceBackingStoreService: WorkspaceBackingStoreService
         let workspaceCatalogService: WorkspaceCatalogService
+        let workspaceIdentityService: WorkspaceIdentityService
 
         func execute(
             _ request: WorkspacePersistenceRequest
@@ -200,6 +240,8 @@ extension AppFeature {
                 return saveActiveDocument(saveRequest, request: request)
             case let .prepareDocumentReplacement(replacementRequest):
                 return prepareDocumentReplacement(replacementRequest, request: request)
+            case let .reserveNewTabBackingStore(reservationRequest):
+                return reserveNewTabBackingStore(reservationRequest, request: request)
             case let .loadedWorkspaceFollowUp(followUpRequest):
                 return applyLoadedWorkspaceFollowUp(followUpRequest, request: request)
             case let .saveTabsForClose(closeRequest):
@@ -309,6 +351,34 @@ extension AppFeature {
                     WorkspacePersistenceFailure(
                         request: request,
                         feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func reserveNewTabBackingStore(
+            _ requestPayload: WorkspaceTabReservationRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            let tabID = workspaceIdentityService.generateTabID()
+            do {
+                let backingStoreURL = try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
+                return .success(
+                    .newTabBackingStoreReserved(
+                        PreparedWorkspaceTab(
+                            id: tabID,
+                            title: requestPayload.title,
+                            backingStoreURL: backingStoreURL,
+                            sourceProjectURL: requestPayload.sourceProjectURL,
+                            pane: requestPayload.pane
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .couldNotCreateTab
                     )
                 )
             }
@@ -426,6 +496,66 @@ extension AppFeature {
         }
     }
 
+    struct WorkspaceCatalogUseCase: Sendable {
+        let workspaceCatalogService: WorkspaceCatalogService
+
+        func execute(
+            _ request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            switch request {
+            case let .moveSavedProject(moveRequest):
+                return moveSavedProject(moveRequest, request: request)
+            case let .discardAutosaveEntry(discardRequest):
+                return discardAutosaveEntry(discardRequest, request: request)
+            }
+        }
+
+        private func moveSavedProject(
+            _ requestPayload: WorkspaceSavedProjectMoveRequest,
+            request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            do {
+                let destinationURL = try workspaceCatalogService.moveSavedProject(
+                    requestPayload.sourceURL,
+                    to: requestPayload.relativeFolderPath
+                )
+                return .success(
+                    .savedProjectMoved(
+                        WorkspaceSavedProjectMoveResult(
+                            sourceURL: requestPayload.sourceURL,
+                            destinationURL: destinationURL,
+                            openTabID: requestPayload.openTabID
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspaceCatalogFailure(
+                        request: request,
+                        feedback: .moveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func discardAutosaveEntry(
+            _ requestPayload: WorkspaceAutosaveEntryDiscardRequest,
+            request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            do {
+                try workspaceCatalogService.discardAutosaveEntry(requestPayload.autosaveID)
+                return .success(.autosaveEntryDiscarded(requestPayload.autosaveID))
+            } catch {
+                return .failure(
+                    WorkspaceCatalogFailure(
+                        request: request,
+                        feedback: .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+    }
+
     struct WorkspaceCatalogService: Sendable {
         let documentWorkspaceClient: DocumentWorkspaceClient
 
@@ -481,6 +611,11 @@ extension AppFeature {
         let pane: WorkspacePane
     }
 
+    struct PendingLoadedWorkspaceProject: Equatable, Sendable {
+        let loaded: LoadedPaintProject
+        let plan: LoadedWorkspaceProjectPlan
+    }
+
     var workspaceBackingStoreService: WorkspaceBackingStoreService {
         WorkspaceBackingStoreService(
             paintDocumentClient: paintDocumentClient,
@@ -503,6 +638,13 @@ extension AppFeature {
     var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
         WorkspacePersistenceUseCase(
             workspaceBackingStoreService: workspaceBackingStoreService,
+            workspaceCatalogService: workspaceCatalogService,
+            workspaceIdentityService: workspaceIdentityService
+        )
+    }
+
+    var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
+        WorkspaceCatalogUseCase(
             workspaceCatalogService: workspaceCatalogService
         )
     }
@@ -617,26 +759,40 @@ extension AppFeature {
         using plan: LoadedWorkspaceProjectPlan,
         state: inout State
     ) -> Effect<Action> {
-        let preparedTab: PreparedWorkspaceTab?
         switch plan.destination {
-        case .selectedTab, .activeTab:
-            preparedTab = nil
         case let .newTab(title, sourceProjectURL):
-            switch prepareNewTabReservation(
-                title: title,
-                sourceProjectURL: sourceProjectURL,
-                state: state
-            ) {
-            case let .success(reservation):
-                preparedTab = reservation
-            case let .failure(failure):
-                state.application.completeWorkspaceProjectLoad(
-                    feedback: failure.feedback
+            state.workspace.pendingLoadedWorkspaceProject = PendingLoadedWorkspaceProject(
+                loaded: loaded,
+                plan: plan
+            )
+            return .send(
+                .workspacePersistenceRequested(
+                    .reserveNewTabBackingStore(
+                        WorkspaceTabReservationRequest(
+                            title: title,
+                            sourceProjectURL: sourceProjectURL,
+                            pane: state.workspace.focusedWorkspacePane
+                        )
+                    )
                 )
-                return .none
-            }
-        }
+            )
 
+        case .selectedTab, .activeTab:
+            return completeLoadedWorkspaceProject(
+                loaded,
+                using: plan,
+                preparedTab: nil,
+                state: &state
+            )
+        }
+    }
+
+    func completeLoadedWorkspaceProject(
+        _ loaded: LoadedPaintProject,
+        using plan: LoadedWorkspaceProjectPlan,
+        preparedTab: PreparedWorkspaceTab?,
+        state: inout State
+    ) -> Effect<Action> {
         let activationResult: Result<Void, WorkspacePersistenceFailure>
         switch plan.destination {
         case let .selectedTab(tabID, pane):
@@ -645,12 +801,14 @@ extension AppFeature {
             activationResult = .success(())
 
         case .newTab:
-            applyLoadedProject(loaded, state: &state)
-            if let preparedTab {
-                activationResult = activatePreparedTab(preparedTab, state: &state)
-            } else {
-                activationResult = .success(())
+            guard let preparedTab else {
+                state.application.completeWorkspaceProjectLoad(
+                    feedback: .couldNotCreateTab
+                )
+                return .none
             }
+            applyLoadedProject(loaded, state: &state)
+            activationResult = activatePreparedTab(preparedTab, state: &state)
 
         case let .activeTab(title, sourceProjectURL):
             applyLoadedProject(loaded, state: &state)
@@ -835,6 +993,19 @@ extension AppFeature {
         }
     }
 
+    func workspaceCatalogEffect(
+        for request: WorkspaceCatalogRequest
+    ) -> Effect<Action> {
+        .run { [workspaceCatalogUseCase] send in
+            switch workspaceCatalogUseCase.execute(request) {
+            case let .success(result):
+                await send(.workspaceCatalogSucceeded(result))
+            case let .failure(failure):
+                await send(.workspaceCatalogFailed(failure))
+            }
+        }
+    }
+
     func documentReplacementPreparationEffect(
         request: WorkspaceDocumentReplacementRequest?,
         onPrepared: @escaping @Sendable () -> Action,
@@ -858,6 +1029,12 @@ extension AppFeature {
         request: WorkspacePersistenceRequest
     ) -> Effect<Action> {
         workspacePersistenceEffect(for: request)
+    }
+
+    func handleWorkspaceCatalogRequested(
+        request: WorkspaceCatalogRequest
+    ) -> Effect<Action> {
+        workspaceCatalogEffect(for: request)
     }
 
     func handleWorkspacePersistenceSucceeded(
@@ -891,6 +1068,18 @@ extension AppFeature {
         case .documentReplacementPrepared:
             return .none
 
+        case let .newTabBackingStoreReserved(preparedTab):
+            guard let pendingLoadedWorkspaceProject = state.workspace.pendingLoadedWorkspaceProject else {
+                return .none
+            }
+            state.workspace.pendingLoadedWorkspaceProject = nil
+            return completeLoadedWorkspaceProject(
+                pendingLoadedWorkspaceProject.loaded,
+                using: pendingLoadedWorkspaceProject.plan,
+                preparedTab: preparedTab,
+                state: &state
+            )
+
         case let .loadedWorkspaceFollowUpApplied(followUp):
             applyLoadedWorkspaceSuccessEffects(
                 followUp.successEffects,
@@ -914,7 +1103,12 @@ extension AppFeature {
         failure: WorkspacePersistenceFailure
     ) -> Effect<Action> {
         switch failure.request {
-        case .loadedWorkspaceFollowUp:
+        case .some(.loadedWorkspaceFollowUp):
+            state.application.completeWorkspaceProjectLoad(
+                feedback: failure.feedback
+            )
+        case .some(.reserveNewTabBackingStore):
+            state.workspace.pendingLoadedWorkspaceProject = nil
             state.application.completeWorkspaceProjectLoad(
                 feedback: failure.feedback
             )
@@ -922,6 +1116,30 @@ extension AppFeature {
             state.application.presentFeedback(failure.feedback)
         }
         return .none
+    }
+
+    func handleWorkspaceCatalogSucceeded(
+        state: inout State,
+        result: WorkspaceCatalogResult
+    ) -> Effect<Action> {
+        switch result {
+        case let .savedProjectMoved(moveResult):
+            if let openTabID = moveResult.openTabID {
+                state.workspace.updateTab(id: openTabID, sourceProjectURL: moveResult.destinationURL)
+            }
+            return .send(.homeProjectsLoadRequested)
+
+        case let .autosaveEntryDiscarded(autosaveID):
+            state.recovery.removeItem(id: autosaveID)
+            return .none
+        }
+    }
+
+    func handleWorkspaceCatalogFailed(
+        state: inout State,
+        failure: WorkspaceCatalogFailure
+    ) {
+        state.application.presentFeedback(failure.feedback)
     }
 
     func applyDirtyPresentation(state: inout State) -> Effect<Action> {

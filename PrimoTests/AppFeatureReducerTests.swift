@@ -141,4 +141,141 @@ final class AppFeatureReducerTests: XCTestCase {
         XCTAssertFalse(state.application.showsHome)
         XCTAssertEqual(state.application.bannerMessage, "workspace follow-up failed")
     }
+
+    func testMoveSavedProjectUsesWorkspaceCatalogRequest() async {
+        let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/source.atelier"))
+        let destinationURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/moved.atelier"))
+        let activeTab = OpenDocumentTab.testValue(sourceProjectURL: sourceURL)
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.workspace.openTabs = [activeTab]
+                state.workspace.activeTabID = activeTab.id
+                state.workspace.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.documentWorkspaceClient = .stub(
+                moveSavedProject: { _, _ in destinationURL }
+            )
+        }
+        store.exhaustivity = .off
+
+        await store.send(.moveSavedProject(sourceURL, nil))
+        await store.receive(
+            .workspaceCatalogRequested(
+                .moveSavedProject(
+                    AppFeature.WorkspaceSavedProjectMoveRequest(
+                        sourceURL: sourceURL,
+                        relativeFolderPath: nil,
+                        openTabID: activeTab.id
+                    )
+                )
+            )
+        )
+        await store.receive(
+            .workspaceCatalogSucceeded(
+                .savedProjectMoved(
+                    AppFeature.WorkspaceSavedProjectMoveResult(
+                        sourceURL: sourceURL,
+                        destinationURL: destinationURL,
+                        openTabID: activeTab.id
+                    )
+                )
+            )
+        ) {
+            $0.workspace.openTabs[0].sourceProjectURL = destinationURL
+        }
+        await store.receive(.homeProjectsLoadRequested)
+    }
+
+    func testAutosaveRecoveryDiscardRemovesStateOnlyAfterCatalogSuccess() async {
+        let autosaveID = WorkspaceItemID.testValue("autosave-1")
+        let autosaveItem = AutosaveRecoveryItem(
+            id: autosaveID,
+            title: "Recovered",
+            sourceProjectURL: nil,
+            autosaveProjectURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/autosave.atelier")),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            previewImageData: nil
+        )
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.recovery.items = [autosaveItem]
+                state.recovery.isPresented = true
+                return state
+            }()
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.documentWorkspaceClient = .stub(
+                discardAutosaveEntry: { _ in }
+            )
+        }
+        store.exhaustivity = .off
+
+        await store.send(.autosaveRecoveryDiscardRequested(autosaveID))
+        XCTAssertEqual(store.state.recovery.items, [autosaveItem])
+        await store.receive(
+            .workspaceCatalogRequested(
+                .discardAutosaveEntry(
+                    AppFeature.WorkspaceAutosaveEntryDiscardRequest(
+                        autosaveID: autosaveID
+                    )
+                )
+            )
+        )
+        await store.receive(
+            .workspaceCatalogSucceeded(.autosaveEntryDiscarded(autosaveID))
+        ) {
+            $0.recovery.items = []
+        }
+    }
+
+    func testOpenDocumentLoadedRequestsReservationBeforeAppendingNewTab() async {
+        let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/imported.atelier"))
+        let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
+        let loaded = LoadedPaintProject.testValue()
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        } withDependencies: {
+            $0.uuidClient = UUIDClient(generate: { reservedID })
+            $0.documentWorkspaceClient = .stub(
+                createTabBackingStoreURL: { id in
+                    DocumentProjectPath(URL(fileURLWithPath: "/tmp/\(id.uuidString).atelier"))
+                }
+            )
+        }
+        store.exhaustivity = .off
+
+        await store.send(.openDocumentLoaded(loaded, sourceURL)) {
+            $0.workspace.pendingLoadedWorkspaceProject = AppFeature.PendingLoadedWorkspaceProject(
+                loaded: loaded,
+                plan: AppFeature.LoadedWorkspaceProjectPlan(
+                    destination: .newTab(
+                        title: sourceURL.displayName,
+                        sourceProjectURL: sourceURL
+                    ),
+                    successEffects: .init(
+                        feedback: .openedDocument(loaded.presentation.layerRows.count)
+                    )
+                )
+            )
+        }
+        XCTAssertTrue(store.state.workspace.openTabs.isEmpty)
+        await store.receive(
+            .workspacePersistenceRequested(
+                .reserveNewTabBackingStore(
+                    AppFeature.WorkspaceTabReservationRequest(
+                        title: sourceURL.displayName,
+                        sourceProjectURL: sourceURL,
+                        pane: .primary
+                    )
+                )
+            )
+        )
+    }
 }
