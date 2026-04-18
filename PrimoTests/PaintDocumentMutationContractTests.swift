@@ -3,6 +3,15 @@ import XCTest
 @testable import Primo
 
 final class PaintDocumentMutationContractTests: XCTestCase {
+    func testSessionUndoRejectsMissingHistory() {
+        let session = PaintDocumentSession()
+
+        XCTAssertEqual(
+            session.undo(),
+            .failure(.noUndoState)
+        )
+    }
+
     func testSessionSetActiveLayerRejectsInvalidLayerIndex() {
         let session = PaintDocumentSession()
 
@@ -31,6 +40,15 @@ final class PaintDocumentMutationContractTests: XCTestCase {
         XCTAssertEqual(
             session.setLayerOpacity(index: 0, opacity: 1.4),
             .failure(.invalidOpacity(1.4))
+        )
+    }
+
+    func testSessionAssignLayerRejectsInvalidFolderID() {
+        let session = PaintDocumentSession()
+
+        XCTAssertEqual(
+            session.assignLayer(index: 0, toFolder: 999),
+            .failure(.invalidFolderID(999))
         )
     }
 

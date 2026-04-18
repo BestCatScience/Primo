@@ -237,20 +237,6 @@ extension PaintDocumentSession {
         return nil
     }
 
-    func wrapMutationResult(
-        _ didMutate: Bool,
-        operation: String
-    ) -> DocumentMutationResult {
-        didMutate ? .success(()) : .failure(.bridgeMutationFailed(operation))
-    }
-
-    func wrapIndexedMutationResult(
-        _ value: Int,
-        operation: String
-    ) -> DocumentIndexedMutationResult {
-        value >= 0 ? .success(value) : .failure(.bridgeMutationFailed(operation))
-    }
-
     func beginPixelLayerMutation(
         at index: Int,
         preservesTextLayerMetadata: Bool = false
@@ -456,12 +442,16 @@ struct PaintDocumentSessionDocumentGateway {
             bridge.canRedo()
         }
 
-        func undo() -> Bool {
+        func undoResult() -> DocumentMutationResult {
             bridge.undo()
+                ? .success(())
+                : .failure(.bridgeMutationFailed("undo"))
         }
 
-        func redo() -> Bool {
+        func redoResult() -> DocumentMutationResult {
             bridge.redo()
+                ? .success(())
+                : .failure(.bridgeMutationFailed("redo"))
         }
 
         func clearHistory() {
@@ -517,20 +507,29 @@ struct PaintDocumentSessionDocumentGateway {
             Int(bridge.duplicateLayer(at: index, name: name))
         }
 
-        func deleteLayer(index: Int) -> Bool {
+        func deleteLayerResult(index: Int) -> DocumentMutationResult {
             bridge.deleteLayer(at: index)
+                ? .success(())
+                : .failure(.bridgeMutationFailed("deleteLayer"))
         }
 
-        func moveLayer(from index: Int, to destinationIndex: Int) -> Bool {
+        func moveLayerResult(
+            from index: Int,
+            to destinationIndex: Int
+        ) -> DocumentMutationResult {
             bridge.moveLayer(at: index, to: destinationIndex)
+                ? .success(())
+                : .failure(.bridgeMutationFailed("moveLayer"))
         }
 
         func createFolder(name: String, layerIndex: Int) -> Int {
             Int(bridge.createFolder(name: name, layerIndex: layerIndex))
         }
 
-        func deleteFolder(id folderID: Int) -> Bool {
+        func deleteFolderResult(id folderID: Int) -> DocumentMutationResult {
             bridge.deleteFolder(id: folderID)
+                ? .success(())
+                : .failure(.bridgeMutationFailed("deleteFolder"))
         }
 
         func setFolderVisible(_ isVisible: Bool, folderID: Int) {
@@ -545,8 +544,10 @@ struct PaintDocumentSessionDocumentGateway {
             bridge.setFolderExpanded(isExpanded, folderID: folderID)
         }
 
-        func setLayerFolder(index: Int, folderID: Int) -> Bool {
+        func setLayerFolderResult(index: Int, folderID: Int) -> DocumentMutationResult {
             bridge.setLayerFolder(at: index, folderID: folderID)
+                ? .success(())
+                : .failure(.bridgeMutationFailed("assignLayerToFolder"))
         }
 
         func setLayerName(_ name: String, index: Int) {
@@ -593,8 +594,10 @@ struct PaintDocumentSessionDocumentGateway {
             bridge.clearLayerMask(at: index)
         }
 
-        func applyLayerMask(index: Int) -> Bool {
+        func applyLayerMaskResult(index: Int) -> DocumentMutationResult {
             bridge.applyLayerMask(at: index)
+                ? .success(())
+                : .failure(.bridgeMutationFailed("applyLayerMask"))
         }
 
         func clearLayer(index: Int) {
@@ -623,14 +626,25 @@ struct PaintDocumentSessionDocumentGateway {
             bridgeService.descriptors.makeProcessingDescriptor(from: request)
         }
 
-        func applyLayerProcessing(index: Int, descriptor: APPaintLayerProcessingDescriptor) -> Bool {
+        func applyLayerProcessingResult(
+            index: Int,
+            descriptor: APPaintLayerProcessingDescriptor,
+            operation: String
+        ) -> DocumentMutationResult {
             bridge.applyLayerProcessing(at: index, descriptor: descriptor)
+                ? .success(())
+                : .failure(.bridgeMutationFailed(operation))
         }
 
-        func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> Bool {
-            applyLayerProcessing(
+        func applyLayerProcessingResult(
+            index: Int,
+            request: LayerProcessingRequest,
+            operation: String
+        ) -> DocumentMutationResult {
+            applyLayerProcessingResult(
                 index: index,
-                descriptor: makeProcessingDescriptor(from: request)
+                descriptor: makeProcessingDescriptor(from: request),
+                operation: operation
             )
         }
     }

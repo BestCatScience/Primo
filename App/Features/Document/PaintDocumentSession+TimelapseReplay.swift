@@ -24,11 +24,11 @@ extension PaintDocumentSession {
             invalidateThumbnailCache(for: layerIndex.rawValue)
 
         case .undo:
-            _ = documentGateway.history.undo()
+            _ = documentGateway.history.undoResult()
             invalidateThumbnailCache()
 
         case .redo:
-            _ = documentGateway.history.redo()
+            _ = documentGateway.history.redoResult()
             invalidateThumbnailCache()
 
         case let .addLayer(name):
@@ -40,11 +40,11 @@ extension PaintDocumentSession {
             invalidateThumbnailCache()
 
         case let .deleteLayer(index):
-            _ = documentGateway.layers.deleteLayer(index: index.rawValue)
+            _ = documentGateway.layers.deleteLayerResult(index: index.rawValue)
             invalidateThumbnailCache()
 
         case let .moveLayer(index, destinationIndex):
-            _ = documentGateway.layers.moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
+            _ = documentGateway.layers.moveLayerResult(from: index.rawValue, to: destinationIndex.rawValue)
             invalidateThumbnailCache()
 
         case let .createFolder(folderID, name, anchorLayerIndex):
@@ -53,7 +53,7 @@ extension PaintDocumentSession {
 
         case let .deleteFolder(folderID):
             if let resolved = folderIDMap[folderID] {
-                _ = documentGateway.layers.deleteFolder(id: resolved)
+                _ = documentGateway.layers.deleteFolderResult(id: resolved)
                 folderIDMap.removeValue(forKey: folderID)
             }
 
@@ -64,7 +64,7 @@ extension PaintDocumentSession {
 
         case let .assignLayerToFolder(index, folderID):
             let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
-            _ = documentGateway.layers.setLayerFolder(index: index.rawValue, folderID: resolvedFolderID)
+            _ = documentGateway.layers.setLayerFolderResult(index: index.rawValue, folderID: resolvedFolderID)
             invalidateThumbnailCache()
 
         case let .setLayerVisibility(index, isVisible):
@@ -104,7 +104,7 @@ extension PaintDocumentSession {
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .applyLayerMask(index):
-            _ = documentGateway.layers.applyLayerMask(index: index.rawValue)
+            _ = documentGateway.layers.applyLayerMaskResult(index: index.rawValue)
             invalidateThumbnailCache(for: index.rawValue)
 
         case let .clearLayer(index):

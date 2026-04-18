@@ -21,16 +21,15 @@ extension PaintDocumentSession {
         if let failure = folderMutationFailure(folderID) {
             return .failure(failure)
         }
-        let didDelete = documentGateway.layers.deleteFolder(id: folderID)
-        if didDelete {
+        switch documentGateway.layers.deleteFolderResult(id: folderID) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             applyRecordedLifecycleMutation(
                 recording: .deleteFolder(folderID: .unchecked(folderID))
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didDelete,
-            operation: "deleteFolder"
-        )
     }
 
     func setFolderVisibility(folderID: Int, isVisible: Bool) -> DocumentMutationResult {
@@ -67,18 +66,17 @@ extension PaintDocumentSession {
         if folderID >= 0, let failure = folderMutationFailure(folderID) {
             return .failure(failure)
         }
-        let didAssign = documentGateway.layers.setLayerFolder(index: index, folderID: folderID)
-        if didAssign {
+        switch documentGateway.layers.setLayerFolderResult(index: index, folderID: folderID) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             applyRecordedLifecycleMutation(
                 recording: .assignLayerToFolder(
                     index: .unchecked(index),
                     folderID: folderID >= 0 ? .unchecked(folderID) : nil
                 )
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didAssign,
-            operation: "assignLayerToFolder"
-        )
     }
 }

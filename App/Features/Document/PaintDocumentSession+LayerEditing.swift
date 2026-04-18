@@ -14,28 +14,26 @@ extension PaintDocumentSession {
         guard canUndo() else {
             return .failure(.noUndoState)
         }
-        let didUndo = documentGateway.history.undo()
-        if didUndo {
+        switch documentGateway.history.undoResult() {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             applyDocumentLifecycleMutation(recording: .undo)
+            return .success(())
         }
-        return wrapMutationResult(
-            didUndo,
-            operation: "undo"
-        )
     }
 
     func redo() -> DocumentMutationResult {
         guard canRedo() else {
             return .failure(.noRedoState)
         }
-        let didRedo = documentGateway.history.redo()
-        if didRedo {
+        switch documentGateway.history.redoResult() {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             applyDocumentLifecycleMutation(recording: .redo)
+            return .success(())
         }
-        return wrapMutationResult(
-            didRedo,
-            operation: "redo"
-        )
     }
 
     func addLayer(name: String) -> DocumentIndexedMutationResult {
@@ -71,17 +69,16 @@ extension PaintDocumentSession {
         if let failure = layerMutationFailure(index) {
             return .failure(failure)
         }
-        let didDelete = documentGateway.layers.deleteLayer(index: index)
-        if didDelete {
+        switch documentGateway.layers.deleteLayerResult(index: index) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             remapStoredTextLayersForDeletion(of: index)
             applyDocumentLifecycleMutation(
                 recording: .deleteLayer(index: .unchecked(index))
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didDelete,
-            operation: "deleteLayer"
-        )
     }
 
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
@@ -91,8 +88,10 @@ extension PaintDocumentSession {
         if let failure = layerMutationFailure(destinationIndex) {
             return .failure(failure)
         }
-        let didMove = documentGateway.layers.moveLayer(from: index, to: destinationIndex)
-        if didMove {
+        switch documentGateway.layers.moveLayerResult(from: index, to: destinationIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             remapStoredTextLayersForMove(from: index, to: destinationIndex)
             applyDocumentLifecycleMutation(
                 recording: .moveLayer(
@@ -100,10 +99,7 @@ extension PaintDocumentSession {
                     destinationIndex: .unchecked(destinationIndex)
                 )
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didMove,
-            operation: "moveLayer"
-        )
     }
 }

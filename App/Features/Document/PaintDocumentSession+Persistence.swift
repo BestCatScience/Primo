@@ -171,7 +171,7 @@ extension PaintDocumentSession {
 
         for layer in restorationPlan.layers {
             guard let storedFolderID = layer.folderID, let resolvedFolderID = folderIDMap[storedFolderID] else { continue }
-            _ = documentGateway.layers.setLayerFolder(index: layer.index, folderID: resolvedFolderID)
+            _ = documentGateway.layers.setLayerFolderResult(index: layer.index, folderID: resolvedFolderID)
         }
 
         documentGateway.layers.setActiveLayerIndex(restorationPlan.activeLayerIndex)

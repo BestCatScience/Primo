@@ -29,105 +29,10 @@ extension AppFeature {
         let errorMessage: String?
     }
 
-    struct WorkspaceProjectLoadUseCase: Sendable {
-        let paintDocumentClient: PaintDocumentClient
-        let documentImportClient: DocumentImportClient
-        let workspaceBackingStoreService: WorkspaceBackingStoreService
+    struct WorkspaceProjectReplacementPreparationService: Sendable {
         let workspacePersistenceUseCase: WorkspacePersistenceUseCase
 
-        func execute(
-            _ request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            switch request {
-            case let .project(operation):
-                return loadProject(operation, request: request)
-            case let .imported(operation):
-                return loadImportedProject(operation, request: request)
-            }
-        }
-
-        private func loadProject(
-            _ operation: WorkspaceProjectLoadOperation,
-            request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            switch prepareDocumentReplacementIfNeeded(
-                operation.prepareDocumentReplacementRequest,
-                request: request
-            ) {
-            case let .failure(failure):
-                return .failure(failure)
-            case .success:
-                break
-            }
-
-            do {
-                let loaded = try paintDocumentClient.loadProject(operation.fileURL)
-                if let workspaceItemToRemove = operation.removeWorkspaceItemOnSuccess {
-                    do {
-                        // Best-effort cleanup of a staged workspace item after a successful load.
-                        try workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
-                    } catch {
-                    }
-                }
-                return .success(.project(loaded))
-            } catch {
-                return .failure(
-                    WorkspaceProjectLoadFailure(
-                        request: request,
-                        feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
-                        errorMessage: AppFeature.optionalErrorMessage(error)
-                    )
-                )
-            }
-        }
-
-        private func loadImportedProject(
-            _ operation: WorkspaceImportedProjectLoadOperation,
-            request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            switch prepareDocumentReplacementIfNeeded(
-                operation.prepareDocumentReplacementRequest,
-                request: request
-            ) {
-            case let .failure(failure):
-                return .failure(failure)
-            case .success:
-                break
-            }
-
-            switch documentImportClient.stageImportedDocument(
-                ImportedDocumentStageRequest(sourceURL: operation.sourceURL)
-            ) {
-            case let .failure(error):
-                return .failure(
-                    WorkspaceProjectLoadFailure(
-                        request: request,
-                        feedback: .openFailed(error.errorDescription),
-                        errorMessage: error.errorDescription
-                    )
-                )
-
-            case let .success(staged):
-                defer {
-                    // Best-effort cleanup of a staged imported project after load completes.
-                    _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
-                }
-                do {
-                    let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
-                    return .success(.imported(loaded, staged.suggestedTitle))
-                } catch {
-                    return .failure(
-                        WorkspaceProjectLoadFailure(
-                            request: request,
-                            feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
-                            errorMessage: AppFeature.optionalErrorMessage(error)
-                        )
-                    )
-                }
-            }
-        }
-
-        private func prepareDocumentReplacementIfNeeded(
+        func prepareIfNeeded(
             _ prepareRequest: WorkspaceDocumentReplacementRequest?,
             request: WorkspaceProjectLoadRequest
         ) -> Result<Void, WorkspaceProjectLoadFailure> {
@@ -152,12 +57,144 @@ extension AppFeature {
         }
     }
 
+    struct WorkspaceProjectLoadCleanupService: Sendable {
+        let workspaceBackingStoreService: WorkspaceBackingStoreService
+        let documentImportClient: DocumentImportClient
+
+        func discardWorkspaceItemIfNeeded(
+            _ workspaceItem: DocumentProjectPath?
+        ) {
+            guard let workspaceItem else { return }
+            do {
+                // Best-effort cleanup of a staged workspace item after a successful load.
+                try workspaceBackingStoreService.removeWorkspaceItem(workspaceItem)
+            } catch {
+            }
+        }
+
+        func discardImportedStaging(
+            _ stagedProjectURL: DocumentProjectPath
+        ) {
+            // Best-effort cleanup of a staged imported project after load completes.
+            _ = documentImportClient.discardStagedDocument(stagedProjectURL)
+        }
+    }
+
+    struct WorkspaceProjectLoadUseCase: Sendable {
+        let paintDocumentClient: PaintDocumentClient
+        let documentImportClient: DocumentImportClient
+        let replacementPreparationService: WorkspaceProjectReplacementPreparationService
+        let cleanupService: WorkspaceProjectLoadCleanupService
+
+        func execute(
+            _ request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch request {
+            case let .project(operation):
+                return loadProject(operation, request: request)
+            case let .imported(operation):
+                return loadImportedProject(operation, request: request)
+            }
+        }
+
+        private func loadProject(
+            _ operation: WorkspaceProjectLoadOperation,
+            request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch replacementPreparationService.prepareIfNeeded(
+                operation.prepareDocumentReplacementRequest,
+                request: request
+            ) {
+            case let .failure(failure):
+                return .failure(failure)
+            case .success:
+                break
+            }
+
+            do {
+                let loaded = try paintDocumentClient.loadProject(operation.fileURL)
+                cleanupService.discardWorkspaceItemIfNeeded(
+                    operation.removeWorkspaceItemOnSuccess
+                )
+                return .success(.project(loaded))
+            } catch {
+                return .failure(
+                    WorkspaceProjectLoadFailure(
+                        request: request,
+                        feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
+                        errorMessage: AppFeature.optionalErrorMessage(error)
+                    )
+                )
+            }
+        }
+
+        private func loadImportedProject(
+            _ operation: WorkspaceImportedProjectLoadOperation,
+            request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch replacementPreparationService.prepareIfNeeded(
+                operation.prepareDocumentReplacementRequest,
+                request: request
+            ) {
+            case let .failure(failure):
+                return .failure(failure)
+            case .success:
+                break
+            }
+
+            switch documentImportClient.stageImportedDocument(
+                ImportedDocumentStageRequest(sourceURL: operation.sourceURL)
+            ) {
+            case let .failure(error):
+                return .failure(
+                    WorkspaceProjectLoadFailure(
+                        request: request,
+                        feedback: .openFailed(error.errorDescription),
+                        errorMessage: error.errorDescription
+                    )
+                )
+
+            case let .success(staged):
+                defer {
+                    cleanupService.discardImportedStaging(
+                        staged.stagedProjectURL
+                    )
+                }
+                do {
+                    let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
+                    return .success(.imported(loaded, staged.suggestedTitle))
+                } catch {
+                    return .failure(
+                        WorkspaceProjectLoadFailure(
+                            request: request,
+                            feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
+                            errorMessage: AppFeature.optionalErrorMessage(error)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    var workspaceProjectReplacementPreparationService: WorkspaceProjectReplacementPreparationService {
+        WorkspaceProjectReplacementPreparationService(
+            workspacePersistenceUseCase: workspacePersistenceUseCase
+        )
+    }
+
+    var workspaceProjectLoadCleanupService: WorkspaceProjectLoadCleanupService {
+        WorkspaceProjectLoadCleanupService(
+            workspaceBackingStoreService: workspaceBackingStoreService,
+            documentImportClient: documentImportClient
+        )
+    }
+
     var workspaceProjectLoadUseCase: WorkspaceProjectLoadUseCase {
         WorkspaceProjectLoadUseCase(
             paintDocumentClient: paintDocumentClient,
             documentImportClient: documentImportClient,
-            workspaceBackingStoreService: workspaceBackingStoreService,
-            workspacePersistenceUseCase: workspacePersistenceUseCase
+            replacementPreparationService: workspaceProjectReplacementPreparationService,
+            cleanupService: workspaceProjectLoadCleanupService
         )
     }
 

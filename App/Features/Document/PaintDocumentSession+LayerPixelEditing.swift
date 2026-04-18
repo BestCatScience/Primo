@@ -33,18 +33,21 @@ extension PaintDocumentSession {
         case .success:
             break
         }
-        let didApply = documentGateway.processing.applyLayerProcessing(index: index, request: request)
-        if didApply {
+        switch documentGateway.processing.applyLayerProcessingResult(
+            index: index,
+            request: request,
+            operation: "applyLayerProcessing"
+        ) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             let pixelData = pixelDataForLayer(index: index)
             applyLayerLifecycleMutation(
                 at: index,
                 recording: .replaceLayerPixels(index: .unchecked(index), data: pixelData)
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didApply,
-            operation: "applyLayerProcessing"
-        )
     }
 
     func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
@@ -114,11 +117,14 @@ extension PaintDocumentSession {
         let adjustedData = isLayerAlphaLocked(index: index)
             ? Self.pixelDataByPreservingExistingAlpha(source: data, existing: pixelDataForLayer(index: index))
             : data
-        let didApply = documentGateway.processing.applyLayerProcessing(
+        switch documentGateway.processing.applyLayerProcessingResult(
             index: index,
-            descriptor: documentGateway.processing.makeReplacePixelsDescriptor(pixelData: adjustedData)
-        )
-        if !didApply {
+            descriptor: documentGateway.processing.makeReplacePixelsDescriptor(pixelData: adjustedData),
+            operation: "replaceLayerPixels"
+        ) {
+        case .success:
+            break
+        case .failure:
             documentGateway.layers.replaceLayerPixels(index: index, data: adjustedData, transient: true)
         }
         applyLayerLifecycleMutation(
@@ -165,8 +171,11 @@ extension PaintDocumentSession {
         if let failure = layerMutationFailure(index) {
             return .failure(failure)
         }
-        guard documentGateway.layers.applyLayerMask(index: index) else {
-            return .failure(.bridgeMutationFailed("applyLayerMask"))
+        switch documentGateway.layers.applyLayerMaskResult(index: index) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            break
         }
         let pixelData = pixelDataForLayer(index: index)
         applyLayerLifecycleMutation(
@@ -186,19 +195,19 @@ extension PaintDocumentSession {
         case .success:
             break
         }
-        let didApply = documentGateway.processing.applyLayerProcessing(
+        switch documentGateway.processing.applyLayerProcessingResult(
             index: index,
-            descriptor: documentGateway.processing.makeClearLayerDescriptor()
-        )
-        if didApply {
+            descriptor: documentGateway.processing.makeClearLayerDescriptor(),
+            operation: "clearLayer"
+        ) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
             applyLayerLifecycleMutation(
                 at: index,
                 recording: .clearLayer(index: .unchecked(index))
             )
+            return .success(())
         }
-        return wrapMutationResult(
-            didApply,
-            operation: "clearLayer"
-        )
     }
 }

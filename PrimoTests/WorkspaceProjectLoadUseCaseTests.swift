@@ -33,11 +33,16 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
         let useCase = AppFeature.WorkspaceProjectLoadUseCase(
             paintDocumentClient: paintDocumentClient,
             documentImportClient: .stub(),
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: paintDocumentClient,
-                documentWorkspaceClient: documentWorkspaceClient
+            replacementPreparationService: AppFeature.WorkspaceProjectReplacementPreparationService(
+                workspacePersistenceUseCase: persistenceUseCase
             ),
-            workspacePersistenceUseCase: persistenceUseCase
+            cleanupService: AppFeature.WorkspaceProjectLoadCleanupService(
+                workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                    paintDocumentClient: paintDocumentClient,
+                    documentWorkspaceClient: documentWorkspaceClient
+                ),
+                documentImportClient: .stub()
+            )
         )
         let request = AppFeature.WorkspaceProjectLoadRequest.project(
             AppFeature.WorkspaceProjectLoadOperation(
@@ -87,26 +92,32 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
             }
         )
         let documentWorkspaceClient = DocumentWorkspaceClient.stub()
-        let useCase = AppFeature.WorkspaceProjectLoadUseCase(
-            paintDocumentClient: paintDocumentClient,
-            documentImportClient: documentImportClient,
+        let persistenceUseCase = AppFeature.WorkspacePersistenceUseCase(
             workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
                 paintDocumentClient: paintDocumentClient,
                 documentWorkspaceClient: documentWorkspaceClient
             ),
-            workspacePersistenceUseCase: AppFeature.WorkspacePersistenceUseCase(
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C2")! }
+                )
+            )
+        )
+        let useCase = AppFeature.WorkspaceProjectLoadUseCase(
+            paintDocumentClient: paintDocumentClient,
+            documentImportClient: documentImportClient,
+            replacementPreparationService: AppFeature.WorkspaceProjectReplacementPreparationService(
+                workspacePersistenceUseCase: persistenceUseCase
+            ),
+            cleanupService: AppFeature.WorkspaceProjectLoadCleanupService(
                 workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
                     paintDocumentClient: paintDocumentClient,
                     documentWorkspaceClient: documentWorkspaceClient
                 ),
-                workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                    documentWorkspaceClient: documentWorkspaceClient
-                ),
-                workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                    uuidClient: UUIDClient(
-                        generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C2")! }
-                    )
-                )
+                documentImportClient: documentImportClient
             )
         )
 
@@ -142,26 +153,32 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
             }
         )
         let documentWorkspaceClient = DocumentWorkspaceClient.stub()
-        let useCase = AppFeature.WorkspaceProjectLoadUseCase(
-            paintDocumentClient: paintDocumentClient,
-            documentImportClient: documentImportClient,
+        let persistenceUseCase = AppFeature.WorkspacePersistenceUseCase(
             workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
                 paintDocumentClient: paintDocumentClient,
                 documentWorkspaceClient: documentWorkspaceClient
             ),
-            workspacePersistenceUseCase: AppFeature.WorkspacePersistenceUseCase(
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C3")! }
+                )
+            )
+        )
+        let useCase = AppFeature.WorkspaceProjectLoadUseCase(
+            paintDocumentClient: paintDocumentClient,
+            documentImportClient: documentImportClient,
+            replacementPreparationService: AppFeature.WorkspaceProjectReplacementPreparationService(
+                workspacePersistenceUseCase: persistenceUseCase
+            ),
+            cleanupService: AppFeature.WorkspaceProjectLoadCleanupService(
                 workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
                     paintDocumentClient: paintDocumentClient,
                     documentWorkspaceClient: documentWorkspaceClient
                 ),
-                workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                    documentWorkspaceClient: documentWorkspaceClient
-                ),
-                workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                    uuidClient: UUIDClient(
-                        generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C3")! }
-                    )
-                )
+                documentImportClient: documentImportClient
             )
         )
 
@@ -175,6 +192,60 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 )
             ),
             .success(.imported(loadedProject, "Imported"))
+        )
+    }
+
+    func testStagedWorkspaceCleanupFailureKeepsProjectLoadSuccessful() {
+        let loadedProject = LoadedPaintProject.testValue()
+        let stagedWorkspaceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/staged-workspace.atelier"))
+        let paintDocumentClient = PaintDocumentClient.stub(
+            loadProject: { _ in loadedProject }
+        )
+        let documentWorkspaceClient = DocumentWorkspaceClient.stub(
+            removeWorkspaceItem: { _ in
+                throw TestError.expected("workspace cleanup failed")
+            }
+        )
+        let persistenceUseCase = AppFeature.WorkspacePersistenceUseCase(
+            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                paintDocumentClient: paintDocumentClient,
+                documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: documentWorkspaceClient
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C4")! }
+                )
+            )
+        )
+        let useCase = AppFeature.WorkspaceProjectLoadUseCase(
+            paintDocumentClient: paintDocumentClient,
+            documentImportClient: .stub(),
+            replacementPreparationService: AppFeature.WorkspaceProjectReplacementPreparationService(
+                workspacePersistenceUseCase: persistenceUseCase
+            ),
+            cleanupService: AppFeature.WorkspaceProjectLoadCleanupService(
+                workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                    paintDocumentClient: paintDocumentClient,
+                    documentWorkspaceClient: documentWorkspaceClient
+                ),
+                documentImportClient: .stub()
+            )
+        )
+
+        XCTAssertEqual(
+            useCase.execute(
+                .project(
+                    AppFeature.WorkspaceProjectLoadOperation(
+                        fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
+                        prepareDocumentReplacementRequest: nil,
+                        removeWorkspaceItemOnSuccess: stagedWorkspaceURL
+                    )
+                )
+            ),
+            .success(.project(loadedProject))
         )
     }
 }
