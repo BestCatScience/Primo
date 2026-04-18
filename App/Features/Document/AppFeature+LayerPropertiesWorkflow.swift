@@ -1,12 +1,13 @@
+import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    func handleActiveLayerVisibilityToggle(state: inout State) {
+    func handleActiveLayerVisibilityToggle(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
@@ -17,22 +18,24 @@ extension AppFeature {
     func handleSelectAdjacentLayer(
         state: inout State,
         direction: Int
-    ) {
+    ) -> Effect<Action> {
         guard let currentPosition = state.layerSidebar.layers.firstIndex(where: { $0.index == state.layerSidebar.activeLayerIndex }) else {
-            return
+            return .none
         }
         let targetPosition = currentPosition + direction
         guard state.layerSidebar.layers.indices.contains(targetPosition) else {
-            return
+            return .none
         }
         let targetIndex = state.layerSidebar.layers[targetPosition].index
-        guard layerWorkflowService.setActiveLayer(targetIndex) else {
-            return
-        }
-        state.canvas.activateLayerForEditing(targetIndex)
-        completeDocumentMutation(
+        return performDocumentMutation(
             state: &state,
-            contract: .currentPresentation
+            contract: .currentPresentation,
+            mutation: {
+                layerWorkflowService.setActiveLayer(targetIndex)
+            },
+            onSuccess: { _, state in
+                state.canvas.activateLayerForEditing(targetIndex)
+            }
         )
     }
 
@@ -40,8 +43,8 @@ extension AppFeature {
         state: inout State,
         index: Int,
         opacity: Double
-    ) {
-        _ = handleDocumentMutation(
+    ) -> Effect<Action> {
+        performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
@@ -52,11 +55,11 @@ extension AppFeature {
     func handleLayerLockToggle(
         state: inout State,
         index: Int
-    ) {
+    ) -> Effect<Action> {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(state: &state) {
+        return performDocumentMutation(state: &state) {
             layerWorkflowService.setLayerLocked(index, isLocked: !layer.isLocked)
         }
     }
@@ -64,11 +67,11 @@ extension AppFeature {
     func handleLayerAlphaLockToggle(
         state: inout State,
         index: Int
-    ) {
+    ) -> Effect<Action> {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(state: &state) {
+        return performDocumentMutation(state: &state) {
             layerWorkflowService.setLayerAlphaLocked(index, isAlphaLocked: !layer.isAlphaLocked)
         }
     }
@@ -76,14 +79,14 @@ extension AppFeature {
     func handleLayerClippingToggle(
         state: inout State,
         index: Int
-    ) {
+    ) -> Effect<Action> {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
-            return
+            return .none
         }
         guard layer.isClipped || index > 0 else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(state: &state) {
+        return performDocumentMutation(state: &state) {
             layerWorkflowService.setLayerClipped(index, isClipped: !layer.isClipped)
         }
     }
@@ -91,25 +94,27 @@ extension AppFeature {
     func handleLayerSelection(
         state: inout State,
         index: Int
-    ) {
-        guard layerWorkflowService.setActiveLayer(index) else {
-            return
-        }
-        state.canvas.activateLayerForEditing(index)
-        completeDocumentMutation(
+    ) -> Effect<Action> {
+        performDocumentMutation(
             state: &state,
-            contract: .currentPresentation
+            contract: .currentPresentation,
+            mutation: {
+                layerWorkflowService.setActiveLayer(index)
+            },
+            onSuccess: { _, state in
+                state.canvas.activateLayerForEditing(index)
+            }
         )
     }
 
     func handleLayerVisibilityToggle(
         state: inout State,
         index: Int
-    ) {
+    ) -> Effect<Action> {
         guard let layer = state.layerSidebar.layer(withIndex: index) else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
@@ -121,8 +126,8 @@ extension AppFeature {
         state: inout State,
         folderID: Int,
         isExpanded: Bool
-    ) {
-        _ = handleDocumentMutation(
+    ) -> Effect<Action> {
+        performDocumentMutation(
             state: &state,
             contract: .currentPresentation
         ) {
@@ -133,11 +138,11 @@ extension AppFeature {
     func handleFolderVisibilityToggle(
         state: inout State,
         folderID: Int
-    ) {
+    ) -> Effect<Action> {
         guard let folder = state.layerSidebar.folder(withID: folderID) else {
-            return
+            return .none
         }
-        _ = handleDocumentMutation(state: &state) {
+        return performDocumentMutation(state: &state) {
             layerWorkflowService.setFolderVisibility(folderID, visible: !folder.visible)
         }
     }
@@ -146,8 +151,8 @@ extension AppFeature {
         state: inout State,
         folderID: Int,
         name: String
-    ) {
-        _ = handleDocumentMutation(state: &state) {
+    ) -> Effect<Action> {
+        performDocumentMutation(state: &state) {
             layerWorkflowService.setFolderName(folderID, name: name)
         }
     }
@@ -156,8 +161,8 @@ extension AppFeature {
         state: inout State,
         index: Int,
         blendMode: LayerBlendMode
-    ) {
-        _ = handleDocumentMutation(
+    ) -> Effect<Action> {
+        performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection)
         ) {
@@ -169,8 +174,8 @@ extension AppFeature {
         state: inout State,
         index: Int,
         name: String
-    ) {
-        _ = handleDocumentMutation(state: &state) {
+    ) -> Effect<Action> {
+        performDocumentMutation(state: &state) {
             layerWorkflowService.setLayerName(index, name: name)
         }
     }

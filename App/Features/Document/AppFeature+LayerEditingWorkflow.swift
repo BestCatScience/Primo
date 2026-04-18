@@ -1,3 +1,4 @@
+import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
@@ -98,240 +99,186 @@ extension AppFeature {
         }
     }
 
+    struct DocumentMutationFeedbackMapper {
+        func feedback(
+            for failure: DocumentMutationFailure,
+            default defaultFeedback: ApplicationFeedback? = nil
+        ) -> ApplicationFeedback? {
+            if let defaultFeedback {
+                return defaultFeedback
+            }
+            switch failure {
+            case .invalidCanvasSize:
+                return .canvasSizeUnsupported
+            case .noUndoState:
+                return .undoUnavailableWhileDrawing
+            case .noRedoState:
+                return .redoUnavailableWhileDrawing
+            case .invalidLayerIndex,
+                 .invalidFolderID,
+                 .layerLocked,
+                 .alphaLocked,
+                 .invalidOpacity,
+                 .emptyInput,
+                 .bridgeMutationFailed,
+                 .incompatibleLayerType:
+                return nil
+            }
+        }
+    }
+
     struct LayerWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
-        @discardableResult
-        func addLayer(named name: String) -> Int {
-            switch paintDocumentClient.addLayer(name) {
-            case let .success(index):
-                return index
-            case .failure:
-                return -1
-            }
+        func addLayer(named name: String) -> DocumentIndexedMutationResult {
+            paintDocumentClient.addLayer(name)
         }
 
         func createFolder(
             named name: String,
             afterLayerAt activeLayerIndex: Int
-        ) -> Int {
-            switch paintDocumentClient.createFolder(name, activeLayerIndex) {
-            case let .success(folderID):
-                return folderID
-            case .failure:
-                return -1
-            }
+        ) -> DocumentIndexedMutationResult {
+            paintDocumentClient.createFolder(name, activeLayerIndex)
         }
 
-        func deleteFolder(_ folderID: Int) -> Bool {
-            if case .success = paintDocumentClient.deleteFolder(folderID) {
-                return true
-            }
-            return false
+        func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
+            paintDocumentClient.deleteFolder(folderID)
         }
 
-        func deleteLayer(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.deleteLayer(index) {
-                return true
-            }
-            return false
+        func deleteLayer(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.deleteLayer(index)
         }
 
         func duplicateLayer(
             _ index: Int,
             named duplicateName: String
-        ) -> Int {
-            switch paintDocumentClient.duplicateLayer(index, duplicateName) {
-            case let .success(duplicatedIndex):
-                return duplicatedIndex
-            case .failure:
-                return -1
-            }
+        ) -> DocumentIndexedMutationResult {
+            paintDocumentClient.duplicateLayer(index, duplicateName)
         }
 
         func moveLayer(
             _ index: Int,
             to destinationIndex: Int
-        ) -> Bool {
-            if case .success = paintDocumentClient.moveLayer(index, destinationIndex) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.moveLayer(index, destinationIndex)
         }
 
         func assignLayer(
             _ index: Int,
             toFolder folderID: Int
-        ) -> Bool {
-            if case .success = paintDocumentClient.assignLayerToFolder(index, folderID) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.assignLayerToFolder(index, folderID)
         }
 
-        func mergeLayerDown(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.mergeLayerDown(index) {
-                return true
-            }
-            return false
+        func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.mergeLayerDown(index)
         }
 
         func setLayerVisibility(
             _ index: Int,
             visible: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerVisibility(index, visible) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerVisibility(index, visible)
         }
 
-        func setActiveLayer(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.setActiveLayer(index) {
-                return true
-            }
-            return false
+        func setActiveLayer(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.setActiveLayer(index)
         }
 
         func setLayerOpacity(
             _ index: Int,
             opacity: Double
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerOpacity(index, opacity) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerOpacity(index, opacity)
         }
 
         func setLayerLocked(
             _ index: Int,
             isLocked: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerLocked(index, isLocked) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerLocked(index, isLocked)
         }
 
         func setLayerAlphaLocked(
             _ index: Int,
             isAlphaLocked: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked)
         }
 
         func setLayerClipped(
             _ index: Int,
             isClipped: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerClipped(index, isClipped) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerClipped(index, isClipped)
         }
 
         func setFolderExpanded(
             _ folderID: Int,
             isExpanded: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setFolderExpanded(folderID, isExpanded) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setFolderExpanded(folderID, isExpanded)
         }
 
         func setFolderVisibility(
             _ folderID: Int,
             visible: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.setFolderVisibility(folderID, visible) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setFolderVisibility(folderID, visible)
         }
 
         func setFolderName(
             _ folderID: Int,
             name: String
-        ) -> Bool {
-            if case .success = paintDocumentClient.setFolderName(folderID, name) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setFolderName(folderID, name)
         }
 
         func setLayerBlendMode(
             _ index: Int,
             blendMode: LayerBlendMode
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerBlendMode(index, blendMode) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerBlendMode(index, blendMode)
         }
 
         func setLayerName(
             _ index: Int,
             name: String
-        ) -> Bool {
-            if case .success = paintDocumentClient.setLayerName(index, name) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setLayerName(index, name)
         }
 
         func replaceLayerPixels(
             _ index: Int,
             pixelData: Data
-        ) -> Bool {
-            if case .success = paintDocumentClient.replaceLayerPixels(index, pixelData) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.replaceLayerPixels(index, pixelData)
         }
 
         func setTextLayer(
             _ index: Int,
             textLayer: TextLayerData
-        ) -> Bool {
-            if case .success = paintDocumentClient.setTextLayer(index, textLayer) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setTextLayer(index, textLayer)
         }
 
-        func clearLayer(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.clearLayer(index) {
-                return true
-            }
-            return false
+        func clearLayer(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.clearLayer(index)
         }
 
         func replaceLayerMask(
             _ index: Int,
             maskData: Data
-        ) -> Bool {
-            if case .success = paintDocumentClient.replaceLayerMask(index, maskData) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.replaceLayerMask(index, maskData)
         }
 
-        func clearLayerMask(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.clearLayerMask(index) {
-                return true
-            }
-            return false
+        func clearLayerMask(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.clearLayerMask(index)
         }
 
-        func applyLayerMask(_ index: Int) -> Bool {
-            if case .success = paintDocumentClient.applyLayerMask(index) {
-                return true
-            }
-            return false
+        func applyLayerMask(_ index: Int) -> DocumentMutationResult {
+            paintDocumentClient.applyLayerMask(index)
         }
     }
 
@@ -351,72 +298,57 @@ extension AppFeature {
         DocumentMutationFeedbackCoordinator()
     }
 
+    var documentMutationFeedbackMapper: DocumentMutationFeedbackMapper {
+        DocumentMutationFeedbackMapper()
+    }
+
+    @discardableResult
     func completeDocumentMutation(
         state: inout State,
         contract: DocumentMutationContract = .dirty
-    ) {
+    ) -> Effect<Action> {
         documentCanvasMutationCoordinator.apply(
             contract.canvasMutation,
             to: &state
         )
-        documentPresentationRefreshCoordinator.apply(
-            contract.refresh,
-            to: &state,
-            applyCurrentPresentation: { state in
-                applyPresentation(documentPresentationService.presentation(), state: &state)
-            },
-            applyDirtyPresentation: { state in
-                applyDirtyPresentation(state: &state)
-            }
-        )
+        let effect: Effect<Action>
+        switch contract.refresh {
+        case .none:
+            effect = .none
+        case .current:
+            applyPresentation(documentPresentationQueryService.presentation(), state: &state)
+            effect = .none
+        case .dirty:
+            effect = applyDirtyPresentation(state: &state)
+        }
         documentMutationFeedbackCoordinator.apply(
             contract.successFeedback,
             to: &state
         )
+        return effect
     }
 
     @discardableResult
-    func handleDocumentMutation(
+    func performDocumentMutation<Success>(
         state: inout State,
         contract: DocumentMutationContract = .dirty,
-        mutation: () -> Bool
-    ) -> Bool {
-        guard mutation() else { return false }
-        completeDocumentMutation(state: &state, contract: contract)
-        return true
-    }
-
-    @discardableResult
-    func handleDocumentMutation(
-        state: inout State,
-        contract: DocumentMutationContract = .dirty,
-        failureFeedback: ApplicationFeedback,
-        mutation: () -> Bool
-    ) -> Bool {
-        guard handleDocumentMutation(
-            state: &state,
-            contract: contract,
-            mutation: mutation
-        ) else {
-            state.application.presentFeedback(failureFeedback)
-            return false
+        failureFeedback: ApplicationFeedback? = nil,
+        mutation: () -> Result<Success, DocumentMutationFailure>,
+        onSuccess: (Success, inout State) -> Void = { _, _ in }
+    ) -> Effect<Action> {
+        switch mutation() {
+        case let .success(success):
+            onSuccess(success, &state)
+            return completeDocumentMutation(state: &state, contract: contract)
+        case let .failure(failure):
+            documentMutationFeedbackCoordinator.apply(
+                documentMutationFeedbackMapper.feedback(
+                    for: failure,
+                    default: failureFeedback
+                ),
+                to: &state
+            )
+            return .none
         }
-        return true
-    }
-
-    func handleLayerMutation(
-        state: inout State,
-        clearsSelection: Bool = false,
-        updatesPresentationDirectly: Bool = false,
-        mutation: () -> Bool
-    ) {
-        _ = handleDocumentMutation(
-            state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: clearsSelection ? .clearSelection : .none,
-                refresh: updatesPresentationDirectly ? .current : .dirty
-            ),
-            mutation: mutation
-        )
     }
 }

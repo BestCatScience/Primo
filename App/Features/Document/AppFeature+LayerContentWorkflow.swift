@@ -1,3 +1,4 @@
+import ComposableArchitecture
 import Foundation
 import UIKit
 
@@ -107,10 +108,10 @@ extension AppFeature {
         state: inout State,
         name: String?,
         data: Data
-    ) {
+    ) -> Effect<Action> {
         guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
             state.application.presentFeedback(.couldNotImportPhoto(nil))
-            return
+            return .none
         }
         let namingPolicy = namingPolicy(for: state)
         let layerName = namingPolicy.photoLayerName(
@@ -126,10 +127,10 @@ extension AppFeature {
             appliedMutation = mutation
         case .failure:
             state.application.presentFeedback(.couldNotImportPhoto(nil))
-            return
+            return .none
         }
         state.canvas.activateLayerForNewContent(appliedMutation.targetLayerIndex)
-        completeDocumentMutation(
+        return completeDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(successFeedback: .photoImportedToNewLayer)
         )
@@ -138,11 +139,11 @@ extension AppFeature {
     func handleApplyText(
         state: inout State,
         draft: TextLayerDraft
-    ) {
+    ) -> Effect<Action> {
         let namingPolicy = namingPolicy(for: state)
         let fontOption = state.brushPalette.text.availableFonts.first(where: { $0.postScriptName == draft.fontPostScriptName })
             ?? state.brushPalette.text.availableFonts.first
-        guard let position = draft.position else { return }
+        guard let position = draft.position else { return .none }
         let uiColor = UIColor(state.brushPalette.brush.activeOpaqueColor)
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -179,17 +180,17 @@ extension AppFeature {
             appliedMutation = mutation
         case .failure:
             state.application.presentFeedback(.textLayerApplyFailed)
-            return
+            return .none
         }
         state.canvas.activateLayer(appliedMutation.targetLayerIndex)
         state.canvas.activateTool(.text)
         state.brushPalette.setTextTargetLayer(appliedMutation.targetLayerIndex)
-        completeDocumentMutation(state: &state)
+        return completeDocumentMutation(state: &state)
     }
 
-    func handleClearActiveLayer(state: inout State) {
+    func handleClearActiveLayer(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        _ = handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
                 canvasMutation: .finalizeLayer(
@@ -205,24 +206,24 @@ extension AppFeature {
         )
     }
 
-    func handleCreateLayerMask(state: inout State) {
+    func handleCreateLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
             state.application.presentFeedback(.createLayerMaskNeedsSelection)
-            return
+            return .none
         }
-        guard handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             failureFeedback: .createLayerMaskFailed,
             mutation: {
                 layerWorkflowService.replaceLayerMask(activeLayerIndex, maskData: maskData)
             }
-        ) else { return }
+        )
     }
 
-    func handleClearLayerMask(state: inout State) {
+    func handleClearLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        _ = handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             mutation: {
                 layerWorkflowService.clearLayerMask(activeLayerIndex)
@@ -230,9 +231,9 @@ extension AppFeature {
         )
     }
 
-    func handleApplyLayerMask(state: inout State) {
+    func handleApplyLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard handleDocumentMutation(
+        return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(
                 canvasMutation: .finalizeLayer(
@@ -246,6 +247,6 @@ extension AppFeature {
             mutation: {
                 layerWorkflowService.applyLayerMask(activeLayerIndex)
             }
-        ) else { return }
+        )
     }
 }

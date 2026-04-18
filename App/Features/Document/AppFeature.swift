@@ -75,6 +75,9 @@ struct AppFeature {
         case task
         case startupLanguageLoaded(AppLanguage)
         case documentPaperStyleSyncRequested(CanvasPaperStyle)
+        case workspacePersistenceRequested(WorkspacePersistenceRequest)
+        case workspacePersistenceSucceeded(WorkspacePersistenceResult)
+        case workspacePersistenceFailed(WorkspacePersistenceFailure)
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch
@@ -129,12 +132,6 @@ struct AppFeature {
         case saveDocumentCopyRequested
         case exportDocumentRequested
         case exportTimelapseRequested
-        case nanoBananaEditRequested(NanoBananaGenerationRequest)
-        case nanoBananaEditSucceeded(NanoBananaPreviewState)
-        case nanoBananaEditFailed(ApplicationFeedback)
-        case nanoBananaCancelRequested
-        case nanoBananaRegenerateRequested
-        case nanoBananaRetryJob(UUID)
         case openImportedDocumentRequested(URL)
         case openImportedDocumentLoaded(LoadedPaintProject, String)
         case openDocumentSelected(DocumentProjectPath)

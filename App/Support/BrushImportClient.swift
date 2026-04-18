@@ -50,7 +50,8 @@ struct BrushImportClient: Sendable {
 
     static func live(
         brushTipLibraryClient: BrushTipLibraryClient,
-        textFontLibraryClient: TextFontLibraryClient
+        textFontLibraryClient: TextFontLibraryClient,
+        securityScopedResourceClient: SecurityScopedResourceClient
     ) -> BrushImportClient {
         BrushImportClient(
             importBrushPresets: { request in
@@ -58,34 +59,34 @@ struct BrushImportClient: Sendable {
                 var failures: [String] = []
 
                 for url in request.urls {
-                    withSecurityScopedAccess(to: url) {
+                    let didAccess = securityScopedResourceClient.startAccessing(url)
+                    defer {
+                        if didAccess {
+                            securityScopedResourceClient.stopAccessing(url)
+                        }
+                    }
+                    do {
                         if url.pathExtension.lowercased() == "abr" {
-                            do {
-                                let brushes = try brushTipLibraryClient
-                                    .importPhotoshopBrushes(url)
-                                    .map(\.preset)
-                                if brushes.isEmpty {
-                                    failures.append(
-                                        "\(url.lastPathComponent): \(request.language.localized("対応している先端が見つかりませんでした。"))"
-                                    )
-                                } else {
-                                    imported.append(contentsOf: brushes)
-                                }
-                            } catch {
-                                failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                            let brushes = try brushTipLibraryClient
+                                .importPhotoshopBrushes(url)
+                                .map(\.preset)
+                            if brushes.isEmpty {
+                                failures.append(
+                                    "\(url.lastPathComponent): \(request.language.localized("対応している先端が見つかりませんでした。"))"
+                                )
+                            } else {
+                                imported.append(contentsOf: brushes)
                             }
-                            return
+                            continue
                         }
 
                         let brushName = url.deletingPathExtension().lastPathComponent
-                        do {
-                            let tip = try brushTipLibraryClient.loadRaster(url)
-                            imported.append(
-                                BrushPreset.photoshopImported(name: brushName, tip: tip)
-                            )
-                        } catch {
-                            failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                        }
+                        let tip = try brushTipLibraryClient.loadRaster(url)
+                        imported.append(
+                            BrushPreset.photoshopImported(name: brushName, tip: tip)
+                        )
+                    } catch {
+                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
                     }
                 }
 
@@ -96,28 +97,36 @@ struct BrushImportClient: Sendable {
                 var failures: [String] = []
 
                 for url in request.urls {
-                    withSecurityScopedAccess(to: url) {
-                        do {
-                            importedFonts.append(
-                                contentsOf: try textFontLibraryClient.importFonts([url])
-                            )
-                        } catch {
-                            failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                    let didAccess = securityScopedResourceClient.startAccessing(url)
+                    defer {
+                        if didAccess {
+                            securityScopedResourceClient.stopAccessing(url)
                         }
+                    }
+                    do {
+                        importedFonts.append(
+                            contentsOf: try textFontLibraryClient.importFonts([url])
+                        )
+                    } catch {
+                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
                     }
                 }
 
                 return TextFontImportResult(fonts: importedFonts, failureMessages: failures)
             },
             loadCustomTip: { url in
-                withSecurityScopedAccess(to: url) {
-                    do {
-                        return .success(try brushTipLibraryClient.loadRaster(url))
-                    } catch {
-                        return .failure(
-                            .loadFailed("\(url.lastPathComponent): \(error.localizedDescription)")
-                        )
+                let didAccess = securityScopedResourceClient.startAccessing(url)
+                defer {
+                    if didAccess {
+                        securityScopedResourceClient.stopAccessing(url)
                     }
+                }
+                do {
+                    return .success(try brushTipLibraryClient.loadRaster(url))
+                } catch {
+                    return .failure(
+                        .loadFailed("\(url.lastPathComponent): \(error.localizedDescription)")
+                    )
                 }
             }
         )
@@ -128,9 +137,11 @@ private enum BrushImportClientKey: DependencyKey {
     static var liveValue: BrushImportClient {
         @Dependency(\.brushTipLibraryClient) var brushTipLibraryClient
         @Dependency(\.textFontLibraryClient) var textFontLibraryClient
+        @Dependency(\.securityScopedResourceClient) var securityScopedResourceClient
         return .live(
             brushTipLibraryClient: brushTipLibraryClient,
-            textFontLibraryClient: textFontLibraryClient
+            textFontLibraryClient: textFontLibraryClient,
+            securityScopedResourceClient: securityScopedResourceClient
         )
     }
 }
@@ -140,16 +151,6 @@ extension DependencyValues {
         get { self[BrushImportClientKey.self] }
         set { self[BrushImportClientKey.self] = newValue }
     }
-}
-
-func withSecurityScopedAccess<T>(to url: URL, _ work: () -> T) -> T {
-    let didAccess = url.startAccessingSecurityScopedResource()
-    defer {
-        if didAccess {
-            url.stopAccessingSecurityScopedResource()
-        }
-    }
-    return work()
 }
 
 enum NeverOperationFailure: OperationFailure, Equatable {}

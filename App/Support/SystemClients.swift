@@ -95,6 +95,20 @@ struct KeyValueStoreClient: Sendable {
     )
 }
 
+struct SecurityScopedResourceClient: Sendable {
+    var startAccessing: @Sendable (URL) -> Bool
+    var stopAccessing: @Sendable (URL) -> Void
+
+    static let live = SecurityScopedResourceClient(
+        startAccessing: { url in
+            url.startAccessingSecurityScopedResource()
+        },
+        stopAccessing: { url in
+            url.stopAccessingSecurityScopedResource()
+        }
+    )
+}
+
 struct AppLanguageClient: Sendable {
     var load: @Sendable () -> AppLanguage
     var persist: @Sendable (AppLanguage) -> Void

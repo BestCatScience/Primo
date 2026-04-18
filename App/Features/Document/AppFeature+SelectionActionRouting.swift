@@ -58,8 +58,7 @@ extension AppFeature {
             return applyTransform(state: &state)
 
         case let .brushPalette(.delegate(.applyText(draft))):
-            handleApplyText(state: &state, draft: draft)
-            return .none
+            return handleApplyText(state: &state, draft: draft)
 
         case .canvas(.delegate(.applyTransform)):
             return .none
@@ -69,16 +68,13 @@ extension AppFeature {
             return .none
 
         case .createLayerMaskFromSelectionRequested:
-            handleCreateLayerMask(state: &state)
-            return .none
+            return handleCreateLayerMask(state: &state)
 
         case .clearLayerMaskRequested:
-            handleClearLayerMask(state: &state)
-            return .none
+            return handleClearLayerMask(state: &state)
 
         case .applyLayerMaskRequested:
-            handleApplyLayerMask(state: &state)
-            return .none
+            return handleApplyLayerMask(state: &state)
 
         default:
             return nil

@@ -63,7 +63,7 @@ extension AppFeature {
     }
 
     func handleExportDocumentRequest(state: inout State) {
-        guard let pngData = documentPresentationService.compositePNGData(
+        guard let pngData = documentPresentationQueryService.compositePNGData(
             paperStyle: resolvedPaperStyle(for: state)
         ) else {
             state.application.presentFeedback(.exportFailed)

@@ -20,6 +20,10 @@ private enum KeyValueStoreClientKey: DependencyKey {
     static let liveValue = KeyValueStoreClient.live
 }
 
+private enum SecurityScopedResourceClientKey: DependencyKey {
+    static let liveValue = SecurityScopedResourceClient.live
+}
+
 private enum AppLanguageClientKey: DependencyKey {
     static var liveValue: AppLanguageClient {
         @Dependency(\.keyValueStoreClient) var keyValueStoreClient
@@ -51,6 +55,11 @@ extension DependencyValues {
     var keyValueStoreClient: KeyValueStoreClient {
         get { self[KeyValueStoreClientKey.self] }
         set { self[KeyValueStoreClientKey.self] = newValue }
+    }
+
+    var securityScopedResourceClient: SecurityScopedResourceClient {
+        get { self[SecurityScopedResourceClientKey.self] }
+        set { self[SecurityScopedResourceClientKey.self] = newValue }
     }
 
     var appLanguageClient: AppLanguageClient {

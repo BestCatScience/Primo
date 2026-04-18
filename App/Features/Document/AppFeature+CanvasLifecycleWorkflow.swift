@@ -111,14 +111,12 @@ extension AppFeature {
             _ preparedReplacement: PreparedFreshDocumentReplacement,
             to state: inout State,
             prepareFreshDocument: (CGSize, inout State) -> Void,
-            syncPaperStyleToDocument: (inout State) -> Void,
             applyCurrentPresentation: (inout State) -> Void
         ) {
             prepareFreshDocument(
                 preparedReplacement.contract.canvasSize,
                 &state
             )
-            syncPaperStyleToDocument(&state)
             applyCurrentPresentation(&state)
         }
     }
@@ -151,10 +149,11 @@ extension AppFeature {
         func complete(
             state: inout State,
             contract: FreshDocumentReplacementContract,
-            documentMutation: () -> Bool,
+            documentMutation: () -> DocumentMutationResult,
             prepareReplacement: (FreshDocumentReplacementContract, inout State) -> PreparedFreshDocumentReplacement?,
             applyWorkspaceState: (PreparedFreshDocumentReplacement, inout State) -> Void,
-            activateReplacement: (PreparedFreshDocumentReplacement, inout State) -> Effect<Action>
+            activateReplacement: (PreparedFreshDocumentReplacement, inout State) -> Effect<Action>,
+            mapMutationFailureFeedback: (DocumentMutationFailure, ApplicationFeedback?) -> ApplicationFeedback?
         ) -> Effect<Action> {
             guard let preparedReplacement = prepareReplacement(
                 contract,
@@ -162,8 +161,14 @@ extension AppFeature {
             ) else {
                 return .none
             }
-            guard documentMutation() else {
-                if let feedback = preparedReplacement.contract.mutationFailureFeedback {
+            switch documentMutation() {
+            case .success:
+                break
+            case let .failure(failure):
+                if let feedback = mapMutationFailureFeedback(
+                    failure,
+                    preparedReplacement.contract.mutationFailureFeedback
+                ) {
                     state.application.presentFeedback(feedback)
                 }
                 return .none
@@ -176,51 +181,51 @@ extension AppFeature {
     struct CanvasLifecycleService {
         let paintDocumentClient: PaintDocumentClient
 
-        func createCanvas(_ dimensions: CanvasDimensions) -> Bool {
+        func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
             paintDocumentClient.newCanvas(dimensions.width, dimensions.height)
             paintDocumentClient.prewarmDrawingResources()
-            return true
+            return .success(())
         }
 
-        func resizeCanvas(_ dimensions: CanvasDimensions) -> Bool {
-            if case .success = paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height) {
-                return true
-            }
-            return false
+        func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+            paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height)
         }
 
-        func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> Bool {
-            if case .success = paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height) {
-                return true
-            }
-            return false
+        func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+            paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height)
         }
 
         func initializeImportedCanvas(
             _ request: ImportedCanvasRequest,
             layerName: String
-        ) -> Bool {
-            guard createCanvas(request.dimensions) else { return false }
-            guard case .success = paintDocumentClient.replaceLayerPixels(0, request.pixelData) else { return false }
-            guard case .success = paintDocumentClient.setLayerName(0, layerName) else { return false }
-            if case .success = paintDocumentClient.setActiveLayer(0) {
-                return true
+        ) -> DocumentMutationResult {
+            switch createCanvas(request.dimensions) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
             }
-            return false
+            switch paintDocumentClient.replaceLayerPixels(0, request.pixelData) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
+            }
+            switch paintDocumentClient.setLayerName(0, layerName) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
+            }
+            return paintDocumentClient.setActiveLayer(0)
         }
 
-        func undo() -> Bool {
-            if case .success = paintDocumentClient.undo() {
-                return true
-            }
-            return false
+        func undo() -> DocumentMutationResult {
+            paintDocumentClient.undo()
         }
 
-        func redo() -> Bool {
-            if case .success = paintDocumentClient.redo() {
-                return true
-            }
-            return false
+        func redo() -> DocumentMutationResult {
+            paintDocumentClient.redo()
         }
     }
 
@@ -347,12 +352,8 @@ extension AppFeature {
                     to: &state
                 )
             },
-            syncPaperStyleToDocument: { state in
-                let paperStyle = resolvedPaperStyle(for: state)
-                documentPresentationService.setPaperStyle(paperStyle)
-            },
             applyCurrentPresentation: { state in
-                applyPresentation(documentPresentationService.presentation(), state: &state)
+                applyPresentation(documentPresentationQueryService.presentation(), state: &state)
             }
         )
     }
@@ -378,22 +379,27 @@ extension AppFeature {
         _ preparedReplacement: PreparedFreshDocumentReplacement,
         state: inout State
     ) -> Effect<Action> {
-        freshDocumentActivationCoordinator.activate(
-            preparedReplacement,
-            state: &state,
-            activatePreparedTab: { preparedTab, state in
-                activatePreparedTab(preparedTab, state: &state)
-            },
-            cancelEffects: {
-                cancelStartupPresentationEffects()
-            }
+        .merge(
+            freshDocumentActivationCoordinator.activate(
+                preparedReplacement,
+                state: &state,
+                activatePreparedTab: { preparedTab, state in
+                    activatePreparedTab(preparedTab, state: &state)
+                },
+                cancelEffects: {
+                    cancelStartupPresentationEffects()
+                }
+            ),
+            documentPaperStyleSyncClient.synchronizeEffect(
+                resolvedPaperStyle(for: state)
+            )
         )
     }
 
     func completeFreshDocumentReplacement(
         state: inout State,
         contract: FreshDocumentReplacementContract,
-        documentMutation: () -> Bool
+        documentMutation: () -> DocumentMutationResult
     ) -> Effect<Action> {
         freshDocumentReplacementCoordinator.complete(
             state: &state,
@@ -416,6 +422,12 @@ extension AppFeature {
                     preparedReplacement,
                     state: &state
                 )
+            },
+            mapMutationFailureFeedback: { failure, defaultFeedback in
+                documentMutationFeedbackMapper.feedback(
+                    for: failure,
+                    default: defaultFeedback
+                )
             }
         )
     }
@@ -423,21 +435,19 @@ extension AppFeature {
     func handleHistoryMutationRequest(
         state: inout State,
         operation: CanvasHistoryOperation,
-        performMutation: () -> Bool
-    ) {
+        performMutation: () -> DocumentMutationResult
+    ) -> Effect<Action> {
         if state.canvas.isStrokeActive {
             presentCanvasLifecycleFailure(
                 operation == .undo ? .undoUnavailableWhileDrawing : .redoUnavailableWhileDrawing,
                 state: &state
             )
-            return
+            return .none
         }
-        guard performMutation() else {
-            return
-        }
-        completeDocumentMutation(
+        return performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            mutation: performMutation
         )
     }
 
@@ -471,7 +481,7 @@ extension AppFeature {
         state: inout State,
         width: Int,
         height: Int
-    ) {
+    ) -> Effect<Action> {
         switch validatedResizePlan(
             currentDimensions: currentCanvasDimensions(state: state),
             width: width,
@@ -480,18 +490,19 @@ extension AppFeature {
         ) {
         case let .invalid(error):
             presentCanvasLifecycleFailure(error, state: &state)
+            return .none
         case .unchanged:
-            return
+            return .none
         case let .valid(plan):
-            guard canvasLifecycleService.resizeCanvas(plan.dimensions) else {
-                return
-            }
-            completeDocumentMutation(
+            return performDocumentMutation(
                 state: &state,
                 contract: DocumentMutationContract(
                     canvasMutation: .resetTransientEditingState,
                     successFeedback: plan.successFeedback
-                )
+                ),
+                mutation: {
+                    canvasLifecycleService.resizeCanvas(plan.dimensions)
+                }
             )
         }
     }
@@ -500,7 +511,7 @@ extension AppFeature {
         state: inout State,
         width: Int,
         height: Int
-    ) {
+    ) -> Effect<Action> {
         switch validatedResizePlan(
             currentDimensions: currentCanvasDimensions(state: state),
             width: width,
@@ -509,18 +520,19 @@ extension AppFeature {
         ) {
         case let .invalid(error):
             presentCanvasLifecycleFailure(error, state: &state)
+            return .none
         case .unchanged:
-            return
+            return .none
         case let .valid(plan):
-            guard canvasLifecycleService.resizeCanvasExtent(plan.dimensions) else {
-                return
-            }
-            completeDocumentMutation(
+            return performDocumentMutation(
                 state: &state,
                 contract: DocumentMutationContract(
                     canvasMutation: .resetTransientEditingState,
                     successFeedback: plan.successFeedback
-                )
+                ),
+                mutation: {
+                    canvasLifecycleService.resizeCanvasExtent(plan.dimensions)
+                }
             )
         }
     }
@@ -567,7 +579,7 @@ extension AppFeature {
         )
     }
 
-    func handleUndoRequested(state: inout State) {
+    func handleUndoRequested(state: inout State) -> Effect<Action> {
         handleHistoryMutationRequest(
             state: &state,
             operation: .undo,
@@ -575,7 +587,7 @@ extension AppFeature {
         )
     }
 
-    func handleRedoRequested(state: inout State) {
+    func handleRedoRequested(state: inout State) -> Effect<Action> {
         handleHistoryMutationRequest(
             state: &state,
             operation: .redo,

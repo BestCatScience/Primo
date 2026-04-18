@@ -1,15 +1,12 @@
+import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    struct DocumentPresentationService {
+    struct DocumentPresentationQueryService {
         let paintDocumentClient: PaintDocumentClient
 
         func presentation() -> PaintDocumentPresentation {
             paintDocumentClient.presentation()
-        }
-
-        func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
-            paintDocumentClient.setPaperStyle(paperStyle)
         }
 
         func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
@@ -17,8 +14,22 @@ extension AppFeature {
         }
     }
 
-    var documentPresentationService: DocumentPresentationService {
-        DocumentPresentationService(paintDocumentClient: paintDocumentClient)
+    struct DocumentPaperStyleSyncClient {
+        let paintDocumentClient: PaintDocumentClient
+
+        func synchronizeEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
+            .run { [paintDocumentClient] _ in
+                paintDocumentClient.setPaperStyle(paperStyle)
+            }
+        }
+    }
+
+    var documentPresentationQueryService: DocumentPresentationQueryService {
+        DocumentPresentationQueryService(paintDocumentClient: paintDocumentClient)
+    }
+
+    var documentPaperStyleSyncClient: DocumentPaperStyleSyncClient {
+        DocumentPaperStyleSyncClient(paintDocumentClient: paintDocumentClient)
     }
 
     func applyPresentation(

@@ -245,7 +245,13 @@ extension AppFeature {
                     case let .success(imageData):
                         outputPNGData = imageData
                     case let .failure(failure):
-                        await send(.nanoBananaEditFailed(AppFeature.nanoBananaFailureFeedback(failure)))
+                        await send(
+                            .nanoBanana(
+                                .generationFailed(
+                                    AppFeature.nanoBananaFailureFeedback(failure)
+                                )
+                            )
+                        )
                         return
                     }
 
@@ -279,7 +285,13 @@ extension AppFeature {
                     case let .success(imageData):
                         outputPNGData = imageData
                     case let .failure(failure):
-                        await send(.nanoBananaEditFailed(AppFeature.nanoBananaFailureFeedback(failure)))
+                        await send(
+                            .nanoBanana(
+                                .generationFailed(
+                                    AppFeature.nanoBananaFailureFeedback(failure)
+                                )
+                            )
+                        )
                         return
                     }
 
@@ -306,8 +318,10 @@ extension AppFeature {
 
                 guard let finalPixelData else {
                     await send(
-                        .nanoBananaEditFailed(
-                            .nanoBananaUnsupportedImage
+                        .nanoBanana(
+                            .generationFailed(
+                                .nanoBananaUnsupportedImage
+                            )
                         )
                     )
                     return
@@ -324,7 +338,7 @@ extension AppFeature {
                         height: prepared.canvasHeight
                     )
                 )
-                await send(.nanoBananaEditSucceeded(preview))
+                await send(.nanoBanana(.generationSucceeded(preview)))
             }
             .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
         }
@@ -456,16 +470,4 @@ extension AppFeature {
         nanoBananaGenerationService.cancel(state: &state)
     }
 
-    func handleNanoBananaRegenerateRequested(state: inout State) -> Effect<Action> {
-        guard let request = state.nanoBanana.regenerationRequest() else { return .none }
-        return .send(.nanoBananaEditRequested(request))
-    }
-
-    func handleNanoBananaRetryJob(
-        state: inout State,
-        jobID: UUID
-    ) -> Effect<Action> {
-        guard let request = state.nanoBanana.retryRequest(for: jobID) else { return .none }
-        return .send(.nanoBananaEditRequested(request))
-    }
 }

@@ -1,3 +1,4 @@
+import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
@@ -12,18 +13,12 @@ extension AppFeature {
         func applyLayerProcessing(
             _ layerIndex: Int,
             request: LayerProcessingRequest
-        ) -> Bool {
-            if case .success = paintDocumentClient.applyLayerProcessing(layerIndex, request) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.applyLayerProcessing(layerIndex, request)
         }
 
-        func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) -> Bool {
-            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
-                return true
-            }
-            return false
+        func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) -> DocumentMutationResult {
+            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
     }
 
@@ -79,22 +74,21 @@ extension AppFeature {
     func handleAdjustmentApplyUsingProcessing(
         state: inout State,
         failureFeedback: ApplicationFeedback,
-        apply: () -> Bool
-    ) -> Bool {
+        apply: () -> DocumentMutationResult
+    ) -> Effect<Action> {
         state.canvas.clearAdjustmentPreview()
-        guard apply() else {
-            state.application.presentFeedback(failureFeedback)
-            return false
-        }
-        completeDocumentMutation(
-            state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: .finalizeLayer(
-                    LayerMutationFinalization(index: state.canvas.activeLayerIndex)
-                )
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let mutationContract = DocumentMutationContract(
+            canvasMutation: .finalizeLayer(
+                LayerMutationFinalization(index: activeLayerIndex)
             )
         )
-        return true
+        return performDocumentMutation(
+            state: &state,
+            contract: mutationContract,
+            failureFeedback: failureFeedback,
+            mutation: apply
+        )
     }
 
     @discardableResult
@@ -102,7 +96,7 @@ extension AppFeature {
         state: inout State,
         request: LayerProcessingRequest,
         failureFeedback: ApplicationFeedback
-    ) -> Bool {
+    ) -> Effect<Action> {
         let activeLayerIndex = state.canvas.activeLayerIndex
         return handleAdjustmentApplyUsingProcessing(
             state: &state,
@@ -120,27 +114,28 @@ extension AppFeature {
         state: inout State,
         adjustedPixels: Data?,
         failureFeedback: ApplicationFeedback
-    ) -> Bool {
+    ) -> Effect<Action> {
         state.canvas.clearAdjustmentPreview()
         guard let adjustedPixels else {
             state.application.presentFeedback(failureFeedback)
-            return false
+            return .none
         }
-        guard adjustmentWorkflowService.replaceLayerPixels(
-            state.canvas.activeLayerIndex,
-            with: adjustedPixels
-        ) else {
-            state.application.presentFeedback(failureFeedback)
-            return false
-        }
-        completeDocumentMutation(
-            state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: .finalizeLayer(
-                    LayerMutationFinalization(index: state.canvas.activeLayerIndex)
-                )
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let mutationContract = DocumentMutationContract(
+            canvasMutation: .finalizeLayer(
+                LayerMutationFinalization(index: activeLayerIndex)
             )
         )
-        return true
+        return performDocumentMutation(
+            state: &state,
+            contract: mutationContract,
+            failureFeedback: failureFeedback,
+            mutation: {
+                adjustmentWorkflowService.replaceLayerPixels(
+                    activeLayerIndex,
+                    with: adjustedPixels
+                )
+            }
+        )
     }
 }

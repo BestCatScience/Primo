@@ -8,20 +8,16 @@ extension AppFeature {
     ) -> Effect<Action>? {
         switch action {
         case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
-            handleClearActiveLayer(state: &state)
-            return .none
+            return handleClearActiveLayer(state: &state)
 
         case .activeLayerVisibilityToggled:
-            handleActiveLayerVisibilityToggle(state: &state)
-            return .none
+            return handleActiveLayerVisibilityToggle(state: &state)
 
         case .selectPreviousLayer:
-            handleSelectAdjacentLayer(state: &state, direction: -1)
-            return .none
+            return handleSelectAdjacentLayer(state: &state, direction: -1)
 
         case .selectNextLayer:
-            handleSelectAdjacentLayer(state: &state, direction: 1)
-            return .none
+            return handleSelectAdjacentLayer(state: &state, direction: 1)
 
         case .brushPalette(.binding(\.paper.color)),
              .brushPalette(.binding(\.paper.isTransparent)):
@@ -38,84 +34,64 @@ extension AppFeature {
             return handleTransparentPaperBindingChanged(state: &state)
 
         case .layerSidebar(.delegate(.addLayer)):
-            handleAddLayer(state: &state)
-            return .none
+            return handleAddLayer(state: &state)
 
         case .layerSidebar(.delegate(.addFolder)):
-            handleAddFolder(state: &state)
-            return .none
+            return handleAddFolder(state: &state)
 
         case let .layerSidebar(.delegate(.deleteFolder(folderID))):
-            handleFolderDeletion(state: &state, folderID: folderID)
-            return .none
+            return handleFolderDeletion(state: &state, folderID: folderID)
 
         case let .layerSidebar(.delegate(.deleteLayer(index))):
-            handleLayerDeletion(state: &state, index: index)
-            return .none
+            return handleLayerDeletion(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.duplicateLayer(index))):
-            handleLayerDuplication(state: &state, index: index)
-            return .none
+            return handleLayerDuplication(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.moveLayer(index, destinationIndex))):
-            handleLayerMove(state: &state, index: index, destinationIndex: destinationIndex)
-            return .none
+            return handleLayerMove(state: &state, index: index, destinationIndex: destinationIndex)
 
         case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
-            handleLayerFolderAssignment(state: &state, index: index, folderID: folderID)
-            return .none
+            return handleLayerFolderAssignment(state: &state, index: index, folderID: folderID)
 
         case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
-            handleLayerFolderAssignment(state: &state, index: index, folderID: -1)
-            return .none
+            return handleLayerFolderAssignment(state: &state, index: index, folderID: -1)
 
         case let .layerSidebar(.delegate(.setOpacity(index, opacity))):
-            handleLayerOpacityChange(state: &state, index: index, opacity: opacity)
-            return .none
+            return handleLayerOpacityChange(state: &state, index: index, opacity: opacity)
 
         case let .layerSidebar(.delegate(.toggleLayerLock(index))):
-            handleLayerLockToggle(state: &state, index: index)
-            return .none
+            return handleLayerLockToggle(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.toggleAlphaLock(index))):
-            handleLayerAlphaLockToggle(state: &state, index: index)
-            return .none
+            return handleLayerAlphaLockToggle(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.toggleClippingMask(index))):
-            handleLayerClippingToggle(state: &state, index: index)
-            return .none
+            return handleLayerClippingToggle(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.mergeDown(index))):
-            handleLayerMergeDown(state: &state, index: index)
-            return .none
+            return handleLayerMergeDown(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.selectLayer(index))):
-            handleLayerSelection(state: &state, index: index)
-            return .none
+            return handleLayerSelection(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.toggleVisibility(index))):
-            handleLayerVisibilityToggle(state: &state, index: index)
-            return .none
+            return handleLayerVisibilityToggle(state: &state, index: index)
 
         case let .layerSidebar(.delegate(.setFolderExpanded(folderID, isExpanded))):
-            handleFolderExpandedChange(state: &state, folderID: folderID, isExpanded: isExpanded)
-            return .none
+            return handleFolderExpandedChange(state: &state, folderID: folderID, isExpanded: isExpanded)
 
         case let .layerSidebar(.delegate(.toggleFolderVisibility(folderID))):
-            handleFolderVisibilityToggle(state: &state, folderID: folderID)
-            return .none
+            return handleFolderVisibilityToggle(state: &state, folderID: folderID)
 
         case let .layerSidebar(.delegate(.renameFolder(folderID, name))):
-            handleFolderRename(state: &state, folderID: folderID, name: name)
-            return .none
+            return handleFolderRename(state: &state, folderID: folderID, name: name)
 
         case let .layerSidebar(.delegate(.setBlendMode(index, blendMode))):
-            handleLayerBlendModeChange(state: &state, index: index, blendMode: blendMode)
-            return .none
+            return handleLayerBlendModeChange(state: &state, index: index, blendMode: blendMode)
 
         case let .layerSidebar(.delegate(.renameLayer(index, name))):
-            handleLayerRename(state: &state, index: index, name: name)
-            return .none
+            return handleLayerRename(state: &state, index: index, name: name)
 
         case .layerSidebar:
             return .none

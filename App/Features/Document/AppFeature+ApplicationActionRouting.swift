@@ -57,6 +57,17 @@ extension AppFeature {
         case let .documentPaperStyleSyncRequested(paperStyle):
             return handleDocumentPaperStyleSyncRequested(paperStyle: paperStyle)
 
+        case let .workspacePersistenceRequested(request):
+            return handleWorkspacePersistenceRequested(request: request)
+
+        case let .workspacePersistenceSucceeded(result):
+            handleWorkspacePersistenceSucceeded(state: &state, result: result)
+            return .none
+
+        case let .workspacePersistenceFailed(failure):
+            handleWorkspacePersistenceFailed(state: &state, failure: failure)
+            return .none
+
         case let .bootstrapPresentationLoaded(presentation):
             handleBootstrapPresentationLoaded(state: &state, presentation: presentation)
             return .none

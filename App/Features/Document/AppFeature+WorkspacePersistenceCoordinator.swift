@@ -3,7 +3,29 @@ import Foundation
 
 extension AppFeature {
     struct WorkspacePersistenceFailure: Error, Equatable {
+        let request: WorkspacePersistenceRequest?
         let feedback: ApplicationFeedback
+
+        init(
+            request: WorkspacePersistenceRequest? = nil,
+            feedback: ApplicationFeedback
+        ) {
+            self.request = request
+            self.feedback = feedback
+        }
+    }
+
+    struct WorkspaceDirtyPresentationRequest: Equatable, Sendable {
+        let activeTab: OpenDocumentTab
+        let paperStyle: CanvasPaperStyle
+    }
+
+    enum WorkspacePersistenceRequest: Equatable, Sendable {
+        case dirtyPresentationRefreshed(WorkspaceDirtyPresentationRequest)
+    }
+
+    enum WorkspacePersistenceResult: Equatable, Sendable {
+        case dirtyPresentationPersisted(OpenDocumentTab.ID)
     }
 
     struct LoadedWorkspaceProjectPlan {
@@ -324,7 +346,7 @@ extension AppFeature {
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
             pane: preparedTab.pane,
-            previewImageData: documentPresentationService.compositePNGData(
+            previewImageData: documentPresentationQueryService.compositePNGData(
                 paperStyle: resolvedPaperStyle(for: state)
             )
         )
@@ -378,7 +400,7 @@ extension AppFeature {
             state.workspace.updateActiveTabMetadata(
                 title: title,
                 sourceProjectURL: sourceProjectURL,
-                previewImageData: documentPresentationService.compositePNGData(
+                previewImageData: documentPresentationQueryService.compositePNGData(
                     paperStyle: resolvedPaperStyle(for: state)
                 ),
                 canvasSize: state.canvas.canvasSize
@@ -415,22 +437,92 @@ extension AppFeature {
         }
     }
 
-    func applyDirtyPresentation(state: inout State) {
-        applyPresentation(paintDocumentClient.presentation(), state: &state)
+    func dirtyPresentationRequest(
+        state: State
+    ) -> WorkspacePersistenceRequest? {
+        guard let activeTab = state.workspace.activeTab else {
+            return nil
+        }
+        return .dirtyPresentationRefreshed(
+            WorkspaceDirtyPresentationRequest(
+                activeTab: activeTab,
+                paperStyle: resolvedPaperStyle(for: state)
+            )
+        )
+    }
+
+    func workspacePersistenceEffect(
+        for request: WorkspacePersistenceRequest
+    ) -> Effect<Action> {
+        .run { [workspaceBackingStoreService] send in
+            do {
+                switch request {
+                case let .dirtyPresentationRefreshed(dirtyPresentation):
+                    try workspaceBackingStoreService.saveProject(
+                        at: dirtyPresentation.activeTab.backingStoreURL.fileURL,
+                        paperStyle: dirtyPresentation.paperStyle
+                    )
+                    try workspaceBackingStoreService.persistAutosaveSnapshot(
+                        dirtyPresentation.activeTab.backingStoreURL,
+                        dirtyPresentation.activeTab
+                    )
+                    await send(
+                        .workspacePersistenceSucceeded(
+                            .dirtyPresentationPersisted(
+                                dirtyPresentation.activeTab.id
+                            )
+                        )
+                    )
+                }
+            } catch {
+                await send(
+                    .workspacePersistenceFailed(
+                        WorkspacePersistenceFailure(
+                            request: request,
+                            feedback: saveFailureFeedback(error)
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    func handleWorkspacePersistenceRequested(
+        request: WorkspacePersistenceRequest
+    ) -> Effect<Action> {
+        workspacePersistenceEffect(for: request)
+    }
+
+    func handleWorkspacePersistenceSucceeded(
+        state: inout State,
+        result: WorkspacePersistenceResult
+    ) {
+        switch result {
+        case .dirtyPresentationPersisted:
+            break
+        }
+    }
+
+    func handleWorkspacePersistenceFailed(
+        state: inout State,
+        failure: WorkspacePersistenceFailure
+    ) {
+        state.application.presentFeedback(failure.feedback)
+    }
+
+    func applyDirtyPresentation(state: inout State) -> Effect<Action> {
+        applyPresentation(documentPresentationQueryService.presentation(), state: &state)
         state.workspace.setActiveTabDirty(true)
-        switch persistActiveTabToBackingStore(state: &state) {
-        case .success:
-            break
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-            return
+        state.workspace.updateActiveTabMetadata(
+            previewImageData: documentPresentationQueryService.compositePNGData(
+                paperStyle: resolvedPaperStyle(for: state)
+            ),
+            canvasSize: state.canvas.canvasSize
+        )
+        guard let request = dirtyPresentationRequest(state: state) else {
+            return .none
         }
-        switch persistActiveTabAutosave(state: &state) {
-        case .success:
-            break
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-        }
+        return .send(.workspacePersistenceRequested(request))
     }
 
     func persistActiveTabAutosave(

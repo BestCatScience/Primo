@@ -446,6 +446,8 @@ struct NanoBananaFeature {
         case restorePurchasesTapped
         case purchaseErrorDismissed
         case historyItemSelected(NanoBananaGenerationRequest)
+        case generationSucceeded(NanoBananaPreviewState)
+        case generationFailed(AppFeature.ApplicationFeedback)
         case delegate(Delegate)
     }
 
@@ -588,6 +590,9 @@ struct NanoBananaFeature {
 
             case let .historyItemSelected(request):
                 state.applyHistoryItem(request)
+                return .none
+
+            case .generationSucceeded, .generationFailed:
                 return .none
 
             case .delegate:

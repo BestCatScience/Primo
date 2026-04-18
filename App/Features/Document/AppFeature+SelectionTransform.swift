@@ -14,11 +14,8 @@ extension AppFeature {
         func setTextLayer(
             _ layerIndex: Int,
             _ textLayer: TextLayerData
-        ) -> Bool {
-            if case .success = paintDocumentClient.setTextLayer(layerIndex, textLayer) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.setTextLayer(layerIndex, textLayer)
         }
 
         func pixelDataForLayer(_ layerIndex: Int) -> Data {
@@ -28,11 +25,8 @@ extension AppFeature {
         func replaceLayerPixels(
             _ layerIndex: Int,
             _ pixelData: Data
-        ) -> Bool {
-            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
     }
 
@@ -115,7 +109,7 @@ extension AppFeature {
         }
         switch commit {
         case let .text(layerIndex, textLayer):
-            guard handleDocumentMutation(
+            return performDocumentMutation(
                 state: &state,
                 contract: DocumentMutationContract(
                     canvasMutation: .resetTransformPreview
@@ -123,12 +117,9 @@ extension AppFeature {
                 mutation: {
                     selectionTransformService.setTextLayer(layerIndex, textLayer)
                 }
-            ) else {
-                discardTransformPreview(state: &state)
-                return .none
-            }
+            )
         case let .pixels(layerIndex, pixelData, selection):
-            guard handleDocumentMutation(
+            return performDocumentMutation(
                 state: &state,
                 contract: DocumentMutationContract(
                     canvasMutation: .completeTransform(
@@ -139,11 +130,7 @@ extension AppFeature {
                 mutation: {
                     selectionTransformService.replaceLayerPixels(layerIndex, pixelData)
                 }
-            ) else {
-                discardTransformPreview(state: &state)
-                return .none
-            }
+            )
         }
-        return .none
     }
 }

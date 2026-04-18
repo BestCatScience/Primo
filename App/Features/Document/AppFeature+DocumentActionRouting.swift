@@ -11,12 +11,10 @@ extension AppFeature {
             return handleNewCanvasRequest(state: &state, width: width, height: height)
 
         case let .resizeCanvasRequested(width, height):
-            handleResizeCanvasRequest(state: &state, width: width, height: height)
-            return .none
+            return handleResizeCanvasRequest(state: &state, width: width, height: height)
 
         case let .resizeCanvasExtentRequested(width, height):
-            handleResizeCanvasExtentRequest(state: &state, width: width, height: height)
-            return .none
+            return handleResizeCanvasExtentRequest(state: &state, width: width, height: height)
 
         case let .newCanvasFromImageReceived(name, data):
             return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
@@ -26,12 +24,10 @@ extension AppFeature {
             return .none
 
         case .undoRequested:
-            handleUndoRequested(state: &state)
-            return .none
+            return handleUndoRequested(state: &state)
 
         case .redoRequested:
-            handleRedoRequested(state: &state)
-            return .none
+            return handleRedoRequested(state: &state)
 
         case .saveHistoryRequested:
             return handleSaveHistoryRequest(state: &state)
@@ -95,25 +91,13 @@ extension AppFeature {
                 return handleNanoBananaCancelRequested(state: &state)
             }
 
-        case let .nanoBananaEditRequested(request):
-            return handleNanoBananaEditRequest(state: &state, request: request)
-
-        case let .nanoBananaEditSucceeded(preview):
+        case let .nanoBanana(.generationSucceeded(preview)):
             handleNanoBananaEditSucceeded(state: &state, preview: preview)
             return .none
 
-        case let .nanoBananaEditFailed(feedback):
+        case let .nanoBanana(.generationFailed(feedback)):
             handleNanoBananaEditFailed(state: &state, feedback: feedback)
             return .none
-
-        case .nanoBananaCancelRequested:
-            return handleNanoBananaCancelRequested(state: &state)
-
-        case .nanoBananaRegenerateRequested:
-            return handleNanoBananaRegenerateRequested(state: &state)
-
-        case let .nanoBananaRetryJob(jobID):
-            return handleNanoBananaRetryJob(state: &state, jobID: jobID)
 
         case let .timelapseExportProgressUpdated(progress):
             handleTimelapseExportProgressUpdated(state: &state, progress: progress)
@@ -128,8 +112,7 @@ extension AppFeature {
             return .none
 
         case let .photoImportReceived(name, data):
-            handlePhotoImport(state: &state, name: name, data: data)
-            return .none
+            return handlePhotoImport(state: &state, name: name, data: data)
 
         case let .photoImportFailed(feedback):
             handlePhotoImportFailed(state: &state, feedback: feedback)

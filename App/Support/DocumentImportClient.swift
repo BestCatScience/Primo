@@ -33,36 +33,41 @@ struct DocumentImportClient: Sendable {
 
     static func live(
         fileClient: FileClient,
-        uuidClient: UUIDClient
+        uuidClient: UUIDClient,
+        securityScopedResourceClient: SecurityScopedResourceClient
     ) -> DocumentImportClient {
         DocumentImportClient(
             stageImportedDocument: { request in
-                withSecurityScopedAccess(to: request.sourceURL) {
-                    let stagingRoot = fileClient.temporaryDirectory()
-                        .appendingPathComponent("primo-open", isDirectory: true)
-                        .appendingPathComponent(uuidClient.generate().uuidString, isDirectory: true)
-                    let destinationURL = stagingRoot.appendingPathComponent(
-                        request.sourceURL.lastPathComponent,
-                        isDirectory: true
-                    )
-
-                    do {
-                        try fileClient.createDirectory(stagingRoot, true)
-                        if fileClient.fileExists(destinationURL.path) {
-                            try fileClient.removeItem(destinationURL)
-                        }
-                        try fileClient.copyItem(request.sourceURL, destinationURL)
-                        return .success(
-                            ImportedDocumentStageResult(
-                                stagedProjectURL: DocumentProjectPath(destinationURL),
-                                suggestedTitle: request.sourceURL.deletingPathExtension().lastPathComponent
-                            )
-                        )
-                    } catch {
-                        return .failure(
-                            .stagingFailed(error.localizedDescription)
-                        )
+                let didAccess = securityScopedResourceClient.startAccessing(request.sourceURL)
+                defer {
+                    if didAccess {
+                        securityScopedResourceClient.stopAccessing(request.sourceURL)
                     }
+                }
+                let stagingRoot = fileClient.temporaryDirectory()
+                    .appendingPathComponent("primo-open", isDirectory: true)
+                    .appendingPathComponent(uuidClient.generate().uuidString, isDirectory: true)
+                let destinationURL = stagingRoot.appendingPathComponent(
+                    request.sourceURL.lastPathComponent,
+                    isDirectory: true
+                )
+
+                do {
+                    try fileClient.createDirectory(stagingRoot, true)
+                    if fileClient.fileExists(destinationURL.path) {
+                        try fileClient.removeItem(destinationURL)
+                    }
+                    try fileClient.copyItem(request.sourceURL, destinationURL)
+                    return .success(
+                        ImportedDocumentStageResult(
+                            stagedProjectURL: DocumentProjectPath(destinationURL),
+                            suggestedTitle: request.sourceURL.deletingPathExtension().lastPathComponent
+                        )
+                    )
+                } catch {
+                    return .failure(
+                        .stagingFailed(error.localizedDescription)
+                    )
                 }
             },
             discardStagedDocument: { stagedProjectURL in
@@ -83,7 +88,12 @@ private enum DocumentImportClientKey: DependencyKey {
     static var liveValue: DocumentImportClient {
         @Dependency(\.fileClient) var fileClient
         @Dependency(\.uuidClient) var uuidClient
-        return .live(fileClient: fileClient, uuidClient: uuidClient)
+        @Dependency(\.securityScopedResourceClient) var securityScopedResourceClient
+        return .live(
+            fileClient: fileClient,
+            uuidClient: uuidClient,
+            securityScopedResourceClient: securityScopedResourceClient
+        )
     }
 }
 
