@@ -1,10 +1,21 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
+import PrimoBrushDomain
 import PrimoDocumentDomain
 import PrimoLocalization
 import UIKit
 import simd
+
+typealias SelectionToolMode = PrimoDocumentDomain.SelectionToolMode
+typealias ShapeToolMode = PrimoDocumentDomain.ShapeToolMode
+typealias LayerBlendMode = PrimoDocumentDomain.LayerBlendMode
+typealias BrushTipKind = PrimoBrushDomain.BrushTipKind
+typealias BrushAngleMode = PrimoBrushDomain.BrushAngleMode
+typealias BrushTextureMode = PrimoBrushDomain.BrushTextureMode
+typealias BrushDualBlendMode = PrimoBrushDomain.BrushDualBlendMode
+typealias BrushScatterMode = PrimoBrushDomain.BrushScatterMode
+typealias BrushColorMixingMode = PrimoBrushDomain.BrushColorMixingMode
 
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
@@ -143,12 +154,7 @@ enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     }
 }
 
-enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case lasso
-    case auto
-
-    var id: String { rawValue }
-
+extension SelectionToolMode {
     var title: String {
         localizedTitle(.english)
     }
@@ -163,16 +169,7 @@ enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identifiable 
     }
 }
 
-enum ShapeToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case line
-    case rectangle
-    case ellipse
-    case triangle
-    case pentagon
-    case hexagon
-
-    var id: String { rawValue }
-
+extension ShapeToolMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .line:
@@ -231,38 +228,7 @@ enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiab
     }
 }
 
-enum LayerBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case normal
-    case darken
-    case multiply
-    case colorBurn
-    case linearBurn
-    case subtract
-    case lighten
-    case screen
-    case colorDodge
-    case glowDodge
-    case overlay
-    case softLight
-    case hardLight
-    case difference
-    case vividLight
-    case linearLight
-    case pinLight
-    case hardMix
-    case exclusion
-    case darkerColor
-    case lighterColor
-    case divide
-    case hue
-    case saturation
-    case color
-    case add
-    case addGlow
-    case luminosity
-
-    var id: String { rawValue }
-
+extension LayerBlendMode {
     var title: String {
         localizedTitle(.japanese)
     }
@@ -435,14 +401,7 @@ enum LayerProcessingRequest: Equatable, Sendable {
     case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 }
 
-enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case pencil
-    case ink
-    case oil
-    case airbrush
-
-    var id: String { rawValue }
-
+extension BrushTipKind {
     var title: String {
         localizedTitle(.english)
     }
@@ -474,13 +433,7 @@ enum BrushTipKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-enum BrushAngleMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case fixed
-    case strokeDirection
-    case stylusTilt
-
-    var id: String { rawValue }
-
+extension BrushAngleMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .fixed:
@@ -493,14 +446,7 @@ enum BrushAngleMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-enum BrushTextureMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case off
-    case strokeLocked
-    case eachTip
-    case moving
-
-    var id: String { rawValue }
-
+extension BrushTextureMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .off:
@@ -515,13 +461,7 @@ enum BrushTextureMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-enum BrushDualBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case multiply
-    case darker
-    case subtract
-
-    var id: String { rawValue }
-
+extension BrushDualBlendMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .multiply:
@@ -534,12 +474,7 @@ enum BrushDualBlendMode: String, CaseIterable, Equatable, Sendable, Identifiable
     }
 }
 
-enum BrushScatterMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case directional
-    case spray
-
-    var id: String { rawValue }
-
+extension BrushScatterMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .directional:
@@ -550,14 +485,7 @@ enum BrushScatterMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-enum BrushColorMixingMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case off
-    case blend
-    case runningColor
-    case smear
-
-    var id: String { rawValue }
-
+extension BrushColorMixingMode {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .off:
@@ -571,22 +499,6 @@ enum BrushColorMixingMode: String, CaseIterable, Equatable, Sendable, Identifiab
         }
     }
 
-    static func inferred(
-        wetness: Double,
-        colorMixStrength: Double,
-        smudgeBlurEnabled: Bool,
-        smudgeBleed: Double,
-        smudgeRadius: Double,
-        paintLoad: Double
-    ) -> BrushColorMixingMode {
-        if smudgeBlurEnabled || smudgeBleed > 0.001 || smudgeRadius > 0.001 {
-            return .runningColor
-        }
-        if wetness > 0.001 || colorMixStrength > 0.001 {
-            return paintLoad <= 0.18 ? .smear : .blend
-        }
-        return .off
-    }
 }
 
 enum BrushTipShapePreset: String, CaseIterable, Equatable, Sendable, Identifiable {

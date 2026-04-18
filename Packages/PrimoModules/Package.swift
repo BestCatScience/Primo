@@ -7,8 +7,12 @@ let package = Package(
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
+        .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoDocumentContracts", targets: ["PrimoDocumentContracts"]),
         .library(name: "PrimoWorkspaceDomain", targets: ["PrimoWorkspaceDomain"]),
+        .library(name: "PrimoWorkspaceInfrastructure", targets: ["PrimoWorkspaceInfrastructure"]),
+        .library(name: "PrimoBrushFileFormats", targets: ["PrimoBrushFileFormats"]),
+        .library(name: "PrimoBrushInfrastructure", targets: ["PrimoBrushInfrastructure"]),
     ],
     targets: [
         .target(
@@ -22,6 +26,9 @@ let package = Package(
             dependencies: ["PrimoCoreTypes"]
         ),
         .target(
+            name: "PrimoBrushDomain"
+        ),
+        .target(
             name: "PrimoDocumentContracts",
             dependencies: ["PrimoDocumentDomain"]
         ),
@@ -33,9 +40,41 @@ let package = Package(
                 "PrimoCoreTypes",
             ]
         ),
+        .target(
+            name: "PrimoWorkspaceInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+            ]
+        ),
+        .target(
+            name: "PrimoBrushFileFormats",
+            dependencies: ["PrimoCoreTypes"]
+        ),
+        .target(
+            name: "PrimoBrushInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
+                "PrimoBrushFileFormats",
+            ]
+        ),
         .testTarget(
             name: "PrimoWorkspaceDomainTests",
             dependencies: ["PrimoWorkspaceDomain"]
+        ),
+        .testTarget(
+            name: "PrimoWorkspaceInfrastructureTests",
+            dependencies: ["PrimoWorkspaceInfrastructure"]
+        ),
+        .testTarget(
+            name: "PrimoBrushDomainTests",
+            dependencies: ["PrimoBrushDomain"]
+        ),
+        .testTarget(
+            name: "PrimoBrushFileFormatsTests",
+            dependencies: ["PrimoBrushFileFormats"]
         ),
     ]
 )

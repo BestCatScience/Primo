@@ -17,6 +17,8 @@ typealias SaveHistoryEntry = PrimoDocumentDomain.SaveHistoryEntry
 typealias TextFontOption = PrimoDocumentDomain.TextFontOption
 typealias TextLayerData = PrimoDocumentDomain.TextLayerData
 typealias TextLayerDraft = PrimoDocumentDomain.TextLayerDraft
+typealias ColorRangeSelectionSource = PrimoDocumentDomain.ColorRangeSelectionSource
+typealias ColorRangeSelectionRequest = PrimoDocumentDomain.ColorRangeSelectionRequest
 
 struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Comparable {
     let rawValue: Int
@@ -135,12 +137,7 @@ extension SaveHistoryTrigger {
     }
 }
 
-enum ColorRangeSelectionSource: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case activeLayer
-    case canvas
-
-    var id: String { rawValue }
-
+extension ColorRangeSelectionSource {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .activeLayer:
@@ -149,16 +146,6 @@ enum ColorRangeSelectionSource: String, CaseIterable, Equatable, Sendable, Ident
             return language.localized("キャンバス合成")
         }
     }
-}
-
-struct ColorRangeSelectionRequest: Equatable, Sendable {
-    let source: ColorRangeSelectionSource
-    let red: UInt8
-    let green: UInt8
-    let blue: UInt8
-    let tolerance: Double
-    let minimumAlpha: Double
-    let expansion: Int
 }
 
 enum CanvasTransformMode: String, CaseIterable, Equatable, Sendable, Identifiable {
