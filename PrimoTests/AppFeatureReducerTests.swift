@@ -5,6 +5,10 @@ import XCTest
 
 @MainActor
 final class AppFeatureReducerTests: XCTestCase {
+    private let repoRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
     func testHomeReturnRequestedEmitsWorkspacePersistenceRequest() async {
         let previewData = Data([0x01, 0x02, 0x03])
         let activeTab = OpenDocumentTab.testValue()
@@ -386,5 +390,54 @@ final class AppFeatureReducerTests: XCTestCase {
 
         XCTAssertFalse(state.application.isHydrating)
         XCTAssertEqual(state.application.bannerMessage, "discard failed")
+    }
+
+    func testWorkspaceCatalogFailureUsesReasonBasedMapper() {
+        let feature = AppFeature()
+        var state = AppFeature.State()
+        state.application.beginHydration()
+
+        feature.handleWorkspaceCatalogFailed(
+            state: &state,
+            failure: AppFeature.WorkspaceCatalogFailure(
+                request: .loadAutosaveRecoveryItems,
+                reason: .loadAutosaveRecoveryItemsFailed("catalog load failed")
+            )
+        )
+
+        XCTAssertFalse(state.application.isHydrating)
+        XCTAssertEqual(state.application.bannerMessage, "catalog load failed")
+    }
+
+    func testArchitectureContractsExposeLayeredProtocolVocabulary() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Support/OperationContracts.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(contents.contains("protocol DomainCommand"))
+        XCTAssertTrue(contents.contains("protocol DomainOutcome"))
+        XCTAssertTrue(contents.contains("protocol FailureReason"))
+        XCTAssertTrue(contents.contains("protocol DomainIssue"))
+    }
+
+    func testDocumentWorkspaceInfrastructureDoesNotReferencePresentationFeedback() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/DocumentWorkspaceClient.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(contents.contains("ApplicationFeedback"))
+        XCTAssertFalse(contents.contains("message(for:"))
+    }
+
+    func testCanvasLifecycleFailureNoLongerEmbedsPresentationFeedback() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/AppFeature+CanvasLifecycleWorkflow.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertFalse(contents.contains("var feedback: ApplicationFeedback"))
+        XCTAssertTrue(contents.contains("CanvasLifecycleFeedbackMapper"))
     }
 }

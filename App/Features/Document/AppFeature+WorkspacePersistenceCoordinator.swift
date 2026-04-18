@@ -2,14 +2,14 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    enum WorkspacePersistenceIssue: Error, Equatable, Sendable {
+    enum WorkspacePersistenceIssue: Error, Equatable, Sendable, DomainIssue {
         case autosaveCleanupFailed(String?)
         case saveHistoryPersistFailed(String?)
         case workspaceItemRemovalFailed(String?)
         case autosaveEntryDiscardFailed(String?)
     }
 
-    enum WorkspacePersistenceFailureReason: Error, Equatable, Sendable {
+    enum WorkspacePersistenceFailureReason: Error, Equatable, Sendable, FailureReason {
         case saveFailed(String?)
         case couldNotCreateTab
         case activeTabUnavailable
@@ -114,9 +114,17 @@ extension AppFeature {
         let activeTab: OpenDocumentTab
     }
 
-    struct WorkspaceCatalogFailure: Error, Equatable {
+    enum WorkspaceCatalogFailureReason: Error, Equatable, Sendable, FailureReason {
+        case loadSavedProjectsFailed(String?)
+        case loadAutosaveRecoveryItemsFailed(String?)
+        case loadSaveHistoryEntriesFailed(String?)
+        case moveSavedProjectFailed(String?)
+        case discardAutosaveEntryFailed(String?)
+    }
+
+    struct WorkspaceCatalogFailure: Error, Equatable, Sendable {
         let request: WorkspaceCatalogRequest
-        let feedback: ApplicationFeedback
+        let reason: WorkspaceCatalogFailureReason
     }
 
     enum WorkspacePersistenceRequest: Equatable, Sendable {
@@ -601,7 +609,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceCatalogFailure(
                         request: request,
-                        feedback: .openFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .loadSavedProjectsFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -620,7 +628,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceCatalogFailure(
                         request: request,
-                        feedback: .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .loadAutosaveRecoveryItemsFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -642,7 +650,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceCatalogFailure(
                         request: request,
-                        feedback: .saveHistoryRestoreFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .loadSaveHistoryEntriesFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -670,7 +678,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceCatalogFailure(
                         request: request,
-                        feedback: .moveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .moveSavedProjectFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -687,7 +695,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceCatalogFailure(
                         request: request,
-                        feedback: .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .discardAutosaveEntryFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -1378,19 +1386,23 @@ extension AppFeature {
         state: inout State,
         failure: WorkspaceCatalogFailure
     ) {
+        let feedback = workspaceFeedbackMapper.feedback(for: failure)
         switch failure.request {
         case .loadSavedProjects:
             state.application.finishLoadingHomeProjects([])
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentFeedback(feedback)
         case .loadAutosaveRecoveryItems:
             state.application.failHydration(
-                message: failure.feedback.message(for: state.application.appLanguage)
+                message: workspaceFeedbackMapper.message(
+                    for: feedback,
+                    language: state.application.appLanguage
+                )
             )
         case .loadSaveHistoryEntries:
             state.saveHistory.dismiss()
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentFeedback(feedback)
         case .moveSavedProject, .discardAutosaveEntry:
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentFeedback(feedback)
         }
     }
 
@@ -1448,6 +1460,23 @@ extension AppFeature {
                 return .couldNotCreateTab
             case .activeTabUnavailable:
                 return .saveFailed(nil)
+            }
+        }
+
+        func feedback(
+            for failure: WorkspaceCatalogFailure
+        ) -> ApplicationFeedback {
+            switch failure.reason {
+            case let .loadSavedProjectsFailed(message):
+                return .openFailed(message)
+            case let .loadAutosaveRecoveryItemsFailed(message):
+                return .autosaveRestoreFailed(message)
+            case let .loadSaveHistoryEntriesFailed(message):
+                return .saveHistoryRestoreFailed(message)
+            case let .moveSavedProjectFailed(message):
+                return .moveFailed(message)
+            case let .discardAutosaveEntryFailed(message):
+                return .autosaveRestoreFailed(message)
             }
         }
 

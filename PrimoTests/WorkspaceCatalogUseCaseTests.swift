@@ -113,7 +113,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
             .failure(
                 AppFeature.WorkspaceCatalogFailure(
                     request: request,
-                    feedback: .moveFailed("move failed")
+                    reason: .moveSavedProjectFailed("move failed")
                 )
             )
         )

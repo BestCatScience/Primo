@@ -2,7 +2,7 @@ import ComposableArchitecture
 import CryptoKit
 import Foundation
 
-enum WorkspaceCatalogFailure: LocalizedError, Equatable, OperationFailure {
+enum DocumentWorkspaceCatalogError: LocalizedError, Equatable, OperationFailure {
     case projectLoadFailed(String)
     case metadataReadFailed(String)
     case metadataDecodeFailed(String)
@@ -208,7 +208,7 @@ private struct DocumentWorkspaceStorage: Sendable {
             )
             let projectURL = projectURL(in: entryURL)
             guard fileClient.fileExists(projectURL.path) else {
-                throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+                throw DocumentWorkspaceCatalogError.invalidWorkspaceEntry(
                     "Missing autosave project at \(projectURL.lastPathComponent)"
                 )
             }
@@ -292,7 +292,7 @@ private struct DocumentWorkspaceStorage: Sendable {
             )
             let projectURL = projectURL(in: entryURL)
             guard fileClient.fileExists(projectURL.path) else {
-                throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+                throw DocumentWorkspaceCatalogError.invalidWorkspaceEntry(
                     "Missing save history project at \(projectURL.lastPathComponent)"
                 )
             }
@@ -437,7 +437,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         do {
             return try RelativeProjectFolderPath(validating: relativePath)
         } catch {
-            throw WorkspaceCatalogFailure.invalidRelativeFolderPath(
+            throw DocumentWorkspaceCatalogError.invalidRelativeFolderPath(
                 "Invalid saved project folder path '\(relativePath)': \(error.localizedDescription)"
             )
         }
@@ -477,7 +477,7 @@ private struct DocumentWorkspaceStorage: Sendable {
                 uuidClient: uuidClient
             )
         } catch {
-            throw WorkspaceCatalogFailure.projectLoadFailed(
+            throw DocumentWorkspaceCatalogError.projectLoadFailed(
                 "Could not load \(label) at \(projectURL.lastPathComponent): \(error.localizedDescription)"
             )
         }
@@ -490,7 +490,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         do {
             return try fileClient.readData(metadataURL)
         } catch {
-            throw WorkspaceCatalogFailure.metadataReadFailed(
+            throw DocumentWorkspaceCatalogError.metadataReadFailed(
                 "Could not read \(label) at \(metadataURL.lastPathComponent): \(error.localizedDescription)"
             )
         }
@@ -504,7 +504,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         do {
             return try JSONDecoder().decode(type, from: data)
         } catch {
-            throw WorkspaceCatalogFailure.metadataDecodeFailed(
+            throw DocumentWorkspaceCatalogError.metadataDecodeFailed(
                 "Could not decode \(label): \(error.localizedDescription)"
             )
         }
@@ -517,7 +517,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         do {
             return try WorkspaceItemID(validating: rawValue)
         } catch {
-            throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+            throw DocumentWorkspaceCatalogError.invalidWorkspaceEntry(
                 "Invalid \(label) identifier '\(rawValue)': \(error.localizedDescription)"
             )
         }
@@ -528,7 +528,7 @@ private struct DocumentWorkspaceStorage: Sendable {
             let values = try url.resourceValues(forKeys: [.contentModificationDateKey])
             return values.contentModificationDate ?? .distantPast
         } catch {
-            throw WorkspaceCatalogFailure.resourceLookupFailed(
+            throw DocumentWorkspaceCatalogError.resourceLookupFailed(
                 "Could not read modification date for \(url.lastPathComponent): \(error.localizedDescription)"
             )
         }

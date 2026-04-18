@@ -3,27 +3,12 @@ import CoreGraphics
 import Foundation
 
 extension AppFeature {
-    enum CanvasLifecycleContractFailure: Error, Equatable {
+    enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {
         case unsupportedCanvasSize
         case invalidImageData
         case unsupportedImageSize
         case undoUnavailableWhileDrawing
         case redoUnavailableWhileDrawing
-
-        var feedback: ApplicationFeedback {
-            switch self {
-            case .unsupportedCanvasSize:
-                return .canvasSizeUnsupported
-            case .invalidImageData:
-                return .couldNotCreateCanvasFromImage(nil)
-            case .unsupportedImageSize:
-                return .imageSizeUnsupported
-            case .undoUnavailableWhileDrawing:
-                return .undoUnavailableWhileDrawing
-            case .redoUnavailableWhileDrawing:
-                return .redoUnavailableWhileDrawing
-            }
-        }
     }
 
     struct CanvasDimensions: Equatable, Sendable {
@@ -239,6 +224,27 @@ extension AppFeature {
         CanvasLifecycleService(paintDocumentClient: paintDocumentClient)
     }
 
+    struct CanvasLifecycleFeedbackMapper: Sendable {
+        func feedback(for failure: CanvasLifecycleContractFailure) -> ApplicationFeedback {
+            switch failure {
+            case .unsupportedCanvasSize:
+                return .canvasSizeUnsupported
+            case .invalidImageData:
+                return .couldNotCreateCanvasFromImage(nil)
+            case .unsupportedImageSize:
+                return .imageSizeUnsupported
+            case .undoUnavailableWhileDrawing:
+                return .undoUnavailableWhileDrawing
+            case .redoUnavailableWhileDrawing:
+                return .redoUnavailableWhileDrawing
+            }
+        }
+    }
+
+    var canvasLifecycleFeedbackMapper: CanvasLifecycleFeedbackMapper {
+        CanvasLifecycleFeedbackMapper()
+    }
+
     var freshDocumentReservationCoordinator: FreshDocumentReservationCoordinator {
         FreshDocumentReservationCoordinator()
     }
@@ -342,7 +348,7 @@ extension AppFeature {
         _ failure: CanvasLifecycleContractFailure,
         state: inout State
     ) {
-        state.application.presentFeedback(failure.feedback)
+        state.application.presentFeedback(canvasLifecycleFeedbackMapper.feedback(for: failure))
     }
 
     func applyFreshDocumentWorkspaceState(
