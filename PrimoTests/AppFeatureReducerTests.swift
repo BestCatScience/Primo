@@ -235,6 +235,88 @@ final class AppFeatureReducerTests: XCTestCase {
         }
     }
 
+    func testHomeProjectsLoadUsesWorkspaceCatalogRequest() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.homeProjectsLoadRequested) {
+            $0.application.isLoadingHomeProjects = true
+        }
+        await store.receive(.workspaceCatalogRequested(.loadSavedProjects))
+    }
+
+    func testAutosaveRecoveryLoadUsesWorkspaceCatalogRequest() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.autosaveRecoveryLoadRequested)
+        await store.receive(.workspaceCatalogRequested(.loadAutosaveRecoveryItems))
+    }
+
+    func testSaveHistoryLoadUsesWorkspaceCatalogRequest() async {
+        let activeTab = OpenDocumentTab.testValue()
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.workspace.openTabs = [activeTab]
+                state.workspace.activeTabID = activeTab.id
+                state.workspace.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        ) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.saveHistoryRequested) {
+            $0.saveHistory.isPresented = true
+        }
+        await store.receive(
+            .workspaceCatalogRequested(
+                .loadSaveHistoryEntries(
+                    AppFeature.WorkspaceSaveHistoryLoadRequest(
+                        activeTab: activeTab
+                    )
+                )
+            )
+        )
+    }
+
+    func testFreshDocumentPreparationRequestsReservation() async {
+        let dimensions = AppFeature.CanvasDimensions(width: 640, height: 480)!
+        let store = TestStore(initialState: AppFeature.State()) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.newCanvasPreparationCompleted(dimensions)) {
+            $0.workspace.pendingWorkspaceTabReservation = .freshDocument(
+                AppFeature.PendingFreshDocumentMutation(
+                    contract: AppFeature.FreshDocumentReplacementContract(
+                        canvasSize: dimensions.size,
+                        tabTitle: "Untitled"
+                    ),
+                    operation: .newCanvas(dimensions)
+                )
+            )
+        }
+        await store.receive(
+            .workspacePersistenceRequested(
+                .reserveNewTabBackingStore(
+                    AppFeature.WorkspaceTabReservationRequest(
+                        title: "Untitled",
+                        sourceProjectURL: nil,
+                        pane: .primary
+                    )
+                )
+            )
+        )
+    }
+
     func testOpenDocumentLoadedRequestsReservationBeforeAppendingNewTab() async {
         let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/imported.atelier"))
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
@@ -252,15 +334,17 @@ final class AppFeatureReducerTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.openDocumentLoaded(loaded, sourceURL)) {
-            $0.workspace.pendingLoadedWorkspaceProject = AppFeature.PendingLoadedWorkspaceProject(
-                loaded: loaded,
-                plan: AppFeature.LoadedWorkspaceProjectPlan(
-                    destination: .newTab(
-                        title: sourceURL.displayName,
-                        sourceProjectURL: sourceURL
-                    ),
-                    successEffects: .init(
-                        feedback: .openedDocument(loaded.presentation.layerRows.count)
+            $0.workspace.pendingWorkspaceTabReservation = .loadedProject(
+                AppFeature.PendingLoadedWorkspaceProject(
+                    loaded: loaded,
+                    plan: AppFeature.LoadedWorkspaceProjectPlan(
+                        destination: .newTab(
+                            title: sourceURL.displayName,
+                            sourceProjectURL: sourceURL
+                        ),
+                        successEffects: .init(
+                            feedback: .openedDocument(loaded.presentation.layerRows.count)
+                        )
                     )
                 )
             )

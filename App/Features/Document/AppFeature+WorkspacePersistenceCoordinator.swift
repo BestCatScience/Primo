@@ -94,6 +94,10 @@ extension AppFeature {
         let autosaveID: WorkspaceItemID
     }
 
+    struct WorkspaceSaveHistoryLoadRequest: Equatable, Sendable {
+        let activeTab: OpenDocumentTab
+    }
+
     struct WorkspaceCatalogFailure: Error, Equatable {
         let request: WorkspaceCatalogRequest
         let feedback: ApplicationFeedback
@@ -120,11 +124,17 @@ extension AppFeature {
     }
 
     enum WorkspaceCatalogRequest: Equatable, Sendable {
+        case loadSavedProjects
+        case loadAutosaveRecoveryItems
+        case loadSaveHistoryEntries(WorkspaceSaveHistoryLoadRequest)
         case moveSavedProject(WorkspaceSavedProjectMoveRequest)
         case discardAutosaveEntry(WorkspaceAutosaveEntryDiscardRequest)
     }
 
     enum WorkspaceCatalogResult: Equatable, Sendable {
+        case savedProjectsLoaded([SavedProjectSummary])
+        case autosaveRecoveryItemsLoaded([AutosaveRecoveryItem])
+        case saveHistoryEntriesLoaded([SaveHistoryEntry])
         case savedProjectMoved(WorkspaceSavedProjectMoveResult)
         case autosaveEntryDiscarded(WorkspaceItemID)
     }
@@ -503,10 +513,76 @@ extension AppFeature {
             _ request: WorkspaceCatalogRequest
         ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
             switch request {
+            case .loadSavedProjects:
+                return loadSavedProjects(request: request)
+            case .loadAutosaveRecoveryItems:
+                return loadAutosaveRecoveryItems(request: request)
+            case let .loadSaveHistoryEntries(loadRequest):
+                return loadSaveHistoryEntries(loadRequest, request: request)
             case let .moveSavedProject(moveRequest):
                 return moveSavedProject(moveRequest, request: request)
             case let .discardAutosaveEntry(discardRequest):
                 return discardAutosaveEntry(discardRequest, request: request)
+            }
+        }
+
+        private func loadSavedProjects(
+            request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            do {
+                return .success(
+                    .savedProjectsLoaded(
+                        try workspaceCatalogService.loadSavedProjects()
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspaceCatalogFailure(
+                        request: request,
+                        feedback: .openFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func loadAutosaveRecoveryItems(
+            request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            do {
+                return .success(
+                    .autosaveRecoveryItemsLoaded(
+                        try workspaceCatalogService.loadAutosaveRecoveryItems()
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspaceCatalogFailure(
+                        request: request,
+                        feedback: .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func loadSaveHistoryEntries(
+            _ requestPayload: WorkspaceSaveHistoryLoadRequest,
+            request: WorkspaceCatalogRequest
+        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
+            do {
+                return .success(
+                    .saveHistoryEntriesLoaded(
+                        try workspaceCatalogService.loadSaveHistoryEntries(
+                            for: requestPayload.activeTab
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspaceCatalogFailure(
+                        request: request,
+                        feedback: .saveHistoryRestoreFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
             }
         }
 
@@ -611,9 +687,24 @@ extension AppFeature {
         let pane: WorkspacePane
     }
 
+    enum PendingWorkspaceTabReservation: Equatable, Sendable {
+        case loadedProject(PendingLoadedWorkspaceProject)
+        case freshDocument(PendingFreshDocumentMutation)
+    }
+
     struct PendingLoadedWorkspaceProject: Equatable, Sendable {
         let loaded: LoadedPaintProject
         let plan: LoadedWorkspaceProjectPlan
+    }
+
+    struct PendingFreshDocumentMutation: Equatable, Sendable {
+        enum Operation: Equatable, Sendable {
+            case newCanvas(CanvasDimensions)
+            case importedCanvas(ImportedCanvasPlan)
+        }
+
+        let contract: FreshDocumentReplacementContract
+        let operation: Operation
     }
 
     var workspaceBackingStoreService: WorkspaceBackingStoreService {
@@ -706,33 +797,6 @@ extension AppFeature {
         )
     }
 
-    func prepareNewTabReservation(
-        title: String,
-        sourceProjectURL: DocumentProjectPath?,
-        state: State
-    ) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure> {
-        let tabID = workspaceIdentityService.generateTabID()
-        let backingStoreURL: DocumentProjectPath
-        do {
-            backingStoreURL = try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
-        } catch {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: .couldNotCreateTab
-                )
-            )
-        }
-        return .success(
-            PreparedWorkspaceTab(
-                id: tabID,
-                title: title,
-                backingStoreURL: backingStoreURL,
-                sourceProjectURL: sourceProjectURL,
-                pane: state.workspace.focusedWorkspacePane
-            )
-        )
-    }
-
     func activatePreparedTab(
         _ preparedTab: PreparedWorkspaceTab,
         state: inout State
@@ -761,9 +825,11 @@ extension AppFeature {
     ) -> Effect<Action> {
         switch plan.destination {
         case let .newTab(title, sourceProjectURL):
-            state.workspace.pendingLoadedWorkspaceProject = PendingLoadedWorkspaceProject(
-                loaded: loaded,
-                plan: plan
+            state.workspace.pendingWorkspaceTabReservation = .loadedProject(
+                PendingLoadedWorkspaceProject(
+                    loaded: loaded,
+                    plan: plan
+                )
             )
             return .send(
                 .workspacePersistenceRequested(
@@ -1069,16 +1135,25 @@ extension AppFeature {
             return .none
 
         case let .newTabBackingStoreReserved(preparedTab):
-            guard let pendingLoadedWorkspaceProject = state.workspace.pendingLoadedWorkspaceProject else {
+            guard let pendingReservation = state.workspace.pendingWorkspaceTabReservation else {
                 return .none
             }
-            state.workspace.pendingLoadedWorkspaceProject = nil
-            return completeLoadedWorkspaceProject(
-                pendingLoadedWorkspaceProject.loaded,
-                using: pendingLoadedWorkspaceProject.plan,
-                preparedTab: preparedTab,
-                state: &state
-            )
+            state.workspace.pendingWorkspaceTabReservation = nil
+            switch pendingReservation {
+            case let .loadedProject(pendingLoadedWorkspaceProject):
+                return completeLoadedWorkspaceProject(
+                    pendingLoadedWorkspaceProject.loaded,
+                    using: pendingLoadedWorkspaceProject.plan,
+                    preparedTab: preparedTab,
+                    state: &state
+                )
+            case let .freshDocument(pendingFreshDocumentMutation):
+                return completeReservedFreshDocumentMutation(
+                    pendingFreshDocumentMutation,
+                    preparedTab: preparedTab,
+                    state: &state
+                )
+            }
 
         case let .loadedWorkspaceFollowUpApplied(followUp):
             applyLoadedWorkspaceSuccessEffects(
@@ -1108,7 +1183,7 @@ extension AppFeature {
                 feedback: failure.feedback
             )
         case .some(.reserveNewTabBackingStore):
-            state.workspace.pendingLoadedWorkspaceProject = nil
+            state.workspace.pendingWorkspaceTabReservation = nil
             state.application.completeWorkspaceProjectLoad(
                 feedback: failure.feedback
             )
@@ -1123,6 +1198,18 @@ extension AppFeature {
         result: WorkspaceCatalogResult
     ) -> Effect<Action> {
         switch result {
+        case let .savedProjectsLoaded(projects):
+            state.application.finishLoadingHomeProjects(projects)
+            return .none
+
+        case let .autosaveRecoveryItemsLoaded(items):
+            state.recovery.present(items: items)
+            return .none
+
+        case let .saveHistoryEntriesLoaded(entries):
+            state.saveHistory.present(entries: entries)
+            return .none
+
         case let .savedProjectMoved(moveResult):
             if let openTabID = moveResult.openTabID {
                 state.workspace.updateTab(id: openTabID, sourceProjectURL: moveResult.destinationURL)
@@ -1139,7 +1226,18 @@ extension AppFeature {
         state: inout State,
         failure: WorkspaceCatalogFailure
     ) {
-        state.application.presentFeedback(failure.feedback)
+        switch failure.request {
+        case .loadSavedProjects:
+            state.application.finishLoadingHomeProjects([])
+            state.application.presentFeedback(failure.feedback)
+        case .loadAutosaveRecoveryItems:
+            state.application.failHydration(feedback: failure.feedback)
+        case .loadSaveHistoryEntries:
+            state.saveHistory.dismiss()
+            state.application.presentFeedback(failure.feedback)
+        case .moveSavedProject, .discardAutosaveEntry:
+            state.application.presentFeedback(failure.feedback)
+        }
     }
 
     func applyDirtyPresentation(state: inout State) -> Effect<Action> {

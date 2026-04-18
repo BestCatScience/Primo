@@ -151,6 +151,8 @@
 		AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */; };
 		AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */; };
 		AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000008 /* AppFeatureReducerTests.swift */; };
+		AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */; };
+		AA100000000000000000000A /* PaintDocumentMutationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -302,6 +304,8 @@
 		AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasStrokeWorkflowTests.swift; sourceTree = "<group>"; };
 		AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentMutationFeedbackMapperTests.swift; sourceTree = "<group>"; };
 		AA2000000000000000000008 /* AppFeatureReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureReducerTests.swift; sourceTree = "<group>"; };
+		AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCatalogUseCaseTests.swift; sourceTree = "<group>"; };
+		AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentMutationContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -416,6 +420,8 @@
 				AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */,
 				AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */,
 				AA2000000000000000000008 /* AppFeatureReducerTests.swift */,
+				AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */,
+				AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */,
 			);
 			path = PrimoTests;
 			sourceTree = "<group>";
@@ -861,7 +867,9 @@
 				AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */,
 				AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */,
 				AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */,
+				AA100000000000000000000A /* PaintDocumentMutationContractTests.swift in Sources */,
 				AA1000000000000000000003 /* TestSupport.swift in Sources */,
+				AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */,
 				AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */,
 				AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */,
 			);

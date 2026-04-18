@@ -217,17 +217,51 @@ extension PaintDocumentSession {
         documentGateway.queries.folderInfos().contains { Int($0.folderID) == folderID }
     }
 
-    @discardableResult
+    func layerMutationFailure(
+        _ index: Int,
+        requiresUnlocked: Bool = false
+    ) -> DocumentMutationFailure? {
+        guard containsLayerIndex(index) else {
+            return .invalidLayerIndex(index)
+        }
+        if requiresUnlocked, isLayerLocked(index: index) {
+            return .layerLocked(index)
+        }
+        return nil
+    }
+
+    func folderMutationFailure(_ folderID: Int) -> DocumentMutationFailure? {
+        guard containsFolderID(folderID) else {
+            return .invalidFolderID(folderID)
+        }
+        return nil
+    }
+
+    func wrapMutationResult(
+        _ didMutate: Bool,
+        operation: String
+    ) -> DocumentMutationResult {
+        didMutate ? .success(()) : .failure(.bridgeMutationFailed(operation))
+    }
+
+    func wrapIndexedMutationResult(
+        _ value: Int,
+        operation: String
+    ) -> DocumentIndexedMutationResult {
+        value >= 0 ? .success(value) : .failure(.bridgeMutationFailed(operation))
+    }
+
     func beginPixelLayerMutation(
         at index: Int,
         preservesTextLayerMetadata: Bool = false
-    ) -> Bool {
-        guard containsLayerIndex(index) else { return false }
-        guard !isLayerLocked(index: index) else { return false }
+    ) -> DocumentMutationResult {
+        if let failure = layerMutationFailure(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
         if !preservesTextLayerMetadata {
             clearTextLayerData(index: index)
         }
-        return true
+        return .success(())
     }
 
     func applyRecordedLifecycleMutation(

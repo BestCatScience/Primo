@@ -88,17 +88,7 @@ extension AppFeature {
 
     func handleHomeProjectsLoadRequest(state: inout State) -> Effect<Action> {
         state.application.beginLoadingHomeProjects()
-        return .run { [workspaceCatalogService] send in
-            do {
-                await send(.homeProjectsLoaded(try workspaceCatalogService.loadSavedProjects()))
-            } catch {
-                await send(
-                    .homeProjectsLoadFailed(
-                        .openFailed(Self.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
+        return .send(.workspaceCatalogRequested(.loadSavedProjects))
     }
 
     func handleHomeProjectsLoaded(

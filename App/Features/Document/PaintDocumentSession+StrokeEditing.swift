@@ -33,10 +33,14 @@ extension PaintDocumentSession {
         )
     }
 
-    @discardableResult
-    func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> Bool {
+    func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
         let layerIndex = documentGateway.queries.activeLayerIndex()
-        guard beginPixelLayerMutation(at: layerIndex) else { return false }
+        switch beginPixelLayerMutation(at: layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            break
+        }
         documentGateway.strokes.fill(sample: sample, brush: brush)
         applyLayerLifecycleMutation(
             at: layerIndex,
@@ -46,13 +50,17 @@ extension PaintDocumentSession {
                 sample: sample
             )
         )
-        return true
+        return .success(())
     }
 
-    @discardableResult
-    func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> Bool {
-        guard !samples.isEmpty else { return false }
-        guard beginPixelLayerMutation(at: layerIndex) else { return false }
+    func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        switch beginPixelLayerMutation(at: layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            break
+        }
         beginOrContinueTrackedBlurStroke(on: layerIndex, brush: brush)
         appendTrackedBlurSamples(samples)
         applyBlurStroke(
@@ -66,7 +74,7 @@ extension PaintDocumentSession {
             at: layerIndex,
             captureFrame: captureTimelapse
         )
-        return true
+        return .success(())
     }
 
     func endBlurStroke() {
@@ -76,10 +84,13 @@ extension PaintDocumentSession {
         )
     }
 
-    @discardableResult
-    func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> Bool {
-        guard containsLayerIndex(layerIndex) else { return false }
-        guard !isLayerLocked(index: layerIndex) else { return false }
+    func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
+        guard !samples.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        if let failure = layerMutationFailure(layerIndex, requiresUnlocked: true) {
+            return .failure(failure)
+        }
         let basePixelData = pixelDataForLayer(index: layerIndex)
         guard let rasterized = AppFeature.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
@@ -89,7 +100,7 @@ extension PaintDocumentSession {
             brush: brush,
             preserveAlphaLockedPixels: isLayerAlphaLocked(index: layerIndex)
         ) else {
-            return false
+            return .failure(.bridgeMutationFailed("applySoftwareStroke"))
         }
         return replaceLayerPixels(index: layerIndex, data: rasterized)
     }

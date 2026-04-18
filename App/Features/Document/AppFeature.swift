@@ -39,7 +39,7 @@ struct AppFeature {
         var focusedWorkspacePane: WorkspacePane = .primary
         var workspaceLayout: WorkspaceLayoutMode = .single
         var pendingCloseConfirmation: PendingCloseConfirmationState?
-        var pendingLoadedWorkspaceProject: PendingLoadedWorkspaceProject?
+        var pendingWorkspaceTabReservation: PendingWorkspaceTabReservation?
     }
 
     struct RecoveryState: Equatable {

@@ -2,34 +2,18 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    private struct SaveHistoryWorkflowCoordinator {
-        let workspaceCatalogService: WorkspaceCatalogService
-
-        func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
-            .run { [workspaceCatalogService] send in
-                do {
-                    await send(.saveHistoryLoaded(try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)))
-                } catch {
-                    await send(
-                        .saveHistoryLoadFailed(
-                            .saveHistoryRestoreFailed(AppFeature.optionalErrorMessage(error))
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    private var saveHistoryWorkflowCoordinator: SaveHistoryWorkflowCoordinator {
-        SaveHistoryWorkflowCoordinator(
-            workspaceCatalogService: workspaceCatalogService
-        )
-    }
-
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
         guard let activeTab = state.workspace.activeTab else { return .none }
         state.saveHistory.beginPresentation()
-        return saveHistoryWorkflowCoordinator.loadSaveHistoryEffect(for: activeTab)
+        return .send(
+            .workspaceCatalogRequested(
+                .loadSaveHistoryEntries(
+                    WorkspaceSaveHistoryLoadRequest(
+                        activeTab: activeTab
+                    )
+                )
+            )
+        )
     }
 
     func handleSaveHistoryRestoreRequest(

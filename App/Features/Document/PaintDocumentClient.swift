@@ -221,54 +221,13 @@ extension DependencyValues {
     }
 }
 
-private extension PaintDocumentSession {
-    func requireLayerIndex(
-        _ index: Int,
-        requiresUnlocked: Bool = false
-    ) -> DocumentMutationFailure? {
-        guard containsLayerIndex(index) else {
-            return .invalidLayerIndex(index)
-        }
-        if requiresUnlocked, isLayerLocked(index: index) {
-            return .layerLocked(index)
-        }
-        return nil
-    }
-
-    func requireFolderID(_ folderID: Int) -> DocumentMutationFailure? {
-        guard containsFolderID(folderID) else {
-            return .invalidFolderID(folderID)
-        }
-        return nil
-    }
-
-    func wrapMutation(
-        _ didMutate: Bool,
-        operation: String
-    ) -> DocumentMutationResult {
-        didMutate ? .success(()) : .failure(.bridgeMutationFailed(operation))
-    }
-}
-
 extension PaintDocumentSession {
     func resizeCanvasMutation(width: Int, height: Int) -> DocumentMutationResult {
-        guard width > 0, height > 0 else {
-            return .failure(.invalidCanvasSize(width: width, height: height))
-        }
-        return wrapMutation(
-            resizeCanvas(width: width, height: height),
-            operation: "resizeCanvas"
-        )
+        resizeCanvas(width: width, height: height)
     }
 
     func resizeCanvasExtentMutation(width: Int, height: Int) -> DocumentMutationResult {
-        guard width > 0, height > 0 else {
-            return .failure(.invalidCanvasSize(width: width, height: height))
-        }
-        return wrapMutation(
-            resizeCanvasExtent(width: width, height: height),
-            operation: "resizeCanvasExtent"
-        )
+        resizeCanvasExtent(width: width, height: height)
     }
 
     func blurMutation(
@@ -277,15 +236,11 @@ extension PaintDocumentSession {
         layerIndex: Int,
         captureTimelapse: Bool
     ) -> DocumentMutationResult {
-        guard !samples.isEmpty else {
-            return .failure(.emptyInput)
-        }
-        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse),
-            operation: "blurStroke"
+        blur(
+            samples: samples,
+            brush: brush,
+            layerIndex: layerIndex,
+            captureTimelapse: captureTimelapse
         )
     }
 
@@ -293,316 +248,151 @@ extension PaintDocumentSession {
         sample: StylusSample,
         brush: BrushRuntimeSettings
     ) -> DocumentMutationResult {
-        let layerIndex = documentGateway.queries.activeLayerIndex()
-        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            fill(sample: sample, brush: brush),
-            operation: "fill"
-        )
+        fill(sample: sample, brush: brush)
     }
 
     func undoMutation() -> DocumentMutationResult {
-        guard canUndo() else {
-            return .failure(.noUndoState)
-        }
-        return wrapMutation(
-            undo(),
-            operation: "undo"
-        )
+        undo()
     }
 
     func redoMutation() -> DocumentMutationResult {
-        guard canRedo() else {
-            return .failure(.noRedoState)
-        }
-        return wrapMutation(
-            redo(),
-            operation: "redo"
-        )
+        redo()
     }
 
     func addLayerMutation(name: String) -> DocumentIndexedMutationResult {
-        .success(addLayer(name: name))
+        addLayer(name: name)
     }
 
     func duplicateLayerMutation(
         index: Int,
         name: String
     ) -> DocumentIndexedMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        let duplicatedIndex = duplicateLayer(index: index, name: name)
-        guard duplicatedIndex >= 0 else {
-            return .failure(.bridgeMutationFailed("duplicateLayer"))
-        }
-        return .success(duplicatedIndex)
+        duplicateLayer(index: index, name: name)
     }
 
     func deleteLayerMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            deleteLayer(index: index),
-            operation: "deleteLayer"
-        )
+        deleteLayer(index: index)
     }
 
     func moveLayerMutation(
         from index: Int,
         to destinationIndex: Int
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        if let failure = requireLayerIndex(destinationIndex) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            moveLayer(from: index, to: destinationIndex),
-            operation: "moveLayer"
-        )
+        moveLayer(from: index, to: destinationIndex)
     }
 
     func createFolderMutation(
         name: String,
         layerIndex: Int
     ) -> DocumentIndexedMutationResult {
-        if layerIndex >= 0, let failure = requireLayerIndex(layerIndex) {
-            return .failure(failure)
-        }
-        let folderID = createFolder(name: name, layerIndex: layerIndex)
-        guard folderID >= 0 else {
-            return .failure(.bridgeMutationFailed("createFolder"))
-        }
-        return .success(folderID)
+        createFolder(name: name, layerIndex: layerIndex)
     }
 
     func deleteFolderMutation(folderID: Int) -> DocumentMutationResult {
-        if let failure = requireFolderID(folderID) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            deleteFolder(folderID: folderID),
-            operation: "deleteFolder"
-        )
+        deleteFolder(folderID: folderID)
     }
 
     func setFolderVisibilityMutation(
         folderID: Int,
         isVisible: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireFolderID(folderID) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setFolderVisibility(folderID: folderID, isVisible: isVisible),
-            operation: "setFolderVisibility"
-        )
+        setFolderVisibility(folderID: folderID, isVisible: isVisible)
     }
 
     func setFolderNameMutation(
         folderID: Int,
         name: String
     ) -> DocumentMutationResult {
-        if let failure = requireFolderID(folderID) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setFolderName(folderID: folderID, name: name),
-            operation: "setFolderName"
-        )
+        setFolderName(folderID: folderID, name: name)
     }
 
     func setFolderExpandedMutation(
         folderID: Int,
         isExpanded: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireFolderID(folderID) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setFolderExpanded(folderID: folderID, isExpanded: isExpanded),
-            operation: "setFolderExpanded"
-        )
+        setFolderExpanded(folderID: folderID, isExpanded: isExpanded)
     }
 
     func assignLayerMutation(
         index: Int,
         toFolder folderID: Int
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        if folderID >= 0, let failure = requireFolderID(folderID) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            assignLayer(index: index, toFolder: folderID),
-            operation: "assignLayerToFolder"
-        )
+        assignLayer(index: index, toFolder: folderID)
     }
 
     func setActiveLayerMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setActiveLayer(index: index),
-            operation: "setActiveLayer"
-        )
+        setActiveLayer(index: index)
     }
 
     func setLayerNameMutation(
         index: Int,
         name: String
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerName(index: index, name: name),
-            operation: "setLayerName"
-        )
+        setLayerName(index: index, name: name)
     }
 
     func setLayerVisibilityMutation(
         index: Int,
         isVisible: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerVisibility(index: index, isVisible: isVisible),
-            operation: "setLayerVisibility"
-        )
+        setLayerVisibility(index: index, isVisible: isVisible)
     }
 
     func setLayerLockedMutation(
         index: Int,
         isLocked: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerLocked(index: index, isLocked: isLocked),
-            operation: "setLayerLocked"
-        )
+        setLayerLocked(index: index, isLocked: isLocked)
     }
 
     func setLayerAlphaLockedMutation(
         index: Int,
         isAlphaLocked: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked),
-            operation: "setLayerAlphaLocked"
-        )
+        setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
     }
 
     func setLayerClippedMutation(
         index: Int,
         isClipped: Bool
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerClipped(index: index, isClipped: isClipped),
-            operation: "setLayerClipped"
-        )
+        setLayerClipped(index: index, isClipped: isClipped)
     }
 
     func revealLayerForEditingMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            revealLayerForEditing(index: index),
-            operation: "revealLayerForEditing"
-        )
+        revealLayerForEditing(index: index)
     }
 
     func setLayerOpacityMutation(
         index: Int,
         opacity: Double
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        guard (0...1).contains(opacity) else {
-            return .failure(.invalidOpacity(opacity))
-        }
-        return wrapMutation(
-            setLayerOpacity(index: index, opacity: opacity),
-            operation: "setLayerOpacity"
-        )
+        setLayerOpacity(index: index, opacity: opacity)
     }
 
     func setLayerBlendModeMutation(
         index: Int,
         blendMode: LayerBlendMode
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            setLayerBlendMode(index: index, blendMode: blendMode),
-            operation: "setLayerBlendMode"
-        )
+        setLayerBlendMode(index: index, blendMode: blendMode)
     }
 
     func mergeLayerDownMutation(index: Int) -> DocumentMutationResult {
-        guard index > 0 else {
-            return .failure(.invalidLayerIndex(index))
-        }
-        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        if let failure = requireLayerIndex(index - 1, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            mergeLayerDown(index: index),
-            operation: "mergeLayerDown"
-        )
+        mergeLayerDown(index: index)
     }
 
     func setTextLayerMutation(
         index: Int,
         textLayer: TextLayerData
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .failure(.emptyInput)
-        }
-        return wrapMutation(
-            setTextLayer(index: index, textLayer: textLayer),
-            operation: "setTextLayer"
-        )
+        setTextLayer(index: index, textLayer: textLayer)
     }
 
     func applyLayerProcessingMutation(
         index: Int,
         request: LayerProcessingRequest
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            applyLayerProcessing(index: index, request: request),
-            operation: "applyLayerProcessing"
-        )
+        applyLayerProcessing(index: index, request: request)
     }
 
     func applySoftwareStrokeMutation(
@@ -610,77 +400,32 @@ extension PaintDocumentSession {
         brush: BrushRuntimeSettings,
         layerIndex: Int
     ) -> DocumentMutationResult {
-        guard !samples.isEmpty else {
-            return .failure(.emptyInput)
-        }
-        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex),
-            operation: "applySoftwareStroke"
-        )
+        applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
     }
 
     func replaceLayerPixelsMutation(
         index: Int,
         data: Data
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        guard !data.isEmpty else {
-            return .failure(.emptyInput)
-        }
-        return wrapMutation(
-            replaceLayerPixels(index: index, data: data),
-            operation: "replaceLayerPixels"
-        )
+        replaceLayerPixels(index: index, data: data)
     }
 
     func replaceLayerMaskMutation(
         index: Int,
         data: Data
     ) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        guard !data.isEmpty else {
-            return .failure(.emptyInput)
-        }
-        return wrapMutation(
-            replaceLayerMask(index: index, maskData: data),
-            operation: "replaceLayerMask"
-        )
+        replaceLayerMask(index: index, maskData: data)
     }
 
     func clearLayerMaskMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            clearLayerMask(index: index),
-            operation: "clearLayerMask"
-        )
+        clearLayerMask(index: index)
     }
 
     func applyLayerMaskMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            applyLayerMask(index: index),
-            operation: "applyLayerMask"
-        )
+        applyLayerMask(index: index)
     }
 
     func clearLayerMutation(index: Int) -> DocumentMutationResult {
-        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
-            return .failure(failure)
-        }
-        return wrapMutation(
-            clearLayer(index: index),
-            operation: "clearLayer"
-        )
+        clearLayer(index: index)
     }
 }

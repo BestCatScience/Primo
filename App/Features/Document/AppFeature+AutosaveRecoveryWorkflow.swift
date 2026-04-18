@@ -3,7 +3,7 @@ import Foundation
 
 extension AppFeature {
     func handleAutosaveRecoveryLoadRequest() -> Effect<Action> {
-        loadAutosaveRecoveryEffect()
+        .send(.workspaceCatalogRequested(.loadAutosaveRecoveryItems))
     }
 
     func handleAutosaveRecoveryRestoreRequest(

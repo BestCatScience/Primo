@@ -161,20 +161,6 @@ extension AppFeature {
         )
     }
 
-    func loadAutosaveRecoveryEffect() -> Effect<Action> {
-        .run { [workspaceCatalogService] send in
-            do {
-                await send(.autosaveRecoveryLoaded(try workspaceCatalogService.loadAutosaveRecoveryItems()))
-            } catch {
-                await send(
-                    .autosaveRecoveryLoadFailed(
-                        .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-    }
-
     func beginWorkspaceProjectLoad(
         state: inout State,
         fileURL: URL,

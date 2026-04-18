@@ -1,9 +1,10 @@
 import Foundation
 
 extension PaintDocumentSession {
-    @discardableResult
-    func createFolder(name: String, layerIndex: Int) -> Int {
-        guard containsValidLayerAnchor(layerIndex) else { return -1 }
+    func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
+        guard containsValidLayerAnchor(layerIndex) else {
+            return .failure(.invalidLayerIndex(layerIndex))
+        }
         let folderID = documentGateway.layers.createFolder(name: name, layerIndex: layerIndex)
         applyRecordedLifecycleMutation(
             recording: .createFolder(
@@ -13,48 +14,59 @@ extension PaintDocumentSession {
             ),
             captureFrame: false
         )
-        return folderID
+        return .success(folderID)
     }
 
-    @discardableResult
-    func deleteFolder(folderID: Int) -> Bool {
+    func deleteFolder(folderID: Int) -> DocumentMutationResult {
+        if let failure = folderMutationFailure(folderID) {
+            return .failure(failure)
+        }
         let didDelete = documentGateway.layers.deleteFolder(id: folderID)
         if didDelete {
             applyRecordedLifecycleMutation(
                 recording: .deleteFolder(folderID: .unchecked(folderID))
             )
         }
-        return didDelete
+        return wrapMutationResult(
+            didDelete,
+            operation: "deleteFolder"
+        )
     }
 
-    @discardableResult
-    func setFolderVisibility(folderID: Int, isVisible: Bool) -> Bool {
-        guard containsFolderID(folderID) else { return false }
+    func setFolderVisibility(folderID: Int, isVisible: Bool) -> DocumentMutationResult {
+        if let failure = folderMutationFailure(folderID) {
+            return .failure(failure)
+        }
         documentGateway.layers.setFolderVisible(isVisible, folderID: folderID)
         applyRecordedLifecycleMutation(
             recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
         )
-        return true
+        return .success(())
     }
 
-    @discardableResult
-    func setFolderName(folderID: Int, name: String) -> Bool {
-        guard containsFolderID(folderID) else { return false }
+    func setFolderName(folderID: Int, name: String) -> DocumentMutationResult {
+        if let failure = folderMutationFailure(folderID) {
+            return .failure(failure)
+        }
         documentGateway.layers.setFolderName(name, folderID: folderID)
-        return true
+        return .success(())
     }
 
-    @discardableResult
-    func setFolderExpanded(folderID: Int, isExpanded: Bool) -> Bool {
-        guard containsFolderID(folderID) else { return false }
+    func setFolderExpanded(folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
+        if let failure = folderMutationFailure(folderID) {
+            return .failure(failure)
+        }
         documentGateway.layers.setFolderExpanded(isExpanded, folderID: folderID)
-        return true
+        return .success(())
     }
 
-    @discardableResult
-    func assignLayer(index: Int, toFolder folderID: Int) -> Bool {
-        guard containsLayerIndex(index) else { return false }
-        guard folderID < 0 || containsFolderID(folderID) else { return false }
+    func assignLayer(index: Int, toFolder folderID: Int) -> DocumentMutationResult {
+        if let failure = layerMutationFailure(index) {
+            return .failure(failure)
+        }
+        if folderID >= 0, let failure = folderMutationFailure(folderID) {
+            return .failure(failure)
+        }
         let didAssign = documentGateway.layers.setLayerFolder(index: index, folderID: folderID)
         if didAssign {
             applyRecordedLifecycleMutation(
@@ -64,6 +76,9 @@ extension PaintDocumentSession {
                 )
             )
         }
-        return didAssign
+        return wrapMutationResult(
+            didAssign,
+            operation: "assignLayerToFolder"
+        )
     }
 }

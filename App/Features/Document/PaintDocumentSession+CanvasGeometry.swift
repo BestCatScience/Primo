@@ -2,15 +2,18 @@ import CoreGraphics
 import Foundation
 
 extension PaintDocumentSession {
-    @discardableResult
-    func resizeCanvas(width: Int, height: Int) -> Bool {
-        guard width > 0 && height > 0 else { return false }
+    func resizeCanvas(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0 && height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         let sourceSize = PaintDocumentCanvasSize(
             width: documentGateway.queries.canvasWidth,
             height: documentGateway.queries.canvasHeight
         )
-        guard targetSize != sourceSize else { return false }
+        guard targetSize != sourceSize else {
+            return .failure(.bridgeMutationFailed("resizeCanvas"))
+        }
 
         let layerInfos = documentGateway.queries.layerInfos()
         let folderInfos = documentGateway.queries.folderInfos()
@@ -67,18 +70,21 @@ extension PaintDocumentSession {
             textLayers: resizedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
-        return true
+        return .success(())
     }
 
-    @discardableResult
-    func resizeCanvasExtent(width: Int, height: Int) -> Bool {
-        guard width > 0 && height > 0 else { return false }
+    func resizeCanvasExtent(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0 && height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         let sourceSize = PaintDocumentCanvasSize(
             width: documentGateway.queries.canvasWidth,
             height: documentGateway.queries.canvasHeight
         )
-        guard targetSize != sourceSize else { return false }
+        guard targetSize != sourceSize else {
+            return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+        }
 
         let layerInfos = documentGateway.queries.layerInfos()
         let folderInfos = documentGateway.queries.folderInfos()
@@ -138,7 +144,7 @@ extension PaintDocumentSession {
             textLayers: shiftedTextLayers,
             activeLayerIndex: activeLayerIndex
         )
-        return true
+        return .success(())
     }
 
     private func makeResizedBridgeContext(
