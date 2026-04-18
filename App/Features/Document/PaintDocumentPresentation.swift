@@ -1,5 +1,18 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentDomain
+
+typealias CanvasPaperStyle = PrimoDocumentDomain.CanvasPaperStyle
+typealias DocumentProjectPath = PrimoDocumentDomain.DocumentProjectPath
+typealias WorkspaceItemID = PrimoDocumentDomain.WorkspaceItemID
+typealias RelativeProjectFolderPath = PrimoDocumentDomain.RelativeProjectFolderPath
+typealias DocumentWorkspaceError = PrimoDocumentDomain.DocumentWorkspaceError
+typealias SavedProjectSummary = PrimoDocumentDomain.SavedProjectSummary
+typealias WorkspacePane = PrimoDocumentDomain.WorkspacePane
+typealias OpenDocumentTab = PrimoDocumentDomain.OpenDocumentTab
+typealias AutosaveRecoveryItem = PrimoDocumentDomain.AutosaveRecoveryItem
+typealias SaveHistoryTrigger = PrimoDocumentDomain.SaveHistoryTrigger
+typealias SaveHistoryEntry = PrimoDocumentDomain.SaveHistoryEntry
 
 struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Comparable {
     let rawValue: Int
@@ -87,131 +100,6 @@ struct DocumentFolderID: Hashable, Codable, Sendable, Identifiable, Comparable {
     }
 }
 
-struct DocumentProjectPath: Hashable, Codable, Sendable, Identifiable {
-    let fileURL: URL
-
-    init(_ fileURL: URL) {
-        self.fileURL = fileURL.standardizedFileURL
-    }
-
-    var id: URL { fileURL }
-    var displayName: String { fileURL.deletingPathExtension().lastPathComponent }
-    var path: String { fileURL.path }
-}
-
-struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
-    let rawValue: String
-
-    init(validating rawValue: String) throws {
-        let normalized = rawValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        guard !normalized.isEmpty else {
-            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
-        }
-        guard normalized.unicodeScalars.allSatisfy(WorkspaceItemID.isAllowedScalar(_:)) else {
-            throw DocumentWorkspaceError.invalidIdentifier(rawValue)
-        }
-        self.rawValue = normalized
-    }
-
-    init(unchecked rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    var id: String { rawValue }
-
-    private static func isAllowedScalar(_ scalar: UnicodeScalar) -> Bool {
-        switch scalar.value {
-        case 45, 48...57, 97...122:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-struct RelativeProjectFolderPath: Hashable, Codable, Sendable {
-    let components: [String]
-
-    init(components: [String]) {
-        self.components = components
-    }
-
-    init(validating rawValue: String?) throws {
-        let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty else {
-            self.components = []
-            return
-        }
-        guard !trimmed.hasPrefix("/") else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-
-        let components = trimmed
-            .split(separator: "/", omittingEmptySubsequences: true)
-            .map(String.init)
-        guard !components.isEmpty else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-        guard components.allSatisfy({ $0 != "." && $0 != ".." }) else {
-            throw DocumentWorkspaceError.invalidRelativeFolderPath(trimmed)
-        }
-        self.components = components
-    }
-
-    var rawValue: String {
-        components.joined(separator: "/")
-    }
-
-    func appending(to rootDirectory: URL) -> URL {
-        components.reduce(rootDirectory) { partialResult, component in
-            partialResult.appendingPathComponent(component, isDirectory: true)
-        }
-    }
-}
-
-enum DocumentWorkspaceError: LocalizedError {
-    case invalidIdentifier(String)
-    case invalidRelativeFolderPath(String)
-    case invalidLayerIndex(Int)
-    case invalidFolderID(Int)
-    case missingProjectDirectory(String, URL)
-    case invalidProjectDirectory(String, URL)
-    case destinationAlreadyExists(URL)
-
-    var errorDescription: String? {
-        switch self {
-        case let .invalidIdentifier(value):
-            return "Invalid workspace identifier: \(value)"
-        case let .invalidRelativeFolderPath(value):
-            return "Invalid destination folder path: \(value)"
-        case let .invalidLayerIndex(value):
-            return "Invalid layer index: \(value)"
-        case let .invalidFolderID(value):
-            return "Invalid folder ID: \(value)"
-        case let .missingProjectDirectory(label, url):
-            return "Missing \(label) at \(url.lastPathComponent)"
-        case let .invalidProjectDirectory(label, url):
-            return "Invalid \(label) at \(url.lastPathComponent)"
-        case let .destinationAlreadyExists(url):
-            return "A project already exists at \(url.lastPathComponent)"
-        }
-    }
-}
-
-struct SavedProjectSummary: Equatable, Sendable, Identifiable {
-    let url: DocumentProjectPath
-    let name: String
-    let relativeFolderPath: RelativeProjectFolderPath?
-    let modifiedAt: Date
-    let canvasSize: CGSize
-    let layerCount: Int
-    let previewImageData: Data?
-
-    var id: DocumentProjectPath { url }
-}
-
 struct PaintDocumentPresentation: Equatable, Sendable {
     var canvasSize: CGSize
     var activeLayerIndex: Int
@@ -225,41 +113,12 @@ struct LoadedPaintProject: Equatable, Sendable {
     var paperStyle: CanvasPaperStyle
 }
 
-enum WorkspacePane: String, CaseIterable, Equatable, Sendable {
-    case primary
-    case secondary
-}
-
 enum WorkspaceLayoutMode: Equatable, Sendable {
     case single
     case split
 }
 
-struct OpenDocumentTab: Equatable, Sendable, Identifiable {
-    let id: UUID
-    var title: String
-    var backingStoreURL: DocumentProjectPath
-    var sourceProjectURL: DocumentProjectPath?
-    var canvasSize: CGSize
-    var isDirty: Bool
-    var pane: WorkspacePane
-    var previewImageData: Data?
-}
-
-struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
-    let id: WorkspaceItemID
-    let title: String
-    let sourceProjectURL: DocumentProjectPath?
-    let autosaveProjectURL: DocumentProjectPath
-    let updatedAt: Date
-    let previewImageData: Data?
-}
-
-enum SaveHistoryTrigger: String, Codable, Equatable, Sendable {
-    case manualSave
-    case autoSave
-    case closeSave
-
+extension SaveHistoryTrigger {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .manualSave:
@@ -270,15 +129,6 @@ enum SaveHistoryTrigger: String, Codable, Equatable, Sendable {
             return language.localized("閉じる前に保存")
         }
     }
-}
-
-struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
-    let id: WorkspaceItemID
-    let title: String
-    let projectURL: DocumentProjectPath
-    let createdAt: Date
-    let trigger: SaveHistoryTrigger
-    let previewImageData: Data?
 }
 
 enum ColorRangeSelectionSource: String, CaseIterable, Equatable, Sendable, Identifiable {

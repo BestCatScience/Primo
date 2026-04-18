@@ -1,31 +1,10 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
 
-struct ImportedDocumentStageRequest: Equatable, OperationRequest {
-    let sourceURL: URL
-}
-
-struct ImportedDocumentStageResult: Equatable, OperationResult {
-    let stagedProjectURL: DocumentProjectPath
-    let suggestedTitle: String
-}
-
-enum ImportedDocumentStageFailure: LocalizedError, Equatable, OperationFailure {
-    case stagingFailed(String)
-
-    var errorDescription: String? {
-        switch self {
-        case let .stagingFailed(message):
-            return message
-        }
-    }
-}
-
-enum ImportedDocumentStageContract: OperationContract {
-    typealias Request = ImportedDocumentStageRequest
-    typealias Result = ImportedDocumentStageResult
-    typealias Failure = ImportedDocumentStageFailure
-}
+typealias ImportedDocumentStageRequest = PrimoDocumentContracts.ImportedDocumentStageRequest
+typealias ImportedDocumentStageResult = PrimoDocumentContracts.ImportedDocumentStageResult
+typealias ImportedDocumentStageFailure = PrimoDocumentContracts.ImportedDocumentStageFailure
 
 struct DocumentImportClient: Sendable {
     var stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>

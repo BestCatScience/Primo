@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
+import PrimoDocumentDomain
 import UIKit
 import simd
 
@@ -749,22 +750,6 @@ enum BrushTipShapePreset: String, CaseIterable, Equatable, Sendable, Identifiabl
         }
         return .custom
     }
-}
-
-struct CanvasPaperStyle: Equatable, Sendable {
-    var red: Float
-    var green: Float
-    var blue: Float
-    var alpha: Float
-    var isTransparent: Bool
-
-    static let `default` = CanvasPaperStyle(
-        red: 1.0,
-        green: 1.0,
-        blue: 1.0,
-        alpha: 1.0,
-        isTransparent: false
-    )
 }
 
 struct BrushPreset: Identifiable, Equatable {

@@ -1,4 +1,5 @@
 import Foundation
+import PrimoWorkspaceDomain
 
 struct ShareExport: Equatable, Identifiable {
     let id: UUID
@@ -65,11 +66,7 @@ struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
 }
 
-enum PendingCloseOperation: Equatable, Sendable {
-    case tab(OpenDocumentTab.ID)
-    case closeOtherTabs(OpenDocumentTab.ID)
-    case closeTabsToRight(OpenDocumentTab.ID)
-}
+typealias PendingCloseOperation = PrimoWorkspaceDomain.PendingCloseOperation
 
 struct PendingCloseConfirmationState: Equatable, Sendable {
     let operation: PendingCloseOperation

@@ -36,6 +36,10 @@
 		A00000000000000000000035 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* Metal.framework */; };
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
 		A00000000000000000000039 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
+		B90000000000000000000001 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
+		B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
+		B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003C /* PaintDocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* PaintDocumentSession.swift */; };
@@ -99,6 +103,10 @@
 		A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */; };
 		AA1000000000000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000002 /* XCTest.framework */; };
 		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
+		B90000000000000000000005 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
+		B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
+		B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
 		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
@@ -323,6 +331,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */,
+				B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */,
+				B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000001 /* PrimoCoreTypes in Frameworks */,
 				A00000000000000000000039 /* ComposableArchitecture in Frameworks */,
 				A00000000000000000000037 /* MetalKit.framework in Frameworks */,
 				A00000000000000000000035 /* Metal.framework in Frameworks */,
@@ -337,6 +349,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */,
+				B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */,
+				B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000005 /* PrimoCoreTypes in Frameworks */,
 				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
 				AA1000000000000000000001 /* XCTest.framework in Frameworks */,
 			);
@@ -647,6 +663,10 @@
 			name = Primo;
 			packageProductDependencies = (
 				A00000000000000000000093 /* ComposableArchitecture */,
+				B90000000000000000000011 /* PrimoCoreTypes */,
+				B90000000000000000000012 /* PrimoDocumentDomain */,
+				B90000000000000000000013 /* PrimoDocumentContracts */,
+				B90000000000000000000014 /* PrimoWorkspaceDomain */,
 			);
 			productName = Primo;
 			productReference = A00000000000000000000030 /* Primo.app */;
@@ -667,6 +687,10 @@
 			name = PrimoTests;
 			packageProductDependencies = (
 				A00000000000000000000093 /* ComposableArchitecture */,
+				B90000000000000000000011 /* PrimoCoreTypes */,
+				B90000000000000000000012 /* PrimoDocumentDomain */,
+				B90000000000000000000013 /* PrimoDocumentContracts */,
+				B90000000000000000000014 /* PrimoWorkspaceDomain */,
 			);
 			productName = PrimoTests;
 			productReference = AA2000000000000000000001 /* PrimoTests.xctest */;
@@ -702,6 +726,7 @@
 			mainGroup = A00000000000000000000050;
 			packageReferences = (
 				A00000000000000000000092 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+				B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */,
 			);
 			productRefGroup = A00000000000000000000055 /* Products */;
 			projectDirPath = "";
@@ -1162,11 +1187,38 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PrimoModules;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		A00000000000000000000093 /* ComposableArchitecture */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A00000000000000000000092 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
+		};
+		B90000000000000000000011 /* PrimoCoreTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoCoreTypes;
+		};
+		B90000000000000000000012 /* PrimoDocumentDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentDomain;
+		};
+		B90000000000000000000013 /* PrimoDocumentContracts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentContracts;
+		};
+		B90000000000000000000014 /* PrimoWorkspaceDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoWorkspaceDomain;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

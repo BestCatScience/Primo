@@ -1,58 +1,20 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
+import PrimoWorkspaceDomain
 
 extension AppFeature {
-    enum WorkspaceProjectLoadIssue: Error, Equatable, Sendable {
-        case workspaceItemRemovalFailed(String?)
-        case importedStagingCleanupFailed(String?)
-    }
-
-    enum WorkspaceProjectLoadFailureReason: Error, Equatable, Sendable {
-        case prepareDocumentReplacementFailed(WorkspacePersistenceFailureReason)
-        case openFailed(String?)
-        case importFailed(String?)
-    }
-
-    struct WorkspaceProjectLoadOperation: Equatable, Sendable {
-        let fileURL: URL
-        let removeWorkspaceItemOnSuccess: DocumentProjectPath?
-    }
-
-    struct WorkspaceImportedProjectLoadOperation: Equatable, Sendable {
-        let sourceURL: URL
-    }
-
-    enum WorkspaceProjectLoadRequest: Equatable, Sendable {
-        case project(WorkspaceProjectLoadOperation)
-        case imported(WorkspaceImportedProjectLoadOperation)
-    }
-
-    enum WorkspaceProjectLoadResult: Equatable, Sendable {
-        case project(LoadedPaintProject, [WorkspaceProjectLoadIssue])
-        case imported(LoadedPaintProject, String, [WorkspaceProjectLoadIssue])
-    }
-
-    struct WorkspaceProjectLoadFailure: Error, Equatable, Sendable {
-        let request: WorkspaceProjectLoadRequest
-        let reason: WorkspaceProjectLoadFailureReason
-    }
-
-    struct WorkspaceProjectPreparationUseCase: Sendable {
-        let workspacePersistenceUseCase: WorkspacePersistenceUseCase
-
-        func execute(
-            _ request: WorkspaceDocumentReplacementRequest
-        ) -> Result<Void, WorkspacePersistenceFailure> {
-            switch workspacePersistenceUseCase.execute(
-                .prepareDocumentReplacement(request)
-            ) {
-            case .success:
-                return .success(())
-            case let .failure(failure):
-                return .failure(failure)
-            }
-        }
-    }
+    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceDomain.WorkspaceProjectLoadIssue
+    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceDomain.WorkspaceProjectLoadFailureReason
+    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceDomain.WorkspaceProjectLoadOperation
+    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceDomain.WorkspaceImportedProjectLoadOperation
+    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceDomain.WorkspaceProjectLoadRequest
+    typealias WorkspaceProjectLoadResult = PrimoWorkspaceDomain.WorkspaceProjectLoadResult<LoadedPaintProject>
+    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceDomain.WorkspaceProjectLoadFailure
+    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceDomain.WorkspaceProjectPreparationUseCase
+    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceDomain.WorkspaceProjectLoadUseCase<LoadedPaintProject>
+    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceDomain.WorkspaceProjectLoadCommand
+    typealias WorkspaceProjectLoadingService = PrimoWorkspaceDomain.WorkspaceProjectLoadingService<LoadedPaintProject>
 
     struct WorkspaceProjectCleanupService: Sendable {
         let workspaceBackingStoreService: WorkspaceBackingStoreService
@@ -87,108 +49,6 @@ extension AppFeature {
                     )
                 ]
             }
-        }
-    }
-
-    struct WorkspaceProjectLoadUseCase: Sendable {
-        let paintDocumentClient: PaintDocumentClient
-        let documentImportClient: DocumentImportClient
-        let cleanupService: WorkspaceProjectCleanupService
-
-        func execute(
-            _ request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            switch request {
-            case let .project(operation):
-                return loadProject(operation, request: request)
-            case let .imported(operation):
-                return loadImportedProject(operation, request: request)
-            }
-        }
-
-        private func loadProject(
-            _ operation: WorkspaceProjectLoadOperation,
-            request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            do {
-                let loaded = try paintDocumentClient.loadProject(operation.fileURL)
-                let issues = cleanupService.discardWorkspaceItemIfNeeded(
-                    operation.removeWorkspaceItemOnSuccess
-                )
-                return .success(.project(loaded, issues))
-            } catch {
-                return .failure(
-                    WorkspaceProjectLoadFailure(
-                        request: request,
-                        reason: .openFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func loadImportedProject(
-            _ operation: WorkspaceImportedProjectLoadOperation,
-            request: WorkspaceProjectLoadRequest
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            switch documentImportClient.stageImportedDocument(
-                ImportedDocumentStageRequest(sourceURL: operation.sourceURL)
-            ) {
-            case let .failure(error):
-                return .failure(
-                    WorkspaceProjectLoadFailure(
-                        request: request,
-                        reason: .importFailed(error.errorDescription)
-                    )
-                )
-
-            case let .success(staged):
-                do {
-                    let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
-                    let issues = cleanupService.discardImportedStaging(
-                        staged.stagedProjectURL
-                    )
-                    return .success(.imported(loaded, staged.suggestedTitle, issues))
-                } catch {
-                    _ = cleanupService.discardImportedStaging(
-                        staged.stagedProjectURL
-                    )
-                    return .failure(
-                        WorkspaceProjectLoadFailure(
-                            request: request,
-                            reason: .openFailed(AppFeature.optionalErrorMessage(error))
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    struct WorkspaceProjectLoadCommand: Equatable, Sendable {
-        let loadRequest: WorkspaceProjectLoadRequest
-        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
-    }
-
-    struct WorkspaceProjectLoadingService: Sendable {
-        let preparationUseCase: WorkspaceProjectPreparationUseCase
-        let loadUseCase: WorkspaceProjectLoadUseCase
-
-        func execute(
-            _ command: WorkspaceProjectLoadCommand
-        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
-            if let prepareRequest = command.prepareDocumentReplacementRequest {
-                switch preparationUseCase.execute(prepareRequest) {
-                case .success:
-                    break
-                case let .failure(failure):
-                    return .failure(
-                        WorkspaceProjectLoadFailure(
-                            request: command.loadRequest,
-                            reason: .prepareDocumentReplacementFailed(failure.reason)
-                        )
-                    )
-                }
-            }
-            return loadUseCase.execute(command.loadRequest)
         }
     }
 
@@ -310,5 +170,73 @@ extension AppFeature {
                 await send(onFailure(failure))
             }
         }
+    }
+}
+
+extension PrimoWorkspaceDomain.WorkspaceProjectLoadUseCase where LoadedProject == LoadedPaintProject {
+    init(
+        paintDocumentClient: PaintDocumentClient,
+        documentImportClient: DocumentImportClient,
+        cleanupService: AppFeature.WorkspaceProjectCleanupService
+    ) {
+        self.init(
+            projectLoader: ProjectLoadingGateway<LoadedPaintProject>(
+                loadProject: { url in
+                    try paintDocumentClient.loadProject(url)
+                }
+            ),
+            documentImport: DocumentImportGateway(
+                stageImportedDocument: { request in
+                    documentImportClient.stageImportedDocument(
+                        ImportedDocumentStageRequest(sourceURL: request.sourceURL)
+                    )
+                },
+                discardStagedDocument: { stagedProjectURL in
+                    documentImportClient.discardStagedDocument(stagedProjectURL)
+                }
+            ),
+            cleanupService: PrimoWorkspaceDomain.WorkspaceProjectCleanupService(
+                workspaceBackingStore: WorkspaceBackingStoreGateway(
+                    saveProject: { fileURL, paperStyle in
+                        try cleanupService.workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
+                    },
+                    persistProjectSnapshot: { sourceURL, preferredDestinationURL in
+                        try cleanupService.workspaceBackingStoreService.persistProjectSnapshot(
+                            sourceURL,
+                            preferredDestinationURL: preferredDestinationURL
+                        )
+                    },
+                    createTabBackingStoreURL: { tabID in
+                        try cleanupService.workspaceBackingStoreService.createTabBackingStoreURL(tabID)
+                    },
+                    persistAutosaveSnapshot: { backingStoreURL, tab in
+                        try cleanupService.workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
+                    },
+                    discardAutosaveSnapshot: { tab in
+                        try cleanupService.workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+                    },
+                    persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
+                        try cleanupService.workspaceBackingStoreService.persistSaveHistorySnapshot(
+                            backingStoreURL,
+                            tab,
+                            trigger
+                        )
+                    },
+                    removeWorkspaceItem: { url in
+                        try cleanupService.workspaceBackingStoreService.removeWorkspaceItem(url)
+                    }
+                ),
+                documentImport: DocumentImportGateway(
+                    stageImportedDocument: { request in
+                        documentImportClient.stageImportedDocument(
+                            ImportedDocumentStageRequest(sourceURL: request.sourceURL)
+                        )
+                    },
+                    discardStagedDocument: { stagedProjectURL in
+                        documentImportClient.discardStagedDocument(stagedProjectURL)
+                    }
+                )
+            )
+        )
     }
 }

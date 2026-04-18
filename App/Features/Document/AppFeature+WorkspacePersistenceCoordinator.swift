@@ -1,221 +1,36 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
+import PrimoWorkspaceDomain
 
 extension AppFeature {
-    enum WorkspacePersistenceIssue: Error, Equatable, Sendable, DomainIssue {
-        case autosaveCleanupFailed(String?)
-        case saveHistoryPersistFailed(String?)
-        case workspaceItemRemovalFailed(String?)
-        case autosaveEntryDiscardFailed(String?)
-    }
-
-    enum WorkspacePersistenceFailureReason: Error, Equatable, Sendable, FailureReason {
-        case saveFailed(String?)
-        case couldNotCreateTab
-        case activeTabUnavailable
-    }
-
-    struct WorkspacePersistenceFailure: Error, Equatable, Sendable {
-        let request: WorkspacePersistenceRequest?
-        let reason: WorkspacePersistenceFailureReason
-
-        init(
-            request: WorkspacePersistenceRequest? = nil,
-            reason: WorkspacePersistenceFailureReason
-        ) {
-            self.request = request
-            self.reason = reason
-        }
-    }
-
-    struct WorkspaceDirtyPresentationRequest: Equatable, Sendable {
-        let activeTab: OpenDocumentTab
-        let paperStyle: CanvasPaperStyle
-    }
-
-    enum WorkspaceDocumentSavePurpose: Equatable, Sendable {
-        case saveDocument
-        case homeReturn
-    }
-
-    struct WorkspaceDocumentSaveRequest: Equatable, Sendable {
-        let activeTab: OpenDocumentTab
-        let paperStyle: CanvasPaperStyle
-        let preferredDestinationURL: DocumentProjectPath?
-        let trigger: SaveHistoryTrigger
-        let purpose: WorkspaceDocumentSavePurpose
-    }
-
-    struct WorkspaceDocumentSaveResult: Equatable, Sendable {
-        let activeTabID: OpenDocumentTab.ID
-        let savedURL: DocumentProjectPath
-        let purpose: WorkspaceDocumentSavePurpose
-        let previewImageData: Data?
-        let canvasSize: CGSize
-        var issues: [WorkspacePersistenceIssue] = []
-    }
-
-    struct WorkspaceDocumentReplacementRequest: Equatable, Sendable {
-        let activeTab: OpenDocumentTab
-        let paperStyle: CanvasPaperStyle
-    }
-
-    struct LoadedWorkspaceFollowUpPersistenceRequest: Equatable, Sendable {
-        let activeTab: OpenDocumentTab
-        let paperStyle: CanvasPaperStyle
-        let persistsToBackingStore: Bool
-        let persistsAutosave: Bool
-        let successEffects: LoadedWorkspaceProjectPlan.SuccessEffects
-    }
-
-    struct LoadedWorkspaceFollowUpPersistenceResult: Equatable, Sendable {
-        let successEffects: LoadedWorkspaceProjectPlan.SuccessEffects
-        var issues: [WorkspacePersistenceIssue] = []
-    }
-
-    struct WorkspaceCloseTabsSaveRequest: Equatable, Sendable {
-        let operation: PendingCloseOperation
-        let tabs: [OpenDocumentTab]
-        let activeTab: WorkspaceDocumentReplacementRequest?
-    }
-
-    struct WorkspaceCloseTabsSaveResult: Equatable, Sendable {
-        let operation: PendingCloseOperation
-        var issues: [WorkspacePersistenceIssue] = []
-    }
-
-    struct WorkspaceArtifactDiscardRequest: Equatable, Sendable {
-        let tabs: [OpenDocumentTab]
-    }
-
-    struct WorkspaceTabReservationRequest: Equatable, Sendable {
-        let title: String
-        let sourceProjectURL: DocumentProjectPath?
-        let pane: WorkspacePane
-    }
-
-    struct WorkspaceSavedProjectMoveRequest: Equatable, Sendable {
-        let sourceURL: DocumentProjectPath
-        let relativeFolderPath: RelativeProjectFolderPath?
-        let openTabID: OpenDocumentTab.ID?
-    }
-
-    struct WorkspaceSavedProjectMoveResult: Equatable, Sendable {
-        let sourceURL: DocumentProjectPath
-        let destinationURL: DocumentProjectPath
-        let openTabID: OpenDocumentTab.ID?
-    }
-
-    struct WorkspaceAutosaveEntryDiscardRequest: Equatable, Sendable {
-        let autosaveID: WorkspaceItemID
-    }
-
-    struct WorkspaceSaveHistoryLoadRequest: Equatable, Sendable {
-        let activeTab: OpenDocumentTab
-    }
-
-    enum WorkspaceCatalogFailureReason: Error, Equatable, Sendable, FailureReason {
-        case loadSavedProjectsFailed(String?)
-        case loadAutosaveRecoveryItemsFailed(String?)
-        case loadSaveHistoryEntriesFailed(String?)
-        case moveSavedProjectFailed(String?)
-        case discardAutosaveEntryFailed(String?)
-    }
-
-    struct WorkspaceCatalogFailure: Error, Equatable, Sendable {
-        let request: WorkspaceCatalogRequest
-        let reason: WorkspaceCatalogFailureReason
-    }
-
-    enum WorkspacePersistenceRequest: Equatable, Sendable {
-        case dirtyPresentationRefreshed(WorkspaceDirtyPresentationRequest)
-        case saveActiveDocument(WorkspaceDocumentSaveRequest)
-        case prepareDocumentReplacement(WorkspaceDocumentReplacementRequest)
-        case reserveNewTabBackingStore(WorkspaceTabReservationRequest)
-        case loadedWorkspaceFollowUp(LoadedWorkspaceFollowUpPersistenceRequest)
-        case saveTabsForClose(WorkspaceCloseTabsSaveRequest)
-        case discardAutosaveArtifacts(WorkspaceArtifactDiscardRequest)
-    }
-
-    enum WorkspacePersistenceResult: Equatable, Sendable {
-        case dirtyPresentationPersisted(OpenDocumentTab.ID)
-        case activeDocumentSaved(WorkspaceDocumentSaveResult)
-        case documentReplacementPrepared(OpenDocumentTab.ID)
-        case newTabBackingStoreReserved(PreparedWorkspaceTab)
-        case loadedWorkspaceFollowUpApplied(LoadedWorkspaceFollowUpPersistenceResult)
-        case tabsSavedForClose(WorkspaceCloseTabsSaveResult)
-        case autosaveArtifactsDiscarded([WorkspacePersistenceIssue])
-    }
-
-    enum WorkspaceCatalogRequest: Equatable, Sendable {
-        case loadSavedProjects
-        case loadAutosaveRecoveryItems
-        case loadSaveHistoryEntries(WorkspaceSaveHistoryLoadRequest)
-        case moveSavedProject(WorkspaceSavedProjectMoveRequest)
-        case discardAutosaveEntry(WorkspaceAutosaveEntryDiscardRequest)
-    }
-
-    enum WorkspaceCatalogResult: Equatable, Sendable {
-        case savedProjectsLoaded([SavedProjectSummary])
-        case autosaveRecoveryItemsLoaded([AutosaveRecoveryItem])
-        case saveHistoryEntriesLoaded([SaveHistoryEntry])
-        case savedProjectMoved(WorkspaceSavedProjectMoveResult)
-        case autosaveEntryDiscarded(WorkspaceItemID)
-    }
-
-    struct LoadedWorkspaceProjectPlan: Equatable, Sendable {
-        enum Destination: Equatable, Sendable {
-            case selectedTab(tabID: OpenDocumentTab.ID, pane: WorkspacePane)
-            case newTab(title: String, sourceProjectURL: DocumentProjectPath?)
-            case activeTab(title: String?, sourceProjectURL: DocumentProjectPath?)
-        }
-
-        struct FollowUp: Equatable, Sendable {
-            var marksTabDirty = false
-            var persistsToBackingStore = false
-            var persistsAutosave = false
-        }
-
-        enum RecoveryResolution: Equatable, Sendable {
-            case none
-            case removeItem(WorkspaceItemID)
-            case completeRestore(WorkspaceItemID)
-            case dismiss
-        }
-
-        enum SaveHistoryResolution: Equatable, Sendable {
-            case none
-            case completeRestore
-        }
-
-        enum Completion: Equatable, Sendable {
-            case none
-            case openedDocument(layerCount: Int)
-            case restoredSaveHistory
-            case restoredAutosave
-        }
-
-        struct SuccessEffects: Equatable, Sendable {
-            var discardedAutosaveEntryID: WorkspaceItemID?
-            var recoveryResolution: RecoveryResolution = .none
-            var saveHistoryResolution: SaveHistoryResolution = .none
-            var completion: Completion = .none
-        }
-
-        let destination: Destination
-        var followUp = FollowUp()
-        var successEffects = SuccessEffects()
-
-        init(
-            destination: Destination,
-            followUp: FollowUp = FollowUp(),
-            successEffects: SuccessEffects = SuccessEffects()
-        ) {
-            self.destination = destination
-            self.followUp = followUp
-            self.successEffects = successEffects
-        }
-    }
+    typealias WorkspacePersistenceIssue = PrimoWorkspaceDomain.WorkspacePersistenceIssue
+    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceDomain.WorkspacePersistenceFailureReason
+    typealias WorkspacePersistenceFailure = PrimoWorkspaceDomain.WorkspacePersistenceFailure
+    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceDomain.WorkspaceDirtyPresentationRequest
+    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceDomain.WorkspaceDocumentSavePurpose
+    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceDomain.WorkspaceDocumentSaveRequest
+    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceDomain.WorkspaceDocumentSaveResult
+    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceDomain.WorkspaceDocumentReplacementRequest
+    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceDomain.LoadedWorkspaceFollowUpPersistenceRequest
+    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceDomain.LoadedWorkspaceFollowUpPersistenceResult
+    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceDomain.WorkspaceCloseTabsSaveRequest
+    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceDomain.WorkspaceCloseTabsSaveResult
+    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceDomain.WorkspaceArtifactDiscardRequest
+    typealias WorkspaceTabReservationRequest = PrimoWorkspaceDomain.WorkspaceTabReservationRequest
+    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceDomain.WorkspaceSavedProjectMoveRequest
+    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceDomain.WorkspaceSavedProjectMoveResult
+    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceDomain.WorkspaceAutosaveEntryDiscardRequest
+    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceDomain.WorkspaceSaveHistoryLoadRequest
+    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceDomain.WorkspaceCatalogFailureReason
+    typealias WorkspaceCatalogFailure = PrimoWorkspaceDomain.WorkspaceCatalogFailure
+    typealias WorkspacePersistenceRequest = PrimoWorkspaceDomain.WorkspacePersistenceRequest
+    typealias WorkspacePersistenceResult = PrimoWorkspaceDomain.WorkspacePersistenceResult
+    typealias WorkspaceCatalogRequest = PrimoWorkspaceDomain.WorkspaceCatalogRequest
+    typealias WorkspaceCatalogResult = PrimoWorkspaceDomain.WorkspaceCatalogResult
+    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceDomain.LoadedWorkspaceProjectPlan
+    typealias WorkspacePersistenceUseCase = PrimoWorkspaceDomain.WorkspacePersistenceUseCase
+    typealias WorkspaceCatalogUseCase = PrimoWorkspaceDomain.WorkspaceCatalogUseCase
 
     struct WorkspaceBackingStoreService: Sendable {
         let paintDocumentClient: PaintDocumentClient
@@ -266,442 +81,6 @@ extension AppFeature {
         }
     }
 
-    struct WorkspacePersistenceUseCase: Sendable {
-        let workspaceBackingStoreService: WorkspaceBackingStoreService
-        let workspaceCatalogService: WorkspaceCatalogService
-        let workspaceIdentityService: WorkspaceIdentityService
-
-        func execute(
-            _ request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            switch request {
-            case let .dirtyPresentationRefreshed(dirtyPresentation):
-                return persistDirtyPresentation(dirtyPresentation, request: request)
-            case let .saveActiveDocument(saveRequest):
-                return saveActiveDocument(saveRequest, request: request)
-            case let .prepareDocumentReplacement(replacementRequest):
-                return prepareDocumentReplacement(replacementRequest, request: request)
-            case let .reserveNewTabBackingStore(reservationRequest):
-                return reserveNewTabBackingStore(reservationRequest, request: request)
-            case let .loadedWorkspaceFollowUp(followUpRequest):
-                return applyLoadedWorkspaceFollowUp(followUpRequest, request: request)
-            case let .saveTabsForClose(closeRequest):
-                return saveTabsForClose(closeRequest, request: request)
-            case let .discardAutosaveArtifacts(discardRequest):
-                return .success(.autosaveArtifactsDiscarded(discardAutosaveArtifacts(discardRequest)))
-            }
-        }
-
-        private func persistDirtyPresentation(
-            _ requestPayload: WorkspaceDirtyPresentationRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            do {
-                try workspaceBackingStoreService.saveProject(
-                    at: requestPayload.activeTab.backingStoreURL.fileURL,
-                    paperStyle: requestPayload.paperStyle
-                )
-                try workspaceBackingStoreService.persistAutosaveSnapshot(
-                    requestPayload.activeTab.backingStoreURL,
-                    requestPayload.activeTab
-                )
-                return .success(
-                    .dirtyPresentationPersisted(requestPayload.activeTab.id)
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func saveActiveDocument(
-            _ requestPayload: WorkspaceDocumentSaveRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            do {
-                try workspaceBackingStoreService.saveProject(
-                    at: requestPayload.activeTab.backingStoreURL.fileURL,
-                    paperStyle: requestPayload.paperStyle
-                )
-                let savedURL = try workspaceBackingStoreService.persistProjectSnapshot(
-                    requestPayload.activeTab.backingStoreURL,
-                    preferredDestinationURL: requestPayload.preferredDestinationURL
-                )
-
-                var savedTab = requestPayload.activeTab
-                savedTab.title = savedURL.displayName
-                savedTab.sourceProjectURL = savedURL
-                savedTab.isDirty = false
-                var issues: [WorkspacePersistenceIssue] = []
-
-                do {
-                    try workspaceBackingStoreService.discardAutosaveSnapshot(requestPayload.activeTab)
-                } catch {
-                    issues.append(
-                        .autosaveCleanupFailed(
-                            AppFeature.optionalErrorMessage(error)
-                        )
-                    )
-                }
-
-                do {
-                    try workspaceBackingStoreService.persistSaveHistorySnapshot(
-                        savedTab.backingStoreURL,
-                        savedTab,
-                        requestPayload.trigger
-                    )
-                } catch {
-                    issues.append(
-                        .saveHistoryPersistFailed(
-                            AppFeature.optionalErrorMessage(error)
-                        )
-                    )
-                }
-
-                return .success(
-                    .activeDocumentSaved(
-                        WorkspaceDocumentSaveResult(
-                            activeTabID: requestPayload.activeTab.id,
-                            savedURL: savedURL,
-                            purpose: requestPayload.purpose,
-                            previewImageData: savedTab.previewImageData,
-                            canvasSize: savedTab.canvasSize,
-                            issues: issues
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func prepareDocumentReplacement(
-            _ requestPayload: WorkspaceDocumentReplacementRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            do {
-                try workspaceBackingStoreService.saveProject(
-                    at: requestPayload.activeTab.backingStoreURL.fileURL,
-                    paperStyle: requestPayload.paperStyle
-                )
-                return .success(
-                    .documentReplacementPrepared(requestPayload.activeTab.id)
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func reserveNewTabBackingStore(
-            _ requestPayload: WorkspaceTabReservationRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            let tabID = workspaceIdentityService.generateTabID()
-            do {
-                let backingStoreURL = try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
-                return .success(
-                    .newTabBackingStoreReserved(
-                        PreparedWorkspaceTab(
-                            id: tabID,
-                            title: requestPayload.title,
-                            backingStoreURL: backingStoreURL,
-                            sourceProjectURL: requestPayload.sourceProjectURL,
-                            pane: requestPayload.pane
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .couldNotCreateTab
-                    )
-                )
-            }
-        }
-
-        private func applyLoadedWorkspaceFollowUp(
-            _ requestPayload: LoadedWorkspaceFollowUpPersistenceRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            do {
-                var issues: [WorkspacePersistenceIssue] = []
-                if requestPayload.persistsToBackingStore {
-                    try workspaceBackingStoreService.saveProject(
-                        at: requestPayload.activeTab.backingStoreURL.fileURL,
-                        paperStyle: requestPayload.paperStyle
-                    )
-                }
-                if requestPayload.persistsAutosave {
-                    try workspaceBackingStoreService.persistAutosaveSnapshot(
-                        requestPayload.activeTab.backingStoreURL,
-                        requestPayload.activeTab
-                    )
-                }
-                if let autosaveEntryID = requestPayload.successEffects.discardedAutosaveEntryID {
-                    do {
-                        try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
-                    } catch {
-                        issues.append(
-                            .autosaveEntryDiscardFailed(
-                                AppFeature.optionalErrorMessage(error)
-                            )
-                        )
-                    }
-                }
-                return .success(
-                    .loadedWorkspaceFollowUpApplied(
-                        LoadedWorkspaceFollowUpPersistenceResult(
-                            successEffects: requestPayload.successEffects,
-                            issues: issues
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func saveTabsForClose(
-            _ requestPayload: WorkspaceCloseTabsSaveRequest,
-            request: WorkspacePersistenceRequest
-        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
-            do {
-                var issues: [WorkspacePersistenceIssue] = []
-                if let activeTab = requestPayload.activeTab {
-                    try workspaceBackingStoreService.saveProject(
-                        at: activeTab.activeTab.backingStoreURL.fileURL,
-                        paperStyle: activeTab.paperStyle
-                    )
-                }
-
-                for tab in requestPayload.tabs {
-                    let destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
-                        tab.backingStoreURL,
-                        preferredDestinationURL: tab.sourceProjectURL
-                    )
-
-                    var savedTab = tab
-                    savedTab.title = destinationURL.displayName
-                    savedTab.sourceProjectURL = destinationURL
-                    savedTab.isDirty = false
-
-                    do {
-                        try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-                    } catch {
-                        issues.append(
-                            .autosaveCleanupFailed(
-                                AppFeature.optionalErrorMessage(error)
-                            )
-                        )
-                    }
-
-                    do {
-                        try workspaceBackingStoreService.persistSaveHistorySnapshot(
-                            savedTab.backingStoreURL,
-                            savedTab,
-                            .closeSave
-                        )
-                    } catch {
-                        issues.append(
-                            .saveHistoryPersistFailed(
-                                AppFeature.optionalErrorMessage(error)
-                            )
-                        )
-                    }
-                }
-
-                return .success(
-                    .tabsSavedForClose(
-                        WorkspaceCloseTabsSaveResult(
-                            operation: requestPayload.operation,
-                            issues: issues
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        request: request,
-                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func discardAutosaveArtifacts(
-            _ requestPayload: WorkspaceArtifactDiscardRequest
-        ) -> [WorkspacePersistenceIssue] {
-            var issues: [WorkspacePersistenceIssue] = []
-            for tab in requestPayload.tabs {
-                do {
-                    try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-                } catch {
-                    issues.append(
-                        .autosaveCleanupFailed(
-                            AppFeature.optionalErrorMessage(error)
-                        )
-                    )
-                }
-                do {
-                    try workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
-                } catch {
-                    issues.append(
-                        .workspaceItemRemovalFailed(
-                            AppFeature.optionalErrorMessage(error)
-                        )
-                    )
-                }
-            }
-            return issues
-        }
-    }
-
-    struct WorkspaceCatalogUseCase: Sendable {
-        let workspaceCatalogService: WorkspaceCatalogService
-
-        func execute(
-            _ request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            switch request {
-            case .loadSavedProjects:
-                return loadSavedProjects(request: request)
-            case .loadAutosaveRecoveryItems:
-                return loadAutosaveRecoveryItems(request: request)
-            case let .loadSaveHistoryEntries(loadRequest):
-                return loadSaveHistoryEntries(loadRequest, request: request)
-            case let .moveSavedProject(moveRequest):
-                return moveSavedProject(moveRequest, request: request)
-            case let .discardAutosaveEntry(discardRequest):
-                return discardAutosaveEntry(discardRequest, request: request)
-            }
-        }
-
-        private func loadSavedProjects(
-            request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            do {
-                return .success(
-                    .savedProjectsLoaded(
-                        try workspaceCatalogService.loadSavedProjects()
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspaceCatalogFailure(
-                        request: request,
-                        reason: .loadSavedProjectsFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func loadAutosaveRecoveryItems(
-            request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            do {
-                return .success(
-                    .autosaveRecoveryItemsLoaded(
-                        try workspaceCatalogService.loadAutosaveRecoveryItems()
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspaceCatalogFailure(
-                        request: request,
-                        reason: .loadAutosaveRecoveryItemsFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func loadSaveHistoryEntries(
-            _ requestPayload: WorkspaceSaveHistoryLoadRequest,
-            request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            do {
-                return .success(
-                    .saveHistoryEntriesLoaded(
-                        try workspaceCatalogService.loadSaveHistoryEntries(
-                            for: requestPayload.activeTab
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspaceCatalogFailure(
-                        request: request,
-                        reason: .loadSaveHistoryEntriesFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func moveSavedProject(
-            _ requestPayload: WorkspaceSavedProjectMoveRequest,
-            request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            do {
-                let destinationURL = try workspaceCatalogService.moveSavedProject(
-                    requestPayload.sourceURL,
-                    to: requestPayload.relativeFolderPath
-                )
-                return .success(
-                    .savedProjectMoved(
-                        WorkspaceSavedProjectMoveResult(
-                            sourceURL: requestPayload.sourceURL,
-                            destinationURL: destinationURL,
-                            openTabID: requestPayload.openTabID
-                        )
-                    )
-                )
-            } catch {
-                return .failure(
-                    WorkspaceCatalogFailure(
-                        request: request,
-                        reason: .moveSavedProjectFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-
-        private func discardAutosaveEntry(
-            _ requestPayload: WorkspaceAutosaveEntryDiscardRequest,
-            request: WorkspaceCatalogRequest
-        ) -> Result<WorkspaceCatalogResult, WorkspaceCatalogFailure> {
-            do {
-                try workspaceCatalogService.discardAutosaveEntry(requestPayload.autosaveID)
-                return .success(.autosaveEntryDiscarded(requestPayload.autosaveID))
-            } catch {
-                return .failure(
-                    WorkspaceCatalogFailure(
-                        request: request,
-                        reason: .discardAutosaveEntryFailed(AppFeature.optionalErrorMessage(error))
-                    )
-                )
-            }
-        }
-    }
-
     struct WorkspaceCatalogService: Sendable {
         let documentWorkspaceClient: DocumentWorkspaceClient
 
@@ -749,13 +128,7 @@ extension AppFeature {
         }
     }
 
-    struct PreparedWorkspaceTab: Equatable, Sendable {
-        let id: OpenDocumentTab.ID
-        let title: String
-        let backingStoreURL: DocumentProjectPath
-        let sourceProjectURL: DocumentProjectPath?
-        let pane: WorkspacePane
-    }
+    typealias PreparedWorkspaceTab = PrimoWorkspaceDomain.PreparedWorkspaceTab
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)
@@ -1635,5 +1008,92 @@ extension AppFeature {
 
     var workspaceFeedbackMapper: WorkspaceFeedbackMapper {
         WorkspaceFeedbackMapper()
+    }
+}
+
+extension PrimoWorkspaceDomain.WorkspacePersistenceUseCase {
+    init(
+        workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService,
+        workspaceCatalogService: AppFeature.WorkspaceCatalogService,
+        workspaceIdentityService: AppFeature.WorkspaceIdentityService
+    ) {
+        self.init(
+            workspaceBackingStore: WorkspaceBackingStoreGateway(
+                saveProject: { fileURL, paperStyle in
+                    try workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
+                },
+                persistProjectSnapshot: { sourceURL, preferredDestinationURL in
+                    try workspaceBackingStoreService.persistProjectSnapshot(
+                        sourceURL,
+                        preferredDestinationURL: preferredDestinationURL
+                    )
+                },
+                createTabBackingStoreURL: { tabID in
+                    try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
+                },
+                persistAutosaveSnapshot: { backingStoreURL, tab in
+                    try workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
+                },
+                discardAutosaveSnapshot: { tab in
+                    try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+                },
+                persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
+                    try workspaceBackingStoreService.persistSaveHistorySnapshot(
+                        backingStoreURL,
+                        tab,
+                        trigger
+                    )
+                },
+                removeWorkspaceItem: { url in
+                    try workspaceBackingStoreService.removeWorkspaceItem(url)
+                }
+            ),
+            workspaceCatalog: WorkspaceCatalogGateway(
+                loadSavedProjects: {
+                    try workspaceCatalogService.loadSavedProjects()
+                },
+                moveSavedProject: { sourceURL, relativeFolderPath in
+                    try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
+                },
+                loadAutosaveRecoveryItems: {
+                    try workspaceCatalogService.loadAutosaveRecoveryItems()
+                },
+                discardAutosaveEntry: { autosaveID in
+                    try workspaceCatalogService.discardAutosaveEntry(autosaveID)
+                },
+                loadSaveHistoryEntries: { activeTab in
+                    try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
+                }
+            ),
+            identityGenerator: WorkspaceIdentityGenerator(
+                generateTabID: {
+                    workspaceIdentityService.generateTabID()
+                }
+            )
+        )
+    }
+}
+
+extension PrimoWorkspaceDomain.WorkspaceCatalogUseCase {
+    init(workspaceCatalogService: AppFeature.WorkspaceCatalogService) {
+        self.init(
+            workspaceCatalog: WorkspaceCatalogGateway(
+                loadSavedProjects: {
+                    try workspaceCatalogService.loadSavedProjects()
+                },
+                moveSavedProject: { sourceURL, relativeFolderPath in
+                    try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
+                },
+                loadAutosaveRecoveryItems: {
+                    try workspaceCatalogService.loadAutosaveRecoveryItems()
+                },
+                discardAutosaveEntry: { autosaveID in
+                    try workspaceCatalogService.discardAutosaveEntry(autosaveID)
+                },
+                loadSaveHistoryEntries: { activeTab in
+                    try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
+                }
+            )
+        )
     }
 }
