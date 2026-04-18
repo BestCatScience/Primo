@@ -117,6 +117,7 @@ struct AppFeature {
         case deferredPresentationRefresh
         case refreshPresentationRequested
         case newCanvasRequested(width: Int, height: Int)
+        case newCanvasPreparationCompleted(CanvasDimensions)
         case undoRequested
         case redoRequested
         case saveHistoryRequested
@@ -150,6 +151,7 @@ struct AppFeature {
         case resizeCanvasRequested(width: Int, height: Int)
         case resizeCanvasExtentRequested(width: Int, height: Int)
         case newCanvasFromImageReceived(name: String?, data: Data)
+        case newCanvasFromImagePreparationCompleted(ImportedCanvasPlan)
         case newCanvasFromImageFailed(ApplicationFeedback)
         case clearActiveLayerButtonTapped
         case createLayerMaskFromSelectionRequested

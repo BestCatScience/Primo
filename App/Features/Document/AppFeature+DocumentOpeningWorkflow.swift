@@ -10,6 +10,7 @@ extension AppFeature {
             state: &state,
             sourceURL: sourceURL,
             onSuccess: { .openImportedDocumentLoaded($0, $1) },
+            onPreparationFailure: { .openDocumentFailed($0.feedback) },
             onFailure: {
                 .openDocumentFailed(
                     .openFailed(Self.optionalErrorMessage($0))
@@ -22,12 +23,12 @@ extension AppFeature {
         state: inout State,
         loaded: LoadedPaintProject,
         suggestedTitle: String
-    ) {
+    ) -> Effect<Action> {
         let trimmedTitle = suggestedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle = trimmedTitle.isEmpty
             ? (state.application.appLanguage == .japanese ? "読み込み済みドキュメント" : "Imported Document")
             : trimmedTitle
-        applyLoadedWorkspaceProject(
+        return applyLoadedWorkspaceProject(
             loaded,
             using: LoadedWorkspaceProjectPlan(
                 destination: .newTab(
@@ -79,6 +80,7 @@ extension AppFeature {
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
             onSuccess: { .openDocumentLoaded($0, url) },
+            onPreparationFailure: { .openDocumentFailed($0.feedback) },
             onFailure: {
                 .openDocumentFailed(
                     .openFailed(Self.optionalErrorMessage($0))
@@ -96,7 +98,7 @@ extension AppFeature {
             state.application.completeWorkspaceProjectLoad()
             return .send(.tabSelected(existingTabID))
         }
-        applyLoadedWorkspaceProject(
+        return applyLoadedWorkspaceProject(
             loaded,
             using: LoadedWorkspaceProjectPlan(
                 destination: .newTab(
@@ -109,6 +111,5 @@ extension AppFeature {
             ),
             state: &state
         )
-        return .none
     }
 }

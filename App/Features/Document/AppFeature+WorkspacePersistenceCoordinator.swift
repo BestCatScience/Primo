@@ -20,40 +20,102 @@ extension AppFeature {
         let paperStyle: CanvasPaperStyle
     }
 
+    enum WorkspaceDocumentSavePurpose: Equatable, Sendable {
+        case saveDocument
+        case homeReturn
+    }
+
+    struct WorkspaceDocumentSaveRequest: Equatable, Sendable {
+        let activeTab: OpenDocumentTab
+        let paperStyle: CanvasPaperStyle
+        let preferredDestinationURL: DocumentProjectPath?
+        let trigger: SaveHistoryTrigger
+        let purpose: WorkspaceDocumentSavePurpose
+    }
+
+    struct WorkspaceDocumentSaveResult: Equatable, Sendable {
+        let activeTabID: OpenDocumentTab.ID
+        let savedURL: DocumentProjectPath
+        let purpose: WorkspaceDocumentSavePurpose
+        let previewImageData: Data?
+        let canvasSize: CGSize
+    }
+
+    struct WorkspaceDocumentReplacementRequest: Equatable, Sendable {
+        let activeTab: OpenDocumentTab
+        let paperStyle: CanvasPaperStyle
+    }
+
+    struct LoadedWorkspaceFollowUpPersistenceRequest: Equatable, Sendable {
+        let activeTab: OpenDocumentTab
+        let paperStyle: CanvasPaperStyle
+        let persistsToBackingStore: Bool
+        let persistsAutosave: Bool
+        let successEffects: LoadedWorkspaceProjectPlan.SuccessEffects
+    }
+
+    struct LoadedWorkspaceFollowUpPersistenceResult: Equatable, Sendable {
+        let successEffects: LoadedWorkspaceProjectPlan.SuccessEffects
+    }
+
+    struct WorkspaceCloseTabsSaveRequest: Equatable, Sendable {
+        let operation: PendingCloseOperation
+        let tabs: [OpenDocumentTab]
+        let activeTab: WorkspaceDocumentReplacementRequest?
+    }
+
+    struct WorkspaceCloseTabsSaveResult: Equatable, Sendable {
+        let operation: PendingCloseOperation
+    }
+
+    struct WorkspaceArtifactDiscardRequest: Equatable, Sendable {
+        let tabs: [OpenDocumentTab]
+    }
+
     enum WorkspacePersistenceRequest: Equatable, Sendable {
         case dirtyPresentationRefreshed(WorkspaceDirtyPresentationRequest)
+        case saveActiveDocument(WorkspaceDocumentSaveRequest)
+        case prepareDocumentReplacement(WorkspaceDocumentReplacementRequest)
+        case loadedWorkspaceFollowUp(LoadedWorkspaceFollowUpPersistenceRequest)
+        case saveTabsForClose(WorkspaceCloseTabsSaveRequest)
+        case discardAutosaveArtifacts(WorkspaceArtifactDiscardRequest)
     }
 
     enum WorkspacePersistenceResult: Equatable, Sendable {
         case dirtyPresentationPersisted(OpenDocumentTab.ID)
+        case activeDocumentSaved(WorkspaceDocumentSaveResult)
+        case documentReplacementPrepared(OpenDocumentTab.ID)
+        case loadedWorkspaceFollowUpApplied(LoadedWorkspaceFollowUpPersistenceResult)
+        case tabsSavedForClose(WorkspaceCloseTabsSaveResult)
+        case autosaveArtifactsDiscarded
     }
 
     struct LoadedWorkspaceProjectPlan {
-        enum Destination {
+        enum Destination: Equatable, Sendable {
             case selectedTab(tabID: OpenDocumentTab.ID, pane: WorkspacePane)
             case newTab(title: String, sourceProjectURL: DocumentProjectPath?)
             case activeTab(title: String?, sourceProjectURL: DocumentProjectPath?)
         }
 
-        struct FollowUp {
+        struct FollowUp: Equatable, Sendable {
             var marksTabDirty = false
             var persistsToBackingStore = false
             var persistsAutosave = false
         }
 
-        enum RecoveryResolution {
+        enum RecoveryResolution: Equatable, Sendable {
             case none
             case removeItem(WorkspaceItemID)
             case completeRestore(WorkspaceItemID)
             case dismiss
         }
 
-        enum SaveHistoryResolution {
+        enum SaveHistoryResolution: Equatable, Sendable {
             case none
             case completeRestore
         }
 
-        struct SuccessEffects {
+        struct SuccessEffects: Equatable, Sendable {
             var discardedAutosaveEntryID: WorkspaceItemID?
             var recoveryResolution: RecoveryResolution = .none
             var saveHistoryResolution: SaveHistoryResolution = .none
@@ -75,7 +137,7 @@ extension AppFeature {
         }
     }
 
-    struct WorkspaceBackingStoreService {
+    struct WorkspaceBackingStoreService: Sendable {
         let paintDocumentClient: PaintDocumentClient
         let documentWorkspaceClient: DocumentWorkspaceClient
 
@@ -124,7 +186,247 @@ extension AppFeature {
         }
     }
 
-    struct WorkspaceCatalogService {
+    struct WorkspacePersistenceUseCase: Sendable {
+        let workspaceBackingStoreService: WorkspaceBackingStoreService
+        let workspaceCatalogService: WorkspaceCatalogService
+
+        func execute(
+            _ request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            switch request {
+            case let .dirtyPresentationRefreshed(dirtyPresentation):
+                return persistDirtyPresentation(dirtyPresentation, request: request)
+            case let .saveActiveDocument(saveRequest):
+                return saveActiveDocument(saveRequest, request: request)
+            case let .prepareDocumentReplacement(replacementRequest):
+                return prepareDocumentReplacement(replacementRequest, request: request)
+            case let .loadedWorkspaceFollowUp(followUpRequest):
+                return applyLoadedWorkspaceFollowUp(followUpRequest, request: request)
+            case let .saveTabsForClose(closeRequest):
+                return saveTabsForClose(closeRequest, request: request)
+            case let .discardAutosaveArtifacts(discardRequest):
+                discardAutosaveArtifacts(discardRequest)
+                return .success(.autosaveArtifactsDiscarded)
+            }
+        }
+
+        private func persistDirtyPresentation(
+            _ requestPayload: WorkspaceDirtyPresentationRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            do {
+                try workspaceBackingStoreService.saveProject(
+                    at: requestPayload.activeTab.backingStoreURL.fileURL,
+                    paperStyle: requestPayload.paperStyle
+                )
+                try workspaceBackingStoreService.persistAutosaveSnapshot(
+                    requestPayload.activeTab.backingStoreURL,
+                    requestPayload.activeTab
+                )
+                return .success(
+                    .dirtyPresentationPersisted(requestPayload.activeTab.id)
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func saveActiveDocument(
+            _ requestPayload: WorkspaceDocumentSaveRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            do {
+                try workspaceBackingStoreService.saveProject(
+                    at: requestPayload.activeTab.backingStoreURL.fileURL,
+                    paperStyle: requestPayload.paperStyle
+                )
+                let savedURL = try workspaceBackingStoreService.persistProjectSnapshot(
+                    requestPayload.activeTab.backingStoreURL,
+                    preferredDestinationURL: requestPayload.preferredDestinationURL
+                )
+
+                var savedTab = requestPayload.activeTab
+                savedTab.title = savedURL.displayName
+                savedTab.sourceProjectURL = savedURL
+                savedTab.isDirty = false
+
+                do {
+                    // Best-effort cleanup of autosave artifacts after a successful save transition.
+                    try workspaceBackingStoreService.discardAutosaveSnapshot(requestPayload.activeTab)
+                } catch {
+                }
+
+                do {
+                    // Save history is resilience-focused and should not block a successful save.
+                    try workspaceBackingStoreService.persistSaveHistorySnapshot(
+                        savedTab.backingStoreURL,
+                        savedTab,
+                        requestPayload.trigger
+                    )
+                } catch {
+                }
+
+                return .success(
+                    .activeDocumentSaved(
+                        WorkspaceDocumentSaveResult(
+                            activeTabID: requestPayload.activeTab.id,
+                            savedURL: savedURL,
+                            purpose: requestPayload.purpose,
+                            previewImageData: savedTab.previewImageData,
+                            canvasSize: savedTab.canvasSize
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func prepareDocumentReplacement(
+            _ requestPayload: WorkspaceDocumentReplacementRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            do {
+                try workspaceBackingStoreService.saveProject(
+                    at: requestPayload.activeTab.backingStoreURL.fileURL,
+                    paperStyle: requestPayload.paperStyle
+                )
+                return .success(
+                    .documentReplacementPrepared(requestPayload.activeTab.id)
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func applyLoadedWorkspaceFollowUp(
+            _ requestPayload: LoadedWorkspaceFollowUpPersistenceRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            do {
+                if requestPayload.persistsToBackingStore {
+                    try workspaceBackingStoreService.saveProject(
+                        at: requestPayload.activeTab.backingStoreURL.fileURL,
+                        paperStyle: requestPayload.paperStyle
+                    )
+                }
+                if requestPayload.persistsAutosave {
+                    try workspaceBackingStoreService.persistAutosaveSnapshot(
+                        requestPayload.activeTab.backingStoreURL,
+                        requestPayload.activeTab
+                    )
+                }
+                if let autosaveEntryID = requestPayload.successEffects.discardedAutosaveEntryID {
+                    try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+                }
+                return .success(
+                    .loadedWorkspaceFollowUpApplied(
+                        LoadedWorkspaceFollowUpPersistenceResult(
+                            successEffects: requestPayload.successEffects
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func saveTabsForClose(
+            _ requestPayload: WorkspaceCloseTabsSaveRequest,
+            request: WorkspacePersistenceRequest
+        ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
+            do {
+                if let activeTab = requestPayload.activeTab {
+                    try workspaceBackingStoreService.saveProject(
+                        at: activeTab.activeTab.backingStoreURL.fileURL,
+                        paperStyle: activeTab.paperStyle
+                    )
+                }
+
+                for tab in requestPayload.tabs {
+                    let destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
+                        tab.backingStoreURL,
+                        preferredDestinationURL: tab.sourceProjectURL
+                    )
+
+                    var savedTab = tab
+                    savedTab.title = destinationURL.displayName
+                    savedTab.sourceProjectURL = destinationURL
+                    savedTab.isDirty = false
+
+                    do {
+                        // Best-effort cleanup of autosave artifacts for a tab that is about to close.
+                        try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+                    } catch {
+                    }
+
+                    do {
+                        // Save history should not block closing the workspace after a successful save.
+                        try workspaceBackingStoreService.persistSaveHistorySnapshot(
+                            savedTab.backingStoreURL,
+                            savedTab,
+                            .closeSave
+                        )
+                    } catch {
+                    }
+                }
+
+                return .success(
+                    .tabsSavedForClose(
+                        WorkspaceCloseTabsSaveResult(
+                            operation: requestPayload.operation
+                        )
+                    )
+                )
+            } catch {
+                return .failure(
+                    WorkspacePersistenceFailure(
+                        request: request,
+                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
+
+        private func discardAutosaveArtifacts(
+            _ requestPayload: WorkspaceArtifactDiscardRequest
+        ) {
+            for tab in requestPayload.tabs {
+                do {
+                    // Best-effort cleanup of autosave artifacts during tab teardown.
+                    try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+                } catch {
+                }
+                do {
+                    // Best-effort cleanup of transient workspace items during tab teardown.
+                    try workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
+                } catch {
+                }
+            }
+        }
+    }
+
+    struct WorkspaceCatalogService: Sendable {
         let documentWorkspaceClient: DocumentWorkspaceClient
 
         func loadSavedProjects() throws -> [SavedProjectSummary] {
@@ -151,7 +453,7 @@ extension AppFeature {
         }
     }
 
-    struct WorkspaceArtifactService {
+    struct WorkspaceArtifactService: Sendable {
         let documentWorkspaceClient: DocumentWorkspaceClient
 
         func timelapseTemporaryDirectory() -> URL {
@@ -163,7 +465,7 @@ extension AppFeature {
         }
     }
 
-    struct WorkspaceIdentityService {
+    struct WorkspaceIdentityService: Sendable {
         let uuidClient: UUIDClient
 
         func generateTabID() -> OpenDocumentTab.ID {
@@ -171,7 +473,7 @@ extension AppFeature {
         }
     }
 
-    struct PreparedWorkspaceTab {
+    struct PreparedWorkspaceTab: Equatable, Sendable {
         let id: OpenDocumentTab.ID
         let title: String
         let backingStoreURL: DocumentProjectPath
@@ -198,6 +500,13 @@ extension AppFeature {
         )
     }
 
+    var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
+        WorkspacePersistenceUseCase(
+            workspaceBackingStoreService: workspaceBackingStoreService,
+            workspaceCatalogService: workspaceCatalogService
+        )
+    }
+
     var workspaceIdentityService: WorkspaceIdentityService {
         WorkspaceIdentityService(
             uuidClient: uuidClient
@@ -206,6 +515,19 @@ extension AppFeature {
 
     func saveFailureFeedback(_ error: Error) -> ApplicationFeedback {
         .saveFailed(Self.optionalErrorMessage(error))
+    }
+
+    func refreshActiveTabMetadataForPersistence(
+        state: inout State
+    ) -> OpenDocumentTab? {
+        let paperStyle = resolvedPaperStyle(for: state)
+        state.workspace.updateActiveTabMetadata(
+            previewImageData: documentPresentationQueryService.compositePNGData(
+                paperStyle: paperStyle
+            ),
+            canvasSize: state.canvas.canvasSize
+        )
+        return state.workspace.activeTab
     }
 
     func requireActiveTab(
@@ -222,89 +544,24 @@ extension AppFeature {
         return .success(activeTab)
     }
 
-    func persistActiveTabToBackingStore(
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
+    func documentReplacementRequest(
+        state: inout State,
+        failureFeedback: ApplicationFeedback = .saveFailed(nil)
+    ) -> Result<WorkspaceDocumentReplacementRequest, WorkspacePersistenceFailure> {
         let activeTab: OpenDocumentTab
-        switch requireActiveTab(in: state) {
+        switch requireActiveTab(in: state, failureFeedback: failureFeedback) {
         case let .success(tab):
             activeTab = tab
         case let .failure(failure):
             return .failure(failure)
         }
-        do {
-            try workspaceBackingStoreService.saveProject(
-                at: activeTab.backingStoreURL.fileURL,
+        let refreshedActiveTab = refreshActiveTabMetadataForPersistence(state: &state) ?? activeTab
+        return .success(
+            WorkspaceDocumentReplacementRequest(
+                activeTab: refreshedActiveTab,
                 paperStyle: resolvedPaperStyle(for: state)
             )
-            state.workspace.updateActiveTabMetadata(
-                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
-                canvasSize: state.canvas.canvasSize
-            )
-            return .success(())
-        } catch {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: saveFailureFeedback(
-                        error
-                    )
-                )
-            )
-        }
-    }
-
-    func prepareForDocumentReplacement(
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
-        guard !state.application.showsHome else { return .success(()) }
-        return persistActiveTabToBackingStore(state: &state)
-    }
-
-    func persistActiveProjectToWorkspace(
-        state: inout State,
-        preferredDestinationURL: DocumentProjectPath?
-    ) -> Result<DocumentProjectPath, WorkspacePersistenceFailure> {
-        let activeTab: OpenDocumentTab
-        switch requireActiveTab(in: state) {
-        case let .success(tab):
-            activeTab = tab
-        case let .failure(failure):
-            return .failure(failure)
-        }
-        switch persistActiveTabToBackingStore(state: &state) {
-        case .success:
-            break
-        case let .failure(failure):
-            return .failure(failure)
-        }
-
-        do {
-            let savedURL = try workspaceBackingStoreService.persistProjectSnapshot(
-                activeTab.backingStoreURL,
-                preferredDestinationURL: preferredDestinationURL
-            )
-            let previousTab = activeTab
-            state.workspace.updateActiveTabMetadata(
-                title: savedURL.displayName,
-                sourceProjectURL: savedURL,
-                previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
-                canvasSize: state.canvas.canvasSize
-            )
-            state.workspace.setActiveTabDirty(false)
-            clearAutosave(for: previousTab)
-            if let refreshedTab = state.workspace.activeTab {
-                clearAutosave(for: refreshedTab)
-            }
-            return .success(savedURL)
-        } catch {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: saveFailureFeedback(
-                        error
-                    )
-                )
-            )
-        }
+        )
     }
 
     func prepareNewTabReservation(
@@ -352,14 +609,14 @@ extension AppFeature {
         )
         state.workspace.appendTab(tab)
         state.workspace.activateTab(preparedTab.id, pane: preparedTab.pane)
-        return persistActiveTabToBackingStore(state: &state)
+        return .success(())
     }
 
     func applyLoadedWorkspaceProject(
         _ loaded: LoadedPaintProject,
         using plan: LoadedWorkspaceProjectPlan,
         state: inout State
-    ) {
+    ) -> Effect<Action> {
         let preparedTab: PreparedWorkspaceTab?
         switch plan.destination {
         case .selectedTab, .activeTab:
@@ -376,7 +633,7 @@ extension AppFeature {
                 state.application.completeWorkspaceProjectLoad(
                     feedback: failure.feedback
                 )
-                return
+                return .none
             }
         }
 
@@ -413,20 +670,23 @@ extension AppFeature {
             state.application.completeWorkspaceProjectLoad(
                 feedback: failure.feedback
             )
-            return
+            return .none
         case .success:
             break
         }
 
-        switch applyLoadedWorkspaceFollowUp(
-            plan.followUp,
+        switch makeLoadedWorkspaceFollowUpRequest(
+            plan: plan,
             state: &state
         ) {
         case let .failure(failure):
             state.application.completeWorkspaceProjectLoad(
                 feedback: failure.feedback
             )
-        case .success:
+            return .none
+        case let .success(.some(request)):
+            return .send(.workspacePersistenceRequested(request))
+        case .success(.none):
             applyLoadedWorkspaceSuccessEffects(
                 plan.successEffects,
                 state: &state
@@ -434,6 +694,7 @@ extension AppFeature {
             state.application.completeWorkspaceProjectLoad(
                 feedback: plan.successEffects.feedback
             )
+            return .none
         }
     }
 
@@ -451,38 +712,144 @@ extension AppFeature {
         )
     }
 
+    func saveActiveDocumentRequest(
+        state: inout State,
+        preferredDestinationURL: DocumentProjectPath?,
+        trigger: SaveHistoryTrigger,
+        purpose: WorkspaceDocumentSavePurpose
+    ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
+        let context: WorkspaceDocumentReplacementRequest
+        switch documentReplacementRequest(state: &state) {
+        case let .success(request):
+            context = request
+        case let .failure(failure):
+            return .failure(failure)
+        }
+        return .success(
+            .saveActiveDocument(
+                WorkspaceDocumentSaveRequest(
+                    activeTab: context.activeTab,
+                    paperStyle: context.paperStyle,
+                    preferredDestinationURL: preferredDestinationURL,
+                    trigger: trigger,
+                    purpose: purpose
+                )
+            )
+        )
+    }
+
+    func makeLoadedWorkspaceFollowUpRequest(
+        plan: LoadedWorkspaceProjectPlan,
+        state: inout State
+    ) -> Result<WorkspacePersistenceRequest?, WorkspacePersistenceFailure> {
+        if plan.followUp.marksTabDirty {
+            state.workspace.setActiveTabDirty(true)
+        }
+
+        let requiresBackingStorePersistence: Bool = {
+            switch plan.destination {
+            case .newTab:
+                return true
+            case .selectedTab, .activeTab:
+                return false
+            }
+        }()
+
+        let shouldPersistToBackingStore = requiresBackingStorePersistence || plan.followUp.persistsToBackingStore
+        guard shouldPersistToBackingStore || plan.followUp.persistsAutosave || plan.successEffects.discardedAutosaveEntryID != nil else {
+            return .success(nil)
+        }
+
+        let context: WorkspaceDocumentReplacementRequest
+        switch documentReplacementRequest(state: &state) {
+        case let .success(request):
+            context = request
+        case let .failure(failure):
+            return .failure(failure)
+        }
+
+        return .success(
+            .loadedWorkspaceFollowUp(
+                LoadedWorkspaceFollowUpPersistenceRequest(
+                    activeTab: context.activeTab,
+                    paperStyle: context.paperStyle,
+                    persistsToBackingStore: shouldPersistToBackingStore,
+                    persistsAutosave: plan.followUp.persistsAutosave,
+                    successEffects: plan.successEffects
+                )
+            )
+        )
+    }
+
+    func closeTabsPersistenceRequest(
+        operation: PendingCloseOperation,
+        tabIDs: [OpenDocumentTab.ID],
+        state: inout State
+    ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
+        var tabs = tabIDs.compactMap { state.workspace.tab(withID: $0) }
+        let activeTabRequest: WorkspaceDocumentReplacementRequest?
+        if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID) {
+            switch documentReplacementRequest(state: &state) {
+            case let .success(request):
+                activeTabRequest = request
+                if let index = tabs.firstIndex(where: { $0.id == request.activeTab.id }) {
+                    tabs[index] = request.activeTab
+                }
+            case let .failure(failure):
+                return .failure(failure)
+            }
+        } else {
+            activeTabRequest = nil
+        }
+        return .success(
+            .saveTabsForClose(
+                WorkspaceCloseTabsSaveRequest(
+                    operation: operation,
+                    tabs: tabs,
+                    activeTab: activeTabRequest
+                )
+            )
+        )
+    }
+
+    func discardArtifactsRequest(
+        for tabs: [OpenDocumentTab]
+    ) -> WorkspacePersistenceRequest {
+        .discardAutosaveArtifacts(
+            WorkspaceArtifactDiscardRequest(
+                tabs: tabs
+            )
+        )
+    }
+
     func workspacePersistenceEffect(
         for request: WorkspacePersistenceRequest
     ) -> Effect<Action> {
-        .run { [workspaceBackingStoreService] send in
-            do {
-                switch request {
-                case let .dirtyPresentationRefreshed(dirtyPresentation):
-                    try workspaceBackingStoreService.saveProject(
-                        at: dirtyPresentation.activeTab.backingStoreURL.fileURL,
-                        paperStyle: dirtyPresentation.paperStyle
-                    )
-                    try workspaceBackingStoreService.persistAutosaveSnapshot(
-                        dirtyPresentation.activeTab.backingStoreURL,
-                        dirtyPresentation.activeTab
-                    )
-                    await send(
-                        .workspacePersistenceSucceeded(
-                            .dirtyPresentationPersisted(
-                                dirtyPresentation.activeTab.id
-                            )
-                        )
-                    )
-                }
-            } catch {
-                await send(
-                    .workspacePersistenceFailed(
-                        WorkspacePersistenceFailure(
-                            request: request,
-                            feedback: saveFailureFeedback(error)
-                        )
-                    )
-                )
+        .run { [workspacePersistenceUseCase] send in
+            switch workspacePersistenceUseCase.execute(request) {
+            case let .success(result):
+                await send(.workspacePersistenceSucceeded(result))
+            case let .failure(failure):
+                await send(.workspacePersistenceFailed(failure))
+            }
+        }
+    }
+
+    func documentReplacementPreparationEffect(
+        request: WorkspaceDocumentReplacementRequest?,
+        onPrepared: @escaping @Sendable () -> Action,
+        onFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action
+    ) -> Effect<Action> {
+        guard let request else {
+            return .send(onPrepared())
+        }
+        return .run { [workspacePersistenceUseCase] send in
+            let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(request)
+            switch workspacePersistenceUseCase.execute(persistenceRequest) {
+            case .success:
+                await send(onPrepared())
+            case let .failure(failure):
+                await send(onFailure(failure))
             }
         }
     }
@@ -496,18 +863,65 @@ extension AppFeature {
     func handleWorkspacePersistenceSucceeded(
         state: inout State,
         result: WorkspacePersistenceResult
-    ) {
+    ) -> Effect<Action> {
         switch result {
         case .dirtyPresentationPersisted:
-            break
+            return .none
+
+        case let .activeDocumentSaved(saved):
+            state.workspace.updateTab(
+                id: saved.activeTabID,
+                title: saved.savedURL.displayName,
+                sourceProjectURL: saved.savedURL,
+                previewImageData: saved.previewImageData,
+                canvasSize: saved.canvasSize,
+                isDirty: false
+            )
+            state.application.presentFeedback(
+                .savedDocument(saved.savedURL.fileURL.lastPathComponent)
+            )
+            switch saved.purpose {
+            case .saveDocument:
+                return .send(.homeProjectsLoadRequested)
+            case .homeReturn:
+                state.application.showHome()
+                return .send(.homeProjectsLoadRequested)
+            }
+
+        case .documentReplacementPrepared:
+            return .none
+
+        case let .loadedWorkspaceFollowUpApplied(followUp):
+            applyLoadedWorkspaceSuccessEffects(
+                followUp.successEffects,
+                state: &state
+            )
+            state.application.completeWorkspaceProjectLoad(
+                feedback: followUp.successEffects.feedback
+            )
+            return .none
+
+        case let .tabsSavedForClose(closeResult):
+            return performCloseOperation(closeResult.operation)
+
+        case .autosaveArtifactsDiscarded:
+            return .none
         }
     }
 
     func handleWorkspacePersistenceFailed(
         state: inout State,
         failure: WorkspacePersistenceFailure
-    ) {
-        state.application.presentFeedback(failure.feedback)
+    ) -> Effect<Action> {
+        switch failure.request {
+        case .loadedWorkspaceFollowUp:
+            state.application.completeWorkspaceProjectLoad(
+                feedback: failure.feedback
+            )
+        default:
+            state.application.presentFeedback(failure.feedback)
+        }
+        return .none
     }
 
     func applyDirtyPresentation(state: inout State) -> Effect<Action> {
@@ -525,74 +939,10 @@ extension AppFeature {
         return .send(.workspacePersistenceRequested(request))
     }
 
-    func persistActiveTabAutosave(
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
-        let activeTab: OpenDocumentTab
-        switch requireActiveTab(in: state) {
-        case let .success(tab):
-            activeTab = tab
-        case let .failure(failure):
-            return .failure(failure)
-        }
-
-        do {
-            try workspaceBackingStoreService.persistAutosaveSnapshot(
-                activeTab.backingStoreURL,
-                activeTab
-            )
-            return .success(())
-        } catch {
-            return .failure(
-                WorkspacePersistenceFailure(
-                    feedback: saveFailureFeedback(
-                        error
-                    )
-                )
-            )
-        }
-    }
-
-    func applyLoadedWorkspaceFollowUp(
-        _ followUp: LoadedWorkspaceProjectPlan.FollowUp,
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
-        if followUp.marksTabDirty {
-            state.workspace.setActiveTabDirty(true)
-        }
-        if followUp.persistsToBackingStore {
-            switch persistActiveTabToBackingStore(state: &state) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-        }
-        if followUp.persistsAutosave {
-            switch persistActiveTabAutosave(state: &state) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-        }
-        return .success(())
-    }
-
     func applyLoadedWorkspaceSuccessEffects(
         _ successEffects: LoadedWorkspaceProjectPlan.SuccessEffects,
         state: inout State
     ) {
-        if let autosaveEntryID = successEffects.discardedAutosaveEntryID {
-            do {
-                try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
-            } catch {
-                state.application.presentFeedback(
-                    .autosaveRestoreFailed(Self.optionalErrorMessage(error))
-                )
-            }
-        }
-
         switch successEffects.recoveryResolution {
         case .none:
             break
@@ -610,92 +960,6 @@ extension AppFeature {
         case .completeRestore:
             state.saveHistory.completeRestore()
         }
-    }
-
-    func clearAutosave(for tab: OpenDocumentTab) {
-        do {
-            // Best-effort cleanup of autosave artifacts after a successful persistence transition.
-            try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-        } catch {
-        }
-    }
-
-    func discardTransientWorkspaceArtifacts(for tab: OpenDocumentTab) {
-        clearAutosave(for: tab)
-        do {
-            // Best-effort cleanup of transient workspace artifacts during tab teardown.
-            try workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
-        } catch {
-        }
-    }
-
-    func discardTransientWorkspaceArtifacts(for tabs: [OpenDocumentTab]) {
-        tabs.forEach(discardTransientWorkspaceArtifacts(for:))
-    }
-
-    func persistSaveHistorySnapshot(
-        for tab: OpenDocumentTab,
-        trigger: SaveHistoryTrigger
-    ) {
-        do {
-            try workspaceBackingStoreService.persistSaveHistorySnapshot(
-                tab.backingStoreURL,
-                tab,
-                trigger
-            )
-        } catch {
-            // Save history is a resilience feature. Keep editing even if a snapshot could not be recorded.
-        }
-    }
-
-    func saveTabsForClose(
-        _ tabIDs: [OpenDocumentTab.ID],
-        state: inout State
-    ) -> Result<Void, WorkspacePersistenceFailure> {
-        if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID) {
-            switch persistActiveTabToBackingStore(state: &state) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-        }
-        for tabID in tabIDs {
-            guard let previousTab = state.workspace.tab(withID: tabID) else { continue }
-            let destinationURL: DocumentProjectPath
-            do {
-                destinationURL = try workspaceBackingStoreService.persistProjectSnapshot(
-                    previousTab.backingStoreURL,
-                    preferredDestinationURL: previousTab.sourceProjectURL
-                )
-            } catch {
-                return .failure(
-                    WorkspacePersistenceFailure(
-                        feedback: .saveFailed(Self.optionalErrorMessage(error))
-                    )
-                )
-            }
-            let updatedTab = state.workspace.updateTab(
-                id: tabID,
-                title: destinationURL.displayName,
-                sourceProjectURL: destinationURL,
-                isDirty: false
-            )
-            if tabID == state.workspace.activeTabID {
-                state.workspace.updateActiveTabMetadata(
-                    title: destinationURL.displayName,
-                    sourceProjectURL: destinationURL,
-                    previewImageData: paintDocumentClient.compositePNGData(resolvedPaperStyle(for: state)),
-                    canvasSize: state.canvas.canvasSize
-                )
-            }
-            clearAutosave(for: previousTab)
-            if let updatedTab {
-                clearAutosave(for: updatedTab)
-                persistSaveHistorySnapshot(for: updatedTab, trigger: .closeSave)
-            }
-        }
-        return .success(())
     }
 
     static func nextUntitledTabTitle(existingTabs: [OpenDocumentTab]) -> String {

@@ -40,12 +40,10 @@ extension AppFeature {
             )
 
         case let .canvas(.delegate(.blurSamples(samples))):
-            handleBlurSamples(state: &state, samples: samples)
-            return .none
+            return handleBlurSamples(state: &state, samples: samples)
 
         case .canvas(.delegate(.endBlurStroke)):
-            handleEndBlurStroke(state: &state)
-            return .none
+            return handleEndBlurStroke(state: &state)
 
         case let .canvas(.delegate(.fill(sample))):
             return handleFill(state: &state, sample: sample)

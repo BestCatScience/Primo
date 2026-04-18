@@ -61,12 +61,10 @@ extension AppFeature {
             return handleWorkspacePersistenceRequested(request: request)
 
         case let .workspacePersistenceSucceeded(result):
-            handleWorkspacePersistenceSucceeded(state: &state, result: result)
-            return .none
+            return handleWorkspacePersistenceSucceeded(state: &state, result: result)
 
         case let .workspacePersistenceFailed(failure):
-            handleWorkspacePersistenceFailed(state: &state, failure: failure)
-            return .none
+            return handleWorkspacePersistenceFailed(state: &state, failure: failure)
 
         case let .bootstrapPresentationLoaded(presentation):
             handleBootstrapPresentationLoaded(state: &state, presentation: presentation)
@@ -101,8 +99,7 @@ extension AppFeature {
             return handleAutosaveRecoveryRestoreRequest(state: &state, autosaveID: autosaveID)
 
         case let .autosaveRecoveryOpened(loaded, item):
-            handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item)
-            return .none
+            return handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item)
 
         case let .autosaveRecoveryRestoreFailed(feedback):
             handleAutosaveRecoveryRestoreFailed(state: &state, feedback: feedback)

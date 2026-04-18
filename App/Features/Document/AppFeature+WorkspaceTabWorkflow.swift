@@ -7,14 +7,29 @@ extension AppFeature {
         let documentImportClient: DocumentImportClient
         let workspaceCatalogService: WorkspaceCatalogService
         let workspaceBackingStoreService: WorkspaceBackingStoreService
+        let workspacePersistenceUseCase: WorkspacePersistenceUseCase
 
         func loadProjectEffect(
             from fileURL: URL,
+            prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest? = nil,
             onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
+            onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
             onFailure: @escaping @Sendable (Error) -> Action,
             removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil
         ) -> Effect<Action> {
-            .run { [paintDocumentClient, workspaceBackingStoreService] send in
+            .run { [paintDocumentClient, workspaceBackingStoreService, workspacePersistenceUseCase] send in
+                if let prepareDocumentReplacementRequest {
+                    let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(
+                        prepareDocumentReplacementRequest
+                    )
+                    switch workspacePersistenceUseCase.execute(persistenceRequest) {
+                    case .success:
+                        break
+                    case let .failure(failure):
+                        await send(onPreparationFailure(failure))
+                        return
+                    }
+                }
                 do {
                     let loaded = try paintDocumentClient.loadProject(fileURL)
                     if let workspaceItemToRemove = removeWorkspaceItemOnSuccess {
@@ -33,10 +48,24 @@ extension AppFeature {
 
         func loadImportedProjectEffect(
             from sourceURL: URL,
+            prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest? = nil,
             onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
+            onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
             onFailure: @escaping @Sendable (Error) -> Action
         ) -> Effect<Action> {
-            .run { [documentImportClient, paintDocumentClient] send in
+            .run { [documentImportClient, paintDocumentClient, workspacePersistenceUseCase] send in
+                if let prepareDocumentReplacementRequest {
+                    let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(
+                        prepareDocumentReplacementRequest
+                    )
+                    switch workspacePersistenceUseCase.execute(persistenceRequest) {
+                    case .success:
+                        break
+                    case let .failure(failure):
+                        await send(onPreparationFailure(failure))
+                        return
+                    }
+                }
                 let stagedResult = documentImportClient.stageImportedDocument(
                     ImportedDocumentStageRequest(sourceURL: sourceURL)
                 )
@@ -77,7 +106,8 @@ extension AppFeature {
             paintDocumentClient: paintDocumentClient,
             documentImportClient: documentImportClient,
             workspaceCatalogService: workspaceCatalogService,
-            workspaceBackingStoreService: workspaceBackingStoreService
+            workspaceBackingStoreService: workspaceBackingStoreService,
+            workspacePersistenceUseCase: workspacePersistenceUseCase
         )
     }
 
@@ -87,21 +117,27 @@ extension AppFeature {
         persistCurrentTab: Bool = true,
         removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil,
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
+        onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
         onFailure: @escaping @Sendable (Error) -> Action
     ) -> Effect<Action> {
-        if persistCurrentTab {
-            switch prepareForDocumentReplacement(state: &state) {
-            case .success:
-                break
+        let prepareRequest: WorkspaceDocumentReplacementRequest?
+        if persistCurrentTab && !state.application.showsHome {
+            switch documentReplacementRequest(state: &state) {
+            case let .success(request):
+                prepareRequest = request
             case let .failure(failure):
                 state.application.presentFeedback(failure.feedback)
                 return .none
             }
+        } else {
+            prepareRequest = nil
         }
         state.application.beginHydration()
         return workspaceTabCoordinator.loadProjectEffect(
             from: fileURL,
+            prepareDocumentReplacementRequest: prepareRequest,
             onSuccess: onSuccess,
+            onPreparationFailure: onPreparationFailure,
             onFailure: onFailure,
             removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
         )
@@ -112,21 +148,27 @@ extension AppFeature {
         sourceURL: URL,
         persistCurrentTab: Bool = true,
         onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
+        onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
         onFailure: @escaping @Sendable (Error) -> Action
     ) -> Effect<Action> {
-        if persistCurrentTab {
-            switch prepareForDocumentReplacement(state: &state) {
-            case .success:
-                break
+        let prepareRequest: WorkspaceDocumentReplacementRequest?
+        if persistCurrentTab && !state.application.showsHome {
+            switch documentReplacementRequest(state: &state) {
+            case let .success(request):
+                prepareRequest = request
             case let .failure(failure):
                 state.application.presentFeedback(failure.feedback)
                 return .none
             }
+        } else {
+            prepareRequest = nil
         }
         state.application.beginHydration()
         return workspaceTabCoordinator.loadImportedProjectEffect(
             from: sourceURL,
+            prepareDocumentReplacementRequest: prepareRequest,
             onSuccess: onSuccess,
+            onPreparationFailure: onPreparationFailure,
             onFailure: onFailure
         )
     }

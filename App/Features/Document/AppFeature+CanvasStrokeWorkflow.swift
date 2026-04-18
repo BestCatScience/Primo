@@ -22,7 +22,7 @@ extension AppFeature {
 
     enum StrokeCommitResolution {
         case committed(DocumentMutationContract)
-        case failed
+        case failed(DocumentMutationFailure)
     }
 
     struct CanvasStrokeContextResolver {
@@ -93,13 +93,16 @@ extension AppFeature {
         func prepareEditing(
             state: inout State,
             clearSelectionWithoutRefresh: (inout State) -> Void
-        ) -> Bool {
-            guard workflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
-                return false
+        ) -> DocumentMutationResult {
+            switch workflowService.ensureLayerVisible(state.canvas.activeLayerIndex) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
             }
             clearSelectionWithoutRefresh(&state)
             workflowService.cancelStroke()
-            return true
+            return .success(())
         }
 
         func applyPreviewResolution(
@@ -216,37 +219,47 @@ extension AppFeature {
             keepsSelectionCleared: Bool,
             refreshViaDirtyPresentation: Bool,
             clearSelectionWithoutRefresh: (inout State) -> Void,
-            commitFallbackPixels: (inout State, [StylusSample], BrushRuntimeSettings, LayerRowModel, Bool) -> Bool
+            commitFallbackPixels: (inout State, [StylusSample], BrushRuntimeSettings, LayerRowModel, Bool) -> DocumentMutationResult
         ) -> StrokeCommitResolution {
             let shouldApplyTaperOnCommit = context.brush.taperIn > 0.001 || context.brush.taperOut > 0.001
             if keepsSelectionCleared {
-                guard workflowService.ensureLayerVisible(context.activeLayerIndex) else {
-                    return .failed
+                switch workflowService.ensureLayerVisible(context.activeLayerIndex) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    return .failed(failure)
                 }
                 clearSelectionWithoutRefresh(&state)
             }
-            let didCommit: Bool
+            let commitResult: DocumentMutationResult
             if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
-                didCommit = workflowService.replaceLayerPixels(
+                commitResult = workflowService.replaceLayerPixels(
                     context.activeLayerIndex,
                     pixelData: previewPixels
                 )
             } else {
-                let committedInSession = workflowService.applySoftwareStroke(
+                switch workflowService.applySoftwareStroke(
                     samples,
                     brush: context.brush,
                     layerIndex: context.activeLayerIndex
-                )
-                didCommit = committedInSession || commitFallbackPixels(
-                    &state,
-                    samples,
-                    context.brush,
-                    context.activeLayer,
-                    refreshViaDirtyPresentation
-                )
+                ) {
+                case .success:
+                    commitResult = .success(())
+                case .failure:
+                    commitResult = commitFallbackPixels(
+                        &state,
+                        samples,
+                        context.brush,
+                        context.activeLayer,
+                        refreshViaDirtyPresentation
+                    )
+                }
             }
-            guard didCommit else {
-                return .failed
+            switch commitResult {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failed(failure)
             }
             return .committed(
                 DocumentMutationContract(
@@ -263,13 +276,15 @@ extension AppFeature {
             state: inout State,
             resetPreview: (inout State) -> Void,
             completeMutation: (inout State, DocumentMutationContract) -> Effect<Action>,
+            applyFailureFeedback: (DocumentMutationFailure, inout State) -> Void,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
             resetPreview(&state)
             switch resolution {
             case let .committed(contract):
                 return completeMutation(&state, contract)
-            case .failed:
+            case let .failed(failure):
+                applyFailureFeedback(failure, &state)
                 return cancelEffects()
             }
         }
@@ -280,7 +295,8 @@ extension AppFeature {
             state: inout State,
             sample: StylusSample,
             resolveContext: (State) -> CanvasStrokeContext?,
-            prepareEditing: (inout State) -> Bool,
+            prepareEditing: (inout State) -> DocumentMutationResult,
+            applyFailureFeedback: (DocumentMutationFailure, inout State) -> Void,
             captureBaseSnapshot: (inout State) -> Void,
             resolveInitialPreview: (State, StylusSample, CanvasStrokeContext) -> StrokePreviewResolution?,
             applyPreview: (StrokePreviewResolution, Int, inout State) -> Void,
@@ -289,7 +305,11 @@ extension AppFeature {
             guard let context = resolveContext(state) else {
                 return .none
             }
-            guard prepareEditing(&state) else {
+            switch prepareEditing(&state) {
+            case .success:
+                break
+            case let .failure(failure):
+                applyFailureFeedback(failure, &state)
                 return .none
             }
             captureBaseSnapshot(&state)
@@ -373,11 +393,8 @@ extension AppFeature {
     struct CanvasStrokeWorkflowService {
         let paintDocumentClient: PaintDocumentClient
 
-        func ensureLayerVisible(_ layerIndex: Int) -> Bool {
-            if case .success = paintDocumentClient.setLayerVisibility(layerIndex, true) {
-                return true
-            }
-            return false
+        func ensureLayerVisible(_ layerIndex: Int) -> DocumentMutationResult {
+            paintDocumentClient.setLayerVisibility(layerIndex, true)
         }
 
         func cancelStroke() {
@@ -406,29 +423,20 @@ extension AppFeature {
         func replaceLayerPixels(
             _ layerIndex: Int,
             pixelData: Data
-        ) -> Bool {
-            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
         }
 
         func applySoftwareStroke(
             _ samples: [StylusSample],
             brush: BrushRuntimeSettings,
             layerIndex: Int
-        ) -> Bool {
-            if case .success = paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex)
         }
 
-        func revealLayerForEditing(_ layerIndex: Int) -> Bool {
-            if case .success = paintDocumentClient.revealLayerForEditing(layerIndex) {
-                return true
-            }
-            return false
+        func revealLayerForEditing(_ layerIndex: Int) -> DocumentMutationResult {
+            paintDocumentClient.revealLayerForEditing(layerIndex)
         }
 
         func blurStroke(
@@ -436,11 +444,8 @@ extension AppFeature {
             brush: BrushRuntimeSettings,
             layerIndex: Int,
             clearSelectionAfterBlur: Bool
-        ) -> Bool {
-            if case .success = paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
         }
 
         func endBlurStroke() {
@@ -450,11 +455,8 @@ extension AppFeature {
         func fill(
             _ sample: StylusSample,
             brush: BrushRuntimeSettings
-        ) -> Bool {
-            if case .success = paintDocumentClient.fill(sample, brush) {
-                return true
-            }
-            return false
+        ) -> DocumentMutationResult {
+            paintDocumentClient.fill(sample, brush)
         }
     }
 
@@ -493,8 +495,8 @@ extension AppFeature {
     func clearCanvasSelectionWithoutRefresh(state: inout State) {
         canvasStrokeStateCoordinator.clearSelectionWithoutRefresh(
             state: &state,
-            performDocumentMutation: { state, contract in
-                completeDocumentMutation(state: &state, contract: contract)
+            performDocumentMutation: { mutableState, contract in
+                completeDocumentMutation(state: &mutableState, contract: contract)
             }
         )
     }
@@ -502,8 +504,8 @@ extension AppFeature {
     func ensureCurrentCanvasPresentationLoaded(state: inout State) {
         canvasStrokeStateCoordinator.ensureCurrentPresentationLoaded(
             state: &state,
-            performDocumentMutation: { state, contract in
-                completeDocumentMutation(state: &state, contract: contract)
+            performDocumentMutation: { mutableState, contract in
+                completeDocumentMutation(state: &mutableState, contract: contract)
             }
         )
     }
@@ -511,19 +513,27 @@ extension AppFeature {
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
-            ensureCurrentPresentationLoaded: { state in
-                ensureCurrentCanvasPresentationLoaded(state: &state)
+            ensureCurrentPresentationLoaded: { mutableState in
+                ensureCurrentCanvasPresentationLoaded(state: &mutableState)
             }
         )
     }
 
     func prepareCanvasStrokeEditing(state: inout State) -> Bool {
-        canvasStrokeStateCoordinator.prepareEditing(
+        switch canvasStrokeStateCoordinator.prepareEditing(
             state: &state,
             clearSelectionWithoutRefresh: { state in
                 clearCanvasSelectionWithoutRefresh(state: &state)
             }
-        )
+        ) {
+        case .success:
+            return true
+        case let .failure(failure):
+            if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
+                state.application.presentFeedback(feedback)
+            }
+            return false
+        }
     }
 
     func previewBrush(for brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
@@ -649,6 +659,11 @@ extension AppFeature {
                     contract: contract
                 )
             },
+            applyFailureFeedback: { failure, state in
+                if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
+                    state.application.presentFeedback(feedback)
+                }
+            },
             cancelEffects: {
                 cancelStartupPresentationEffects()
             }
@@ -721,7 +736,7 @@ extension AppFeature {
         brush: BrushRuntimeSettings,
         activeLayer: LayerRowModel,
         refreshViaDirtyPresentation: Bool
-    ) -> Bool {
+    ) -> DocumentMutationResult {
         if !refreshViaDirtyPresentation {
             ensureCurrentCanvasPresentationLoaded(state: &state)
         }
@@ -740,7 +755,7 @@ extension AppFeature {
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
             )
         else {
-            return false
+            return .failure(.bridgeMutationFailed("Missing fallback stroke snapshot"))
         }
         return canvasStrokeWorkflowService.replaceLayerPixels(
             state.canvas.activeLayerIndex,
@@ -761,8 +776,10 @@ extension AppFeature {
         state: inout State,
         contract: DocumentMutationContract = .dirty
     ) -> Effect<Action> {
-        completeDocumentMutation(state: &state, contract: contract)
-        return cancelStartupPresentationEffects()
+        .merge(
+            completeDocumentMutation(state: &state, contract: contract),
+            cancelStartupPresentationEffects()
+        )
     }
 
     func handleBeginStroke(
@@ -776,7 +793,17 @@ extension AppFeature {
                 canvasStrokeContext(in: state)
             },
             prepareEditing: { state in
-                prepareCanvasStrokeEditing(state: &state)
+                canvasStrokeStateCoordinator.prepareEditing(
+                    state: &state,
+                    clearSelectionWithoutRefresh: { state in
+                        clearCanvasSelectionWithoutRefresh(state: &state)
+                    }
+                )
+            },
+            applyFailureFeedback: { failure, state in
+                if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
+                    state.application.presentFeedback(feedback)
+                }
             },
             captureBaseSnapshot: { state in
                 captureActiveStrokeBaseSnapshotIfNeeded(state: &state)
@@ -907,31 +934,35 @@ extension AppFeature {
     func handleBlurSamples(
         state: inout State,
         samples: [StylusSample]
-    ) {
-        guard !samples.isEmpty else { return }
+    ) -> Effect<Action> {
+        guard !samples.isEmpty else { return .none }
         guard activeEditableCanvasLayer(in: state) != nil else {
-            return
+            return .none
         }
-        guard canvasStrokeWorkflowService.revealLayerForEditing(state.canvas.activeLayerIndex) else {
-            return
-        }
-        guard canvasStrokeWorkflowService.blurStroke(
-            samples,
-            brush: resolvedBrushSettings(for: state),
-            layerIndex: state.canvas.activeLayerIndex,
-            clearSelectionAfterBlur: false
-        ) else {
-            return
-        }
-        completeDocumentMutation(
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let brush = resolvedBrushSettings(for: state)
+        return performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            mutation: {
+                switch canvasStrokeWorkflowService.revealLayerForEditing(activeLayerIndex) {
+                case .success:
+                    return canvasStrokeWorkflowService.blurStroke(
+                        samples,
+                        brush: brush,
+                        layerIndex: activeLayerIndex,
+                        clearSelectionAfterBlur: false
+                    )
+                case let .failure(failure):
+                    return .failure(failure)
+                }
+            }
         )
     }
 
-    func handleEndBlurStroke(state: inout State) {
+    func handleEndBlurStroke(state: inout State) -> Effect<Action> {
         canvasStrokeWorkflowService.endBlurStroke()
-        completeDocumentMutation(state: &state)
+        return completeCanvasStrokeMutation(state: &state)
     }
 
     func handleFill(
@@ -941,15 +972,22 @@ extension AppFeature {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        guard canvasStrokeWorkflowService.ensureLayerVisible(state.canvas.activeLayerIndex) else {
-            return .none
-        }
-        guard canvasStrokeWorkflowService.fill(sample, brush: resolvedBrushSettings(for: state)) else {
-            return .none
-        }
-        return completeCanvasStrokeMutation(
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let brush = resolvedBrushSettings(for: state)
+        return performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection)
+            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            mutation: {
+                switch canvasStrokeWorkflowService.ensureLayerVisible(activeLayerIndex) {
+                case .success:
+                    return canvasStrokeWorkflowService.fill(
+                        sample,
+                        brush: brush
+                    )
+                case let .failure(failure):
+                    return .failure(failure)
+                }
+            }
         )
     }
 }

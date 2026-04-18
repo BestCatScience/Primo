@@ -17,6 +17,7 @@ extension AppFeature {
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
             onSuccess: { .tabSelectionLoaded(tabID, $0) },
+            onPreparationFailure: { .tabSelectionFailed($0.feedback) },
             onFailure: {
                 .tabSelectionFailed(
                     .openFailed(Self.optionalErrorMessage($0))
@@ -29,12 +30,12 @@ extension AppFeature {
         state: inout State,
         tabID: OpenDocumentTab.ID,
         loaded: LoadedPaintProject
-    ) {
+    ) -> Effect<Action> {
         guard let targetTab = state.workspace.tab(withID: tabID) else {
             state.application.finishHydration()
-            return
+            return .none
         }
-        applyLoadedWorkspaceProject(
+        return applyLoadedWorkspaceProject(
             loaded,
             using: LoadedWorkspaceProjectPlan(
                 destination: .selectedTab(tabID: tabID, pane: targetTab.pane)
@@ -58,8 +59,10 @@ extension AppFeature {
         tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
         guard let closure = state.workspace.closeTab(id: tabID) else { return .none }
-        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
-        return effect(for: closure.disposition, state: &state)
+        return .merge(
+            effect(for: closure.disposition, state: &state),
+            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+        )
     }
 
     func handleCloseOtherTabs(
@@ -67,8 +70,10 @@ extension AppFeature {
         retaining tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
         let closure = state.workspace.closeOtherTabs(retaining: tabID)
-        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
-        return effect(for: closure.disposition, state: &state)
+        return .merge(
+            effect(for: closure.disposition, state: &state),
+            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+        )
     }
 
     func handleCloseTabsToRight(
@@ -76,7 +81,9 @@ extension AppFeature {
         tabID: OpenDocumentTab.ID
     ) -> Effect<Action> {
         let closure = state.workspace.closeTabsToRight(of: tabID)
-        discardTransientWorkspaceArtifacts(for: closure.removedTabs)
-        return effect(for: closure.disposition, state: &state)
+        return .merge(
+            effect(for: closure.disposition, state: &state),
+            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+        )
     }
 }

@@ -138,12 +138,6 @@ extension AppFeature {
     }
 
     private struct NanoBananaDocumentService {
-        enum ApplyFailure: Error, Equatable {
-            case createLayerFailed
-            case setActiveLayerFailed(Int)
-            case replacePixelsFailed(Int)
-        }
-
         struct AppliedPreview {
             let targetLayerIndex: Int
         }
@@ -152,7 +146,7 @@ extension AppFeature {
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
-        ) -> Result<AppliedPreview, ApplyFailure> {
+        ) -> Result<AppliedPreview, DocumentMutationFailure> {
             let resolvedTarget: (index: Int, createdNewLayer: Bool)
             switch plan.target {
             case let .existingLayer(index):
@@ -161,18 +155,24 @@ extension AppFeature {
                 switch paintDocumentClient.addLayer(name) {
                 case let .success(index):
                     resolvedTarget = (index, true)
-                case .failure:
-                    return .failure(.createLayerFailed)
+                case let .failure(failure):
+                    return .failure(failure)
                 }
             }
 
-            guard case .success = paintDocumentClient.setActiveLayer(resolvedTarget.index) else {
+            switch paintDocumentClient.setActiveLayer(resolvedTarget.index) {
+            case .success:
+                break
+            case let .failure(failure):
                 rollback(plan: plan, resolvedTarget: resolvedTarget)
-                return .failure(.setActiveLayerFailed(resolvedTarget.index))
+                return .failure(failure)
             }
-            guard case .success = paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) else {
+            switch paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) {
+            case .success:
+                break
+            case let .failure(failure):
                 rollback(plan: plan, resolvedTarget: resolvedTarget)
-                return .failure(.replacePixelsFailed(resolvedTarget.index))
+                return .failure(failure)
             }
             return .success(
                 AppliedPreview(
@@ -433,10 +433,13 @@ extension AppFeature {
         switch nanoBananaDocumentService.apply(applicationPlan) {
         case let .success(preview):
             appliedPreview = preview
-        case .failure:
+        case let .failure(failure):
             nanoBananaGenerationService.applyFailure(
                 state: &state,
-                feedback: .nanoBananaApplyFailed
+                feedback: documentMutationFeedbackMapper.feedback(
+                    for: failure,
+                    default: .nanoBananaApplyFailed
+                ) ?? .nanoBananaApplyFailed
             )
             return
         }

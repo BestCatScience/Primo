@@ -51,7 +51,7 @@ extension AppFeature {
         }
     }
 
-    enum ApplicationFeedback: Equatable {
+    enum ApplicationFeedback: Equatable, Sendable {
         case saveFailed(String?)
         case openFailed(String?)
         case moveFailed(String?)
@@ -61,6 +61,13 @@ extension AppFeature {
         case couldNotImportPhoto(String?)
         case photoImportedToNewLayer
         case textLayerApplyFailed
+        case layerUnavailable
+        case folderUnavailable
+        case layerEditLocked
+        case layerAlphaEditLocked
+        case emptyDocumentMutationInput
+        case documentMutationBridgeFailed(String?)
+        case unsupportedLayerType
         case createLayerMaskNeedsSelection
         case createLayerMaskFailed
         case applyLayerMaskFailed
@@ -124,6 +131,36 @@ extension AppFeature.ApplicationFeedback {
             return language == .japanese
                 ? "テキストをレイヤーに適用できませんでした"
                 : "Could not apply text to the layer"
+        case .layerUnavailable:
+            return language == .japanese
+                ? "対象のレイヤーが見つかりませんでした"
+                : "The target layer could not be found"
+        case .folderUnavailable:
+            return language == .japanese
+                ? "対象のフォルダが見つかりませんでした"
+                : "The target folder could not be found"
+        case .layerEditLocked:
+            return language == .japanese
+                ? "レイヤーがロックされているため編集できません"
+                : "The layer is locked and cannot be edited"
+        case .layerAlphaEditLocked:
+            return language == .japanese
+                ? "アルファロックされているため編集できません"
+                : "The layer is alpha locked and cannot be edited"
+        case .emptyDocumentMutationInput:
+            return language == .japanese
+                ? "空の入力ではこの操作を実行できません"
+                : "This operation requires a non-empty input"
+        case let .documentMutationBridgeFailed(message):
+            return (message?.isEmpty == false)
+                ? message!
+                : (language == .japanese
+                    ? "ドキュメントの更新に失敗しました"
+                    : "The document update failed")
+        case .unsupportedLayerType:
+            return language == .japanese
+                ? "このレイヤー種類では操作できません"
+                : "This operation is not supported for the current layer type"
         case .createLayerMaskNeedsSelection:
             return language == .japanese
                 ? "選択範囲を作成してからマスクを追加してください"

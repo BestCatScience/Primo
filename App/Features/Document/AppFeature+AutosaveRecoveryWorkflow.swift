@@ -17,6 +17,7 @@ extension AppFeature {
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
             onSuccess: { .autosaveRecoveryOpened($0, item) },
+            onPreparationFailure: { .autosaveRecoveryRestoreFailed($0.feedback) },
             onFailure: {
                 .autosaveRecoveryRestoreFailed(
                     .autosaveRestoreFailed(Self.optionalErrorMessage($0))
@@ -29,8 +30,8 @@ extension AppFeature {
         state: inout State,
         loaded: LoadedPaintProject,
         item: AutosaveRecoveryItem
-    ) {
-        applyLoadedWorkspaceProject(
+    ) -> Effect<Action> {
+        return applyLoadedWorkspaceProject(
             loaded,
             using: LoadedWorkspaceProjectPlan(
                 destination: .newTab(

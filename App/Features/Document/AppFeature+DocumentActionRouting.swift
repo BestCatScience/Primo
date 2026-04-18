@@ -10,6 +10,9 @@ extension AppFeature {
         case let .newCanvasRequested(width, height):
             return handleNewCanvasRequest(state: &state, width: width, height: height)
 
+        case let .newCanvasPreparationCompleted(dimensions):
+            return handleNewCanvasPreparationCompleted(state: &state, dimensions: dimensions)
+
         case let .resizeCanvasRequested(width, height):
             return handleResizeCanvasRequest(state: &state, width: width, height: height)
 
@@ -18,6 +21,9 @@ extension AppFeature {
 
         case let .newCanvasFromImageReceived(name, data):
             return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
+
+        case let .newCanvasFromImagePreparationCompleted(plan):
+            return handleNewCanvasFromImagePreparationCompleted(state: &state, plan: plan)
 
         case let .newCanvasFromImageFailed(feedback):
             handleNewCanvasFromImageFailed(state: &state, feedback: feedback)
@@ -52,13 +58,12 @@ extension AppFeature {
             )
 
         case let .saveHistoryOpened(loaded, projectURL, openInNewTab):
-            handleSaveHistoryOpened(
+            return handleSaveHistoryOpened(
                 state: &state,
                 loaded: loaded,
                 projectURL: projectURL,
                 openInNewTab: openInNewTab
             )
-            return .none
 
         case let .saveHistoryRestoreFailed(feedback):
             handleSaveHistoryRestoreFailed(state: &state, feedback: feedback)

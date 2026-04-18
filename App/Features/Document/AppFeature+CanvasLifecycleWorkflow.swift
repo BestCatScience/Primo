@@ -379,7 +379,20 @@ extension AppFeature {
         _ preparedReplacement: PreparedFreshDocumentReplacement,
         state: inout State
     ) -> Effect<Action> {
-        .merge(
+        let persistenceEffect: Effect<Action>
+        switch documentReplacementRequest(state: &state) {
+        case let .success(request):
+            persistenceEffect = .send(
+                .workspacePersistenceRequested(
+                    .prepareDocumentReplacement(request)
+                )
+            )
+        case let .failure(failure):
+            state.application.presentFeedback(failure.feedback)
+            persistenceEffect = .none
+        }
+
+        return .merge(
             freshDocumentActivationCoordinator.activate(
                 preparedReplacement,
                 state: &state,
@@ -392,7 +405,8 @@ extension AppFeature {
             ),
             documentPaperStyleSyncClient.synchronizeEffect(
                 resolvedPaperStyle(for: state)
-            )
+            ),
+            persistenceEffect
         )
     }
 
@@ -460,13 +474,29 @@ extension AppFeature {
             presentCanvasLifecycleFailure(.unsupportedCanvasSize, state: &state)
             return .none
         }
-        switch prepareForDocumentReplacement(state: &state) {
-        case .success:
-            break
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-            return .none
+        let prepareRequest: WorkspaceDocumentReplacementRequest?
+        if state.application.showsHome {
+            prepareRequest = nil
+        } else {
+            switch documentReplacementRequest(state: &state) {
+            case let .success(request):
+                prepareRequest = request
+            case let .failure(failure):
+                state.application.presentFeedback(failure.feedback)
+                return .none
+            }
         }
+        return documentReplacementPreparationEffect(
+            request: prepareRequest,
+            onPrepared: { .newCanvasPreparationCompleted(dimensions) },
+            onFailure: { .workspacePersistenceFailed($0) }
+        )
+    }
+
+    func handleNewCanvasPreparationCompleted(
+        state: inout State,
+        dimensions: CanvasDimensions
+    ) -> Effect<Action> {
         return completeFreshDocumentReplacement(
             state: &state,
             contract: FreshDocumentReplacementContract(
@@ -555,25 +585,41 @@ extension AppFeature {
             presentCanvasLifecycleFailure(error, state: &state)
             return .none
         }
-        switch prepareForDocumentReplacement(state: &state) {
-        case .success:
-            break
-        case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
-            return .none
+        let prepareRequest: WorkspaceDocumentReplacementRequest?
+        if state.application.showsHome {
+            prepareRequest = nil
+        } else {
+            switch documentReplacementRequest(state: &state) {
+            case let .success(request):
+                prepareRequest = request
+            case let .failure(failure):
+                state.application.presentFeedback(failure.feedback)
+                return .none
+            }
         }
+        return documentReplacementPreparationEffect(
+            request: prepareRequest,
+            onPrepared: { .newCanvasFromImagePreparationCompleted(importedPlan) },
+            onFailure: { .workspacePersistenceFailed($0) }
+        )
+    }
+
+    func handleNewCanvasFromImagePreparationCompleted(
+        state: inout State,
+        plan: ImportedCanvasPlan
+    ) -> Effect<Action> {
         return completeFreshDocumentReplacement(
             state: &state,
             contract: FreshDocumentReplacementContract(
-                canvasSize: importedPlan.request.dimensions.size,
-                tabTitle: importedPlan.layerName,
+                canvasSize: plan.request.dimensions.size,
+                tabTitle: plan.layerName,
                 successFeedback: .canvasCreatedFromImage,
                 mutationFailureFeedback: .couldNotCreateCanvasFromImage(nil)
             ),
             documentMutation: {
                 canvasLifecycleService.initializeImportedCanvas(
-                    importedPlan.request,
-                    layerName: importedPlan.layerName
+                    plan.request,
+                    layerName: plan.layerName
                 )
             }
         )

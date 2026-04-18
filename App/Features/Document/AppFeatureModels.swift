@@ -65,13 +65,13 @@ struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
 }
 
-enum PendingCloseOperation: Equatable {
+enum PendingCloseOperation: Equatable, Sendable {
     case tab(OpenDocumentTab.ID)
     case closeOtherTabs(OpenDocumentTab.ID)
     case closeTabsToRight(OpenDocumentTab.ID)
 }
 
-struct PendingCloseConfirmationState: Equatable {
+struct PendingCloseConfirmationState: Equatable, Sendable {
     let operation: PendingCloseOperation
     let tabIDs: [OpenDocumentTab.ID]
     let tabTitles: [String]

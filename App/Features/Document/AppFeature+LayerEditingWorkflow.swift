@@ -114,15 +114,22 @@ extension AppFeature {
                 return .undoUnavailableWhileDrawing
             case .noRedoState:
                 return .redoUnavailableWhileDrawing
-            case .invalidLayerIndex,
-                 .invalidFolderID,
-                 .layerLocked,
-                 .alphaLocked,
-                 .invalidOpacity,
-                 .emptyInput,
-                 .bridgeMutationFailed,
-                 .incompatibleLayerType:
-                return nil
+            case .invalidLayerIndex:
+                return .layerUnavailable
+            case .invalidFolderID:
+                return .folderUnavailable
+            case .layerLocked:
+                return .layerEditLocked
+            case .alphaLocked:
+                return .layerAlphaEditLocked
+            case .invalidOpacity:
+                return .documentMutationBridgeFailed(nil)
+            case .emptyInput:
+                return .emptyDocumentMutationInput
+            case let .bridgeMutationFailed(message):
+                return .documentMutationBridgeFailed(message)
+            case .incompatibleLayerType:
+                return .unsupportedLayerType
             }
         }
     }

@@ -45,20 +45,6 @@ extension AppFeature {
             }
             .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
         }
-
-        func synchronizePaperStyleEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
-            .run { [paintDocumentClient] _ in
-                paintDocumentClient.setPaperStyle(paperStyle)
-            }
-        }
-
-        func refreshPresentationEffect(paperStyle: CanvasPaperStyle) -> Effect<Action> {
-            .run { [paintDocumentClient] send in
-                paintDocumentClient.setPaperStyle(paperStyle)
-                await send(.presentationLoaded(paintDocumentClient.presentation()))
-            }
-            .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
-        }
     }
 
     var startupPresentationService: StartupPresentationService {
@@ -83,7 +69,7 @@ extension AppFeature {
         return .merge(
             startupPresentationService.bootstrapPresentationEffect(),
             startupLanguageLoadEffect(),
-            startupPresentationService.synchronizePaperStyleEffect(resolvedPaperStyle(for: state)),
+            documentPaperStyleSyncClient.synchronizeEffect(resolvedPaperStyle(for: state)),
             .send(.homeProjectsLoadRequested),
             .send(.autosaveRecoveryLoadRequested)
         )
@@ -132,18 +118,17 @@ extension AppFeature {
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {
         if state.workspace.activeTab != nil {
-            switch persistActiveProjectToWorkspace(
+            switch saveActiveDocumentRequest(
                 state: &state,
-                preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
+                preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL,
+                trigger: .autoSave,
+                purpose: .homeReturn
             ) {
-            case .success:
-                break
+            case let .success(request):
+                return .send(.workspacePersistenceRequested(request))
             case let .failure(failure):
                 state.application.presentFeedback(failure.feedback)
                 return .none
-            }
-            if let activeTab = state.workspace.activeTab {
-                persistSaveHistorySnapshot(for: activeTab, trigger: .autoSave)
             }
         }
         state.application.showHome()
@@ -157,12 +142,15 @@ extension AppFeature {
     func handleDocumentPaperStyleSyncRequested(
         paperStyle: CanvasPaperStyle
     ) -> Effect<Action> {
-        startupPresentationService.synchronizePaperStyleEffect(paperStyle)
+        documentPaperStyleSyncClient.synchronizeEffect(paperStyle)
     }
 
     func handleRefreshPresentationRequest(state: inout State) -> Effect<Action> {
-        startupPresentationService.refreshPresentationEffect(
-            paperStyle: resolvedPaperStyle(for: state)
+        .merge(
+            documentPaperStyleSyncClient.synchronizeEffect(
+                resolvedPaperStyle(for: state)
+            ),
+            startupPresentationService.deferredPresentationRefreshEffect()
         )
     }
 

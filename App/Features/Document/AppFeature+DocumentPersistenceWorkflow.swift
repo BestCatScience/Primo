@@ -41,6 +41,7 @@ extension AppFeature {
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
+            onPreparationFailure: { .saveHistoryRestoreFailed($0.feedback) },
             onFailure: {
                 .saveHistoryRestoreFailed(
                     .saveHistoryRestoreFailed(Self.optionalErrorMessage($0))
@@ -54,10 +55,10 @@ extension AppFeature {
         loaded: LoadedPaintProject,
         projectURL: DocumentProjectPath,
         openInNewTab: Bool
-    ) {
+    ) -> Effect<Action> {
         let restoredTitle = projectURL.displayName
         if openInNewTab || state.workspace.activeTab == nil {
-            applyLoadedWorkspaceProject(
+            return applyLoadedWorkspaceProject(
                 loaded,
                 using: LoadedWorkspaceProjectPlan(
                     destination: .newTab(
@@ -79,7 +80,7 @@ extension AppFeature {
         } else {
             let existingSourceURL = state.workspace.activeTab?.sourceProjectURL
             let existingTitle = state.workspace.activeTab?.title ?? restoredTitle
-            applyLoadedWorkspaceProject(
+            return applyLoadedWorkspaceProject(
                 loaded,
                 using: LoadedWorkspaceProjectPlan(
                     destination: .activeTab(
@@ -105,22 +106,18 @@ extension AppFeature {
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?
     ) -> Effect<Action> {
-        let savedURL: DocumentProjectPath
-        switch persistActiveProjectToWorkspace(
+        switch saveActiveDocumentRequest(
             state: &state,
-            preferredDestinationURL: preferredDestinationURL
+            preferredDestinationURL: preferredDestinationURL,
+            trigger: .manualSave,
+            purpose: .saveDocument
         ) {
-        case let .success(url):
-            savedURL = url
+        case let .success(request):
+            return .send(.workspacePersistenceRequested(request))
         case let .failure(failure):
             state.application.presentFeedback(failure.feedback)
             return .none
         }
-        state.application.presentFeedback(.savedDocument(savedURL.fileURL.lastPathComponent))
-        if let activeTab = state.workspace.activeTab {
-            persistSaveHistorySnapshot(for: activeTab, trigger: .manualSave)
-        }
-        return .send(.homeProjectsLoadRequested)
     }
 
     func handleSaveHistoryRestoreFailed(

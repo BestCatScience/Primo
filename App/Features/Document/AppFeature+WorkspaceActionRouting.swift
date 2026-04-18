@@ -56,9 +56,13 @@ extension AppFeature {
 
     func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
         guard let confirmation = state.workspace.consumeCloseConfirmation() else { return .none }
-        switch saveTabsForClose(confirmation.tabIDs, state: &state) {
-        case .success:
-            return performCloseOperation(confirmation.operation)
+        switch closeTabsPersistenceRequest(
+            operation: confirmation.operation,
+            tabIDs: confirmation.tabIDs,
+            state: &state
+        ) {
+        case let .success(request):
+            return .send(.workspacePersistenceRequested(request))
         case let .failure(failure):
             state.application.presentFeedback(
                 failure.feedback
@@ -129,8 +133,7 @@ extension AppFeature {
             return handleTabSelection(state: &state, tabID: tabID)
 
         case let .tabSelectionLoaded(tabID, loaded):
-            handleTabSelectionLoaded(state: &state, tabID: tabID, loaded: loaded)
-            return .none
+            return handleTabSelectionLoaded(state: &state, tabID: tabID, loaded: loaded)
 
         case let .tabSelectionFailed(feedback):
             handleTabSelectionFailed(state: &state, feedback: feedback)
@@ -204,12 +207,11 @@ extension AppFeature {
             )
 
         case let .openImportedDocumentLoaded(loaded, suggestedTitle):
-            handleOpenImportedDocumentLoaded(
+            return handleOpenImportedDocumentLoaded(
                 state: &state,
                 loaded: loaded,
                 suggestedTitle: suggestedTitle
             )
-            return .none
 
         case let .openDocumentSelected(url):
             return handleOpenDocumentSelection(
