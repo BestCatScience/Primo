@@ -519,21 +519,23 @@ extension AppFeature {
         )
     }
 
-    func prepareCanvasStrokeEditing(state: inout State) -> Bool {
-        switch canvasStrokeStateCoordinator.prepareEditing(
+    func applyCanvasStrokeFailure(
+        _ failure: DocumentMutationFailure,
+        state: inout State
+    ) {
+        documentMutationFeedbackCoordinator.apply(
+            documentMutationFeedbackMapper.feedback(for: failure),
+            to: &state
+        )
+    }
+
+    func prepareCanvasStrokeEditing(state: inout State) -> DocumentMutationResult {
+        canvasStrokeStateCoordinator.prepareEditing(
             state: &state,
             clearSelectionWithoutRefresh: { state in
                 clearCanvasSelectionWithoutRefresh(state: &state)
             }
-        ) {
-        case .success:
-            return true
-        case let .failure(failure):
-            if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
-                state.application.presentFeedback(feedback)
-            }
-            return false
-        }
+        )
     }
 
     func previewBrush(for brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
@@ -660,9 +662,7 @@ extension AppFeature {
                 )
             },
             applyFailureFeedback: { failure, state in
-                if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
-                    state.application.presentFeedback(feedback)
-                }
+                applyCanvasStrokeFailure(failure, state: &state)
             },
             cancelEffects: {
                 cancelStartupPresentationEffects()
@@ -793,17 +793,10 @@ extension AppFeature {
                 canvasStrokeContext(in: state)
             },
             prepareEditing: { state in
-                canvasStrokeStateCoordinator.prepareEditing(
-                    state: &state,
-                    clearSelectionWithoutRefresh: { state in
-                        clearCanvasSelectionWithoutRefresh(state: &state)
-                    }
-                )
+                prepareCanvasStrokeEditing(state: &state)
             },
             applyFailureFeedback: { failure, state in
-                if let feedback = documentMutationFeedbackMapper.feedback(for: failure) {
-                    state.application.presentFeedback(feedback)
-                }
+                applyCanvasStrokeFailure(failure, state: &state)
             },
             captureBaseSnapshot: { state in
                 captureActiveStrokeBaseSnapshotIfNeeded(state: &state)
@@ -860,7 +853,11 @@ extension AppFeature {
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard let first = samples.first else { return .none }
-        guard prepareCanvasStrokeEditing(state: &state) else {
+        switch prepareCanvasStrokeEditing(state: &state) {
+        case .success:
+            break
+        case let .failure(failure):
+            applyCanvasStrokeFailure(failure, state: &state)
             return .none
         }
         canvasStrokeWorkflowService.beginStroke(first, brush: resolvedBrushSettings(for: state))

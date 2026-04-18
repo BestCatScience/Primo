@@ -2,113 +2,177 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    struct WorkspaceTabCoordinator {
+    struct WorkspaceProjectLoadOperation: Equatable, Sendable {
+        let fileURL: URL
+        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
+        let removeWorkspaceItemOnSuccess: DocumentProjectPath?
+    }
+
+    struct WorkspaceImportedProjectLoadOperation: Equatable, Sendable {
+        let sourceURL: URL
+        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
+    }
+
+    enum WorkspaceProjectLoadRequest: Equatable, Sendable {
+        case project(WorkspaceProjectLoadOperation)
+        case imported(WorkspaceImportedProjectLoadOperation)
+    }
+
+    enum WorkspaceProjectLoadResult: Equatable, Sendable {
+        case project(LoadedPaintProject)
+        case imported(LoadedPaintProject, String)
+    }
+
+    struct WorkspaceProjectLoadFailure: Error, Equatable, Sendable {
+        let request: WorkspaceProjectLoadRequest
+        let feedback: ApplicationFeedback
+        let errorMessage: String?
+    }
+
+    struct WorkspaceProjectLoadUseCase: Sendable {
         let paintDocumentClient: PaintDocumentClient
         let documentImportClient: DocumentImportClient
-        let workspaceCatalogService: WorkspaceCatalogService
         let workspaceBackingStoreService: WorkspaceBackingStoreService
         let workspacePersistenceUseCase: WorkspacePersistenceUseCase
 
-        func loadProjectEffect(
-            from fileURL: URL,
-            prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest? = nil,
-            onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
-            onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
-            onFailure: @escaping @Sendable (Error) -> Action,
-            removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil
-        ) -> Effect<Action> {
-            .run { [paintDocumentClient, workspaceBackingStoreService, workspacePersistenceUseCase] send in
-                if let prepareDocumentReplacementRequest {
-                    let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(
-                        prepareDocumentReplacementRequest
-                    )
-                    switch workspacePersistenceUseCase.execute(persistenceRequest) {
-                    case .success:
-                        break
-                    case let .failure(failure):
-                        await send(onPreparationFailure(failure))
-                        return
-                    }
-                }
-                do {
-                    let loaded = try paintDocumentClient.loadProject(fileURL)
-                    if let workspaceItemToRemove = removeWorkspaceItemOnSuccess {
-                        do {
-                            try workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
-                        } catch {
-                            // Best-effort cleanup of a staged workspace item after a successful load.
-                        }
-                    }
-                    await send(onSuccess(loaded))
-                } catch {
-                    await send(onFailure(error))
-                }
+        func execute(
+            _ request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch request {
+            case let .project(operation):
+                return loadProject(operation, request: request)
+            case let .imported(operation):
+                return loadImportedProject(operation, request: request)
             }
         }
 
-        func loadImportedProjectEffect(
-            from sourceURL: URL,
-            prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest? = nil,
-            onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
-            onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
-            onFailure: @escaping @Sendable (Error) -> Action
-        ) -> Effect<Action> {
-            .run { [documentImportClient, paintDocumentClient, workspacePersistenceUseCase] send in
-                if let prepareDocumentReplacementRequest {
-                    let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(
-                        prepareDocumentReplacementRequest
-                    )
-                    switch workspacePersistenceUseCase.execute(persistenceRequest) {
-                    case .success:
-                        break
-                    case let .failure(failure):
-                        await send(onPreparationFailure(failure))
-                        return
-                    }
-                }
-                let stagedResult = documentImportClient.stageImportedDocument(
-                    ImportedDocumentStageRequest(sourceURL: sourceURL)
-                )
-                switch stagedResult {
-                case let .failure(error):
-                    await send(onFailure(error))
+        private func loadProject(
+            _ operation: WorkspaceProjectLoadOperation,
+            request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch prepareDocumentReplacementIfNeeded(
+                operation.prepareDocumentReplacementRequest,
+                request: request
+            ) {
+            case let .failure(failure):
+                return .failure(failure)
+            case .success:
+                break
+            }
 
-                case let .success(staged):
+            do {
+                let loaded = try paintDocumentClient.loadProject(operation.fileURL)
+                if let workspaceItemToRemove = operation.removeWorkspaceItemOnSuccess {
                     do {
-                        let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
-                        _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
-                        await send(onSuccess(loaded, staged.suggestedTitle))
+                        // Best-effort cleanup of a staged workspace item after a successful load.
+                        try workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
                     } catch {
-                        _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
-                        await send(onFailure(error))
                     }
                 }
+                return .success(.project(loaded))
+            } catch {
+                return .failure(
+                    WorkspaceProjectLoadFailure(
+                        request: request,
+                        feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
+                        errorMessage: AppFeature.optionalErrorMessage(error)
+                    )
+                )
             }
         }
 
-        func loadAutosaveRecoveryEffect() -> Effect<Action> {
-            .run { [workspaceCatalogService] send in
+        private func loadImportedProject(
+            _ operation: WorkspaceImportedProjectLoadOperation,
+            request: WorkspaceProjectLoadRequest
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            switch prepareDocumentReplacementIfNeeded(
+                operation.prepareDocumentReplacementRequest,
+                request: request
+            ) {
+            case let .failure(failure):
+                return .failure(failure)
+            case .success:
+                break
+            }
+
+            switch documentImportClient.stageImportedDocument(
+                ImportedDocumentStageRequest(sourceURL: operation.sourceURL)
+            ) {
+            case let .failure(error):
+                return .failure(
+                    WorkspaceProjectLoadFailure(
+                        request: request,
+                        feedback: .openFailed(error.errorDescription),
+                        errorMessage: error.errorDescription
+                    )
+                )
+
+            case let .success(staged):
+                defer {
+                    // Best-effort cleanup of a staged imported project after load completes.
+                    _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
+                }
                 do {
-                    await send(.autosaveRecoveryLoaded(try workspaceCatalogService.loadAutosaveRecoveryItems()))
+                    let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
+                    return .success(.imported(loaded, staged.suggestedTitle))
                 } catch {
-                    await send(
-                        .autosaveRecoveryLoadFailed(
-                            .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                    return .failure(
+                        WorkspaceProjectLoadFailure(
+                            request: request,
+                            feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
+                            errorMessage: AppFeature.optionalErrorMessage(error)
                         )
                     )
                 }
             }
         }
+
+        private func prepareDocumentReplacementIfNeeded(
+            _ prepareRequest: WorkspaceDocumentReplacementRequest?,
+            request: WorkspaceProjectLoadRequest
+        ) -> Result<Void, WorkspaceProjectLoadFailure> {
+            guard let prepareRequest else {
+                return .success(())
+            }
+            let persistenceRequest = WorkspacePersistenceRequest.prepareDocumentReplacement(
+                prepareRequest
+            )
+            switch workspacePersistenceUseCase.execute(persistenceRequest) {
+            case .success:
+                return .success(())
+            case let .failure(failure):
+                return .failure(
+                    WorkspaceProjectLoadFailure(
+                        request: request,
+                        feedback: failure.feedback,
+                        errorMessage: nil
+                    )
+                )
+            }
+        }
     }
 
-    var workspaceTabCoordinator: WorkspaceTabCoordinator {
-        WorkspaceTabCoordinator(
+    var workspaceProjectLoadUseCase: WorkspaceProjectLoadUseCase {
+        WorkspaceProjectLoadUseCase(
             paintDocumentClient: paintDocumentClient,
             documentImportClient: documentImportClient,
-            workspaceCatalogService: workspaceCatalogService,
             workspaceBackingStoreService: workspaceBackingStoreService,
             workspacePersistenceUseCase: workspacePersistenceUseCase
         )
+    }
+
+    func loadAutosaveRecoveryEffect() -> Effect<Action> {
+        .run { [workspaceCatalogService] send in
+            do {
+                await send(.autosaveRecoveryLoaded(try workspaceCatalogService.loadAutosaveRecoveryItems()))
+            } catch {
+                await send(
+                    .autosaveRecoveryLoadFailed(
+                        .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                    )
+                )
+            }
+        }
     }
 
     func beginWorkspaceProjectLoad(
@@ -117,8 +181,7 @@ extension AppFeature {
         persistCurrentTab: Bool = true,
         removeWorkspaceItemOnSuccess: DocumentProjectPath? = nil,
         onSuccess: @escaping @Sendable (LoadedPaintProject) -> Action,
-        onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
-        onFailure: @escaping @Sendable (Error) -> Action
+        onFailure: @escaping @Sendable (WorkspaceProjectLoadFailure) -> Action
     ) -> Effect<Action> {
         let prepareRequest: WorkspaceDocumentReplacementRequest?
         if persistCurrentTab && !state.application.showsHome {
@@ -133,14 +196,23 @@ extension AppFeature {
             prepareRequest = nil
         }
         state.application.beginHydration()
-        return workspaceTabCoordinator.loadProjectEffect(
-            from: fileURL,
-            prepareDocumentReplacementRequest: prepareRequest,
-            onSuccess: onSuccess,
-            onPreparationFailure: onPreparationFailure,
-            onFailure: onFailure,
-            removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
+        let request = WorkspaceProjectLoadRequest.project(
+            WorkspaceProjectLoadOperation(
+                fileURL: fileURL,
+                prepareDocumentReplacementRequest: prepareRequest,
+                removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
+            )
         )
+        return .run { [workspaceProjectLoadUseCase] send in
+            switch workspaceProjectLoadUseCase.execute(request) {
+            case let .success(.project(loaded)):
+                await send(onSuccess(loaded))
+            case .success(.imported):
+                return
+            case let .failure(failure):
+                await send(onFailure(failure))
+            }
+        }
     }
 
     func beginImportedWorkspaceProjectLoad(
@@ -148,8 +220,7 @@ extension AppFeature {
         sourceURL: URL,
         persistCurrentTab: Bool = true,
         onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
-        onPreparationFailure: @escaping @Sendable (WorkspacePersistenceFailure) -> Action,
-        onFailure: @escaping @Sendable (Error) -> Action
+        onFailure: @escaping @Sendable (WorkspaceProjectLoadFailure) -> Action
     ) -> Effect<Action> {
         let prepareRequest: WorkspaceDocumentReplacementRequest?
         if persistCurrentTab && !state.application.showsHome {
@@ -164,12 +235,21 @@ extension AppFeature {
             prepareRequest = nil
         }
         state.application.beginHydration()
-        return workspaceTabCoordinator.loadImportedProjectEffect(
-            from: sourceURL,
-            prepareDocumentReplacementRequest: prepareRequest,
-            onSuccess: onSuccess,
-            onPreparationFailure: onPreparationFailure,
-            onFailure: onFailure
+        let request = WorkspaceProjectLoadRequest.imported(
+            WorkspaceImportedProjectLoadOperation(
+                sourceURL: sourceURL,
+                prepareDocumentReplacementRequest: prepareRequest
+            )
         )
+        return .run { [workspaceProjectLoadUseCase] send in
+            switch workspaceProjectLoadUseCase.execute(request) {
+            case let .success(.imported(loaded, suggestedTitle)):
+                await send(onSuccess(loaded, suggestedTitle))
+            case .success(.project):
+                return
+            case let .failure(failure):
+                await send(onFailure(failure))
+            }
+        }
     }
 }

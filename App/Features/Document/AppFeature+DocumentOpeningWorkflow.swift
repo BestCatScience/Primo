@@ -10,12 +10,7 @@ extension AppFeature {
             state: &state,
             sourceURL: sourceURL,
             onSuccess: { .openImportedDocumentLoaded($0, $1) },
-            onPreparationFailure: { .openDocumentFailed($0.feedback) },
-            onFailure: {
-                .openDocumentFailed(
-                    .openFailed(Self.optionalErrorMessage($0))
-                )
-            }
+            onFailure: { .openDocumentFailed($0.feedback) }
         )
     }
 
@@ -80,12 +75,7 @@ extension AppFeature {
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
             onSuccess: { .openDocumentLoaded($0, url) },
-            onPreparationFailure: { .openDocumentFailed($0.feedback) },
-            onFailure: {
-                .openDocumentFailed(
-                    .openFailed(Self.optionalErrorMessage($0))
-                )
-            }
+            onFailure: { .openDocumentFailed($0.feedback) }
         )
     }
 

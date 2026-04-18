@@ -41,12 +41,7 @@ extension AppFeature {
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
-            onPreparationFailure: { .saveHistoryRestoreFailed($0.feedback) },
-            onFailure: {
-                .saveHistoryRestoreFailed(
-                    .saveHistoryRestoreFailed(Self.optionalErrorMessage($0))
-                )
-            }
+            onFailure: { .saveHistoryRestoreFailed(.saveHistoryRestoreFailed($0.errorMessage)) }
         )
     }
 

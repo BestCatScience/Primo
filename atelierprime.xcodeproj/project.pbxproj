@@ -143,6 +143,14 @@
 		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
 		F10000000000000000000007 /* DocumentImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* DocumentImportClient.swift */; };
 		F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000A /* BrushStrokeKernel.swift */; };
+		AA1000000000000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000002 /* XCTest.framework */; };
+		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
+		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
+		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
+		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
+		AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */; };
+		AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */; };
+		AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000008 /* AppFeatureReducerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -286,7 +294,25 @@
 		F10000000000000000000006 /* BrushImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushImportClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000008 /* DocumentImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImportClient.swift; sourceTree = "<group>"; };
 		F1000000000000000000000A /* BrushStrokeKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushStrokeKernel.swift; sourceTree = "<group>"; };
+		AA2000000000000000000001 /* PrimoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrimoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA2000000000000000000002 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
+		AA2000000000000000000003 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePersistenceUseCaseTests.swift; sourceTree = "<group>"; };
+		AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceProjectLoadUseCaseTests.swift; sourceTree = "<group>"; };
+		AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasStrokeWorkflowTests.swift; sourceTree = "<group>"; };
+		AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentMutationFeedbackMapperTests.swift; sourceTree = "<group>"; };
+		AA2000000000000000000008 /* AppFeatureReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureReducerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		AA5000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A00000000000000000000070 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00000000000000000000060;
+			remoteInfo = Primo;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A00000000000000000000040 /* Frameworks */ = {
@@ -303,6 +329,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA4000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
+				AA1000000000000000000001 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -312,6 +347,7 @@
 				A00000000000000000000051 /* App */,
 				A00000000000000000000052 /* Bridge */,
 				A00000000000000000000053 /* Engine */,
+				AA3000000000000000000001 /* PrimoTests */,
 				A00000000000000000000054 /* Frameworks */,
 				A00000000000000000000055 /* Products */,
 			);
@@ -351,6 +387,7 @@
 		A00000000000000000000054 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				AA2000000000000000000002 /* XCTest.framework */,
 				A00000000000000000000038 /* MetalKit.framework */,
 				A00000000000000000000036 /* Metal.framework */,
 				A00000000000000000000034 /* AVFoundation.framework */,
@@ -365,8 +402,22 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000030 /* Primo.app */,
+				AA2000000000000000000001 /* PrimoTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA3000000000000000000001 /* PrimoTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA2000000000000000000003 /* TestSupport.swift */,
+				AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */,
+				AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */,
+				AA2000000000000000000006 /* CanvasStrokeWorkflowTests.swift */,
+				AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */,
+				AA2000000000000000000008 /* AppFeatureReducerTests.swift */,
+			);
+			path = PrimoTests;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000056 /* include */ = {
@@ -595,6 +646,26 @@
 			productReference = A00000000000000000000030 /* Primo.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA6000000000000000000001 /* PrimoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA8000000000000000000004 /* Build configuration list for PBXNativeTarget "PrimoTests" */;
+			buildPhases = (
+				AA4000000000000000000002 /* Sources */,
+				AA4000000000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA7000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = PrimoTests;
+			packageProductDependencies = (
+				A00000000000000000000093 /* ComposableArchitecture */,
+			);
+			productName = PrimoTests;
+			productReference = AA2000000000000000000001 /* PrimoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -607,6 +678,10 @@
 				TargetAttributes = {
 					A00000000000000000000060 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					AA6000000000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A00000000000000000000060;
 					};
 				};
 			};
@@ -627,6 +702,7 @@
 			projectRoot = "";
 			targets = (
 				A00000000000000000000060 /* Primo */,
+				AA6000000000000000000001 /* PrimoTests */,
 			);
 		};
 /* End PBXProject section */
@@ -778,7 +854,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA4000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */,
+				AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */,
+				AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */,
+				AA1000000000000000000003 /* TestSupport.swift in Sources */,
+				AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */,
+				AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA7000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00000000000000000000060 /* Primo */;
+			targetProxy = AA5000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A00000000000000000000080 /* Debug */ = {
@@ -955,6 +1052,63 @@
 			};
 			name = Release;
 		};
+		AA8000000000000000000002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 2RZR3M2YPU;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.bestcatscience.primo.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.10;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Primo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Primo";
+			};
+			name = Debug;
+		};
+		AA8000000000000000000003 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 2RZR3M2YPU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.bestcatscience.primo.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.10;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Primo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Primo";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -972,6 +1126,15 @@
 			buildConfigurations = (
 				A00000000000000000000082 /* Debug */,
 				A00000000000000000000083 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA8000000000000000000004 /* Build configuration list for PBXNativeTarget "PrimoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA8000000000000000000002 /* Debug */,
+				AA8000000000000000000003 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

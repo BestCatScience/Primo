@@ -65,6 +65,7 @@ extension AppFeature {
         case folderUnavailable
         case layerEditLocked
         case layerAlphaEditLocked
+        case invalidLayerOpacity
         case emptyDocumentMutationInput
         case documentMutationBridgeFailed(String?)
         case unsupportedLayerType
@@ -147,6 +148,10 @@ extension AppFeature.ApplicationFeedback {
             return language == .japanese
                 ? "アルファロックされているため編集できません"
                 : "The layer is alpha locked and cannot be edited"
+        case .invalidLayerOpacity:
+            return language == .japanese
+                ? "レイヤーの不透明度が不正です"
+                : "The layer opacity is invalid"
         case .emptyDocumentMutationInput:
             return language == .japanese
                 ? "空の入力ではこの操作を実行できません"

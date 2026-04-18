@@ -123,7 +123,7 @@ extension AppFeature {
             case .alphaLocked:
                 return .layerAlphaEditLocked
             case .invalidOpacity:
-                return .documentMutationBridgeFailed(nil)
+                return .invalidLayerOpacity
             case .emptyInput:
                 return .emptyDocumentMutationInput
             case let .bridgeMutationFailed(message):

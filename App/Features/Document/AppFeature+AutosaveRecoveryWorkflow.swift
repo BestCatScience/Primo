@@ -3,7 +3,7 @@ import Foundation
 
 extension AppFeature {
     func handleAutosaveRecoveryLoadRequest() -> Effect<Action> {
-        workspaceTabCoordinator.loadAutosaveRecoveryEffect()
+        loadAutosaveRecoveryEffect()
     }
 
     func handleAutosaveRecoveryRestoreRequest(
@@ -17,12 +17,7 @@ extension AppFeature {
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
             onSuccess: { .autosaveRecoveryOpened($0, item) },
-            onPreparationFailure: { .autosaveRecoveryRestoreFailed($0.feedback) },
-            onFailure: {
-                .autosaveRecoveryRestoreFailed(
-                    .autosaveRestoreFailed(Self.optionalErrorMessage($0))
-                )
-            }
+            onFailure: { .autosaveRecoveryRestoreFailed(.autosaveRestoreFailed($0.errorMessage)) }
         )
     }
 
