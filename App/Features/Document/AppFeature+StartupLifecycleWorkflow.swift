@@ -100,10 +100,10 @@ extension AppFeature {
 
     func handleHomeProjectsLoadFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.application.finishLoadingHomeProjects([])
-        state.application.presentFeedback(feedback)
+        state.application.presentBanner(message)
     }
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {

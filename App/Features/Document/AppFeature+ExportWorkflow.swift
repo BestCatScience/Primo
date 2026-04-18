@@ -37,9 +37,7 @@ extension AppFeature {
                 } catch {
                     await send(
                         .timelapseExportFailed(
-                            .timelapseExportFailed(
-                                AppFeature.optionalErrorMessage(error)
-                            )
+                            AppFeature.optionalErrorMessage(error)
                         )
                     )
                 }
@@ -105,10 +103,12 @@ extension AppFeature {
 
     func handleTimelapseExportFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.export.failTimelapseExport()
-        state.application.presentFeedback(feedback)
+        state.application.presentBanner(
+            message ?? ApplicationFeedback.timelapseExportFailed(nil).message(for: state.application.appLanguage)
+        )
     }
 
     func handleExportSheetDismissed(state: inout State) {

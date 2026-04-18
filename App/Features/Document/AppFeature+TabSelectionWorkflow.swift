@@ -12,12 +12,20 @@ extension AppFeature {
         if state.workspace.isActiveTab(tabID), !state.application.showsHome {
             return .none
         }
+        let language = state.application.appLanguage
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
             onSuccess: { loaded, _ in .tabSelectionLoaded(tabID, loaded) },
-            onFailure: { .tabSelectionFailed(workspaceFeedbackMapper.feedback(for: $0, context: .openDocument)) }
+            onFailure: {
+                .tabSelectionFailed(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
+                        language: language
+                    )
+                )
+            }
         )
     }
 
@@ -41,10 +49,10 @@ extension AppFeature {
 
     func handleTabSelectionFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.application.failHydration(
-            message: feedback.message(for: state.application.appLanguage),
+            message: message,
             showingHome: state.workspace.activeTab == nil ? true : nil
         )
     }

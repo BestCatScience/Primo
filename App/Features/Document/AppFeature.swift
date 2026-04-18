@@ -87,19 +87,19 @@ struct AppFeature {
         case loadPresentationAfterLaunch
         case homeProjectsLoadRequested
         case homeProjectsLoaded([SavedProjectSummary])
-        case homeProjectsLoadFailed(ApplicationFeedback)
+        case homeProjectsLoadFailed(String?)
         case autosaveRecoveryLoadRequested
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
-        case autosaveRecoveryLoadFailed(ApplicationFeedback)
+        case autosaveRecoveryLoadFailed(String?)
         case autosaveRecoveryRestoreRequested(WorkspaceItemID)
         case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem, [WorkspaceProjectLoadIssue])
-        case autosaveRecoveryRestoreFailed(ApplicationFeedback)
+        case autosaveRecoveryRestoreFailed(String?)
         case autosaveRecoveryDiscardRequested(WorkspaceItemID)
         case autosaveRecoveryDismissed
         case homeSectionSelected(HomeSidebarSection)
         case tabSelected(OpenDocumentTab.ID)
         case tabSelectionLoaded(OpenDocumentTab.ID, LoadedPaintProject)
-        case tabSelectionFailed(ApplicationFeedback)
+        case tabSelectionFailed(String?)
         case tabCloseRequested(OpenDocumentTab.ID)
         case tabClosed(OpenDocumentTab.ID)
         case closeOtherTabsRequested(OpenDocumentTab.ID)
@@ -126,11 +126,11 @@ struct AppFeature {
         case redoRequested
         case saveHistoryRequested
         case saveHistoryLoaded([SaveHistoryEntry])
-        case saveHistoryLoadFailed(ApplicationFeedback)
+        case saveHistoryLoadFailed(String?)
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
         case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool, [WorkspaceProjectLoadIssue])
-        case saveHistoryRestoreFailed(ApplicationFeedback)
+        case saveHistoryRestoreFailed(String?)
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
         case saveDocumentRequested
@@ -141,12 +141,12 @@ struct AppFeature {
         case openImportedDocumentLoaded(LoadedPaintProject, String, [WorkspaceProjectLoadIssue])
         case openDocumentSelected(DocumentProjectPath)
         case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath, [WorkspaceProjectLoadIssue])
-        case openDocumentFailed(ApplicationFeedback)
+        case openDocumentFailed(String?)
         case photoImportReceived(name: String?, data: Data)
-        case photoImportFailed(ApplicationFeedback)
+        case photoImportFailed(String?)
         case timelapseExportProgressUpdated(TimelapseExportProgress)
         case timelapseExportSucceeded(TimelapseExportResult)
-        case timelapseExportFailed(ApplicationFeedback)
+        case timelapseExportFailed(String?)
         case exportSheetDismissed
         case bannerDismissed
         case languageChanged(AppLanguage)
@@ -156,7 +156,7 @@ struct AppFeature {
         case resizeCanvasExtentRequested(width: Int, height: Int)
         case newCanvasFromImageReceived(name: String?, data: Data)
         case newCanvasFromImagePreparationCompleted(ImportedCanvasPlan)
-        case newCanvasFromImageFailed(ApplicationFeedback)
+        case newCanvasFromImageFailed(String?)
         case clearActiveLayerButtonTapped
         case createLayerMaskFromSelectionRequested
         case clearLayerMaskRequested

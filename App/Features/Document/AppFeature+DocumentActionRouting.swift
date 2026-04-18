@@ -25,8 +25,8 @@ extension AppFeature {
         case let .newCanvasFromImagePreparationCompleted(plan):
             return handleNewCanvasFromImagePreparationCompleted(state: &state, plan: plan)
 
-        case let .newCanvasFromImageFailed(feedback):
-            handleNewCanvasFromImageFailed(state: &state, feedback: feedback)
+        case let .newCanvasFromImageFailed(message):
+            handleNewCanvasFromImageFailed(state: &state, message: message)
             return .none
 
         case .undoRequested:
@@ -42,8 +42,8 @@ extension AppFeature {
             state.saveHistory.present(entries: entries)
             return .none
 
-        case let .saveHistoryLoadFailed(feedback):
-            handleSaveHistoryLoadFailed(state: &state, feedback: feedback)
+        case let .saveHistoryLoadFailed(message):
+            handleSaveHistoryLoadFailed(state: &state, message: message)
             return .none
 
         case .saveHistoryDismissed:
@@ -66,8 +66,8 @@ extension AppFeature {
                 issues: issues
             )
 
-        case let .saveHistoryRestoreFailed(feedback):
-            handleSaveHistoryRestoreFailed(state: &state, feedback: feedback)
+        case let .saveHistoryRestoreFailed(message):
+            handleSaveHistoryRestoreFailed(state: &state, message: message)
             return .none
 
         case .exportDocumentRequested:
@@ -113,15 +113,15 @@ extension AppFeature {
             handleTimelapseExportSucceeded(state: &state, result: result)
             return .none
 
-        case let .timelapseExportFailed(feedback):
-            handleTimelapseExportFailed(state: &state, feedback: feedback)
+        case let .timelapseExportFailed(message):
+            handleTimelapseExportFailed(state: &state, message: message)
             return .none
 
         case let .photoImportReceived(name, data):
             return handlePhotoImport(state: &state, name: name, data: data)
 
-        case let .photoImportFailed(feedback):
-            handlePhotoImportFailed(state: &state, feedback: feedback)
+        case let .photoImportFailed(message):
+            handlePhotoImportFailed(state: &state, message: message)
             return .none
 
         default:

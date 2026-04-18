@@ -4,24 +4,24 @@ import Foundation
 extension AppFeature {
     func handleNewCanvasFromImageFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
-        state.application.presentFeedback(feedback)
+        state.application.presentBanner(message)
     }
 
     func handleOpenDocumentFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.application.failHydration(
-            message: feedback.message(for: state.application.appLanguage)
+            message: message
         )
     }
 
     func handlePhotoImportFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
-        state.application.presentFeedback(feedback)
+        state.application.presentBanner(message)
     }
 }

@@ -6,11 +6,19 @@ extension AppFeature {
         state: inout State,
         sourceURL: URL
     ) -> Effect<Action> {
-        beginImportedWorkspaceProjectLoad(
+        let language = state.application.appLanguage
+        return beginImportedWorkspaceProjectLoad(
             state: &state,
             sourceURL: sourceURL,
             onSuccess: { .openImportedDocumentLoaded($0, $1, $2) },
-            onFailure: { .openDocumentFailed(workspaceFeedbackMapper.feedback(for: $0, context: .importDocument)) }
+            onFailure: {
+                .openDocumentFailed(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: $0, context: .importDocument),
+                        language: language
+                    )
+                )
+            }
         )
     }
 
@@ -68,12 +76,20 @@ extension AppFeature {
             state.application.completeWorkspaceProjectLoad()
             return .send(.tabSelected(existingTabID))
         }
+        let language = state.application.appLanguage
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
             onSuccess: { .openDocumentLoaded($0, url, $1) },
-            onFailure: { .openDocumentFailed(workspaceFeedbackMapper.feedback(for: $0, context: .openDocument)) }
+            onFailure: {
+                .openDocumentFailed(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
+                        language: language
+                    )
+                )
+            }
         )
     }
 

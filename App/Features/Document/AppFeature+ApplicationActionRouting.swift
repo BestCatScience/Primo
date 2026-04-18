@@ -90,8 +90,8 @@ extension AppFeature {
             handleHomeProjectsLoaded(state: &state, projects: projects)
             return .none
 
-        case let .homeProjectsLoadFailed(feedback):
-            handleHomeProjectsLoadFailed(state: &state, feedback: feedback)
+        case let .homeProjectsLoadFailed(message):
+            handleHomeProjectsLoadFailed(state: &state, message: message)
             return .none
 
         case .autosaveRecoveryLoadRequested:
@@ -101,8 +101,8 @@ extension AppFeature {
             handleAutosaveRecoveryLoaded(state: &state, items: items)
             return .none
 
-        case let .autosaveRecoveryLoadFailed(feedback):
-            handleAutosaveRecoveryRestoreFailed(state: &state, feedback: feedback)
+        case let .autosaveRecoveryLoadFailed(message):
+            handleAutosaveRecoveryRestoreFailed(state: &state, message: message)
             return .none
 
         case let .autosaveRecoveryRestoreRequested(autosaveID):
@@ -111,8 +111,8 @@ extension AppFeature {
         case let .autosaveRecoveryOpened(loaded, item, issues):
             return handleAutosaveRecoveryOpened(state: &state, loaded: loaded, item: item, issues: issues)
 
-        case let .autosaveRecoveryRestoreFailed(feedback):
-            handleAutosaveRecoveryRestoreFailed(state: &state, feedback: feedback)
+        case let .autosaveRecoveryRestoreFailed(message):
+            handleAutosaveRecoveryRestoreFailed(state: &state, message: message)
             return .none
 
         case let .autosaveRecoveryDiscardRequested(autosaveID):

@@ -21,11 +21,19 @@ extension AppFeature {
         projectURL: DocumentProjectPath,
         openInNewTab: Bool
     ) -> Effect<Action> {
+        let language = state.application.appLanguage
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab, $1) },
-            onFailure: { .saveHistoryRestoreFailed(workspaceFeedbackMapper.feedback(for: $0, context: .saveHistoryRestore)) }
+            onFailure: {
+                .saveHistoryRestoreFailed(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: $0, context: .saveHistoryRestore),
+                        language: language
+                    )
+                )
+            }
         )
     }
 
@@ -115,18 +123,18 @@ extension AppFeature {
 
     func handleSaveHistoryRestoreFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.application.failHydration(
-            message: feedback.message(for: state.application.appLanguage)
+            message: message
         )
     }
 
     func handleSaveHistoryLoadFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.saveHistory.dismiss()
-        state.application.presentFeedback(feedback)
+        state.application.presentBanner(message)
     }
 }

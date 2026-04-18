@@ -138,8 +138,8 @@ extension AppFeature {
         case let .tabSelectionLoaded(tabID, loaded):
             return handleTabSelectionLoaded(state: &state, tabID: tabID, loaded: loaded)
 
-        case let .tabSelectionFailed(feedback):
-            handleTabSelectionFailed(state: &state, feedback: feedback)
+        case let .tabSelectionFailed(message):
+            handleTabSelectionFailed(state: &state, message: message)
             return .none
 
         case let .tabCloseRequested(tabID):
@@ -239,8 +239,8 @@ extension AppFeature {
                 issues: issues
             )
 
-        case let .openDocumentFailed(feedback):
-            handleOpenDocumentFailed(state: &state, feedback: feedback)
+        case let .openDocumentFailed(message):
+            handleOpenDocumentFailed(state: &state, message: message)
             return .none
 
         default:

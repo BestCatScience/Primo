@@ -13,11 +13,19 @@ extension AppFeature {
         guard let item = state.recovery.item(id: autosaveID) else {
             return .none
         }
+        let language = state.application.appLanguage
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
             onSuccess: { .autosaveRecoveryOpened($0, item, $1) },
-            onFailure: { .autosaveRecoveryRestoreFailed(workspaceFeedbackMapper.feedback(for: $0, context: .autosaveRestore)) }
+            onFailure: {
+                .autosaveRecoveryRestoreFailed(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: $0, context: .autosaveRestore),
+                        language: language
+                    )
+                )
+            }
         )
     }
 
@@ -70,10 +78,10 @@ extension AppFeature {
 
     func handleAutosaveRecoveryRestoreFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        message: String?
     ) {
         state.application.failHydration(
-            message: feedback.message(for: state.application.appLanguage)
+            message: message
         )
     }
 }

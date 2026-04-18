@@ -413,16 +413,25 @@ struct ContentView: View {
     @MainActor
     private func importPhotoLayer(from item: PhotosPickerItem) async {
         defer { selectedPhotoLayerItem = nil }
+        let language = store.application.appLanguage
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                store.send(.photoImportFailed(.couldNotImportPhoto(nil)))
+                store.send(
+                    .photoImportFailed(
+                        AppFeature.ApplicationFeedback
+                            .couldNotImportPhoto(nil)
+                            .message(for: language)
+                    )
+                )
                 return
             }
             store.send(.photoImportReceived(name: nil, data: data))
         } catch {
             store.send(
                 .photoImportFailed(
-                    .couldNotImportPhoto(AppFeature.optionalErrorMessage(error))
+                    AppFeature.ApplicationFeedback
+                        .couldNotImportPhoto(AppFeature.optionalErrorMessage(error))
+                        .message(for: language)
                 )
             )
         }
@@ -431,9 +440,16 @@ struct ContentView: View {
     @MainActor
     private func createCanvasFromPhoto(from item: PhotosPickerItem) async {
         defer { selectedNewCanvasPhotoItem = nil }
+        let language = store.application.appLanguage
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                store.send(.newCanvasFromImageFailed(.couldNotCreateCanvasFromImage(nil)))
+                store.send(
+                    .newCanvasFromImageFailed(
+                        AppFeature.ApplicationFeedback
+                            .couldNotCreateCanvasFromImage(nil)
+                            .message(for: language)
+                    )
+                )
                 return
             }
             store.send(.newCanvasFromImageReceived(name: nil, data: data))
@@ -441,7 +457,9 @@ struct ContentView: View {
         } catch {
             store.send(
                 .newCanvasFromImageFailed(
-                    .couldNotCreateCanvasFromImage(AppFeature.optionalErrorMessage(error))
+                    AppFeature.ApplicationFeedback
+                        .couldNotCreateCanvasFromImage(AppFeature.optionalErrorMessage(error))
+                        .message(for: language)
                 )
             )
         }
