@@ -103,7 +103,8 @@ final class AppFeatureReducerTests: XCTestCase {
                 AppFeature.LoadedWorkspaceFollowUpPersistenceResult(
                     successEffects: .init(
                         feedback: .restoredAutosave
-                    )
+                    ),
+                    issues: []
                 )
             )
         )
@@ -333,7 +334,7 @@ final class AppFeatureReducerTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.openDocumentLoaded(loaded, sourceURL)) {
+        await store.send(.openDocumentLoaded(loaded, sourceURL, [])) {
             $0.workspace.pendingWorkspaceTabReservation = .loadedProject(
                 AppFeature.PendingLoadedWorkspaceProject(
                     loaded: loaded,
@@ -361,5 +362,26 @@ final class AppFeatureReducerTests: XCTestCase {
                 )
             )
         )
+    }
+
+    func testLoadedWorkspaceFollowUpIssuesOverrideSuccessBanner() {
+        let feature = AppFeature()
+        var state = AppFeature.State()
+        state.application.beginHydration()
+
+        _ = feature.handleWorkspacePersistenceSucceeded(
+            state: &state,
+            result: .loadedWorkspaceFollowUpApplied(
+                AppFeature.LoadedWorkspaceFollowUpPersistenceResult(
+                    successEffects: .init(
+                        feedback: .restoredAutosave
+                    ),
+                    issues: [.autosaveEntryDiscardFailed("discard failed")]
+                )
+            )
+        )
+
+        XCTAssertFalse(state.application.isHydrating)
+        XCTAssertEqual(state.application.bannerMessage, "discard failed")
     }
 }

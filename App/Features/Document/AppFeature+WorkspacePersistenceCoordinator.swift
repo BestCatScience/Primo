@@ -2,6 +2,42 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    enum WorkspacePersistenceIssue: Error, Equatable, Sendable {
+        case autosaveCleanupFailed(String?)
+        case saveHistoryPersistFailed(String?)
+        case workspaceItemRemovalFailed(String?)
+        case autosaveEntryDiscardFailed(String?)
+
+        func message(for language: AppLanguage) -> String {
+            switch self {
+            case let .autosaveCleanupFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "保存後の自動保存クリーンアップに失敗しました"
+                        : "Autosave cleanup failed after saving")
+            case let .saveHistoryPersistFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "保存履歴の記録に失敗しました"
+                        : "Saving to history failed")
+            case let .workspaceItemRemovalFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "一時ワークスペース項目の削除に失敗しました"
+                        : "Temporary workspace cleanup failed")
+            case let .autosaveEntryDiscardFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "自動保存エントリの破棄に失敗しました"
+                        : "Autosave entry cleanup failed")
+            }
+        }
+    }
+
     struct WorkspacePersistenceFailure: Error, Equatable {
         let request: WorkspacePersistenceRequest?
         let feedback: ApplicationFeedback
@@ -39,6 +75,7 @@ extension AppFeature {
         let purpose: WorkspaceDocumentSavePurpose
         let previewImageData: Data?
         let canvasSize: CGSize
+        var issues: [WorkspacePersistenceIssue] = []
     }
 
     struct WorkspaceDocumentReplacementRequest: Equatable, Sendable {
@@ -56,6 +93,7 @@ extension AppFeature {
 
     struct LoadedWorkspaceFollowUpPersistenceResult: Equatable, Sendable {
         let successEffects: LoadedWorkspaceProjectPlan.SuccessEffects
+        var issues: [WorkspacePersistenceIssue] = []
     }
 
     struct WorkspaceCloseTabsSaveRequest: Equatable, Sendable {
@@ -66,6 +104,7 @@ extension AppFeature {
 
     struct WorkspaceCloseTabsSaveResult: Equatable, Sendable {
         let operation: PendingCloseOperation
+        var issues: [WorkspacePersistenceIssue] = []
     }
 
     struct WorkspaceArtifactDiscardRequest: Equatable, Sendable {
@@ -120,7 +159,7 @@ extension AppFeature {
         case newTabBackingStoreReserved(PreparedWorkspaceTab)
         case loadedWorkspaceFollowUpApplied(LoadedWorkspaceFollowUpPersistenceResult)
         case tabsSavedForClose(WorkspaceCloseTabsSaveResult)
-        case autosaveArtifactsDiscarded
+        case autosaveArtifactsDiscarded([WorkspacePersistenceIssue])
     }
 
     enum WorkspaceCatalogRequest: Equatable, Sendable {
@@ -169,6 +208,7 @@ extension AppFeature {
             var recoveryResolution: RecoveryResolution = .none
             var saveHistoryResolution: SaveHistoryResolution = .none
             var feedback: ApplicationFeedback?
+            var warningMessage: String?
         }
 
         let destination: Destination
@@ -257,8 +297,7 @@ extension AppFeature {
             case let .saveTabsForClose(closeRequest):
                 return saveTabsForClose(closeRequest, request: request)
             case let .discardAutosaveArtifacts(discardRequest):
-                discardAutosaveArtifacts(discardRequest)
-                return .success(.autosaveArtifactsDiscarded)
+                return .success(.autosaveArtifactsDiscarded(discardAutosaveArtifacts(discardRequest)))
             }
         }
 
@@ -306,21 +345,30 @@ extension AppFeature {
                 savedTab.title = savedURL.displayName
                 savedTab.sourceProjectURL = savedURL
                 savedTab.isDirty = false
+                var issues: [WorkspacePersistenceIssue] = []
 
                 do {
-                    // Best-effort cleanup of autosave artifacts after a successful save transition.
                     try workspaceBackingStoreService.discardAutosaveSnapshot(requestPayload.activeTab)
                 } catch {
+                    issues.append(
+                        .autosaveCleanupFailed(
+                            AppFeature.optionalErrorMessage(error)
+                        )
+                    )
                 }
 
                 do {
-                    // Save history is resilience-focused and should not block a successful save.
                     try workspaceBackingStoreService.persistSaveHistorySnapshot(
                         savedTab.backingStoreURL,
                         savedTab,
                         requestPayload.trigger
                     )
                 } catch {
+                    issues.append(
+                        .saveHistoryPersistFailed(
+                            AppFeature.optionalErrorMessage(error)
+                        )
+                    )
                 }
 
                 return .success(
@@ -330,7 +378,8 @@ extension AppFeature {
                             savedURL: savedURL,
                             purpose: requestPayload.purpose,
                             previewImageData: savedTab.previewImageData,
-                            canvasSize: savedTab.canvasSize
+                            canvasSize: savedTab.canvasSize,
+                            issues: issues
                         )
                     )
                 )
@@ -399,6 +448,7 @@ extension AppFeature {
             request: WorkspacePersistenceRequest
         ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
             do {
+                var issues: [WorkspacePersistenceIssue] = []
                 if requestPayload.persistsToBackingStore {
                     try workspaceBackingStoreService.saveProject(
                         at: requestPayload.activeTab.backingStoreURL.fileURL,
@@ -412,12 +462,21 @@ extension AppFeature {
                     )
                 }
                 if let autosaveEntryID = requestPayload.successEffects.discardedAutosaveEntryID {
-                    try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+                    do {
+                        try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+                    } catch {
+                        issues.append(
+                            .autosaveEntryDiscardFailed(
+                                AppFeature.optionalErrorMessage(error)
+                            )
+                        )
+                    }
                 }
                 return .success(
                     .loadedWorkspaceFollowUpApplied(
                         LoadedWorkspaceFollowUpPersistenceResult(
-                            successEffects: requestPayload.successEffects
+                            successEffects: requestPayload.successEffects,
+                            issues: issues
                         )
                     )
                 )
@@ -436,6 +495,7 @@ extension AppFeature {
             request: WorkspacePersistenceRequest
         ) -> Result<WorkspacePersistenceResult, WorkspacePersistenceFailure> {
             do {
+                var issues: [WorkspacePersistenceIssue] = []
                 if let activeTab = requestPayload.activeTab {
                     try workspaceBackingStoreService.saveProject(
                         at: activeTab.activeTab.backingStoreURL.fileURL,
@@ -455,26 +515,35 @@ extension AppFeature {
                     savedTab.isDirty = false
 
                     do {
-                        // Best-effort cleanup of autosave artifacts for a tab that is about to close.
                         try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
                     } catch {
+                        issues.append(
+                            .autosaveCleanupFailed(
+                                AppFeature.optionalErrorMessage(error)
+                            )
+                        )
                     }
 
                     do {
-                        // Save history should not block closing the workspace after a successful save.
                         try workspaceBackingStoreService.persistSaveHistorySnapshot(
                             savedTab.backingStoreURL,
                             savedTab,
                             .closeSave
                         )
                     } catch {
+                        issues.append(
+                            .saveHistoryPersistFailed(
+                                AppFeature.optionalErrorMessage(error)
+                            )
+                        )
                     }
                 }
 
                 return .success(
                     .tabsSavedForClose(
                         WorkspaceCloseTabsSaveResult(
-                            operation: requestPayload.operation
+                            operation: requestPayload.operation,
+                            issues: issues
                         )
                     )
                 )
@@ -490,19 +559,29 @@ extension AppFeature {
 
         private func discardAutosaveArtifacts(
             _ requestPayload: WorkspaceArtifactDiscardRequest
-        ) {
+        ) -> [WorkspacePersistenceIssue] {
+            var issues: [WorkspacePersistenceIssue] = []
             for tab in requestPayload.tabs {
                 do {
-                    // Best-effort cleanup of autosave artifacts during tab teardown.
                     try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
                 } catch {
+                    issues.append(
+                        .autosaveCleanupFailed(
+                            AppFeature.optionalErrorMessage(error)
+                        )
+                    )
                 }
                 do {
-                    // Best-effort cleanup of transient workspace items during tab teardown.
                     try workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
                 } catch {
+                    issues.append(
+                        .workspaceItemRemovalFailed(
+                            AppFeature.optionalErrorMessage(error)
+                        )
+                    )
                 }
             }
+            return issues
         }
     }
 
@@ -750,6 +829,14 @@ extension AppFeature {
         .saveFailed(Self.optionalErrorMessage(error))
     }
 
+    func workspacePersistenceWarningMessage(
+        _ issues: [WorkspacePersistenceIssue],
+        language: AppLanguage
+    ) -> String? {
+        guard !issues.isEmpty else { return nil }
+        return issues.map { $0.message(for: language) }.joined(separator: "\n")
+    }
+
     func refreshActiveTabMetadataForPersistence(
         state: inout State
     ) -> OpenDocumentTab? {
@@ -916,7 +1003,8 @@ extension AppFeature {
                 state: &state
             )
             state.application.completeWorkspaceProjectLoad(
-                feedback: plan.successEffects.feedback
+                feedback: plan.successEffects.feedback,
+                bannerMessage: plan.successEffects.warningMessage
             )
             return .none
         }
@@ -1120,9 +1208,17 @@ extension AppFeature {
                 canvasSize: saved.canvasSize,
                 isDirty: false
             )
-            state.application.presentFeedback(
-                .savedDocument(saved.savedURL.fileURL.lastPathComponent)
+            let warningMessage = workspacePersistenceWarningMessage(
+                saved.issues,
+                language: state.application.appLanguage
             )
+            if let warningMessage {
+                state.application.presentBanner(warningMessage)
+            } else {
+                state.application.presentFeedback(
+                    .savedDocument(saved.savedURL.fileURL.lastPathComponent)
+                )
+            }
             switch saved.purpose {
             case .saveDocument:
                 return .send(.homeProjectsLoadRequested)
@@ -1160,15 +1256,33 @@ extension AppFeature {
                 followUp.successEffects,
                 state: &state
             )
+            let warningMessage = followUp.successEffects.warningMessage
+                ?? workspacePersistenceWarningMessage(
+                    followUp.issues,
+                    language: state.application.appLanguage
+                )
             state.application.completeWorkspaceProjectLoad(
-                feedback: followUp.successEffects.feedback
+                feedback: followUp.successEffects.feedback,
+                bannerMessage: warningMessage
             )
             return .none
 
         case let .tabsSavedForClose(closeResult):
+            if let warningMessage = workspacePersistenceWarningMessage(
+                closeResult.issues,
+                language: state.application.appLanguage
+            ) {
+                state.application.presentBanner(warningMessage)
+            }
             return performCloseOperation(closeResult.operation)
 
-        case .autosaveArtifactsDiscarded:
+        case let .autosaveArtifactsDiscarded(issues):
+            if let warningMessage = workspacePersistenceWarningMessage(
+                issues,
+                language: state.application.appLanguage
+            ) {
+                state.application.presentBanner(warningMessage)
+            }
             return .none
         }
     }

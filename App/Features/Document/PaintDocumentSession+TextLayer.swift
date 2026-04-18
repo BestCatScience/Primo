@@ -20,10 +20,6 @@ extension PaintDocumentSession {
         case .success:
             break
         }
-        let existingPixelData = pixelDataForLayer(index: index)
-        guard !existingPixelData.isEmpty else {
-            return .failure(.bridgeMutationFailed("setTextLayer"))
-        }
         guard let rasterized = rasterizedTextLayerPixelData(textLayer) else {
             return .failure(.bridgeMutationFailed("setTextLayer"))
         }

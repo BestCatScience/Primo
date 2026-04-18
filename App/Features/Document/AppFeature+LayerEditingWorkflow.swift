@@ -130,6 +130,8 @@ extension AppFeature {
                 return .documentMutationBridgeFailed(message)
             case .incompatibleLayerType:
                 return .unsupportedLayerType
+            case let .transactionFailure(primary, rollback):
+                return .documentMutationTransactionFailed(primary, rollback)
             }
         }
     }

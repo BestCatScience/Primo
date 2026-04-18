@@ -97,6 +97,43 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(setActiveLayerCalls.values, [3])
     }
 
+    func testLayerContentTransactionSurfacesRollbackFailure() {
+        let result = withDependencies {
+            $0.paintDocumentClient = .stub(
+                presentation: .testValue(activeLayerIndex: 3),
+                addLayer: { _ in .success(7) },
+                deleteLayer: { _ in
+                    .failure(.bridgeMutationFailed("delete rollback failed"))
+                },
+                setActiveLayer: { _ in
+                    .failure(.bridgeMutationFailed("active layer rollback failed"))
+                },
+                replaceLayerPixels: { _, _ in
+                    .failure(.bridgeMutationFailed("replace failed"))
+                }
+            )
+        } operation: {
+            let feature = AppFeature()
+            return feature.layerContentWorkflowService.applyPixels(
+                Data([0x00]),
+                to: .newLayer(name: "Imported")
+            )
+        }
+
+        XCTAssertEqual(
+            result,
+            .failure(
+                .transactionFailure(
+                    primary: .bridgeMutationFailed("replace failed"),
+                    rollback: .transactionFailure(
+                        primary: .bridgeMutationFailed("delete rollback failed"),
+                        rollback: .bridgeMutationFailed("active layer rollback failed")
+                    )
+                )
+            )
+        )
+    }
+
     func testNanoBananaApplyRollsBackCreatedLayerOnFailure() {
         let addLayerCalls = TestRecorder<String>()
         let deleteLayerCalls = TestRecorder<Int>()

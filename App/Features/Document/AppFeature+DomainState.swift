@@ -68,6 +68,7 @@ extension AppFeature {
         case invalidLayerOpacity
         case emptyDocumentMutationInput
         case documentMutationBridgeFailed(String?)
+        case documentMutationTransactionFailed(DocumentMutationFailure, DocumentMutationFailure)
         case unsupportedLayerType
         case createLayerMaskNeedsSelection
         case createLayerMaskFailed
@@ -162,6 +163,12 @@ extension AppFeature.ApplicationFeedback {
                 : (language == .japanese
                     ? "ドキュメントの更新に失敗しました"
                     : "The document update failed")
+        case let .documentMutationTransactionFailed(primary, rollback):
+            let primaryMessage = AppFeature.documentMutationFailureMessage(primary, language: language)
+            let rollbackMessage = AppFeature.documentMutationFailureMessage(rollback, language: language)
+            return language == .japanese
+                ? "\(primaryMessage)\n復旧処理にも失敗しました: \(rollbackMessage)"
+                : "\(primaryMessage)\nRollback also failed: \(rollbackMessage)"
         case .unsupportedLayerType:
             return language == .japanese
                 ? "このレイヤー種類では操作できません"
@@ -252,6 +259,42 @@ extension AppFeature {
         return message.isEmpty ? nil : message
     }
 
+    static func documentMutationFailureMessage(
+        _ failure: DocumentMutationFailure,
+        language: AppLanguage
+    ) -> String {
+        switch failure {
+        case .invalidCanvasSize:
+            return ApplicationFeedback.canvasSizeUnsupported.message(for: language)
+        case .noUndoState:
+            return ApplicationFeedback.undoUnavailableWhileDrawing.message(for: language)
+        case .noRedoState:
+            return ApplicationFeedback.redoUnavailableWhileDrawing.message(for: language)
+        case .invalidLayerIndex:
+            return ApplicationFeedback.layerUnavailable.message(for: language)
+        case .invalidFolderID:
+            return ApplicationFeedback.folderUnavailable.message(for: language)
+        case .layerLocked:
+            return ApplicationFeedback.layerEditLocked.message(for: language)
+        case .alphaLocked:
+            return ApplicationFeedback.layerAlphaEditLocked.message(for: language)
+        case .invalidOpacity:
+            return ApplicationFeedback.invalidLayerOpacity.message(for: language)
+        case .emptyInput:
+            return ApplicationFeedback.emptyDocumentMutationInput.message(for: language)
+        case let .bridgeMutationFailed(message):
+            return ApplicationFeedback.documentMutationBridgeFailed(message).message(for: language)
+        case .incompatibleLayerType:
+            return ApplicationFeedback.unsupportedLayerType.message(for: language)
+        case let .transactionFailure(primary, rollback):
+            return ApplicationFeedback.documentMutationTransactionFailed(
+                primary,
+                rollback
+            )
+            .message(for: language)
+        }
+    }
+
     func namingPolicy(for state: State) -> DocumentNamingPolicy {
         DocumentNamingPolicy(language: state.application.appLanguage)
     }
@@ -285,10 +328,13 @@ extension AppFeature.ApplicationState {
     }
 
     mutating func completeWorkspaceProjectLoad(
-        feedback: AppFeature.ApplicationFeedback? = nil
+        feedback: AppFeature.ApplicationFeedback? = nil,
+        bannerMessage: String? = nil
     ) {
         finishHydration(showingHome: false)
-        if let feedback {
+        if let bannerMessage {
+            presentBanner(bannerMessage)
+        } else if let feedback {
             presentFeedback(feedback)
         }
     }

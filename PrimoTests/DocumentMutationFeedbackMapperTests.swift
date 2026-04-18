@@ -24,5 +24,17 @@ final class DocumentMutationFeedbackMapperTests: XCTestCase {
             .documentMutationBridgeFailed("bridge failed")
         )
         XCTAssertEqual(mapper.feedback(for: .incompatibleLayerType(3)), .unsupportedLayerType)
+        XCTAssertEqual(
+            mapper.feedback(
+                for: .transactionFailure(
+                    primary: .layerLocked(1),
+                    rollback: .bridgeMutationFailed("rollback failed")
+                )
+            ),
+            .documentMutationTransactionFailed(
+                .layerLocked(1),
+                .bridgeMutationFailed("rollback failed")
+            )
+        )
     }
 }

@@ -56,7 +56,8 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
                         savedURL: savedURL,
                         purpose: .saveDocument,
                         previewImageData: activeTab.previewImageData,
-                        canvasSize: activeTab.canvasSize
+                        canvasSize: activeTab.canvasSize,
+                        issues: []
                     )
                 )
             )
@@ -65,7 +66,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         XCTAssertEqual(saveHistoryTriggers.values, [.manualSave])
     }
 
-    func testSaveHistoryFailureDoesNotFailCloseSave() {
+    func testSaveHistoryFailureReturnsCloseSaveIssue() {
         let tab = OpenDocumentTab.testValue()
         let paintDocumentClient = PaintDocumentClient.stub()
         let documentWorkspaceClient = DocumentWorkspaceClient.stub(
@@ -101,7 +102,58 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             .success(
                 .tabsSavedForClose(
                     AppFeature.WorkspaceCloseTabsSaveResult(
-                        operation: .tab(tab.id)
+                        operation: .tab(tab.id),
+                        issues: [.saveHistoryPersistFailed("save history unavailable")]
+                    )
+                )
+            )
+        )
+    }
+
+    func testAutosaveCleanupFailureReturnsSaveIssue() {
+        let savedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/saved-document.atelier"))
+        let activeTab = OpenDocumentTab.testValue(previewImageData: Data([0xAB]))
+        let useCase = AppFeature.WorkspacePersistenceUseCase(
+            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                paintDocumentClient: .stub(),
+                documentWorkspaceClient: .stub(
+                    persistProjectSnapshot: { _, _ in savedURL },
+                    discardAutosaveSnapshot: { _ in
+                        throw TestError.expected("autosave cleanup failed")
+                    }
+                )
+            ),
+            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                documentWorkspaceClient: .stub()
+            ),
+            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                uuidClient: UUIDClient(
+                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A3")! }
+                )
+            )
+        )
+
+        XCTAssertEqual(
+            useCase.execute(
+                .saveActiveDocument(
+                    AppFeature.WorkspaceDocumentSaveRequest(
+                        activeTab: activeTab,
+                        paperStyle: .default,
+                        preferredDestinationURL: nil,
+                        trigger: .manualSave,
+                        purpose: .saveDocument
+                    )
+                )
+            ),
+            .success(
+                .activeDocumentSaved(
+                    AppFeature.WorkspaceDocumentSaveResult(
+                        activeTabID: activeTab.id,
+                        savedURL: savedURL,
+                        purpose: .saveDocument,
+                        previewImageData: activeTab.previewImageData,
+                        canvasSize: activeTab.canvasSize,
+                        issues: [.autosaveCleanupFailed("autosave cleanup failed")]
                     )
                 )
             )

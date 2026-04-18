@@ -157,7 +157,7 @@ extension PaintDocumentSession {
             return .failure(failure)
         }
         guard documentGateway.queries.layerMaskDataForLayer(index: index) != nil else {
-            return .failure(.bridgeMutationFailed("clearLayerMask"))
+            return .success(())
         }
         documentGateway.layers.clearLayerMask(index: index)
         applyLayerLifecycleMutation(

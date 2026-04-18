@@ -24,7 +24,7 @@ extension AppFeature {
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: projectURL.fileURL,
-            onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab) },
+            onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab, $1) },
             onFailure: { .saveHistoryRestoreFailed(.saveHistoryRestoreFailed($0.errorMessage)) }
         )
     }
@@ -33,9 +33,14 @@ extension AppFeature {
         state: inout State,
         loaded: LoadedPaintProject,
         projectURL: DocumentProjectPath,
-        openInNewTab: Bool
+        openInNewTab: Bool,
+        issues: [WorkspaceProjectLoadIssue]
     ) -> Effect<Action> {
         let restoredTitle = projectURL.displayName
+        let warningMessage = workspaceProjectLoadWarningMessage(
+            issues,
+            language: state.application.appLanguage
+        )
         if openInNewTab || state.workspace.activeTab == nil {
             return applyLoadedWorkspaceProject(
                 loaded,
@@ -51,7 +56,8 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        feedback: .restoredSaveHistory
+                        feedback: .restoredSaveHistory,
+                        warningMessage: warningMessage
                     )
                 ),
                 state: &state
@@ -73,7 +79,8 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        feedback: .restoredSaveHistory
+                        feedback: .restoredSaveHistory,
+                        warningMessage: warningMessage
                     )
                 ),
                 state: &state

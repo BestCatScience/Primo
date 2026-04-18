@@ -12,7 +12,7 @@ extension PaintDocumentSession {
             height: documentGateway.queries.canvasHeight
         )
         guard targetSize != sourceSize else {
-            return .failure(.bridgeMutationFailed("resizeCanvas"))
+            return .success(())
         }
 
         let layerInfos = documentGateway.queries.layerInfos()
@@ -83,7 +83,7 @@ extension PaintDocumentSession {
             height: documentGateway.queries.canvasHeight
         )
         guard targetSize != sourceSize else {
-            return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+            return .success(())
         }
 
         let layerInfos = documentGateway.queries.layerInfos()

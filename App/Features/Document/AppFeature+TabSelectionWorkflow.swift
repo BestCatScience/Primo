@@ -16,7 +16,7 @@ extension AppFeature {
             state: &state,
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
-            onSuccess: { .tabSelectionLoaded(tabID, $0) },
+            onSuccess: { loaded, _ in .tabSelectionLoaded(tabID, loaded) },
             onFailure: { .tabSelectionFailed($0.feedback) }
         )
     }

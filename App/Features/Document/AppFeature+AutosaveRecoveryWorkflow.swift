@@ -16,7 +16,7 @@ extension AppFeature {
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
-            onSuccess: { .autosaveRecoveryOpened($0, item) },
+            onSuccess: { .autosaveRecoveryOpened($0, item, $1) },
             onFailure: { .autosaveRecoveryRestoreFailed(.autosaveRestoreFailed($0.errorMessage)) }
         )
     }
@@ -24,7 +24,8 @@ extension AppFeature {
     func handleAutosaveRecoveryOpened(
         state: inout State,
         loaded: LoadedPaintProject,
-        item: AutosaveRecoveryItem
+        item: AutosaveRecoveryItem,
+        issues: [WorkspaceProjectLoadIssue]
     ) -> Effect<Action> {
         return applyLoadedWorkspaceProject(
             loaded,
@@ -41,7 +42,11 @@ extension AppFeature {
                 successEffects: .init(
                     discardedAutosaveEntryID: item.id,
                     recoveryResolution: .completeRestore(item.id),
-                    feedback: .restoredAutosave
+                    feedback: .restoredAutosave,
+                    warningMessage: workspaceProjectLoadWarningMessage(
+                        issues,
+                        language: state.application.appLanguage
+                    )
                 )
             ),
             state: &state

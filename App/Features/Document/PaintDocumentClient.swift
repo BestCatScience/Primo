@@ -17,6 +17,7 @@ enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
     case noRedoState
     case bridgeMutationFailed(String)
     case incompatibleLayerType(Int)
+    indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
 }
 
 struct PaintDocumentClient: Sendable {

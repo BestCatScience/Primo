@@ -206,11 +206,12 @@ extension AppFeature {
                 sourceURL: sourceURL
             )
 
-        case let .openImportedDocumentLoaded(loaded, suggestedTitle):
+        case let .openImportedDocumentLoaded(loaded, suggestedTitle, issues):
             return handleOpenImportedDocumentLoaded(
                 state: &state,
                 loaded: loaded,
-                suggestedTitle: suggestedTitle
+                suggestedTitle: suggestedTitle,
+                issues: issues
             )
 
         case let .openDocumentSelected(url):
@@ -227,11 +228,12 @@ extension AppFeature {
                 removesStagedWorkspaceItem: false
             )
 
-        case let .openDocumentLoaded(loaded, sourceURL):
+        case let .openDocumentLoaded(loaded, sourceURL, issues):
             return handleOpenDocumentLoaded(
                 state: &state,
                 loaded: loaded,
-                sourceURL: sourceURL
+                sourceURL: sourceURL,
+                issues: issues
             )
 
         case let .openDocumentFailed(feedback):

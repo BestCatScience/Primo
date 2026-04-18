@@ -28,7 +28,14 @@ extension AppFeature {
             }
             switch mutation(resolvedTarget.index) {
             case let .failure(failure):
-                rollbackResolvedTargetIfNeeded(resolvedTarget)
+                if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
+                    return .failure(
+                        .transactionFailure(
+                            primary: failure,
+                            rollback: rollbackFailure
+                        )
+                    )
+                }
                 return .failure(failure)
             case .success:
                 return .success(
@@ -58,13 +65,29 @@ extension AppFeature {
 
         private func rollbackResolvedTargetIfNeeded(
             _ resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
-        ) {
+        ) -> DocumentMutationFailure? {
+            var rollbackFailure: DocumentMutationFailure?
             if resolvedTarget.createdNewLayer, resolvedTarget.index >= 0 {
-                // Best-effort cleanup of a transient layer created for a failed content mutation.
-                _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
+                switch paintDocumentClient.deleteLayer(resolvedTarget.index) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    rollbackFailure = failure
+                }
             }
-            // Best-effort restoration of the previously active layer after a failed content mutation.
-            _ = paintDocumentClient.setActiveLayer(resolvedTarget.originalActiveLayerIndex)
+            switch paintDocumentClient.setActiveLayer(resolvedTarget.originalActiveLayerIndex) {
+            case .success:
+                break
+            case let .failure(failure):
+                if let rollbackFailure {
+                    return .transactionFailure(
+                        primary: rollbackFailure,
+                        rollback: failure
+                    )
+                }
+                return failure
+            }
+            return rollbackFailure
         }
     }
 

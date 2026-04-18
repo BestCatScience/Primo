@@ -57,12 +57,13 @@ extension AppFeature {
                 openInNewTab: openInNewTab
             )
 
-        case let .saveHistoryOpened(loaded, projectURL, openInNewTab):
+        case let .saveHistoryOpened(loaded, projectURL, openInNewTab, issues):
             return handleSaveHistoryOpened(
                 state: &state,
                 loaded: loaded,
                 projectURL: projectURL,
-                openInNewTab: openInNewTab
+                openInNewTab: openInNewTab,
+                issues: issues
             )
 
         case let .saveHistoryRestoreFailed(feedback):

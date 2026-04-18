@@ -92,7 +92,7 @@ struct AppFeature {
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
         case autosaveRecoveryLoadFailed(ApplicationFeedback)
         case autosaveRecoveryRestoreRequested(WorkspaceItemID)
-        case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem)
+        case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem, [WorkspaceProjectLoadIssue])
         case autosaveRecoveryRestoreFailed(ApplicationFeedback)
         case autosaveRecoveryDiscardRequested(WorkspaceItemID)
         case autosaveRecoveryDismissed
@@ -129,7 +129,7 @@ struct AppFeature {
         case saveHistoryLoadFailed(ApplicationFeedback)
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
-        case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool)
+        case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool, [WorkspaceProjectLoadIssue])
         case saveHistoryRestoreFailed(ApplicationFeedback)
         case featherSelectionRequested(Int)
         case colorRangeSelectionRequested(ColorRangeSelectionRequest)
@@ -138,9 +138,9 @@ struct AppFeature {
         case exportDocumentRequested
         case exportTimelapseRequested
         case openImportedDocumentRequested(URL)
-        case openImportedDocumentLoaded(LoadedPaintProject, String)
+        case openImportedDocumentLoaded(LoadedPaintProject, String, [WorkspaceProjectLoadIssue])
         case openDocumentSelected(DocumentProjectPath)
-        case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath)
+        case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath, [WorkspaceProjectLoadIssue])
         case openDocumentFailed(ApplicationFeedback)
         case photoImportReceived(name: String?, data: Data)
         case photoImportFailed(ApplicationFeedback)

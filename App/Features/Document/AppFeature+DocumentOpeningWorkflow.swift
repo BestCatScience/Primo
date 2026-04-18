@@ -9,7 +9,7 @@ extension AppFeature {
         beginImportedWorkspaceProjectLoad(
             state: &state,
             sourceURL: sourceURL,
-            onSuccess: { .openImportedDocumentLoaded($0, $1) },
+            onSuccess: { .openImportedDocumentLoaded($0, $1, $2) },
             onFailure: { .openDocumentFailed($0.feedback) }
         )
     }
@@ -17,7 +17,8 @@ extension AppFeature {
     func handleOpenImportedDocumentLoaded(
         state: inout State,
         loaded: LoadedPaintProject,
-        suggestedTitle: String
+        suggestedTitle: String,
+        issues: [WorkspaceProjectLoadIssue]
     ) -> Effect<Action> {
         let trimmedTitle = suggestedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle = trimmedTitle.isEmpty
@@ -31,7 +32,11 @@ extension AppFeature {
                     sourceProjectURL: nil
                 ),
                 successEffects: .init(
-                    feedback: .openedDocument(loaded.presentation.layerRows.count)
+                    feedback: .openedDocument(loaded.presentation.layerRows.count),
+                    warningMessage: workspaceProjectLoadWarningMessage(
+                        issues,
+                        language: state.application.appLanguage
+                    )
                 )
             ),
             state: &state
@@ -67,7 +72,7 @@ extension AppFeature {
             state: &state,
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
-            onSuccess: { .openDocumentLoaded($0, url) },
+            onSuccess: { .openDocumentLoaded($0, url, $1) },
             onFailure: { .openDocumentFailed($0.feedback) }
         )
     }
@@ -75,10 +80,16 @@ extension AppFeature {
     func handleOpenDocumentLoaded(
         state: inout State,
         loaded: LoadedPaintProject,
-        sourceURL: DocumentProjectPath
+        sourceURL: DocumentProjectPath,
+        issues: [WorkspaceProjectLoadIssue]
     ) -> Effect<Action> {
         if let existingTabID = state.workspace.tabID(forSourceProjectURL: sourceURL) {
-            state.application.completeWorkspaceProjectLoad()
+            state.application.completeWorkspaceProjectLoad(
+                bannerMessage: workspaceProjectLoadWarningMessage(
+                    issues,
+                    language: state.application.appLanguage
+                )
+            )
             return .send(.tabSelected(existingTabID))
         }
         return applyLoadedWorkspaceProject(
@@ -89,7 +100,11 @@ extension AppFeature {
                     sourceProjectURL: sourceURL
                 ),
                 successEffects: .init(
-                    feedback: .openedDocument(loaded.presentation.layerRows.count)
+                    feedback: .openedDocument(loaded.presentation.layerRows.count),
+                    warningMessage: workspaceProjectLoadWarningMessage(
+                        issues,
+                        language: state.application.appLanguage
+                    )
                 )
             ),
             state: &state
