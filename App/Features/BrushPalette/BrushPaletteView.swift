@@ -22,8 +22,6 @@ struct BrushPaletteView: View {
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
     @State var selectedToolInspectorTab: ToolInspectorTab = .basic
-    @State var importErrorMessage: String?
-    @State var textFontImportErrorMessage: String?
     @State var renamingSavedTipPresetName: String?
     @State var savedTipRenameDraft = ""
     var rendersFloatingPanelOnly = false
@@ -34,11 +32,6 @@ struct BrushPaletteView: View {
     var onSetTransformMode: (CanvasTransformMode) -> Void = { _ in }
     var onSetTransformAspectRatioLock: (Bool) -> Void = { _ in }
     let paletteColumns = Array(repeating: GridItem(.fixed(22), spacing: 8), count: 5)
-
-    private var brushTipLibraryClient: BrushTipLibraryClient {
-        @Dependency(\.brushTipLibraryClient) var brushTipLibraryClient
-        return brushTipLibraryClient
-    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -59,12 +52,18 @@ struct BrushPaletteView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
+        .task {
+            store.send(.task)
+        }
         .animation(.spring(response: 0.28, dampingFraction: 0.9), value: store.ui.showsBrushSettingsPopover)
         .sheet(isPresented: $isImportingBrush) {
             BrushImportDocumentPicker(
                 allowedContentTypes: [.png, .primoBrushTip, UTType(filenameExtension: "abr") ?? .data],
                 allowsMultipleSelection: true,
-                onPick: importBrushes,
+                onPick: { urls in
+                    isImportingBrush = false
+                    store.send(.importBrushesRequested(urls))
+                },
                 onCancel: { isImportingBrush = false }
             )
             .ignoresSafeArea()
@@ -73,7 +72,11 @@ struct BrushPaletteView: View {
             BrushImportDocumentPicker(
                 allowedContentTypes: [.png, .primoBrushTip],
                 allowsMultipleSelection: false,
-                onPick: importCustomTip,
+                onPick: { urls in
+                    isImportingCustomTip = false
+                    guard let url = urls.first else { return }
+                    store.send(.importCustomTipRequested(url))
+                },
                 onCancel: { isImportingCustomTip = false }
             )
             .ignoresSafeArea()
@@ -82,7 +85,10 @@ struct BrushPaletteView: View {
             BrushImportDocumentPicker(
                 allowedContentTypes: [UTType(filenameExtension: "ttf") ?? .data, UTType(filenameExtension: "otf") ?? .data],
                 allowsMultipleSelection: true,
-                onPick: importTextFonts,
+                onPick: { urls in
+                    isImportingTextFont = false
+                    store.send(.importTextFontsRequested(urls))
+                },
                 onCancel: { isImportingTextFont = false }
             )
             .ignoresSafeArea()
@@ -90,39 +96,39 @@ struct BrushPaletteView: View {
         .alert(
             language.localized("ブラシを読み込めませんでした"),
             isPresented: Binding(
-                get: { importErrorMessage != nil },
+                get: { store.ui.brushLibraryErrorMessage != nil },
                 set: { newValue in
                     if !newValue {
-                        importErrorMessage = nil
+                        store.send(.dismissBrushLibraryError)
                     }
                 }
             ),
             actions: {
                 Button("OK", role: .cancel) {
-                    importErrorMessage = nil
+                    store.send(.dismissBrushLibraryError)
                 }
             },
             message: {
-                Text(importErrorMessage ?? "")
+                Text(store.ui.brushLibraryErrorMessage ?? "")
             }
         )
         .alert(
             language.localized("フォントを読み込めませんでした"),
             isPresented: Binding(
-                get: { textFontImportErrorMessage != nil },
+                get: { store.ui.textFontImportErrorMessage != nil },
                 set: { newValue in
                     if !newValue {
-                        textFontImportErrorMessage = nil
+                        store.send(.dismissTextFontImportError)
                     }
                 }
             ),
             actions: {
                 Button("OK", role: .cancel) {
-                    textFontImportErrorMessage = nil
+                    store.send(.dismissTextFontImportError)
                 }
             },
             message: {
-                Text(textFontImportErrorMessage ?? "")
+                Text(store.ui.textFontImportErrorMessage ?? "")
             }
         )
         .alert(
@@ -169,90 +175,6 @@ struct BrushPaletteView: View {
 
     private var floatingPanelXOffset: CGFloat {
         208
-    }
-
-    private func importBrushes(_ urls: [URL]) {
-        isImportingBrush = false
-        var imported: [BrushPreset] = []
-        var failures: [String] = []
-
-        for url in urls {
-            withSecurityScopedAccess(to: url) {
-                if url.pathExtension.lowercased() == "abr" {
-                    do {
-                        let brushes = try brushTipLibraryClient.importPhotoshopBrushes(url).map(\.preset)
-                        if brushes.isEmpty {
-                            failures.append("\(url.lastPathComponent): \(language.localized("対応している先端が見つかりませんでした。"))")
-                        } else {
-                            imported.append(contentsOf: brushes)
-                        }
-                    } catch {
-                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                    }
-                    return
-                }
-
-                let brushName = url.deletingPathExtension().lastPathComponent
-                do {
-                    let tip = try brushTipLibraryClient.loadRaster(url)
-                    imported.append(BrushPreset.photoshopImported(name: brushName, tip: tip))
-                } catch {
-                    failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                }
-            }
-        }
-
-        if !imported.isEmpty {
-            store.send(.importedPresets(imported))
-        }
-        if !failures.isEmpty {
-            importErrorMessage = failures.joined(separator: "\n")
-        }
-    }
-
-    private func importTextFonts(_ urls: [URL]) {
-        isImportingTextFont = false
-        var importedFonts: [TextFontOption] = []
-        var failures: [String] = []
-
-        for url in urls {
-            withSecurityScopedAccess(to: url) {
-                do {
-                    importedFonts.append(contentsOf: try TextFontLibrary.importFonts(from: [url]))
-                } catch {
-                    failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                }
-            }
-        }
-
-        if !importedFonts.isEmpty {
-            store.send(.importedTextFonts(importedFonts))
-        }
-        if !failures.isEmpty {
-            textFontImportErrorMessage = failures.joined(separator: "\n")
-        }
-    }
-
-    private func importCustomTip(_ urls: [URL]) {
-        isImportingCustomTip = false
-        guard let url = urls.first else { return }
-
-        var resolvedTip: BrushTipRaster?
-        var failure: String?
-
-        withSecurityScopedAccess(to: url) {
-            do {
-                resolvedTip = try brushTipLibraryClient.loadRaster(url)
-            } catch {
-                failure = "\(url.lastPathComponent): \(error.localizedDescription)"
-            }
-        }
-
-        if let resolvedTip {
-            store.brush.customTip = resolvedTip
-        } else if let failure {
-            importErrorMessage = failure
-        }
     }
 }
 

@@ -2,6 +2,46 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
+    func handleOpenImportedDocumentRequest(
+        state: inout State,
+        sourceURL: URL
+    ) -> Effect<Action> {
+        beginImportedWorkspaceProjectLoad(
+            state: &state,
+            sourceURL: sourceURL,
+            onSuccess: { .openImportedDocumentLoaded($0, $1) },
+            onFailure: {
+                .openDocumentFailed(
+                    .openFailed(Self.optionalErrorMessage($0))
+                )
+            }
+        )
+    }
+
+    func handleOpenImportedDocumentLoaded(
+        state: inout State,
+        loaded: LoadedPaintProject,
+        suggestedTitle: String
+    ) {
+        let trimmedTitle = suggestedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle = trimmedTitle.isEmpty
+            ? (state.application.appLanguage == .japanese ? "読み込み済みドキュメント" : "Imported Document")
+            : trimmedTitle
+        applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(
+                    title: resolvedTitle,
+                    sourceProjectURL: nil
+                ),
+                successEffects: .init(
+                    feedback: .openedDocument(loaded.presentation.layerRows.count)
+                )
+            ),
+            state: &state
+        )
+    }
+
     func handleSavedProjectMove(
         state: inout State,
         url: DocumentProjectPath,

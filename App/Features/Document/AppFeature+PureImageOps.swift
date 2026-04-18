@@ -24,26 +24,18 @@ extension AppFeature {
         )
     }
 
-    static func nanoBananaErrorFeedback(_ message: String) -> ApplicationFeedback {
-        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            return .nanoBananaEditFailed(nil)
-        }
-
-        let normalized = trimmed.lowercased()
-        if normalized.contains("invalid response") {
+    static func nanoBananaFailureFeedback(_ failure: NanoBananaFailure) -> ApplicationFeedback {
+        switch failure {
+        case .invalidResponse:
             return .nanoBananaInvalidResponse
-        }
-        if normalized.contains("invalid endpoint") {
+        case .invalidEndpoint:
             return .nanoBananaInvalidEndpoint
-        }
-        if normalized.contains("missing image")
-            || normalized.contains("did not return decodable image")
-            || normalized.contains("returned text instead of an image")
-        {
+        case .missingImageData:
             return .nanoBananaMissingImage
+        case let .apiError(message),
+             let .transport(message):
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? .nanoBananaEditFailed(nil) : .nanoBananaEditFailed(trimmed)
         }
-
-        return .nanoBananaEditFailed(trimmed)
     }
 }

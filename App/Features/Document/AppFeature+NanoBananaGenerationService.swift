@@ -135,6 +135,11 @@ extension AppFeature {
     }
 
     private struct NanoBananaDocumentService {
+        enum ApplyFailure: Error, Equatable {
+            case setActiveLayerFailed(Int)
+            case replacePixelsFailed(Int)
+        }
+
         struct AppliedPreview {
             let targetLayerIndex: Int
         }
@@ -143,7 +148,7 @@ extension AppFeature {
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
-        ) -> AppliedPreview? {
+        ) -> Result<AppliedPreview, ApplyFailure> {
             let resolvedTarget: (index: Int, createdNewLayer: Bool)
             switch plan.target {
             case let .existingLayer(index):
@@ -154,14 +159,16 @@ extension AppFeature {
 
             guard paintDocumentClient.setActiveLayer(resolvedTarget.index) else {
                 rollbackResolvedTargetIfNeeded(resolvedTarget)
-                return nil
+                return .failure(.setActiveLayerFailed(resolvedTarget.index))
             }
             guard paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) else {
                 rollbackResolvedTargetIfNeeded(resolvedTarget)
-                return nil
+                return .failure(.replacePixelsFailed(resolvedTarget.index))
             }
-            return AppliedPreview(
-                targetLayerIndex: resolvedTarget.index
+            return .success(
+                AppliedPreview(
+                    targetLayerIndex: resolvedTarget.index
+                )
             )
         }
 
@@ -191,108 +198,119 @@ extension AppFeature {
 
         func makeEditEffect(_ prepared: NanoBananaValidatedEdit) -> Effect<Action> {
             .run { [nanoBananaClient] send in
-                do {
-                    let requestPrompt = prepared.normalizedRequest.editScope == .selectedArea
-                        ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(prepared.trimmedPrompt)"
-                        : prepared.trimmedPrompt
+                let requestPrompt = prepared.normalizedRequest.editScope == .selectedArea
+                    ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(prepared.trimmedPrompt)"
+                    : prepared.trimmedPrompt
 
-                    let finalPixelData: Data?
-                    switch prepared.normalizedRequest.editScope {
-                    case .wholeLayer:
-                        guard let inputPNGData = AppFeature.pngData(
-                            fromLayerPixelData: prepared.sourceLayerPixelData,
-                            width: prepared.canvasWidth,
-                            height: prepared.canvasHeight
-                        ) else {
-                            finalPixelData = nil
-                            break
-                        }
-                        let outputPNGData = try await nanoBananaClient.editImage(
-                            inputPNGData,
-                            requestPrompt,
-                            prepared.normalizedRequest.config,
-                            prepared.normalizedRequest.model
+                func executeEdit(inputPNGData: Data) async -> Result<Data, NanoBananaFailure> {
+                    let result = await nanoBananaClient.executeEdit(
+                        NanoBananaEditRequest(
+                            inputPNGData: inputPNGData,
+                            prompt: requestPrompt,
+                            config: prepared.normalizedRequest.config,
+                            model: prepared.normalizedRequest.model
                         )
-                        finalPixelData = AppFeature.rawLayerPixelData(
-                            fromPNGData: outputPNGData,
-                            width: prepared.canvasWidth,
-                            height: prepared.canvasHeight
-                        )
+                    )
+                    return result.map { $0.imageData }
+                }
 
-                    case .selectedArea:
-                        guard
-                            let adjustedSelection = prepared.adjustedSelection,
-                            let crop = AppFeature.inpaintCrop(
-                                source: prepared.sourceLayerPixelData,
-                                canvasWidth: prepared.canvasWidth,
-                                canvasHeight: prepared.canvasHeight,
-                                selection: adjustedSelection
-                            ),
-                            let cropPNGData = AppFeature.pngData(
-                                fromLayerPixelData: crop.pixelData,
-                                width: crop.width,
-                                height: crop.height
-                            )
-                        else {
-                            finalPixelData = nil
-                            break
-                        }
-
-                        let outputPNGData = try await nanoBananaClient.editImage(
-                            cropPNGData,
-                            requestPrompt,
-                            prepared.normalizedRequest.config,
-                            prepared.normalizedRequest.model
-                        )
-                        guard let editedCropPixelData = AppFeature.rawLayerPixelData(
-                            fromPNGData: outputPNGData,
-                            width: crop.width,
-                            height: crop.height
-                        ) else {
-                            finalPixelData = nil
-                            break
-                        }
-
-                        let baseLayerPixelData = prepared.normalizedRequest.outputMode == .replaceCurrentLayer
-                            ? prepared.sourceLayerPixelData
-                            : Data(repeating: 0, count: prepared.canvasWidth * prepared.canvasHeight * 4)
-                        finalPixelData = AppFeature.applyingInpaintCrop(
-                            editedCropPixelData,
-                            to: baseLayerPixelData,
-                            canvasWidth: prepared.canvasWidth,
-                            canvasHeight: prepared.canvasHeight,
-                            crop: crop
-                        )
+                let finalPixelData: Data?
+                switch prepared.normalizedRequest.editScope {
+                case .wholeLayer:
+                    guard let inputPNGData = AppFeature.pngData(
+                        fromLayerPixelData: prepared.sourceLayerPixelData,
+                        width: prepared.canvasWidth,
+                        height: prepared.canvasHeight
+                    ) else {
+                        finalPixelData = nil
+                        break
                     }
 
-                    guard let finalPixelData else {
-                        await send(
-                            .nanoBananaEditFailed(
-                                .nanoBananaUnsupportedImage
-                            )
-                        )
+                    let outputPNGData: Data
+                    switch await executeEdit(inputPNGData: inputPNGData) {
+                    case let .success(imageData):
+                        outputPNGData = imageData
+                    case let .failure(failure):
+                        await send(.nanoBananaEditFailed(AppFeature.nanoBananaFailureFeedback(failure)))
                         return
                     }
 
-                    let preview = NanoBananaPreviewState(
-                        request: prepared.normalizedRequest,
-                        outputLayerIndex: prepared.outputLayerIndex,
-                        pixelData: finalPixelData,
-                        beforePreviewImageData: prepared.beforePreviewImageData,
-                        afterPreviewImageData: AppFeature.pngData(
-                            fromLayerPixelData: finalPixelData,
-                            width: prepared.canvasWidth,
-                            height: prepared.canvasHeight
-                        )
+                    finalPixelData = AppFeature.rawLayerPixelData(
+                        fromPNGData: outputPNGData,
+                        width: prepared.canvasWidth,
+                        height: prepared.canvasHeight
                     )
-                    await send(.nanoBananaEditSucceeded(preview))
-                } catch {
-                    await send(
-                        .nanoBananaEditFailed(
-                            AppFeature.nanoBananaErrorFeedback(error.localizedDescription)
+
+                case .selectedArea:
+                    guard
+                        let adjustedSelection = prepared.adjustedSelection,
+                        let crop = AppFeature.inpaintCrop(
+                            source: prepared.sourceLayerPixelData,
+                            canvasWidth: prepared.canvasWidth,
+                            canvasHeight: prepared.canvasHeight,
+                            selection: adjustedSelection
+                        ),
+                        let cropPNGData = AppFeature.pngData(
+                            fromLayerPixelData: crop.pixelData,
+                            width: crop.width,
+                            height: crop.height
                         )
+                    else {
+                        finalPixelData = nil
+                        break
+                    }
+
+                    let outputPNGData: Data
+                    switch await executeEdit(inputPNGData: cropPNGData) {
+                    case let .success(imageData):
+                        outputPNGData = imageData
+                    case let .failure(failure):
+                        await send(.nanoBananaEditFailed(AppFeature.nanoBananaFailureFeedback(failure)))
+                        return
+                    }
+
+                    guard let editedCropPixelData = AppFeature.rawLayerPixelData(
+                        fromPNGData: outputPNGData,
+                        width: crop.width,
+                        height: crop.height
+                    ) else {
+                        finalPixelData = nil
+                        break
+                    }
+
+                    let baseLayerPixelData = prepared.normalizedRequest.outputMode == .replaceCurrentLayer
+                        ? prepared.sourceLayerPixelData
+                        : Data(repeating: 0, count: prepared.canvasWidth * prepared.canvasHeight * 4)
+                    finalPixelData = AppFeature.applyingInpaintCrop(
+                        editedCropPixelData,
+                        to: baseLayerPixelData,
+                        canvasWidth: prepared.canvasWidth,
+                        canvasHeight: prepared.canvasHeight,
+                        crop: crop
                     )
                 }
+
+                guard let finalPixelData else {
+                    await send(
+                        .nanoBananaEditFailed(
+                            .nanoBananaUnsupportedImage
+                        )
+                    )
+                    return
+                }
+
+                let preview = NanoBananaPreviewState(
+                    request: prepared.normalizedRequest,
+                    outputLayerIndex: prepared.outputLayerIndex,
+                    pixelData: finalPixelData,
+                    beforePreviewImageData: prepared.beforePreviewImageData,
+                    afterPreviewImageData: AppFeature.pngData(
+                        fromLayerPixelData: finalPixelData,
+                        width: prepared.canvasWidth,
+                        height: prepared.canvasHeight
+                    )
+                )
+                await send(.nanoBananaEditSucceeded(preview))
             }
             .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
         }
@@ -383,7 +401,11 @@ extension AppFeature {
         case let .success(plan):
             applicationPlan = plan
         }
-        guard let appliedPreview = nanoBananaDocumentService.apply(applicationPlan) else {
+        let appliedPreview: NanoBananaDocumentService.AppliedPreview
+        switch nanoBananaDocumentService.apply(applicationPlan) {
+        case let .success(preview):
+            appliedPreview = preview
+        case .failure:
             nanoBananaGenerationService.applyFailure(
                 state: &state,
                 feedback: .nanoBananaApplyFailed

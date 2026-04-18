@@ -12,42 +12,57 @@ extension AppFeature {
     }
 
     struct LayerContentWorkflowService {
+        enum MutationFailure: Error, Equatable {
+            case replacePixelsFailed(Int)
+            case setTextLayerFailed(Int)
+            case setActiveLayerFailed(Int)
+        }
+
         let paintDocumentClient: PaintDocumentClient
 
         func applyPixels(
             _ pixelData: Data,
             to target: LayerContentMutationTarget
-        ) -> AppliedLayerContentMutation? {
+        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
             apply(target: target) { targetLayerIndex in
                 guard paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) else {
-                    return false
+                    return .failure(.replacePixelsFailed(targetLayerIndex))
                 }
-                return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                guard paintDocumentClient.setActiveLayer(targetLayerIndex) else {
+                    return .failure(.setActiveLayerFailed(targetLayerIndex))
+                }
+                return .success(())
             }
         }
 
         func applyTextLayer(
             _ textLayer: TextLayerData,
             to target: LayerContentMutationTarget
-        ) -> AppliedLayerContentMutation? {
+        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
             apply(target: target) { targetLayerIndex in
                 guard paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
-                    return false
+                    return .failure(.setTextLayerFailed(targetLayerIndex))
                 }
-                return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                guard paintDocumentClient.setActiveLayer(targetLayerIndex) else {
+                    return .failure(.setActiveLayerFailed(targetLayerIndex))
+                }
+                return .success(())
             }
         }
 
         private func apply(
             target: LayerContentMutationTarget,
-            mutation: (Int) -> Bool
-        ) -> AppliedLayerContentMutation? {
+            mutation: (Int) -> Result<Void, MutationFailure>
+        ) -> Result<AppliedLayerContentMutation, MutationFailure> {
             let resolvedTarget = resolve(target)
-            guard mutation(resolvedTarget.index) else {
+            switch mutation(resolvedTarget.index) {
+            case let .failure(failure):
                 rollbackResolvedTargetIfNeeded(resolvedTarget)
-                return nil
+                return .failure(failure)
+            case .success:
+                break
             }
-            return AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index)
+            return .success(AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index))
         }
 
         private func resolve(_ target: LayerContentMutationTarget) -> (index: Int, createdNewLayer: Bool) {
@@ -83,10 +98,14 @@ extension AppFeature {
             proposedName: name,
             layerSidebar: state.layerSidebar
         )
-        guard let appliedMutation = layerContentWorkflowService.applyPixels(
+        let appliedMutation: AppliedLayerContentMutation
+        switch layerContentWorkflowService.applyPixels(
             importedPixelData,
             to: .newLayer(name: layerName)
-        ) else {
+        ) {
+        case let .success(mutation):
+            appliedMutation = mutation
+        case .failure:
             state.application.presentFeedback(.couldNotImportPhoto(nil))
             return
         }
@@ -132,10 +151,14 @@ extension AppFeature {
         } else {
             target = .newLayer(name: namingPolicy.textLayerName(from: draft.text))
         }
-        guard let appliedMutation = layerContentWorkflowService.applyTextLayer(
+        let appliedMutation: AppliedLayerContentMutation
+        switch layerContentWorkflowService.applyTextLayer(
             textLayer,
             to: target
-        ) else {
+        ) {
+        case let .success(mutation):
+            appliedMutation = mutation
+        case .failure:
             state.application.presentFeedback(.textLayerApplyFailed)
             return
         }

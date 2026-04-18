@@ -7,6 +7,11 @@ import UIKit
 struct BrushPaletteFeature {
     static let maximumBrushRadius: Double = 256
 
+    fileprivate struct LibraryBootstrap {
+        let savedPresets: [BrushPreset]
+        let availableFonts: [TextFontOption]
+    }
+
     @ObservableState
     struct State: Equatable {
         struct BrushSettings: Equatable {
@@ -381,31 +386,23 @@ struct BrushPaletteFeature {
             var selectedFontDisplayName: String?
 
             init() {
-                let fonts = TextFontLibrary.availableFonts()
-                self.availableFonts = fonts
-                self.selectedFontPostScriptName = fonts.first?.postScriptName
-                self.selectedFontDisplayName = fonts.first?.displayName
+                availableFonts = []
+                selectedFontPostScriptName = nil
+                selectedFontDisplayName = nil
             }
         }
 
         struct LibraryState: Equatable {
             var selectedBrush: BrushPreset? = .defaultPencil
             var presets: [BrushPreset] = BrushPreset.defaults
-            var savedPresets: [BrushPreset]
-
-            init(
-                savedPresets: [BrushPreset] = BrushPresetLibraryClient.live(
-                    fileClient: .live,
-                    uuidClient: .live,
-                    brushTipLibraryClient: .live(fileClient: .live)
-                ).loadSavedPresets()
-            ) {
-                self.savedPresets = savedPresets
-            }
+            var savedPresets: [BrushPreset] = []
         }
 
         struct UIState: Equatable {
             var showsBrushSettingsPopover = false
+            var hasLoadedLibrary = false
+            var brushLibraryErrorMessage: String?
+            var textFontImportErrorMessage: String?
         }
 
         var brush = BrushSettings()
@@ -424,10 +421,20 @@ struct BrushPaletteFeature {
     }
 
     enum Action: BindableAction, Equatable {
+        case task
         case binding(BindingAction<State>)
         case selectPreset(BrushPreset)
+        case bootstrapLoaded(savedPresets: [BrushPreset], availableFonts: [TextFontOption])
         case importedPresets([BrushPreset])
         case importedTextFonts([TextFontOption])
+        case importBrushesRequested([URL])
+        case importTextFontsRequested([URL])
+        case importCustomTipRequested(URL)
+        case customTipImported(BrushTipRaster)
+        case brushLibraryErrorOccurred(String)
+        case textFontImportErrorOccurred(String)
+        case dismissBrushLibraryError
+        case dismissTextFontImportError
         case saveCurrentBrushButtonTapped
         case resetCurrentBrushSettingsButtonTapped
         case deleteSavedPresetButtonTapped(String)
@@ -454,11 +461,35 @@ struct BrushPaletteFeature {
     }
 
     @Dependency(\.brushPresetLibraryClient) var brushPresetLibraryClient
+    @Dependency(\.brushImportClient) var brushImportClient
+    @Dependency(\.textFontLibraryClient) var textFontLibraryClient
+    @Dependency(\.appLanguageClient) var appLanguageClient
 
     var body: some ReducerOf<Self> {
         BindingReducer()
         Reduce { state, action in
             switch action {
+            case .task:
+                guard !state.ui.hasLoadedLibrary else { return .none }
+                state.ui.hasLoadedLibrary = true
+                return .run { [brushPresetLibraryClient, textFontLibraryClient] send in
+                    await send(
+                        .bootstrapLoaded(
+                            savedPresets: brushPresetLibraryClient.loadSavedPresets(),
+                            availableFonts: textFontLibraryClient.loadAvailableFonts()
+                        )
+                    )
+                }
+
+            case let .bootstrapLoaded(savedPresets, availableFonts):
+                state.applyLibraryBootstrap(
+                    LibraryBootstrap(
+                        savedPresets: savedPresets,
+                        availableFonts: availableFonts
+                    )
+                )
+                return .none
+
             case .binding(\.paper.color),
                  .binding(\.paper.isTransparent):
                 return .none
@@ -550,26 +581,119 @@ struct BrushPaletteFeature {
                 return .none
 
             case let .importedPresets(presets):
-                let persistedPresets = state.persistImportedPresets(
-                    presets,
-                    brushPresetLibraryClient: brushPresetLibraryClient
-                )
-                let resolvedPresets = persistedPresets.isEmpty ? presets : persistedPresets
-                state.library.presets.insert(contentsOf: resolvedPresets.reversed(), at: 0)
-                if let first = resolvedPresets.first {
+                state.library.presets.insert(contentsOf: presets.reversed(), at: 0)
+                if let first = presets.first {
                     state.applyPreset(first)
                 }
                 return .none
 
             case let .importedTextFonts(fonts):
-                state.text.availableFonts = TextFontLibrary.availableFonts()
-                if state.text.selectedFontPostScriptName == nil, let first = state.text.availableFonts.first {
-                    state.text.selectedFontPostScriptName = first.postScriptName
-                    state.text.selectedFontDisplayName = first.displayName
-                } else if let selected = fonts.first {
+                if let selected = fonts.first {
                     state.text.selectedFontPostScriptName = selected.postScriptName
                     state.text.selectedFontDisplayName = selected.displayName
                 }
+                return .none
+
+            case let .importBrushesRequested(urls):
+                let existingNames = state.library.savedPresets.map(\.name) + state.library.presets.map(\.name)
+                let resolvedLanguage = appLanguageClient.load()
+                return .run { [brushImportClient, brushPresetLibraryClient] send in
+                    let importedResult = brushImportClient.importBrushPresets(
+                        BrushPresetImportRequest(urls: urls, language: resolvedLanguage)
+                    )
+
+                    var usedNames = Set(existingNames)
+                    var workingSaved = brushPresetLibraryClient.loadSavedPresets()
+                    var resolvedImported: [BrushPreset] = []
+                    var failureMessages = importedResult.failureMessages
+
+                    for preset in importedResult.presets {
+                        let resolvedName = brushPresetLibraryClient.uniqueName(
+                            preset.name,
+                            Array(usedNames)
+                        )
+                        let resolvedPreset = resolvedName == preset.name
+                            ? preset
+                            : preset.renamed(to: resolvedName)
+                        usedNames.insert(resolvedName)
+                        resolvedImported.append(resolvedPreset)
+                        do {
+                            workingSaved = try brushPresetLibraryClient.savePreset(
+                                resolvedPreset,
+                                false
+                            )
+                        } catch {
+                            failureMessages.append(
+                                "\(resolvedPreset.name): \(error.localizedDescription)"
+                            )
+                        }
+                    }
+
+                    await send(.bootstrapLoaded(savedPresets: workingSaved, availableFonts: []))
+                    if !resolvedImported.isEmpty {
+                        await send(.importedPresets(resolvedImported))
+                    }
+                    if !failureMessages.isEmpty {
+                        await send(.brushLibraryErrorOccurred(failureMessages.joined(separator: "\n")))
+                    }
+                }
+
+            case let .importTextFontsRequested(urls):
+                let savedPresets = state.library.savedPresets
+                return .run { [brushImportClient, textFontLibraryClient] send in
+                    let importResult = brushImportClient.importTextFonts(
+                        TextFontImportRequest(urls: urls)
+                    )
+                    await send(
+                        .bootstrapLoaded(
+                            savedPresets: savedPresets,
+                            availableFonts: textFontLibraryClient.loadAvailableFonts()
+                        )
+                    )
+                    if !importResult.fonts.isEmpty {
+                        await send(.importedTextFonts(importResult.fonts))
+                    }
+                    if !importResult.failureMessages.isEmpty {
+                        await send(
+                            .textFontImportErrorOccurred(
+                                importResult.failureMessages.joined(separator: "\n")
+                            )
+                        )
+                    }
+                }
+
+            case let .importCustomTipRequested(url):
+                return .run { [brushImportClient] send in
+                    switch brushImportClient.loadCustomTip(url) {
+                    case let .success(customTip):
+                        await send(.customTipImported(customTip))
+                    case let .failure(error):
+                        await send(
+                            .brushLibraryErrorOccurred(
+                                error.localizedDescription
+                            )
+                        )
+                    }
+                }
+
+            case let .customTipImported(customTip):
+                state.brush.customTip = customTip
+                return .none
+
+            case let .brushLibraryErrorOccurred(message):
+                state.ui.brushLibraryErrorMessage = message
+                return .none
+
+            case let .textFontImportErrorOccurred(message):
+                state.ui.textFontImportErrorMessage = message
+                return .none
+
+            case .dismissBrushLibraryError:
+                state.ui.brushLibraryErrorMessage = nil
+                return .none
+
+            case .dismissTextFontImportError:
+                state.ui.textFontImportErrorMessage = nil
                 return .none
 
             case let .setTextPlacement(position):
@@ -622,43 +746,55 @@ struct BrushPaletteFeature {
                     ? baseName
                     : brushPresetLibraryClient.uniqueName(baseName, savedNames)
                 let preset = state.brush.makePreset(named: resolvedName)
-                if let saved = try? brushPresetLibraryClient.savePreset(preset, isOverwritingSavedPreset) {
-                    state.library.savedPresets = saved
-                    if let matching = saved.first(where: { $0.name == resolvedName }) {
-                        state.applyPreset(matching)
-                    } else {
-                        state.applyPreset(preset)
+                return .run { [brushPresetLibraryClient] send in
+                    do {
+                        let saved = try brushPresetLibraryClient.savePreset(
+                            preset,
+                            isOverwritingSavedPreset
+                        )
+                        await send(.bootstrapLoaded(savedPresets: saved, availableFonts: []))
+                        if let matching = saved.first(where: { $0.name == resolvedName }) {
+                            await send(.selectPreset(matching))
+                        } else {
+                            await send(.selectPreset(preset))
+                        }
+                    } catch {
+                        await send(.brushLibraryErrorOccurred(error.localizedDescription))
                     }
                 }
-                return .none
 
             case .resetCurrentBrushSettingsButtonTapped:
                 state.applyPreset(state.library.selectedBrush ?? .defaultPencil)
                 return .none
 
             case let .deleteSavedPresetButtonTapped(name):
-                if let saved = try? brushPresetLibraryClient.deletePreset(name) {
-                    state.library.savedPresets = saved
-                } else {
-                    state.library.savedPresets.removeAll { $0.name == name }
+                return .run { [brushPresetLibraryClient] send in
+                    do {
+                        let saved = try brushPresetLibraryClient.deletePreset(name)
+                        await send(.bootstrapLoaded(savedPresets: saved, availableFonts: []))
+                    } catch {
+                        await send(.brushLibraryErrorOccurred(error.localizedDescription))
+                    }
                 }
-                state.library.presets.removeAll { $0.name == name }
-                if state.library.selectedBrush?.name == name {
-                    state.library.selectedBrush = nil
-                }
-                return .none
 
             case let .renameSavedPresetButtonTapped(oldName, newName):
                 let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !trimmed.isEmpty else { return .none }
-                if let saved = try? brushPresetLibraryClient.renamePreset(oldName, trimmed) {
-                    state.library.savedPresets = saved
-                    if state.library.selectedBrush?.name == oldName,
-                       let renamed = saved.first(where: { $0.name == trimmed }) ?? saved.first(where: { $0.customTip == state.brush.customTip }) {
-                        state.applyPreset(renamed)
+                let selectedBrushName = state.library.selectedBrush?.name
+                let selectedCustomTip = state.brush.customTip
+                return .run { [brushPresetLibraryClient] send in
+                    do {
+                        let saved = try brushPresetLibraryClient.renamePreset(oldName, trimmed)
+                        await send(.bootstrapLoaded(savedPresets: saved, availableFonts: []))
+                        if selectedBrushName == oldName,
+                           let renamed = saved.first(where: { $0.name == trimmed })
+                            ?? saved.first(where: { $0.customTip == selectedCustomTip }) {
+                            await send(.selectPreset(renamed))
+                        }
+                    } catch {
+                        await send(.brushLibraryErrorOccurred(error.localizedDescription))
                     }
                 }
-                return .none
 
             case .clearActiveLayerButtonTapped:
                 return .send(.delegate(.clearActiveLayer))
@@ -680,6 +816,17 @@ struct BrushPaletteFeature {
 }
 
 extension BrushPaletteFeature.State {
+    fileprivate mutating func applyLibraryBootstrap(_ bootstrap: BrushPaletteFeature.LibraryBootstrap) {
+        library.savedPresets = bootstrap.savedPresets
+        if !bootstrap.availableFonts.isEmpty {
+            text.availableFonts = bootstrap.availableFonts
+            if text.selectedFontPostScriptName == nil, let first = bootstrap.availableFonts.first {
+                text.selectedFontPostScriptName = first.postScriptName
+                text.selectedFontDisplayName = first.displayName
+            }
+        }
+    }
+
     mutating func syncPaper(
         color: Color,
         isTransparent: Bool
@@ -761,90 +908,73 @@ private extension BrushPaletteFeature.State {
         library.selectedBrush = preset
         brush.applyPreset(preset)
     }
+}
 
-    mutating func persistImportedPresets(
-        _ imported: [BrushPreset],
-        brushPresetLibraryClient: BrushPresetLibraryClient
-    ) -> [BrushPreset] {
-        guard !imported.isEmpty else { return [] }
-
-        var resolvedImported: [BrushPreset] = []
-        var workingSaved = library.savedPresets
-        var usedNames = Set(library.savedPresets.map(\.name))
-        usedNames.formUnion(library.presets.map(\.name))
-
-        for preset in imported {
-            let resolvedName = brushPresetLibraryClient.uniqueName(preset.name, Array(usedNames))
-            let resolvedPreset = resolvedName == preset.name ? preset : BrushPreset(
-                name: resolvedName,
-                tipKind: preset.tipKind,
-                color: preset.color,
-                radius: preset.radius,
-                sizeSpeedSensitivity: preset.sizeSpeedSensitivity,
-                taperIn: preset.taperIn,
-                taperOut: preset.taperOut,
-                opacity: preset.opacity,
-                hardness: preset.hardness,
-                roundness: preset.roundness,
-                roundnessPressureSensitivity: preset.roundnessPressureSensitivity,
-                roundnessTiltSensitivity: preset.roundnessTiltSensitivity,
-                angle: preset.angle,
-                anglePressureSensitivity: preset.anglePressureSensitivity,
-                angleTiltSensitivity: preset.angleTiltSensitivity,
-                angleMode: preset.angleMode,
-                spacing: preset.spacing,
-                spacingJitter: preset.spacingJitter,
-                scatterEnabled: preset.scatterEnabled,
-                scatterMode: preset.scatterMode,
-                scatterLateral: preset.scatterLateral,
-                scatterLinear: preset.scatterLinear,
-                count: preset.count,
-                countJitter: preset.countJitter,
-                countSizeJitter: preset.countSizeJitter,
-                countOpacityJitter: preset.countOpacityJitter,
-                angleJitter: preset.angleJitter,
-                roundnessJitter: preset.roundnessJitter,
-                textureMode: preset.textureMode,
-                textureStrength: preset.textureStrength,
-                flow: preset.flow,
-                flowPressureSensitivity: preset.flowPressureSensitivity,
-                flowJitter: preset.flowJitter,
-                velocityInfluence: preset.velocityInfluence,
-                wetness: preset.wetness,
-                wetnessPressureSensitivity: preset.wetnessPressureSensitivity,
-                opacityPressureSensitivity: preset.opacityPressureSensitivity,
-                colorMixStrength: preset.colorMixStrength,
-                paintLoad: preset.paintLoad,
-                loadPressureSensitivity: preset.loadPressureSensitivity,
-                dualBrushEnabled: preset.dualBrushEnabled,
-                dualTipKind: preset.dualTipKind,
-                dualScale: preset.dualScale,
-                dualSpacing: preset.dualSpacing,
-                dualScatter: preset.dualScatter,
-                dualAngle: preset.dualAngle,
-                dualBlendMode: preset.dualBlendMode,
-                grainScale: preset.grainScale,
-                grainContrast: preset.grainContrast,
-                paperScale: preset.paperScale,
-                paperStrength: preset.paperStrength,
-                paperThreshold: preset.paperThreshold,
-                flipX: preset.flipX,
-                flipY: preset.flipY,
-                customTip: preset.customTip,
-                pressureSensitivity: preset.pressureSensitivity,
-                red: preset.red,
-                green: preset.green,
-                blue: preset.blue
-            )
-            usedNames.insert(resolvedName)
-            resolvedImported.append(resolvedPreset)
-
-            if let saved = try? brushPresetLibraryClient.savePreset(resolvedPreset, false) {
-                workingSaved = saved
-            }
-        }
-
-        library.savedPresets = workingSaved
-        return resolvedImported
+private extension BrushPreset {
+    func renamed(to newName: String) -> BrushPreset {
+        BrushPreset(
+            name: newName,
+            tipKind: tipKind,
+            color: color,
+            radius: radius,
+            sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
+            opacity: opacity,
+            hardness: hardness,
+            roundness: roundness,
+            roundnessPressureSensitivity: roundnessPressureSensitivity,
+            roundnessTiltSensitivity: roundnessTiltSensitivity,
+            angle: angle,
+            anglePressureSensitivity: anglePressureSensitivity,
+            angleTiltSensitivity: angleTiltSensitivity,
+            angleMode: angleMode,
+            spacing: spacing,
+            spacingJitter: spacingJitter,
+            scatterEnabled: scatterEnabled,
+            scatterMode: scatterMode,
+            scatterLateral: scatterLateral,
+            scatterLinear: scatterLinear,
+            count: count,
+            countJitter: countJitter,
+            countSizeJitter: countSizeJitter,
+            countOpacityJitter: countOpacityJitter,
+            angleJitter: angleJitter,
+            roundnessJitter: roundnessJitter,
+            textureMode: textureMode,
+            textureStrength: textureStrength,
+            flow: flow,
+            flowPressureSensitivity: flowPressureSensitivity,
+            flowJitter: flowJitter,
+            velocityInfluence: velocityInfluence,
+            wetness: wetness,
+            wetnessPressureSensitivity: wetnessPressureSensitivity,
+            opacityPressureSensitivity: opacityPressureSensitivity,
+            colorMixStrength: colorMixStrength,
+            smudgeBlurEnabled: smudgeBlurEnabled,
+            smudgeBleed: smudgeBleed,
+            smudgeRadius: smudgeRadius,
+            paintLoad: paintLoad,
+            loadPressureSensitivity: loadPressureSensitivity,
+            dualBrushEnabled: dualBrushEnabled,
+            dualTipKind: dualTipKind,
+            dualScale: dualScale,
+            dualSpacing: dualSpacing,
+            dualScatter: dualScatter,
+            dualAngle: dualAngle,
+            dualBlendMode: dualBlendMode,
+            grainScale: grainScale,
+            grainContrast: grainContrast,
+            paperScale: paperScale,
+            paperStrength: paperStrength,
+            paperThreshold: paperThreshold,
+            flipX: flipX,
+            flipY: flipY,
+            customTip: customTip,
+            pressureSensitivity: pressureSensitivity,
+            red: red,
+            green: green,
+            blue: blue
+        )
     }
 }

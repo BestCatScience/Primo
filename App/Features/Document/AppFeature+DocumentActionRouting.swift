@@ -103,12 +103,12 @@ extension AppFeature {
         case let .nanoBananaRetryJob(jobID):
             return handleNanoBananaRetryJob(state: &state, jobID: jobID)
 
-        case let .timelapseExportProgressUpdated(progress, previewData):
-            handleTimelapseExportProgressUpdated(state: &state, progress: progress, previewData: previewData)
+        case let .timelapseExportProgressUpdated(progress):
+            handleTimelapseExportProgressUpdated(state: &state, progress: progress)
             return .none
 
-        case let .timelapseExportSucceeded(url):
-            handleTimelapseExportSucceeded(state: &state, url: url)
+        case let .timelapseExportSucceeded(result):
+            handleTimelapseExportSucceeded(state: &state, result: result)
             return .none
 
         case let .timelapseExportFailed(feedback):

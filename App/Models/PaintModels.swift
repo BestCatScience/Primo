@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
-import CoreText
 import UIKit
 import simd
 
@@ -175,101 +174,14 @@ struct TextLayerDraft: Equatable, Sendable {
 }
 
 enum TextFontLibrary {
-    private static let fileManager = FileManager.default
-    private static let importedFontsDirectoryName = "ImportedFonts"
-    private static var registeredFontURLs = Set<String>()
+    private static let liveClient = TextFontLibraryClient.live(fileClient: .live)
 
     static func availableFonts() -> [TextFontOption] {
-        registerImportedFontsIfNeeded()
-        var options: [TextFontOption] = []
-        for family in UIFont.familyNames.sorted() {
-            for postScriptName in UIFont.fontNames(forFamilyName: family).sorted() {
-                let font = UIFont(name: postScriptName, size: 14)
-                options.append(
-                    TextFontOption(
-                        postScriptName: postScriptName,
-                        displayName: font?.fontName ?? postScriptName,
-                        sourceFilename: nil
-                    )
-                )
-            }
-        }
-        return options.sorted {
-            ($0.displayName, $0.postScriptName) < ($1.displayName, $1.postScriptName)
-        }
+        liveClient.loadAvailableFonts()
     }
 
     static func importFonts(from urls: [URL]) throws -> [TextFontOption] {
-        try fileManager.createDirectory(at: importedFontsDirectoryURL(), withIntermediateDirectories: true)
-        var imported: [TextFontOption] = []
-
-        for url in urls {
-            let destinationURL = uniqueImportedFontURL(for: url.lastPathComponent)
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
-            }
-            try fileManager.copyItem(at: url, to: destinationURL)
-            imported.append(contentsOf: try registerFont(at: destinationURL, sourceFilename: destinationURL.lastPathComponent))
-        }
-
-        return imported
-    }
-
-    static func registerImportedFontsIfNeeded() {
-        guard let urls = try? fileManager.contentsOfDirectory(
-            at: importedFontsDirectoryURL(),
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else {
-            return
-        }
-        for url in urls {
-            _ = try? registerFont(at: url, sourceFilename: url.lastPathComponent)
-        }
-    }
-
-    static func importedFontsDirectoryURL() -> URL {
-        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.temporaryDirectory
-        return baseURL.appendingPathComponent(importedFontsDirectoryName, isDirectory: true)
-    }
-
-    private static func uniqueImportedFontURL(for filename: String) -> URL {
-        let directory = importedFontsDirectoryURL()
-        let ext = (filename as NSString).pathExtension
-        let stem = ((filename as NSString).deletingPathExtension.isEmpty ? "ImportedFont" : (filename as NSString).deletingPathExtension)
-        var counter = 0
-        while true {
-            let candidateName = counter == 0
-                ? "\(stem)\(ext.isEmpty ? "" : ".\(ext)")"
-                : "\(stem)-\(counter)\(ext.isEmpty ? "" : ".\(ext)")"
-            let candidateURL = directory.appendingPathComponent(candidateName, isDirectory: false)
-            if !fileManager.fileExists(atPath: candidateURL.path) {
-                return candidateURL
-            }
-            counter += 1
-        }
-    }
-
-    private static func registerFont(at url: URL, sourceFilename: String?) throws -> [TextFontOption] {
-        if !registeredFontURLs.contains(url.path) {
-            var registrationError: Unmanaged<CFError>?
-            let didRegister = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &registrationError)
-            if !didRegister, let error = registrationError?.takeRetainedValue() {
-                let description = CFErrorCopyDescription(error) as String
-                if !description.localizedCaseInsensitiveContains("already") {
-                    throw error
-                }
-            }
-            registeredFontURLs.insert(url.path)
-        }
-
-        guard let provider = CGDataProvider(url: url as CFURL), let cgFont = CGFont(provider) else {
-            return []
-        }
-        let postScriptName = cgFont.postScriptName as String? ?? url.deletingPathExtension().lastPathComponent
-        let displayName = CTFontCopyFullName(CTFontCreateWithGraphicsFont(cgFont, 14, nil, nil)) as String
-        return [TextFontOption(postScriptName: postScriptName, displayName: displayName, sourceFilename: sourceFilename)]
+        try liveClient.importFonts(urls)
     }
 }
 

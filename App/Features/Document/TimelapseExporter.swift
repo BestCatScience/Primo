@@ -12,17 +12,12 @@ enum TimelapseExporter {
         to directory: URL,
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
-        progress: ((Double, URL) -> Void)? = nil
-    ) throws -> URL {
+        progress: ((TimelapseExportProgress) -> Void)? = nil
+    ) throws -> TimelapseExportResult {
         try fileClient.createDirectory(directory, true)
         let outputURL = directory.appendingPathComponent(exportFilename(date: dateClient.now()))
         if fileClient.fileExists(outputURL.path) {
             try fileClient.removeItem(outputURL)
-        }
-
-        let previewURL = directory.appendingPathComponent("timelapse-preview.jpg")
-        if fileClient.fileExists(previewURL.path) {
-            try fileClient.removeItem(previewURL)
         }
 
         let frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(capture.framesPerSecond, 1)))
@@ -97,8 +92,6 @@ enum TimelapseExporter {
                 frameDuration: frameDuration,
                 holdFrameCount: holdFrameCount,
                 totalFrameCount: totalFrameCount,
-                previewURL: previewURL,
-                fileClient: fileClient,
                 progress: progress
             )
         case let .operations(operations):
@@ -106,6 +99,7 @@ enum TimelapseExporter {
             try appendOperationFrames(
                 exportOperations,
                 capture: capture,
+                fileClient: fileClient,
                 targetSize: targetSize,
                 input: input,
                 adaptor: adaptor,
@@ -113,8 +107,6 @@ enum TimelapseExporter {
                 frameDuration: frameDuration,
                 holdFrameCount: holdFrameCount,
                 totalFrameCount: totalFrameCount,
-                previewURL: previewURL,
-                fileClient: fileClient,
                 progress: progress
             )
         }
@@ -135,7 +127,7 @@ enum TimelapseExporter {
             throw writer.error ?? TimelapseExportError.exportFailed
         }
 
-        return outputURL
+        return TimelapseExportResult(url: outputURL)
     }
 
     private static func appendFrameImages(
@@ -147,9 +139,7 @@ enum TimelapseExporter {
         frameDuration: CMTime,
         holdFrameCount: Int,
         totalFrameCount: Int,
-        previewURL: URL,
-        fileClient: FileClient,
-        progress: ((Double, URL) -> Void)?
+        progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
         for (index, frameURL) in frameURLs.enumerated() {
             guard let image = decodedImage(from: frameURL) else {
@@ -164,8 +154,12 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: image, to: previewURL, fileClient: fileClient)
-            progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
+            progress?(
+                TimelapseExportProgress(
+                    progress: Double(index + 1) / Double(totalFrameCount),
+                    previewImageData: makePreviewData(image: image)
+                )
+            )
         }
 
         guard let finalFrameURL = frameURLs.last,
@@ -183,14 +177,19 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: finalImage, to: previewURL, fileClient: fileClient)
-            progress?(Double(frameURLs.count + holdIndex) / Double(totalFrameCount), previewURL)
+            progress?(
+                TimelapseExportProgress(
+                    progress: Double(frameURLs.count + holdIndex) / Double(totalFrameCount),
+                    previewImageData: makePreviewData(image: finalImage)
+                )
+            )
         }
     }
 
     private static func appendOperationFrames(
         _ operations: [TimelapseOperation],
         capture: TimelapseCapture,
+        fileClient: FileClient,
         targetSize: CGSize,
         input: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
@@ -198,9 +197,7 @@ enum TimelapseExporter {
         frameDuration: CMTime,
         holdFrameCount: Int,
         totalFrameCount: Int,
-        previewURL: URL,
-        fileClient: FileClient,
-        progress: ((Double, URL) -> Void)?
+        progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
         let replaySession = PaintDocumentSession(
             width: max(Int(capture.canvasSize.width.rounded()), 1),
@@ -225,8 +222,12 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: image, to: previewURL, fileClient: fileClient)
-            progress?(Double(index + 1) / Double(totalFrameCount), previewURL)
+            progress?(
+                TimelapseExportProgress(
+                    progress: Double(index + 1) / Double(totalFrameCount),
+                    previewImageData: makePreviewData(image: image)
+                )
+            )
         }
 
         guard let finalImage else {
@@ -243,8 +244,12 @@ enum TimelapseExporter {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            try writePreview(image: finalImage, to: previewURL, fileClient: fileClient)
-            progress?(Double(operations.count + holdIndex) / Double(totalFrameCount), previewURL)
+            progress?(
+                TimelapseExportProgress(
+                    progress: Double(operations.count + holdIndex) / Double(totalFrameCount),
+                    previewImageData: makePreviewData(image: finalImage)
+                )
+            )
         }
     }
 
@@ -375,11 +380,8 @@ enum TimelapseExporter {
         return sampled
     }
 
-    private static func writePreview(image: CGImage, to url: URL, fileClient: FileClient) throws {
-        guard let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.72) else {
-            throw TimelapseExportError.exportFailed
-        }
-        try fileClient.writeData(data, url, .atomic)
+    private static func makePreviewData(image: CGImage) -> Data? {
+        UIImage(cgImage: image).jpegData(compressionQuality: 0.72)
     }
 }
 

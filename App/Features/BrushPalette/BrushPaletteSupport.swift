@@ -405,13 +405,11 @@ struct BrushStrokePreview: View {
     }
 
     private func previewStampAlpha(pressure: Double, opacityJitter: Double) -> Double {
-        let base = min(max(style.opacity, 0.04), 1.0)
-        let flow = min(max(style.flow, 0.0), 1.0)
-        let hardnessBias = 0.55 + (style.hardness * 0.45)
-        let opacityPressure = max(0.2, 1.0 - style.opacityPressureSensitivity + (style.opacityPressureSensitivity * pressure))
-        let flowPressure = max(0.2, 1.0 - style.flowPressureSensitivity + (style.flowPressureSensitivity * pressure))
-        let customTipBoost = style.customTip == nil ? 1.0 : 0.92
-        return min(max(base * flow * hardnessBias * 0.55 * opacityPressure * flowPressure * opacityJitter * customTipBoost, 0.0), 1.0)
+        BrushStrokeKernel.previewStampAlpha(
+            pressure: pressure,
+            opacityJitter: opacityJitter,
+            style: style
+        )
     }
 
     private func previewPressure(at index: Int, total: Int) -> Double {
@@ -429,16 +427,11 @@ struct BrushStrokePreview: View {
     }
 
     private func strokeTaperScale(progress: Double, taperIn: Double, taperOut: Double) -> Double {
-        func easedRamp(_ progress: Double, length: Double) -> Double {
-            guard length > 0.001 else { return 1.0 }
-            let t = min(max(progress / length, 0.0), 1.0)
-            let eased = t * t * (3.0 - (2.0 * t))
-            return 0.08 + (0.92 * eased)
-        }
-
-        let entry = easedRamp(progress, length: taperIn)
-        let exit = easedRamp(1.0 - progress, length: taperOut)
-        return min(entry, exit)
+        BrushStrokeKernel.taperScale(
+            progress: progress,
+            taperIn: taperIn,
+            taperOut: taperOut
+        )
     }
 
     private func signedNoise(_ seed: Double) -> Double {

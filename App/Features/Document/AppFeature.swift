@@ -136,13 +136,15 @@ struct AppFeature {
         case nanoBananaCancelRequested
         case nanoBananaRegenerateRequested
         case nanoBananaRetryJob(UUID)
+        case openImportedDocumentRequested(URL)
+        case openImportedDocumentLoaded(LoadedPaintProject, String)
         case openDocumentSelected(DocumentProjectPath)
         case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath)
         case openDocumentFailed(ApplicationFeedback)
         case photoImportReceived(name: String?, data: Data)
         case photoImportFailed(ApplicationFeedback)
-        case timelapseExportProgressUpdated(Double, Data?)
-        case timelapseExportSucceeded(URL)
+        case timelapseExportProgressUpdated(TimelapseExportProgress)
+        case timelapseExportSucceeded(TimelapseExportResult)
         case timelapseExportFailed(ApplicationFeedback)
         case exportSheetDismissed
         case bannerDismissed
@@ -187,6 +189,7 @@ struct AppFeature {
     @Dependency(\.paintDocumentClient) var paintDocumentClient
     @Dependency(\.nanoBananaClient) var nanoBananaClient
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
+    @Dependency(\.documentImportClient) var documentImportClient
     @Dependency(\.fileClient) var fileClient
     @Dependency(\.dateClient) var dateClient
     @Dependency(\.uuidClient) var uuidClient

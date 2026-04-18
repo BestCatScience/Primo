@@ -197,6 +197,20 @@ extension AppFeature {
         case .homeReturnRequested:
             return handleHomeReturnRequest(state: &state)
 
+        case let .openImportedDocumentRequested(sourceURL):
+            return handleOpenImportedDocumentRequest(
+                state: &state,
+                sourceURL: sourceURL
+            )
+
+        case let .openImportedDocumentLoaded(loaded, suggestedTitle):
+            handleOpenImportedDocumentLoaded(
+                state: &state,
+                loaded: loaded,
+                suggestedTitle: suggestedTitle
+            )
+            return .none
+
         case let .openDocumentSelected(url):
             return handleOpenDocumentSelection(
                 state: &state,

@@ -4,6 +4,7 @@ import Foundation
 extension AppFeature {
     struct WorkspaceTabCoordinator {
         let paintDocumentClient: PaintDocumentClient
+        let documentImportClient: DocumentImportClient
         let workspaceCatalogService: WorkspaceCatalogService
         let workspaceBackingStoreService: WorkspaceBackingStoreService
 
@@ -17,7 +18,11 @@ extension AppFeature {
                 do {
                     let loaded = try paintDocumentClient.loadProject(fileURL)
                     if let workspaceItemToRemove = removeWorkspaceItemOnSuccess {
-                        try? workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
+                        do {
+                            try workspaceBackingStoreService.removeWorkspaceItem(workspaceItemToRemove)
+                        } catch {
+                            // Best-effort cleanup of a staged workspace item after a successful load.
+                        }
                     }
                     await send(onSuccess(loaded))
                 } catch {
@@ -26,9 +31,40 @@ extension AppFeature {
             }
         }
 
+        func loadImportedProjectEffect(
+            from sourceURL: URL,
+            onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
+            onFailure: @escaping @Sendable (Error) -> Action
+        ) -> Effect<Action> {
+            .run { [documentImportClient, paintDocumentClient] send in
+                let stagedResult = documentImportClient.stageImportedDocument(
+                    ImportedDocumentStageRequest(sourceURL: sourceURL)
+                )
+                switch stagedResult {
+                case let .failure(error):
+                    await send(onFailure(error))
+
+                case let .success(staged):
+                    do {
+                        let loaded = try paintDocumentClient.loadProject(staged.stagedProjectURL.fileURL)
+                        _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
+                        await send(onSuccess(loaded, staged.suggestedTitle))
+                    } catch {
+                        _ = documentImportClient.discardStagedDocument(staged.stagedProjectURL)
+                        await send(onFailure(error))
+                    }
+                }
+            }
+        }
+
         func loadAutosaveRecoveryEffect() -> Effect<Action> {
             .run { [workspaceCatalogService] send in
-                let items = (try? workspaceCatalogService.loadAutosaveRecoveryItems()) ?? []
+                let items: [AutosaveRecoveryItem]
+                do {
+                    items = try workspaceCatalogService.loadAutosaveRecoveryItems()
+                } catch {
+                    items = []
+                }
                 await send(.autosaveRecoveryLoaded(items))
             }
         }
@@ -37,6 +73,7 @@ extension AppFeature {
     var workspaceTabCoordinator: WorkspaceTabCoordinator {
         WorkspaceTabCoordinator(
             paintDocumentClient: paintDocumentClient,
+            documentImportClient: documentImportClient,
             workspaceCatalogService: workspaceCatalogService,
             workspaceBackingStoreService: workspaceBackingStoreService
         )
@@ -65,6 +102,30 @@ extension AppFeature {
             onSuccess: onSuccess,
             onFailure: onFailure,
             removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
+        )
+    }
+
+    func beginImportedWorkspaceProjectLoad(
+        state: inout State,
+        sourceURL: URL,
+        persistCurrentTab: Bool = true,
+        onSuccess: @escaping @Sendable (LoadedPaintProject, String) -> Action,
+        onFailure: @escaping @Sendable (Error) -> Action
+    ) -> Effect<Action> {
+        if persistCurrentTab {
+            switch prepareForDocumentReplacement(state: &state) {
+            case .success:
+                break
+            case let .failure(failure):
+                state.application.presentFeedback(failure.feedback)
+                return .none
+            }
+        }
+        state.application.beginHydration()
+        return workspaceTabCoordinator.loadImportedProjectEffect(
+            from: sourceURL,
+            onSuccess: onSuccess,
+            onFailure: onFailure
         )
     }
 }

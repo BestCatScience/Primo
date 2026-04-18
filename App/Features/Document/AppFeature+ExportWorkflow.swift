@@ -23,18 +23,17 @@ extension AppFeature {
         ) -> Effect<Action> {
             .run { [workspaceArtifactService, fileClient, dateClient] send in
                 do {
-                    let url = try TimelapseExporter.exportVideo(
+                    let result = try TimelapseExporter.exportVideo(
                         from: capture,
                         to: workspaceArtifactService.timelapseTemporaryDirectory(),
                         fileClient: fileClient,
                         dateClient: dateClient
-                    ) { progress, previewURL in
-                        let previewData = try? fileClient.readData(previewURL)
+                    ) { progress in
                         Task {
-                            await send(.timelapseExportProgressUpdated(progress, previewData))
+                            await send(.timelapseExportProgressUpdated(progress))
                         }
                     }
-                    await send(.timelapseExportSucceeded(url))
+                    await send(.timelapseExportSucceeded(result))
                 } catch {
                     await send(
                         .timelapseExportFailed(
@@ -90,17 +89,18 @@ extension AppFeature {
 
     func handleTimelapseExportProgressUpdated(
         state: inout State,
-        progress: Double,
-        previewData: Data?
+        progress: TimelapseExportProgress
     ) {
-        state.export.updateTimelapsePreview(progress: progress, previewData: previewData)
+        state.export.updateTimelapsePreview(progress)
     }
 
     func handleTimelapseExportSucceeded(
         state: inout State,
-        url: URL
+        result: TimelapseExportResult
     ) {
-        state.export.completeTimelapseExport(with: exportWorkflowService.makeShareExport(url: url))
+        state.export.completeTimelapseExport(
+            with: exportWorkflowService.makeShareExport(url: result.url)
+        )
     }
 
     func handleTimelapseExportFailed(

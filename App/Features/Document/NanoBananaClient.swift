@@ -154,57 +154,103 @@ struct NanoBananaRequestConfig: Equatable, Sendable {
     let endpoint: String
 }
 
+struct NanoBananaEditRequest: Equatable, Sendable, OperationRequest {
+    let inputPNGData: Data
+    let prompt: String
+    let config: NanoBananaRequestConfig
+    let model: NanoBananaModel
+}
+
+struct NanoBananaEditResult: Equatable, Sendable, OperationResult {
+    let imageData: Data
+}
+
+enum NanoBananaFailure: LocalizedError, Equatable, OperationFailure {
+    case invalidEndpoint
+    case invalidResponse
+    case missingImageData(String)
+    case apiError(String)
+    case transport(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidEndpoint:
+            return "Nano Banana endpoint is invalid."
+        case .invalidResponse:
+            return "Nano Banana returned an invalid response."
+        case let .missingImageData(message):
+            return message
+        case let .apiError(message):
+            return message
+        case let .transport(message):
+            return message
+        }
+    }
+}
+
+enum NanoBananaEditContract: OperationContract {
+    typealias Request = NanoBananaEditRequest
+    typealias Result = NanoBananaEditResult
+    typealias Failure = NanoBananaFailure
+}
+
 struct NanoBananaClient: Sendable {
-    var editImage: @Sendable (_ inputPNGData: Data, _ prompt: String, _ config: NanoBananaRequestConfig, _ model: NanoBananaModel) async throws -> Data
+    var executeEdit: @Sendable (NanoBananaEditRequest) async -> Result<NanoBananaEditResult, NanoBananaFailure>
 
     static func live(httpClient: HTTPClient) -> NanoBananaClient {
-        NanoBananaClient { inputPNGData, prompt, config, model in
-        let primaryPrompt = enforcedImageEditingPrompt(from: prompt)
-        let retryPrompt = strictRetryImageEditingPrompt(from: prompt)
-        var lastError: Error?
+        NanoBananaClient { request in
+            let primaryPrompt = enforcedImageEditingPrompt(from: request.prompt)
+            let retryPrompt = strictRetryImageEditingPrompt(from: request.prompt)
+            var lastError: NanoBananaFailure?
 
-        let candidateModels = retryModels(startingWith: model)
-        for round in 0..<3 {
-            if round > 0 {
-                let delayNanoseconds = UInt64((0.8 + Double(round) * 0.9) * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: delayNanoseconds)
-            }
+            let candidateModels = retryModels(startingWith: request.model)
+            for round in 0..<3 {
+                if round > 0 {
+                    let delayNanoseconds = UInt64((0.8 + Double(round) * 0.9) * 1_000_000_000)
+                    try? await Task.sleep(nanoseconds: delayNanoseconds)
+                }
 
-            for candidateModel in candidateModels {
-                do {
-                    if let imageData = try await performEditRequest(
-                        inputPNGData: inputPNGData,
-                        prompt: primaryPrompt,
-                        config: config,
-                        model: candidateModel,
-                        httpClient: httpClient
-                    ) {
-                        return imageData
-                    }
+                for candidateModel in candidateModels {
+                    do {
+                        if let imageData = try await performEditRequest(
+                            inputPNGData: request.inputPNGData,
+                            prompt: primaryPrompt,
+                            config: request.config,
+                            model: candidateModel,
+                            httpClient: httpClient
+                        ) {
+                            return .success(NanoBananaEditResult(imageData: imageData))
+                        }
 
-                    if let imageData = try await performEditRequest(
-                        inputPNGData: inputPNGData,
-                        prompt: retryPrompt,
-                        config: config,
-                        model: candidateModel,
-                        httpClient: httpClient
-                    ) {
-                        return imageData
-                    }
-                } catch {
-                    lastError = error
-                    guard shouldRetryWithAnotherModel(after: error) else {
-                        throw error
+                        if let imageData = try await performEditRequest(
+                            inputPNGData: request.inputPNGData,
+                            prompt: retryPrompt,
+                            config: request.config,
+                            model: candidateModel,
+                            httpClient: httpClient
+                        ) {
+                            return .success(NanoBananaEditResult(imageData: imageData))
+                        }
+                    } catch let failure as NanoBananaFailure {
+                        lastError = failure
+                        guard shouldRetryWithAnotherModel(after: failure) else {
+                            return .failure(failure)
+                        }
+                    } catch {
+                        let failure = NanoBananaFailure.transport(error.localizedDescription)
+                        lastError = failure
+                        return .failure(failure)
                     }
                 }
             }
-        }
 
-        if let lastError {
-            throw lastError
+            if let lastError {
+                return .failure(lastError)
+            }
+            return .failure(
+                .missingImageData("Nano Banana did not return decodable image bytes.")
+            )
         }
-        throw NanoBananaError.missingImageData("Nano Banana did not return decodable image bytes.")
-    }
     }
 
     private static func enforcedImageEditingPrompt(from prompt: String) -> String {
@@ -239,9 +285,8 @@ struct NanoBananaClient: Sendable {
         [initialModel] + NanoBananaModel.allCases.filter { $0 != initialModel }
     }
 
-    private static func shouldRetryWithAnotherModel(after error: Error) -> Bool {
-        guard let nanoBananaError = error as? NanoBananaError else { return false }
-        switch nanoBananaError {
+    private static func shouldRetryWithAnotherModel(after error: NanoBananaFailure) -> Bool {
+        switch error {
         case let .apiError(message):
             let normalized = message.lowercased()
             return normalized.contains("high demand")
@@ -262,7 +307,7 @@ struct NanoBananaClient: Sendable {
     ) async throws -> Data? {
         switch config.accessMode {
         case .userAPIKey:
-            var lastError: Error?
+            var lastError: NanoBananaFailure?
             for request in makeGeminiRequests(
                 inputPNGData: inputPNGData,
                 prompt: prompt,
@@ -272,21 +317,27 @@ struct NanoBananaClient: Sendable {
                 do {
                     let (data, response) = try await httpClient.data(request)
                     guard let httpResponse = response as? HTTPURLResponse else {
-                        throw NanoBananaError.invalidResponse
+                        throw NanoBananaFailure.invalidResponse
                     }
 
                     guard (200...299).contains(httpResponse.statusCode) else {
                         if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
-                            throw NanoBananaError.apiError(apiError.error.message)
+                            throw NanoBananaFailure.apiError(apiError.error.message)
                         }
-                        throw NanoBananaError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)")
+                        throw NanoBananaFailure.apiError(
+                            String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                        )
                     }
 
                     if let imageData = try decodeImageData(from: data) {
                         return imageData
                     }
                 } catch {
-                    lastError = error
+                    if let failure = error as? NanoBananaFailure {
+                        lastError = failure
+                    } else {
+                        lastError = .transport(error.localizedDescription)
+                    }
                 }
             }
             if let lastError {
@@ -303,14 +354,16 @@ struct NanoBananaClient: Sendable {
             )
             let (data, response) = try await httpClient.data(request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw NanoBananaError.invalidResponse
+                throw NanoBananaFailure.invalidResponse
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
-                    throw NanoBananaError.apiError(apiError.error.message)
+                    throw NanoBananaFailure.apiError(apiError.error.message)
                 }
-                throw NanoBananaError.apiError(String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)")
+                throw NanoBananaFailure.apiError(
+                    String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                )
             }
 
             return try decodeImageData(from: data)
@@ -387,7 +440,7 @@ struct NanoBananaClient: Sendable {
         model: NanoBananaModel
     ) throws -> URLRequest {
         guard let url = URL(string: endpoint), !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw NanoBananaError.invalidEndpoint
+            throw NanoBananaFailure.invalidEndpoint
         }
 
         let requestBody = ProxyEditRequest(
@@ -446,7 +499,9 @@ struct NanoBananaClient: Sendable {
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !joinedText.isEmpty {
-                throw NanoBananaError.missingImageData("Nano Banana returned text instead of an image: \(joinedText.prefix(240))")
+                throw NanoBananaFailure.missingImageData(
+                    "Nano Banana returned text instead of an image: \(joinedText.prefix(240))"
+                )
             }
         }
 
@@ -642,26 +697,6 @@ private struct ProxyEditResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case imageBase64 = "image_base64"
         case inlineData = "inline_data"
-    }
-}
-
-enum NanoBananaError: LocalizedError {
-    case invalidEndpoint
-    case invalidResponse
-    case missingImageData(String)
-    case apiError(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidEndpoint:
-            return "Nano Banana endpoint is invalid."
-        case .invalidResponse:
-            return "Nano Banana returned an invalid response."
-        case let .missingImageData(message):
-            return message
-        case let .apiError(message):
-            return message
-        }
     }
 }
 

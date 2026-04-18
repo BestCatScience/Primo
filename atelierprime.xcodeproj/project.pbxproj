@@ -138,6 +138,11 @@
 		D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000008 /* PaintDocumentGeometryService.swift */; };
 		D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5000000000000000000000A /* PaintDocumentBlurService.swift */; };
 		E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AppFeature+DomainState.swift */; };
+		F10000000000000000000001 /* OperationContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* OperationContracts.swift */; };
+		F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* TextFontLibraryClient.swift */; };
+		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
+		F10000000000000000000007 /* DocumentImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* DocumentImportClient.swift */; };
+		F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000A /* BrushStrokeKernel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -276,6 +281,11 @@
 		D50000000000000000000008 /* PaintDocumentGeometryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentGeometryService.swift; sourceTree = "<group>"; };
 		D5000000000000000000000A /* PaintDocumentBlurService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBlurService.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* AppFeature+DomainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DomainState.swift"; sourceTree = "<group>"; };
+		F10000000000000000000002 /* OperationContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationContracts.swift; sourceTree = "<group>"; };
+		F10000000000000000000004 /* TextFontLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFontLibraryClient.swift; sourceTree = "<group>"; };
+		F10000000000000000000006 /* BrushImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushImportClient.swift; sourceTree = "<group>"; };
+		F10000000000000000000008 /* DocumentImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImportClient.swift; sourceTree = "<group>"; };
+		F1000000000000000000000A /* BrushStrokeKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushStrokeKernel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -412,8 +422,13 @@
 			children = (
 				A0000000000000000000000A /* primo-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
+				F10000000000000000000002 /* OperationContracts.swift */,
 				A000000000000000000000C9 /* SystemClients.swift */,
 				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
+				F10000000000000000000004 /* TextFontLibraryClient.swift */,
+				F10000000000000000000006 /* BrushImportClient.swift */,
+				F10000000000000000000008 /* DocumentImportClient.swift */,
+				F1000000000000000000000A /* BrushStrokeKernel.swift */,
 				A00000000000000000000095 /* BrushPresetStore.swift */,
 				A0000000000000000000004D /* BrushTipFile.swift */,
 				A0000000000000000000004F /* PhotoshopBrushFile.swift */,
@@ -721,6 +736,11 @@
 				D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */,
 				A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */,
 				A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */,
+				F10000000000000000000001 /* OperationContracts.swift in Sources */,
+				F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */,
+				F10000000000000000000005 /* BrushImportClient.swift in Sources */,
+				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,
+				F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */,
 				D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */,
 				D50000000000000000000003 /* PaintDocumentPersistenceService.swift in Sources */,
 				D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */,

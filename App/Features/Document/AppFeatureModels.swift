@@ -15,6 +15,15 @@ struct TimelapseExportPreview: Equatable {
     var previewImageData: Data?
 }
 
+struct TimelapseExportProgress: Equatable, Sendable {
+    var progress: Double
+    var previewImageData: Data?
+}
+
+struct TimelapseExportResult: Equatable, Sendable {
+    var url: URL
+}
+
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
     case layers

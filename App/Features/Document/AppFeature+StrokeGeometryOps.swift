@@ -55,16 +55,11 @@ extension AppFeature {
     }
 
     static func strokeTaperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
-        func easedRamp(_ progress: CGFloat, length: CGFloat) -> CGFloat {
-            guard length > 0.001 else { return 1.0 }
-            let t = max(0.0, min(1.0, progress / length))
-            let eased = t * t * (3.0 - (2.0 * t))
-            return 0.08 + (0.92 * eased)
-        }
-
-        let entry = easedRamp(progress, length: taperIn)
-        let exit = easedRamp(1.0 - progress, length: taperOut)
-        return min(entry, exit)
+        BrushStrokeKernel.taperScale(
+            progress: progress,
+            taperIn: taperIn,
+            taperOut: taperOut
+        )
     }
 
     static func strokeProgressTable(_ samples: [StylusSample]) -> [CGFloat] {
@@ -171,21 +166,14 @@ extension AppFeature {
     }
 
     static func resolvedStrokeRadius(for sample: StylusSample, progress: CGFloat = 0, brush: BrushRuntimeSettings) -> CGFloat {
-        let clampedPressure = max(0.08, min(sample.pressure, 1.0))
-        let pressureFactor = max(
-            0.1,
-            1.0 + ((clampedPressure - 1.0) * CGFloat(brush.pressureSensitivity))
-        )
-        let taperScale = strokeTaperScale(
+        BrushStrokeKernel.resolvedRadius(
+            for: sample,
             progress: progress,
-            taperIn: CGFloat(brush.taperIn),
-            taperOut: CGFloat(brush.taperOut)
+            brush: brush
         )
-        return max(CGFloat(brush.radius) * pressureFactor * taperScale, 1.5)
     }
 
     static func previewNoise(x: CGFloat, y: CGFloat) -> CGFloat {
-        let value = sin((x * 12.9898) + (y * 78.233)) * 43758.5453
-        return value - floor(value)
+        BrushStrokeKernel.noise(x: x, y: y)
     }
 }

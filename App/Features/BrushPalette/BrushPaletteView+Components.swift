@@ -543,16 +543,6 @@ extension BrushPaletteView {
         .buttonStyle(.plain)
     }
 
-    func withSecurityScopedAccess<T>(to url: URL, _ work: () -> T) -> T {
-        let didAccess = url.startAccessingSecurityScopedResource()
-        defer {
-            if didAccess {
-                url.stopAccessingSecurityScopedResource()
-            }
-        }
-        return work()
-    }
-
     func brushTipButton(tipKind: BrushTipKind, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
