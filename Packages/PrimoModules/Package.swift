@@ -5,6 +5,7 @@ let package = Package(
     name: "PrimoModules",
     products: [
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
+        .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoDocumentContracts", targets: ["PrimoDocumentContracts"]),
         .library(name: "PrimoWorkspaceDomain", targets: ["PrimoWorkspaceDomain"]),
@@ -12,6 +13,9 @@ let package = Package(
     targets: [
         .target(
             name: "PrimoCoreTypes"
+        ),
+        .target(
+            name: "PrimoLocalization"
         ),
         .target(
             name: "PrimoDocumentDomain",

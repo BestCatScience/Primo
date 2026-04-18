@@ -1,23 +1,10 @@
 import CoreGraphics
 import Foundation
+import PrimoLocalization
 
-enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case english
-    case japanese
+typealias AppLanguage = PrimoLocalization.AppLanguage
 
-    static let storageKey = "primo.appLanguage"
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .english:
-            return "English"
-        case .japanese:
-            return "日本語"
-        }
-    }
-
+extension AppLanguage {
     func localized(_ text: String) -> String {
         switch self {
         case .english:
@@ -26,7 +13,6 @@ enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
             return StudioStrings.japaneseCatalog[text] ?? text
         }
     }
-
 }
 
 enum StudioStrings {

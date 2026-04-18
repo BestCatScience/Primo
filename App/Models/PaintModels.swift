@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import CoreGraphics
 import PrimoDocumentDomain
+import PrimoLocalization
 import UIKit
 import simd
 
@@ -69,111 +70,6 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-struct TextFontOption: Identifiable, Equatable, Sendable, Codable {
-    let postScriptName: String
-    let displayName: String
-    let sourceFilename: String?
-
-    var id: String { postScriptName }
-}
-
-struct TextLayerData: Equatable, Sendable, Codable {
-    var text: String
-    var positionX: Double
-    var positionY: Double
-    var fontPostScriptName: String
-    var fontDisplayName: String
-    var fontSize: Double
-    var scale: Double
-    var rotationDegrees: Double
-    var red: Double
-    var green: Double
-    var blue: Double
-    var alpha: Double
-
-    var position: CGPoint {
-        get { CGPoint(x: positionX, y: positionY) }
-        set {
-            positionX = newValue.x
-            positionY = newValue.y
-        }
-    }
-
-    var color: Color {
-        Color(red: red, green: green, blue: blue, opacity: alpha)
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case text
-        case positionX
-        case positionY
-        case fontPostScriptName
-        case fontDisplayName
-        case fontSize
-        case scale
-        case rotationDegrees
-        case red
-        case green
-        case blue
-        case alpha
-    }
-
-    init(
-        text: String,
-        positionX: Double,
-        positionY: Double,
-        fontPostScriptName: String,
-        fontDisplayName: String,
-        fontSize: Double,
-        scale: Double = 1.0,
-        rotationDegrees: Double = 0,
-        red: Double,
-        green: Double,
-        blue: Double,
-        alpha: Double
-    ) {
-        self.text = text
-        self.positionX = positionX
-        self.positionY = positionY
-        self.fontPostScriptName = fontPostScriptName
-        self.fontDisplayName = fontDisplayName
-        self.fontSize = fontSize
-        self.scale = scale
-        self.rotationDegrees = rotationDegrees
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.alpha = alpha
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        text = try container.decode(String.self, forKey: .text)
-        positionX = try container.decode(Double.self, forKey: .positionX)
-        positionY = try container.decode(Double.self, forKey: .positionY)
-        fontPostScriptName = try container.decode(String.self, forKey: .fontPostScriptName)
-        fontDisplayName = try container.decode(String.self, forKey: .fontDisplayName)
-        fontSize = try container.decode(Double.self, forKey: .fontSize)
-        scale = try container.decodeIfPresent(Double.self, forKey: .scale) ?? 1.0
-        rotationDegrees = try container.decodeIfPresent(Double.self, forKey: .rotationDegrees) ?? 0
-        red = try container.decode(Double.self, forKey: .red)
-        green = try container.decode(Double.self, forKey: .green)
-        blue = try container.decode(Double.self, forKey: .blue)
-        alpha = try container.decode(Double.self, forKey: .alpha)
-    }
-}
-
-struct TextLayerDraft: Equatable, Sendable {
-    var targetLayerIndex: Int?
-    var text: String
-    var position: CGPoint?
-    var fontPostScriptName: String?
-    var fontDisplayName: String?
-    var fontSize: Double
-    var scale: Double
-    var rotationDegrees: Double
-}
-
 enum TextFontLibrary {
     private static let liveClient = TextFontLibraryClient.live(fileClient: .live)
 
@@ -183,6 +79,12 @@ enum TextFontLibrary {
 
     static func importFonts(from urls: [URL]) throws -> [TextFontOption] {
         try liveClient.importFonts(urls)
+    }
+}
+
+extension TextLayerData {
+    var color: Color {
+        Color(red: red, green: green, blue: blue, opacity: alpha)
     }
 }
 

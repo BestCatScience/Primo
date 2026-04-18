@@ -1,5 +1,8 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
+import PrimoDocumentDomain
+import PrimoLocalization
 
 struct BrushPresetImportRequest: Equatable, OperationRequest {
     let urls: [URL]

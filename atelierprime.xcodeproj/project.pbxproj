@@ -37,6 +37,7 @@
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
 		A00000000000000000000039 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
 		B90000000000000000000001 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000015 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
 		B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
 		B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
 		B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
@@ -104,6 +105,7 @@
 		AA1000000000000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000002 /* XCTest.framework */; };
 		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
 		B90000000000000000000005 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000017 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
 		B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
 		B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
 		B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
@@ -334,6 +336,7 @@
 				B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */,
 				B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */,
 				B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000015 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000001 /* PrimoCoreTypes in Frameworks */,
 				A00000000000000000000039 /* ComposableArchitecture in Frameworks */,
 				A00000000000000000000037 /* MetalKit.framework in Frameworks */,
@@ -352,6 +355,7 @@
 				B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */,
 				B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */,
 				B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000017 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000005 /* PrimoCoreTypes in Frameworks */,
 				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
 				AA1000000000000000000001 /* XCTest.framework in Frameworks */,
@@ -664,6 +668,7 @@
 			packageProductDependencies = (
 				A00000000000000000000093 /* ComposableArchitecture */,
 				B90000000000000000000011 /* PrimoCoreTypes */,
+				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -688,6 +693,7 @@
 			packageProductDependencies = (
 				A00000000000000000000093 /* ComposableArchitecture */,
 				B90000000000000000000011 /* PrimoCoreTypes */,
+				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -1204,6 +1210,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoCoreTypes;
+		};
+		B90000000000000000000016 /* PrimoLocalization */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoLocalization;
 		};
 		B90000000000000000000012 /* PrimoDocumentDomain */ = {
 			isa = XCSwiftPackageProductDependency;

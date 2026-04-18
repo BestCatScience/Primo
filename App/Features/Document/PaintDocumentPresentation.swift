@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentDomain
+import PrimoLocalization
 
 typealias CanvasPaperStyle = PrimoDocumentDomain.CanvasPaperStyle
 typealias DocumentProjectPath = PrimoDocumentDomain.DocumentProjectPath
@@ -13,6 +14,9 @@ typealias OpenDocumentTab = PrimoDocumentDomain.OpenDocumentTab
 typealias AutosaveRecoveryItem = PrimoDocumentDomain.AutosaveRecoveryItem
 typealias SaveHistoryTrigger = PrimoDocumentDomain.SaveHistoryTrigger
 typealias SaveHistoryEntry = PrimoDocumentDomain.SaveHistoryEntry
+typealias TextFontOption = PrimoDocumentDomain.TextFontOption
+typealias TextLayerData = PrimoDocumentDomain.TextLayerData
+typealias TextLayerDraft = PrimoDocumentDomain.TextLayerDraft
 
 struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Comparable {
     let rawValue: Int

@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import CoreText
 import Foundation
+import PrimoCoreTypes
+import PrimoDocumentDomain
 import Synchronization
 import UIKit
 
