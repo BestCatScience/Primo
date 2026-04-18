@@ -7,47 +7,24 @@ extension AppFeature {
         case saveHistoryPersistFailed(String?)
         case workspaceItemRemovalFailed(String?)
         case autosaveEntryDiscardFailed(String?)
-
-        func message(for language: AppLanguage) -> String {
-            switch self {
-            case let .autosaveCleanupFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "保存後の自動保存クリーンアップに失敗しました"
-                        : "Autosave cleanup failed after saving")
-            case let .saveHistoryPersistFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "保存履歴の記録に失敗しました"
-                        : "Saving to history failed")
-            case let .workspaceItemRemovalFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "一時ワークスペース項目の削除に失敗しました"
-                        : "Temporary workspace cleanup failed")
-            case let .autosaveEntryDiscardFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "自動保存エントリの破棄に失敗しました"
-                        : "Autosave entry cleanup failed")
-            }
-        }
     }
 
-    struct WorkspacePersistenceFailure: Error, Equatable {
+    enum WorkspacePersistenceFailureReason: Error, Equatable, Sendable {
+        case saveFailed(String?)
+        case couldNotCreateTab
+        case activeTabUnavailable
+    }
+
+    struct WorkspacePersistenceFailure: Error, Equatable, Sendable {
         let request: WorkspacePersistenceRequest?
-        let feedback: ApplicationFeedback
+        let reason: WorkspacePersistenceFailureReason
 
         init(
             request: WorkspacePersistenceRequest? = nil,
-            feedback: ApplicationFeedback
+            reason: WorkspacePersistenceFailureReason
         ) {
             self.request = request
-            self.feedback = feedback
+            self.reason = reason
         }
     }
 
@@ -203,12 +180,18 @@ extension AppFeature {
             case completeRestore
         }
 
+        enum Completion: Equatable, Sendable {
+            case none
+            case openedDocument(layerCount: Int)
+            case restoredSaveHistory
+            case restoredAutosave
+        }
+
         struct SuccessEffects: Equatable, Sendable {
             var discardedAutosaveEntryID: WorkspaceItemID?
             var recoveryResolution: RecoveryResolution = .none
             var saveHistoryResolution: SaveHistoryResolution = .none
-            var feedback: ApplicationFeedback?
-            var warningMessage: String?
+            var completion: Completion = .none
         }
 
         let destination: Destination
@@ -321,7 +304,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -387,7 +370,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -409,7 +392,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -437,7 +420,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .couldNotCreateTab
+                        reason: .couldNotCreateTab
                     )
                 )
             }
@@ -484,7 +467,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -551,7 +534,7 @@ extension AppFeature {
                 return .failure(
                     WorkspacePersistenceFailure(
                         request: request,
-                        feedback: .saveFailed(AppFeature.optionalErrorMessage(error))
+                        reason: .saveFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -774,6 +757,7 @@ extension AppFeature {
     struct PendingLoadedWorkspaceProject: Equatable, Sendable {
         let loaded: LoadedPaintProject
         let plan: LoadedWorkspaceProjectPlan
+        let presentation: LoadedWorkspacePresentation
     }
 
     struct PendingFreshDocumentMutation: Equatable, Sendable {
@@ -829,14 +813,6 @@ extension AppFeature {
         .saveFailed(Self.optionalErrorMessage(error))
     }
 
-    func workspacePersistenceWarningMessage(
-        _ issues: [WorkspacePersistenceIssue],
-        language: AppLanguage
-    ) -> String? {
-        guard !issues.isEmpty else { return nil }
-        return issues.map { $0.message(for: language) }.joined(separator: "\n")
-    }
-
     func refreshActiveTabMetadataForPersistence(
         state: inout State
     ) -> OpenDocumentTab? {
@@ -852,12 +828,11 @@ extension AppFeature {
 
     func requireActiveTab(
         in state: State,
-        failureFeedback: ApplicationFeedback = .saveFailed(nil)
     ) -> Result<OpenDocumentTab, WorkspacePersistenceFailure> {
         guard let activeTab = state.workspace.activeTab else {
             return .failure(
                 WorkspacePersistenceFailure(
-                    feedback: failureFeedback
+                    reason: .activeTabUnavailable
                 )
             )
         }
@@ -865,11 +840,10 @@ extension AppFeature {
     }
 
     func documentReplacementRequest(
-        state: inout State,
-        failureFeedback: ApplicationFeedback = .saveFailed(nil)
+        state: inout State
     ) -> Result<WorkspaceDocumentReplacementRequest, WorkspacePersistenceFailure> {
         let activeTab: OpenDocumentTab
-        switch requireActiveTab(in: state, failureFeedback: failureFeedback) {
+        switch requireActiveTab(in: state) {
         case let .success(tab):
             activeTab = tab
         case let .failure(failure):
@@ -905,9 +879,15 @@ extension AppFeature {
         return .success(())
     }
 
+    struct LoadedWorkspacePresentation: Equatable, Sendable {
+        var issues: [WorkspaceProjectLoadIssue] = []
+        var completion: LoadedWorkspaceProjectPlan.Completion = .none
+    }
+
     func applyLoadedWorkspaceProject(
         _ loaded: LoadedPaintProject,
         using plan: LoadedWorkspaceProjectPlan,
+        presentation: LoadedWorkspacePresentation = LoadedWorkspacePresentation(),
         state: inout State
     ) -> Effect<Action> {
         switch plan.destination {
@@ -915,7 +895,8 @@ extension AppFeature {
             state.workspace.pendingWorkspaceTabReservation = .loadedProject(
                 PendingLoadedWorkspaceProject(
                     loaded: loaded,
-                    plan: plan
+                    plan: plan,
+                    presentation: presentation
                 )
             )
             return .send(
@@ -934,6 +915,7 @@ extension AppFeature {
             return completeLoadedWorkspaceProject(
                 loaded,
                 using: plan,
+                presentation: presentation,
                 preparedTab: nil,
                 state: &state
             )
@@ -943,6 +925,7 @@ extension AppFeature {
     func completeLoadedWorkspaceProject(
         _ loaded: LoadedPaintProject,
         using plan: LoadedWorkspaceProjectPlan,
+        presentation: LoadedWorkspacePresentation,
         preparedTab: PreparedWorkspaceTab?,
         state: inout State
     ) -> Effect<Action> {
@@ -956,7 +939,12 @@ extension AppFeature {
         case .newTab:
             guard let preparedTab else {
                 state.application.completeWorkspaceProjectLoad(
-                    feedback: .couldNotCreateTab
+                    message: workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(
+                            for: WorkspacePersistenceFailure(reason: .couldNotCreateTab)
+                        ),
+                        language: state.application.appLanguage
+                    )
                 )
                 return .none
             }
@@ -979,20 +967,26 @@ extension AppFeature {
         switch activationResult {
         case let .failure(failure):
             state.application.completeWorkspaceProjectLoad(
-                feedback: failure.feedback
+                message: workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
             )
             return .none
         case .success:
             break
         }
 
-        switch makeLoadedWorkspaceFollowUpRequest(
+        switch loadedWorkspaceFollowUpRequest(
             plan: plan,
             state: &state
         ) {
         case let .failure(failure):
             state.application.completeWorkspaceProjectLoad(
-                feedback: failure.feedback
+                message: workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
             )
             return .none
         case let .success(.some(request)):
@@ -1003,8 +997,10 @@ extension AppFeature {
                 state: &state
             )
             state.application.completeWorkspaceProjectLoad(
-                feedback: plan.successEffects.feedback,
-                bannerMessage: plan.successEffects.warningMessage
+                message: workspaceFeedbackMapper.loadedWorkspaceCompletionMessage(
+                    presentation: presentation,
+                    language: state.application.appLanguage
+                )
             )
             return .none
         }
@@ -1050,7 +1046,37 @@ extension AppFeature {
         )
     }
 
-    func makeLoadedWorkspaceFollowUpRequest(
+    struct LoadedWorkspaceFollowUpPlanner: Sendable {
+        func request(
+            plan: LoadedWorkspaceProjectPlan,
+            context: WorkspaceDocumentReplacementRequest,
+            requiresBackingStorePersistence: Bool
+        ) -> WorkspacePersistenceRequest? {
+            let shouldPersistToBackingStore = requiresBackingStorePersistence || plan.followUp.persistsToBackingStore
+            guard shouldPersistToBackingStore
+                || plan.followUp.persistsAutosave
+                || plan.successEffects.discardedAutosaveEntryID != nil
+            else {
+                return nil
+            }
+
+            return .loadedWorkspaceFollowUp(
+                LoadedWorkspaceFollowUpPersistenceRequest(
+                    activeTab: context.activeTab,
+                    paperStyle: context.paperStyle,
+                    persistsToBackingStore: shouldPersistToBackingStore,
+                    persistsAutosave: plan.followUp.persistsAutosave,
+                    successEffects: plan.successEffects
+                )
+            )
+        }
+    }
+
+    var loadedWorkspaceFollowUpPlanner: LoadedWorkspaceFollowUpPlanner {
+        LoadedWorkspaceFollowUpPlanner()
+    }
+
+    func loadedWorkspaceFollowUpRequest(
         plan: LoadedWorkspaceProjectPlan,
         state: inout State
     ) -> Result<WorkspacePersistenceRequest?, WorkspacePersistenceFailure> {
@@ -1068,7 +1094,10 @@ extension AppFeature {
         }()
 
         let shouldPersistToBackingStore = requiresBackingStorePersistence || plan.followUp.persistsToBackingStore
-        guard shouldPersistToBackingStore || plan.followUp.persistsAutosave || plan.successEffects.discardedAutosaveEntryID != nil else {
+        guard shouldPersistToBackingStore
+            || plan.followUp.persistsAutosave
+            || plan.successEffects.discardedAutosaveEntryID != nil
+        else {
             return .success(nil)
         }
 
@@ -1081,14 +1110,10 @@ extension AppFeature {
         }
 
         return .success(
-            .loadedWorkspaceFollowUp(
-                LoadedWorkspaceFollowUpPersistenceRequest(
-                    activeTab: context.activeTab,
-                    paperStyle: context.paperStyle,
-                    persistsToBackingStore: shouldPersistToBackingStore,
-                    persistsAutosave: plan.followUp.persistsAutosave,
-                    successEffects: plan.successEffects
-                )
+            loadedWorkspaceFollowUpPlanner.request(
+                plan: plan,
+                context: context,
+                requiresBackingStorePersistence: requiresBackingStorePersistence
             )
         )
     }
@@ -1208,15 +1233,18 @@ extension AppFeature {
                 canvasSize: saved.canvasSize,
                 isDirty: false
             )
-            let warningMessage = workspacePersistenceWarningMessage(
-                saved.issues,
+            let warningMessage = workspaceFeedbackMapper.bannerMessage(
+                for: saved.issues,
                 language: state.application.appLanguage
             )
             if let warningMessage {
                 state.application.presentBanner(warningMessage)
             } else {
-                state.application.presentFeedback(
-                    .savedDocument(saved.savedURL.fileURL.lastPathComponent)
+                state.application.presentBanner(
+                    workspaceFeedbackMapper.message(
+                        for: .savedDocument(saved.savedURL.fileURL.lastPathComponent),
+                        language: state.application.appLanguage
+                    )
                 )
             }
             switch saved.purpose {
@@ -1240,6 +1268,7 @@ extension AppFeature {
                 return completeLoadedWorkspaceProject(
                     pendingLoadedWorkspaceProject.loaded,
                     using: pendingLoadedWorkspaceProject.plan,
+                    presentation: pendingLoadedWorkspaceProject.presentation,
                     preparedTab: preparedTab,
                     state: &state
                 )
@@ -1256,20 +1285,18 @@ extension AppFeature {
                 followUp.successEffects,
                 state: &state
             )
-            let warningMessage = followUp.successEffects.warningMessage
-                ?? workspacePersistenceWarningMessage(
-                    followUp.issues,
+            state.application.completeWorkspaceProjectLoad(
+                message: workspaceFeedbackMapper.loadedWorkspaceCompletionMessage(
+                    completion: followUp.successEffects.completion,
+                    persistenceIssues: followUp.issues,
                     language: state.application.appLanguage
                 )
-            state.application.completeWorkspaceProjectLoad(
-                feedback: followUp.successEffects.feedback,
-                bannerMessage: warningMessage
             )
             return .none
 
         case let .tabsSavedForClose(closeResult):
-            if let warningMessage = workspacePersistenceWarningMessage(
-                closeResult.issues,
+            if let warningMessage = workspaceFeedbackMapper.bannerMessage(
+                for: closeResult.issues,
                 language: state.application.appLanguage
             ) {
                 state.application.presentBanner(warningMessage)
@@ -1277,8 +1304,8 @@ extension AppFeature {
             return performCloseOperation(closeResult.operation)
 
         case let .autosaveArtifactsDiscarded(issues):
-            if let warningMessage = workspacePersistenceWarningMessage(
-                issues,
+            if let warningMessage = workspaceFeedbackMapper.bannerMessage(
+                for: issues,
                 language: state.application.appLanguage
             ) {
                 state.application.presentBanner(warningMessage)
@@ -1294,15 +1321,26 @@ extension AppFeature {
         switch failure.request {
         case .some(.loadedWorkspaceFollowUp):
             state.application.completeWorkspaceProjectLoad(
-                feedback: failure.feedback
+                message: workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
             )
         case .some(.reserveNewTabBackingStore):
             state.workspace.pendingWorkspaceTabReservation = nil
             state.application.completeWorkspaceProjectLoad(
-                feedback: failure.feedback
+                message: workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
             )
         default:
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentBanner(
+                workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
+            )
         }
         return .none
     }
@@ -1345,7 +1383,9 @@ extension AppFeature {
             state.application.finishLoadingHomeProjects([])
             state.application.presentFeedback(failure.feedback)
         case .loadAutosaveRecoveryItems:
-            state.application.failHydration(feedback: failure.feedback)
+            state.application.failHydration(
+                message: failure.feedback.message(for: state.application.appLanguage)
+            )
         case .loadSaveHistoryEntries:
             state.saveHistory.dismiss()
             state.application.presentFeedback(failure.feedback)
@@ -1395,5 +1435,176 @@ extension AppFeature {
     static func nextUntitledTabTitle(existingTabs: [OpenDocumentTab]) -> String {
         let untitledTabs = existingTabs.filter { $0.sourceProjectURL == nil && $0.title.hasPrefix("Untitled") }
         return untitledTabs.isEmpty ? "Untitled" : "Untitled \(untitledTabs.count + 1)"
+    }
+}
+
+extension AppFeature {
+    struct WorkspaceFeedbackMapper: Sendable {
+        func feedback(for failure: WorkspacePersistenceFailure) -> ApplicationFeedback {
+            switch failure.reason {
+            case let .saveFailed(message):
+                return .saveFailed(message)
+            case .couldNotCreateTab:
+                return .couldNotCreateTab
+            case .activeTabUnavailable:
+                return .saveFailed(nil)
+            }
+        }
+
+        func feedback(
+            for failure: WorkspaceProjectLoadFailure,
+            context: WorkspaceLoadFailureContext = .openDocument
+        ) -> ApplicationFeedback {
+            switch failure.reason {
+            case let .prepareDocumentReplacementFailed(reason):
+                return feedback(
+                    for: WorkspacePersistenceFailure(
+                        request: nil,
+                        reason: reason
+                    )
+                )
+            case let .openFailed(message):
+                switch context {
+                case .openDocument, .importDocument:
+                    return .openFailed(message)
+                case .autosaveRestore:
+                    return .autosaveRestoreFailed(message)
+                case .saveHistoryRestore:
+                    return .saveHistoryRestoreFailed(message)
+                }
+            case let .importFailed(message):
+                switch context {
+                case .openDocument, .importDocument:
+                    return .openFailed(message)
+                case .autosaveRestore:
+                    return .autosaveRestoreFailed(message)
+                case .saveHistoryRestore:
+                    return .saveHistoryRestoreFailed(message)
+                }
+            }
+        }
+
+        func bannerMessage(
+            for issues: [WorkspacePersistenceIssue],
+            language: AppLanguage
+        ) -> String? {
+            guard !issues.isEmpty else { return nil }
+            return issues.map { message(for: $0, language: language) }.joined(separator: "\n")
+        }
+
+        func bannerMessage(
+            for issues: [WorkspaceProjectLoadIssue],
+            language: AppLanguage
+        ) -> String? {
+            guard !issues.isEmpty else { return nil }
+            return issues.map { message(for: $0, language: language) }.joined(separator: "\n")
+        }
+
+        func loadedWorkspaceCompletionMessage(
+            presentation: LoadedWorkspacePresentation,
+            language: AppLanguage
+        ) -> String? {
+            if let issueBanner = bannerMessage(for: presentation.issues, language: language) {
+                return issueBanner
+            }
+            return completionMessage(for: presentation.completion, language: language)
+        }
+
+        func loadedWorkspaceCompletionMessage(
+            completion: LoadedWorkspaceProjectPlan.Completion,
+            persistenceIssues: [WorkspacePersistenceIssue],
+            language: AppLanguage
+        ) -> String? {
+            if let issueBanner = bannerMessage(for: persistenceIssues, language: language) {
+                return issueBanner
+            }
+            return completionMessage(for: completion, language: language)
+        }
+
+        func message(
+            for feedback: ApplicationFeedback?,
+            language: AppLanguage
+        ) -> String? {
+            feedback?.message(for: language)
+        }
+
+        private func completionMessage(
+            for completion: LoadedWorkspaceProjectPlan.Completion,
+            language: AppLanguage
+        ) -> String? {
+            switch completion {
+            case .none:
+                return nil
+            case let .openedDocument(layerCount):
+                return ApplicationFeedback.openedDocument(layerCount).message(for: language)
+            case .restoredSaveHistory:
+                return ApplicationFeedback.restoredSaveHistory.message(for: language)
+            case .restoredAutosave:
+                return ApplicationFeedback.restoredAutosave.message(for: language)
+            }
+        }
+
+        private func message(
+            for issue: WorkspacePersistenceIssue,
+            language: AppLanguage
+        ) -> String {
+            switch issue {
+            case let .autosaveCleanupFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "保存後の自動保存クリーンアップに失敗しました"
+                        : "Autosave cleanup failed after saving")
+            case let .saveHistoryPersistFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "保存履歴の記録に失敗しました"
+                        : "Saving to history failed")
+            case let .workspaceItemRemovalFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "一時ワークスペース項目の削除に失敗しました"
+                        : "Temporary workspace cleanup failed")
+            case let .autosaveEntryDiscardFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "自動保存エントリの破棄に失敗しました"
+                        : "Autosave entry cleanup failed")
+            }
+        }
+
+        private func message(
+            for issue: WorkspaceProjectLoadIssue,
+            language: AppLanguage
+        ) -> String {
+            switch issue {
+            case let .workspaceItemRemovalFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "読み込み後の一時ワークスペース項目の削除に失敗しました"
+                        : "Temporary workspace cleanup failed after loading")
+            case let .importedStagingCleanupFailed(message):
+                return (message?.isEmpty == false)
+                    ? message!
+                    : (language == .japanese
+                        ? "読み込み後の一時インポートデータの削除に失敗しました"
+                        : "Imported staging cleanup failed after loading")
+            }
+        }
+    }
+
+    enum WorkspaceLoadFailureContext: Sendable {
+        case openDocument
+        case importDocument
+        case autosaveRestore
+        case saveHistoryRestore
+    }
+
+    var workspaceFeedbackMapper: WorkspaceFeedbackMapper {
+        WorkspaceFeedbackMapper()
     }
 }

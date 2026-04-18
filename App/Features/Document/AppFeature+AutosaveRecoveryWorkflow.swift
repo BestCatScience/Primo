@@ -17,7 +17,7 @@ extension AppFeature {
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
             onSuccess: { .autosaveRecoveryOpened($0, item, $1) },
-            onFailure: { .autosaveRecoveryRestoreFailed(.autosaveRestoreFailed($0.errorMessage)) }
+            onFailure: { .autosaveRecoveryRestoreFailed(workspaceFeedbackMapper.feedback(for: $0, context: .autosaveRestore)) }
         )
     }
 
@@ -42,12 +42,12 @@ extension AppFeature {
                 successEffects: .init(
                     discardedAutosaveEntryID: item.id,
                     recoveryResolution: .completeRestore(item.id),
-                    feedback: .restoredAutosave,
-                    warningMessage: workspaceProjectLoadWarningMessage(
-                        issues,
-                        language: state.application.appLanguage
-                    )
+                    completion: .restoredAutosave
                 )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .restoredAutosave
             ),
             state: &state
         )
@@ -72,6 +72,8 @@ extension AppFeature {
         state: inout State,
         feedback: ApplicationFeedback
     ) {
-        state.application.failHydration(feedback: feedback)
+        state.application.failHydration(
+            message: feedback.message(for: state.application.appLanguage)
+        )
     }
 }

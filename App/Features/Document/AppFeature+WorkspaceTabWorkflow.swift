@@ -5,34 +5,21 @@ extension AppFeature {
     enum WorkspaceProjectLoadIssue: Error, Equatable, Sendable {
         case workspaceItemRemovalFailed(String?)
         case importedStagingCleanupFailed(String?)
+    }
 
-        func message(for language: AppLanguage) -> String {
-            switch self {
-            case let .workspaceItemRemovalFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "読み込み後の一時ワークスペース項目の削除に失敗しました"
-                        : "Temporary workspace cleanup failed after loading")
-            case let .importedStagingCleanupFailed(message):
-                return (message?.isEmpty == false)
-                    ? message!
-                    : (language == .japanese
-                        ? "読み込み後の一時インポートデータの削除に失敗しました"
-                        : "Imported staging cleanup failed after loading")
-            }
-        }
+    enum WorkspaceProjectLoadFailureReason: Error, Equatable, Sendable {
+        case prepareDocumentReplacementFailed(WorkspacePersistenceFailureReason)
+        case openFailed(String?)
+        case importFailed(String?)
     }
 
     struct WorkspaceProjectLoadOperation: Equatable, Sendable {
         let fileURL: URL
-        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
         let removeWorkspaceItemOnSuccess: DocumentProjectPath?
     }
 
     struct WorkspaceImportedProjectLoadOperation: Equatable, Sendable {
         let sourceURL: URL
-        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
     }
 
     enum WorkspaceProjectLoadRequest: Equatable, Sendable {
@@ -47,8 +34,7 @@ extension AppFeature {
 
     struct WorkspaceProjectLoadFailure: Error, Equatable, Sendable {
         let request: WorkspaceProjectLoadRequest
-        let feedback: ApplicationFeedback
-        let errorMessage: String?
+        let reason: WorkspaceProjectLoadFailureReason
     }
 
     struct WorkspaceProjectPreparationUseCase: Sendable {
@@ -134,8 +120,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceProjectLoadFailure(
                         request: request,
-                        feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
-                        errorMessage: AppFeature.optionalErrorMessage(error)
+                        reason: .openFailed(AppFeature.optionalErrorMessage(error))
                     )
                 )
             }
@@ -152,8 +137,7 @@ extension AppFeature {
                 return .failure(
                     WorkspaceProjectLoadFailure(
                         request: request,
-                        feedback: .openFailed(error.errorDescription),
-                        errorMessage: error.errorDescription
+                        reason: .importFailed(error.errorDescription)
                     )
                 )
 
@@ -171,12 +155,40 @@ extension AppFeature {
                     return .failure(
                         WorkspaceProjectLoadFailure(
                             request: request,
-                            feedback: .openFailed(AppFeature.optionalErrorMessage(error)),
-                            errorMessage: AppFeature.optionalErrorMessage(error)
+                            reason: .openFailed(AppFeature.optionalErrorMessage(error))
                         )
                     )
                 }
             }
+        }
+    }
+
+    struct WorkspaceProjectLoadCommand: Equatable, Sendable {
+        let loadRequest: WorkspaceProjectLoadRequest
+        let prepareDocumentReplacementRequest: WorkspaceDocumentReplacementRequest?
+    }
+
+    struct WorkspaceProjectLoadingService: Sendable {
+        let preparationUseCase: WorkspaceProjectPreparationUseCase
+        let loadUseCase: WorkspaceProjectLoadUseCase
+
+        func execute(
+            _ command: WorkspaceProjectLoadCommand
+        ) -> Result<WorkspaceProjectLoadResult, WorkspaceProjectLoadFailure> {
+            if let prepareRequest = command.prepareDocumentReplacementRequest {
+                switch preparationUseCase.execute(prepareRequest) {
+                case .success:
+                    break
+                case let .failure(failure):
+                    return .failure(
+                        WorkspaceProjectLoadFailure(
+                            request: command.loadRequest,
+                            reason: .prepareDocumentReplacementFailed(failure.reason)
+                        )
+                    )
+                }
+            }
+            return loadUseCase.execute(command.loadRequest)
         }
     }
 
@@ -201,27 +213,11 @@ extension AppFeature {
         )
     }
 
-    func workspaceProjectLoadWarningMessage(
-        _ issues: [WorkspaceProjectLoadIssue],
-        language: AppLanguage
-    ) -> String? {
-        guard !issues.isEmpty else { return nil }
-        return issues.map { $0.message(for: language) }.joined(separator: "\n")
-    }
-
-    func workspaceProjectLoadEffect(
-        request: WorkspaceProjectLoadRequest,
-        onSuccess: @escaping @Sendable (WorkspaceProjectLoadResult) -> Action,
-        onFailure: @escaping @Sendable (WorkspaceProjectLoadFailure) -> Action
-    ) -> Effect<Action> {
-        .run { [workspaceProjectLoadUseCase] send in
-            switch workspaceProjectLoadUseCase.execute(request) {
-            case let .success(result):
-                await send(onSuccess(result))
-            case let .failure(failure):
-                await send(onFailure(failure))
-            }
-        }
+    var workspaceProjectLoadingService: WorkspaceProjectLoadingService {
+        WorkspaceProjectLoadingService(
+            preparationUseCase: workspaceProjectPreparationUseCase,
+            loadUseCase: workspaceProjectLoadUseCase
+        )
     }
 
     func beginWorkspaceProjectLoad(
@@ -238,40 +234,29 @@ extension AppFeature {
             case let .success(request):
                 prepareRequest = request
             case let .failure(failure):
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: failure),
+                        language: state.application.appLanguage
+                    )
+                )
                 return .none
             }
         } else {
             prepareRequest = nil
         }
         state.application.beginHydration()
-        let request = WorkspaceProjectLoadRequest.project(
+        let command = WorkspaceProjectLoadCommand(
+            loadRequest: .project(
             WorkspaceProjectLoadOperation(
                 fileURL: fileURL,
-                prepareDocumentReplacementRequest: prepareRequest,
                 removeWorkspaceItemOnSuccess: removeWorkspaceItemOnSuccess
             )
+            ),
+            prepareDocumentReplacementRequest: prepareRequest
         )
-        return .run { [workspaceProjectPreparationUseCase, workspaceProjectLoadUseCase] send in
-            if let prepareRequest {
-                switch workspaceProjectPreparationUseCase.execute(prepareRequest) {
-                case .success:
-                    break
-                case let .failure(failure):
-                    await send(
-                        onFailure(
-                            WorkspaceProjectLoadFailure(
-                                request: request,
-                                feedback: failure.feedback,
-                                errorMessage: nil
-                            )
-                        )
-                    )
-                    return
-                }
-            }
-
-            switch workspaceProjectLoadUseCase.execute(request) {
+        return .run { [workspaceProjectLoadingService] send in
+            switch workspaceProjectLoadingService.execute(command) {
             case let .success(.project(loaded, issues)):
                 await send(onSuccess(loaded, issues))
             case .success(.imported):
@@ -295,39 +280,28 @@ extension AppFeature {
             case let .success(request):
                 prepareRequest = request
             case let .failure(failure):
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: failure),
+                        language: state.application.appLanguage
+                    )
+                )
                 return .none
             }
         } else {
             prepareRequest = nil
         }
         state.application.beginHydration()
-        let request = WorkspaceProjectLoadRequest.imported(
+        let command = WorkspaceProjectLoadCommand(
+            loadRequest: .imported(
             WorkspaceImportedProjectLoadOperation(
-                sourceURL: sourceURL,
-                prepareDocumentReplacementRequest: prepareRequest
+                sourceURL: sourceURL
             )
+            ),
+            prepareDocumentReplacementRequest: prepareRequest
         )
-        return .run { [workspaceProjectPreparationUseCase, workspaceProjectLoadUseCase] send in
-            if let prepareRequest {
-                switch workspaceProjectPreparationUseCase.execute(prepareRequest) {
-                case .success:
-                    break
-                case let .failure(failure):
-                    await send(
-                        onFailure(
-                            WorkspaceProjectLoadFailure(
-                                request: request,
-                                feedback: failure.feedback,
-                                errorMessage: nil
-                            )
-                        )
-                    )
-                    return
-                }
-            }
-
-            switch workspaceProjectLoadUseCase.execute(request) {
+        return .run { [workspaceProjectLoadingService] send in
+            switch workspaceProjectLoadingService.execute(command) {
             case let .success(.imported(loaded, suggestedTitle, issues)):
                 await send(onSuccess(loaded, suggestedTitle, issues))
             case .success(.project):

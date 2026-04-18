@@ -17,7 +17,7 @@ extension AppFeature {
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
             onSuccess: { loaded, _ in .tabSelectionLoaded(tabID, loaded) },
-            onFailure: { .tabSelectionFailed($0.feedback) }
+            onFailure: { .tabSelectionFailed(workspaceFeedbackMapper.feedback(for: $0, context: .openDocument)) }
         )
     }
 
@@ -44,7 +44,7 @@ extension AppFeature {
         feedback: ApplicationFeedback
     ) {
         state.application.failHydration(
-            feedback: feedback,
+            message: feedback.message(for: state.application.appLanguage),
             showingHome: state.workspace.activeTab == nil ? true : nil
         )
     }

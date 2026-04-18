@@ -25,7 +25,7 @@ extension AppFeature {
             state: &state,
             fileURL: projectURL.fileURL,
             onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab, $1) },
-            onFailure: { .saveHistoryRestoreFailed(.saveHistoryRestoreFailed($0.errorMessage)) }
+            onFailure: { .saveHistoryRestoreFailed(workspaceFeedbackMapper.feedback(for: $0, context: .saveHistoryRestore)) }
         )
     }
 
@@ -37,10 +37,6 @@ extension AppFeature {
         issues: [WorkspaceProjectLoadIssue]
     ) -> Effect<Action> {
         let restoredTitle = projectURL.displayName
-        let warningMessage = workspaceProjectLoadWarningMessage(
-            issues,
-            language: state.application.appLanguage
-        )
         if openInNewTab || state.workspace.activeTab == nil {
             return applyLoadedWorkspaceProject(
                 loaded,
@@ -56,9 +52,12 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        feedback: .restoredSaveHistory,
-                        warningMessage: warningMessage
+                        completion: .restoredSaveHistory
                     )
+                ),
+                presentation: LoadedWorkspacePresentation(
+                    issues: issues,
+                    completion: .restoredSaveHistory
                 ),
                 state: &state
             )
@@ -79,9 +78,12 @@ extension AppFeature {
                     ),
                     successEffects: .init(
                         saveHistoryResolution: .completeRestore,
-                        feedback: .restoredSaveHistory,
-                        warningMessage: warningMessage
+                        completion: .restoredSaveHistory
                     )
+                ),
+                presentation: LoadedWorkspacePresentation(
+                    issues: issues,
+                    completion: .restoredSaveHistory
                 ),
                 state: &state
             )
@@ -101,7 +103,12 @@ extension AppFeature {
         case let .success(request):
             return .send(.workspacePersistenceRequested(request))
         case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentBanner(
+                workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
+            )
             return .none
         }
     }
@@ -110,7 +117,9 @@ extension AppFeature {
         state: inout State,
         feedback: ApplicationFeedback
     ) {
-        state.application.failHydration(feedback: feedback)
+        state.application.failHydration(
+            message: feedback.message(for: state.application.appLanguage)
+        )
     }
 
     func handleSaveHistoryLoadFailed(

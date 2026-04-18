@@ -5,48 +5,75 @@ import XCTest
 final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
     func testPrepareReplacementFailureStopsBeforeLoad() {
         let activeTab = OpenDocumentTab.testValue()
+        let loadCalls = TestRecorder<URL>()
         let paintDocumentClient = PaintDocumentClient.stub(
             saveProject: { _, _ in
                 throw TestError.expected("prepare replacement failed")
+            },
+            loadProject: { url in
+                loadCalls.record(url)
+                return .testValue()
             }
         )
         let documentWorkspaceClient = DocumentWorkspaceClient.stub()
-        let useCase = AppFeature.WorkspaceProjectPreparationUseCase(
-            workspacePersistenceUseCase: AppFeature.WorkspacePersistenceUseCase(
-                workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                    paintDocumentClient: paintDocumentClient,
-                    documentWorkspaceClient: documentWorkspaceClient
-                ),
-                workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                    documentWorkspaceClient: documentWorkspaceClient
-                ),
-                workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                    uuidClient: UUIDClient(
-                        generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C1")! }
+        let loadingService = AppFeature.WorkspaceProjectLoadingService(
+            preparationUseCase: AppFeature.WorkspaceProjectPreparationUseCase(
+                workspacePersistenceUseCase: AppFeature.WorkspacePersistenceUseCase(
+                    workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                        paintDocumentClient: paintDocumentClient,
+                        documentWorkspaceClient: documentWorkspaceClient
+                    ),
+                    workspaceCatalogService: AppFeature.WorkspaceCatalogService(
+                        documentWorkspaceClient: documentWorkspaceClient
+                    ),
+                    workspaceIdentityService: AppFeature.WorkspaceIdentityService(
+                        uuidClient: UUIDClient(
+                            generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000C1")! }
+                        )
                     )
+                )
+            ),
+            loadUseCase: AppFeature.WorkspaceProjectLoadUseCase(
+                paintDocumentClient: paintDocumentClient,
+                documentImportClient: .stub(),
+                cleanupService: AppFeature.WorkspaceProjectCleanupService(
+                    workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
+                        paintDocumentClient: paintDocumentClient,
+                        documentWorkspaceClient: documentWorkspaceClient
+                    ),
+                    documentImportClient: .stub()
                 )
             )
         )
 
         XCTAssertEqual(
-            useCase.execute(
-                AppFeature.WorkspaceDocumentReplacementRequest(
-                    activeTab: activeTab,
-                    paperStyle: .default
+            loadingService.execute(
+                AppFeature.WorkspaceProjectLoadCommand(
+                    loadRequest: .project(
+                        AppFeature.WorkspaceProjectLoadOperation(
+                            fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
+                            removeWorkspaceItemOnSuccess: nil
+                        )
+                    ),
+                    prepareDocumentReplacementRequest: AppFeature.WorkspaceDocumentReplacementRequest(
+                        activeTab: activeTab,
+                        paperStyle: .default
+                    )
                 )
             ),
             .failure(
-                AppFeature.WorkspacePersistenceFailure(
-                    request: .prepareDocumentReplacement(
-                        AppFeature.WorkspaceDocumentReplacementRequest(
-                            activeTab: activeTab,
-                            paperStyle: .default
+                AppFeature.WorkspaceProjectLoadFailure(
+                    request: .project(
+                        AppFeature.WorkspaceProjectLoadOperation(
+                            fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
+                            removeWorkspaceItemOnSuccess: nil
                         )
                     ),
-                    feedback: .saveFailed("prepare replacement failed")
+                    reason: .prepareDocumentReplacementFailed(.saveFailed("prepare replacement failed"))
                 )
             )
         )
+        XCTAssertTrue(loadCalls.values.isEmpty)
     }
 
     func testImportedProjectLoadSuccessDiscardsStagedDocument() {
@@ -85,8 +112,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
         let result = useCase.execute(
             .imported(
                 AppFeature.WorkspaceImportedProjectLoadOperation(
-                    sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier"),
-                    prepareDocumentReplacementRequest: nil
+                    sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier")
                 )
             )
         )
@@ -129,8 +155,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
             useCase.execute(
                 .imported(
                     AppFeature.WorkspaceImportedProjectLoadOperation(
-                        sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier"),
-                        prepareDocumentReplacementRequest: nil
+                        sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier")
                     )
                 )
             ),
@@ -172,7 +197,6 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 .project(
                     AppFeature.WorkspaceProjectLoadOperation(
                         fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
-                        prepareDocumentReplacementRequest: nil,
                         removeWorkspaceItemOnSuccess: stagedWorkspaceURL
                     )
                 )

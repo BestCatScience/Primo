@@ -10,7 +10,7 @@ extension AppFeature {
             state: &state,
             sourceURL: sourceURL,
             onSuccess: { .openImportedDocumentLoaded($0, $1, $2) },
-            onFailure: { .openDocumentFailed($0.feedback) }
+            onFailure: { .openDocumentFailed(workspaceFeedbackMapper.feedback(for: $0, context: .importDocument)) }
         )
     }
 
@@ -32,12 +32,12 @@ extension AppFeature {
                     sourceProjectURL: nil
                 ),
                 successEffects: .init(
-                    feedback: .openedDocument(loaded.presentation.layerRows.count),
-                    warningMessage: workspaceProjectLoadWarningMessage(
-                        issues,
-                        language: state.application.appLanguage
-                    )
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
                 )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
             ),
             state: &state
         )
@@ -73,7 +73,7 @@ extension AppFeature {
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
             onSuccess: { .openDocumentLoaded($0, url, $1) },
-            onFailure: { .openDocumentFailed($0.feedback) }
+            onFailure: { .openDocumentFailed(workspaceFeedbackMapper.feedback(for: $0, context: .openDocument)) }
         )
     }
 
@@ -85,8 +85,8 @@ extension AppFeature {
     ) -> Effect<Action> {
         if let existingTabID = state.workspace.tabID(forSourceProjectURL: sourceURL) {
             state.application.completeWorkspaceProjectLoad(
-                bannerMessage: workspaceProjectLoadWarningMessage(
-                    issues,
+                message: workspaceFeedbackMapper.bannerMessage(
+                    for: issues,
                     language: state.application.appLanguage
                 )
             )
@@ -100,12 +100,12 @@ extension AppFeature {
                     sourceProjectURL: sourceURL
                 ),
                 successEffects: .init(
-                    feedback: .openedDocument(loaded.presentation.layerRows.count),
-                    warningMessage: workspaceProjectLoadWarningMessage(
-                        issues,
-                        language: state.application.appLanguage
-                    )
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
                 )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
             ),
             state: &state
         )

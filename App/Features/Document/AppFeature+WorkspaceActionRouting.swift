@@ -64,8 +64,11 @@ extension AppFeature {
         case let .success(request):
             return .send(.workspacePersistenceRequested(request))
         case let .failure(failure):
-            state.application.presentFeedback(
-                failure.feedback
+            state.application.presentBanner(
+                workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
             )
             return .none
         }

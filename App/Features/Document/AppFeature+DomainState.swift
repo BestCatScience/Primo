@@ -320,23 +320,18 @@ extension AppFeature.ApplicationState {
     }
 
     mutating func failHydration(
-        feedback: AppFeature.ApplicationFeedback,
+        message: String?,
         showingHome: Bool? = nil
     ) {
         finishHydration(showingHome: showingHome)
-        presentFeedback(feedback)
+        presentBanner(message)
     }
 
     mutating func completeWorkspaceProjectLoad(
-        feedback: AppFeature.ApplicationFeedback? = nil,
-        bannerMessage: String? = nil
+        message: String? = nil
     ) {
         finishHydration(showingHome: false)
-        if let bannerMessage {
-            presentBanner(bannerMessage)
-        } else if let feedback {
-            presentFeedback(feedback)
-        }
+        presentBanner(message)
     }
 
     mutating func showHome(section: HomeSidebarSection = .home) {

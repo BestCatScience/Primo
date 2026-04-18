@@ -87,7 +87,8 @@ extension AppFeature {
         func prepare(
             contract: FreshDocumentReplacementContract,
             state: inout State,
-            reserveTab: (String, DocumentProjectPath?, State) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure>
+            reserveTab: (String, DocumentProjectPath?, State) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure>,
+            mapFailureMessage: (WorkspacePersistenceFailure, AppLanguage) -> String?
         ) -> PreparedFreshDocumentReplacement? {
             switch reserveTab(
                 contract.tabTitle,
@@ -100,7 +101,9 @@ extension AppFeature {
                     preparedTab: preparedTab
                 )
             case let .failure(failure):
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    mapFailureMessage(failure, state.application.appLanguage)
+                )
                 return nil
             }
         }
@@ -126,14 +129,17 @@ extension AppFeature {
             _ preparedReplacement: PreparedFreshDocumentReplacement,
             state: inout State,
             activatePreparedTab: (PreparedWorkspaceTab, inout State) -> Result<Void, WorkspacePersistenceFailure>,
-            cancelEffects: () -> Effect<Action>
+            cancelEffects: () -> Effect<Action>,
+            mapFailureMessage: (WorkspacePersistenceFailure, AppLanguage) -> String?
         ) -> Effect<Action> {
             let activationSucceeded: Bool
             if case let .failure(failure) = activatePreparedTab(
                 preparedReplacement.preparedTab,
                 &state
             ) {
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    mapFailureMessage(failure, state.application.appLanguage)
+                )
                 activationSucceeded = false
             } else {
                 activationSucceeded = true
@@ -440,7 +446,12 @@ extension AppFeature {
                 )
             )
         case let .failure(failure):
-            state.application.presentFeedback(failure.feedback)
+            state.application.presentBanner(
+                workspaceFeedbackMapper.message(
+                    for: workspaceFeedbackMapper.feedback(for: failure),
+                    language: state.application.appLanguage
+                )
+            )
             persistenceEffect = .none
         }
 
@@ -453,6 +464,12 @@ extension AppFeature {
                 },
                 cancelEffects: {
                     cancelStartupPresentationEffects()
+                },
+                mapFailureMessage: { failure, language in
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: failure),
+                        language: language
+                    )
                 }
             ),
             documentPaperStyleSyncClient.synchronizeEffect(
@@ -498,7 +515,12 @@ extension AppFeature {
             case let .success(request):
                 prepareRequest = request
             case let .failure(failure):
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: failure),
+                        language: state.application.appLanguage
+                    )
+                )
                 return .none
             }
         }
@@ -609,7 +631,12 @@ extension AppFeature {
             case let .success(request):
                 prepareRequest = request
             case let .failure(failure):
-                state.application.presentFeedback(failure.feedback)
+                state.application.presentBanner(
+                    workspaceFeedbackMapper.message(
+                        for: workspaceFeedbackMapper.feedback(for: failure),
+                        language: state.application.appLanguage
+                    )
+                )
                 return .none
             }
         }

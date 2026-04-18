@@ -13,7 +13,9 @@ extension AppFeature {
         state: inout State,
         feedback: ApplicationFeedback
     ) {
-        state.application.failHydration(feedback: feedback)
+        state.application.failHydration(
+            message: feedback.message(for: state.application.appLanguage)
+        )
     }
 
     func handlePhotoImportFailed(

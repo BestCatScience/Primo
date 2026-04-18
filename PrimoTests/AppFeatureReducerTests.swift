@@ -102,7 +102,7 @@ final class AppFeatureReducerTests: XCTestCase {
             result: .loadedWorkspaceFollowUpApplied(
                 AppFeature.LoadedWorkspaceFollowUpPersistenceResult(
                     successEffects: .init(
-                        feedback: .restoredAutosave
+                        completion: .restoredAutosave
                     ),
                     issues: []
                 )
@@ -134,7 +134,7 @@ final class AppFeatureReducerTests: XCTestCase {
                         successEffects: .init()
                     )
                 ),
-                feedback: .saveFailed("workspace follow-up failed")
+                reason: .saveFailed("workspace follow-up failed")
             )
         )
 
@@ -344,8 +344,11 @@ final class AppFeatureReducerTests: XCTestCase {
                             sourceProjectURL: sourceURL
                         ),
                         successEffects: .init(
-                            feedback: .openedDocument(loaded.presentation.layerRows.count)
+                            completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
                         )
+                    ),
+                    presentation: AppFeature.LoadedWorkspacePresentation(
+                        completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
                     )
                 )
             )
@@ -374,7 +377,7 @@ final class AppFeatureReducerTests: XCTestCase {
             result: .loadedWorkspaceFollowUpApplied(
                 AppFeature.LoadedWorkspaceFollowUpPersistenceResult(
                     successEffects: .init(
-                        feedback: .restoredAutosave
+                        completion: .restoredAutosave
                     ),
                     issues: [.autosaveEntryDiscardFailed("discard failed")]
                 )

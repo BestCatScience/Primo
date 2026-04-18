@@ -234,7 +234,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             .failure(
                 AppFeature.WorkspacePersistenceFailure(
                     request: request,
-                    feedback: .couldNotCreateTab
+                    reason: .couldNotCreateTab
                 )
             )
         )
