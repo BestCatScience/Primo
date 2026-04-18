@@ -2,6 +2,27 @@ import ComposableArchitecture
 import CryptoKit
 import Foundation
 
+enum WorkspaceCatalogFailure: LocalizedError, Equatable, OperationFailure {
+    case projectLoadFailed(String)
+    case metadataReadFailed(String)
+    case metadataDecodeFailed(String)
+    case resourceLookupFailed(String)
+    case invalidRelativeFolderPath(String)
+    case invalidWorkspaceEntry(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .projectLoadFailed(message),
+             let .metadataReadFailed(message),
+             let .metadataDecodeFailed(message),
+             let .resourceLookupFailed(message),
+             let .invalidRelativeFolderPath(message),
+             let .invalidWorkspaceEntry(message):
+            return message
+        }
+    }
+}
+
 struct DocumentWorkspaceClient: Sendable {
     var createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
     var createProjectURL: @Sendable () throws -> DocumentProjectPath
@@ -118,29 +139,27 @@ private struct DocumentWorkspaceStorage: Sendable {
         let rootDirectory = try appProjectsDirectory()
         let projectURLs = try discoverProjectDirectories(in: rootDirectory)
 
-        return projectURLs.compactMap { projectURL in
-            guard let loaded = try? PaintDocumentSession.loadProject(
+        var summaries: [SavedProjectSummary] = []
+        for projectURL in projectURLs {
+            let loaded = try loadProjectSession(
                 from: projectURL,
-                fileClient: fileClient,
-                dateClient: dateClient,
-                uuidClient: uuidClient
-            ) else {
-                return nil
-            }
+                label: "saved project"
+            )
             let presentation = loaded.presentation()
             let previewData = loaded.compositePNGData(paperStyle: loaded.currentPaperStyle)
-            let values = try? projectURL.resourceValues(forKeys: [.contentModificationDateKey])
-            return SavedProjectSummary(
-                url: DocumentProjectPath(projectURL),
-                name: DocumentProjectPath(projectURL).displayName,
-                relativeFolderPath: relativeFolderPath(for: projectURL, rootDirectory: rootDirectory),
-                modifiedAt: values?.contentModificationDate ?? .distantPast,
-                canvasSize: presentation.canvasSize,
-                layerCount: presentation.layerRows.count,
-                previewImageData: previewData
+            summaries.append(
+                SavedProjectSummary(
+                    url: DocumentProjectPath(projectURL),
+                    name: DocumentProjectPath(projectURL).displayName,
+                    relativeFolderPath: try relativeFolderPath(for: projectURL, rootDirectory: rootDirectory),
+                    modifiedAt: try contentModificationDate(for: projectURL),
+                    canvasSize: presentation.canvasSize,
+                    layerCount: presentation.layerRows.count,
+                    previewImageData: previewData
+                )
             )
         }
-        .sorted { $0.modifiedAt > $1.modifiedAt }
+        return summaries.sorted { $0.modifiedAt > $1.modifiedAt }
     }
 
     func moveSavedProject(at url: DocumentProjectPath, toRelativeFolderPath relativeFolderPath: RelativeProjectFolderPath?) throws -> DocumentProjectPath {
@@ -174,21 +193,31 @@ private struct DocumentWorkspaceStorage: Sendable {
             guard try isDirectory(entryURL) else { return nil }
 
             let metadataURL = metadataURL(in: entryURL)
-            guard let data = try? fileClient.readData(metadataURL) else { return nil }
-            let metadata = try JSONDecoder().decode(StoredAutosaveMetadata.self, from: data)
-            let identifier = try WorkspaceItemID(validating: metadata.id)
+            let data = try readMetadataData(
+                at: metadataURL,
+                label: "autosave metadata"
+            )
+            let metadata: StoredAutosaveMetadata = try decodeMetadata(
+                StoredAutosaveMetadata.self,
+                from: data,
+                label: "autosave metadata"
+            )
+            let identifier = try workspaceItemID(
+                validating: metadata.id,
+                label: "autosave metadata"
+            )
             let projectURL = projectURL(in: entryURL)
-            guard fileClient.fileExists(projectURL.path) else { return nil }
+            guard fileClient.fileExists(projectURL.path) else {
+                throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+                    "Missing autosave project at \(projectURL.lastPathComponent)"
+                )
+            }
 
-            let previewImageData: Data? = {
-                guard let session = try? PaintDocumentSession.loadProject(
-                    from: projectURL,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    uuidClient: uuidClient
-                ) else { return nil }
-                return session.compositePNGData(paperStyle: session.currentPaperStyle)
-            }()
+            let session = try loadProjectSession(
+                from: projectURL,
+                label: "autosave preview"
+            )
+            let previewImageData = session.compositePNGData(paperStyle: session.currentPaperStyle)
 
             return AutosaveRecoveryItem(
                 id: identifier,
@@ -248,21 +277,31 @@ private struct DocumentWorkspaceStorage: Sendable {
             guard try isDirectory(entryURL) else { return nil }
 
             let metadataURL = metadataURL(in: entryURL)
-            guard let data = try? fileClient.readData(metadataURL) else { return nil }
-            let metadata = try JSONDecoder().decode(StoredSaveHistoryMetadata.self, from: data)
-            let identifier = try WorkspaceItemID(validating: metadata.id)
+            let data = try readMetadataData(
+                at: metadataURL,
+                label: "save history metadata"
+            )
+            let metadata: StoredSaveHistoryMetadata = try decodeMetadata(
+                StoredSaveHistoryMetadata.self,
+                from: data,
+                label: "save history metadata"
+            )
+            let identifier = try workspaceItemID(
+                validating: metadata.id,
+                label: "save history metadata"
+            )
             let projectURL = projectURL(in: entryURL)
-            guard fileClient.fileExists(projectURL.path) else { return nil }
+            guard fileClient.fileExists(projectURL.path) else {
+                throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+                    "Missing save history project at \(projectURL.lastPathComponent)"
+                )
+            }
 
-            let previewImageData: Data? = {
-                guard let session = try? PaintDocumentSession.loadProject(
-                    from: projectURL,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    uuidClient: uuidClient
-                ) else { return nil }
-                return session.compositePNGData(paperStyle: session.currentPaperStyle)
-            }()
+            let session = try loadProjectSession(
+                from: projectURL,
+                label: "save history preview"
+            )
+            let previewImageData = session.compositePNGData(paperStyle: session.currentPaperStyle)
 
             return SaveHistoryEntry(
                 id: identifier,
@@ -384,7 +423,10 @@ private struct DocumentWorkspaceStorage: Sendable {
         return projectURLs
     }
 
-    private func relativeFolderPath(for projectURL: URL, rootDirectory: URL) -> RelativeProjectFolderPath? {
+    private func relativeFolderPath(
+        for projectURL: URL,
+        rootDirectory: URL
+    ) throws -> RelativeProjectFolderPath? {
         let parentPath = projectURL.deletingLastPathComponent().standardizedFileURL.path
         let rootPath = rootDirectory.standardizedFileURL.path
         guard parentPath != rootPath else { return nil }
@@ -392,7 +434,13 @@ private struct DocumentWorkspaceStorage: Sendable {
         guard parentPath.hasPrefix(prefix) else { return nil }
         let relativePath = String(parentPath.dropFirst(prefix.count))
         guard !relativePath.isEmpty else { return nil }
-        return try? RelativeProjectFolderPath(validating: relativePath)
+        do {
+            return try RelativeProjectFolderPath(validating: relativePath)
+        } catch {
+            throw WorkspaceCatalogFailure.invalidRelativeFolderPath(
+                "Invalid saved project folder path '\(relativePath)': \(error.localizedDescription)"
+            )
+        }
     }
 
     private func trimSaveHistoryEntries(for identifier: WorkspaceItemID, limit: Int) throws {
@@ -403,14 +451,86 @@ private struct DocumentWorkspaceStorage: Sendable {
             [.isDirectoryKey, .contentModificationDateKey],
             [.skipsHiddenFiles]
         )
-        let sortedEntryURLs = entryURLs.sorted { lhs, rhs in
-            let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-            return lhsDate > rhsDate
-        }
+        let sortedEntryURLs = try entryURLs
+            .map { entryURL in
+                (entryURL, try contentModificationDate(for: entryURL))
+            }
+            .sorted { lhs, rhs in
+                lhs.1 > rhs.1
+            }
+            .map(\.0)
         guard sortedEntryURLs.count > limit else { return }
         for entryURL in sortedEntryURLs.dropFirst(limit) {
             try removeItemIfExists(at: entryURL)
+        }
+    }
+
+    private func loadProjectSession(
+        from projectURL: URL,
+        label: String
+    ) throws -> PaintDocumentSession {
+        do {
+            return try PaintDocumentSession.loadProject(
+                from: projectURL,
+                fileClient: fileClient,
+                dateClient: dateClient,
+                uuidClient: uuidClient
+            )
+        } catch {
+            throw WorkspaceCatalogFailure.projectLoadFailed(
+                "Could not load \(label) at \(projectURL.lastPathComponent): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func readMetadataData(
+        at metadataURL: URL,
+        label: String
+    ) throws -> Data {
+        do {
+            return try fileClient.readData(metadataURL)
+        } catch {
+            throw WorkspaceCatalogFailure.metadataReadFailed(
+                "Could not read \(label) at \(metadataURL.lastPathComponent): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func decodeMetadata<T: Decodable>(
+        _ type: T.Type,
+        from data: Data,
+        label: String
+    ) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            throw WorkspaceCatalogFailure.metadataDecodeFailed(
+                "Could not decode \(label): \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func workspaceItemID(
+        validating rawValue: String,
+        label: String
+    ) throws -> WorkspaceItemID {
+        do {
+            return try WorkspaceItemID(validating: rawValue)
+        } catch {
+            throw WorkspaceCatalogFailure.invalidWorkspaceEntry(
+                "Invalid \(label) identifier '\(rawValue)': \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func contentModificationDate(for url: URL) throws -> Date {
+        do {
+            let values = try url.resourceValues(forKeys: [.contentModificationDateKey])
+            return values.contentModificationDate ?? .distantPast
+        } catch {
+            throw WorkspaceCatalogFailure.resourceLookupFailed(
+                "Could not read modification date for \(url.lastPathComponent): \(error.localizedDescription)"
+            )
         }
     }
 

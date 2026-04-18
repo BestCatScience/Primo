@@ -25,20 +25,17 @@ extension AppFeature {
 
         case .brushPalette(.binding(\.paper.color)),
              .brushPalette(.binding(\.paper.isTransparent)):
-            handleBrushPalettePaperBindingChanged(state: &state)
-            return .none
+            return handleBrushPalettePaperBindingChanged(state: &state)
 
         case .brushPalette:
             handleBrushPaletteStateRefresh(state: &state)
             return .none
 
         case .layerSidebar(.binding(\.paperColor)):
-            handlePaperColorBindingChanged(state: &state)
-            return .none
+            return handlePaperColorBindingChanged(state: &state)
 
         case .layerSidebar(.binding(\.transparentPaper)):
-            handleTransparentPaperBindingChanged(state: &state)
-            return .none
+            return handleTransparentPaperBindingChanged(state: &state)
 
         case .layerSidebar(.delegate(.addLayer)):
             handleAddLayer(state: &state)

@@ -3,8 +3,8 @@ import UIKit
 
 extension ContentView {
     var resolvedNanoBananaInputLayerIndex: Int {
-        if store.layerSidebar.layers.contains(where: { $0.index == nanoBananaInputLayerIndex }) {
-            return nanoBananaInputLayerIndex
+        if store.layerSidebar.layers.contains(where: { $0.index == nanoBananaState.composer.inputLayerIndex }) {
+            return nanoBananaState.composer.inputLayerIndex
         }
         return store.layerSidebar.activeLayerIndex
     }
@@ -13,79 +13,102 @@ extension ContentView {
         store.layerSidebar.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })?.name ?? "-"
     }
 
-    func prepareNanoBananaComposer() {
-        nanoBananaPrompt = ""
-        nanoBananaInputLayerIndex = store.layerSidebar.activeLayerIndex
-        nanoBananaEditScope = store.canvas.selection?.isEmpty == false ? .selectedArea : .wholeLayer
-        nanoBananaMaskExpansion = 0
-        nanoBananaInvertsMask = false
-        nanoBananaOutputMode = .replaceCurrentLayer
-        nanoBananaModel = .flashImage25
-        workspaceBottomPanelSection = .nanoBanana
-        workspaceBottomPanelCollapsed = false
-    }
-
-    var nanoBananaGenerateDisabled: Bool {
-        nanoBananaState.isGenerating ||
-        store.layerSidebar.layers.isEmpty ||
-        nanoBananaPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        (
-            nanoBananaAccessMode == .userAPIKey
-            ? nanoBananaAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            : (
-                nanoBananaCommerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            )
+    var nanoBananaPromptBinding: Binding<String> {
+        Binding(
+            get: { nanoBananaState.composer.prompt },
+            set: { store.send(.nanoBanana(.promptChanged($0))) }
         )
     }
 
-    func requestNanoBananaGeneration(closeSheet: Bool) {
-        if nanoBananaAccessMode == .appManaged, !nanoBananaCommerce.isSubscriptionActive {
-            nanoBananaFocusedField = nil
-            showsNanoBananaPaywall = true
-            return
-        }
-        submitNanoBananaRequest(closeSheet: closeSheet)
+    var nanoBananaInputLayerIndexBinding: Binding<Int> {
+        Binding(
+            get: { nanoBananaState.composer.inputLayerIndex },
+            set: { store.send(.nanoBanana(.inputLayerIndexChanged($0))) }
+        )
     }
 
-    func submitNanoBananaRequest(closeSheet: Bool) {
-        nanoBananaFocusedField = nil
+    var nanoBananaEditScopeBinding: Binding<NanoBananaEditScope> {
+        Binding(
+            get: { nanoBananaState.composer.editScope },
+            set: { store.send(.nanoBanana(.editScopeChanged($0))) }
+        )
+    }
+
+    var nanoBananaOutputModeBinding: Binding<NanoBananaOutputMode> {
+        Binding(
+            get: { nanoBananaState.composer.outputMode },
+            set: { store.send(.nanoBanana(.outputModeChanged($0))) }
+        )
+    }
+
+    var nanoBananaMaskExpansionBinding: Binding<Int> {
+        Binding(
+            get: { nanoBananaState.composer.maskSettings.expansion },
+            set: { store.send(.nanoBanana(.maskExpansionChanged($0))) }
+        )
+    }
+
+    var nanoBananaMaskInversionBinding: Binding<Bool> {
+        Binding(
+            get: { nanoBananaState.composer.maskSettings.isInverted },
+            set: { store.send(.nanoBanana(.maskInversionChanged($0))) }
+        )
+    }
+
+    var nanoBananaModelBinding: Binding<NanoBananaModel> {
+        Binding(
+            get: { nanoBananaState.composer.model },
+            set: { store.send(.nanoBanana(.modelChanged($0))) }
+        )
+    }
+
+    var nanoBananaAccessModeBinding: Binding<NanoBananaAccessMode> {
+        Binding(
+            get: { nanoBananaState.accessMode },
+            set: { store.send(.nanoBanana(.accessModeChanged($0))) }
+        )
+    }
+
+    var nanoBananaAPIKeyBinding: Binding<String> {
+        Binding(
+            get: { nanoBananaState.apiKey },
+            set: { store.send(.nanoBanana(.apiKeyChanged($0))) }
+        )
+    }
+
+    func prepareNanoBananaComposer() {
         store.send(
-            .nanoBananaEditRequested(
-                NanoBananaGenerationRequest(
-                    prompt: nanoBananaPrompt,
-                    config: NanoBananaRequestConfig(
-                        accessMode: nanoBananaAccessMode,
-                        credential: nanoBananaAccessMode == .userAPIKey ? nanoBananaAPIKey : nanoBananaCommerce.latestEntitlementJWS,
-                        endpoint: nanoBananaCommerce.proxyEndpoint
-                    ),
-                    model: nanoBananaModel,
-                    inputLayerIndex: resolvedNanoBananaInputLayerIndex,
-                    editScope: nanoBananaEditScope,
-                    outputMode: nanoBananaOutputMode,
-                    maskSettings: NanoBananaMaskSettings(
-                        expansion: nanoBananaMaskExpansion,
-                        isInverted: nanoBananaInvertsMask
-                    )
+            .nanoBanana(
+                .prepareComposer(
+                    activeLayerIndex: store.layerSidebar.activeLayerIndex,
+                    hasSelection: store.canvas.selection?.isEmpty == false
                 )
             )
         )
-        if closeSheet {
-            showsNanoBananaSheet = false
-        }
+    }
+
+    var nanoBananaGenerateDisabled: Bool {
+        nanoBananaState.generateDisabled || store.layerSidebar.layers.isEmpty
+    }
+
+    func requestNanoBananaGeneration(closeSheet: Bool) {
+        nanoBananaFocusedField = nil
+        store.send(.nanoBanana(.inputLayerIndexChanged(resolvedNanoBananaInputLayerIndex)))
+        store.send(.nanoBanana(.generateButtonTapped(closeSheet: closeSheet)))
     }
 
     @ViewBuilder
     var nanoBananaSubscriptionControls: some View {
         LabeledContent(language.localized("状態")) {
             Text(
-                nanoBananaCommerce.isSubscriptionActive
+                nanoBananaState.commerce.isSubscriptionActive
                 ? language.localized("有効")
                 : language.localized("未購入")
             )
-            .foregroundStyle(nanoBananaCommerce.isSubscriptionActive ? .green : .secondary)
+            .foregroundStyle(nanoBananaState.commerce.isSubscriptionActive ? .green : .secondary)
         }
 
-        if let product = nanoBananaCommerce.primaryProduct {
+        if let product = nanoBananaState.commerce.primaryProduct {
             LabeledContent(language.localized("プラン")) {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(product.displayName)
@@ -93,34 +116,35 @@ extension ContentView {
                         .foregroundStyle(.secondary)
                 }
             }
-        } else if nanoBananaCommerce.isLoading {
+        } else if nanoBananaState.commerce.isLoading {
             Text(language.localized("サブスクリプション情報を読み込み中…"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
 
         Button(language.localized("サブスクリプションを購入")) {
-            Task {
-                await nanoBananaCommerce.purchasePrimaryProduct()
-            }
+            store.send(.nanoBanana(.purchasePrimaryProductTapped))
         }
-        .disabled(nanoBananaCommerce.isLoading || nanoBananaCommerce.isSubscriptionActive)
+        .disabled(nanoBananaState.commerce.isLoading || nanoBananaState.commerce.isSubscriptionActive)
 
         Button(language.localized("購入を復元")) {
-            Task {
-                await nanoBananaCommerce.restorePurchases()
-            }
+            store.send(.nanoBanana(.restorePurchasesTapped))
         }
-        .disabled(nanoBananaCommerce.isLoading)
+        .disabled(nanoBananaState.commerce.isLoading)
 
-        if let manageURL = nanoBananaCommerce.manageSubscriptionsURL {
+        if let manageURL = nanoBananaState.commerce.manageSubscriptionsURL {
             Link(language.localized("サブスクリプションを管理"), destination: manageURL)
         }
 
-        if let purchaseErrorMessage = nanoBananaCommerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
+        if let purchaseErrorMessage = nanoBananaState.commerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
             Text(purchaseErrorMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            Button(language.localized("メッセージを閉じる")) {
+                store.send(.nanoBanana(.purchaseErrorDismissed))
+            }
+            .buttonStyle(.borderless)
         }
 
         Text(language.localized("自社バックエンドでプロバイダ API キー注入と購入権限チェックを行う想定です"))
@@ -149,13 +173,13 @@ extension ContentView {
                 }
 
                 Section(language.localized("プラン")) {
-                    if let product = nanoBananaCommerce.primaryProduct {
+                    if let product = nanoBananaState.commerce.primaryProduct {
                         LabeledContent(product.displayName) {
                             Text(product.displayPrice)
                         }
                     } else {
                         Text(
-                            nanoBananaCommerce.isLoading
+                            nanoBananaState.commerce.isLoading
                             ? language.localized("サブスクリプション情報を読み込み中…")
                             : language.localized("サブスクリプション商品は利用できません")
                         )
@@ -172,7 +196,7 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        showsNanoBananaPaywall = false
+                        store.send(.nanoBanana(.paywallPresentationChanged(false)))
                     }
                 }
             }
@@ -1086,7 +1110,7 @@ extension ContentView {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
-                        TextEditor(text: $nanoBananaPrompt)
+                        TextEditor(text: nanoBananaPromptBinding)
                             .frame(minHeight: 110)
                             .foregroundStyle(.black)
                             .tint(.black)
@@ -1108,7 +1132,7 @@ extension ContentView {
                         HStack(spacing: 8) {
                             ForEach(NanoBananaPromptPreset.allCases) { preset in
                                 Button(preset.title(language)) {
-                                    nanoBananaPrompt = preset.prompt(language)
+                                    store.send(.nanoBanana(.promptChanged(preset.prompt(language))))
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.black.opacity(0.92))
@@ -1129,22 +1153,19 @@ extension ContentView {
                 }
 
                 Section(language.localized("入力")) {
-                    Picker(language.localized("接続方式"), selection: Binding(
-                        get: { nanoBananaAccessMode },
-                        set: { nanoBananaAccessMode = $0 }
-                    )) {
+                    Picker(language.localized("接続方式"), selection: nanoBananaAccessModeBinding) {
                         ForEach(NanoBananaAccessMode.allCases) { mode in
                             Text(mode.title(language)).tag(mode)
                         }
                     }
 
-                    Picker(language.localized("入力レイヤー"), selection: $nanoBananaInputLayerIndex) {
+                    Picker(language.localized("入力レイヤー"), selection: nanoBananaInputLayerIndexBinding) {
                         ForEach(store.layerSidebar.layers) { layer in
                             Text(layer.name).tag(layer.index)
                         }
                     }
 
-                    Picker(language.localized("編集範囲"), selection: $nanoBananaEditScope) {
+                    Picker(language.localized("編集範囲"), selection: nanoBananaEditScopeBinding) {
                         ForEach(NanoBananaEditScope.allCases) { scope in
                             Text(scope.title(language)).tag(scope)
                         }
@@ -1157,24 +1178,24 @@ extension ContentView {
                             .foregroundStyle(.secondary)
                     }
 
-                    if nanoBananaEditScope == .selectedArea {
+                    if nanoBananaState.composer.editScope == .selectedArea {
                         Stepper(
-                            "\(language.localized("マスク拡張")): \(nanoBananaMaskExpansion)",
-                            value: $nanoBananaMaskExpansion,
+                            "\(language.localized("マスク拡張")): \(nanoBananaState.composer.maskSettings.expansion)",
+                            value: nanoBananaMaskExpansionBinding,
                             in: -24...48
                         )
 
-                        Toggle(language.localized("マスクを反転"), isOn: $nanoBananaInvertsMask)
+                        Toggle(language.localized("マスクを反転"), isOn: nanoBananaMaskInversionBinding)
                     }
 
-                    Picker(language.localized("モデル"), selection: $nanoBananaModel) {
+                    Picker(language.localized("モデル"), selection: nanoBananaModelBinding) {
                         ForEach(NanoBananaModel.allCases) { model in
                             Text(model.title(language)).tag(model)
                         }
                     }
 
-                    if nanoBananaAccessMode == .userAPIKey {
-                        SecureField(language.localized("Gemini API キー"), text: $nanoBananaAPIKey)
+                    if nanoBananaState.accessMode == .userAPIKey {
+                        SecureField(language.localized("Gemini API キー"), text: nanoBananaAPIKeyBinding)
                             .focused($nanoBananaFocusedField, equals: .apiKey)
                         Text(language.localized("この端末内に保存されます"))
                             .font(.footnote)
@@ -1185,7 +1206,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("出力")) {
-                    Picker(language.localized("出力先"), selection: $nanoBananaOutputMode) {
+                    Picker(language.localized("出力先"), selection: nanoBananaOutputModeBinding) {
                         ForEach(NanoBananaOutputMode.allCases) { mode in
                             Text(mode.title(language)).tag(mode)
                         }
@@ -1208,7 +1229,7 @@ extension ContentView {
                                     .lineLimit(2)
                                 if job.status == .failed || job.status == .canceled {
                                     Button(language.localized("再試行")) {
-                                        store.send(.nanoBananaRetryJob(job.id))
+                                        store.send(.nanoBanana(.retryJobTapped(job.id)))
                                     }
                                     .buttonStyle(.borderless)
                                 }
@@ -1221,13 +1242,7 @@ extension ContentView {
                     Section(language.localized("履歴")) {
                         ForEach(nanoBananaState.history.prefix(4)) { item in
                             Button {
-                                nanoBananaPrompt = item.request.prompt
-                                nanoBananaInputLayerIndex = item.request.inputLayerIndex
-                                nanoBananaEditScope = item.request.editScope
-                                nanoBananaOutputMode = item.request.outputMode
-                                nanoBananaModel = item.request.model
-                                nanoBananaMaskExpansion = item.request.maskSettings.expansion
-                                nanoBananaInvertsMask = item.request.maskSettings.isInverted
+                                store.send(.nanoBanana(.historyItemSelected(item.request)))
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(item.request.prompt)
@@ -1248,7 +1263,7 @@ extension ContentView {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
                         nanoBananaFocusedField = nil
-                        showsNanoBananaSheet = false
+                        store.send(.nanoBanana(.sheetPresentationChanged(false)))
                     }
                 }
 
@@ -1718,7 +1733,7 @@ extension ContentView {
 
                 Button(StudioStrings.nanoBananaEdit(language)) {
                     prepareNanoBananaComposer()
-                    showsNanoBananaSheet = true
+                    store.send(.nanoBanana(.sheetPresentationChanged(true)))
                 }
                 .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || nanoBananaState.isGenerating)
 

@@ -183,11 +183,17 @@ extension AppFeature {
         }
 
         func resizeCanvas(_ dimensions: CanvasDimensions) -> Bool {
-            paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height)
+            if case .success = paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height) {
+                return true
+            }
+            return false
         }
 
         func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> Bool {
-            paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height)
+            if case .success = paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height) {
+                return true
+            }
+            return false
         }
 
         func initializeImportedCanvas(
@@ -195,17 +201,26 @@ extension AppFeature {
             layerName: String
         ) -> Bool {
             guard createCanvas(request.dimensions) else { return false }
-            guard paintDocumentClient.replaceLayerPixels(0, request.pixelData) else { return false }
-            guard paintDocumentClient.setLayerName(0, layerName) else { return false }
-            return paintDocumentClient.setActiveLayer(0)
+            guard case .success = paintDocumentClient.replaceLayerPixels(0, request.pixelData) else { return false }
+            guard case .success = paintDocumentClient.setLayerName(0, layerName) else { return false }
+            if case .success = paintDocumentClient.setActiveLayer(0) {
+                return true
+            }
+            return false
         }
 
         func undo() -> Bool {
-            paintDocumentClient.undo()
+            if case .success = paintDocumentClient.undo() {
+                return true
+            }
+            return false
         }
 
         func redo() -> Bool {
-            paintDocumentClient.redo()
+            if case .success = paintDocumentClient.redo() {
+                return true
+            }
+            return false
         }
     }
 

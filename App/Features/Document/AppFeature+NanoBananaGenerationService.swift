@@ -103,6 +103,7 @@ extension AppFeature {
 
         let preview: NanoBananaPreviewState
         let target: Target
+        let originalActiveLayerIndex: Int
     }
 
     private struct NanoBananaPreviewApplicationContract {
@@ -119,7 +120,8 @@ extension AppFeature {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .existingLayer(index: preview.outputLayerIndex)
+                        target: .existingLayer(index: preview.outputLayerIndex),
+                        originalActiveLayerIndex: state.canvas.activeLayerIndex
                     )
                 )
 
@@ -127,7 +129,8 @@ extension AppFeature {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar))
+                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar)),
+                        originalActiveLayerIndex: state.canvas.activeLayerIndex
                     )
                 )
             }
@@ -136,6 +139,7 @@ extension AppFeature {
 
     private struct NanoBananaDocumentService {
         enum ApplyFailure: Error, Equatable {
+            case createLayerFailed
             case setActiveLayerFailed(Int)
             case replacePixelsFailed(Int)
         }
@@ -154,15 +158,20 @@ extension AppFeature {
             case let .existingLayer(index):
                 resolvedTarget = (index, false)
             case let .newLayer(name):
-                resolvedTarget = (paintDocumentClient.addLayer(name), true)
+                switch paintDocumentClient.addLayer(name) {
+                case let .success(index):
+                    resolvedTarget = (index, true)
+                case .failure:
+                    return .failure(.createLayerFailed)
+                }
             }
 
-            guard paintDocumentClient.setActiveLayer(resolvedTarget.index) else {
-                rollbackResolvedTargetIfNeeded(resolvedTarget)
+            guard case .success = paintDocumentClient.setActiveLayer(resolvedTarget.index) else {
+                rollback(plan: plan, resolvedTarget: resolvedTarget)
                 return .failure(.setActiveLayerFailed(resolvedTarget.index))
             }
-            guard paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) else {
-                rollbackResolvedTargetIfNeeded(resolvedTarget)
+            guard case .success = paintDocumentClient.replaceLayerPixels(resolvedTarget.index, plan.preview.pixelData) else {
+                rollback(plan: plan, resolvedTarget: resolvedTarget)
                 return .failure(.replacePixelsFailed(resolvedTarget.index))
             }
             return .success(
@@ -172,9 +181,14 @@ extension AppFeature {
             )
         }
 
-        private func rollbackResolvedTargetIfNeeded(_ resolvedTarget: (index: Int, createdNewLayer: Bool)) {
-            guard resolvedTarget.createdNewLayer else { return }
-            _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
+        private func rollback(
+            plan: NanoBananaPreviewApplicationPlan,
+            resolvedTarget: (index: Int, createdNewLayer: Bool)
+        ) {
+            if resolvedTarget.createdNewLayer {
+                _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
+            }
+            _ = paintDocumentClient.setActiveLayer(plan.originalActiveLayerIndex)
         }
     }
 

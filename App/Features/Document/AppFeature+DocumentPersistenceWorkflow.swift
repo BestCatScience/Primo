@@ -7,8 +7,15 @@ extension AppFeature {
 
         func loadSaveHistoryEffect(for activeTab: OpenDocumentTab) -> Effect<Action> {
             .run { [workspaceCatalogService] send in
-                let entries = (try? workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)) ?? []
-                await send(.saveHistoryLoaded(entries))
+                do {
+                    await send(.saveHistoryLoaded(try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)))
+                } catch {
+                    await send(
+                        .saveHistoryLoadFailed(
+                            .saveHistoryRestoreFailed(AppFeature.optionalErrorMessage(error))
+                        )
+                    )
+                }
             }
         }
     }
@@ -121,5 +128,13 @@ extension AppFeature {
         feedback: ApplicationFeedback
     ) {
         state.application.failHydration(feedback: feedback)
+    }
+
+    func handleSaveHistoryLoadFailed(
+        state: inout State,
+        feedback: ApplicationFeedback
+    ) {
+        state.saveHistory.dismiss()
+        state.application.presentFeedback(feedback)
     }
 }

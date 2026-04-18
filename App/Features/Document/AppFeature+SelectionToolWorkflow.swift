@@ -115,29 +115,33 @@ extension AppFeature {
         )
     }
 
-    func handlePaperBindingSync(state: inout State) {
+    func handlePaperBindingSync(state: inout State) -> Effect<Action> {
         handleBrushPaletteStateRefresh(state: &state)
         state.canvas.updatePaperStyle(resolvedPaperStyle(for: state))
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        return .send(
+            .documentPaperStyleSyncRequested(
+                resolvedPaperStyle(for: state)
+            )
+        )
     }
 
-    func handlePaperColorBindingChanged(state: inout State) {
+    func handlePaperColorBindingChanged(state: inout State) -> Effect<Action> {
         state.brushPalette.syncPaper(
             color: state.layerSidebar.paperColor,
             isTransparent: state.layerSidebar.transparentPaper
         )
-        handlePaperBindingSync(state: &state)
+        return handlePaperBindingSync(state: &state)
     }
 
-    func handleTransparentPaperBindingChanged(state: inout State) {
+    func handleTransparentPaperBindingChanged(state: inout State) -> Effect<Action> {
         state.brushPalette.syncPaper(
             color: state.layerSidebar.paperColor,
             isTransparent: state.layerSidebar.transparentPaper
         )
-        handlePaperBindingSync(state: &state)
+        return handlePaperBindingSync(state: &state)
     }
 
-    func handleBrushPalettePaperBindingChanged(state: inout State) {
+    func handleBrushPalettePaperBindingChanged(state: inout State) -> Effect<Action> {
         handlePaperBindingSync(state: &state)
     }
 

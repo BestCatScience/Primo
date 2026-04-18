@@ -103,154 +103,235 @@ extension AppFeature {
 
         @discardableResult
         func addLayer(named name: String) -> Int {
-            paintDocumentClient.addLayer(name)
+            switch paintDocumentClient.addLayer(name) {
+            case let .success(index):
+                return index
+            case .failure:
+                return -1
+            }
         }
 
         func createFolder(
             named name: String,
             afterLayerAt activeLayerIndex: Int
         ) -> Int {
-            paintDocumentClient.createFolder(name, activeLayerIndex)
+            switch paintDocumentClient.createFolder(name, activeLayerIndex) {
+            case let .success(folderID):
+                return folderID
+            case .failure:
+                return -1
+            }
         }
 
         func deleteFolder(_ folderID: Int) -> Bool {
-            paintDocumentClient.deleteFolder(folderID)
+            if case .success = paintDocumentClient.deleteFolder(folderID) {
+                return true
+            }
+            return false
         }
 
         func deleteLayer(_ index: Int) -> Bool {
-            paintDocumentClient.deleteLayer(index)
+            if case .success = paintDocumentClient.deleteLayer(index) {
+                return true
+            }
+            return false
         }
 
         func duplicateLayer(
             _ index: Int,
             named duplicateName: String
         ) -> Int {
-            paintDocumentClient.duplicateLayer(index, duplicateName)
+            switch paintDocumentClient.duplicateLayer(index, duplicateName) {
+            case let .success(duplicatedIndex):
+                return duplicatedIndex
+            case .failure:
+                return -1
+            }
         }
 
         func moveLayer(
             _ index: Int,
             to destinationIndex: Int
         ) -> Bool {
-            paintDocumentClient.moveLayer(index, destinationIndex)
+            if case .success = paintDocumentClient.moveLayer(index, destinationIndex) {
+                return true
+            }
+            return false
         }
 
         func assignLayer(
             _ index: Int,
             toFolder folderID: Int
         ) -> Bool {
-            paintDocumentClient.assignLayerToFolder(index, folderID)
+            if case .success = paintDocumentClient.assignLayerToFolder(index, folderID) {
+                return true
+            }
+            return false
         }
 
         func mergeLayerDown(_ index: Int) -> Bool {
-            paintDocumentClient.mergeLayerDown(index)
+            if case .success = paintDocumentClient.mergeLayerDown(index) {
+                return true
+            }
+            return false
         }
 
         func setLayerVisibility(
             _ index: Int,
             visible: Bool
         ) -> Bool {
-            paintDocumentClient.setLayerVisibility(index, visible)
+            if case .success = paintDocumentClient.setLayerVisibility(index, visible) {
+                return true
+            }
+            return false
         }
 
         func setActiveLayer(_ index: Int) -> Bool {
-            paintDocumentClient.setActiveLayer(index)
+            if case .success = paintDocumentClient.setActiveLayer(index) {
+                return true
+            }
+            return false
         }
 
         func setLayerOpacity(
             _ index: Int,
             opacity: Double
         ) -> Bool {
-            paintDocumentClient.setLayerOpacity(index, opacity)
+            if case .success = paintDocumentClient.setLayerOpacity(index, opacity) {
+                return true
+            }
+            return false
         }
 
         func setLayerLocked(
             _ index: Int,
             isLocked: Bool
         ) -> Bool {
-            paintDocumentClient.setLayerLocked(index, isLocked)
+            if case .success = paintDocumentClient.setLayerLocked(index, isLocked) {
+                return true
+            }
+            return false
         }
 
         func setLayerAlphaLocked(
             _ index: Int,
             isAlphaLocked: Bool
         ) -> Bool {
-            paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked)
+            if case .success = paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked) {
+                return true
+            }
+            return false
         }
 
         func setLayerClipped(
             _ index: Int,
             isClipped: Bool
         ) -> Bool {
-            paintDocumentClient.setLayerClipped(index, isClipped)
+            if case .success = paintDocumentClient.setLayerClipped(index, isClipped) {
+                return true
+            }
+            return false
         }
 
         func setFolderExpanded(
             _ folderID: Int,
             isExpanded: Bool
         ) -> Bool {
-            paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+            if case .success = paintDocumentClient.setFolderExpanded(folderID, isExpanded) {
+                return true
+            }
+            return false
         }
 
         func setFolderVisibility(
             _ folderID: Int,
             visible: Bool
         ) -> Bool {
-            paintDocumentClient.setFolderVisibility(folderID, visible)
+            if case .success = paintDocumentClient.setFolderVisibility(folderID, visible) {
+                return true
+            }
+            return false
         }
 
         func setFolderName(
             _ folderID: Int,
             name: String
         ) -> Bool {
-            paintDocumentClient.setFolderName(folderID, name)
+            if case .success = paintDocumentClient.setFolderName(folderID, name) {
+                return true
+            }
+            return false
         }
 
         func setLayerBlendMode(
             _ index: Int,
             blendMode: LayerBlendMode
         ) -> Bool {
-            paintDocumentClient.setLayerBlendMode(index, blendMode)
+            if case .success = paintDocumentClient.setLayerBlendMode(index, blendMode) {
+                return true
+            }
+            return false
         }
 
         func setLayerName(
             _ index: Int,
             name: String
         ) -> Bool {
-            paintDocumentClient.setLayerName(index, name)
+            if case .success = paintDocumentClient.setLayerName(index, name) {
+                return true
+            }
+            return false
         }
 
         func replaceLayerPixels(
             _ index: Int,
             pixelData: Data
         ) -> Bool {
-            paintDocumentClient.replaceLayerPixels(index, pixelData)
+            if case .success = paintDocumentClient.replaceLayerPixels(index, pixelData) {
+                return true
+            }
+            return false
         }
 
         func setTextLayer(
             _ index: Int,
             textLayer: TextLayerData
         ) -> Bool {
-            paintDocumentClient.setTextLayer(index, textLayer)
+            if case .success = paintDocumentClient.setTextLayer(index, textLayer) {
+                return true
+            }
+            return false
         }
 
         func clearLayer(_ index: Int) -> Bool {
-            paintDocumentClient.clearLayer(index)
+            if case .success = paintDocumentClient.clearLayer(index) {
+                return true
+            }
+            return false
         }
 
         func replaceLayerMask(
             _ index: Int,
             maskData: Data
         ) -> Bool {
-            paintDocumentClient.replaceLayerMask(index, maskData)
+            if case .success = paintDocumentClient.replaceLayerMask(index, maskData) {
+                return true
+            }
+            return false
         }
 
         func clearLayerMask(_ index: Int) -> Bool {
-            paintDocumentClient.clearLayerMask(index)
+            if case .success = paintDocumentClient.clearLayerMask(index) {
+                return true
+            }
+            return false
         }
 
         func applyLayerMask(_ index: Int) -> Bool {
-            paintDocumentClient.applyLayerMask(index)
+            if case .success = paintDocumentClient.applyLayerMask(index) {
+                return true
+            }
+            return false
         }
     }
 

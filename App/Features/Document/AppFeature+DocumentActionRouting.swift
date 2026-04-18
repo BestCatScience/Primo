@@ -40,6 +40,10 @@ extension AppFeature {
             state.saveHistory.present(entries: entries)
             return .none
 
+        case let .saveHistoryLoadFailed(feedback):
+            handleSaveHistoryLoadFailed(state: &state, feedback: feedback)
+            return .none
+
         case .saveHistoryDismissed:
             state.saveHistory.dismiss()
             return .none
@@ -82,6 +86,14 @@ extension AppFeature {
 
         case .exportTimelapseRequested:
             return handleTimelapseExportRequest(state: &state)
+
+        case let .nanoBanana(.delegate(delegateAction)):
+            switch delegateAction {
+            case let .requestEdit(request):
+                return handleNanoBananaEditRequest(state: &state, request: request)
+            case .cancelEdit:
+                return handleNanoBananaCancelRequested(state: &state)
+            }
 
         case let .nanoBananaEditRequested(request):
             return handleNanoBananaEditRequest(state: &state, request: request)

@@ -57,7 +57,13 @@ extension AppFeature {
         autosaveID: WorkspaceItemID
     ) {
         state.recovery.removeItem(id: autosaveID)
-        try? workspaceCatalogService.discardAutosaveEntry(autosaveID)
+        do {
+            try workspaceCatalogService.discardAutosaveEntry(autosaveID)
+        } catch {
+            state.application.presentFeedback(
+                .autosaveRestoreFailed(Self.optionalErrorMessage(error))
+            )
+        }
     }
 
     func handleAutosaveRecoveryRestoreFailed(

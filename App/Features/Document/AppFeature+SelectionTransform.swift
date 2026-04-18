@@ -15,7 +15,10 @@ extension AppFeature {
             _ layerIndex: Int,
             _ textLayer: TextLayerData
         ) -> Bool {
-            paintDocumentClient.setTextLayer(layerIndex, textLayer)
+            if case .success = paintDocumentClient.setTextLayer(layerIndex, textLayer) {
+                return true
+            }
+            return false
         }
 
         func pixelDataForLayer(_ layerIndex: Int) -> Data {
@@ -26,7 +29,10 @@ extension AppFeature {
             _ layerIndex: Int,
             _ pixelData: Data
         ) -> Bool {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
+                return true
+            }
+            return false
         }
     }
 

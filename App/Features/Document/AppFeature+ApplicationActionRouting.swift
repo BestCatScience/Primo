@@ -50,6 +50,13 @@ extension AppFeature {
         case .task:
             return handleTask(state: &state)
 
+        case let .startupLanguageLoaded(language):
+            handleStartupLanguageLoaded(state: &state, language: language)
+            return .none
+
+        case let .documentPaperStyleSyncRequested(paperStyle):
+            return handleDocumentPaperStyleSyncRequested(paperStyle: paperStyle)
+
         case let .bootstrapPresentationLoaded(presentation):
             handleBootstrapPresentationLoaded(state: &state, presentation: presentation)
             return .none
@@ -64,11 +71,19 @@ extension AppFeature {
             handleHomeProjectsLoaded(state: &state, projects: projects)
             return .none
 
+        case let .homeProjectsLoadFailed(feedback):
+            handleHomeProjectsLoadFailed(state: &state, feedback: feedback)
+            return .none
+
         case .autosaveRecoveryLoadRequested:
             return handleAutosaveRecoveryLoadRequest()
 
         case let .autosaveRecoveryLoaded(items):
             handleAutosaveRecoveryLoaded(state: &state, items: items)
+            return .none
+
+        case let .autosaveRecoveryLoadFailed(feedback):
+            handleAutosaveRecoveryRestoreFailed(state: &state, feedback: feedback)
             return .none
 
         case let .autosaveRecoveryRestoreRequested(autosaveID):
@@ -102,12 +117,10 @@ extension AppFeature {
             return handleDeferredPresentationRefresh()
 
         case .refreshPresentationRequested:
-            handleRefreshPresentationRequest(state: &state)
-            return .none
+            return handleRefreshPresentationRequest(state: &state)
 
         case let .languageChanged(language):
-            handleLanguageChanged(state: &state, language: language)
-            return .none
+            return handleLanguageChanged(state: &state, language: language)
 
         case .exportSheetDismissed:
             handleExportSheetDismissed(state: &state)

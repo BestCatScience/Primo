@@ -11,14 +11,7 @@ struct ContentView: View {
         case apiKey
     }
 
-    enum WorkspaceBottomPanelSection: Hashable {
-        case nanoBanana
-        case history
-        case output
-    }
-
     let store: StoreOf<AppFeature>
-    @StateObject var nanoBananaCommerce = NanoBananaCommerce()
     private let studioUIScale: CGFloat = 0.56
     @State var showsOpenDocumentImporter = false
     @State var showsPhotoLayerImporter = false
@@ -39,8 +32,6 @@ struct ContentView: View {
     @State var showsFeatherSelectionSheet = false
     @State var showsColorRangeSelectionSheet = false
     @State var showsTransformNumericSheet = false
-    @State var showsNanoBananaSheet = false
-    @State var showsNanoBananaPaywall = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var resizeCanvasWidthText = ""
@@ -71,29 +62,13 @@ struct ContentView: View {
     @State var colorRangeMinimumAlpha = 0.05
     @State var colorRangeExpansion = 0.0
     @State var colorRangeSource: ColorRangeSelectionSource = .activeLayer
-    @State var nanoBananaPrompt = ""
-    @State var nanoBananaInputLayerIndex = 0
-    @State var nanoBananaEditScope: NanoBananaEditScope = .wholeLayer
-    @State var nanoBananaOutputMode: NanoBananaOutputMode = .replaceCurrentLayer
-    @State var nanoBananaMaskExpansion = 0
-    @State var nanoBananaInvertsMask = false
-    @State var nanoBananaModel: NanoBananaModel = .flashImage25
     @State var selectedPhotoLayerItem: PhotosPickerItem?
     @State var selectedNewCanvasPhotoItem: PhotosPickerItem?
     @State var selectedToolMetricEditor: ToolMetricEditor?
     @State var toolMetricSizeText = ""
     @State var toolMetricOpacityText = ""
-    @State var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
-    @State var workspaceBottomPanelCollapsed = false
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
-    @AppStorage("primo.nanobanana.accessMode") var nanoBananaAccessModeRawValue = NanoBananaAccessMode.userAPIKey.rawValue
-    @AppStorage("primo.nanobanana.apiKey") var nanoBananaAPIKey = ""
     var language: AppLanguage { applicationState.appLanguage }
-
-    var nanoBananaAccessMode: NanoBananaAccessMode {
-        get { NanoBananaAccessMode(rawValue: nanoBananaAccessModeRawValue) ?? .userAPIKey }
-        nonmutating set { nanoBananaAccessModeRawValue = newValue.rawValue }
-    }
 
     enum ToolMetricEditor: Hashable {
         case size
@@ -113,7 +88,7 @@ struct ContentView: View {
             store.send(.task)
         }
         .task {
-            await nanoBananaCommerce.prepare()
+            store.send(.nanoBanana(.task))
         }
         .sheet(item: Binding(
             get: { exportState.shareSheet },
@@ -169,10 +144,20 @@ struct ContentView: View {
         .sheet(isPresented: $showsTransformNumericSheet) {
             transformNumericSheet
         }
-        .sheet(isPresented: $showsNanoBananaSheet) {
+        .sheet(
+            isPresented: Binding(
+                get: { nanoBananaState.isSheetPresented },
+                set: { store.send(.nanoBanana(.sheetPresentationChanged($0))) }
+            )
+        ) {
             nanoBananaSheet
         }
-        .sheet(isPresented: $showsNanoBananaPaywall) {
+        .sheet(
+            isPresented: Binding(
+                get: { nanoBananaState.isPaywallPresented },
+                set: { store.send(.nanoBanana(.paywallPresentationChanged($0))) }
+            )
+        ) {
             nanoBananaPaywallSheet
         }
         .sheet(
@@ -238,7 +223,11 @@ struct ContentView: View {
         }
         .task(id: applicationState.bannerMessage) {
             guard applicationState.bannerMessage != nil else { return }
-            try? await Task.sleep(for: .milliseconds(2200))
+            do {
+                try await Task.sleep(for: .milliseconds(2200))
+            } catch {
+                return
+            }
             guard !Task.isCancelled else { return }
             store.send(.bannerDismissed)
         }
@@ -399,7 +388,7 @@ struct ContentView: View {
                         progress: progress,
                         language: language,
                         onCancel: {
-                            store.send(.nanoBananaCancelRequested)
+                            store.send(.nanoBanana(.cancelGenerationTapped))
                         }
                     )
                 }

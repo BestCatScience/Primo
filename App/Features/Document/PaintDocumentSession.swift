@@ -30,13 +30,21 @@ final class PaintDocumentSession {
         self.bridge = APPaintDocumentBridge(width: width, height: height)
         let timelapseDirectoryURL = services.timelapse.makeDirectoryURL()
         self.sessionState = PaintDocumentSessionState(timelapseDirectoryURL: timelapseDirectoryURL)
-        try? services.fileIO.createDirectory(timelapseDirectoryURL, true)
+        do {
+            // Best-effort cleanup/setup for transient timelapse artifacts owned by the session.
+            try services.fileIO.createDirectory(timelapseDirectoryURL, true)
+        } catch {
+        }
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
     }
 
     deinit {
-        try? services.timelapse.removeDirectory(at: timelapseDirectoryURL)
+        do {
+            // Best-effort cleanup for transient timelapse artifacts owned by the session.
+            try services.timelapse.removeDirectory(at: timelapseDirectoryURL)
+        } catch {
+        }
     }
 
     var currentPaperStyle: CanvasPaperStyle {

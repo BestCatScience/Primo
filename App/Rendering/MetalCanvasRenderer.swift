@@ -364,6 +364,10 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
             attachment?.destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
 
-        return try? device.makeRenderPipelineState(descriptor: descriptor)
+        do {
+            return try device.makeRenderPipelineState(descriptor: descriptor)
+        } catch {
+            return nil
+        }
     }
 }

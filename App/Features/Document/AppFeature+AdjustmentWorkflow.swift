@@ -13,11 +13,17 @@ extension AppFeature {
             _ layerIndex: Int,
             request: LayerProcessingRequest
         ) -> Bool {
-            paintDocumentClient.applyLayerProcessing(layerIndex, request)
+            if case .success = paintDocumentClient.applyLayerProcessing(layerIndex, request) {
+                return true
+            }
+            return false
         }
 
         func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) -> Bool {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
+                return true
+            }
+            return false
         }
     }
 

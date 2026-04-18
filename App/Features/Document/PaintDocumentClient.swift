@@ -2,6 +2,23 @@ import ComposableArchitecture
 import Foundation
 import Synchronization
 
+typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
+typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
+
+enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
+    case invalidLayerIndex(Int)
+    case invalidFolderID(Int)
+    case layerLocked(Int)
+    case alphaLocked(Int)
+    case invalidCanvasSize(width: Int, height: Int)
+    case invalidOpacity(Double)
+    case emptyInput
+    case noUndoState
+    case noRedoState
+    case bridgeMutationFailed(String)
+    case incompatibleLayerType(Int)
+}
+
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     var presentation: @Sendable () -> PaintDocumentPresentation
@@ -13,50 +30,50 @@ struct PaintDocumentClient: Sendable {
     var loadProject: @Sendable (URL) throws -> LoadedPaintProject
     var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
     var newCanvas: @Sendable (Int, Int) -> Void
-    var resizeCanvas: @Sendable (Int, Int) -> Bool
-    var resizeCanvasExtent: @Sendable (Int, Int) -> Bool
+    var resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
+    var resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
     var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     var appendStroke: @Sendable (StylusSample) -> Void
     var endStroke: @Sendable () -> Void
     var cancelStroke: @Sendable () -> Void
-    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> Bool
+    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
     var endBlurStroke: @Sendable () -> Void
-    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> Bool
+    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
     var canUndo: @Sendable () -> Bool
     var canRedo: @Sendable () -> Bool
-    var undo: @Sendable () -> Bool
-    var redo: @Sendable () -> Bool
-    var addLayer: @Sendable (String) -> Int
-    var duplicateLayer: @Sendable (Int, String) -> Int
-    var deleteLayer: @Sendable (Int) -> Bool
-    var moveLayer: @Sendable (Int, Int) -> Bool
-    var createFolder: @Sendable (String, Int) -> Int
-    var deleteFolder: @Sendable (Int) -> Bool
-    var setFolderVisibility: @Sendable (Int, Bool) -> Bool
-    var setFolderName: @Sendable (Int, String) -> Bool
-    var setFolderExpanded: @Sendable (Int, Bool) -> Bool
-    var assignLayerToFolder: @Sendable (Int, Int) -> Bool
-    var setActiveLayer: @Sendable (Int) -> Bool
-    var setLayerName: @Sendable (Int, String) -> Bool
-    var setLayerVisibility: @Sendable (Int, Bool) -> Bool
-    var setLayerLocked: @Sendable (Int, Bool) -> Bool
-    var setLayerAlphaLocked: @Sendable (Int, Bool) -> Bool
-    var setLayerClipped: @Sendable (Int, Bool) -> Bool
-    var revealLayerForEditing: @Sendable (Int) -> Bool
-    var setLayerOpacity: @Sendable (Int, Double) -> Bool
-    var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> Bool
-    var mergeLayerDown: @Sendable (Int) -> Bool
+    var undo: @Sendable () -> DocumentMutationResult
+    var redo: @Sendable () -> DocumentMutationResult
+    var addLayer: @Sendable (String) -> DocumentIndexedMutationResult
+    var duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
+    var deleteLayer: @Sendable (Int) -> DocumentMutationResult
+    var moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
+    var createFolder: @Sendable (String, Int) -> DocumentIndexedMutationResult
+    var deleteFolder: @Sendable (Int) -> DocumentMutationResult
+    var setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    var setFolderName: @Sendable (Int, String) -> DocumentMutationResult
+    var setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
+    var assignLayerToFolder: @Sendable (Int, Int) -> DocumentMutationResult
+    var setActiveLayer: @Sendable (Int) -> DocumentMutationResult
+    var setLayerName: @Sendable (Int, String) -> DocumentMutationResult
+    var setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    var setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    var setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    var setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
+    var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+    var setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
+    var setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
+    var mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
     var textLayerData: @Sendable (Int) -> TextLayerData?
-    var setTextLayer: @Sendable (Int, TextLayerData) -> Bool
+    var setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
     var clearTextLayerData: @Sendable (Int) -> Void
-    var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> Bool
-    var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> Bool
+    var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
+    var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     var pixelDataForLayer: @Sendable (Int) -> Data
-    var replaceLayerPixels: @Sendable (Int, Data) -> Bool
-    var replaceLayerMask: @Sendable (Int, Data) -> Bool
-    var clearLayerMask: @Sendable (Int) -> Bool
-    var applyLayerMask: @Sendable (Int) -> Bool
-    var clearLayer: @Sendable (Int) -> Bool
+    var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
+    var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
+    var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
+    var clearLayer: @Sendable (Int) -> DocumentMutationResult
     var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
     static func live(
@@ -106,10 +123,10 @@ struct PaintDocumentClient: Sendable {
                 ))
             },
             resizeCanvas: { width, height in
-                sessionBox.withSession { $0.resizeCanvas(width: width, height: height) }
+                sessionBox.withSession { $0.resizeCanvasMutation(width: width, height: height) }
             },
             resizeCanvasExtent: { width, height in
-                sessionBox.withSession { $0.resizeCanvasExtent(width: width, height: height) }
+                sessionBox.withSession { $0.resizeCanvasExtentMutation(width: width, height: height) }
             },
             beginStroke: { sample, brush in sessionBox.withSession { $0.beginStroke(sample: sample, brush: brush) } },
             appendStroke: { sample in sessionBox.withSession { $0.appendStroke(sample: sample) } },
@@ -117,52 +134,52 @@ struct PaintDocumentClient: Sendable {
             cancelStroke: { sessionBox.withSession { $0.cancelStroke() } },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
                 sessionBox.withSession {
-                    $0.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
+                    $0.blurMutation(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
                 }
             },
             endBlurStroke: { sessionBox.withSession { $0.endBlurStroke() } },
-            fill: { sample, brush in sessionBox.withSession { $0.fill(sample: sample, brush: brush) } },
+            fill: { sample, brush in sessionBox.withSession { $0.fillMutation(sample: sample, brush: brush) } },
             canUndo: { sessionBox.withSession { $0.canUndo() } },
             canRedo: { sessionBox.withSession { $0.canRedo() } },
-            undo: { sessionBox.withSession { $0.undo() } },
-            redo: { sessionBox.withSession { $0.redo() } },
-            addLayer: { name in sessionBox.withSession { $0.addLayer(name: name) } },
-            duplicateLayer: { index, name in sessionBox.withSession { $0.duplicateLayer(index: index, name: name) } },
-            deleteLayer: { index in sessionBox.withSession { $0.deleteLayer(index: index) } },
-            moveLayer: { index, destination in sessionBox.withSession { $0.moveLayer(from: index, to: destination) } },
-            createFolder: { name, layerIndex in sessionBox.withSession { $0.createFolder(name: name, layerIndex: layerIndex) } },
-            deleteFolder: { folderID in sessionBox.withSession { $0.deleteFolder(folderID: folderID) } },
-            setFolderVisibility: { folderID, isVisible in sessionBox.withSession { $0.setFolderVisibility(folderID: folderID, isVisible: isVisible) } },
-            setFolderName: { folderID, name in sessionBox.withSession { $0.setFolderName(folderID: folderID, name: name) } },
-            setFolderExpanded: { folderID, isExpanded in sessionBox.withSession { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) } },
-            assignLayerToFolder: { index, folderID in sessionBox.withSession { $0.assignLayer(index: index, toFolder: folderID) } },
-            setActiveLayer: { index in sessionBox.withSession { $0.setActiveLayer(index: index) } },
-            setLayerName: { index, name in sessionBox.withSession { $0.setLayerName(index: index, name: name) } },
-            setLayerVisibility: { index, isVisible in sessionBox.withSession { $0.setLayerVisibility(index: index, isVisible: isVisible) } },
-            setLayerLocked: { index, isLocked in sessionBox.withSession { $0.setLayerLocked(index: index, isLocked: isLocked) } },
-            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withSession { $0.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked) } },
-            setLayerClipped: { index, isClipped in sessionBox.withSession { $0.setLayerClipped(index: index, isClipped: isClipped) } },
-            revealLayerForEditing: { index in sessionBox.withSession { $0.revealLayerForEditing(index: index) } },
-            setLayerOpacity: { index, opacity in sessionBox.withSession { $0.setLayerOpacity(index: index, opacity: opacity) } },
-            setLayerBlendMode: { index, blendMode in sessionBox.withSession { $0.setLayerBlendMode(index: index, blendMode: blendMode) } },
-            mergeLayerDown: { index in sessionBox.withSession { $0.mergeLayerDown(index: index) } },
+            undo: { sessionBox.withSession { $0.undoMutation() } },
+            redo: { sessionBox.withSession { $0.redoMutation() } },
+            addLayer: { name in sessionBox.withSession { $0.addLayerMutation(name: name) } },
+            duplicateLayer: { index, name in sessionBox.withSession { $0.duplicateLayerMutation(index: index, name: name) } },
+            deleteLayer: { index in sessionBox.withSession { $0.deleteLayerMutation(index: index) } },
+            moveLayer: { index, destination in sessionBox.withSession { $0.moveLayerMutation(from: index, to: destination) } },
+            createFolder: { name, layerIndex in sessionBox.withSession { $0.createFolderMutation(name: name, layerIndex: layerIndex) } },
+            deleteFolder: { folderID in sessionBox.withSession { $0.deleteFolderMutation(folderID: folderID) } },
+            setFolderVisibility: { folderID, isVisible in sessionBox.withSession { $0.setFolderVisibilityMutation(folderID: folderID, isVisible: isVisible) } },
+            setFolderName: { folderID, name in sessionBox.withSession { $0.setFolderNameMutation(folderID: folderID, name: name) } },
+            setFolderExpanded: { folderID, isExpanded in sessionBox.withSession { $0.setFolderExpandedMutation(folderID: folderID, isExpanded: isExpanded) } },
+            assignLayerToFolder: { index, folderID in sessionBox.withSession { $0.assignLayerMutation(index: index, toFolder: folderID) } },
+            setActiveLayer: { index in sessionBox.withSession { $0.setActiveLayerMutation(index: index) } },
+            setLayerName: { index, name in sessionBox.withSession { $0.setLayerNameMutation(index: index, name: name) } },
+            setLayerVisibility: { index, isVisible in sessionBox.withSession { $0.setLayerVisibilityMutation(index: index, isVisible: isVisible) } },
+            setLayerLocked: { index, isLocked in sessionBox.withSession { $0.setLayerLockedMutation(index: index, isLocked: isLocked) } },
+            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withSession { $0.setLayerAlphaLockedMutation(index: index, isAlphaLocked: isAlphaLocked) } },
+            setLayerClipped: { index, isClipped in sessionBox.withSession { $0.setLayerClippedMutation(index: index, isClipped: isClipped) } },
+            revealLayerForEditing: { index in sessionBox.withSession { $0.revealLayerForEditingMutation(index: index) } },
+            setLayerOpacity: { index, opacity in sessionBox.withSession { $0.setLayerOpacityMutation(index: index, opacity: opacity) } },
+            setLayerBlendMode: { index, blendMode in sessionBox.withSession { $0.setLayerBlendModeMutation(index: index, blendMode: blendMode) } },
+            mergeLayerDown: { index in sessionBox.withSession { $0.mergeLayerDownMutation(index: index) } },
             textLayerData: { index in sessionBox.withSession { $0.textLayerData(index: index) } },
-            setTextLayer: { index, textLayer in sessionBox.withSession { $0.setTextLayer(index: index, textLayer: textLayer) } },
+            setTextLayer: { index, textLayer in sessionBox.withSession { $0.setTextLayerMutation(index: index, textLayer: textLayer) } },
             clearTextLayerData: { index in sessionBox.withSession { $0.clearTextLayerData(index: index) } },
-            applyLayerProcessing: { index, request in sessionBox.withSession { $0.applyLayerProcessing(index: index, request: request) } },
+            applyLayerProcessing: { index, request in sessionBox.withSession { $0.applyLayerProcessingMutation(index: index, request: request) } },
             applySoftwareStroke: { samples, brush, layerIndex in
                 sessionBox.withSession {
-                    $0.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
+                    $0.applySoftwareStrokeMutation(samples: samples, brush: brush, layerIndex: layerIndex)
                 }
             },
             pixelDataForLayer: { index in sessionBox.withSession { $0.pixelDataForLayer(index: index) } },
             replaceLayerPixels: { index, data in
-                sessionBox.withSession { $0.replaceLayerPixels(index: index, data: data) }
+                sessionBox.withSession { $0.replaceLayerPixelsMutation(index: index, data: data) }
             },
-            replaceLayerMask: { index, data in sessionBox.withSession { $0.replaceLayerMask(index: index, maskData: data) } },
-            clearLayerMask: { index in sessionBox.withSession { $0.clearLayerMask(index: index) } },
-            applyLayerMask: { index in sessionBox.withSession { $0.applyLayerMask(index: index) } },
-            clearLayer: { index in sessionBox.withSession { $0.clearLayer(index: index) } },
+            replaceLayerMask: { index, data in sessionBox.withSession { $0.replaceLayerMaskMutation(index: index, data: data) } },
+            clearLayerMask: { index in sessionBox.withSession { $0.clearLayerMaskMutation(index: index) } },
+            applyLayerMask: { index in sessionBox.withSession { $0.applyLayerMaskMutation(index: index) } },
+            clearLayer: { index in sessionBox.withSession { $0.clearLayerMutation(index: index) } },
             consumeDirtyUpdate: { sessionBox.withSession { $0.consumeDirtyUpdate() } }
         )
     }
@@ -201,5 +218,469 @@ extension DependencyValues {
     var paintDocumentClient: PaintDocumentClient {
         get { self[PaintDocumentClientKey.self] }
         set { self[PaintDocumentClientKey.self] = newValue }
+    }
+}
+
+private extension PaintDocumentSession {
+    func requireLayerIndex(
+        _ index: Int,
+        requiresUnlocked: Bool = false
+    ) -> DocumentMutationFailure? {
+        guard containsLayerIndex(index) else {
+            return .invalidLayerIndex(index)
+        }
+        if requiresUnlocked, isLayerLocked(index: index) {
+            return .layerLocked(index)
+        }
+        return nil
+    }
+
+    func requireFolderID(_ folderID: Int) -> DocumentMutationFailure? {
+        guard containsFolderID(folderID) else {
+            return .invalidFolderID(folderID)
+        }
+        return nil
+    }
+
+    func wrapMutation(
+        _ didMutate: Bool,
+        operation: String
+    ) -> DocumentMutationResult {
+        didMutate ? .success(()) : .failure(.bridgeMutationFailed(operation))
+    }
+}
+
+extension PaintDocumentSession {
+    func resizeCanvasMutation(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0, height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
+        return wrapMutation(
+            resizeCanvas(width: width, height: height),
+            operation: "resizeCanvas"
+        )
+    }
+
+    func resizeCanvasExtentMutation(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0, height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
+        return wrapMutation(
+            resizeCanvasExtent(width: width, height: height),
+            operation: "resizeCanvasExtent"
+        )
+    }
+
+    func blurMutation(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int,
+        captureTimelapse: Bool
+    ) -> DocumentMutationResult {
+        guard !samples.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse),
+            operation: "blurStroke"
+        )
+    }
+
+    func fillMutation(
+        sample: StylusSample,
+        brush: BrushRuntimeSettings
+    ) -> DocumentMutationResult {
+        let layerIndex = documentGateway.queries.activeLayerIndex()
+        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            fill(sample: sample, brush: brush),
+            operation: "fill"
+        )
+    }
+
+    func undoMutation() -> DocumentMutationResult {
+        guard canUndo() else {
+            return .failure(.noUndoState)
+        }
+        return wrapMutation(
+            undo(),
+            operation: "undo"
+        )
+    }
+
+    func redoMutation() -> DocumentMutationResult {
+        guard canRedo() else {
+            return .failure(.noRedoState)
+        }
+        return wrapMutation(
+            redo(),
+            operation: "redo"
+        )
+    }
+
+    func addLayerMutation(name: String) -> DocumentIndexedMutationResult {
+        .success(addLayer(name: name))
+    }
+
+    func duplicateLayerMutation(
+        index: Int,
+        name: String
+    ) -> DocumentIndexedMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        let duplicatedIndex = duplicateLayer(index: index, name: name)
+        guard duplicatedIndex >= 0 else {
+            return .failure(.bridgeMutationFailed("duplicateLayer"))
+        }
+        return .success(duplicatedIndex)
+    }
+
+    func deleteLayerMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            deleteLayer(index: index),
+            operation: "deleteLayer"
+        )
+    }
+
+    func moveLayerMutation(
+        from index: Int,
+        to destinationIndex: Int
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        if let failure = requireLayerIndex(destinationIndex) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            moveLayer(from: index, to: destinationIndex),
+            operation: "moveLayer"
+        )
+    }
+
+    func createFolderMutation(
+        name: String,
+        layerIndex: Int
+    ) -> DocumentIndexedMutationResult {
+        if layerIndex >= 0, let failure = requireLayerIndex(layerIndex) {
+            return .failure(failure)
+        }
+        let folderID = createFolder(name: name, layerIndex: layerIndex)
+        guard folderID >= 0 else {
+            return .failure(.bridgeMutationFailed("createFolder"))
+        }
+        return .success(folderID)
+    }
+
+    func deleteFolderMutation(folderID: Int) -> DocumentMutationResult {
+        if let failure = requireFolderID(folderID) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            deleteFolder(folderID: folderID),
+            operation: "deleteFolder"
+        )
+    }
+
+    func setFolderVisibilityMutation(
+        folderID: Int,
+        isVisible: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireFolderID(folderID) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setFolderVisibility(folderID: folderID, isVisible: isVisible),
+            operation: "setFolderVisibility"
+        )
+    }
+
+    func setFolderNameMutation(
+        folderID: Int,
+        name: String
+    ) -> DocumentMutationResult {
+        if let failure = requireFolderID(folderID) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setFolderName(folderID: folderID, name: name),
+            operation: "setFolderName"
+        )
+    }
+
+    func setFolderExpandedMutation(
+        folderID: Int,
+        isExpanded: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireFolderID(folderID) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setFolderExpanded(folderID: folderID, isExpanded: isExpanded),
+            operation: "setFolderExpanded"
+        )
+    }
+
+    func assignLayerMutation(
+        index: Int,
+        toFolder folderID: Int
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        if folderID >= 0, let failure = requireFolderID(folderID) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            assignLayer(index: index, toFolder: folderID),
+            operation: "assignLayerToFolder"
+        )
+    }
+
+    func setActiveLayerMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setActiveLayer(index: index),
+            operation: "setActiveLayer"
+        )
+    }
+
+    func setLayerNameMutation(
+        index: Int,
+        name: String
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerName(index: index, name: name),
+            operation: "setLayerName"
+        )
+    }
+
+    func setLayerVisibilityMutation(
+        index: Int,
+        isVisible: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerVisibility(index: index, isVisible: isVisible),
+            operation: "setLayerVisibility"
+        )
+    }
+
+    func setLayerLockedMutation(
+        index: Int,
+        isLocked: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerLocked(index: index, isLocked: isLocked),
+            operation: "setLayerLocked"
+        )
+    }
+
+    func setLayerAlphaLockedMutation(
+        index: Int,
+        isAlphaLocked: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked),
+            operation: "setLayerAlphaLocked"
+        )
+    }
+
+    func setLayerClippedMutation(
+        index: Int,
+        isClipped: Bool
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerClipped(index: index, isClipped: isClipped),
+            operation: "setLayerClipped"
+        )
+    }
+
+    func revealLayerForEditingMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            revealLayerForEditing(index: index),
+            operation: "revealLayerForEditing"
+        )
+    }
+
+    func setLayerOpacityMutation(
+        index: Int,
+        opacity: Double
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        guard (0...1).contains(opacity) else {
+            return .failure(.invalidOpacity(opacity))
+        }
+        return wrapMutation(
+            setLayerOpacity(index: index, opacity: opacity),
+            operation: "setLayerOpacity"
+        )
+    }
+
+    func setLayerBlendModeMutation(
+        index: Int,
+        blendMode: LayerBlendMode
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            setLayerBlendMode(index: index, blendMode: blendMode),
+            operation: "setLayerBlendMode"
+        )
+    }
+
+    func mergeLayerDownMutation(index: Int) -> DocumentMutationResult {
+        guard index > 0 else {
+            return .failure(.invalidLayerIndex(index))
+        }
+        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        if let failure = requireLayerIndex(index - 1, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            mergeLayerDown(index: index),
+            operation: "mergeLayerDown"
+        )
+    }
+
+    func setTextLayerMutation(
+        index: Int,
+        textLayer: TextLayerData
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .failure(.emptyInput)
+        }
+        return wrapMutation(
+            setTextLayer(index: index, textLayer: textLayer),
+            operation: "setTextLayer"
+        )
+    }
+
+    func applyLayerProcessingMutation(
+        index: Int,
+        request: LayerProcessingRequest
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            applyLayerProcessing(index: index, request: request),
+            operation: "applyLayerProcessing"
+        )
+    }
+
+    func applySoftwareStrokeMutation(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int
+    ) -> DocumentMutationResult {
+        guard !samples.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        if let failure = requireLayerIndex(layerIndex, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex),
+            operation: "applySoftwareStroke"
+        )
+    }
+
+    func replaceLayerPixelsMutation(
+        index: Int,
+        data: Data
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        guard !data.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        return wrapMutation(
+            replaceLayerPixels(index: index, data: data),
+            operation: "replaceLayerPixels"
+        )
+    }
+
+    func replaceLayerMaskMutation(
+        index: Int,
+        data: Data
+    ) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        guard !data.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        return wrapMutation(
+            replaceLayerMask(index: index, maskData: data),
+            operation: "replaceLayerMask"
+        )
+    }
+
+    func clearLayerMaskMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            clearLayerMask(index: index),
+            operation: "clearLayerMask"
+        )
+    }
+
+    func applyLayerMaskMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            applyLayerMask(index: index),
+            operation: "applyLayerMask"
+        )
+    }
+
+    func clearLayerMutation(index: Int) -> DocumentMutationResult {
+        if let failure = requireLayerIndex(index, requiresUnlocked: true) {
+            return .failure(failure)
+        }
+        return wrapMutation(
+            clearLayer(index: index),
+            operation: "clearLayer"
+        )
     }
 }

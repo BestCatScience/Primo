@@ -23,7 +23,11 @@ extension AppFeature {
         func deferredPresentationLoadEffect() -> Effect<Action> {
             .run { [paintDocumentClient] send in
                 let clock = ContinuousClock()
-                try? await Task.sleep(for: .milliseconds(600))
+                do {
+                    try await Task.sleep(for: .milliseconds(600))
+                } catch {
+                    return
+                }
 
                 let presentationStart = clock.now
                 AppFeature.startupLogger.debug("Loading full presentation after initial launch")
@@ -41,21 +45,55 @@ extension AppFeature {
             }
             .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
         }
+
+        func synchronizePaperStyleEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
+            .run { [paintDocumentClient] _ in
+                paintDocumentClient.setPaperStyle(paperStyle)
+            }
+        }
+
+        func refreshPresentationEffect(paperStyle: CanvasPaperStyle) -> Effect<Action> {
+            .run { [paintDocumentClient] send in
+                paintDocumentClient.setPaperStyle(paperStyle)
+                await send(.presentationLoaded(paintDocumentClient.presentation()))
+            }
+            .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
+        }
     }
 
     var startupPresentationService: StartupPresentationService {
         StartupPresentationService(paintDocumentClient: paintDocumentClient)
     }
 
+    func startupLanguageLoadEffect() -> Effect<Action> {
+        .run { [appLanguageClient] send in
+            await send(.startupLanguageLoaded(appLanguageClient.load()))
+        }
+    }
+
+    func persistLanguageEffect(_ language: AppLanguage) -> Effect<Action> {
+        .run { [appLanguageClient] _ in
+            appLanguageClient.persist(language)
+        }
+    }
+
     func handleTask(state: inout State) -> Effect<Action> {
-        state.application.beginStartup(language: appLanguageClient.load())
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
+        state.application.beginStartup(language: state.application.appLanguage)
         Self.startupLogger.debug("AppFeature.task started")
         return .merge(
             startupPresentationService.bootstrapPresentationEffect(),
+            startupLanguageLoadEffect(),
+            startupPresentationService.synchronizePaperStyleEffect(resolvedPaperStyle(for: state)),
             .send(.homeProjectsLoadRequested),
             .send(.autosaveRecoveryLoadRequested)
         )
+    }
+
+    func handleStartupLanguageLoaded(
+        state: inout State,
+        language: AppLanguage
+    ) {
+        state.application.updateLanguage(language)
     }
 
     func handleLoadPresentationAfterLaunch() -> Effect<Action> {
@@ -65,8 +103,15 @@ extension AppFeature {
     func handleHomeProjectsLoadRequest(state: inout State) -> Effect<Action> {
         state.application.beginLoadingHomeProjects()
         return .run { [workspaceCatalogService] send in
-            let projects = (try? workspaceCatalogService.loadSavedProjects()) ?? []
-            await send(.homeProjectsLoaded(projects))
+            do {
+                await send(.homeProjectsLoaded(try workspaceCatalogService.loadSavedProjects()))
+            } catch {
+                await send(
+                    .homeProjectsLoadFailed(
+                        .openFailed(Self.optionalErrorMessage(error))
+                    )
+                )
+            }
         }
     }
 
@@ -75,6 +120,14 @@ extension AppFeature {
         projects: [SavedProjectSummary]
     ) {
         state.application.finishLoadingHomeProjects(projects)
+    }
+
+    func handleHomeProjectsLoadFailed(
+        state: inout State,
+        feedback: ApplicationFeedback
+    ) {
+        state.application.finishLoadingHomeProjects([])
+        state.application.presentFeedback(feedback)
     }
 
     func handleHomeReturnRequest(state: inout State) -> Effect<Action> {
@@ -101,16 +154,23 @@ extension AppFeature {
         startupPresentationService.deferredPresentationRefreshEffect()
     }
 
-    func handleRefreshPresentationRequest(state: inout State) {
-        paintDocumentClient.setPaperStyle(resolvedPaperStyle(for: state))
-        applyDirtyPresentation(state: &state)
+    func handleDocumentPaperStyleSyncRequested(
+        paperStyle: CanvasPaperStyle
+    ) -> Effect<Action> {
+        startupPresentationService.synchronizePaperStyleEffect(paperStyle)
+    }
+
+    func handleRefreshPresentationRequest(state: inout State) -> Effect<Action> {
+        startupPresentationService.refreshPresentationEffect(
+            paperStyle: resolvedPaperStyle(for: state)
+        )
     }
 
     func handleLanguageChanged(
         state: inout State,
         language: AppLanguage
-    ) {
+    ) -> Effect<Action> {
         state.application.updateLanguage(language)
-        appLanguageClient.persist(language)
+        return persistLanguageEffect(language)
     }
 }

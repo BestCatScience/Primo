@@ -12,6 +12,8 @@ import os
 struct AppFeature {
     static let startupLogger = Logger(subsystem: "com.primo.app", category: "Startup")
 
+    typealias NanoBananaState = NanoBananaFeature.State
+
     enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
@@ -54,14 +56,6 @@ struct AppFeature {
         var timelapsePreview: TimelapseExportPreview?
     }
 
-    struct NanoBananaState: Equatable {
-        var isGenerating = false
-        var jobs: [NanoBananaJob] = []
-        var history: [NanoBananaHistoryItem] = []
-        var pendingRequest: NanoBananaGenerationRequest?
-        var activeJobID: UUID?
-    }
-
     @ObservableState
     struct State: Equatable {
         var application = ApplicationState()
@@ -79,13 +73,17 @@ struct AppFeature {
 
     enum Action: Equatable {
         case task
+        case startupLanguageLoaded(AppLanguage)
+        case documentPaperStyleSyncRequested(CanvasPaperStyle)
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
         case loadPresentationAfterLaunch
         case homeProjectsLoadRequested
         case homeProjectsLoaded([SavedProjectSummary])
+        case homeProjectsLoadFailed(ApplicationFeedback)
         case autosaveRecoveryLoadRequested
         case autosaveRecoveryLoaded([AutosaveRecoveryItem])
+        case autosaveRecoveryLoadFailed(ApplicationFeedback)
         case autosaveRecoveryRestoreRequested(WorkspaceItemID)
         case autosaveRecoveryOpened(LoadedPaintProject, AutosaveRecoveryItem)
         case autosaveRecoveryRestoreFailed(ApplicationFeedback)
@@ -120,6 +118,7 @@ struct AppFeature {
         case redoRequested
         case saveHistoryRequested
         case saveHistoryLoaded([SaveHistoryEntry])
+        case saveHistoryLoadFailed(ApplicationFeedback)
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
         case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool)
@@ -181,6 +180,7 @@ struct AppFeature {
         case selectPreviousLayer
         case selectNextLayer
         case panelCollapseToggled(StudioPanelKind)
+        case nanoBanana(NanoBananaFeature.Action)
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
@@ -199,6 +199,9 @@ struct AppFeature {
         CombineReducers {
             Scope(state: \.brushPalette, action: \.brushPalette) {
                 BrushPaletteFeature()
+            }
+            Scope(state: \.nanoBanana, action: \.nanoBanana) {
+                NanoBananaFeature()
             }
             Scope(state: \.layerSidebar, action: \.layerSidebar) {
                 LayerSidebarFeature()

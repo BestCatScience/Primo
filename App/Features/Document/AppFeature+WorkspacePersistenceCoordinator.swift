@@ -291,7 +291,10 @@ extension AppFeature {
         state: State
     ) -> Result<PreparedWorkspaceTab, WorkspacePersistenceFailure> {
         let tabID = workspaceIdentityService.generateTabID()
-        guard let backingStoreURL = try? workspaceBackingStoreService.createTabBackingStoreURL(tabID) else {
+        let backingStoreURL: DocumentProjectPath
+        do {
+            backingStoreURL = try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
+        } catch {
             return .failure(
                 WorkspacePersistenceFailure(
                     feedback: .couldNotCreateTab
@@ -489,7 +492,13 @@ extension AppFeature {
         state: inout State
     ) {
         if let autosaveEntryID = successEffects.discardedAutosaveEntryID {
-            try? workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+            do {
+                try workspaceCatalogService.discardAutosaveEntry(autosaveEntryID)
+            } catch {
+                state.application.presentFeedback(
+                    .autosaveRestoreFailed(Self.optionalErrorMessage(error))
+                )
+            }
         }
 
         switch successEffects.recoveryResolution {
@@ -512,12 +521,20 @@ extension AppFeature {
     }
 
     func clearAutosave(for tab: OpenDocumentTab) {
-        try? workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+        do {
+            // Best-effort cleanup of autosave artifacts after a successful persistence transition.
+            try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+        } catch {
+        }
     }
 
     func discardTransientWorkspaceArtifacts(for tab: OpenDocumentTab) {
         clearAutosave(for: tab)
-        try? workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
+        do {
+            // Best-effort cleanup of transient workspace artifacts during tab teardown.
+            try workspaceBackingStoreService.removeWorkspaceItem(tab.backingStoreURL)
+        } catch {
+        }
     }
 
     func discardTransientWorkspaceArtifacts(for tabs: [OpenDocumentTab]) {

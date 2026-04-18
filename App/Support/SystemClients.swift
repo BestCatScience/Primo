@@ -77,22 +77,42 @@ struct HTTPClient: Sendable {
     }
 }
 
+struct KeyValueStoreClient: Sendable {
+    var stringForKey: @Sendable (String) -> String?
+    var setString: @Sendable (String?, String) -> Void
+
+    static let live = KeyValueStoreClient(
+        stringForKey: { key in
+            UserDefaults.standard.string(forKey: key)
+        },
+        setString: { value, key in
+            if let value {
+                UserDefaults.standard.set(value, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+    )
+}
+
 struct AppLanguageClient: Sendable {
     var load: @Sendable () -> AppLanguage
     var persist: @Sendable (AppLanguage) -> Void
 
-    static let live = AppLanguageClient(
-        load: {
-            guard
-                let rawValue = UserDefaults.standard.string(forKey: AppLanguage.storageKey),
-                let language = AppLanguage(rawValue: rawValue)
-            else {
-                return .japanese
+    static func live(keyValueStoreClient: KeyValueStoreClient) -> AppLanguageClient {
+        AppLanguageClient(
+            load: {
+                guard
+                    let rawValue = keyValueStoreClient.stringForKey(AppLanguage.storageKey),
+                    let language = AppLanguage(rawValue: rawValue)
+                else {
+                    return .japanese
+                }
+                return language
+            },
+            persist: { language in
+                keyValueStoreClient.setString(language.rawValue, AppLanguage.storageKey)
             }
-            return language
-        },
-        persist: { language in
-            UserDefaults.standard.set(language.rawValue, forKey: AppLanguage.storageKey)
-        }
-    )
+        )
+    }
 }

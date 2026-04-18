@@ -13,6 +13,7 @@ extension AppFeature {
 
     struct LayerContentWorkflowService {
         enum MutationFailure: Error, Equatable {
+            case createLayerFailed
             case replacePixelsFailed(Int)
             case setTextLayerFailed(Int)
             case setActiveLayerFailed(Int)
@@ -25,10 +26,10 @@ extension AppFeature {
             to target: LayerContentMutationTarget
         ) -> Result<AppliedLayerContentMutation, MutationFailure> {
             apply(target: target) { targetLayerIndex in
-                guard paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) else {
+                guard case .success = paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) else {
                     return .failure(.replacePixelsFailed(targetLayerIndex))
                 }
-                guard paintDocumentClient.setActiveLayer(targetLayerIndex) else {
+                guard case .success = paintDocumentClient.setActiveLayer(targetLayerIndex) else {
                     return .failure(.setActiveLayerFailed(targetLayerIndex))
                 }
                 return .success(())
@@ -40,10 +41,10 @@ extension AppFeature {
             to target: LayerContentMutationTarget
         ) -> Result<AppliedLayerContentMutation, MutationFailure> {
             apply(target: target) { targetLayerIndex in
-                guard paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
+                guard case .success = paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) else {
                     return .failure(.setTextLayerFailed(targetLayerIndex))
                 }
-                guard paintDocumentClient.setActiveLayer(targetLayerIndex) else {
+                guard case .success = paintDocumentClient.setActiveLayer(targetLayerIndex) else {
                     return .failure(.setActiveLayerFailed(targetLayerIndex))
                 }
                 return .success(())
@@ -54,7 +55,13 @@ extension AppFeature {
             target: LayerContentMutationTarget,
             mutation: (Int) -> Result<Void, MutationFailure>
         ) -> Result<AppliedLayerContentMutation, MutationFailure> {
-            let resolvedTarget = resolve(target)
+            let resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
+            switch resolve(target) {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(target):
+                resolvedTarget = target
+            }
             switch mutation(resolvedTarget.index) {
             case let .failure(failure):
                 rollbackResolvedTargetIfNeeded(resolvedTarget)
@@ -65,18 +72,30 @@ extension AppFeature {
             return .success(AppliedLayerContentMutation(targetLayerIndex: resolvedTarget.index))
         }
 
-        private func resolve(_ target: LayerContentMutationTarget) -> (index: Int, createdNewLayer: Bool) {
+        private func resolve(
+            _ target: LayerContentMutationTarget
+        ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), MutationFailure> {
+            let originalActiveLayerIndex = paintDocumentClient.presentation().activeLayerIndex
             switch target {
             case let .existingLayer(index):
-                return (index, false)
+                return .success((index, false, originalActiveLayerIndex))
             case let .newLayer(name):
-                return (paintDocumentClient.addLayer(name), true)
+                switch paintDocumentClient.addLayer(name) {
+                case let .success(index):
+                    return .success((index, true, originalActiveLayerIndex))
+                case .failure:
+                    return .failure(.createLayerFailed)
+                }
             }
         }
 
-        private func rollbackResolvedTargetIfNeeded(_ resolvedTarget: (index: Int, createdNewLayer: Bool)) {
-            guard resolvedTarget.createdNewLayer else { return }
-            _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
+        private func rollbackResolvedTargetIfNeeded(
+            _ resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
+        ) {
+            if resolvedTarget.createdNewLayer, resolvedTarget.index >= 0 {
+                _ = paintDocumentClient.deleteLayer(resolvedTarget.index)
+            }
+            _ = paintDocumentClient.setActiveLayer(resolvedTarget.originalActiveLayerIndex)
         }
     }
 

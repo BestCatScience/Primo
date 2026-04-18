@@ -59,13 +59,15 @@ extension AppFeature {
 
         func loadAutosaveRecoveryEffect() -> Effect<Action> {
             .run { [workspaceCatalogService] send in
-                let items: [AutosaveRecoveryItem]
                 do {
-                    items = try workspaceCatalogService.loadAutosaveRecoveryItems()
+                    await send(.autosaveRecoveryLoaded(try workspaceCatalogService.loadAutosaveRecoveryItems()))
                 } catch {
-                    items = []
+                    await send(
+                        .autosaveRecoveryLoadFailed(
+                            .autosaveRestoreFailed(AppFeature.optionalErrorMessage(error))
+                        )
+                    )
                 }
-                await send(.autosaveRecoveryLoaded(items))
             }
         }
     }

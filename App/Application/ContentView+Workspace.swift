@@ -46,7 +46,7 @@ extension ContentView {
                         .padding(.top, 16)
                 }
 
-                if !workspaceBottomPanelCollapsed {
+                if !nanoBananaState.workspaceBottomPanelCollapsed {
                     workspaceBottomPanel
                         .padding(.horizontal, 18)
                         .padding(.bottom, 12)
@@ -328,7 +328,7 @@ extension ContentView {
                 workspaceBottomTab(title: "OUTPUT", section: .output)
                 Spacer(minLength: 0)
                 workspaceTabChromeButton(symbol: "chevron.down") {
-                    workspaceBottomPanelCollapsed = true
+                    store.send(.nanoBanana(.workspaceBottomPanelCollapsedChanged(true)))
                 }
             }
             .padding(.horizontal, 12)
@@ -336,7 +336,7 @@ extension ContentView {
             .background(Color.white.opacity(0.03))
 
             Group {
-                switch workspaceBottomPanelSection {
+                switch nanoBananaState.workspaceBottomPanelSection {
                 case .nanoBanana:
                     workspaceNanoBananaPanel
                 case .history:
@@ -360,12 +360,16 @@ extension ContentView {
 
     var collapsedWorkspaceBottomBar: some View {
         HStack {
-            Text(workspaceBottomPanelSection == .nanoBanana ? "NANO BANANA" : workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT")
+            Text(
+                nanoBananaState.workspaceBottomPanelSection == .nanoBanana
+                ? "NANO BANANA"
+                : nanoBananaState.workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT"
+            )
                 .font(StudioTheme.Typography.mono(10))
                 .foregroundStyle(.white.opacity(0.55))
             Spacer(minLength: 0)
             workspaceTabChromeButton(symbol: "chevron.up") {
-                workspaceBottomPanelCollapsed = false
+                store.send(.nanoBanana(.workspaceBottomPanelCollapsedChanged(false)))
             }
         }
         .padding(.horizontal, 12)
@@ -380,18 +384,18 @@ extension ContentView {
         )
     }
 
-    func workspaceBottomTab(title: String, section: ContentView.WorkspaceBottomPanelSection) -> some View {
+    func workspaceBottomTab(title: String, section: NanoBananaFeature.WorkspaceBottomPanelSection) -> some View {
         Button {
-            workspaceBottomPanelSection = section
+            store.send(.nanoBanana(.workspaceBottomPanelSectionChanged(section)))
         } label: {
             Text(title)
                 .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(workspaceBottomPanelSection == section ? .white.opacity(0.9) : .white.opacity(0.45))
+                .foregroundStyle(nanoBananaState.workspaceBottomPanelSection == section ? .white.opacity(0.9) : .white.opacity(0.45))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(workspaceBottomPanelSection == section ? Color.white.opacity(0.10) : Color.clear)
+                        .fill(nanoBananaState.workspaceBottomPanelSection == section ? Color.white.opacity(0.10) : Color.clear)
                 )
         }
         .buttonStyle(.plain)
@@ -448,7 +452,7 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.white)
 
-                if nanoBananaPrompt.isEmpty {
+                if nanoBananaState.composer.prompt.isEmpty {
                     Text(language.localized("Nano Banana にどう編集させたいか入力してください"))
                         .font(StudioTheme.Typography.body(13))
                         .foregroundStyle(Color.black.opacity(0.38))
@@ -458,7 +462,7 @@ extension ContentView {
                 }
 
                 StudioPlainTextView(
-                    text: $nanoBananaPrompt,
+                    text: nanoBananaPromptBinding,
                     textColor: .black,
                     tintColor: .black,
                     font: .systemFont(ofSize: 13, weight: .medium),
@@ -486,12 +490,12 @@ extension ContentView {
                 spacing: 10
             ) {
                 workspaceNanoBananaStatCard(label: language.localized("入力"), value: resolvedNanoBananaInputLayerName)
-                workspaceNanoBananaStatCard(label: language.localized("対象"), value: nanoBananaEditScope.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("出力"), value: nanoBananaOutputMode.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("モデル"), value: nanoBananaModel.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("対象"), value: nanoBananaState.composer.editScope.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("出力"), value: nanoBananaState.composer.outputMode.title(language))
+                workspaceNanoBananaStatCard(label: language.localized("モデル"), value: nanoBananaState.composer.model.title(language))
             }
 
-            if nanoBananaAccessMode == .appManaged && !nanoBananaCommerce.isSubscriptionActive {
+            if nanoBananaState.accessMode == .appManaged && !nanoBananaState.commerce.isSubscriptionActive {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(language.localized("サブスクリプションが必要です"))
                         .font(StudioTheme.Typography.label(12))
@@ -502,7 +506,7 @@ extension ContentView {
                         .fixedSize(horizontal: false, vertical: true)
 
                     Button(language.localized("Nano Banana を有効化")) {
-                        showsNanoBananaPaywall = true
+                        store.send(.nanoBanana(.paywallPresentationChanged(true)))
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white.opacity(0.94))
@@ -561,7 +565,7 @@ extension ContentView {
             .disabled(nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
 
             Button(language.localized("フルパネルを開く")) {
-                showsNanoBananaSheet = true
+                store.send(.nanoBanana(.sheetPresentationChanged(true)))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white.opacity(0.72))
@@ -585,14 +589,7 @@ extension ContentView {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(nanoBananaState.history.prefix(8)) { item in
                     Button {
-                        nanoBananaPrompt = item.request.prompt
-                        nanoBananaInputLayerIndex = item.request.inputLayerIndex
-                        nanoBananaEditScope = item.request.editScope
-                        nanoBananaOutputMode = item.request.outputMode
-                        nanoBananaModel = item.request.model
-                        nanoBananaMaskExpansion = item.request.maskSettings.expansion
-                        nanoBananaInvertsMask = item.request.maskSettings.isInverted
-                        workspaceBottomPanelSection = .nanoBanana
+                        store.send(.nanoBanana(.historyItemSelected(item.request)))
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.request.prompt)

@@ -374,7 +374,10 @@ extension AppFeature {
         let paintDocumentClient: PaintDocumentClient
 
         func ensureLayerVisible(_ layerIndex: Int) -> Bool {
-            paintDocumentClient.setLayerVisibility(layerIndex, true)
+            if case .success = paintDocumentClient.setLayerVisibility(layerIndex, true) {
+                return true
+            }
+            return false
         }
 
         func cancelStroke() {
@@ -404,7 +407,10 @@ extension AppFeature {
             _ layerIndex: Int,
             pixelData: Data
         ) -> Bool {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            if case .success = paintDocumentClient.replaceLayerPixels(layerIndex, pixelData) {
+                return true
+            }
+            return false
         }
 
         func applySoftwareStroke(
@@ -412,11 +418,17 @@ extension AppFeature {
             brush: BrushRuntimeSettings,
             layerIndex: Int
         ) -> Bool {
-            paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex)
+            if case .success = paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex) {
+                return true
+            }
+            return false
         }
 
         func revealLayerForEditing(_ layerIndex: Int) -> Bool {
-            paintDocumentClient.revealLayerForEditing(layerIndex)
+            if case .success = paintDocumentClient.revealLayerForEditing(layerIndex) {
+                return true
+            }
+            return false
         }
 
         func blurStroke(
@@ -425,7 +437,10 @@ extension AppFeature {
             layerIndex: Int,
             clearSelectionAfterBlur: Bool
         ) -> Bool {
-            paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+            if case .success = paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur) {
+                return true
+            }
+            return false
         }
 
         func endBlurStroke() {
@@ -436,7 +451,10 @@ extension AppFeature {
             _ sample: StylusSample,
             brush: BrushRuntimeSettings
         ) -> Bool {
-            paintDocumentClient.fill(sample, brush)
+            if case .success = paintDocumentClient.fill(sample, brush) {
+                return true
+            }
+            return false
         }
     }
 

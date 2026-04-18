@@ -32,7 +32,11 @@ extension PaintDocumentSession {
 
         let frame = TimelapseFrame(imageURL: frameURL, size: image.size)
         if let removed = appendStoredTimelapseFrame(frame) {
-            try? timelapseService.removeFrame(at: removed.imageURL)
+            do {
+                // Best-effort cleanup for evicted timelapse frames.
+                try timelapseService.removeFrame(at: removed.imageURL)
+            } catch {
+            }
         }
     }
 
@@ -99,7 +103,11 @@ extension PaintDocumentSession {
 
     func resetTimelapseHistory() {
         for frame in resetStoredTimelapseHistory() {
-            try? timelapseService.removeFrame(at: frame.imageURL)
+            do {
+                // Best-effort cleanup for discarded timelapse frames.
+                try timelapseService.removeFrame(at: frame.imageURL)
+            } catch {
+            }
         }
     }
 

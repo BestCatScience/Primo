@@ -132,7 +132,11 @@ private struct BrushPresetLibraryStorage {
         let removed = payload.presets.remove(at: index)
         if let tipFileName = removed.tipFileName {
             let tipURL = directory.appendingPathComponent(tipFileName, isDirectory: false)
-            try? fileClient.removeItem(tipURL)
+            do {
+                // Best-effort cleanup for an orphaned custom tip asset after preset deletion.
+                try fileClient.removeItem(tipURL)
+            } catch {
+            }
         }
 
         let data = try JSONEncoder().encode(payload)

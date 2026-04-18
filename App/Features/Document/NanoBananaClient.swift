@@ -207,7 +207,13 @@ struct NanoBananaClient: Sendable {
             for round in 0..<3 {
                 if round > 0 {
                     let delayNanoseconds = UInt64((0.8 + Double(round) * 0.9) * 1_000_000_000)
-                    try? await Task.sleep(nanoseconds: delayNanoseconds)
+                    do {
+                        try await Task.sleep(nanoseconds: delayNanoseconds)
+                    } catch is CancellationError {
+                        return .failure(.transport("Nano Banana generation was canceled."))
+                    } catch {
+                        return .failure(.transport(error.localizedDescription))
+                    }
                 }
 
                 for candidateModel in candidateModels {
@@ -321,7 +327,7 @@ struct NanoBananaClient: Sendable {
                     }
 
                     guard (200...299).contains(httpResponse.statusCode) else {
-                        if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
+                        if let apiError = decodeAPIErrorEnvelope(from: data) {
                             throw NanoBananaFailure.apiError(apiError.error.message)
                         }
                         throw NanoBananaFailure.apiError(
@@ -358,7 +364,7 @@ struct NanoBananaClient: Sendable {
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
-                if let apiError = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
+                if let apiError = decodeAPIErrorEnvelope(from: data) {
                     throw NanoBananaFailure.apiError(apiError.error.message)
                 }
                 throw NanoBananaFailure.apiError(
@@ -427,7 +433,11 @@ struct NanoBananaClient: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
-            request.httpBody = try? JSONEncoder().encode(requestBody)
+            do {
+                request.httpBody = try JSONEncoder().encode(requestBody)
+            } catch {
+                request.httpBody = nil
+            }
             return request.httpBody == nil ? nil : request
         }
     }
@@ -476,7 +486,7 @@ struct NanoBananaClient: Sendable {
     }
 
     private static func decodeImageData(from data: Data) throws -> Data? {
-        if let decoded = try? JSONDecoder().decode(GenerateContentResponse.self, from: data) {
+        if let decoded = decodeGenerateContentResponse(from: data) {
             if let topLevelParts = decoded.parts {
                 for part in topLevelParts {
                     if let imageData = part.inlineData?.data, let decodedImage = decodeBase64ImageData(imageData) {
@@ -505,7 +515,7 @@ struct NanoBananaClient: Sendable {
             }
         }
 
-        if let decoded = try? JSONDecoder().decode(ProxyEditResponse.self, from: data) {
+        if let decoded = decodeProxyEditResponse(from: data) {
             if let imageBase64 = decoded.imageBase64, let decodedImage = decodeBase64ImageData(imageBase64) {
                 return decodedImage
             }
@@ -514,14 +524,40 @@ struct NanoBananaClient: Sendable {
             }
         }
 
-        if
-            let jsonObject = try? JSONSerialization.jsonObject(with: data),
-            let recursivelyDecodedImage = recursivelyExtractImageData(from: jsonObject)
-        {
-            return recursivelyDecodedImage
+        do {
+            let jsonObject = try JSONSerialization.jsonObject(with: data)
+            if let recursivelyDecodedImage = recursivelyExtractImageData(from: jsonObject) {
+                return recursivelyDecodedImage
+            }
+        } catch {
+            // Ignore non-JSON payloads and continue to the default missing-image path.
         }
 
         return nil
+    }
+
+    private static func decodeAPIErrorEnvelope(from data: Data) -> APIErrorEnvelope? {
+        do {
+            return try JSONDecoder().decode(APIErrorEnvelope.self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func decodeGenerateContentResponse(from data: Data) -> GenerateContentResponse? {
+        do {
+            return try JSONDecoder().decode(GenerateContentResponse.self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func decodeProxyEditResponse(from data: Data) -> ProxyEditResponse? {
+        do {
+            return try JSONDecoder().decode(ProxyEditResponse.self, from: data)
+        } catch {
+            return nil
+        }
     }
 
     private static func decodeBase64ImageData(_ rawValue: String) -> Data? {

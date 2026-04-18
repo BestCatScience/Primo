@@ -596,8 +596,8 @@ struct BrushPaletteFeature {
 
             case let .importBrushesRequested(urls):
                 let existingNames = state.library.savedPresets.map(\.name) + state.library.presets.map(\.name)
-                let resolvedLanguage = appLanguageClient.load()
-                return .run { [brushImportClient, brushPresetLibraryClient] send in
+                return .run { [appLanguageClient, brushImportClient, brushPresetLibraryClient] send in
+                    let resolvedLanguage = appLanguageClient.load()
                     let importedResult = brushImportClient.importBrushPresets(
                         BrushPresetImportRequest(urls: urls, language: resolvedLanguage)
                     )

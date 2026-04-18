@@ -474,7 +474,7 @@ extension ContentView {
     var recoveryState: AppFeature.RecoveryState { store.recovery }
     var saveHistoryState: AppFeature.SaveHistoryState { store.saveHistory }
     var exportState: AppFeature.ExportState { store.export }
-    var nanoBananaState: AppFeature.NanoBananaState { store.nanoBanana }
+    var nanoBananaState: NanoBananaFeature.State { store.nanoBanana }
 
     func workspaceTabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
         workspaceState.openTabs.filter { $0.pane == pane }
