@@ -199,6 +199,16 @@ final class PaintDocumentSession {
 }
 
 extension PaintDocumentSession {
+    var documentLayerMutationContext: DocumentLayerMutationContext {
+        DocumentLayerMutationContext(
+            layerCount: documentGateway.queries.layerInfos().count,
+            folderIDs: Set(documentGateway.queries.folderInfos().map { Int($0.folderID) }),
+            isLayerLocked: { [documentGateway] index in
+                documentGateway.queries.isLayerLocked(index: index)
+            }
+        )
+    }
+
     struct SessionMutationContract<Success> {
         let requirements: [DocumentMutationCommand]
         let applySideEffects: (PaintDocumentSession, Success) -> Void
@@ -246,6 +256,23 @@ extension PaintDocumentSession {
         }
     }
 
+    func mutationFailure(
+        for failure: DocumentLayerMutationFailure
+    ) -> DocumentMutationFailure {
+        switch failure {
+        case let .invalidLayerIndex(index):
+            return .invalidLayerIndex(index)
+        case let .invalidFolderID(folderID):
+            return .invalidFolderID(folderID)
+        case let .layerLocked(index):
+            return .layerLocked(index)
+        case let .invalidOpacity(opacity):
+            return .invalidOpacity(opacity)
+        case let .bridgeMutationFailed(message):
+            return .bridgeMutationFailed(message)
+        }
+    }
+
     func validate(
         _ command: DocumentMutationCommand
     ) -> DocumentMutationFailure? {
@@ -258,6 +285,108 @@ extension PaintDocumentSession {
         _ commands: [DocumentMutationCommand]
     ) -> DocumentMutationFailure? {
         commands.lazy.compactMap(validate(_:)).first
+    }
+
+    func applyLayerIndexMutation(
+        _ mutation: DocumentLayerIndexMutation
+    ) {
+        switch mutation {
+        case let .duplication(sourceIndex, duplicatedIndex):
+            if let textLayer = storedTextLayer(at: sourceIndex) {
+                remapStoredTextLayersForDuplication(
+                    of: sourceIndex,
+                    duplicatedIndex: duplicatedIndex,
+                    duplicate: textLayer
+                )
+            } else {
+                remapStoredTextLayersForInsertion(at: duplicatedIndex)
+            }
+        case let .deletion(index):
+            remapStoredTextLayersForDeletion(of: index)
+        case let .move(sourceIndex, destinationIndex):
+            remapStoredTextLayersForMove(from: sourceIndex, to: destinationIndex)
+        }
+    }
+
+    func applyLayerLifecycleEvent(
+        _ event: DocumentLayerMutationEvent
+    ) {
+        switch event {
+        case let .addLayer(name, index):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .addLayer(name: name)
+            )
+        case let .duplicateLayer(index, _, name):
+            applyDocumentLifecycleMutation(
+                recording: .duplicateLayer(index: .unchecked(index), name: name)
+            )
+        case let .deleteLayer(index):
+            applyDocumentLifecycleMutation(
+                recording: .deleteLayer(index: .unchecked(index))
+            )
+        case let .moveLayer(index, destinationIndex):
+            applyDocumentLifecycleMutation(
+                recording: .moveLayer(
+                    index: .unchecked(index),
+                    destinationIndex: .unchecked(destinationIndex)
+                )
+            )
+        case let .createFolder(folderID, name, anchorLayerIndex):
+            applyRecordedLifecycleMutation(
+                recording: .createFolder(
+                    folderID: .unchecked(folderID),
+                    name: name,
+                    anchorLayerIndex: anchorLayerIndex.map(DocumentLayerIndex.unchecked)
+                ),
+                captureFrame: false
+            )
+        case let .deleteFolder(folderID):
+            applyRecordedLifecycleMutation(
+                recording: .deleteFolder(folderID: .unchecked(folderID))
+            )
+        case let .assignLayerToFolder(index, folderID):
+            applyRecordedLifecycleMutation(
+                recording: .assignLayerToFolder(
+                    index: .unchecked(index),
+                    folderID: folderID.map(DocumentFolderID.unchecked)
+                )
+            )
+        case let .setLayerVisibility(index, isVisible):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
+            )
+        case let .setLayerLocked(index, isLocked):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
+            )
+        case let .setLayerAlphaLocked(index, isAlphaLocked):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
+            )
+        case let .setLayerClipped(index, isClipped):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped)
+            )
+        case let .setLayerOpacity(index, opacity):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity)
+            )
+        case let .setLayerBlendMode(index, blendMode):
+            applyLayerLifecycleMutation(
+                at: index,
+                recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode)
+            )
+        case let .setFolderVisibility(folderID, isVisible):
+            applyRecordedLifecycleMutation(
+                recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
+            )
+        }
     }
 
     func executeMutation<Success>(
@@ -691,5 +820,69 @@ struct PaintDocumentSessionDocumentGateway {
                 operation: operation
             )
         }
+    }
+}
+
+extension PaintDocumentSessionDocumentGateway.LayerAccess: LayerStructureGateway {
+    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult {
+        moveLayerResult(from: index, to: destinationIndex)
+            .mapError { failure in
+                switch failure {
+                case let .bridgeMutationFailed(message):
+                    return .bridgeMutationFailed(message)
+                default:
+                    return .bridgeMutationFailed("moveLayer")
+                }
+            }
+    }
+
+    func createFolder(name: String, anchorLayerIndex: Int) -> Int {
+        createFolder(name: name, layerIndex: anchorLayerIndex)
+    }
+
+    func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult {
+        setLayerFolderResult(index: index, folderID: folderID)
+            .mapError { failure in
+                switch failure {
+                case let .bridgeMutationFailed(message):
+                    return .bridgeMutationFailed(message)
+                default:
+                    return .bridgeMutationFailed("assignLayerToFolder")
+                }
+            }
+    }
+
+    func deleteLayer(index: Int) -> DocumentLayerMutationResult {
+        deleteLayerResult(index: index)
+            .mapError { failure in
+                switch failure {
+                case let .bridgeMutationFailed(message):
+                    return .bridgeMutationFailed(message)
+                default:
+                    return .bridgeMutationFailed("deleteLayer")
+                }
+            }
+    }
+
+    func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult {
+        deleteFolderResult(id: folderID)
+            .mapError { failure in
+                switch failure {
+                case let .bridgeMutationFailed(message):
+                    return .bridgeMutationFailed(message)
+                default:
+                    return .bridgeMutationFailed("deleteFolder")
+                }
+            }
+    }
+}
+
+extension PaintDocumentSessionDocumentGateway.LayerAccess: LayerAttributeGateway {
+    func setLayerOpacity(_ opacity: Double, index: Int) {
+        setLayerOpacity(CGFloat(opacity), index: index)
+    }
+
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) {
+        setLayerBlendMode(blendMode.rawValue, index: index)
     }
 }

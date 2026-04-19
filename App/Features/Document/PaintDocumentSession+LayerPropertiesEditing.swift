@@ -4,133 +4,145 @@ import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func setActiveLayer(index: Int) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(requirements: [.layer(index: index)])
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setActiveLayer(index: index),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setActiveLayerIndex(index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case .success:
             return .success(())
         }
     }
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(requirements: [.layer(index: index)])
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerName(index: index, name: name),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerName(name, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case .success:
             return .success(())
         }
     }
 
     func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerVisibility(index: index, isVisible: isVisible),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerVisible(isVisible, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
             return .success(())
         }
     }
 
     func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerLocked(index: .unchecked(index), isLocked: isLocked)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerLocked(index: index, isLocked: isLocked),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerLocked(isLocked, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
             return .success(())
         }
     }
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerAlphaLocked(isAlphaLocked, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
             return .success(())
         }
     }
 
     func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerClipped(index: .unchecked(index), isClipped: isClipped)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerClipped(index: index, isClipped: isClipped),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerClipped(isClipped, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
             return .success(())
         }
     }
 
     func revealLayerForEditing(index: Int) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(requirements: [.layer(index: index)])
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .revealLayerForEditing(index: index),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerVisible(true, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case .success:
             return .success(())
         }
     }
 
     func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerOpacity(index: .unchecked(index), opacity: opacity)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerOpacity(index: index, opacity: opacity),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            guard (0...1).contains(opacity) else {
-                return .failure(.invalidOpacity(opacity))
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
             }
-            documentGateway.layers.setLayerOpacity(CGFloat(opacity), index: index)
             return .success(())
         }
     }
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.applyLayerLifecycleMutation(
-                        at: index,
-                        recording: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode)
-                    )
-                }
-            )
+        let useCase = LayerAttributeUseCase()
+        switch useCase.execute(
+            .setLayerBlendMode(index: index, blendMode: blendMode),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.setLayerBlendMode(blendMode.rawValue, index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
             return .success(())
         }
     }

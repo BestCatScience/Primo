@@ -38,75 +38,79 @@ extension PaintDocumentSession {
     }
 
     func addLayer(name: String) -> DocumentIndexedMutationResult {
-        let createdIndex = documentGateway.layers.addLayer(name: name)
-        documentGateway.layers.setActiveLayerIndex(createdIndex)
-        applyLayerLifecycleMutation(
-            at: createdIndex,
-            recording: .addLayer(name: name)
-        )
-        return .success(createdIndex)
+        let useCase = LayerStructureUseCase()
+        switch useCase.execute(
+            .addLayer(name: name),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
+        ) {
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(plan.resultingIndex ?? -1)
+        }
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, duplicatedIndex in
-                    if let textLayer = session.storedTextLayer(at: index) {
-                        session.remapStoredTextLayersForDuplication(
-                            of: index,
-                            duplicatedIndex: duplicatedIndex,
-                            duplicate: textLayer
-                        )
-                    } else {
-                        session.remapStoredTextLayersForInsertion(at: duplicatedIndex)
-                    }
-                    session.applyDocumentLifecycleMutation(
-                        recording: .duplicateLayer(index: .unchecked(index), name: name)
-                    )
-                }
-            )
+        let useCase = LayerStructureUseCase()
+        switch useCase.execute(
+            .duplicateLayer(index: index, name: name),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            let duplicatedIndex = documentGateway.layers.duplicateLayer(index: index, name: name)
-            guard duplicatedIndex >= 0 else {
-                return .failure(.bridgeMutationFailed("duplicateLayer"))
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
             }
-            return .success(duplicatedIndex)
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(plan.resultingIndex ?? -1)
         }
     }
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index)],
-                applySideEffects: { session, _ in
-                    session.remapStoredTextLayersForDeletion(of: index)
-                    session.applyDocumentLifecycleMutation(
-                        recording: .deleteLayer(index: .unchecked(index))
-                    )
-                }
-            )
+        let useCase = LayerStructureUseCase()
+        switch useCase.execute(
+            .deleteLayer(index: index),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.deleteLayerResult(index: index)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
+            }
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(())
         }
     }
 
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
-        executeMutation(
-            SessionMutationContract(
-                requirements: [.layer(index: index), .layer(index: destinationIndex)],
-                applySideEffects: { session, _ in
-                    session.remapStoredTextLayersForMove(from: index, to: destinationIndex)
-                    session.applyDocumentLifecycleMutation(
-                        recording: .moveLayer(
-                            index: .unchecked(index),
-                            destinationIndex: .unchecked(destinationIndex)
-                        )
-                    )
-                }
-            )
+        let useCase = LayerStructureUseCase()
+        switch useCase.execute(
+            .moveLayer(index: index, destinationIndex: destinationIndex),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
         ) {
-            documentGateway.layers.moveLayerResult(from: index, to: destinationIndex)
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(plan):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
+            }
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(())
         }
     }
 }

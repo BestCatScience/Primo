@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import Synchronization
 
 typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
@@ -184,6 +185,68 @@ struct PaintDocumentClient: Sendable {
             clearLayer: { index in sessionBox.withSession { $0.clearLayerMutation(index: index) } },
             consumeDirtyUpdate: { sessionBox.withSession { $0.consumeDirtyUpdate() } }
         )
+    }
+}
+
+struct DocumentLayerClient: Sendable {
+    let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
+    let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
+    let deleteLayer: @Sendable (Int) -> DocumentMutationResult
+    let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
+    let createFolder: @Sendable (String, Int) -> DocumentIndexedMutationResult
+    let deleteFolder: @Sendable (Int) -> DocumentMutationResult
+    let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
+    let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
+    let assignLayerToFolder: @Sendable (Int, Int) -> DocumentMutationResult
+    let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
+    let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
+    let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
+    let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+    let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
+    let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
+    let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    let textLayerData: @Sendable (Int) -> TextLayerData?
+    let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
+    let clearTextLayerData: @Sendable (Int) -> Void
+    let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
+    let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
+    let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
+    let clearLayer: @Sendable (Int) -> DocumentMutationResult
+
+    init(paintDocumentClient: PaintDocumentClient) {
+        self.addLayer = paintDocumentClient.addLayer
+        self.duplicateLayer = paintDocumentClient.duplicateLayer
+        self.deleteLayer = paintDocumentClient.deleteLayer
+        self.moveLayer = paintDocumentClient.moveLayer
+        self.createFolder = paintDocumentClient.createFolder
+        self.deleteFolder = paintDocumentClient.deleteFolder
+        self.setFolderVisibility = paintDocumentClient.setFolderVisibility
+        self.setFolderName = paintDocumentClient.setFolderName
+        self.setFolderExpanded = paintDocumentClient.setFolderExpanded
+        self.assignLayerToFolder = paintDocumentClient.assignLayerToFolder
+        self.setActiveLayer = paintDocumentClient.setActiveLayer
+        self.setLayerName = paintDocumentClient.setLayerName
+        self.setLayerVisibility = paintDocumentClient.setLayerVisibility
+        self.setLayerLocked = paintDocumentClient.setLayerLocked
+        self.setLayerAlphaLocked = paintDocumentClient.setLayerAlphaLocked
+        self.setLayerClipped = paintDocumentClient.setLayerClipped
+        self.revealLayerForEditing = paintDocumentClient.revealLayerForEditing
+        self.setLayerOpacity = paintDocumentClient.setLayerOpacity
+        self.setLayerBlendMode = paintDocumentClient.setLayerBlendMode
+        self.mergeLayerDown = paintDocumentClient.mergeLayerDown
+        self.textLayerData = paintDocumentClient.textLayerData
+        self.setTextLayer = paintDocumentClient.setTextLayer
+        self.clearTextLayerData = paintDocumentClient.clearTextLayerData
+        self.replaceLayerPixels = paintDocumentClient.replaceLayerPixels
+        self.replaceLayerMask = paintDocumentClient.replaceLayerMask
+        self.clearLayerMask = paintDocumentClient.clearLayerMask
+        self.applyLayerMask = paintDocumentClient.applyLayerMask
+        self.clearLayer = paintDocumentClient.clearLayer
     }
 }
 

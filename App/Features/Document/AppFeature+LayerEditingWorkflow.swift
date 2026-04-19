@@ -137,162 +137,162 @@ extension AppFeature {
     }
 
     struct LayerWorkflowService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentLayerClient: DocumentLayerClient
 
         func addLayer(named name: String) -> DocumentIndexedMutationResult {
-            paintDocumentClient.addLayer(name)
+            documentLayerClient.addLayer(name)
         }
 
         func createFolder(
             named name: String,
             afterLayerAt activeLayerIndex: Int
         ) -> DocumentIndexedMutationResult {
-            paintDocumentClient.createFolder(name, activeLayerIndex)
+            documentLayerClient.createFolder(name, activeLayerIndex)
         }
 
         func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
-            paintDocumentClient.deleteFolder(folderID)
+            documentLayerClient.deleteFolder(folderID)
         }
 
         func deleteLayer(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.deleteLayer(index)
+            documentLayerClient.deleteLayer(index)
         }
 
         func duplicateLayer(
             _ index: Int,
             named duplicateName: String
         ) -> DocumentIndexedMutationResult {
-            paintDocumentClient.duplicateLayer(index, duplicateName)
+            documentLayerClient.duplicateLayer(index, duplicateName)
         }
 
         func moveLayer(
             _ index: Int,
             to destinationIndex: Int
         ) -> DocumentMutationResult {
-            paintDocumentClient.moveLayer(index, destinationIndex)
+            documentLayerClient.moveLayer(index, destinationIndex)
         }
 
         func assignLayer(
             _ index: Int,
             toFolder folderID: Int
         ) -> DocumentMutationResult {
-            paintDocumentClient.assignLayerToFolder(index, folderID)
+            documentLayerClient.assignLayerToFolder(index, folderID)
         }
 
         func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.mergeLayerDown(index)
+            documentLayerClient.mergeLayerDown(index)
         }
 
         func setLayerVisibility(
             _ index: Int,
             visible: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerVisibility(index, visible)
+            documentLayerClient.setLayerVisibility(index, visible)
         }
 
         func setActiveLayer(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.setActiveLayer(index)
+            documentLayerClient.setActiveLayer(index)
         }
 
         func setLayerOpacity(
             _ index: Int,
             opacity: Double
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerOpacity(index, opacity)
+            documentLayerClient.setLayerOpacity(index, opacity)
         }
 
         func setLayerLocked(
             _ index: Int,
             isLocked: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerLocked(index, isLocked)
+            documentLayerClient.setLayerLocked(index, isLocked)
         }
 
         func setLayerAlphaLocked(
             _ index: Int,
             isAlphaLocked: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked)
+            documentLayerClient.setLayerAlphaLocked(index, isAlphaLocked)
         }
 
         func setLayerClipped(
             _ index: Int,
             isClipped: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerClipped(index, isClipped)
+            documentLayerClient.setLayerClipped(index, isClipped)
         }
 
         func setFolderExpanded(
             _ folderID: Int,
             isExpanded: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+            documentLayerClient.setFolderExpanded(folderID, isExpanded)
         }
 
         func setFolderVisibility(
             _ folderID: Int,
             visible: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.setFolderVisibility(folderID, visible)
+            documentLayerClient.setFolderVisibility(folderID, visible)
         }
 
         func setFolderName(
             _ folderID: Int,
             name: String
         ) -> DocumentMutationResult {
-            paintDocumentClient.setFolderName(folderID, name)
+            documentLayerClient.setFolderName(folderID, name)
         }
 
         func setLayerBlendMode(
             _ index: Int,
             blendMode: LayerBlendMode
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerBlendMode(index, blendMode)
+            documentLayerClient.setLayerBlendMode(index, blendMode)
         }
 
         func setLayerName(
             _ index: Int,
             name: String
         ) -> DocumentMutationResult {
-            paintDocumentClient.setLayerName(index, name)
+            documentLayerClient.setLayerName(index, name)
         }
 
         func replaceLayerPixels(
             _ index: Int,
             pixelData: Data
         ) -> DocumentMutationResult {
-            paintDocumentClient.replaceLayerPixels(index, pixelData)
+            documentLayerClient.replaceLayerPixels(index, pixelData)
         }
 
         func setTextLayer(
             _ index: Int,
             textLayer: TextLayerData
         ) -> DocumentMutationResult {
-            paintDocumentClient.setTextLayer(index, textLayer)
+            documentLayerClient.setTextLayer(index, textLayer)
         }
 
         func clearLayer(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.clearLayer(index)
+            documentLayerClient.clearLayer(index)
         }
 
         func replaceLayerMask(
             _ index: Int,
             maskData: Data
         ) -> DocumentMutationResult {
-            paintDocumentClient.replaceLayerMask(index, maskData)
+            documentLayerClient.replaceLayerMask(index, maskData)
         }
 
         func clearLayerMask(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.clearLayerMask(index)
+            documentLayerClient.clearLayerMask(index)
         }
 
         func applyLayerMask(_ index: Int) -> DocumentMutationResult {
-            paintDocumentClient.applyLayerMask(index)
+            documentLayerClient.applyLayerMask(index)
         }
     }
 
     var layerWorkflowService: LayerWorkflowService {
-        LayerWorkflowService(paintDocumentClient: paintDocumentClient)
+        LayerWorkflowService(documentLayerClient: DocumentLayerClient(paintDocumentClient: paintDocumentClient))
     }
 
     var documentCanvasMutationCoordinator: DocumentCanvasMutationCoordinator {
