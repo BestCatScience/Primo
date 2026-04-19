@@ -8,27 +8,26 @@ extension PaintDocumentSession {
     }
 
     func setTextLayer(index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
-        guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return .failure(.emptyInput)
-        }
-        switch beginPixelLayerMutation(
-            at: index,
-            preservesTextLayerMetadata: true
+        executeMutation(
+            SessionMutationContract(
+                requirements: [.layer(index: index, requiresUnlocked: true)],
+                applySideEffects: { session, _ in
+                    session.setStoredTextLayer(textLayer, at: index)
+                }
+            )
         ) {
-        case let .failure(failure):
-            return .failure(failure)
-        case .success:
-            break
+            guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return .failure(.emptyInput)
+            }
+            guard let rasterized = rasterizedTextLayerPixelData(textLayer) else {
+                return .failure(.bridgeMutationFailed("setTextLayer"))
+            }
+            return replaceLayerPixels(
+                index: index,
+                data: rasterized,
+                preservesTextLayerMetadata: true
+            )
         }
-        guard let rasterized = rasterizedTextLayerPixelData(textLayer) else {
-            return .failure(.bridgeMutationFailed("setTextLayer"))
-        }
-        setStoredTextLayer(textLayer, at: index)
-        return replaceLayerPixels(
-            index: index,
-            data: rasterized,
-            preservesTextLayerMetadata: true
-        )
     }
 
     func clearTextLayerData(index: Int) {

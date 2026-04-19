@@ -199,6 +199,19 @@ final class PaintDocumentSession {
 }
 
 extension PaintDocumentSession {
+    struct SessionMutationContract<Success> {
+        let requirements: [DocumentMutationCommand]
+        let applySideEffects: (PaintDocumentSession, Success) -> Void
+
+        init(
+            requirements: [DocumentMutationCommand] = [],
+            applySideEffects: @escaping (PaintDocumentSession, Success) -> Void = { _, _ in }
+        ) {
+            self.requirements = requirements
+            self.applySideEffects = applySideEffects
+        }
+    }
+
     var documentGateway: PaintDocumentSessionDocumentGateway {
         PaintDocumentSessionDocumentGateway(
             bridge: bridge,
@@ -241,17 +254,44 @@ extension PaintDocumentSession {
             .map(mutationFailure(for:))
     }
 
+    func validate(
+        _ commands: [DocumentMutationCommand]
+    ) -> DocumentMutationFailure? {
+        commands.lazy.compactMap(validate(_:)).first
+    }
+
+    func executeMutation<Success>(
+        _ contract: SessionMutationContract<Success> = .init(),
+        perform: () -> Result<Success, DocumentMutationFailure>
+    ) -> Result<Success, DocumentMutationFailure> {
+        if let failure = validate(contract.requirements) {
+            return .failure(failure)
+        }
+
+        switch perform() {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(value):
+            contract.applySideEffects(self, value)
+            return .success(value)
+        }
+    }
+
     func beginPixelLayerMutation(
         at index: Int,
         preservesTextLayerMetadata: Bool = false
     ) -> DocumentMutationResult {
-        if let failure = validate(.layer(index: index, requiresUnlocked: true)) {
-            return .failure(failure)
+        executeMutation(
+            SessionMutationContract(
+                requirements: [.layer(index: index, requiresUnlocked: true)],
+                applySideEffects: { session, _ in
+                    guard !preservesTextLayerMetadata else { return }
+                    session.clearTextLayerData(index: index)
+                }
+            )
+        ) {
+            .success(())
         }
-        if !preservesTextLayerMetadata {
-            clearTextLayerData(index: index)
-        }
-        return .success(())
     }
 
     func applyRecordedLifecycleMutation(

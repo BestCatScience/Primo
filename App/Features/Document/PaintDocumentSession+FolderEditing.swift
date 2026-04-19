@@ -3,81 +3,92 @@ import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
-        if let failure = validate(.layerAnchor(index: layerIndex)) {
-            return .failure(failure)
+        executeMutation(
+            SessionMutationContract(
+                requirements: [.layerAnchor(index: layerIndex)],
+                applySideEffects: { session, folderID in
+                    session.applyRecordedLifecycleMutation(
+                        recording: .createFolder(
+                            folderID: .unchecked(folderID),
+                            name: name,
+                            anchorLayerIndex: layerIndex >= 0 ? .unchecked(layerIndex) : nil
+                        ),
+                        captureFrame: false
+                    )
+                }
+            )
+        ) {
+            .success(documentGateway.layers.createFolder(name: name, layerIndex: layerIndex))
         }
-        let folderID = documentGateway.layers.createFolder(name: name, layerIndex: layerIndex)
-        applyRecordedLifecycleMutation(
-            recording: .createFolder(
-                folderID: .unchecked(folderID),
-                name: name,
-                anchorLayerIndex: layerIndex >= 0 ? .unchecked(layerIndex) : nil
-            ),
-            captureFrame: false
-        )
-        return .success(folderID)
     }
 
     func deleteFolder(folderID: Int) -> DocumentMutationResult {
-        if let failure = validate(.folder(folderID: folderID)) {
-            return .failure(failure)
-        }
-        switch documentGateway.layers.deleteFolderResult(id: folderID) {
-        case let .failure(failure):
-            return .failure(failure)
-        case .success:
-            applyRecordedLifecycleMutation(
-                recording: .deleteFolder(folderID: .unchecked(folderID))
+        executeMutation(
+            SessionMutationContract(
+                requirements: [.folder(folderID: folderID)],
+                applySideEffects: { session, _ in
+                    session.applyRecordedLifecycleMutation(
+                        recording: .deleteFolder(folderID: .unchecked(folderID))
+                    )
+                }
             )
-            return .success(())
+        ) {
+            documentGateway.layers.deleteFolderResult(id: folderID)
         }
     }
 
     func setFolderVisibility(folderID: Int, isVisible: Bool) -> DocumentMutationResult {
-        if let failure = validate(.folder(folderID: folderID)) {
-            return .failure(failure)
+        executeMutation(
+            SessionMutationContract(
+                requirements: [.folder(folderID: folderID)],
+                applySideEffects: { session, _ in
+                    session.applyRecordedLifecycleMutation(
+                        recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
+                    )
+                }
+            )
+        ) {
+            documentGateway.layers.setFolderVisible(isVisible, folderID: folderID)
+            return .success(())
         }
-        documentGateway.layers.setFolderVisible(isVisible, folderID: folderID)
-        applyRecordedLifecycleMutation(
-            recording: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible)
-        )
-        return .success(())
     }
 
     func setFolderName(folderID: Int, name: String) -> DocumentMutationResult {
-        if let failure = validate(.folder(folderID: folderID)) {
-            return .failure(failure)
+        executeMutation(
+            SessionMutationContract(requirements: [.folder(folderID: folderID)])
+        ) {
+            documentGateway.layers.setFolderName(name, folderID: folderID)
+            return .success(())
         }
-        documentGateway.layers.setFolderName(name, folderID: folderID)
-        return .success(())
     }
 
     func setFolderExpanded(folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
-        if let failure = validate(.folder(folderID: folderID)) {
-            return .failure(failure)
+        executeMutation(
+            SessionMutationContract(requirements: [.folder(folderID: folderID)])
+        ) {
+            documentGateway.layers.setFolderExpanded(isExpanded, folderID: folderID)
+            return .success(())
         }
-        documentGateway.layers.setFolderExpanded(isExpanded, folderID: folderID)
-        return .success(())
     }
 
     func assignLayer(index: Int, toFolder folderID: Int) -> DocumentMutationResult {
-        if let failure = validate(.layer(index: index)) {
-            return .failure(failure)
-        }
-        if folderID >= 0, let failure = validate(.folder(folderID: folderID)) {
-            return .failure(failure)
-        }
-        switch documentGateway.layers.setLayerFolderResult(index: index, folderID: folderID) {
-        case let .failure(failure):
-            return .failure(failure)
-        case .success:
-            applyRecordedLifecycleMutation(
-                recording: .assignLayerToFolder(
-                    index: .unchecked(index),
-                    folderID: folderID >= 0 ? .unchecked(folderID) : nil
-                )
+        let requirements: [DocumentMutationCommand] = folderID >= 0
+            ? [.layer(index: index), .folder(folderID: folderID)]
+            : [.layer(index: index)]
+        return executeMutation(
+            SessionMutationContract(
+                requirements: requirements,
+                applySideEffects: { session, _ in
+                    session.applyRecordedLifecycleMutation(
+                        recording: .assignLayerToFolder(
+                            index: .unchecked(index),
+                            folderID: folderID >= 0 ? .unchecked(folderID) : nil
+                        )
+                    )
+                }
             )
-            return .success(())
+        ) {
+            documentGateway.layers.setLayerFolderResult(index: index, folderID: folderID)
         }
     }
 }
