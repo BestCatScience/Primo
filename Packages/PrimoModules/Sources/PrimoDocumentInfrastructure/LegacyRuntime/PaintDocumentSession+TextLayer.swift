@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentInfrastructure
 
 extension PaintDocumentSession {
     func textLayerData(index: Int) -> TextLayerData? {

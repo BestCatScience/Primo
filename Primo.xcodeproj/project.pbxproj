@@ -48,6 +48,7 @@
 		B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
 		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
 		B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
+		B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003C /* PaintDocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* PaintDocumentSession.swift */; };
@@ -122,6 +123,7 @@
 		B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
 		B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
 		B9000000000000000000002C /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
+		B90000000000000000000031 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
 		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
@@ -363,6 +365,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */,
 				B90000000000000000000021 /* PrimoBrushDomain in Frameworks */,
 				B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */,
 				B9000000000000000000001A /* PrimoBrushInfrastructure in Frameworks */,
@@ -389,6 +392,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B90000000000000000000031 /* PrimoDocumentInfrastructure in Frameworks */,
 				B90000000000000000000023 /* PrimoBrushDomain in Frameworks */,
 				B90000000000000000000020 /* PrimoBrushFileFormats in Frameworks */,
 				B9000000000000000000001D /* PrimoBrushInfrastructure in Frameworks */,
@@ -726,6 +730,7 @@
 				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
+				B90000000000000000000032 /* PrimoDocumentInfrastructure */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
 				B90000000000000000000019 /* PrimoWorkspaceInfrastructure */,
@@ -758,6 +763,7 @@
 				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
+				B90000000000000000000032 /* PrimoDocumentInfrastructure */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
 				B90000000000000000000019 /* PrimoWorkspaceInfrastructure */,
@@ -1309,6 +1315,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentApplication;
+		};
+		B90000000000000000000032 /* PrimoDocumentInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentInfrastructure;
 		};
 		B90000000000000000000019 /* PrimoWorkspaceInfrastructure */ = {
 			isa = XCSwiftPackageProductDependency;

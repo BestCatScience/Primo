@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentInfrastructure
 import UIKit
 
 extension AppFeature {
@@ -100,7 +101,7 @@ extension AppFeature {
         guard let renderedCGImage = renderedImage.cgImage else {
             return nil
         }
-        return PaintDocumentSession.pixelData(from: renderedCGImage, size: canvasRect.size)
+        return DocumentTextRasterizer.pixelData(from: renderedCGImage, size: canvasRect.size)
     }
 
     static func importedCanvasImage(from imageData: Data) -> ImportedCanvasImage? {
@@ -122,7 +123,10 @@ extension AppFeature {
             sourceImage.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
         }
         guard let renderedCGImage = renderedImage.cgImage,
-              let pixelData = PaintDocumentSession.pixelData(from: renderedCGImage, size: CGSize(width: width, height: height)) else {
+              let pixelData = DocumentTextRasterizer.pixelData(
+                from: renderedCGImage,
+                size: CGSize(width: width, height: height)
+              ) else {
             return nil
         }
 

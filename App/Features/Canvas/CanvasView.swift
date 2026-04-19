@@ -1,5 +1,6 @@
 import AVFoundation
 import ComposableArchitecture
+import PrimoDocumentInfrastructure
 import QuartzCore
 import SwiftUI
 import UIKit
@@ -1479,7 +1480,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         )
         transformed.scale = min(max(transformed.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += rotationDegrees
-        guard let resolved = PaintDocumentSession.resolvedTextLayout(for: transformed, canvasSize: canvasSize) else {
+        guard let resolved = DocumentTextRasterizer.resolvedTextLayout(for: transformed, canvasSize: canvasSize) else {
             return nil
         }
         let format = UIGraphicsImageRendererFormat.default()
@@ -1487,10 +1488,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
         let image = renderer.image { context in
-            PaintDocumentSession.drawTextLayer(transformed, resolved: resolved, in: context.cgContext)
+            DocumentTextRasterizer.drawTextLayer(transformed, resolved: resolved, in: context.cgContext)
         }
         guard let cgImage = image.cgImage else { return nil }
-        return PaintDocumentSession.pixelData(from: cgImage, size: canvasSize)
+        return DocumentTextRasterizer.pixelData(from: cgImage, size: canvasSize)
     }
 
     private func configureTextHandle(_ handle: UIView, symbol: String) {
@@ -1549,7 +1550,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         transformed.scale = min(max(transformed.scale * Double((transformPreviewScaleX + transformPreviewScaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += transformPreviewRotationDegrees
 
-        guard let resolved = PaintDocumentSession.resolvedTextLayout(for: transformed, canvasSize: documentSize) else {
+        guard let resolved = DocumentTextRasterizer.resolvedTextLayout(for: transformed, canvasSize: documentSize) else {
             return nil
         }
         let quad = TransformQuad(

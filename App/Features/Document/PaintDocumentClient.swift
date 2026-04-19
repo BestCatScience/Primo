@@ -3,7 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import Synchronization
+import PrimoDocumentInfrastructure
 
 typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
 typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
@@ -78,20 +78,20 @@ struct PaintDocumentClient: Sendable {
         dateClient: DateClient,
         uuidClient: UUIDClient
     ) -> PaintDocumentClient {
-        let sessionBox = PaintDocumentSessionBox(session: PaintDocumentSession(
+        let sessionBox = LockedDocumentRuntimeBox(runtime: PaintDocumentSession(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
         ))
         return PaintDocumentClient(
-            lightweightPresentation: { sessionBox.withSession { $0.lightweightPresentation() } },
-            presentation: { sessionBox.withSession { $0.presentation() } },
-            compositePixelData: { sessionBox.withSession { $0.compositePixelData() } },
-            prewarmDrawingResources: { sessionBox.withSession { $0.prewarmDrawingResources() } },
-            compositePNGData: { style in sessionBox.withSession { $0.compositePNGData(paperStyle: style) } },
-            timelapseCapture: { sessionBox.withSession { $0.timelapseCapture() } },
+            lightweightPresentation: { sessionBox.withRuntime { $0.lightweightPresentation() } },
+            presentation: { sessionBox.withRuntime { $0.presentation() } },
+            compositePixelData: { sessionBox.withRuntime { $0.compositePixelData() } },
+            prewarmDrawingResources: { sessionBox.withRuntime { $0.prewarmDrawingResources() } },
+            compositePNGData: { style in sessionBox.withRuntime { $0.compositePNGData(paperStyle: style) } },
+            timelapseCapture: { sessionBox.withRuntime { $0.timelapseCapture() } },
             saveProject: { url, paperStyle in
-                try sessionBox.withSession { session in
+                try sessionBox.withRuntime { session in
                     try session.saveProject(to: url, paperStyle: paperStyle)
                 }
             },
@@ -106,12 +106,12 @@ struct PaintDocumentClient: Sendable {
                     presentation: session.presentation(),
                     paperStyle: session.currentPaperStyle
                 )
-                sessionBox.replaceSession(with: session)
+                sessionBox.replaceRuntime(with: session)
                 return loadedProject
             },
-            setPaperStyle: { style in sessionBox.withSession { $0.setPaperStyle(style) } },
+            setPaperStyle: { style in sessionBox.withRuntime { $0.setPaperStyle(style) } },
             newCanvas: { width, height in
-                sessionBox.replaceSession(with: PaintDocumentSession(
+                sessionBox.replaceRuntime(with: PaintDocumentSession(
                     width: width,
                     height: height,
                     fileClient: fileClient,
@@ -120,64 +120,64 @@ struct PaintDocumentClient: Sendable {
                 ))
             },
             resizeCanvas: { width, height in
-                sessionBox.withSession { $0.resizeCanvasMutation(width: width, height: height) }
+                sessionBox.withRuntime { $0.resizeCanvasMutation(width: width, height: height) }
             },
             resizeCanvasExtent: { width, height in
-                sessionBox.withSession { $0.resizeCanvasExtentMutation(width: width, height: height) }
+                sessionBox.withRuntime { $0.resizeCanvasExtentMutation(width: width, height: height) }
             },
-            beginStroke: { sample, brush in sessionBox.withSession { $0.beginStroke(sample: sample, brush: brush) } },
-            appendStroke: { sample in sessionBox.withSession { $0.appendStroke(sample: sample) } },
-            endStroke: { sessionBox.withSession { $0.endStroke() } },
-            cancelStroke: { sessionBox.withSession { $0.cancelStroke() } },
+            beginStroke: { sample, brush in sessionBox.withRuntime { $0.beginStroke(sample: sample, brush: brush) } },
+            appendStroke: { sample in sessionBox.withRuntime { $0.appendStroke(sample: sample) } },
+            endStroke: { sessionBox.withRuntime { $0.endStroke() } },
+            cancelStroke: { sessionBox.withRuntime { $0.cancelStroke() } },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                sessionBox.withSession {
+                sessionBox.withRuntime {
                     $0.blurMutation(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
                 }
             },
-            endBlurStroke: { sessionBox.withSession { $0.endBlurStroke() } },
-            fill: { sample, brush in sessionBox.withSession { $0.fillMutation(sample: sample, brush: brush) } },
-            canUndo: { sessionBox.withSession { $0.canUndo() } },
-            canRedo: { sessionBox.withSession { $0.canRedo() } },
-            undo: { sessionBox.withSession { $0.undoMutation() } },
-            redo: { sessionBox.withSession { $0.redoMutation() } },
-            addLayer: { name in sessionBox.withSession { $0.addLayerMutation(name: name) } },
-            duplicateLayer: { index, name in sessionBox.withSession { $0.duplicateLayerMutation(index: index, name: name) } },
-            deleteLayer: { index in sessionBox.withSession { $0.deleteLayerMutation(index: index) } },
-            moveLayer: { index, destination in sessionBox.withSession { $0.moveLayerMutation(from: index, to: destination) } },
-            createFolder: { name, layerIndex in sessionBox.withSession { $0.createFolderMutation(name: name, layerIndex: layerIndex) } },
-            deleteFolder: { folderID in sessionBox.withSession { $0.deleteFolderMutation(folderID: folderID) } },
-            setFolderVisibility: { folderID, isVisible in sessionBox.withSession { $0.setFolderVisibilityMutation(folderID: folderID, isVisible: isVisible) } },
-            setFolderName: { folderID, name in sessionBox.withSession { $0.setFolderNameMutation(folderID: folderID, name: name) } },
-            setFolderExpanded: { folderID, isExpanded in sessionBox.withSession { $0.setFolderExpandedMutation(folderID: folderID, isExpanded: isExpanded) } },
-            assignLayerToFolder: { index, folderID in sessionBox.withSession { $0.assignLayerMutation(index: index, toFolder: folderID) } },
-            setActiveLayer: { index in sessionBox.withSession { $0.setActiveLayerMutation(index: index) } },
-            setLayerName: { index, name in sessionBox.withSession { $0.setLayerNameMutation(index: index, name: name) } },
-            setLayerVisibility: { index, isVisible in sessionBox.withSession { $0.setLayerVisibilityMutation(index: index, isVisible: isVisible) } },
-            setLayerLocked: { index, isLocked in sessionBox.withSession { $0.setLayerLockedMutation(index: index, isLocked: isLocked) } },
-            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withSession { $0.setLayerAlphaLockedMutation(index: index, isAlphaLocked: isAlphaLocked) } },
-            setLayerClipped: { index, isClipped in sessionBox.withSession { $0.setLayerClippedMutation(index: index, isClipped: isClipped) } },
-            revealLayerForEditing: { index in sessionBox.withSession { $0.revealLayerForEditingMutation(index: index) } },
-            setLayerOpacity: { index, opacity in sessionBox.withSession { $0.setLayerOpacityMutation(index: index, opacity: opacity) } },
-            setLayerBlendMode: { index, blendMode in sessionBox.withSession { $0.setLayerBlendModeMutation(index: index, blendMode: blendMode) } },
-            mergeLayerDown: { index in sessionBox.withSession { $0.mergeLayerDownMutation(index: index) } },
-            textLayerData: { index in sessionBox.withSession { $0.textLayerData(index: index) } },
-            setTextLayer: { index, textLayer in sessionBox.withSession { $0.setTextLayerMutation(index: index, textLayer: textLayer) } },
-            clearTextLayerData: { index in sessionBox.withSession { $0.clearTextLayerData(index: index) } },
-            applyLayerProcessing: { index, request in sessionBox.withSession { $0.applyLayerProcessingMutation(index: index, request: request) } },
+            endBlurStroke: { sessionBox.withRuntime { $0.endBlurStroke() } },
+            fill: { sample, brush in sessionBox.withRuntime { $0.fillMutation(sample: sample, brush: brush) } },
+            canUndo: { sessionBox.withRuntime { $0.canUndo() } },
+            canRedo: { sessionBox.withRuntime { $0.canRedo() } },
+            undo: { sessionBox.withRuntime { $0.undoMutation() } },
+            redo: { sessionBox.withRuntime { $0.redoMutation() } },
+            addLayer: { name in sessionBox.withRuntime { $0.addLayerMutation(name: name) } },
+            duplicateLayer: { index, name in sessionBox.withRuntime { $0.duplicateLayerMutation(index: index, name: name) } },
+            deleteLayer: { index in sessionBox.withRuntime { $0.deleteLayerMutation(index: index) } },
+            moveLayer: { index, destination in sessionBox.withRuntime { $0.moveLayerMutation(from: index, to: destination) } },
+            createFolder: { name, layerIndex in sessionBox.withRuntime { $0.createFolderMutation(name: name, layerIndex: layerIndex) } },
+            deleteFolder: { folderID in sessionBox.withRuntime { $0.deleteFolderMutation(folderID: folderID) } },
+            setFolderVisibility: { folderID, isVisible in sessionBox.withRuntime { $0.setFolderVisibilityMutation(folderID: folderID, isVisible: isVisible) } },
+            setFolderName: { folderID, name in sessionBox.withRuntime { $0.setFolderNameMutation(folderID: folderID, name: name) } },
+            setFolderExpanded: { folderID, isExpanded in sessionBox.withRuntime { $0.setFolderExpandedMutation(folderID: folderID, isExpanded: isExpanded) } },
+            assignLayerToFolder: { index, folderID in sessionBox.withRuntime { $0.assignLayerMutation(index: index, toFolder: folderID) } },
+            setActiveLayer: { index in sessionBox.withRuntime { $0.setActiveLayerMutation(index: index) } },
+            setLayerName: { index, name in sessionBox.withRuntime { $0.setLayerNameMutation(index: index, name: name) } },
+            setLayerVisibility: { index, isVisible in sessionBox.withRuntime { $0.setLayerVisibilityMutation(index: index, isVisible: isVisible) } },
+            setLayerLocked: { index, isLocked in sessionBox.withRuntime { $0.setLayerLockedMutation(index: index, isLocked: isLocked) } },
+            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withRuntime { $0.setLayerAlphaLockedMutation(index: index, isAlphaLocked: isAlphaLocked) } },
+            setLayerClipped: { index, isClipped in sessionBox.withRuntime { $0.setLayerClippedMutation(index: index, isClipped: isClipped) } },
+            revealLayerForEditing: { index in sessionBox.withRuntime { $0.revealLayerForEditingMutation(index: index) } },
+            setLayerOpacity: { index, opacity in sessionBox.withRuntime { $0.setLayerOpacityMutation(index: index, opacity: opacity) } },
+            setLayerBlendMode: { index, blendMode in sessionBox.withRuntime { $0.setLayerBlendModeMutation(index: index, blendMode: blendMode) } },
+            mergeLayerDown: { index in sessionBox.withRuntime { $0.mergeLayerDownMutation(index: index) } },
+            textLayerData: { index in sessionBox.withRuntime { $0.textLayerData(index: index) } },
+            setTextLayer: { index, textLayer in sessionBox.withRuntime { $0.setTextLayerMutation(index: index, textLayer: textLayer) } },
+            clearTextLayerData: { index in sessionBox.withRuntime { $0.clearTextLayerData(index: index) } },
+            applyLayerProcessing: { index, request in sessionBox.withRuntime { $0.applyLayerProcessingMutation(index: index, request: request) } },
             applySoftwareStroke: { samples, brush, layerIndex in
-                sessionBox.withSession {
+                sessionBox.withRuntime {
                     $0.applySoftwareStrokeMutation(samples: samples, brush: brush, layerIndex: layerIndex)
                 }
             },
-            pixelDataForLayer: { index in sessionBox.withSession { $0.pixelDataForLayer(index: index) } },
+            pixelDataForLayer: { index in sessionBox.withRuntime { $0.pixelDataForLayer(index: index) } },
             replaceLayerPixels: { index, data in
-                sessionBox.withSession { $0.replaceLayerPixelsMutation(index: index, data: data) }
+                sessionBox.withRuntime { $0.replaceLayerPixelsMutation(index: index, data: data) }
             },
-            replaceLayerMask: { index, data in sessionBox.withSession { $0.replaceLayerMaskMutation(index: index, data: data) } },
-            clearLayerMask: { index in sessionBox.withSession { $0.clearLayerMaskMutation(index: index) } },
-            applyLayerMask: { index in sessionBox.withSession { $0.applyLayerMaskMutation(index: index) } },
-            clearLayer: { index in sessionBox.withSession { $0.clearLayerMutation(index: index) } },
-            consumeDirtyUpdate: { sessionBox.withSession { $0.consumeDirtyUpdate() } }
+            replaceLayerMask: { index, data in sessionBox.withRuntime { $0.replaceLayerMaskMutation(index: index, data: data) } },
+            clearLayerMask: { index in sessionBox.withRuntime { $0.clearLayerMaskMutation(index: index) } },
+            applyLayerMask: { index in sessionBox.withRuntime { $0.applyLayerMaskMutation(index: index) } },
+            clearLayer: { index in sessionBox.withRuntime { $0.clearLayerMutation(index: index) } },
+            consumeDirtyUpdate: { sessionBox.withRuntime { $0.consumeDirtyUpdate() } }
         )
     }
 }
@@ -241,26 +241,6 @@ struct DocumentLayerClient: Sendable {
         self.clearLayerMask = paintDocumentClient.clearLayerMask
         self.applyLayerMask = paintDocumentClient.applyLayerMask
         self.clearLayer = paintDocumentClient.clearLayer
-    }
-}
-
-private final class PaintDocumentSessionBox: Sendable {
-    private let storage: Mutex<PaintDocumentSession>
-
-    init(session: PaintDocumentSession = PaintDocumentSession()) {
-        self.storage = Mutex(session)
-    }
-
-    func withSession<T>(_ body: (PaintDocumentSession) throws -> T) rethrows -> T {
-        try storage.withLock { session in
-            try body(session)
-        }
-    }
-
-    func replaceSession(with session: PaintDocumentSession) {
-        storage.withLock { currentSession in
-            currentSession = session
-        }
     }
 }
 

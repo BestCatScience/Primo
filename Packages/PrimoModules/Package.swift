@@ -3,11 +3,17 @@ import PackageDescription
 
 let package = Package(
     name: "PrimoModules",
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v13),
+    ],
     products: [
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
+        .library(name: "PrimoDocumentEngine", targets: ["PrimoDocumentEngine"]),
+        .library(name: "PrimoDocumentNativeBridge", targets: ["PrimoDocumentNativeBridge"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
@@ -36,13 +42,35 @@ let package = Package(
             dependencies: ["PrimoDocumentDomain", "PrimoDocumentContracts"]
         ),
         .target(
+            name: "PrimoDocumentEngine",
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "PrimoDocumentNativeBridge",
+            dependencies: ["PrimoDocumentEngine"],
+            publicHeadersPath: "include"
+        ),
+        .target(
             name: "PrimoDocumentInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoDocumentApplication",
-            ]
+            ],
+            exclude: ["LegacyRuntime"]
+        ),
+        .target(
+            name: "PrimoDocumentRuntimeInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentApplication",
+                "PrimoDocumentInfrastructure",
+                "PrimoDocumentNativeBridge",
+            ],
+            path: "Sources/PrimoDocumentInfrastructure/LegacyRuntime"
         ),
         .target(
             name: "PrimoBrushDomain"
@@ -146,5 +174,6 @@ let package = Package(
             name: "PrimoBrushFileFormatsTests",
             dependencies: ["PrimoBrushFileFormats"]
         ),
-    ]
+    ],
+    cxxLanguageStandard: .gnucxx20
 )

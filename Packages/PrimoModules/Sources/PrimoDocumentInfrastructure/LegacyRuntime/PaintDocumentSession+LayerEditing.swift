@@ -1,0 +1,124 @@
+import CoreGraphics
+import Foundation
+import PrimoDocumentApplication
+
+extension PaintDocumentSession {
+    func canUndo() -> Bool {
+        documentGateway.history.canUndo()
+    }
+
+    func canRedo() -> Bool {
+        documentGateway.history.canRedo()
+    }
+
+    func undo() -> DocumentMutationResult {
+        guard canUndo() else {
+            return .failure(.noUndoState)
+        }
+        switch documentGateway.history.undoResult() {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            applyDocumentLifecycleMutation(recording: .undo)
+            return .success(())
+        }
+    }
+
+    func redo() -> DocumentMutationResult {
+        guard canRedo() else {
+            return .failure(.noRedoState)
+        }
+        switch documentGateway.history.redoResult() {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            applyDocumentLifecycleMutation(recording: .redo)
+            return .success(())
+        }
+    }
+
+    func addLayer(name: String) -> DocumentIndexedMutationResult {
+        let useCase = DocumentEditorUseCase()
+        switch useCase.execute(
+            .structure(.addLayer(name: name)),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
+        ) {
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(.structure(plan)):
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(plan.resultingIndex ?? -1)
+        case .success:
+            return .failure(.bridgeMutationFailed("addLayer"))
+        }
+    }
+
+    func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
+        let useCase = DocumentEditorUseCase()
+        switch useCase.execute(
+            .structure(.duplicateLayer(index: index, name: name)),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
+        ) {
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(.structure(plan)):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
+            }
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(plan.resultingIndex ?? -1)
+        case .success:
+            return .failure(.bridgeMutationFailed("duplicateLayer"))
+        }
+    }
+
+    func deleteLayer(index: Int) -> DocumentMutationResult {
+        let useCase = DocumentEditorUseCase()
+        switch useCase.execute(
+            .structure(.deleteLayer(index: index)),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
+        ) {
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(.structure(plan)):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
+            }
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(())
+        case .success:
+            return .failure(.bridgeMutationFailed("deleteLayer"))
+        }
+    }
+
+    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
+        let useCase = DocumentEditorUseCase()
+        switch useCase.execute(
+            .structure(.moveLayer(index: index, destinationIndex: destinationIndex)),
+            in: documentLayerMutationContext,
+            gateway: documentGateway.layers
+        ) {
+        case let .failure(failure):
+            return .failure(mutationFailure(for: failure))
+        case let .success(.structure(plan)):
+            if let indexMutation = plan.indexMutation {
+                applyLayerIndexMutation(indexMutation)
+            }
+            if let event = plan.lifecycleEvent {
+                applyLayerLifecycleEvent(event)
+            }
+            return .success(())
+        case .success:
+            return .failure(.bridgeMutationFailed("moveLayer"))
+        }
+    }
+}

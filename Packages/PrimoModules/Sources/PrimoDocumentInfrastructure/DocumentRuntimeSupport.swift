@@ -18,6 +18,29 @@ public struct DocumentProjectPreview: Equatable, Sendable {
     }
 }
 
+public final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var runtime: Runtime
+
+    public init(runtime: Runtime) {
+        self.runtime = runtime
+    }
+
+    public func withRuntime<T>(
+        _ body: (Runtime) throws -> T
+    ) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body(runtime)
+    }
+
+    public func replaceRuntime(with newRuntime: Runtime) {
+        lock.lock()
+        runtime = newRuntime
+        lock.unlock()
+    }
+}
+
 public actor DocumentRuntimeBox<Runtime> where Runtime: Sendable {
     private var runtime: Runtime
 
