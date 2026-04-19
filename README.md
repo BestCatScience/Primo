@@ -44,7 +44,7 @@
   Swift と C++ の橋渡し層です。`APPaintDocumentBridge` が `PaintDocument` を Objective-C API として公開します。
 - `Engine/`
   描画コアです。レイヤー、ストローク、塗りつぶし、合成、dirty 管理などの中核処理があります。
-- `primo.xcodeproj`
+- `Primo.xcodeproj`
   依存関係込みでそのまま開ける Xcode プロジェクトです。
 
 ## 重要なファイル
@@ -71,10 +71,10 @@
 1. Xcode でプロジェクトを開きます。
 
 ```bash
-open primo.xcodeproj
+open Primo.xcodeproj
 ```
 
-2. `primo` スキームを iPad シミュレータまたは実機でビルドして実行します。
+2. `Primo` スキームを iPad シミュレータまたは実機でビルドして実行します。
 3. Apple Pencil を使った描画挙動は実機のほうが確認しやすく、シミュレータは主に UI と基本動作の確認向けです。
 
 ## アーキテクチャ概要

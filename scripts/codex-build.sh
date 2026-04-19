@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 xcodebuild \
-  -project atelierprime.xcodeproj \
-  -scheme atelierprime \
+  -project Primo.xcodeproj \
+  -scheme Primo \
   -sdk iphonesimulator \
   -configuration Debug \
   -derivedDataPath build/DerivedData \

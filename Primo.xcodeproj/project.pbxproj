@@ -787,7 +787,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A00000000000000000000071 /* Build configuration list for PBXProject "atelierprime" */;
+			buildConfigurationList = A00000000000000000000071 /* Build configuration list for PBXProject "Primo" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -1225,7 +1225,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A00000000000000000000071 /* Build configuration list for PBXProject "atelierprime" */ = {
+		A00000000000000000000071 /* Build configuration list for PBXProject "Primo" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A00000000000000000000080 /* Debug */,

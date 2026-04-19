@@ -17,7 +17,7 @@
                BlueprintIdentifier = "A00000000000000000000060"
                BuildableName = "Primo.app"
                BlueprintName = "Primo"
-               ReferencedContainer = "container:atelierprime.xcodeproj">
+               ReferencedContainer = "container:Primo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -47,11 +47,11 @@
             BlueprintIdentifier = "A00000000000000000000060"
             BuildableName = "Primo.app"
             BlueprintName = "Primo"
-            ReferencedContainer = "container:atelierprime.xcodeproj">
+            ReferencedContainer = "container:Primo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../../../Primo.storekit">
+         identifier = "../Primo.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
@@ -67,7 +67,7 @@
             BlueprintIdentifier = "A00000000000000000000060"
             BuildableName = "Primo.app"
             BlueprintName = "Primo"
-            ReferencedContainer = "container:atelierprime.xcodeproj">
+            ReferencedContainer = "container:Primo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

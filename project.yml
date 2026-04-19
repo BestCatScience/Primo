@@ -1,4 +1,4 @@
-name: primo
+name: Primo
 options:
   deploymentTarget:
     iOS: 26.0
@@ -13,7 +13,7 @@ settings:
     CLANG_CXX_LANGUAGE_STANDARD: gnu++20
     CLANG_CXX_LIBRARY: libc++
 targets:
-  primo:
+  Primo:
     type: application
     platform: iOS
     sources:
@@ -26,7 +26,7 @@ targets:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Primo
-        PRODUCT_NAME: primo
+        PRODUCT_NAME: Primo
         TARGETED_DEVICE_FAMILY: 2
         IPHONEOS_DEPLOYMENT_TARGET: 26.0
         SWIFT_OBJC_BRIDGING_HEADER: App/Support/primo-Bridging-Header.h
