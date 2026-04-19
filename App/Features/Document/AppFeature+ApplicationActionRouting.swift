@@ -44,8 +44,8 @@ extension AppFeature {
 
     func routeApplicationAction(
         state: inout State,
-        action: Action
-    ) -> Effect<Action>? {
+        action: ApplicationAction
+    ) -> Effect<Action> {
         switch action {
         case .task:
             return handleTask(state: &state)
@@ -146,9 +146,6 @@ extension AppFeature {
         case .bannerDismissed:
             handleBannerDismissed(state: &state)
             return .none
-
-        default:
-            return nil
         }
     }
 }

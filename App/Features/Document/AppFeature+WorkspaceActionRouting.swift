@@ -129,8 +129,8 @@ extension AppFeature {
 
     func routeWorkspaceAction(
         state: inout State,
-        action: Action
-    ) -> Effect<Action>? {
+        action: WorkspaceAction
+    ) -> Effect<Action> {
         switch action {
         case let .tabSelected(tabID):
             return handleTabSelection(state: &state, tabID: tabID)
@@ -242,9 +242,6 @@ extension AppFeature {
         case let .openDocumentFailed(message):
             handleOpenDocumentFailed(state: &state, message: message)
             return .none
-
-        default:
-            return nil
         }
     }
 }

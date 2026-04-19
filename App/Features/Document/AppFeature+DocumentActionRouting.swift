@@ -7,57 +7,57 @@ extension AppFeature {
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case let .newCanvasRequested(width, height):
+        case let .document(.newCanvasRequested(width, height)):
             return handleNewCanvasRequest(state: &state, width: width, height: height)
 
-        case let .newCanvasPreparationCompleted(dimensions):
+        case let .document(.newCanvasPreparationCompleted(dimensions)):
             return handleNewCanvasPreparationCompleted(state: &state, dimensions: dimensions)
 
-        case let .resizeCanvasRequested(width, height):
+        case let .document(.resizeCanvasRequested(width, height)):
             return handleResizeCanvasRequest(state: &state, width: width, height: height)
 
-        case let .resizeCanvasExtentRequested(width, height):
+        case let .document(.resizeCanvasExtentRequested(width, height)):
             return handleResizeCanvasExtentRequest(state: &state, width: width, height: height)
 
-        case let .newCanvasFromImageReceived(name, data):
+        case let .document(.newCanvasFromImageReceived(name, data)):
             return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
 
-        case let .newCanvasFromImagePreparationCompleted(plan):
+        case let .document(.newCanvasFromImagePreparationCompleted(plan)):
             return handleNewCanvasFromImagePreparationCompleted(state: &state, plan: plan)
 
-        case let .newCanvasFromImageFailed(message):
+        case let .document(.newCanvasFromImageFailed(message)):
             handleNewCanvasFromImageFailed(state: &state, message: message)
             return .none
 
-        case .undoRequested:
+        case .document(.undoRequested):
             return handleUndoRequested(state: &state)
 
-        case .redoRequested:
+        case .document(.redoRequested):
             return handleRedoRequested(state: &state)
 
-        case .saveHistoryRequested:
+        case .document(.saveHistoryRequested):
             return handleSaveHistoryRequest(state: &state)
 
-        case let .saveHistoryLoaded(entries):
+        case let .document(.saveHistoryLoaded(entries)):
             state.saveHistory.present(entries: entries)
             return .none
 
-        case let .saveHistoryLoadFailed(message):
+        case let .document(.saveHistoryLoadFailed(message)):
             handleSaveHistoryLoadFailed(state: &state, message: message)
             return .none
 
-        case .saveHistoryDismissed:
+        case .document(.saveHistoryDismissed):
             state.saveHistory.dismiss()
             return .none
 
-        case let .saveHistoryRestoreRequested(projectURL, openInNewTab):
+        case let .document(.saveHistoryRestoreRequested(projectURL, openInNewTab)):
             return handleSaveHistoryRestoreRequest(
                 state: &state,
                 projectURL: projectURL,
                 openInNewTab: openInNewTab
             )
 
-        case let .saveHistoryOpened(loaded, projectURL, openInNewTab, issues):
+        case let .document(.saveHistoryOpened(loaded, projectURL, openInNewTab, issues)):
             return handleSaveHistoryOpened(
                 state: &state,
                 loaded: loaded,
@@ -66,27 +66,27 @@ extension AppFeature {
                 issues: issues
             )
 
-        case let .saveHistoryRestoreFailed(message):
+        case let .document(.saveHistoryRestoreFailed(message)):
             handleSaveHistoryRestoreFailed(state: &state, message: message)
             return .none
 
-        case .exportDocumentRequested:
+        case .document(.exportDocumentRequested):
             handleExportDocumentRequest(state: &state)
             return .none
 
-        case .saveDocumentRequested:
+        case .document(.saveDocumentRequested):
             return handleSaveDocumentRequest(
                 state: &state,
                 preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
             )
 
-        case .saveDocumentCopyRequested:
+        case .document(.saveDocumentCopyRequested):
             return handleSaveDocumentRequest(
                 state: &state,
                 preferredDestinationURL: nil
             )
 
-        case .exportTimelapseRequested:
+        case .document(.exportTimelapseRequested):
             return handleTimelapseExportRequest(state: &state)
 
         case let .nanoBanana(.delegate(delegateAction)):
@@ -105,22 +105,22 @@ extension AppFeature {
             handleNanoBananaEditFailed(state: &state, feedback: feedback)
             return .none
 
-        case let .timelapseExportProgressUpdated(progress):
+        case let .document(.timelapseExportProgressUpdated(progress)):
             handleTimelapseExportProgressUpdated(state: &state, progress: progress)
             return .none
 
-        case let .timelapseExportSucceeded(result):
+        case let .document(.timelapseExportSucceeded(result)):
             handleTimelapseExportSucceeded(state: &state, result: result)
             return .none
 
-        case let .timelapseExportFailed(message):
+        case let .document(.timelapseExportFailed(message)):
             handleTimelapseExportFailed(state: &state, message: message)
             return .none
 
-        case let .photoImportReceived(name, data):
+        case let .document(.photoImportReceived(name, data)):
             return handlePhotoImport(state: &state, name: name, data: data)
 
-        case let .photoImportFailed(message):
+        case let .document(.photoImportFailed(message)):
             handlePhotoImportFailed(state: &state, message: message)
             return .none
 

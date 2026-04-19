@@ -8,6 +8,8 @@ let package = Package(
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
+        .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
+        .library(name: "PrimoNanoBananaInfrastructure", targets: ["PrimoNanoBananaInfrastructure"]),
         .library(name: "PrimoDocumentContracts", targets: ["PrimoDocumentContracts"]),
         .library(name: "PrimoWorkspaceDomain", targets: ["PrimoWorkspaceDomain"]),
         .library(name: "PrimoWorkspaceInfrastructure", targets: ["PrimoWorkspaceInfrastructure"]),
@@ -27,6 +29,16 @@ let package = Package(
         ),
         .target(
             name: "PrimoBrushDomain"
+        ),
+        .target(
+            name: "PrimoNanoBananaDomain"
+        ),
+        .target(
+            name: "PrimoNanoBananaInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoNanoBananaDomain",
+            ]
         ),
         .target(
             name: "PrimoDocumentContracts",
@@ -71,6 +83,14 @@ let package = Package(
         .testTarget(
             name: "PrimoBrushDomainTests",
             dependencies: ["PrimoBrushDomain"]
+        ),
+        .testTarget(
+            name: "PrimoNanoBananaDomainTests",
+            dependencies: ["PrimoNanoBananaDomain"]
+        ),
+        .testTarget(
+            name: "PrimoNanoBananaInfrastructureTests",
+            dependencies: ["PrimoNanoBananaInfrastructure"]
         ),
         .testTarget(
             name: "PrimoBrushFileFormatsTests",

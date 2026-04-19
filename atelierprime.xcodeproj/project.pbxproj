@@ -45,6 +45,8 @@
 		B9000000000000000000001A /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
 		B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
 		B90000000000000000000021 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
+		B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
+		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003C /* PaintDocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* PaintDocumentSession.swift */; };
@@ -74,7 +76,6 @@
 		A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B3 /* LayerSidebarView+Rows.swift */; };
 		A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B5 /* LayerSidebarView+Support.swift */; };
 		A000000000000000000000B6 /* NanoBananaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B7 /* NanoBananaClient.swift */; };
-		A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B9 /* NanoBananaCommerce.swift */; };
 		A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */; };
 		A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BD /* AppFeature+SelectionTransform.swift */; };
 		A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BF /* DocumentWorkspaceClient.swift */; };
@@ -117,6 +118,8 @@
 		B9000000000000000000001D /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
 		B90000000000000000000020 /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
 		B90000000000000000000023 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
+		B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
+		B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
 		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
@@ -166,6 +169,16 @@
 		DE2EE6961B83425CAAFEACBC /* AppFeature+DocumentActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED876FE803A549B6B0A5E369 /* AppFeature+DocumentActionRouting.swift */; };
 		E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AppFeature+DomainState.swift */; };
 		E5EDC1CCB1374EE3BA93690B /* AppFeature+WorkspaceActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E00941144B432589C8F631 /* AppFeature+WorkspaceActionRouting.swift */; };
+		E70000000000000000000011 /* AppFeature+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000001 /* AppFeature+State.swift */; };
+		E70000000000000000000012 /* AppFeature+Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000002 /* AppFeature+Action.swift */; };
+		E70000000000000000000013 /* NanoBananaFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000003 /* NanoBananaFeature.swift */; };
+		E70000000000000000000014 /* NanoBananaFeature+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000004 /* NanoBananaFeature+State.swift */; };
+		E70000000000000000000015 /* NanoBananaFeature+Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000005 /* NanoBananaFeature+Action.swift */; };
+		E70000000000000000000016 /* NanoBananaFeature+Reducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000006 /* NanoBananaFeature+Reducer.swift */; };
+		E70000000000000000000017 /* NanoBananaDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000007 /* NanoBananaDependencies.swift */; };
+		E70000000000000000000018 /* NanoBananaDomain+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000008 /* NanoBananaDomain+Presentation.swift */; };
+		E70000000000000000000019 /* PrimoNanoBananaModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000009 /* PrimoNanoBananaModules.swift */; };
+		E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7000000000000000000000A /* NanoBananaFeatureTests.swift */; };
 		F10000000000000000000001 /* OperationContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* OperationContracts.swift */; };
 		F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* TextFontLibraryClient.swift */; };
 		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
@@ -246,7 +259,6 @@
 		A000000000000000000000B3 /* LayerSidebarView+Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Rows.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B5 /* LayerSidebarView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Support.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B7 /* NanoBananaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaClient.swift; sourceTree = "<group>"; };
-		A000000000000000000000B9 /* NanoBananaCommerce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaCommerce.swift; sourceTree = "<group>"; };
 		A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BD /* AppFeature+SelectionTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionTransform.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BF /* DocumentWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkspaceClient.swift; sourceTree = "<group>"; };
@@ -327,6 +339,16 @@
 		D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeStrokeService.swift; sourceTree = "<group>"; };
 		D6E00941144B432589C8F631 /* AppFeature+WorkspaceActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceActionRouting.swift"; sourceTree = "<group>"; };
 		E10000000000000000000002 /* AppFeature+DomainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DomainState.swift"; sourceTree = "<group>"; };
+		E70000000000000000000001 /* AppFeature+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+State.swift"; sourceTree = "<group>"; };
+		E70000000000000000000002 /* AppFeature+Action.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+Action.swift"; sourceTree = "<group>"; };
+		E70000000000000000000003 /* NanoBananaFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaFeature.swift; sourceTree = "<group>"; };
+		E70000000000000000000004 /* NanoBananaFeature+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NanoBananaFeature+State.swift"; sourceTree = "<group>"; };
+		E70000000000000000000005 /* NanoBananaFeature+Action.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NanoBananaFeature+Action.swift"; sourceTree = "<group>"; };
+		E70000000000000000000006 /* NanoBananaFeature+Reducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NanoBananaFeature+Reducer.swift"; sourceTree = "<group>"; };
+		E70000000000000000000007 /* NanoBananaDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaDependencies.swift; sourceTree = "<group>"; };
+		E70000000000000000000008 /* NanoBananaDomain+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NanoBananaDomain+Presentation.swift"; sourceTree = "<group>"; };
+		E70000000000000000000009 /* PrimoNanoBananaModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoNanoBananaModules.swift; sourceTree = "<group>"; };
+		E7000000000000000000000A /* NanoBananaFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaFeatureTests.swift; sourceTree = "<group>"; };
 		EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeRasterization.swift"; sourceTree = "<group>"; };
 		ED876FE803A549B6B0A5E369 /* AppFeature+DocumentActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentActionRouting.swift"; sourceTree = "<group>"; };
 		F10000000000000000000002 /* OperationContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationContracts.swift; sourceTree = "<group>"; };
@@ -348,6 +370,8 @@
 				B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */,
 				B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */,
 				B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */,
+				B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */,
 				B90000000000000000000015 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000001 /* PrimoCoreTypes in Frameworks */,
 				A00000000000000000000039 /* ComposableArchitecture in Frameworks */,
@@ -371,6 +395,8 @@
 				B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */,
 				B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */,
 				B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */,
+				B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */,
+				B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */,
 				B90000000000000000000017 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000005 /* PrimoCoreTypes in Frameworks */,
 				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
@@ -503,6 +529,7 @@
 				F10000000000000000000002 /* OperationContracts.swift */,
 				A000000000000000000000C9 /* SystemClients.swift */,
 				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
+				E70000000000000000000009 /* PrimoNanoBananaModules.swift */,
 				F10000000000000000000004 /* TextFontLibraryClient.swift */,
 				F10000000000000000000006 /* BrushImportClient.swift */,
 				F10000000000000000000008 /* DocumentImportClient.swift */,
@@ -544,6 +571,8 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000003 /* AppFeature.swift */,
+				E70000000000000000000001 /* AppFeature+State.swift */,
+				E70000000000000000000002 /* AppFeature+Action.swift */,
 				A000000000000000000000D5 /* AppFeatureModels.swift */,
 				A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */,
 				E10000000000000000000002 /* AppFeature+DomainState.swift */,
@@ -631,7 +660,12 @@
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
 				A000000000000000000000BF /* DocumentWorkspaceClient.swift */,
 				A000000000000000000000B7 /* NanoBananaClient.swift */,
-				A000000000000000000000B9 /* NanoBananaCommerce.swift */,
+				E70000000000000000000003 /* NanoBananaFeature.swift */,
+				E70000000000000000000004 /* NanoBananaFeature+State.swift */,
+				E70000000000000000000005 /* NanoBananaFeature+Action.swift */,
+				E70000000000000000000006 /* NanoBananaFeature+Reducer.swift */,
+				E70000000000000000000007 /* NanoBananaDependencies.swift */,
+				E70000000000000000000008 /* NanoBananaDomain+Presentation.swift */,
 				A000000000000000000000A7 /* TimelapseExporter.swift */,
 				A00000000000000000000019 /* BrushPaletteFeature.swift */,
 				A0000000000000000000001A /* LayerSidebarFeature.swift */,
@@ -661,6 +695,7 @@
 				AA2000000000000000000008 /* AppFeatureReducerTests.swift */,
 				AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */,
 				AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */,
+				E7000000000000000000000A /* NanoBananaFeatureTests.swift */,
 			);
 			path = PrimoTests;
 			sourceTree = "<group>";
@@ -686,6 +721,8 @@
 				B90000000000000000000011 /* PrimoCoreTypes */,
 				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000022 /* PrimoBrushDomain */,
+				B90000000000000000000028 /* PrimoNanoBananaDomain */,
+				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -715,6 +752,8 @@
 				B90000000000000000000011 /* PrimoCoreTypes */,
 				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000022 /* PrimoBrushDomain */,
+				B90000000000000000000028 /* PrimoNanoBananaDomain */,
+				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -785,6 +824,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A000000000000000000000D4 /* AppFeatureModels.swift in Sources */,
+				E70000000000000000000011 /* AppFeature+State.swift in Sources */,
+				E70000000000000000000012 /* AppFeature+Action.swift in Sources */,
 				A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */,
 				E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */,
 				8DA458906F8C4AC69D670CEB /* AppFeature+WorkspaceStateCoordinator.swift in Sources */,
@@ -857,13 +898,19 @@
 				A0000000000000000000004C /* BrushTipFile.swift in Sources */,
 				A000000000000000000000C8 /* SystemClients.swift in Sources */,
 				A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */,
+				E70000000000000000000019 /* PrimoNanoBananaModules.swift in Sources */,
 				A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */,
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
 				A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */,
 				A000000000000000000000B6 /* NanoBananaClient.swift in Sources */,
-				A000000000000000000000B8 /* NanoBananaCommerce.swift in Sources */,
+				E70000000000000000000013 /* NanoBananaFeature.swift in Sources */,
+				E70000000000000000000014 /* NanoBananaFeature+State.swift in Sources */,
+				E70000000000000000000015 /* NanoBananaFeature+Action.swift in Sources */,
+				E70000000000000000000016 /* NanoBananaFeature+Reducer.swift in Sources */,
+				E70000000000000000000017 /* NanoBananaDependencies.swift in Sources */,
+				E70000000000000000000018 /* NanoBananaDomain+Presentation.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
 				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
 				A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */,
@@ -922,6 +969,7 @@
 				AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */,
 				AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */,
 				AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */,
+				E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */,
 				AA100000000000000000000A /* PaintDocumentMutationContractTests.swift in Sources */,
 				AA1000000000000000000003 /* TestSupport.swift in Sources */,
 				AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */,
@@ -1244,6 +1292,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoBrushDomain;
+		};
+		B90000000000000000000028 /* PrimoNanoBananaDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoNanoBananaDomain;
+		};
+		B90000000000000000000029 /* PrimoNanoBananaInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoNanoBananaInfrastructure;
 		};
 		B90000000000000000000019 /* PrimoWorkspaceInfrastructure */ = {
 			isa = XCSwiftPackageProductDependency;

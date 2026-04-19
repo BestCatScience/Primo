@@ -7,7 +7,7 @@ extension AppFeature {
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case let .toolSelected(tool):
+        case let .editing(.toolSelected(tool)):
             handleToolSelection(
                 state: &state,
                 tool: tool,
@@ -15,7 +15,7 @@ extension AppFeature {
             )
             return .none
 
-        case let .toolLongPressed(tool):
+        case let .editing(.toolLongPressed(tool)):
             handleToolSelection(
                 state: &state,
                 tool: tool,
@@ -23,7 +23,7 @@ extension AppFeature {
             )
             return .none
 
-        case let .panelCollapseToggled(panel):
+        case let .editing(.panelCollapseToggled(panel)):
             togglePanelCollapse(for: panel, state: &state)
             return .none
 
@@ -43,11 +43,11 @@ extension AppFeature {
             handleAdjustSelection(state: &state, expansion: -max(contraction, 1))
             return .none
 
-        case let .featherSelectionRequested(radius):
+        case let .editing(.featherSelectionRequested(radius)):
             handleFeatherSelection(state: &state, radius: max(radius, 1))
             return .none
 
-        case let .colorRangeSelectionRequested(request):
+        case let .editing(.colorRangeSelectionRequested(request)):
             return handleColorRangeSelectionRequest(state: &state, request: request)
 
         case .brushPalette(.delegate(.cancelTransform)):
@@ -67,13 +67,13 @@ extension AppFeature {
             handlePlaceText(state: &state, point: point)
             return .none
 
-        case .createLayerMaskFromSelectionRequested:
+        case .editing(.createLayerMaskFromSelectionRequested):
             return handleCreateLayerMask(state: &state)
 
-        case .clearLayerMaskRequested:
+        case .editing(.clearLayerMaskRequested):
             return handleClearLayerMask(state: &state)
 
-        case .applyLayerMaskRequested:
+        case .editing(.applyLayerMaskRequested):
             return handleApplyLayerMask(state: &state)
 
         default:

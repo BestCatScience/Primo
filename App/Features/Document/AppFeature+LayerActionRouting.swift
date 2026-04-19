@@ -7,16 +7,16 @@ extension AppFeature {
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case .clearActiveLayerButtonTapped, .brushPalette(.delegate(.clearActiveLayer)):
+        case .editing(.clearActiveLayerButtonTapped), .brushPalette(.delegate(.clearActiveLayer)):
             return handleClearActiveLayer(state: &state)
 
-        case .activeLayerVisibilityToggled:
+        case .editing(.activeLayerVisibilityToggled):
             return handleActiveLayerVisibilityToggle(state: &state)
 
-        case .selectPreviousLayer:
+        case .editing(.selectPreviousLayer):
             return handleSelectAdjacentLayer(state: &state, direction: -1)
 
-        case .selectNextLayer:
+        case .editing(.selectNextLayer):
             return handleSelectAdjacentLayer(state: &state, direction: 1)
 
         case .brushPalette(.binding(\.paper.color)),

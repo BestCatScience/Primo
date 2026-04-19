@@ -7,20 +7,20 @@ extension AppFeature {
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case let .gradientMapSelected(preset):
+        case let .editing(.gradientMapSelected(preset)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .gradientMap(preset),
                 failureFeedback: .gradientMapApplyFailed
             )
 
-        case let .gradientMapPreviewChanged(settings):
+        case let .editing(.gradientMapPreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.gradientMappedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .gradientMapApplied(settings):
+        case let .editing(.gradientMapApplied(settings)):
             let adjusted = adjustedActiveLayerPixels(in: state) {
                 Self.gradientMappedLayerPixels(source: $0, settings: settings)
             }
@@ -30,98 +30,98 @@ extension AppFeature {
                 failureFeedback: .gradientMapApplyFailed
             )
 
-        case let .hueSaturationBrightnessPreviewChanged(settings):
+        case let .editing(.hueSaturationBrightnessPreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.hueSaturationBrightnessAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .hueSaturationBrightnessApplied(settings):
+        case let .editing(.hueSaturationBrightnessApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .hueSaturationBrightness(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .brightnessContrastPreviewChanged(settings):
+        case let .editing(.brightnessContrastPreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.brightnessContrastAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .brightnessContrastApplied(settings):
+        case let .editing(.brightnessContrastApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .brightnessContrast(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .levelsPreviewChanged(settings):
+        case let .editing(.levelsPreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.levelsAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .levelsApplied(settings):
+        case let .editing(.levelsApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .levels(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .toneCurvePreviewChanged(settings):
+        case let .editing(.toneCurvePreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.toneCurveAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .toneCurveApplied(settings):
+        case let .editing(.toneCurveApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .toneCurve(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .colorBalancePreviewChanged(settings):
+        case let .editing(.colorBalancePreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.colorBalanceAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .colorBalanceApplied(settings):
+        case let .editing(.colorBalanceApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .colorBalance(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .thresholdPreviewChanged(settings):
+        case let .editing(.thresholdPreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.thresholdAdjustedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .thresholdApplied(settings):
+        case let .editing(.thresholdApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .threshold(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case let .posterizePreviewChanged(settings):
+        case let .editing(.posterizePreviewChanged(settings)):
             previewAdjustedActiveLayer(state: &state) { source in
                 settings.flatMap { Self.posterizedLayerPixels(source: source, settings: $0) }
             }
             return .none
 
-        case let .posterizeApplied(settings):
+        case let .editing(.posterizeApplied(settings)):
             return handleAdjustmentApplyRequest(
                 state: &state,
                 request: .posterize(settings),
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 
-        case .luminanceToAlphaRequested:
+        case .editing(.luminanceToAlphaRequested):
             let adjusted = adjustedActiveLayerPixels(in: state) {
                 Self.luminanceToAlphaLayerPixels(source: $0)
             }

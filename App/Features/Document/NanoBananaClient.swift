@@ -1,82 +1,7 @@
 import ComposableArchitecture
 import Foundation
-
-enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case wholeLayer
-    case selectedArea
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .wholeLayer:
-            return language.localized("レイヤー全体")
-        case .selectedArea:
-            return language.localized("選択範囲")
-        }
-    }
-}
-
-enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case replaceCurrentLayer
-    case newLayer
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .replaceCurrentLayer:
-            return language.localized("現在のレイヤーを置き換え")
-        case .newLayer:
-            return language.localized("新規レイヤー")
-        }
-    }
-}
-
-struct NanoBananaMaskSettings: Equatable, Sendable {
-    var expansion: Int = 0
-    var isInverted = false
-}
-
-struct NanoBananaGenerationRequest: Equatable, Sendable {
-    var prompt: String
-    var config: NanoBananaRequestConfig
-    var model: NanoBananaModel
-    var inputLayerIndex: Int
-    var editScope: NanoBananaEditScope
-    var outputMode: NanoBananaOutputMode
-    var maskSettings: NanoBananaMaskSettings = .init()
-}
-
-struct NanoBananaPreviewState: Equatable, Sendable {
-    var request: NanoBananaGenerationRequest
-    var outputLayerIndex: Int
-    var pixelData: Data
-    var beforePreviewImageData: Data?
-    var afterPreviewImageData: Data?
-}
-
-enum NanoBananaJobStatus: String, Equatable, Sendable {
-    case running
-    case succeeded
-    case failed
-    case canceled
-}
-
-struct NanoBananaJob: Equatable, Sendable, Identifiable {
-    var id: UUID
-    var request: NanoBananaGenerationRequest
-    var createdAt: Date
-    var status: NanoBananaJobStatus
-    var message: String?
-}
-
-struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
-    var id: UUID
-    var request: NanoBananaGenerationRequest
-    var createdAt: Date
-    var previewImageData: Data?
-}
+import PrimoCoreTypes
+import PrimoNanoBananaDomain
 
 enum NanoBananaPromptPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
     case retouch
@@ -111,47 +36,6 @@ enum NanoBananaPromptPreset: String, CaseIterable, Equatable, Sendable, Identifi
             return language.localized("全体の構図と被写体を保ったまま、この画像の近いバリエーションを作ってください。")
         }
     }
-}
-
-enum NanoBananaModel: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case flashImage25 = "gemini-2.5-flash-image"
-    case flashImage31Preview = "gemini-3.1-flash-image-preview"
-    case proImagePreview = "gemini-3-pro-image-preview"
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .flashImage25:
-            return "Nano Banana"
-        case .flashImage31Preview:
-            return "Nano Banana 2"
-        case .proImagePreview:
-            return "Nano Banana Pro"
-        }
-    }
-}
-
-enum NanoBananaAccessMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case userAPIKey
-    case appManaged
-
-    var id: String { rawValue }
-
-    func title(_ language: AppLanguage) -> String {
-        switch self {
-        case .userAPIKey:
-            return language.localized("ユーザー API キー")
-        case .appManaged:
-            return language.localized("アプリ課金プラン")
-        }
-    }
-}
-
-struct NanoBananaRequestConfig: Equatable, Sendable {
-    let accessMode: NanoBananaAccessMode
-    let credential: String
-    let endpoint: String
 }
 
 struct NanoBananaEditRequest: Equatable, Sendable, OperationRequest {

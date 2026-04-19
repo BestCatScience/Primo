@@ -8,7 +8,10 @@ struct AppFeatureApplicationReducer: Reducer {
     let feature: AppFeature
 
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        feature.routeApplicationAction(state: &state, action: action) ?? .none
+        guard case let .application(applicationAction) = action else {
+            return .none
+        }
+        return feature.routeApplicationAction(state: &state, action: applicationAction)
     }
 }
 
@@ -19,7 +22,10 @@ struct AppFeatureWorkspaceReducer: Reducer {
     let feature: AppFeature
 
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        feature.routeWorkspaceAction(state: &state, action: action) ?? .none
+        guard case let .workspace(workspaceAction) = action else {
+            return .none
+        }
+        return feature.routeWorkspaceAction(state: &state, action: workspaceAction)
     }
 }
 

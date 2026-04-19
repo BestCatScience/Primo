@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoNanoBananaDomain
 
 extension AppFeature {
     private struct NanoBananaValidatedEdit {
