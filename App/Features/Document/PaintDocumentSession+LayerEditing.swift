@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func canUndo() -> Bool {
@@ -47,7 +48,7 @@ extension PaintDocumentSession {
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         let duplicatedIndex = documentGateway.layers.duplicateLayer(index: index, name: name)
@@ -66,7 +67,7 @@ extension PaintDocumentSession {
     }
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         switch documentGateway.layers.deleteLayerResult(index: index) {
@@ -82,10 +83,10 @@ extension PaintDocumentSession {
     }
 
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
-        if let failure = layerMutationFailure(destinationIndex) {
+        if let failure = validate(.layer(index: destinationIndex)) {
             return .failure(failure)
         }
         switch documentGateway.layers.moveLayerResult(from: index, to: destinationIndex) {

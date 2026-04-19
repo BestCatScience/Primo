@@ -1,9 +1,10 @@
 import Foundation
+import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
-        guard containsValidLayerAnchor(layerIndex) else {
-            return .failure(.invalidLayerIndex(layerIndex))
+        if let failure = validate(.layerAnchor(index: layerIndex)) {
+            return .failure(failure)
         }
         let folderID = documentGateway.layers.createFolder(name: name, layerIndex: layerIndex)
         applyRecordedLifecycleMutation(
@@ -18,7 +19,7 @@ extension PaintDocumentSession {
     }
 
     func deleteFolder(folderID: Int) -> DocumentMutationResult {
-        if let failure = folderMutationFailure(folderID) {
+        if let failure = validate(.folder(folderID: folderID)) {
             return .failure(failure)
         }
         switch documentGateway.layers.deleteFolderResult(id: folderID) {
@@ -33,7 +34,7 @@ extension PaintDocumentSession {
     }
 
     func setFolderVisibility(folderID: Int, isVisible: Bool) -> DocumentMutationResult {
-        if let failure = folderMutationFailure(folderID) {
+        if let failure = validate(.folder(folderID: folderID)) {
             return .failure(failure)
         }
         documentGateway.layers.setFolderVisible(isVisible, folderID: folderID)
@@ -44,7 +45,7 @@ extension PaintDocumentSession {
     }
 
     func setFolderName(folderID: Int, name: String) -> DocumentMutationResult {
-        if let failure = folderMutationFailure(folderID) {
+        if let failure = validate(.folder(folderID: folderID)) {
             return .failure(failure)
         }
         documentGateway.layers.setFolderName(name, folderID: folderID)
@@ -52,7 +53,7 @@ extension PaintDocumentSession {
     }
 
     func setFolderExpanded(folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
-        if let failure = folderMutationFailure(folderID) {
+        if let failure = validate(.folder(folderID: folderID)) {
             return .failure(failure)
         }
         documentGateway.layers.setFolderExpanded(isExpanded, folderID: folderID)
@@ -60,10 +61,10 @@ extension PaintDocumentSession {
     }
 
     func assignLayer(index: Int, toFolder folderID: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
-        if folderID >= 0, let failure = folderMutationFailure(folderID) {
+        if folderID >= 0, let failure = validate(.folder(folderID: folderID)) {
             return .failure(failure)
         }
         switch documentGateway.layers.setLayerFolderResult(index: index, folderID: folderID) {

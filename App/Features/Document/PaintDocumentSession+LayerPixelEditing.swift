@@ -1,15 +1,16 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func mergeLayerDown(index: Int) -> DocumentMutationResult {
         guard index > 0 else {
             return .failure(.invalidLayerIndex(index))
         }
-        if let failure = layerMutationFailure(index, requiresUnlocked: true) {
+        if let failure = validate(.layer(index: index, requiresUnlocked: true)) {
             return .failure(failure)
         }
-        if let failure = layerMutationFailure(index - 1, requiresUnlocked: true) {
+        if let failure = validate(.layer(index: index - 1, requiresUnlocked: true)) {
             return .failure(failure)
         }
         guard let merged = mergedLayerDownPixelData(upperIndex: index, lowerIndex: index - 1) else {
@@ -135,7 +136,7 @@ extension PaintDocumentSession {
     }
 
     func replaceLayerMask(index: Int, maskData: Data) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         guard !maskData.isEmpty else {
@@ -153,7 +154,7 @@ extension PaintDocumentSession {
     }
 
     func clearLayerMask(index: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         guard documentGateway.queries.layerMaskDataForLayer(index: index) != nil else {
@@ -168,7 +169,7 @@ extension PaintDocumentSession {
     }
 
     func applyLayerMask(index: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         switch documentGateway.layers.applyLayerMaskResult(index: index) {

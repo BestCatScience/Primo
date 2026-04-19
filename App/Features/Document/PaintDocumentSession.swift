@@ -2,6 +2,7 @@ import Accelerate
 import CoreGraphics
 import Foundation
 import os
+import PrimoDocumentApplication
 import UIKit
 import simd
 
@@ -205,43 +206,46 @@ extension PaintDocumentSession {
         )
     }
 
-    func containsLayerIndex(_ index: Int) -> Bool {
-        documentGateway.queries.layerInfos().indices.contains(index)
+    var documentMutationValidator: DocumentMutationValidator {
+        DocumentMutationValidator()
     }
 
-    func containsValidLayerAnchor(_ index: Int) -> Bool {
-        index < 0 || containsLayerIndex(index)
+    var documentMutationValidationContext: DocumentMutationValidationContext {
+        DocumentMutationValidationContext(
+            layerCount: documentGateway.queries.layerInfos().count,
+            folderIDs: Set(documentGateway.queries.folderInfos().map { Int($0.folderID) }),
+            isLayerLocked: { [documentGateway] index in
+                documentGateway.queries.isLayerLocked(index: index)
+            }
+        )
     }
 
-    func containsFolderID(_ folderID: Int) -> Bool {
-        documentGateway.queries.folderInfos().contains { Int($0.folderID) == folderID }
-    }
-
-    func layerMutationFailure(
-        _ index: Int,
-        requiresUnlocked: Bool = false
-    ) -> DocumentMutationFailure? {
-        guard containsLayerIndex(index) else {
+    func mutationFailure(
+        for issue: DocumentMutationValidationIssue
+    ) -> DocumentMutationFailure {
+        switch issue {
+        case let .invalidLayerIndex(index):
             return .invalidLayerIndex(index)
-        }
-        if requiresUnlocked, isLayerLocked(index: index) {
+        case let .invalidFolderID(folderID):
+            return .invalidFolderID(folderID)
+        case let .layerLocked(index):
             return .layerLocked(index)
         }
-        return nil
     }
 
-    func folderMutationFailure(_ folderID: Int) -> DocumentMutationFailure? {
-        guard containsFolderID(folderID) else {
-            return .invalidFolderID(folderID)
-        }
-        return nil
+    func validate(
+        _ command: DocumentMutationCommand
+    ) -> DocumentMutationFailure? {
+        documentMutationValidator
+            .validate(command, in: documentMutationValidationContext)
+            .map(mutationFailure(for:))
     }
 
     func beginPixelLayerMutation(
         at index: Int,
         preservesTextLayerMetadata: Bool = false
     ) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index, requiresUnlocked: true) {
+        if let failure = validate(.layer(index: index, requiresUnlocked: true)) {
             return .failure(failure)
         }
         if !preservesTextLayerMetadata {

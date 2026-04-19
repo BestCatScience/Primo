@@ -29,4 +29,27 @@ struct DocumentRasterImageServiceTests {
 
         #expect(roundTripped.count == pixelData.count)
     }
+
+    @Test
+    func mutationValidatorRejectsInvalidTargetsAndLockedLayers() {
+        let validator = DocumentMutationValidator()
+        let context = DocumentMutationValidationContext(
+            layerCount: 3,
+            folderIDs: [4, 9],
+            isLayerLocked: { $0 == 1 }
+        )
+
+        #expect(
+            validator.validate(.layer(index: 7), in: context) == .invalidLayerIndex(7)
+        )
+        #expect(
+            validator.validate(.folder(folderID: 12), in: context) == .invalidFolderID(12)
+        )
+        #expect(
+            validator.validate(.layer(index: 1, requiresUnlocked: true), in: context) == .layerLocked(1)
+        )
+        #expect(
+            validator.validate(.layerAnchor(index: -1), in: context) == nil
+        )
+    }
 }

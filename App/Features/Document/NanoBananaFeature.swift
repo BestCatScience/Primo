@@ -11,8 +11,8 @@ struct NanoBananaFeature {
     @Dependency(\.nanoBananaCommandBuilder) var nanoBananaCommandBuilder
 
     var body: some ReducerOf<Self> {
-        Reduce { [self] state, action in
-            self.coreReduce(into: &state, action: action)
+        Reduce { state, action in
+            coreReduce(into: &state, action: action)
         }
     }
 }

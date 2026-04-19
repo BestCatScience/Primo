@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
@@ -88,7 +89,7 @@ extension PaintDocumentSession {
         guard !samples.isEmpty else {
             return .failure(.emptyInput)
         }
-        if let failure = layerMutationFailure(layerIndex, requiresUnlocked: true) {
+        if let failure = validate(.layer(index: layerIndex, requiresUnlocked: true)) {
             return .failure(failure)
         }
         let basePixelData = pixelDataForLayer(index: layerIndex)
@@ -107,8 +108,7 @@ extension PaintDocumentSession {
 
     func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
-        guard containsLayerIndex(layerIndex) else { return }
-        guard !isLayerLocked(index: layerIndex) else { return }
+        guard validate(.layer(index: layerIndex, requiresUnlocked: true)) == nil else { return }
         let canvasSize = PaintDocumentCanvasSize(
             width: documentGateway.queries.canvasWidth,
             height: documentGateway.queries.canvasHeight

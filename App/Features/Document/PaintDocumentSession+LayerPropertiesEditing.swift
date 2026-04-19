@@ -1,9 +1,10 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 
 extension PaintDocumentSession {
     func setActiveLayer(index: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setActiveLayerIndex(index)
@@ -11,7 +12,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerName(name, index: index)
@@ -19,7 +20,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerVisible(isVisible, index: index)
@@ -31,7 +32,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerLocked(isLocked, index: index)
@@ -43,7 +44,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerAlphaLocked(isAlphaLocked, index: index)
@@ -55,7 +56,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerClipped(isClipped, index: index)
@@ -67,7 +68,7 @@ extension PaintDocumentSession {
     }
 
     func revealLayerForEditing(index: Int) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerVisible(true, index: index)
@@ -75,7 +76,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         guard (0...1).contains(opacity) else {
@@ -90,7 +91,7 @@ extension PaintDocumentSession {
     }
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
-        if let failure = layerMutationFailure(index) {
+        if let failure = validate(.layer(index: index)) {
             return .failure(failure)
         }
         documentGateway.layers.setLayerBlendMode(blendMode.rawValue, index: index)
