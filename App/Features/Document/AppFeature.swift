@@ -16,6 +16,13 @@ struct AppFeature {
     }
 
     @Dependency(\.paintDocumentClient) var paintDocumentClient
+    @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentMutationGateway) var documentMutationGateway
+    @Dependency(\.strokeInputGateway) var strokeInputGateway
+    @Dependency(\.documentHistoryGateway) var documentHistoryGateway
+    @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
+    @Dependency(\.documentExportGateway) var documentExportGateway
+    @Dependency(\.textLayerGateway) var textLayerGateway
     @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.documentImportClient) var documentImportClient

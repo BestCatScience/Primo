@@ -1,4 +1,5 @@
 import Foundation
+import os
 import PrimoCoreTypes
 import PrimoLocalization
 
@@ -8,6 +9,25 @@ typealias FileClient = PrimoCoreTypes.FileClient
 typealias HTTPClient = PrimoCoreTypes.HTTPClient
 typealias KeyValueStoreClient = PrimoCoreTypes.KeyValueStoreClient
 typealias SecurityScopedResourceClient = PrimoCoreTypes.SecurityScopedResourceClient
+
+enum AppDiagnostics {
+    static let isVerboseLoggingEnabled: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        if let rawValue = environment["PRIMO_VERBOSE_LOGGING"] {
+            let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
+        }
+        return false
+    }()
+
+    static func debug(
+        _ logger: Logger,
+        _ message: String
+    ) {
+        guard isVerboseLoggingEnabled else { return }
+        logger.debug("\(message)")
+    }
+}
 
 struct AppLanguageClient: Sendable {
     var load: @Sendable () -> AppLanguage

@@ -38,32 +38,34 @@ extension PaintDocumentSession {
     }
 
     func addLayer(name: String) -> DocumentIndexedMutationResult {
-        let useCase = LayerStructureUseCase()
+        let useCase = DocumentEditorUseCase()
         switch useCase.execute(
-            .addLayer(name: name),
+            .structure(.addLayer(name: name)),
             in: documentLayerMutationContext,
             gateway: documentGateway.layers
         ) {
         case let .failure(failure):
             return .failure(mutationFailure(for: failure))
-        case let .success(plan):
+        case let .success(.structure(plan)):
             if let event = plan.lifecycleEvent {
                 applyLayerLifecycleEvent(event)
             }
             return .success(plan.resultingIndex ?? -1)
+        case .success:
+            return .failure(.bridgeMutationFailed("addLayer"))
         }
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
-        let useCase = LayerStructureUseCase()
+        let useCase = DocumentEditorUseCase()
         switch useCase.execute(
-            .duplicateLayer(index: index, name: name),
+            .structure(.duplicateLayer(index: index, name: name)),
             in: documentLayerMutationContext,
             gateway: documentGateway.layers
         ) {
         case let .failure(failure):
             return .failure(mutationFailure(for: failure))
-        case let .success(plan):
+        case let .success(.structure(plan)):
             if let indexMutation = plan.indexMutation {
                 applyLayerIndexMutation(indexMutation)
             }
@@ -71,19 +73,21 @@ extension PaintDocumentSession {
                 applyLayerLifecycleEvent(event)
             }
             return .success(plan.resultingIndex ?? -1)
+        case .success:
+            return .failure(.bridgeMutationFailed("duplicateLayer"))
         }
     }
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
-        let useCase = LayerStructureUseCase()
+        let useCase = DocumentEditorUseCase()
         switch useCase.execute(
-            .deleteLayer(index: index),
+            .structure(.deleteLayer(index: index)),
             in: documentLayerMutationContext,
             gateway: documentGateway.layers
         ) {
         case let .failure(failure):
             return .failure(mutationFailure(for: failure))
-        case let .success(plan):
+        case let .success(.structure(plan)):
             if let indexMutation = plan.indexMutation {
                 applyLayerIndexMutation(indexMutation)
             }
@@ -91,19 +95,21 @@ extension PaintDocumentSession {
                 applyLayerLifecycleEvent(event)
             }
             return .success(())
+        case .success:
+            return .failure(.bridgeMutationFailed("deleteLayer"))
         }
     }
 
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
-        let useCase = LayerStructureUseCase()
+        let useCase = DocumentEditorUseCase()
         switch useCase.execute(
-            .moveLayer(index: index, destinationIndex: destinationIndex),
+            .structure(.moveLayer(index: index, destinationIndex: destinationIndex)),
             in: documentLayerMutationContext,
             gateway: documentGateway.layers
         ) {
         case let .failure(failure):
             return .failure(mutationFailure(for: failure))
-        case let .success(plan):
+        case let .success(.structure(plan)):
             if let indexMutation = plan.indexMutation {
                 applyLayerIndexMutation(indexMutation)
             }
@@ -111,6 +117,8 @@ extension PaintDocumentSession {
                 applyLayerLifecycleEvent(event)
             }
             return .success(())
+        case .success:
+            return .failure(.bridgeMutationFailed("moveLayer"))
         }
     }
 }

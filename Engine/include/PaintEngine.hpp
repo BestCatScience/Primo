@@ -230,6 +230,148 @@ struct LayerProcessing {
     std::vector<uint8_t> pixelData;
 };
 
+struct PaintLayerSnapshot {
+    std::string name;
+    bool visible = true;
+    bool locked = false;
+    bool alphaLocked = false;
+    bool clipped = false;
+    float opacity = 1.0F;
+    Layer::BlendMode blendMode = Layer::BlendMode::Normal;
+    int folderID = -1;
+    bool hasMask = false;
+    std::vector<uint8_t> pixelData;
+};
+
+struct PaintFolderSnapshot {
+    int id = -1;
+    std::string name;
+    bool visible = true;
+    bool expanded = true;
+    int anchorLayerIndex = -1;
+};
+
+struct PaintDocumentSnapshot {
+    int width = 0;
+    int height = 0;
+    int activeLayerIndex = 0;
+    std::vector<PaintLayerSnapshot> layers;
+    std::vector<PaintFolderSnapshot> folders;
+    std::vector<uint8_t> compositePixelData;
+};
+
+struct AddLayerCommand {
+    std::string name;
+};
+
+struct DuplicateLayerCommand {
+    int index = 0;
+    std::string name;
+};
+
+struct DeleteLayerCommand {
+    int index = 0;
+};
+
+struct MoveLayerCommand {
+    int fromIndex = 0;
+    int toIndex = 0;
+};
+
+struct CreateFolderCommand {
+    std::string name;
+    int layerIndex = -1;
+};
+
+struct DeleteFolderCommand {
+    int folderID = -1;
+};
+
+struct SetActiveLayerCommand {
+    int index = 0;
+};
+
+struct SetLayerNameCommand {
+    int index = 0;
+    std::string name;
+};
+
+struct SetLayerVisibilityCommand {
+    int index = 0;
+    bool visible = true;
+};
+
+struct SetLayerLockedCommand {
+    int index = 0;
+    bool locked = false;
+};
+
+struct SetLayerAlphaLockedCommand {
+    int index = 0;
+    bool alphaLocked = false;
+};
+
+struct SetLayerClippedCommand {
+    int index = 0;
+    bool clipped = false;
+};
+
+struct SetLayerOpacityCommand {
+    int index = 0;
+    float opacity = 1.0F;
+};
+
+struct SetLayerBlendModeCommand {
+    int index = 0;
+    Layer::BlendMode blendMode = Layer::BlendMode::Normal;
+};
+
+struct SetFolderVisibilityCommand {
+    int folderID = -1;
+    bool visible = true;
+};
+
+struct SetFolderNameCommand {
+    int folderID = -1;
+    std::string name;
+};
+
+struct SetFolderExpandedCommand {
+    int folderID = -1;
+    bool expanded = true;
+};
+
+struct SetLayerFolderCommand {
+    int index = 0;
+    int folderID = -1;
+};
+
+using PaintDocumentCommand = std::variant<
+    AddLayerCommand,
+    DuplicateLayerCommand,
+    DeleteLayerCommand,
+    MoveLayerCommand,
+    CreateFolderCommand,
+    DeleteFolderCommand,
+    SetActiveLayerCommand,
+    SetLayerNameCommand,
+    SetLayerVisibilityCommand,
+    SetLayerLockedCommand,
+    SetLayerAlphaLockedCommand,
+    SetLayerClippedCommand,
+    SetLayerOpacityCommand,
+    SetLayerBlendModeCommand,
+    SetFolderVisibilityCommand,
+    SetFolderNameCommand,
+    SetFolderExpandedCommand,
+    SetLayerFolderCommand
+>;
+
+struct PaintDocumentCommandResult {
+    bool success = true;
+    std::optional<int> integerResult;
+};
+
 class PaintDocumentProcessingApplicator;
 
 class PaintDocument {
@@ -292,6 +434,8 @@ public:
     std::vector<uint8_t> compositePixelDataForRect(const DirtyRect& rect) const;
 
     std::span<const uint8_t> composite() const noexcept;
+    PaintDocumentSnapshot snapshot() const;
+    PaintDocumentCommandResult execute(const PaintDocumentCommand& command);
 
 private:
     class StrokesQueue;

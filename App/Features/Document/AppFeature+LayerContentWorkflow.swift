@@ -13,7 +13,8 @@ extension AppFeature {
     }
 
     struct LayerContentTransactionService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentQueryGateway: DocumentQueryGateway
+        let documentMutationGateway: DocumentMutationGateway
 
         func apply(
             target: LayerContentMutationTarget,
@@ -49,12 +50,12 @@ extension AppFeature {
         private func resolve(
             _ target: LayerContentMutationTarget
         ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), DocumentMutationFailure> {
-            let originalActiveLayerIndex = paintDocumentClient.presentation().activeLayerIndex
+            let originalActiveLayerIndex = documentQueryGateway.presentation().activeLayerIndex
             switch target {
             case let .existingLayer(index):
                 return .success((index, false, originalActiveLayerIndex))
             case let .newLayer(name):
-                switch paintDocumentClient.addLayer(name) {
+                switch documentMutationGateway.addLayer(name) {
                 case let .success(index):
                     return .success((index, true, originalActiveLayerIndex))
                 case let .failure(failure):
@@ -68,14 +69,14 @@ extension AppFeature {
         ) -> DocumentMutationFailure? {
             var rollbackFailure: DocumentMutationFailure?
             if resolvedTarget.createdNewLayer, resolvedTarget.index >= 0 {
-                switch paintDocumentClient.deleteLayer(resolvedTarget.index) {
+                switch documentMutationGateway.deleteLayer(resolvedTarget.index) {
                 case .success:
                     break
                 case let .failure(failure):
                     rollbackFailure = failure
                 }
             }
-            switch paintDocumentClient.setActiveLayer(resolvedTarget.originalActiveLayerIndex) {
+            switch documentMutationGateway.setActiveLayer(resolvedTarget.originalActiveLayerIndex) {
             case .success:
                 break
             case let .failure(failure):
@@ -92,7 +93,8 @@ extension AppFeature {
     }
 
     struct LayerContentWorkflowService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentMutationGateway: DocumentMutationGateway
+        let textLayerGateway: TextLayerGateway
         let layerContentTransactionService: LayerContentTransactionService
 
         func applyPixels(
@@ -100,11 +102,11 @@ extension AppFeature {
             to target: LayerContentMutationTarget
         ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
             layerContentTransactionService.apply(target: target) { targetLayerIndex in
-                switch paintDocumentClient.replaceLayerPixels(targetLayerIndex, pixelData) {
+                switch documentMutationGateway.replaceLayerPixels(targetLayerIndex, pixelData) {
                 case let .failure(failure):
                     return .failure(failure)
                 case .success:
-                    return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                    return documentMutationGateway.setActiveLayer(targetLayerIndex)
                 }
             }
         }
@@ -114,23 +116,27 @@ extension AppFeature {
             to target: LayerContentMutationTarget
         ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
             layerContentTransactionService.apply(target: target) { targetLayerIndex in
-                switch paintDocumentClient.setTextLayer(targetLayerIndex, textLayer) {
+                switch textLayerGateway.setTextLayer(targetLayerIndex, textLayer) {
                 case let .failure(failure):
                     return .failure(failure)
                 case .success:
-                    return paintDocumentClient.setActiveLayer(targetLayerIndex)
+                    return documentMutationGateway.setActiveLayer(targetLayerIndex)
                 }
             }
         }
     }
 
     var layerContentTransactionService: LayerContentTransactionService {
-        LayerContentTransactionService(paintDocumentClient: paintDocumentClient)
+        LayerContentTransactionService(
+            documentQueryGateway: documentQueryGateway,
+            documentMutationGateway: documentMutationGateway
+        )
     }
 
     var layerContentWorkflowService: LayerContentWorkflowService {
         LayerContentWorkflowService(
-            paintDocumentClient: paintDocumentClient,
+            documentMutationGateway: documentMutationGateway,
+            textLayerGateway: textLayerGateway,
             layerContentTransactionService: layerContentTransactionService
         )
     }

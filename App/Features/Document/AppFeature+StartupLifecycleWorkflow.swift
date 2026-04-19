@@ -3,25 +3,29 @@ import Foundation
 
 extension AppFeature {
     struct StartupPresentationService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentQueryGateway: DocumentQueryGateway
+        let documentPersistenceGateway: DocumentPersistenceGateway
 
         func bootstrapPresentationEffect() -> Effect<Action> {
-            .run { [paintDocumentClient] send in
+            .run { [documentPersistenceGateway, documentQueryGateway] send in
                 let startupClock = ContinuousClock()
                 let bootstrapStart = startupClock.now
 
-                AppFeature.startupLogger.debug("Loading lightweight presentation")
-                let lightweightPresentation = paintDocumentClient.lightweightPresentation()
+                AppDiagnostics.debug(AppFeature.startupLogger, "Loading lightweight presentation")
+                let lightweightPresentation = documentQueryGateway.lightweightPresentation()
                 let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
-                AppFeature.startupLogger.debug("Lightweight presentation loaded in \(String(describing: bootstrapDuration), privacy: .public)")
+                AppDiagnostics.debug(
+                    AppFeature.startupLogger,
+                    "Lightweight presentation loaded in \(String(describing: bootstrapDuration))"
+                )
                 await send(.bootstrapPresentationLoaded(lightweightPresentation))
-                paintDocumentClient.prewarmDrawingResources()
+                documentPersistenceGateway.prewarmDrawingResources()
                 await send(.loadPresentationAfterLaunch)
             }
         }
 
         func deferredPresentationLoadEffect() -> Effect<Action> {
-            .run { [paintDocumentClient] send in
+            .run { [documentQueryGateway] send in
                 let clock = ContinuousClock()
                 do {
                     try await Task.sleep(for: .milliseconds(600))
@@ -30,25 +34,31 @@ extension AppFeature {
                 }
 
                 let presentationStart = clock.now
-                AppFeature.startupLogger.debug("Loading full presentation after initial launch")
-                let presentation = paintDocumentClient.presentation()
+                AppDiagnostics.debug(AppFeature.startupLogger, "Loading full presentation after initial launch")
+                let presentation = documentQueryGateway.presentation()
                 let presentationDuration = presentationStart.duration(to: clock.now)
-                AppFeature.startupLogger.debug("Full presentation loaded in \(String(describing: presentationDuration), privacy: .public)")
+                AppDiagnostics.debug(
+                    AppFeature.startupLogger,
+                    "Full presentation loaded in \(String(describing: presentationDuration))"
+                )
                 await send(.presentationLoaded(presentation))
             }
             .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
         }
 
         func deferredPresentationRefreshEffect() -> Effect<Action> {
-            .run { [paintDocumentClient] send in
-                await send(.presentationLoaded(paintDocumentClient.presentation()))
+            .run { [documentQueryGateway] send in
+                await send(.presentationLoaded(documentQueryGateway.presentation()))
             }
             .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
         }
     }
 
     var startupPresentationService: StartupPresentationService {
-        StartupPresentationService(paintDocumentClient: paintDocumentClient)
+        StartupPresentationService(
+            documentQueryGateway: documentQueryGateway,
+            documentPersistenceGateway: documentPersistenceGateway
+        )
     }
 
     func startupLanguageLoadEffect() -> Effect<Action> {
@@ -65,7 +75,7 @@ extension AppFeature {
 
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: state.application.appLanguage)
-        Self.startupLogger.debug("AppFeature.task started")
+        AppDiagnostics.debug(Self.startupLogger, "AppFeature.task started")
         return .merge(
             startupPresentationService.bootstrapPresentationEffect(),
             startupLanguageLoadEffect(),

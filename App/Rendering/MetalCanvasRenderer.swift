@@ -105,7 +105,10 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         isPaused = false
         delegate = self
         let duration = start.duration(to: clock.now)
-        Self.logger.debug("MetalCanvasView initialized in \(String(describing: duration), privacy: .public)")
+        AppDiagnostics.debug(
+            Self.logger,
+            "MetalCanvasView initialized in \(String(describing: duration))"
+        )
     }
 
     @available(*, unavailable)
@@ -278,7 +281,10 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         pendingSnapshot = nil
         let duration = start.duration(to: clock.now)
         let megabytes = snapshot.compositePixelData.count / 1_048_576
-        Self.logger.debug("Applied composite snapshot revision \(snapshot.revision) with \(megabytes) MB in \(String(describing: duration), privacy: .public)")
+        AppDiagnostics.debug(
+            Self.logger,
+            "Applied composite snapshot revision \(snapshot.revision) with \(megabytes) MB in \(String(describing: duration))"
+        )
     }
 
     private func ensureCompositeTexture(device: MTLDevice) -> MTLTexture? {

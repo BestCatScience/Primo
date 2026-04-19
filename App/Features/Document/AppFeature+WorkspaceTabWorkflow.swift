@@ -53,7 +53,7 @@ extension AppFeature {
     var workspaceProjectLoaderGateway: ProjectLoadingGateway<LoadedPaintProject> {
         ProjectLoadingGateway(
             loadProject: { url in
-                try paintDocumentClient.loadProject(url)
+                try documentPersistenceGateway.loadProject(url)
             }
         )
     }

@@ -3,33 +3,37 @@ import Foundation
 
 extension AppFeature {
     struct DocumentPresentationQueryService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentQueryGateway: DocumentQueryGateway
+        let documentExportGateway: DocumentExportGateway
 
         func presentation() -> PaintDocumentPresentation {
-            paintDocumentClient.presentation()
+            documentQueryGateway.presentation()
         }
 
         func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
-            paintDocumentClient.compositePNGData(paperStyle)
+            documentExportGateway.compositePNGData(paperStyle)
         }
     }
 
     struct DocumentPaperStyleSyncClient {
-        let paintDocumentClient: PaintDocumentClient
+        let documentPersistenceGateway: DocumentPersistenceGateway
 
         func synchronizeEffect(_ paperStyle: CanvasPaperStyle) -> Effect<Action> {
-            .run { [paintDocumentClient] _ in
-                paintDocumentClient.setPaperStyle(paperStyle)
+            .run { [documentPersistenceGateway] _ in
+                documentPersistenceGateway.setPaperStyle(paperStyle)
             }
         }
     }
 
     var documentPresentationQueryService: DocumentPresentationQueryService {
-        DocumentPresentationQueryService(paintDocumentClient: paintDocumentClient)
+        DocumentPresentationQueryService(
+            documentQueryGateway: documentQueryGateway,
+            documentExportGateway: documentExportGateway
+        )
     }
 
     var documentPaperStyleSyncClient: DocumentPaperStyleSyncClient {
-        DocumentPaperStyleSyncClient(paintDocumentClient: paintDocumentClient)
+        DocumentPaperStyleSyncClient(documentPersistenceGateway: documentPersistenceGateway)
     }
 
     func applyPresentation(

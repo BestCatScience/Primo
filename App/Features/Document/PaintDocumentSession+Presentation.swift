@@ -24,7 +24,10 @@ extension PaintDocumentSession {
         let folderInfos = documentGateway.queries.folderInfos()
         let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
-        Self.logger.debug("lightweightPresentation produced \(rows.count) layers in \(String(describing: duration), privacy: .public)")
+        AppDiagnostics.debug(
+            Self.logger,
+            "lightweightPresentation produced \(rows.count) layers in \(String(describing: duration))"
+        )
         return PaintDocumentPresentation(
             canvasSize: documentGateway.queries.canvasSize,
             activeLayerIndex: documentGateway.queries.activeLayerIndex(),
@@ -58,7 +61,10 @@ extension PaintDocumentSession {
         let rows = buildLayerRows(from: infos)
         let duration = start.duration(to: clock.now)
         let megabytes = snapshots.reduce(0) { $0 + $1.pixelData.count } / 1_048_576
-        Self.logger.debug("presentation produced revision \(revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration), privacy: .public)")
+        AppDiagnostics.debug(
+            Self.logger,
+            "presentation produced revision \(revision) with \(snapshots.count) layers and \(megabytes) MB in \(String(describing: duration))"
+        )
         return PaintDocumentPresentation(
             canvasSize: documentGateway.queries.canvasSize,
             activeLayerIndex: documentGateway.queries.activeLayerIndex(),

@@ -110,18 +110,18 @@ extension AppFeature {
             let targetLayerIndex: Int
         }
 
-        let paintDocumentClient: PaintDocumentClient
+        let documentMutationGateway: DocumentMutationGateway
         let layerContentTransactionService: LayerContentTransactionService
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
         ) -> Result<AppliedPreview, DocumentMutationFailure> {
             layerContentTransactionService.apply(target: plan.target) { targetLayerIndex in
-                switch paintDocumentClient.setActiveLayer(targetLayerIndex) {
+                switch documentMutationGateway.setActiveLayer(targetLayerIndex) {
                 case let .failure(failure):
                     return .failure(failure)
                 case .success:
-                    return paintDocumentClient.replaceLayerPixels(
+                    return documentMutationGateway.replaceLayerPixels(
                         targetLayerIndex,
                         plan.preview.pixelData
                     )
@@ -238,7 +238,7 @@ extension AppFeature {
 
     private var nanoBananaDocumentService: NanoBananaDocumentService {
         NanoBananaDocumentService(
-            paintDocumentClient: paintDocumentClient,
+            documentMutationGateway: documentMutationGateway,
             layerContentTransactionService: layerContentTransactionService
         )
     }

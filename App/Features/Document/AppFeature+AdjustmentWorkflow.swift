@@ -8,22 +8,22 @@ extension AppFeature {
     }
 
     struct AdjustmentWorkflowService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentMutationGateway: DocumentMutationGateway
 
         func applyLayerProcessing(
             _ layerIndex: Int,
             request: LayerProcessingRequest
         ) -> DocumentMutationResult {
-            paintDocumentClient.applyLayerProcessing(layerIndex, request)
+            documentMutationGateway.applyLayerProcessing(layerIndex, request)
         }
 
         func replaceLayerPixels(_ layerIndex: Int, with pixelData: Data) -> DocumentMutationResult {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
         }
     }
 
     var adjustmentWorkflowService: AdjustmentWorkflowService {
-        AdjustmentWorkflowService(paintDocumentClient: paintDocumentClient)
+        AdjustmentWorkflowService(documentMutationGateway: documentMutationGateway)
     }
 
     func activeLayerPixelContext(in state: State) -> ActiveLayerPixelContext? {

@@ -33,14 +33,14 @@ extension AppFeature {
     typealias WorkspaceCatalogUseCase = PrimoWorkspaceDomain.WorkspaceCatalogUseCase
 
     struct WorkspaceBackingStoreService: Sendable {
-        let paintDocumentClient: PaintDocumentClient
+        let documentPersistenceGateway: DocumentPersistenceGateway
         let documentWorkspaceClient: DocumentWorkspaceClient
 
         func saveProject(
             at fileURL: URL,
             paperStyle: CanvasPaperStyle
         ) throws {
-            try paintDocumentClient.saveProject(fileURL, paperStyle)
+            try documentPersistenceGateway.saveProject(fileURL, paperStyle)
         }
 
         func persistProjectSnapshot(
@@ -153,7 +153,7 @@ extension AppFeature {
 
     var workspaceBackingStoreService: WorkspaceBackingStoreService {
         WorkspaceBackingStoreService(
-            paintDocumentClient: paintDocumentClient,
+            documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: documentWorkspaceClient
         )
     }

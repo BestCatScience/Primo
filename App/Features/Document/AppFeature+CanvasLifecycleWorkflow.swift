@@ -171,20 +171,22 @@ extension AppFeature {
     }
 
     struct CanvasLifecycleService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentPersistenceGateway: DocumentPersistenceGateway
+        let documentMutationGateway: DocumentMutationGateway
+        let documentHistoryGateway: DocumentHistoryGateway
 
         func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            paintDocumentClient.newCanvas(dimensions.width, dimensions.height)
-            paintDocumentClient.prewarmDrawingResources()
+            documentPersistenceGateway.newCanvas(dimensions.width, dimensions.height)
+            documentPersistenceGateway.prewarmDrawingResources()
             return .success(())
         }
 
         func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            paintDocumentClient.resizeCanvas(dimensions.width, dimensions.height)
+            documentMutationGateway.resizeCanvas(dimensions.width, dimensions.height)
         }
 
         func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            paintDocumentClient.resizeCanvasExtent(dimensions.width, dimensions.height)
+            documentMutationGateway.resizeCanvasExtent(dimensions.width, dimensions.height)
         }
 
         func initializeImportedCanvas(
@@ -197,32 +199,36 @@ extension AppFeature {
             case let .failure(failure):
                 return .failure(failure)
             }
-            switch paintDocumentClient.replaceLayerPixels(0, request.pixelData) {
+            switch documentMutationGateway.replaceLayerPixels(0, request.pixelData) {
             case .success:
                 break
             case let .failure(failure):
                 return .failure(failure)
             }
-            switch paintDocumentClient.setLayerName(0, layerName) {
+            switch documentMutationGateway.setLayerName(0, layerName) {
             case .success:
                 break
             case let .failure(failure):
                 return .failure(failure)
             }
-            return paintDocumentClient.setActiveLayer(0)
+            return documentMutationGateway.setActiveLayer(0)
         }
 
         func undo() -> DocumentMutationResult {
-            paintDocumentClient.undo()
+            documentHistoryGateway.undo()
         }
 
         func redo() -> DocumentMutationResult {
-            paintDocumentClient.redo()
+            documentHistoryGateway.redo()
         }
     }
 
     var canvasLifecycleService: CanvasLifecycleService {
-        CanvasLifecycleService(paintDocumentClient: paintDocumentClient)
+        CanvasLifecycleService(
+            documentPersistenceGateway: documentPersistenceGateway,
+            documentMutationGateway: documentMutationGateway,
+            documentHistoryGateway: documentHistoryGateway
+        )
     }
 
     struct CanvasLifecycleFeedbackMapper: Sendable {

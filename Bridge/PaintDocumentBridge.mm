@@ -224,6 +224,39 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
     return processing;
 }
 
+primo::PaintDocumentCommandResult APExecuteCommand(
+    primo::PaintDocument& document,
+    const primo::PaintDocumentCommand& command
+) {
+    return document.execute(command);
+}
+
+primo::PaintDocumentSnapshot APReadSnapshot(const primo::PaintDocument& document) {
+    return document.snapshot();
+}
+
+APPaintLayerInfo *APLayerInfoFromSnapshot(const primo::PaintLayerSnapshot& layer) {
+    NSString *name = [NSString stringWithUTF8String:layer.name.c_str()];
+    return [[APPaintLayerInfo alloc] initWithName:name
+                                          visible:layer.visible
+                                           locked:layer.locked
+                                      alphaLocked:layer.alphaLocked
+                                          clipped:layer.clipped
+                                          opacity:layer.opacity
+                                        blendMode:APStringFromBlendMode(layer.blendMode)
+                                         folderID:layer.folderID
+                                          hasMask:layer.hasMask];
+}
+
+APPaintFolderInfo *APFolderInfoFromSnapshot(const primo::PaintFolderSnapshot& folder) {
+    NSString *name = [NSString stringWithUTF8String:folder.name.c_str()];
+    return [[APPaintFolderInfo alloc] initWithFolderID:folder.id
+                                                  name:name
+                                               visible:folder.visible
+                                              expanded:folder.expanded
+                                       anchorLayerIndex:folder.anchorLayerIndex];
+}
+
 }  // namespace
 
 @implementation APDirtyRect
@@ -412,59 +445,61 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
 }
 
 - (NSInteger)addLayerWithName:(NSString *)name {
-    return _document->addLayer(name.UTF8String);
+    const auto result = APExecuteCommand(*_document, primo::AddLayerCommand{
+        .name = std::string(name.UTF8String ?: "")
+    });
+    return result.integerResult.value_or(-1);
 }
 
 - (NSInteger)duplicateLayerAtIndex:(NSInteger)index name:(NSString *)name {
-    return _document->duplicateLayer((int)index, name.UTF8String);
+    const auto result = APExecuteCommand(*_document, primo::DuplicateLayerCommand{
+        .index = (int)index,
+        .name = std::string(name.UTF8String ?: "")
+    });
+    return result.integerResult.value_or(-1);
 }
 
 - (BOOL)deleteLayerAtIndex:(NSInteger)index {
-    return _document->deleteLayer((int)index);
+    return APExecuteCommand(*_document, primo::DeleteLayerCommand{
+        .index = (int)index
+    }).success;
 }
 
 - (BOOL)moveLayerAtIndex:(NSInteger)index toIndex:(NSInteger)destinationIndex {
-    return _document->moveLayer((int)index, (int)destinationIndex);
+    return APExecuteCommand(*_document, primo::MoveLayerCommand{
+        .fromIndex = (int)index,
+        .toIndex = (int)destinationIndex
+    }).success;
 }
 
 - (NSInteger)createFolderWithName:(NSString *)name layerIndex:(NSInteger)layerIndex {
-    return _document->createFolder(name.UTF8String, (int)layerIndex);
+    const auto result = APExecuteCommand(*_document, primo::CreateFolderCommand{
+        .name = std::string(name.UTF8String ?: ""),
+        .layerIndex = (int)layerIndex
+    });
+    return result.integerResult.value_or(-1);
 }
 
 - (BOOL)deleteFolderWithID:(NSInteger)folderID {
-    return _document->deleteFolder((int)folderID);
+    return APExecuteCommand(*_document, primo::DeleteFolderCommand{
+        .folderID = (int)folderID
+    }).success;
 }
 
 - (NSArray<APPaintLayerInfo *> *)layers {
+    const auto snapshot = APReadSnapshot(*_document);
     NSMutableArray<APPaintLayerInfo *> *items = [NSMutableArray array];
-    for (int index = 0; index < _document->layerCount(); ++index) {
-        const auto &layer = _document->layer(index);
-        NSString *name = [NSString stringWithUTF8String:layer.name.c_str()];
-        APPaintLayerInfo *info = [[APPaintLayerInfo alloc] initWithName:name
-                                                                visible:layer.visible
-                                                                 locked:layer.locked
-                                                            alphaLocked:layer.alphaLocked
-                                                                clipped:layer.clipped
-                                                                opacity:layer.opacity
-                                                              blendMode:APStringFromBlendMode(layer.blendMode)
-                                                               folderID:_document->layerFolderID(index)
-                                                                hasMask:_document->hasLayerMask(index)];
-        [items addObject:info];
+    for (const auto &layer : snapshot.layers) {
+        [items addObject:APLayerInfoFromSnapshot(layer)];
     }
     return items;
 }
 
 - (NSArray<APPaintFolderInfo *> *)folders {
+    const auto snapshot = APReadSnapshot(*_document);
     NSMutableArray<APPaintFolderInfo *> *items = [NSMutableArray array];
-    for (int position = 0; position < _document->folderCount(); ++position) {
-        const auto &folder = _document->folderAt(position);
-        NSString *name = [NSString stringWithUTF8String:folder.name.c_str()];
-        APPaintFolderInfo *info = [[APPaintFolderInfo alloc] initWithFolderID:folder.id
-                                                                         name:name
-                                                                      visible:folder.visible
-                                                                     expanded:folder.expanded
-                                                              anchorLayerIndex:folder.anchorLayerIndex];
-        [items addObject:info];
+    for (const auto &folder : snapshot.folders) {
+        [items addObject:APFolderInfoFromSnapshot(folder)];
     }
     return items;
 }
@@ -523,7 +558,9 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
 }
 
 - (void)setActiveLayerIndex:(NSInteger)activeLayerIndex {
-    _document->setActiveLayerIndex((int)activeLayerIndex);
+    (void)APExecuteCommand(*_document, primo::SetActiveLayerCommand{
+        .index = (int)activeLayerIndex
+    });
 }
 
 - (void)clearLayerAtIndex:(NSInteger)index {
@@ -531,47 +568,80 @@ primo::LayerProcessing APProcessingFromDescriptor(APPaintLayerProcessingDescript
 }
 
 - (void)setLayerName:(NSString *)name atIndex:(NSInteger)index {
-    _document->setLayerName((int)index, name.UTF8String);
+    (void)APExecuteCommand(*_document, primo::SetLayerNameCommand{
+        .index = (int)index,
+        .name = std::string(name.UTF8String ?: "")
+    });
 }
 
 - (void)setLayerVisible:(BOOL)visible atIndex:(NSInteger)index {
-    _document->setLayerVisibility((int)index, visible);
+    (void)APExecuteCommand(*_document, primo::SetLayerVisibilityCommand{
+        .index = (int)index,
+        .visible = visible
+    });
 }
 
 - (void)setLayerLocked:(BOOL)locked atIndex:(NSInteger)index {
-    _document->setLayerLocked((int)index, locked);
+    (void)APExecuteCommand(*_document, primo::SetLayerLockedCommand{
+        .index = (int)index,
+        .locked = locked
+    });
 }
 
 - (void)setLayerAlphaLocked:(BOOL)alphaLocked atIndex:(NSInteger)index {
-    _document->setLayerAlphaLocked((int)index, alphaLocked);
+    (void)APExecuteCommand(*_document, primo::SetLayerAlphaLockedCommand{
+        .index = (int)index,
+        .alphaLocked = alphaLocked
+    });
 }
 
 - (void)setLayerClipped:(BOOL)clipped atIndex:(NSInteger)index {
-    _document->setLayerClipped((int)index, clipped);
+    (void)APExecuteCommand(*_document, primo::SetLayerClippedCommand{
+        .index = (int)index,
+        .clipped = clipped
+    });
 }
 
 - (void)setLayerOpacity:(CGFloat)opacity atIndex:(NSInteger)index {
-    _document->setLayerOpacity((int)index, (float)opacity);
+    (void)APExecuteCommand(*_document, primo::SetLayerOpacityCommand{
+        .index = (int)index,
+        .opacity = (float)opacity
+    });
 }
 
 - (void)setLayerBlendMode:(NSString *)blendMode atIndex:(NSInteger)index {
-    _document->setLayerBlendMode((int)index, APBlendModeFromString(blendMode));
+    (void)APExecuteCommand(*_document, primo::SetLayerBlendModeCommand{
+        .index = (int)index,
+        .blendMode = APBlendModeFromString(blendMode)
+    });
 }
 
 - (void)setFolderVisible:(BOOL)visible folderID:(NSInteger)folderID {
-    _document->setFolderVisibility((int)folderID, visible);
+    (void)APExecuteCommand(*_document, primo::SetFolderVisibilityCommand{
+        .folderID = (int)folderID,
+        .visible = visible
+    });
 }
 
 - (void)setFolderName:(NSString *)name folderID:(NSInteger)folderID {
-    _document->setFolderName((int)folderID, name.UTF8String);
+    (void)APExecuteCommand(*_document, primo::SetFolderNameCommand{
+        .folderID = (int)folderID,
+        .name = std::string(name.UTF8String ?: "")
+    });
 }
 
 - (void)setFolderExpanded:(BOOL)expanded folderID:(NSInteger)folderID {
-    _document->setFolderExpanded((int)folderID, expanded);
+    (void)APExecuteCommand(*_document, primo::SetFolderExpandedCommand{
+        .folderID = (int)folderID,
+        .expanded = expanded
+    });
 }
 
 - (BOOL)setLayerFolderAtIndex:(NSInteger)index folderID:(NSInteger)folderID {
-    return _document->setLayerFolder((int)index, (int)folderID);
+    return APExecuteCommand(*_document, primo::SetLayerFolderCommand{
+        .index = (int)index,
+        .folderID = (int)folderID
+    }).success;
 }
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {

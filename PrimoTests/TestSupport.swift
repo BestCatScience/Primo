@@ -195,6 +195,126 @@ extension PaintDocumentClient {
     }
 }
 
+extension DocumentQueryGateway {
+    static func stub(
+        presentation: PaintDocumentPresentation = .testValue(),
+        compositePixelData: @escaping @Sendable () -> Data = { Data() },
+        pixelDataForLayer: @escaping @Sendable (Int) -> Data = { _ in Data() }
+    ) -> Self {
+        Self(
+            lightweightPresentation: { presentation },
+            presentation: { presentation },
+            compositePixelData: compositePixelData,
+            pixelDataForLayer: pixelDataForLayer,
+            consumeDirtyUpdate: { nil }
+        )
+    }
+}
+
+extension DocumentMutationGateway {
+    static func stub(
+        resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult = { _, _ in .success(()) },
+        resizeCanvasExtent: @escaping @Sendable (Int, Int) -> DocumentMutationResult = { _, _ in .success(()) },
+        addLayer: @escaping @Sendable (String) -> DocumentIndexedMutationResult = { _ in .success(0) },
+        deleteLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
+        setActiveLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
+        setLayerName: @escaping @Sendable (Int, String) -> DocumentMutationResult = { _, _ in .success(()) },
+        setLayerVisibility: @escaping @Sendable (Int, Bool) -> DocumentMutationResult = { _, _ in .success(()) },
+        revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
+        replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .success(()) },
+        applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .success(()) }
+    ) -> Self {
+        Self(
+            resizeCanvas: resizeCanvas,
+            resizeCanvasExtent: resizeCanvasExtent,
+            addLayer: addLayer,
+            deleteLayer: deleteLayer,
+            setActiveLayer: setActiveLayer,
+            setLayerName: setLayerName,
+            setLayerVisibility: setLayerVisibility,
+            revealLayerForEditing: revealLayerForEditing,
+            replaceLayerPixels: replaceLayerPixels,
+            replaceLayerMask: { _, _ in .success(()) },
+            clearLayerMask: { _ in .success(()) },
+            applyLayerMask: { _ in .success(()) },
+            clearLayer: { _ in .success(()) },
+            applyLayerProcessing: applyLayerProcessing
+        )
+    }
+}
+
+extension StrokeInputGateway {
+    static func stub(
+        blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult = { _, _, _, _ in .success(()) },
+        fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult = { _, _ in .success(()) },
+        applySoftwareStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult = { _, _, _ in .success(()) }
+    ) -> Self {
+        Self(
+            beginStroke: { _, _ in },
+            appendStroke: { _ in },
+            endStroke: {},
+            cancelStroke: {},
+            blurStroke: blurStroke,
+            endBlurStroke: {},
+            fill: fill,
+            applySoftwareStroke: applySoftwareStroke
+        )
+    }
+}
+
+extension DocumentHistoryGateway {
+    static func stub(
+        undo: @escaping @Sendable () -> DocumentMutationResult = { .success(()) },
+        redo: @escaping @Sendable () -> DocumentMutationResult = { .success(()) }
+    ) -> Self {
+        Self(
+            canUndo: { true },
+            canRedo: { true },
+            undo: undo,
+            redo: redo
+        )
+    }
+}
+
+extension DocumentPersistenceGateway {
+    static func stub(
+        saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void = { _, _ in },
+        loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject = { _ in .testValue() }
+    ) -> Self {
+        Self(
+            saveProject: saveProject,
+            loadProject: loadProject,
+            setPaperStyle: { _ in },
+            newCanvas: { _, _ in },
+            prewarmDrawingResources: {}
+        )
+    }
+}
+
+extension DocumentExportGateway {
+    static func stub(
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data? = { _ in nil },
+        timelapseCapture: @escaping @Sendable () -> TimelapseCapture? = { nil }
+    ) -> Self {
+        Self(
+            compositePNGData: compositePNGData,
+            timelapseCapture: timelapseCapture
+        )
+    }
+}
+
+extension TextLayerGateway {
+    static func stub(
+        setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult = { _, _ in .success(()) }
+    ) -> Self {
+        Self(
+            textLayerData: { _ in nil },
+            setTextLayer: setTextLayer,
+            clearTextLayerData: { _ in }
+        )
+    }
+}
+
 extension DocumentWorkspaceClient {
     static func stub(
         createTabBackingStoreURL: @escaping @Sendable (UUID) throws -> DocumentProjectPath = {

@@ -3,7 +3,7 @@ import Foundation
 
 extension AppFeature {
     private struct ExportWorkflowService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentExportGateway: DocumentExportGateway
         let workspaceArtifactService: WorkspaceArtifactService
         let shareExportFactory: ShareExportFactory
         let fileClient: FileClient
@@ -15,7 +15,7 @@ extension AppFeature {
         }
 
         func timelapseCapture() -> TimelapseCapture? {
-            paintDocumentClient.timelapseCapture()
+            documentExportGateway.timelapseCapture()
         }
 
         func makeTimelapseExportEffect(
@@ -52,7 +52,7 @@ extension AppFeature {
 
     private var exportWorkflowService: ExportWorkflowService {
         ExportWorkflowService(
-            paintDocumentClient: paintDocumentClient,
+            documentExportGateway: documentExportGateway,
             workspaceArtifactService: workspaceArtifactService,
             shareExportFactory: shareExportFactory,
             fileClient: fileClient,

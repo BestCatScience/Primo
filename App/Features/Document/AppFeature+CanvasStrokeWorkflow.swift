@@ -391,40 +391,42 @@ extension AppFeature {
     }
 
     struct CanvasStrokeWorkflowService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentQueryGateway: DocumentQueryGateway
+        let documentMutationGateway: DocumentMutationGateway
+        let strokeInputGateway: StrokeInputGateway
 
         func ensureLayerVisible(_ layerIndex: Int) -> DocumentMutationResult {
-            paintDocumentClient.setLayerVisibility(layerIndex, true)
+            documentMutationGateway.setLayerVisibility(layerIndex, true)
         }
 
         func cancelStroke() {
-            paintDocumentClient.cancelStroke()
+            strokeInputGateway.cancelStroke()
         }
 
         func beginStroke(
             _ sample: StylusSample,
             brush: BrushRuntimeSettings
         ) {
-            paintDocumentClient.beginStroke(sample, brush)
+            strokeInputGateway.beginStroke(sample, brush)
         }
 
         func appendStroke(_ sample: StylusSample) {
-            paintDocumentClient.appendStroke(sample)
+            strokeInputGateway.appendStroke(sample)
         }
 
         func compositePixelData() -> Data {
-            paintDocumentClient.compositePixelData()
+            documentQueryGateway.compositePixelData()
         }
 
         func endStroke() {
-            paintDocumentClient.endStroke()
+            strokeInputGateway.endStroke()
         }
 
         func replaceLayerPixels(
             _ layerIndex: Int,
             pixelData: Data
         ) -> DocumentMutationResult {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
         }
 
         func applySoftwareStroke(
@@ -432,11 +434,11 @@ extension AppFeature {
             brush: BrushRuntimeSettings,
             layerIndex: Int
         ) -> DocumentMutationResult {
-            paintDocumentClient.applySoftwareStroke(samples, brush, layerIndex)
+            strokeInputGateway.applySoftwareStroke(samples, brush, layerIndex)
         }
 
         func revealLayerForEditing(_ layerIndex: Int) -> DocumentMutationResult {
-            paintDocumentClient.revealLayerForEditing(layerIndex)
+            documentMutationGateway.revealLayerForEditing(layerIndex)
         }
 
         func blurStroke(
@@ -445,23 +447,27 @@ extension AppFeature {
             layerIndex: Int,
             clearSelectionAfterBlur: Bool
         ) -> DocumentMutationResult {
-            paintDocumentClient.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
+            strokeInputGateway.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
         }
 
         func endBlurStroke() {
-            paintDocumentClient.endBlurStroke()
+            strokeInputGateway.endBlurStroke()
         }
 
         func fill(
             _ sample: StylusSample,
             brush: BrushRuntimeSettings
         ) -> DocumentMutationResult {
-            paintDocumentClient.fill(sample, brush)
+            strokeInputGateway.fill(sample, brush)
         }
     }
 
     var canvasStrokeWorkflowService: CanvasStrokeWorkflowService {
-        CanvasStrokeWorkflowService(paintDocumentClient: paintDocumentClient)
+        CanvasStrokeWorkflowService(
+            documentQueryGateway: documentQueryGateway,
+            documentMutationGateway: documentMutationGateway,
+            strokeInputGateway: strokeInputGateway
+        )
     }
 
     var canvasStrokeContextResolver: CanvasStrokeContextResolver {

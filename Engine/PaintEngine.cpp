@@ -7,6 +7,7 @@
 #include <functional>
 #include <queue>
 #include <stdexcept>
+#include <type_traits>
 #include <variant>
 
 namespace primo {
@@ -2431,6 +2432,113 @@ std::span<const uint8_t> PaintDocument::composite() const noexcept {
         compositeDirty_ = false;
     }
     return compositeBuffer_;
+}
+
+PaintDocumentSnapshot PaintDocument::snapshot() const {
+    PaintDocumentSnapshot snapshot;
+    snapshot.width = width_;
+    snapshot.height = height_;
+    snapshot.activeLayerIndex = activeLayerIndex_;
+    snapshot.layers.reserve(layers_.size());
+    snapshot.folders.reserve(folders_.size());
+
+    for (size_t index = 0; index < layers_.size(); ++index) {
+        const Layer& layerRef = layer(static_cast<int>(index));
+        PaintLayerSnapshot layerSnapshot;
+        layerSnapshot.name = layerRef.name;
+        layerSnapshot.visible = layerRef.visible;
+        layerSnapshot.locked = layerRef.locked;
+        layerSnapshot.alphaLocked = layerRef.alphaLocked;
+        layerSnapshot.clipped = layerRef.clipped;
+        layerSnapshot.opacity = layerRef.opacity;
+        layerSnapshot.blendMode = layerRef.blendMode;
+        layerSnapshot.folderID = layerFolderIDs_[index];
+        layerSnapshot.hasMask = !layerRef.mask.empty();
+        layerSnapshot.pixelData = layerRef.pixels;
+        snapshot.layers.push_back(std::move(layerSnapshot));
+    }
+
+    for (const LayerFolder& folder : folders_) {
+        PaintFolderSnapshot folderSnapshot;
+        folderSnapshot.id = folder.id;
+        folderSnapshot.name = folder.name;
+        folderSnapshot.visible = folder.visible;
+        folderSnapshot.expanded = folder.expanded;
+        folderSnapshot.anchorLayerIndex = folder.anchorLayerIndex;
+        snapshot.folders.push_back(std::move(folderSnapshot));
+    }
+
+    const auto compositePixels = composite();
+    snapshot.compositePixelData.assign(compositePixels.begin(), compositePixels.end());
+    return snapshot;
+}
+
+PaintDocumentCommandResult PaintDocument::execute(const PaintDocumentCommand& command) {
+    return std::visit(
+        [this](const auto& typedCommand) -> PaintDocumentCommandResult {
+            using Command = std::decay_t<decltype(typedCommand)>;
+
+            if constexpr (std::is_same_v<Command, AddLayerCommand>) {
+                return PaintDocumentCommandResult{
+                    .success = true,
+                    .integerResult = addLayer(typedCommand.name)
+                };
+            } else if constexpr (std::is_same_v<Command, DuplicateLayerCommand>) {
+                return PaintDocumentCommandResult{
+                    .success = true,
+                    .integerResult = duplicateLayer(typedCommand.index, typedCommand.name)
+                };
+            } else if constexpr (std::is_same_v<Command, DeleteLayerCommand>) {
+                return PaintDocumentCommandResult{ .success = deleteLayer(typedCommand.index) };
+            } else if constexpr (std::is_same_v<Command, MoveLayerCommand>) {
+                return PaintDocumentCommandResult{ .success = moveLayer(typedCommand.fromIndex, typedCommand.toIndex) };
+            } else if constexpr (std::is_same_v<Command, CreateFolderCommand>) {
+                return PaintDocumentCommandResult{
+                    .success = true,
+                    .integerResult = createFolder(typedCommand.name, typedCommand.layerIndex)
+                };
+            } else if constexpr (std::is_same_v<Command, DeleteFolderCommand>) {
+                return PaintDocumentCommandResult{ .success = deleteFolder(typedCommand.folderID) };
+            } else if constexpr (std::is_same_v<Command, SetActiveLayerCommand>) {
+                setActiveLayerIndex(typedCommand.index);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerNameCommand>) {
+                setLayerName(typedCommand.index, typedCommand.name);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerVisibilityCommand>) {
+                setLayerVisibility(typedCommand.index, typedCommand.visible);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerLockedCommand>) {
+                setLayerLocked(typedCommand.index, typedCommand.locked);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerAlphaLockedCommand>) {
+                setLayerAlphaLocked(typedCommand.index, typedCommand.alphaLocked);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerClippedCommand>) {
+                setLayerClipped(typedCommand.index, typedCommand.clipped);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerOpacityCommand>) {
+                setLayerOpacity(typedCommand.index, typedCommand.opacity);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerBlendModeCommand>) {
+                setLayerBlendMode(typedCommand.index, typedCommand.blendMode);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetFolderVisibilityCommand>) {
+                setFolderVisibility(typedCommand.folderID, typedCommand.visible);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetFolderNameCommand>) {
+                setFolderName(typedCommand.folderID, typedCommand.name);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetFolderExpandedCommand>) {
+                setFolderExpanded(typedCommand.folderID, typedCommand.expanded);
+                return PaintDocumentCommandResult{};
+            } else if constexpr (std::is_same_v<Command, SetLayerFolderCommand>) {
+                return PaintDocumentCommandResult{ .success = setLayerFolder(typedCommand.index, typedCommand.folderID) };
+            }
+            return PaintDocumentCommandResult{};
+        },
+        command
+    );
 }
 
 void PaintDocument::initializeLayerStorage(Layer& layer) {

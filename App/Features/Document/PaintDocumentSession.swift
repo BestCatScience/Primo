@@ -6,6 +6,8 @@ import PrimoDocumentApplication
 import UIKit
 import simd
 
+extension APPaintDocumentBridge: @unchecked Sendable {}
+
 final class PaintDocumentSession {
     static let logger = Logger(subsystem: "com.primo.app", category: "Document")
     static let maxTimelapseFrames = 20_000
@@ -37,7 +39,10 @@ final class PaintDocumentSession {
         } catch {
         }
         let duration = start.duration(to: clock.now)
-        Self.logger.debug("PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration), privacy: .public)")
+        AppDiagnostics.debug(
+            Self.logger,
+            "PaintDocumentSession initialized \(width)x\(height) in \(String(describing: duration))"
+        )
     }
 
     deinit {
@@ -886,3 +891,5 @@ extension PaintDocumentSessionDocumentGateway.LayerAccess: LayerAttributeGateway
         setLayerBlendMode(blendMode.rawValue, index: index)
     }
 }
+
+extension PaintDocumentSessionDocumentGateway.LayerAccess: DocumentEditorGateway {}

@@ -9,29 +9,35 @@ extension AppFeature {
     }
 
     struct SelectionTransformService {
-        let paintDocumentClient: PaintDocumentClient
+        let documentQueryGateway: DocumentQueryGateway
+        let documentMutationGateway: DocumentMutationGateway
+        let textLayerGateway: TextLayerGateway
 
         func setTextLayer(
             _ layerIndex: Int,
             _ textLayer: TextLayerData
         ) -> DocumentMutationResult {
-            paintDocumentClient.setTextLayer(layerIndex, textLayer)
+            textLayerGateway.setTextLayer(layerIndex, textLayer)
         }
 
         func pixelDataForLayer(_ layerIndex: Int) -> Data {
-            paintDocumentClient.pixelDataForLayer(layerIndex)
+            documentQueryGateway.pixelDataForLayer(layerIndex)
         }
 
         func replaceLayerPixels(
             _ layerIndex: Int,
             _ pixelData: Data
         ) -> DocumentMutationResult {
-            paintDocumentClient.replaceLayerPixels(layerIndex, pixelData)
+            documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
         }
     }
 
     var selectionTransformService: SelectionTransformService {
-        SelectionTransformService(paintDocumentClient: paintDocumentClient)
+        SelectionTransformService(
+            documentQueryGateway: documentQueryGateway,
+            documentMutationGateway: documentMutationGateway,
+            textLayerGateway: textLayerGateway
+        )
     }
 
     func discardTransformPreview(state: inout State) {
