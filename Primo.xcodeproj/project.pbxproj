@@ -49,6 +49,7 @@
 		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
 		B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
 		B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
+		B90000000000000000000033 /* PrimoDocumentRuntimeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000034 /* PrimoDocumentRuntimeInfrastructure */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003C /* PaintDocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* PaintDocumentSession.swift */; };
@@ -131,7 +132,6 @@
 		AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */; };
 		AA1000000000000000000008 /* AppFeatureReducerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000008 /* AppFeatureReducerTests.swift */; };
 		AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */; };
-		AA100000000000000000000A /* PaintDocumentMutationContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */; };
 		B1C0A1D2E3F4456789ABC001 /* AppFeature+AdjustmentActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC002 /* AppFeature+AdjustmentActionRouting.swift */; };
 		B1C0A1D2E3F4456789ABC003 /* AppFeature+SelectionActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC004 /* AppFeature+SelectionActionRouting.swift */; };
 		B1C0A1D2E3F4456789ABC005 /* AppFeature+LayerActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC006 /* AppFeature+LayerActionRouting.swift */; };
@@ -302,7 +302,6 @@
 		AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentMutationFeedbackMapperTests.swift; sourceTree = "<group>"; };
 		AA2000000000000000000008 /* AppFeatureReducerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureReducerTests.swift; sourceTree = "<group>"; };
 		AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceCatalogUseCaseTests.swift; sourceTree = "<group>"; };
-		AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentMutationContractTests.swift; sourceTree = "<group>"; };
 		B1C0A1D2E3F4456789ABC002 /* AppFeature+AdjustmentActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+AdjustmentActionRouting.swift"; sourceTree = "<group>"; };
 		B1C0A1D2E3F4456789ABC004 /* AppFeature+SelectionActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionActionRouting.swift"; sourceTree = "<group>"; };
 		B1C0A1D2E3F4456789ABC006 /* AppFeature+LayerActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerActionRouting.swift"; sourceTree = "<group>"; };
@@ -365,6 +364,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B90000000000000000000033 /* PrimoDocumentRuntimeInfrastructure in Frameworks */,
 				B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */,
 				B90000000000000000000021 /* PrimoBrushDomain in Frameworks */,
 				B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */,
@@ -699,7 +699,6 @@
 				AA2000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift */,
 				AA2000000000000000000008 /* AppFeatureReducerTests.swift */,
 				AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */,
-				AA200000000000000000000A /* PaintDocumentMutationContractTests.swift */,
 				E7000000000000000000000A /* NanoBananaFeatureTests.swift */,
 			);
 			path = PrimoTests;
@@ -730,6 +729,7 @@
 				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
+				B90000000000000000000034 /* PrimoDocumentRuntimeInfrastructure */,
 				B90000000000000000000032 /* PrimoDocumentInfrastructure */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -921,45 +921,10 @@
 				E70000000000000000000017 /* NanoBananaDependencies.swift in Sources */,
 				E70000000000000000000018 /* NanoBananaDomain+Presentation.swift in Sources */,
 				A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */,
-				A0000000000000000000003C /* PaintDocumentSession.swift in Sources */,
-				A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */,
-				D60000000000000000000001 /* PaintDocumentBridgeQueryService.swift in Sources */,
-				D60000000000000000000003 /* PaintDocumentBridgePixelService.swift in Sources */,
-				D60000000000000000000005 /* PaintDocumentBridgeDescriptorService.swift in Sources */,
-				D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */,
-				A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */,
-				A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */,
 				F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */,
 				F10000000000000000000005 /* BrushImportClient.swift in Sources */,
 				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,
 				F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */,
-				D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */,
-				D50000000000000000000003 /* PaintDocumentPersistenceService.swift in Sources */,
-				D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */,
-				D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */,
-				D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */,
-				A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */,
-				A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */,
-				A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */,
-				D30000000000000000000005 /* PaintDocumentSession+FolderEditing.swift in Sources */,
-				D30000000000000000000007 /* PaintDocumentSession+LayerPropertiesEditing.swift in Sources */,
-				D30000000000000000000009 /* PaintDocumentSession+LayerPixelEditing.swift in Sources */,
-				A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */,
-				D3000000000000000000000B /* PaintDocumentSession+TimelapseReplay.swift in Sources */,
-				D3000000000000000000000D /* PaintDocumentSession+TimelapseFrames.swift in Sources */,
-				A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */,
-				C10000000000000000000001 /* PaintDocumentTimelapseOperation.swift in Sources */,
-				C10000000000000000000003 /* PaintDocumentBrushStorageModels.swift in Sources */,
-				C10000000000000000000005 /* PaintDocumentStoredTimelapseOperation.swift in Sources */,
-				C10000000000000000000007 /* PaintDocumentSessionError.swift in Sources */,
-				A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */,
-				A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */,
-				A000000000000000000000C0 /* PaintDocumentSession+TextLayer.swift in Sources */,
-				A000000000000000000000C2 /* PaintDocumentSession+Persistence.swift in Sources */,
-				A000000000000000000000C4 /* PaintDocumentSession+Timelapse.swift in Sources */,
-				A000000000000000000000C6 /* PaintDocumentSession+BridgeFacade.swift in Sources */,
-				A00000000000000000000028 /* PaintDocumentBridge.mm in Sources */,
-				A00000000000000000000029 /* PaintEngine.cpp in Sources */,
 				A0000000000000000000002F /* PaintShaders.metal in Sources */,
 				A00000000000000000000023 /* AppFeature.swift in Sources */,
 				A00000000000000000000024 /* PaintModels.swift in Sources */,
@@ -978,7 +943,6 @@
 				AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */,
 				AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */,
 				E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */,
-				AA100000000000000000000A /* PaintDocumentMutationContractTests.swift in Sources */,
 				AA1000000000000000000003 /* TestSupport.swift in Sources */,
 				AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */,
 				AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */,
@@ -1102,10 +1066,6 @@
 				DEVELOPMENT_TEAM = 2RZR3M2YPU;
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Engine/include",
-				);
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -1124,7 +1084,6 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "App/Support/primo-Bridging-Header.h";
 				SWIFT_VERSION = 5.10;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
@@ -1143,10 +1102,6 @@
 				DEVELOPMENT_TEAM = 2RZR3M2YPU;
 				ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"$(SRCROOT)/Engine/include",
-				);
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -1165,7 +1120,6 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "App/Support/primo-Bridging-Header.h";
 				SWIFT_VERSION = 5.10;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
@@ -1320,6 +1274,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentInfrastructure;
+		};
+		B90000000000000000000034 /* PrimoDocumentRuntimeInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentRuntimeInfrastructure;
 		};
 		B90000000000000000000019 /* PrimoWorkspaceInfrastructure */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
+import PrimoDocumentRuntimeInfrastructure
 import UIKit
 
 enum TimelapseExporter {
@@ -199,17 +200,14 @@ enum TimelapseExporter {
         totalFrameCount: Int,
         progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
-        let replaySession = PaintDocumentSession(
-            width: max(Int(capture.canvasSize.width.rounded()), 1),
-            height: max(Int(capture.canvasSize.height.rounded()), 1),
+        let replayService = DocumentTimelapseReplayService(
+            canvasSize: capture.canvasSize,
             fileClient: fileClient
         )
-        var folderIDMap: [DocumentFolderID: Int] = [:]
         var finalImage: CGImage?
 
         for (index, operation) in operations.enumerated() {
-            replaySession.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
-            guard let image = replaySession.timelapseCompositeImage()?.cgImage else {
+            guard let image = replayService.replay(operation) else {
                 throw TimelapseExportError.exportFailed
             }
             finalImage = image

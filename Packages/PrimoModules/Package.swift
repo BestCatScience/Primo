@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "PrimoDocumentEngine", targets: ["PrimoDocumentEngine"]),
         .library(name: "PrimoDocumentNativeBridge", targets: ["PrimoDocumentNativeBridge"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
+        .library(name: "PrimoDocumentRuntimeInfrastructure", targets: ["PrimoDocumentRuntimeInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
         .library(name: "PrimoNanoBananaApplication", targets: ["PrimoNanoBananaApplication"]),
@@ -157,6 +158,10 @@ let package = Package(
         .testTarget(
             name: "PrimoDocumentApplicationTests",
             dependencies: ["PrimoDocumentApplication"]
+        ),
+        .testTarget(
+            name: "PrimoDocumentRuntimeInfrastructureTests",
+            dependencies: ["PrimoDocumentRuntimeInfrastructure"]
         ),
         .testTarget(
             name: "PrimoNanoBananaDomainTests",

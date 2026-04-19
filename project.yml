@@ -6,6 +6,8 @@ packages:
   ComposableArchitecture:
     url: https://github.com/pointfreeco/swift-composable-architecture
     exactVersion: 1.25.2
+  PrimoModules:
+    path: Packages/PrimoModules
 settings:
   base:
     PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo
@@ -18,10 +20,6 @@ targets:
     platform: iOS
     sources:
       - path: App
-      - path: Bridge
-      - path: Engine
-        excludes:
-          - "**/*.md"
     settings:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
@@ -29,12 +27,13 @@ targets:
         PRODUCT_NAME: Primo
         TARGETED_DEVICE_FAMILY: 2
         IPHONEOS_DEPLOYMENT_TARGET: 26.0
-        SWIFT_OBJC_BRIDGING_HEADER: App/Support/primo-Bridging-Header.h
         CLANG_ENABLE_OBJC_ARC: YES
-        HEADER_SEARCH_PATHS:
-          - $(SRCROOT)/Engine/include
     dependencies:
       - package: ComposableArchitecture
+      - package: PrimoModules
+        product: PrimoDocumentRuntimeInfrastructure
+      - package: PrimoModules
+        product: PrimoDocumentInfrastructure
       - sdk: AVFoundation.framework
       - sdk: CoreGraphics.framework
       - sdk: Foundation.framework

@@ -3,7 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentInfrastructure
+import PrimoDocumentRuntimeInfrastructure
 
 typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
 typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
@@ -78,106 +78,67 @@ struct PaintDocumentClient: Sendable {
         dateClient: DateClient,
         uuidClient: UUIDClient
     ) -> PaintDocumentClient {
-        let sessionBox = LockedDocumentRuntimeBox(runtime: PaintDocumentSession(
+        let runtime = DocumentRuntimeFactory.live(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
-        ))
+        )
         return PaintDocumentClient(
-            lightweightPresentation: { sessionBox.withRuntime { $0.lightweightPresentation() } },
-            presentation: { sessionBox.withRuntime { $0.presentation() } },
-            compositePixelData: { sessionBox.withRuntime { $0.compositePixelData() } },
-            prewarmDrawingResources: { sessionBox.withRuntime { $0.prewarmDrawingResources() } },
-            compositePNGData: { style in sessionBox.withRuntime { $0.compositePNGData(paperStyle: style) } },
-            timelapseCapture: { sessionBox.withRuntime { $0.timelapseCapture() } },
-            saveProject: { url, paperStyle in
-                try sessionBox.withRuntime { session in
-                    try session.saveProject(to: url, paperStyle: paperStyle)
-                }
-            },
-            loadProject: { url in
-                let session = try PaintDocumentSession.loadProject(
-                    from: url,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    uuidClient: uuidClient
-                )
-                let loadedProject = LoadedPaintProject(
-                    presentation: session.presentation(),
-                    paperStyle: session.currentPaperStyle
-                )
-                sessionBox.replaceRuntime(with: session)
-                return loadedProject
-            },
-            setPaperStyle: { style in sessionBox.withRuntime { $0.setPaperStyle(style) } },
-            newCanvas: { width, height in
-                sessionBox.replaceRuntime(with: PaintDocumentSession(
-                    width: width,
-                    height: height,
-                    fileClient: fileClient,
-                    dateClient: dateClient,
-                    uuidClient: uuidClient
-                ))
-            },
-            resizeCanvas: { width, height in
-                sessionBox.withRuntime { $0.resizeCanvasMutation(width: width, height: height) }
-            },
-            resizeCanvasExtent: { width, height in
-                sessionBox.withRuntime { $0.resizeCanvasExtentMutation(width: width, height: height) }
-            },
-            beginStroke: { sample, brush in sessionBox.withRuntime { $0.beginStroke(sample: sample, brush: brush) } },
-            appendStroke: { sample in sessionBox.withRuntime { $0.appendStroke(sample: sample) } },
-            endStroke: { sessionBox.withRuntime { $0.endStroke() } },
-            cancelStroke: { sessionBox.withRuntime { $0.cancelStroke() } },
-            blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                sessionBox.withRuntime {
-                    $0.blurMutation(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
-                }
-            },
-            endBlurStroke: { sessionBox.withRuntime { $0.endBlurStroke() } },
-            fill: { sample, brush in sessionBox.withRuntime { $0.fillMutation(sample: sample, brush: brush) } },
-            canUndo: { sessionBox.withRuntime { $0.canUndo() } },
-            canRedo: { sessionBox.withRuntime { $0.canRedo() } },
-            undo: { sessionBox.withRuntime { $0.undoMutation() } },
-            redo: { sessionBox.withRuntime { $0.redoMutation() } },
-            addLayer: { name in sessionBox.withRuntime { $0.addLayerMutation(name: name) } },
-            duplicateLayer: { index, name in sessionBox.withRuntime { $0.duplicateLayerMutation(index: index, name: name) } },
-            deleteLayer: { index in sessionBox.withRuntime { $0.deleteLayerMutation(index: index) } },
-            moveLayer: { index, destination in sessionBox.withRuntime { $0.moveLayerMutation(from: index, to: destination) } },
-            createFolder: { name, layerIndex in sessionBox.withRuntime { $0.createFolderMutation(name: name, layerIndex: layerIndex) } },
-            deleteFolder: { folderID in sessionBox.withRuntime { $0.deleteFolderMutation(folderID: folderID) } },
-            setFolderVisibility: { folderID, isVisible in sessionBox.withRuntime { $0.setFolderVisibilityMutation(folderID: folderID, isVisible: isVisible) } },
-            setFolderName: { folderID, name in sessionBox.withRuntime { $0.setFolderNameMutation(folderID: folderID, name: name) } },
-            setFolderExpanded: { folderID, isExpanded in sessionBox.withRuntime { $0.setFolderExpandedMutation(folderID: folderID, isExpanded: isExpanded) } },
-            assignLayerToFolder: { index, folderID in sessionBox.withRuntime { $0.assignLayerMutation(index: index, toFolder: folderID) } },
-            setActiveLayer: { index in sessionBox.withRuntime { $0.setActiveLayerMutation(index: index) } },
-            setLayerName: { index, name in sessionBox.withRuntime { $0.setLayerNameMutation(index: index, name: name) } },
-            setLayerVisibility: { index, isVisible in sessionBox.withRuntime { $0.setLayerVisibilityMutation(index: index, isVisible: isVisible) } },
-            setLayerLocked: { index, isLocked in sessionBox.withRuntime { $0.setLayerLockedMutation(index: index, isLocked: isLocked) } },
-            setLayerAlphaLocked: { index, isAlphaLocked in sessionBox.withRuntime { $0.setLayerAlphaLockedMutation(index: index, isAlphaLocked: isAlphaLocked) } },
-            setLayerClipped: { index, isClipped in sessionBox.withRuntime { $0.setLayerClippedMutation(index: index, isClipped: isClipped) } },
-            revealLayerForEditing: { index in sessionBox.withRuntime { $0.revealLayerForEditingMutation(index: index) } },
-            setLayerOpacity: { index, opacity in sessionBox.withRuntime { $0.setLayerOpacityMutation(index: index, opacity: opacity) } },
-            setLayerBlendMode: { index, blendMode in sessionBox.withRuntime { $0.setLayerBlendModeMutation(index: index, blendMode: blendMode) } },
-            mergeLayerDown: { index in sessionBox.withRuntime { $0.mergeLayerDownMutation(index: index) } },
-            textLayerData: { index in sessionBox.withRuntime { $0.textLayerData(index: index) } },
-            setTextLayer: { index, textLayer in sessionBox.withRuntime { $0.setTextLayerMutation(index: index, textLayer: textLayer) } },
-            clearTextLayerData: { index in sessionBox.withRuntime { $0.clearTextLayerData(index: index) } },
-            applyLayerProcessing: { index, request in sessionBox.withRuntime { $0.applyLayerProcessingMutation(index: index, request: request) } },
-            applySoftwareStroke: { samples, brush, layerIndex in
-                sessionBox.withRuntime {
-                    $0.applySoftwareStrokeMutation(samples: samples, brush: brush, layerIndex: layerIndex)
-                }
-            },
-            pixelDataForLayer: { index in sessionBox.withRuntime { $0.pixelDataForLayer(index: index) } },
-            replaceLayerPixels: { index, data in
-                sessionBox.withRuntime { $0.replaceLayerPixelsMutation(index: index, data: data) }
-            },
-            replaceLayerMask: { index, data in sessionBox.withRuntime { $0.replaceLayerMaskMutation(index: index, data: data) } },
-            clearLayerMask: { index in sessionBox.withRuntime { $0.clearLayerMaskMutation(index: index) } },
-            applyLayerMask: { index in sessionBox.withRuntime { $0.applyLayerMaskMutation(index: index) } },
-            clearLayer: { index in sessionBox.withRuntime { $0.clearLayerMutation(index: index) } },
-            consumeDirtyUpdate: { sessionBox.withRuntime { $0.consumeDirtyUpdate() } }
+            lightweightPresentation: runtime.queryGateway.lightweightPresentation,
+            presentation: runtime.queryGateway.presentation,
+            compositePixelData: runtime.queryGateway.compositePixelData,
+            prewarmDrawingResources: runtime.persistenceGateway.prewarmDrawingResources,
+            compositePNGData: runtime.exportGateway.compositePNGData,
+            timelapseCapture: runtime.exportGateway.timelapseCapture,
+            saveProject: runtime.persistenceGateway.saveProject,
+            loadProject: runtime.persistenceGateway.loadProject,
+            setPaperStyle: runtime.persistenceGateway.setPaperStyle,
+            newCanvas: runtime.persistenceGateway.newCanvas,
+            resizeCanvas: runtime.mutationGateway.resizeCanvas,
+            resizeCanvasExtent: runtime.mutationGateway.resizeCanvasExtent,
+            beginStroke: runtime.strokeGateway.beginStroke,
+            appendStroke: runtime.strokeGateway.appendStroke,
+            endStroke: runtime.strokeGateway.endStroke,
+            cancelStroke: runtime.strokeGateway.cancelStroke,
+            blurStroke: runtime.strokeGateway.blurStroke,
+            endBlurStroke: runtime.strokeGateway.endBlurStroke,
+            fill: runtime.strokeGateway.fill,
+            canUndo: runtime.historyGateway.canUndo,
+            canRedo: runtime.historyGateway.canRedo,
+            undo: runtime.historyGateway.undo,
+            redo: runtime.historyGateway.redo,
+            addLayer: runtime.mutationGateway.addLayer,
+            duplicateLayer: runtime.duplicateLayer,
+            deleteLayer: runtime.mutationGateway.deleteLayer,
+            moveLayer: runtime.moveLayer,
+            createFolder: runtime.createFolder,
+            deleteFolder: runtime.deleteFolder,
+            setFolderVisibility: runtime.setFolderVisibility,
+            setFolderName: runtime.setFolderName,
+            setFolderExpanded: runtime.setFolderExpanded,
+            assignLayerToFolder: runtime.assignLayerToFolder,
+            setActiveLayer: runtime.mutationGateway.setActiveLayer,
+            setLayerName: runtime.mutationGateway.setLayerName,
+            setLayerVisibility: runtime.mutationGateway.setLayerVisibility,
+            setLayerLocked: runtime.setLayerLocked,
+            setLayerAlphaLocked: runtime.setLayerAlphaLocked,
+            setLayerClipped: runtime.setLayerClipped,
+            revealLayerForEditing: runtime.mutationGateway.revealLayerForEditing,
+            setLayerOpacity: runtime.setLayerOpacity,
+            setLayerBlendMode: runtime.setLayerBlendMode,
+            mergeLayerDown: runtime.mergeLayerDown,
+            textLayerData: runtime.textLayerGateway.textLayerData,
+            setTextLayer: runtime.textLayerGateway.setTextLayer,
+            clearTextLayerData: runtime.textLayerGateway.clearTextLayerData,
+            applyLayerProcessing: runtime.mutationGateway.applyLayerProcessing,
+            applySoftwareStroke: runtime.strokeGateway.applySoftwareStroke,
+            pixelDataForLayer: runtime.queryGateway.pixelDataForLayer,
+            replaceLayerPixels: runtime.mutationGateway.replaceLayerPixels,
+            replaceLayerMask: runtime.mutationGateway.replaceLayerMask,
+            clearLayerMask: runtime.mutationGateway.clearLayerMask,
+            applyLayerMask: runtime.mutationGateway.applyLayerMask,
+            clearLayer: runtime.mutationGateway.clearLayer,
+            consumeDirtyUpdate: runtime.queryGateway.consumeDirtyUpdate
         )
     }
 }
@@ -389,214 +350,5 @@ private enum TextLayerGatewayKey: DependencyKey {
             setTextLayer: paintDocumentClient.setTextLayer,
             clearTextLayerData: paintDocumentClient.clearTextLayerData
         )
-    }
-}
-
-extension PaintDocumentSession {
-    func resizeCanvasMutation(width: Int, height: Int) -> DocumentMutationResult {
-        resizeCanvas(width: width, height: height)
-    }
-
-    func resizeCanvasExtentMutation(width: Int, height: Int) -> DocumentMutationResult {
-        resizeCanvasExtent(width: width, height: height)
-    }
-
-    func blurMutation(
-        samples: [StylusSample],
-        brush: BrushRuntimeSettings,
-        layerIndex: Int,
-        captureTimelapse: Bool
-    ) -> DocumentMutationResult {
-        blur(
-            samples: samples,
-            brush: brush,
-            layerIndex: layerIndex,
-            captureTimelapse: captureTimelapse
-        )
-    }
-
-    func fillMutation(
-        sample: StylusSample,
-        brush: BrushRuntimeSettings
-    ) -> DocumentMutationResult {
-        fill(sample: sample, brush: brush)
-    }
-
-    func undoMutation() -> DocumentMutationResult {
-        undo()
-    }
-
-    func redoMutation() -> DocumentMutationResult {
-        redo()
-    }
-
-    func addLayerMutation(name: String) -> DocumentIndexedMutationResult {
-        addLayer(name: name)
-    }
-
-    func duplicateLayerMutation(
-        index: Int,
-        name: String
-    ) -> DocumentIndexedMutationResult {
-        duplicateLayer(index: index, name: name)
-    }
-
-    func deleteLayerMutation(index: Int) -> DocumentMutationResult {
-        deleteLayer(index: index)
-    }
-
-    func moveLayerMutation(
-        from index: Int,
-        to destinationIndex: Int
-    ) -> DocumentMutationResult {
-        moveLayer(from: index, to: destinationIndex)
-    }
-
-    func createFolderMutation(
-        name: String,
-        layerIndex: Int
-    ) -> DocumentIndexedMutationResult {
-        createFolder(name: name, layerIndex: layerIndex)
-    }
-
-    func deleteFolderMutation(folderID: Int) -> DocumentMutationResult {
-        deleteFolder(folderID: folderID)
-    }
-
-    func setFolderVisibilityMutation(
-        folderID: Int,
-        isVisible: Bool
-    ) -> DocumentMutationResult {
-        setFolderVisibility(folderID: folderID, isVisible: isVisible)
-    }
-
-    func setFolderNameMutation(
-        folderID: Int,
-        name: String
-    ) -> DocumentMutationResult {
-        setFolderName(folderID: folderID, name: name)
-    }
-
-    func setFolderExpandedMutation(
-        folderID: Int,
-        isExpanded: Bool
-    ) -> DocumentMutationResult {
-        setFolderExpanded(folderID: folderID, isExpanded: isExpanded)
-    }
-
-    func assignLayerMutation(
-        index: Int,
-        toFolder folderID: Int
-    ) -> DocumentMutationResult {
-        assignLayer(index: index, toFolder: folderID)
-    }
-
-    func setActiveLayerMutation(index: Int) -> DocumentMutationResult {
-        setActiveLayer(index: index)
-    }
-
-    func setLayerNameMutation(
-        index: Int,
-        name: String
-    ) -> DocumentMutationResult {
-        setLayerName(index: index, name: name)
-    }
-
-    func setLayerVisibilityMutation(
-        index: Int,
-        isVisible: Bool
-    ) -> DocumentMutationResult {
-        setLayerVisibility(index: index, isVisible: isVisible)
-    }
-
-    func setLayerLockedMutation(
-        index: Int,
-        isLocked: Bool
-    ) -> DocumentMutationResult {
-        setLayerLocked(index: index, isLocked: isLocked)
-    }
-
-    func setLayerAlphaLockedMutation(
-        index: Int,
-        isAlphaLocked: Bool
-    ) -> DocumentMutationResult {
-        setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)
-    }
-
-    func setLayerClippedMutation(
-        index: Int,
-        isClipped: Bool
-    ) -> DocumentMutationResult {
-        setLayerClipped(index: index, isClipped: isClipped)
-    }
-
-    func revealLayerForEditingMutation(index: Int) -> DocumentMutationResult {
-        revealLayerForEditing(index: index)
-    }
-
-    func setLayerOpacityMutation(
-        index: Int,
-        opacity: Double
-    ) -> DocumentMutationResult {
-        setLayerOpacity(index: index, opacity: opacity)
-    }
-
-    func setLayerBlendModeMutation(
-        index: Int,
-        blendMode: LayerBlendMode
-    ) -> DocumentMutationResult {
-        setLayerBlendMode(index: index, blendMode: blendMode)
-    }
-
-    func mergeLayerDownMutation(index: Int) -> DocumentMutationResult {
-        mergeLayerDown(index: index)
-    }
-
-    func setTextLayerMutation(
-        index: Int,
-        textLayer: TextLayerData
-    ) -> DocumentMutationResult {
-        setTextLayer(index: index, textLayer: textLayer)
-    }
-
-    func applyLayerProcessingMutation(
-        index: Int,
-        request: LayerProcessingRequest
-    ) -> DocumentMutationResult {
-        applyLayerProcessing(index: index, request: request)
-    }
-
-    func applySoftwareStrokeMutation(
-        samples: [StylusSample],
-        brush: BrushRuntimeSettings,
-        layerIndex: Int
-    ) -> DocumentMutationResult {
-        applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex)
-    }
-
-    func replaceLayerPixelsMutation(
-        index: Int,
-        data: Data
-    ) -> DocumentMutationResult {
-        replaceLayerPixels(index: index, data: data)
-    }
-
-    func replaceLayerMaskMutation(
-        index: Int,
-        data: Data
-    ) -> DocumentMutationResult {
-        replaceLayerMask(index: index, maskData: data)
-    }
-
-    func clearLayerMaskMutation(index: Int) -> DocumentMutationResult {
-        clearLayerMask(index: index)
-    }
-
-    func applyLayerMaskMutation(index: Int) -> DocumentMutationResult {
-        applyLayerMask(index: index)
-    }
-
-    func clearLayerMutation(index: Int) -> DocumentMutationResult {
-        clearLayer(index: index)
     }
 }

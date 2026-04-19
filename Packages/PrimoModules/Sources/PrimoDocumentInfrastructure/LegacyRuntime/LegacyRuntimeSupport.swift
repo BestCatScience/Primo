@@ -8,9 +8,9 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentNativeBridge
 
-typealias DateClient = PrimoCoreTypes.DateClient
-typealias UUIDClient = PrimoCoreTypes.UUIDClient
-typealias FileClient = PrimoCoreTypes.FileClient
+public typealias DateClient = PrimoCoreTypes.DateClient
+public typealias UUIDClient = PrimoCoreTypes.UUIDClient
+public typealias FileClient = PrimoCoreTypes.FileClient
 
 public typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
 public typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
