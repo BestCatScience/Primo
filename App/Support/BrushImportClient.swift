@@ -1,5 +1,7 @@
 import ComposableArchitecture
 import Foundation
+import PrimoBrushFileFormats
+import PrimoBrushInfrastructure
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoLocalization
@@ -56,40 +58,42 @@ struct BrushImportClient: Sendable {
         textFontLibraryClient: TextFontLibraryClient,
         securityScopedResourceClient: SecurityScopedResourceClient
     ) -> BrushImportClient {
-        BrushImportClient(
+        let packageBrushTipLibraryClient = PrimoBrushInfrastructure.BrushTipLibraryClient(
+            loadRaster: brushTipLibraryClient.loadRaster,
+            prepareBrushTipFile: brushTipLibraryClient.prepareBrushTipFile,
+            importPhotoshopBrushSamples: { url in
+                try brushTipLibraryClient.importPhotoshopBrushes(url).map {
+                    ImportedPhotoshopBrushSample(name: $0.name, tip: $0.tip)
+                }
+            }
+        )
+        let packageTextFontLibraryClient = PrimoBrushInfrastructure.TextFontLibraryClient(
+            loadAvailableFonts: textFontLibraryClient.loadAvailableFonts,
+            importFonts: textFontLibraryClient.importFonts
+        )
+        let service = PrimoBrushInfrastructure.BrushImportService.live(
+            brushTipLibraryClient: packageBrushTipLibraryClient,
+            textFontLibraryClient: packageTextFontLibraryClient,
+            securityScopedResourceClient: securityScopedResourceClient
+        )
+        return BrushImportClient(
             importBrushPresets: { request in
                 var imported: [BrushPreset] = []
                 var failures: [String] = []
 
-                for url in request.urls {
-                    let didAccess = securityScopedResourceClient.startAccessing(url)
-                    defer {
-                        if didAccess {
-                            securityScopedResourceClient.stopAccessing(url)
+                for result in service.importBrushTipSamples(request.urls) {
+                    switch result {
+                    case let .success(samples):
+                        let brushes = samples.map {
+                            BrushPreset.photoshopImported(name: $0.name, tip: $0.tip)
                         }
-                    }
-                    do {
-                        if url.pathExtension.lowercased() == "abr" {
-                            let brushes = try brushTipLibraryClient
-                                .importPhotoshopBrushes(url)
-                                .map(\.preset)
-                            if brushes.isEmpty {
-                                failures.append(
-                                    "\(url.lastPathComponent): \(request.language.localized("対応している先端が見つかりませんでした。"))"
-                                )
-                            } else {
-                                imported.append(contentsOf: brushes)
-                            }
-                            continue
+                        if brushes.isEmpty {
+                            failures.append(request.language.localized("対応している先端が見つかりませんでした。"))
+                        } else {
+                            imported.append(contentsOf: brushes)
                         }
-
-                        let brushName = url.deletingPathExtension().lastPathComponent
-                        let tip = try brushTipLibraryClient.loadRaster(url)
-                        imported.append(
-                            BrushPreset.photoshopImported(name: brushName, tip: tip)
-                        )
-                    } catch {
-                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                    case let .failure(failure):
+                        failures.append(failure.message)
                     }
                 }
 
@@ -99,37 +103,23 @@ struct BrushImportClient: Sendable {
                 var importedFonts: [TextFontOption] = []
                 var failures: [String] = []
 
-                for url in request.urls {
-                    let didAccess = securityScopedResourceClient.startAccessing(url)
-                    defer {
-                        if didAccess {
-                            securityScopedResourceClient.stopAccessing(url)
-                        }
-                    }
-                    do {
-                        importedFonts.append(
-                            contentsOf: try textFontLibraryClient.importFonts([url])
-                        )
-                    } catch {
-                        failures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                for result in service.importTextFonts(request.urls) {
+                    switch result {
+                    case let .success(fonts):
+                        importedFonts.append(contentsOf: fonts)
+                    case let .failure(failure):
+                        failures.append(failure.message)
                     }
                 }
 
                 return TextFontImportResult(fonts: importedFonts, failureMessages: failures)
             },
             loadCustomTip: { url in
-                let didAccess = securityScopedResourceClient.startAccessing(url)
-                defer {
-                    if didAccess {
-                        securityScopedResourceClient.stopAccessing(url)
-                    }
-                }
-                do {
-                    return .success(try brushTipLibraryClient.loadRaster(url))
-                } catch {
-                    return .failure(
-                        .loadFailed("\(url.lastPathComponent): \(error.localizedDescription)")
-                    )
+                switch service.loadCustomTip(url) {
+                case let .success(tip):
+                    return .success(tip)
+                case let .failure(failure):
+                    return .failure(.loadFailed(failure.message))
                 }
             }
         )
