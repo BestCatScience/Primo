@@ -19,20 +19,73 @@ extension NanoBananaFeature {
         var model: NanoBananaModel = .flashImage25
     }
 
+    struct ExecutionState: Equatable {
+        var isGenerating = false
+        var jobs: [NanoBananaJob] = []
+        var history: [NanoBananaHistoryItem] = []
+        var pendingDescriptor: NanoBananaEditDescriptor?
+        var activeJobID: UUID?
+    }
+
+    struct PresentationState: Equatable {
+        var isSheetPresented = false
+        var isPaywallPresented = false
+        var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
+        var workspaceBottomPanelCollapsed = false
+    }
+
     @ObservableState
     struct State: Equatable {
         var composer = ComposerState()
         var settings = NanoBananaSettings()
         var commerce = NanoBananaCommerceSnapshot()
-        var isGenerating = false
-        var jobs: [NanoBananaJob] = []
-        var history: [NanoBananaHistoryItem] = []
-        var pendingRequest: NanoBananaEditDescriptor?
-        var activeJobID: UUID?
-        var isSheetPresented = false
-        var isPaywallPresented = false
-        var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
-        var workspaceBottomPanelCollapsed = false
+        var execution = ExecutionState()
+        var presentation = PresentationState()
+
+        var isGenerating: Bool {
+            get { execution.isGenerating }
+            set { execution.isGenerating = newValue }
+        }
+
+        var jobs: [NanoBananaJob] {
+            get { execution.jobs }
+            set { execution.jobs = newValue }
+        }
+
+        var history: [NanoBananaHistoryItem] {
+            get { execution.history }
+            set { execution.history = newValue }
+        }
+
+        var pendingRequest: NanoBananaEditDescriptor? {
+            get { execution.pendingDescriptor }
+            set { execution.pendingDescriptor = newValue }
+        }
+
+        var activeJobID: UUID? {
+            get { execution.activeJobID }
+            set { execution.activeJobID = newValue }
+        }
+
+        var isSheetPresented: Bool {
+            get { presentation.isSheetPresented }
+            set { presentation.isSheetPresented = newValue }
+        }
+
+        var isPaywallPresented: Bool {
+            get { presentation.isPaywallPresented }
+            set { presentation.isPaywallPresented = newValue }
+        }
+
+        var workspaceBottomPanelSection: WorkspaceBottomPanelSection {
+            get { presentation.workspaceBottomPanelSection }
+            set { presentation.workspaceBottomPanelSection = newValue }
+        }
+
+        var workspaceBottomPanelCollapsed: Bool {
+            get { presentation.workspaceBottomPanelCollapsed }
+            set { presentation.workspaceBottomPanelCollapsed = newValue }
+        }
 
         var progress: Double? {
             guard isGenerating else { return nil }
@@ -96,15 +149,59 @@ extension NanoBananaFeature {
             )
         }
 
+        func buildCommand(
+            using builder: NanoBananaCommandBuilder
+        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
+            builder.build(
+                draft: buildDraft(),
+                apiKey: apiKey,
+                commerce: commerce
+            )
+        }
+
+        func buildCommand(
+            for descriptor: NanoBananaEditDescriptor,
+            using builder: NanoBananaCommandBuilder
+        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
+            builder.build(
+                draft: NanoBananaDraft(
+                    prompt: descriptor.prompt.rawValue,
+                    accessMode: descriptor.accessMode,
+                    model: descriptor.model,
+                    inputLayerIndex: descriptor.inputLayerIndex,
+                    editScope: descriptor.editScope,
+                    outputMode: descriptor.outputMode,
+                    maskSettings: descriptor.maskSettings
+                ),
+                apiKey: apiKey,
+                commerce: commerce
+            )
+        }
+
+        func regenerationCommand(
+            using builder: NanoBananaCommandBuilder
+        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure>? {
+            guard let descriptor = regenerationRequest() else { return nil }
+            return buildCommand(for: descriptor, using: builder)
+        }
+
+        func retryCommand(
+            for jobID: UUID,
+            using builder: NanoBananaCommandBuilder
+        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure>? {
+            guard let descriptor = retryRequest(for: jobID) else { return nil }
+            return buildCommand(for: descriptor, using: builder)
+        }
+
         mutating func beginGeneration(
             descriptor: NanoBananaEditDescriptor,
             jobID: UUID,
             createdAt: Date
         ) {
-            isGenerating = true
-            pendingRequest = descriptor
-            activeJobID = jobID
-            jobs.insert(
+            execution.isGenerating = true
+            execution.pendingDescriptor = descriptor
+            execution.activeJobID = jobID
+            execution.jobs.insert(
                 NanoBananaJob(
                     id: jobID,
                     descriptor: descriptor,
@@ -114,15 +211,15 @@ extension NanoBananaFeature {
                 ),
                 at: 0
             )
-            jobs = Array(jobs.prefix(12))
+            execution.jobs = Array(execution.jobs.prefix(12))
         }
 
         func regenerationRequest() -> NanoBananaEditDescriptor? {
-            pendingRequest
+            execution.pendingDescriptor
         }
 
         func retryRequest(for jobID: UUID) -> NanoBananaEditDescriptor? {
-            jobs.first(where: { $0.id == jobID })?.descriptor
+            execution.jobs.first(where: { $0.id == jobID })?.descriptor
         }
 
         mutating func recordSucceededGeneration(
@@ -130,8 +227,8 @@ extension NanoBananaFeature {
             historyID: UUID,
             createdAt: Date
         ) {
-            isGenerating = false
-            history.insert(
+            execution.isGenerating = false
+            execution.history.insert(
                 NanoBananaHistoryItem(
                     id: historyID,
                     descriptor: preview.descriptor,
@@ -140,17 +237,17 @@ extension NanoBananaFeature {
                 ),
                 at: 0
             )
-            history = Array(history.prefix(12))
-            if let activeJobID,
-               let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
-                jobs[jobIndex].status = .succeeded
-                jobs[jobIndex].message = nil
+            execution.history = Array(execution.history.prefix(12))
+            if let activeJobID = execution.activeJobID,
+               let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
+                execution.jobs[jobIndex].status = .succeeded
+                execution.jobs[jobIndex].message = nil
             }
         }
 
         mutating func completeAppliedEdit(request: NanoBananaEditDescriptor) {
-            pendingRequest = request
-            activeJobID = nil
+            execution.pendingDescriptor = request
+            execution.activeJobID = nil
         }
 
         mutating func markFailed(
@@ -158,11 +255,11 @@ extension NanoBananaFeature {
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)
-            isGenerating = false
-            if let activeJobID,
-               let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
-                jobs[jobIndex].status = .failed
-                jobs[jobIndex].message = message
+            execution.isGenerating = false
+            if let activeJobID = execution.activeJobID,
+               let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
+                execution.jobs[jobIndex].status = .failed
+                execution.jobs[jobIndex].message = message
             }
         }
 
@@ -171,11 +268,11 @@ extension NanoBananaFeature {
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)
-            isGenerating = false
-            if let activeJobID,
-               let jobIndex = jobs.firstIndex(where: { $0.id == activeJobID }) {
-                jobs[jobIndex].status = .canceled
-                jobs[jobIndex].message = message
+            execution.isGenerating = false
+            if let activeJobID = execution.activeJobID,
+               let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
+                execution.jobs[jobIndex].status = .canceled
+                execution.jobs[jobIndex].message = message
             }
         }
     }

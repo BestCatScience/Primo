@@ -95,11 +95,7 @@ extension NanoBananaFeature {
             if closeSheet {
                 state.isSheetPresented = false
             }
-            switch nanoBananaCommandBuilder.build(
-                draft: state.buildDraft(),
-                apiKey: state.apiKey,
-                commerce: state.commerce
-            ) {
+            switch state.buildCommand(using: nanoBananaCommandBuilder) {
             case let .success(command):
                 return .send(.delegate(.requestEdit(command)))
             case .failure(.promptRequired):
@@ -119,22 +115,10 @@ extension NanoBananaFeature {
             return .send(.delegate(.cancelEdit))
 
         case let .retryJobTapped(jobID):
-            guard let descriptor = state.retryRequest(for: jobID) else {
+            guard let commandResult = state.retryCommand(for: jobID, using: nanoBananaCommandBuilder) else {
                 return .none
             }
-            switch nanoBananaCommandBuilder.build(
-                draft: NanoBananaDraft(
-                    prompt: descriptor.prompt.rawValue,
-                    accessMode: descriptor.accessMode,
-                    model: descriptor.model,
-                    inputLayerIndex: descriptor.inputLayerIndex,
-                    editScope: descriptor.editScope,
-                    outputMode: descriptor.outputMode,
-                    maskSettings: descriptor.maskSettings
-                ),
-                apiKey: state.apiKey,
-                commerce: state.commerce
-            ) {
+            switch commandResult {
             case let .success(command):
                 return .send(.delegate(.requestEdit(command)))
             case .failure:
@@ -142,22 +126,10 @@ extension NanoBananaFeature {
             }
 
         case .regenerateTapped:
-            guard let descriptor = state.regenerationRequest() else {
+            guard let commandResult = state.regenerationCommand(using: nanoBananaCommandBuilder) else {
                 return .none
             }
-            switch nanoBananaCommandBuilder.build(
-                draft: NanoBananaDraft(
-                    prompt: descriptor.prompt.rawValue,
-                    accessMode: descriptor.accessMode,
-                    model: descriptor.model,
-                    inputLayerIndex: descriptor.inputLayerIndex,
-                    editScope: descriptor.editScope,
-                    outputMode: descriptor.outputMode,
-                    maskSettings: descriptor.maskSettings
-                ),
-                apiKey: state.apiKey,
-                commerce: state.commerce
-            ) {
+            switch commandResult {
             case let .success(command):
                 return .send(.delegate(.requestEdit(command)))
             case .failure:

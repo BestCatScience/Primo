@@ -16,60 +16,17 @@ extension AppFeature {
     typealias WorkspaceProjectLoadCommand = PrimoWorkspaceDomain.WorkspaceProjectLoadCommand
     typealias WorkspaceProjectLoadingService = PrimoWorkspaceDomain.WorkspaceProjectLoadingService<LoadedPaintProject>
 
-    struct WorkspaceProjectCleanupService: Sendable {
-        let workspaceBackingStoreService: WorkspaceBackingStoreService
-        let documentImportClient: DocumentImportClient
-
-        func discardWorkspaceItemIfNeeded(
-            _ workspaceItem: DocumentProjectPath?
-        ) -> [WorkspaceProjectLoadIssue] {
-            guard let workspaceItem else { return [] }
-            do {
-                try workspaceBackingStoreService.removeWorkspaceItem(workspaceItem)
-                return []
-            } catch {
-                return [
-                    .workspaceItemRemovalFailed(
-                        AppFeature.optionalErrorMessage(error)
-                    )
-                ]
-            }
-        }
-
-        func discardImportedStaging(
-            _ stagedProjectURL: DocumentProjectPath
-        ) -> [WorkspaceProjectLoadIssue] {
-            switch documentImportClient.discardStagedDocument(stagedProjectURL) {
-            case .success:
-                return []
-            case let .failure(failure):
-                return [
-                    .importedStagingCleanupFailed(
-                        failure.errorDescription
-                    )
-                ]
-            }
-        }
-    }
-
     var workspaceProjectPreparationUseCase: WorkspaceProjectPreparationUseCase {
         WorkspaceProjectPreparationUseCase(
             workspacePersistenceUseCase: workspacePersistenceUseCase
         )
     }
 
-    var workspaceProjectCleanupService: WorkspaceProjectCleanupService {
-        WorkspaceProjectCleanupService(
-            workspaceBackingStoreService: workspaceBackingStoreService,
-            documentImportClient: documentImportClient
-        )
-    }
-
     var workspaceProjectLoadUseCase: WorkspaceProjectLoadUseCase {
         WorkspaceProjectLoadUseCase(
-            paintDocumentClient: paintDocumentClient,
-            documentImportClient: documentImportClient,
-            cleanupService: workspaceProjectCleanupService
+            projectLoader: workspaceProjectLoaderGateway,
+            documentImport: documentImportGateway,
+            cleanupService: workspaceDomainProjectCleanupService
         )
     }
 
@@ -77,6 +34,34 @@ extension AppFeature {
         WorkspaceProjectLoadingService(
             preparationUseCase: workspaceProjectPreparationUseCase,
             loadUseCase: workspaceProjectLoadUseCase
+        )
+    }
+
+    var documentImportGateway: DocumentImportGateway {
+        DocumentImportGateway(
+            stageImportedDocument: { request in
+                documentImportClient.stageImportedDocument(
+                    ImportedDocumentStageRequest(sourceURL: request.sourceURL)
+                )
+            },
+            discardStagedDocument: { stagedProjectURL in
+                documentImportClient.discardStagedDocument(stagedProjectURL)
+            }
+        )
+    }
+
+    var workspaceProjectLoaderGateway: ProjectLoadingGateway<LoadedPaintProject> {
+        ProjectLoadingGateway(
+            loadProject: { url in
+                try paintDocumentClient.loadProject(url)
+            }
+        )
+    }
+
+    var workspaceDomainProjectCleanupService: PrimoWorkspaceDomain.WorkspaceProjectCleanupService {
+        PrimoWorkspaceDomain.WorkspaceProjectCleanupService(
+            workspaceBackingStore: workspaceBackingStoreGateway,
+            documentImport: documentImportGateway
         )
     }
 
@@ -170,73 +155,5 @@ extension AppFeature {
                 await send(onFailure(failure))
             }
         }
-    }
-}
-
-extension PrimoWorkspaceDomain.WorkspaceProjectLoadUseCase where LoadedProject == LoadedPaintProject {
-    init(
-        paintDocumentClient: PaintDocumentClient,
-        documentImportClient: DocumentImportClient,
-        cleanupService: AppFeature.WorkspaceProjectCleanupService
-    ) {
-        self.init(
-            projectLoader: ProjectLoadingGateway<LoadedPaintProject>(
-                loadProject: { url in
-                    try paintDocumentClient.loadProject(url)
-                }
-            ),
-            documentImport: DocumentImportGateway(
-                stageImportedDocument: { request in
-                    documentImportClient.stageImportedDocument(
-                        ImportedDocumentStageRequest(sourceURL: request.sourceURL)
-                    )
-                },
-                discardStagedDocument: { stagedProjectURL in
-                    documentImportClient.discardStagedDocument(stagedProjectURL)
-                }
-            ),
-            cleanupService: PrimoWorkspaceDomain.WorkspaceProjectCleanupService(
-                workspaceBackingStore: WorkspaceBackingStoreGateway(
-                    saveProject: { fileURL, paperStyle in
-                        try cleanupService.workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
-                    },
-                    persistProjectSnapshot: { sourceURL, preferredDestinationURL in
-                        try cleanupService.workspaceBackingStoreService.persistProjectSnapshot(
-                            sourceURL,
-                            preferredDestinationURL: preferredDestinationURL
-                        )
-                    },
-                    createTabBackingStoreURL: { tabID in
-                        try cleanupService.workspaceBackingStoreService.createTabBackingStoreURL(tabID)
-                    },
-                    persistAutosaveSnapshot: { backingStoreURL, tab in
-                        try cleanupService.workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
-                    },
-                    discardAutosaveSnapshot: { tab in
-                        try cleanupService.workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-                    },
-                    persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
-                        try cleanupService.workspaceBackingStoreService.persistSaveHistorySnapshot(
-                            backingStoreURL,
-                            tab,
-                            trigger
-                        )
-                    },
-                    removeWorkspaceItem: { url in
-                        try cleanupService.workspaceBackingStoreService.removeWorkspaceItem(url)
-                    }
-                ),
-                documentImport: DocumentImportGateway(
-                    stageImportedDocument: { request in
-                        documentImportClient.stageImportedDocument(
-                            ImportedDocumentStageRequest(sourceURL: request.sourceURL)
-                        )
-                    },
-                    discardStagedDocument: { stagedProjectURL in
-                        documentImportClient.discardStagedDocument(stagedProjectURL)
-                    }
-                )
-            )
-        )
     }
 }

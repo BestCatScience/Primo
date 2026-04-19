@@ -172,21 +172,82 @@ extension AppFeature {
 
     var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
         WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: workspaceBackingStoreService,
-            workspaceCatalogService: workspaceCatalogService,
-            workspaceIdentityService: workspaceIdentityService
+            workspaceBackingStore: workspaceBackingStoreGateway,
+            workspaceCatalog: workspaceCatalogGateway,
+            identityGenerator: workspaceIdentityGenerator
         )
     }
 
     var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
         WorkspaceCatalogUseCase(
-            workspaceCatalogService: workspaceCatalogService
+            workspaceCatalog: workspaceCatalogGateway
         )
     }
 
     var workspaceIdentityService: WorkspaceIdentityService {
         WorkspaceIdentityService(
             uuidClient: uuidClient
+        )
+    }
+
+    var workspaceBackingStoreGateway: WorkspaceBackingStoreGateway {
+        WorkspaceBackingStoreGateway(
+            saveProject: { fileURL, paperStyle in
+                try workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
+            },
+            persistProjectSnapshot: { sourceURL, preferredDestinationURL in
+                try workspaceBackingStoreService.persistProjectSnapshot(
+                    sourceURL,
+                    preferredDestinationURL: preferredDestinationURL
+                )
+            },
+            createTabBackingStoreURL: { tabID in
+                try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
+            },
+            persistAutosaveSnapshot: { backingStoreURL, tab in
+                try workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
+            },
+            discardAutosaveSnapshot: { tab in
+                try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
+            },
+            persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
+                try workspaceBackingStoreService.persistSaveHistorySnapshot(
+                    backingStoreURL,
+                    tab,
+                    trigger
+                )
+            },
+            removeWorkspaceItem: { url in
+                try workspaceBackingStoreService.removeWorkspaceItem(url)
+            }
+        )
+    }
+
+    var workspaceCatalogGateway: WorkspaceCatalogGateway {
+        WorkspaceCatalogGateway(
+            loadSavedProjects: {
+                try workspaceCatalogService.loadSavedProjects()
+            },
+            moveSavedProject: { sourceURL, relativeFolderPath in
+                try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
+            },
+            loadAutosaveRecoveryItems: {
+                try workspaceCatalogService.loadAutosaveRecoveryItems()
+            },
+            discardAutosaveEntry: { autosaveID in
+                try workspaceCatalogService.discardAutosaveEntry(autosaveID)
+            },
+            loadSaveHistoryEntries: { activeTab in
+                try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
+            }
+        )
+    }
+
+    var workspaceIdentityGenerator: WorkspaceIdentityGenerator {
+        WorkspaceIdentityGenerator(
+            generateTabID: {
+                workspaceIdentityService.generateTabID()
+            }
         )
     }
 
@@ -1008,92 +1069,5 @@ extension AppFeature {
 
     var workspaceFeedbackMapper: WorkspaceFeedbackMapper {
         WorkspaceFeedbackMapper()
-    }
-}
-
-extension PrimoWorkspaceDomain.WorkspacePersistenceUseCase {
-    init(
-        workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService,
-        workspaceCatalogService: AppFeature.WorkspaceCatalogService,
-        workspaceIdentityService: AppFeature.WorkspaceIdentityService
-    ) {
-        self.init(
-            workspaceBackingStore: WorkspaceBackingStoreGateway(
-                saveProject: { fileURL, paperStyle in
-                    try workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
-                },
-                persistProjectSnapshot: { sourceURL, preferredDestinationURL in
-                    try workspaceBackingStoreService.persistProjectSnapshot(
-                        sourceURL,
-                        preferredDestinationURL: preferredDestinationURL
-                    )
-                },
-                createTabBackingStoreURL: { tabID in
-                    try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
-                },
-                persistAutosaveSnapshot: { backingStoreURL, tab in
-                    try workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
-                },
-                discardAutosaveSnapshot: { tab in
-                    try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-                },
-                persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
-                    try workspaceBackingStoreService.persistSaveHistorySnapshot(
-                        backingStoreURL,
-                        tab,
-                        trigger
-                    )
-                },
-                removeWorkspaceItem: { url in
-                    try workspaceBackingStoreService.removeWorkspaceItem(url)
-                }
-            ),
-            workspaceCatalog: WorkspaceCatalogGateway(
-                loadSavedProjects: {
-                    try workspaceCatalogService.loadSavedProjects()
-                },
-                moveSavedProject: { sourceURL, relativeFolderPath in
-                    try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
-                },
-                loadAutosaveRecoveryItems: {
-                    try workspaceCatalogService.loadAutosaveRecoveryItems()
-                },
-                discardAutosaveEntry: { autosaveID in
-                    try workspaceCatalogService.discardAutosaveEntry(autosaveID)
-                },
-                loadSaveHistoryEntries: { activeTab in
-                    try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
-                }
-            ),
-            identityGenerator: WorkspaceIdentityGenerator(
-                generateTabID: {
-                    workspaceIdentityService.generateTabID()
-                }
-            )
-        )
-    }
-}
-
-extension PrimoWorkspaceDomain.WorkspaceCatalogUseCase {
-    init(workspaceCatalogService: AppFeature.WorkspaceCatalogService) {
-        self.init(
-            workspaceCatalog: WorkspaceCatalogGateway(
-                loadSavedProjects: {
-                    try workspaceCatalogService.loadSavedProjects()
-                },
-                moveSavedProject: { sourceURL, relativeFolderPath in
-                    try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
-                },
-                loadAutosaveRecoveryItems: {
-                    try workspaceCatalogService.loadAutosaveRecoveryItems()
-                },
-                discardAutosaveEntry: { autosaveID in
-                    try workspaceCatalogService.discardAutosaveEntry(autosaveID)
-                },
-                loadSaveHistoryEntries: { activeTab in
-                    try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
-                }
-            )
-        )
     }
 }
