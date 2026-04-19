@@ -24,7 +24,7 @@ extension AppFeature {
         )
     }
 
-    static func nanoBananaFailureFeedback(_ failure: NanoBananaFailure) -> ApplicationFeedback {
+    static func nanoBananaFailureFeedback(_ failure: NanoBananaEditFailure) -> ApplicationFeedback {
         switch failure {
         case .invalidResponse:
             return .nanoBananaInvalidResponse

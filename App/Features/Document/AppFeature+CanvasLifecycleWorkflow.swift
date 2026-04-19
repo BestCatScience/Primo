@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoCoreTypes
 
 extension AppFeature {
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {

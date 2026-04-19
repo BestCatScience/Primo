@@ -589,14 +589,14 @@ extension ContentView {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(nanoBananaState.history.prefix(8)) { item in
                     Button {
-                        store.send(.nanoBanana(.historyItemSelected(item.request)))
+                        store.send(.nanoBanana(.historyItemSelected(item.descriptor)))
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.request.prompt)
+                            Text(item.descriptor.prompt.rawValue)
                                 .font(StudioTheme.Typography.body(13))
                                 .foregroundStyle(.white.opacity(0.88))
                                 .lineLimit(2)
-                            Text(item.request.model.title(language))
+                            Text(item.descriptor.model.title(language))
                                 .font(StudioTheme.Typography.mono(10))
                                 .foregroundStyle(.white.opacity(0.45))
                         }
@@ -624,7 +624,7 @@ extension ContentView {
                             .padding(.top, 5)
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Text(job.request.model.title(language))
+                                Text(job.descriptor.model.title(language))
                                     .font(StudioTheme.Typography.label(12))
                                     .foregroundStyle(.white.opacity(0.9))
                                 Spacer(minLength: 0)
@@ -632,7 +632,7 @@ extension ContentView {
                                     .font(StudioTheme.Typography.mono(10))
                                     .foregroundStyle(.white.opacity(0.45))
                             }
-                            Text(job.request.prompt)
+                            Text(job.descriptor.prompt.rawValue)
                                 .font(StudioTheme.Typography.body(12))
                                 .foregroundStyle(.white.opacity(0.62))
                                 .lineLimit(2)

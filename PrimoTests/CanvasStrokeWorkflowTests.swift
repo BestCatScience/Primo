@@ -161,20 +161,16 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
-            let request = NanoBananaGenerationRequest(
-                prompt: "Retouch",
-                config: NanoBananaRequestConfig(
-                    accessMode: .appManaged,
-                    credential: "",
-                    endpoint: "https://example.com"
-                ),
+            let descriptor = NanoBananaEditDescriptor(
+                prompt: NonEmptyPrompt("Retouch")!,
+                accessMode: .appManaged,
                 model: .flashImage25,
                 inputLayerIndex: 0,
                 editScope: .wholeLayer,
                 outputMode: .newLayer
             )
             let preview = NanoBananaPreviewState(
-                request: request,
+                descriptor: descriptor,
                 outputLayerIndex: 0,
                 pixelData: Data([0x00]),
                 beforePreviewImageData: nil,

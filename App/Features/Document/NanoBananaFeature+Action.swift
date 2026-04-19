@@ -27,14 +27,14 @@ extension NanoBananaFeature {
         case purchasePrimaryProductTapped
         case restorePurchasesTapped
         case purchaseErrorDismissed
-        case historyItemSelected(NanoBananaGenerationRequest)
+        case historyItemSelected(NanoBananaEditDescriptor)
         case generationSucceeded(NanoBananaPreviewState)
         case generationFailed(AppFeature.ApplicationFeedback)
         case delegate(Delegate)
     }
 
     enum Delegate: Equatable {
-        case requestEdit(NanoBananaGenerationRequest)
+        case requestEdit(SubmitNanoBananaEditCommand)
         case cancelEdit
     }
 }

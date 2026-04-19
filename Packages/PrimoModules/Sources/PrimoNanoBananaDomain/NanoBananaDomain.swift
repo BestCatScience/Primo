@@ -42,25 +42,63 @@ public enum NanoBananaAccessMode: String, CaseIterable, Equatable, Sendable, Ide
     public var id: String { rawValue }
 }
 
-public struct NanoBananaRequestConfig: Equatable, Sendable {
-    public let accessMode: NanoBananaAccessMode
-    public let credential: String
-    public let endpoint: String
+public struct NonEmptyPrompt: Equatable, Sendable {
+    public let rawValue: String
 
-    public init(
-        accessMode: NanoBananaAccessMode,
-        credential: String,
-        endpoint: String
-    ) {
-        self.accessMode = accessMode
-        self.credential = credential
-        self.endpoint = endpoint
+    public init?(_ rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        self.rawValue = trimmed
     }
 }
 
-public struct NanoBananaGenerationRequest: Equatable, Sendable {
+public struct NanoBananaAPIKey: Equatable, Sendable {
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        self.rawValue = trimmed
+    }
+}
+
+public struct NanoBananaEntitlementToken: Equatable, Sendable {
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        self.rawValue = trimmed
+    }
+}
+
+public struct ProxyEndpoint: Equatable, Sendable {
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, URL(string: trimmed) != nil else { return nil }
+        self.rawValue = trimmed
+    }
+}
+
+public enum NanoBananaExecutionConfig: Equatable, Sendable {
+    case userAPIKey(apiKey: NanoBananaAPIKey)
+    case appManaged(entitlement: NanoBananaEntitlementToken, endpoint: ProxyEndpoint)
+
+    public var accessMode: NanoBananaAccessMode {
+        switch self {
+        case .userAPIKey:
+            return .userAPIKey
+        case .appManaged:
+            return .appManaged
+        }
+    }
+}
+
+public struct NanoBananaDraft: Equatable, Sendable {
     public var prompt: String
-    public var config: NanoBananaRequestConfig
+    public var accessMode: NanoBananaAccessMode
     public var model: NanoBananaModel
     public var inputLayerIndex: Int
     public var editScope: NanoBananaEditScope
@@ -69,7 +107,7 @@ public struct NanoBananaGenerationRequest: Equatable, Sendable {
 
     public init(
         prompt: String,
-        config: NanoBananaRequestConfig,
+        accessMode: NanoBananaAccessMode,
         model: NanoBananaModel,
         inputLayerIndex: Int,
         editScope: NanoBananaEditScope,
@@ -77,7 +115,7 @@ public struct NanoBananaGenerationRequest: Equatable, Sendable {
         maskSettings: NanoBananaMaskSettings = .init()
     ) {
         self.prompt = prompt
-        self.config = config
+        self.accessMode = accessMode
         self.model = model
         self.inputLayerIndex = inputLayerIndex
         self.editScope = editScope
@@ -86,21 +124,62 @@ public struct NanoBananaGenerationRequest: Equatable, Sendable {
     }
 }
 
+public struct NanoBananaEditDescriptor: Equatable, Sendable {
+    public var prompt: NonEmptyPrompt
+    public var accessMode: NanoBananaAccessMode
+    public var model: NanoBananaModel
+    public var inputLayerIndex: Int
+    public var editScope: NanoBananaEditScope
+    public var outputMode: NanoBananaOutputMode
+    public var maskSettings: NanoBananaMaskSettings
+
+    public init(
+        prompt: NonEmptyPrompt,
+        accessMode: NanoBananaAccessMode,
+        model: NanoBananaModel,
+        inputLayerIndex: Int,
+        editScope: NanoBananaEditScope,
+        outputMode: NanoBananaOutputMode,
+        maskSettings: NanoBananaMaskSettings = .init()
+    ) {
+        self.prompt = prompt
+        self.accessMode = accessMode
+        self.model = model
+        self.inputLayerIndex = inputLayerIndex
+        self.editScope = editScope
+        self.outputMode = outputMode
+        self.maskSettings = maskSettings
+    }
+}
+
+public struct SubmitNanoBananaEditCommand: Equatable, Sendable {
+    public var descriptor: NanoBananaEditDescriptor
+    public var executionConfig: NanoBananaExecutionConfig
+
+    public init(
+        descriptor: NanoBananaEditDescriptor,
+        executionConfig: NanoBananaExecutionConfig
+    ) {
+        self.descriptor = descriptor
+        self.executionConfig = executionConfig
+    }
+}
+
 public struct NanoBananaPreviewState: Equatable, Sendable {
-    public var request: NanoBananaGenerationRequest
+    public var descriptor: NanoBananaEditDescriptor
     public var outputLayerIndex: Int
     public var pixelData: Data
     public var beforePreviewImageData: Data?
     public var afterPreviewImageData: Data?
 
     public init(
-        request: NanoBananaGenerationRequest,
+        descriptor: NanoBananaEditDescriptor,
         outputLayerIndex: Int,
         pixelData: Data,
         beforePreviewImageData: Data?,
         afterPreviewImageData: Data?
     ) {
-        self.request = request
+        self.descriptor = descriptor
         self.outputLayerIndex = outputLayerIndex
         self.pixelData = pixelData
         self.beforePreviewImageData = beforePreviewImageData
@@ -117,20 +196,20 @@ public enum NanoBananaJobStatus: String, Equatable, Sendable {
 
 public struct NanoBananaJob: Equatable, Sendable, Identifiable {
     public var id: UUID
-    public var request: NanoBananaGenerationRequest
+    public var descriptor: NanoBananaEditDescriptor
     public var createdAt: Date
     public var status: NanoBananaJobStatus
     public var message: String?
 
     public init(
         id: UUID,
-        request: NanoBananaGenerationRequest,
+        descriptor: NanoBananaEditDescriptor,
         createdAt: Date,
         status: NanoBananaJobStatus,
         message: String?
     ) {
         self.id = id
-        self.request = request
+        self.descriptor = descriptor
         self.createdAt = createdAt
         self.status = status
         self.message = message
@@ -139,18 +218,18 @@ public struct NanoBananaJob: Equatable, Sendable, Identifiable {
 
 public struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
     public var id: UUID
-    public var request: NanoBananaGenerationRequest
+    public var descriptor: NanoBananaEditDescriptor
     public var createdAt: Date
     public var previewImageData: Data?
 
     public init(
         id: UUID,
-        request: NanoBananaGenerationRequest,
+        descriptor: NanoBananaEditDescriptor,
         createdAt: Date,
         previewImageData: Data?
     ) {
         self.id = id
-        self.request = request
+        self.descriptor = descriptor
         self.createdAt = createdAt
         self.previewImageData = previewImageData
     }
@@ -210,5 +289,28 @@ public struct NanoBananaCommerceSnapshot: Equatable, Sendable {
         self.purchaseErrorMessage = purchaseErrorMessage
         self.manageSubscriptionsURL = manageSubscriptionsURL
         self.proxyEndpoint = proxyEndpoint
+    }
+}
+
+public enum NanoBananaEditFailure: LocalizedError, Equatable, Sendable {
+    case invalidEndpoint
+    case invalidResponse
+    case missingImageData(String)
+    case apiError(String)
+    case transport(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidEndpoint:
+            return "Nano Banana endpoint is invalid."
+        case .invalidResponse:
+            return "Nano Banana returned an invalid response."
+        case let .missingImageData(message):
+            return message
+        case let .apiError(message):
+            return message
+        case let .transport(message):
+            return message
+        }
     }
 }

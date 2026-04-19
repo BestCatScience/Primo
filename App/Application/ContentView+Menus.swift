@@ -1219,12 +1219,12 @@ extension ContentView {
                         ForEach(nanoBananaState.jobs.prefix(4)) { job in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
-                                    Text(job.request.model.title(language))
+                                    Text(job.descriptor.model.title(language))
                                     Spacer()
                                     Text(job.status.rawValue.capitalized)
                                         .foregroundStyle(.secondary)
                                 }
-                                Text(job.request.prompt)
+                                Text(job.descriptor.prompt.rawValue)
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
@@ -1243,12 +1243,12 @@ extension ContentView {
                     Section(language.localized("履歴")) {
                         ForEach(nanoBananaState.history.prefix(4)) { item in
                             Button {
-                                store.send(.nanoBanana(.historyItemSelected(item.request)))
+                                store.send(.nanoBanana(.historyItemSelected(item.descriptor)))
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(item.request.prompt)
+                                    Text(item.descriptor.prompt.rawValue)
                                         .lineLimit(2)
-                                    Text(item.request.model.title(language))
+                                    Text(item.descriptor.model.title(language))
                                         .font(.footnote)
                                         .foregroundStyle(.secondary)
                                 }

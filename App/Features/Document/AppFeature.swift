@@ -16,7 +16,7 @@ struct AppFeature {
     }
 
     @Dependency(\.paintDocumentClient) var paintDocumentClient
-    @Dependency(\.nanoBananaClient) var nanoBananaClient
+    @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.documentImportClient) var documentImportClient
     @Dependency(\.fileClient) var fileClient

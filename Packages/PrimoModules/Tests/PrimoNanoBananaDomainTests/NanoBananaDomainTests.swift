@@ -3,14 +3,10 @@ import Testing
 
 struct NanoBananaDomainTests {
     @Test
-    func requestRetainsMaskAndOutputConfiguration() {
-        let request = NanoBananaGenerationRequest(
-            prompt: "Refine the lighting",
-            config: NanoBananaRequestConfig(
-                accessMode: .appManaged,
-                credential: "token",
-                endpoint: "https://proxy.example.com/edit"
-            ),
+    func descriptorRetainsMaskAndOutputConfiguration() {
+        let request = NanoBananaEditDescriptor(
+            prompt: NonEmptyPrompt("Refine the lighting")!,
+            accessMode: .appManaged,
             model: .flashImage31Preview,
             inputLayerIndex: 2,
             editScope: .selectedArea,
@@ -21,8 +17,8 @@ struct NanoBananaDomainTests {
             )
         )
 
-        #expect(request.prompt == "Refine the lighting")
-        #expect(request.config.accessMode == .appManaged)
+        #expect(request.prompt.rawValue == "Refine the lighting")
+        #expect(request.accessMode == .appManaged)
         #expect(request.model == .flashImage31Preview)
         #expect(request.inputLayerIndex == 2)
         #expect(request.editScope == .selectedArea)

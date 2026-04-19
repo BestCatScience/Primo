@@ -1,17 +1,17 @@
 import ComposableArchitecture
 import Foundation
+import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
 extension AppFeature {
     private struct NanoBananaValidatedEdit {
-        let normalizedRequest: NanoBananaGenerationRequest
+        let command: SubmitNanoBananaEditCommand
         let adjustedSelection: CanvasSelection?
         let outputLayerIndex: Int
         let canvasWidth: Int
         let canvasHeight: Int
         let sourceLayerPixelData: Data
         let beforePreviewImageData: Data?
-        let trimmedPrompt: String
     }
 
     private struct NanoBananaValidationFailure: Error, Equatable {
@@ -20,61 +20,36 @@ extension AppFeature {
 
     private struct NanoBananaRequestContract {
         func validate(
-            request: NanoBananaGenerationRequest,
+            command: SubmitNanoBananaEditCommand,
             state: AppFeature.State
         ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationFailure> {
-            let trimmedPrompt = request.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedCredential = request.config.credential.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedEndpoint = request.config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedPrompt.isEmpty else {
-                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPromptRequired))
-            }
-            guard request.config.accessMode == .appManaged || !trimmedCredential.isEmpty else {
-                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaAPIKeyRequired))
-            }
-            guard request.config.accessMode == .userAPIKey || !trimmedEndpoint.isEmpty else {
-                return .failure(NanoBananaValidationFailure(feedback: .nanoBananaEndpointRequired))
-            }
             guard
                 let snapshot = state.canvas.renderSnapshot,
-                let layer = snapshot.layers.first(where: { $0.index == request.inputLayerIndex })
+                let layer = snapshot.layers.first(where: { $0.index == command.descriptor.inputLayerIndex })
             else {
                 return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
             }
 
-            let adjustedSelection = request.editScope == .selectedArea
+            let adjustedSelection = command.descriptor.editScope == .selectedArea
                 ? AppFeature.adjustedSelection(
                     state.canvas.selection,
                     canvasSize: state.canvas.canvasSize,
-                    expansion: request.maskSettings.expansion,
-                    isInverted: request.maskSettings.isInverted
+                    expansion: command.descriptor.maskSettings.expansion,
+                    isInverted: command.descriptor.maskSettings.isInverted
                 )
                 : nil
-            if request.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
+            if command.descriptor.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
                 return .failure(NanoBananaValidationFailure(feedback: .nanoBananaSelectionRequired))
             }
 
-            let normalizedRequest = NanoBananaGenerationRequest(
-                prompt: trimmedPrompt,
-                config: NanoBananaRequestConfig(
-                    accessMode: request.config.accessMode,
-                    credential: trimmedCredential,
-                    endpoint: trimmedEndpoint
-                ),
-                model: request.model,
-                inputLayerIndex: request.inputLayerIndex,
-                editScope: request.editScope,
-                outputMode: request.outputMode,
-                maskSettings: request.maskSettings
-            )
-            let outputLayerIndex = request.outputMode == .replaceCurrentLayer
-                ? request.inputLayerIndex
+            let outputLayerIndex = command.descriptor.outputMode == .replaceCurrentLayer
+                ? command.descriptor.inputLayerIndex
                 : state.canvas.activeLayerIndex
             let canvasWidth = snapshot.width
             let canvasHeight = snapshot.height
             let sourceLayerPixelData = layer.pixelData
             let beforePreviewImageData = AppFeature.pngData(
-                fromLayerPixelData: request.outputMode == .replaceCurrentLayer
+                fromLayerPixelData: command.descriptor.outputMode == .replaceCurrentLayer
                     ? sourceLayerPixelData
                     : Data(repeating: 0, count: canvasWidth * canvasHeight * 4),
                 width: canvasWidth,
@@ -83,14 +58,13 @@ extension AppFeature {
 
             return .success(
                 NanoBananaValidatedEdit(
-                    normalizedRequest: normalizedRequest,
+                    command: command,
                     adjustedSelection: adjustedSelection,
                     outputLayerIndex: outputLayerIndex,
                     canvasWidth: canvasWidth,
                     canvasHeight: canvasHeight,
                     sourceLayerPixelData: sourceLayerPixelData,
-                    beforePreviewImageData: beforePreviewImageData,
-                    trimmedPrompt: trimmedPrompt
+                    beforePreviewImageData: beforePreviewImageData
                 )
             )
         }
@@ -107,7 +81,7 @@ extension AppFeature {
             state: AppFeature.State
         ) -> Result<NanoBananaPreviewApplicationPlan, NanoBananaValidationFailure> {
             let namingPolicy = AppFeature.DocumentNamingPolicy(language: state.application.appLanguage)
-            switch preview.request.outputMode {
+            switch preview.descriptor.outputMode {
             case .replaceCurrentLayer:
                 guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
                     return .failure(NanoBananaValidationFailure(feedback: .nanoBananaApplyFailed))
@@ -161,7 +135,7 @@ extension AppFeature {
     }
 
     private struct NanoBananaGenerationService {
-        let nanoBananaClient: NanoBananaClient
+        let nanoBananaEditUseCase: NanoBananaEditUseCase
         let uuidClient: UUIDClient
         let dateClient: DateClient
 
@@ -171,7 +145,7 @@ extension AppFeature {
         ) -> NanoBananaValidatedEdit {
             let jobID = uuidClient.generate()
             state.nanoBanana.beginGeneration(
-                request: edit.normalizedRequest,
+                descriptor: edit.command.descriptor,
                 jobID: jobID,
                 createdAt: dateClient.now()
             )
@@ -179,25 +153,26 @@ extension AppFeature {
         }
 
         func makeEditEffect(_ prepared: NanoBananaValidatedEdit) -> Effect<Action> {
-            .run { [nanoBananaClient] send in
-                let requestPrompt = prepared.normalizedRequest.editScope == .selectedArea
-                    ? "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(prepared.trimmedPrompt)"
-                    : prepared.trimmedPrompt
-
-                func executeEdit(inputPNGData: Data) async -> Result<Data, NanoBananaFailure> {
-                    let result = await nanoBananaClient.executeEdit(
-                        NanoBananaEditRequest(
+            .run { [nanoBananaEditUseCase] send in
+                func executeEdit(inputPNGData: Data, cropScoped: Bool) async -> Result<Data, NanoBananaEditFailure> {
+                    var command = prepared.command
+                    if cropScoped {
+                        let prompt = "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(command.descriptor.prompt.rawValue)"
+                        guard let adjustedPrompt = NonEmptyPrompt(prompt) else {
+                            return .failure(.transport("Selected-area prompt normalization failed."))
+                        }
+                        command.descriptor.prompt = adjustedPrompt
+                    }
+                    return await nanoBananaEditUseCase.execute(
+                        NanoBananaEditExecutionRequest(
                             inputPNGData: inputPNGData,
-                            prompt: requestPrompt,
-                            config: prepared.normalizedRequest.config,
-                            model: prepared.normalizedRequest.model
+                            command: command
                         )
                     )
-                    return result.map { $0.imageData }
                 }
 
                 let finalPixelData: Data?
-                switch prepared.normalizedRequest.editScope {
+                switch prepared.command.descriptor.editScope {
                 case .wholeLayer:
                     guard let inputPNGData = AppFeature.pngData(
                         fromLayerPixelData: prepared.sourceLayerPixelData,
@@ -209,7 +184,7 @@ extension AppFeature {
                     }
 
                     let outputPNGData: Data
-                    switch await executeEdit(inputPNGData: inputPNGData) {
+                    switch await executeEdit(inputPNGData: inputPNGData, cropScoped: false) {
                     case let .success(imageData):
                         outputPNGData = imageData
                     case let .failure(failure):
@@ -249,7 +224,7 @@ extension AppFeature {
                     }
 
                     let outputPNGData: Data
-                    switch await executeEdit(inputPNGData: cropPNGData) {
+                    switch await executeEdit(inputPNGData: cropPNGData, cropScoped: true) {
                     case let .success(imageData):
                         outputPNGData = imageData
                     case let .failure(failure):
@@ -272,7 +247,7 @@ extension AppFeature {
                         break
                     }
 
-                    let baseLayerPixelData = prepared.normalizedRequest.outputMode == .replaceCurrentLayer
+                    let baseLayerPixelData = prepared.command.descriptor.outputMode == .replaceCurrentLayer
                         ? prepared.sourceLayerPixelData
                         : Data(repeating: 0, count: prepared.canvasWidth * prepared.canvasHeight * 4)
                     finalPixelData = AppFeature.applyingInpaintCrop(
@@ -296,7 +271,7 @@ extension AppFeature {
                 }
 
                 let preview = NanoBananaPreviewState(
-                    request: prepared.normalizedRequest,
+                    descriptor: prepared.command.descriptor,
                     outputLayerIndex: prepared.outputLayerIndex,
                     pixelData: finalPixelData,
                     beforePreviewImageData: prepared.beforePreviewImageData,
@@ -345,7 +320,7 @@ extension AppFeature {
 
     private var nanoBananaGenerationService: NanoBananaGenerationService {
         NanoBananaGenerationService(
-            nanoBananaClient: nanoBananaClient,
+            nanoBananaEditUseCase: nanoBananaEditUseCase,
             uuidClient: uuidClient,
             dateClient: dateClient
         )
@@ -368,10 +343,10 @@ extension AppFeature {
 
     func handleNanoBananaEditRequest(
         state: inout State,
-        request: NanoBananaGenerationRequest
+        request: SubmitNanoBananaEditCommand
     ) -> Effect<Action> {
         let validatedEdit: NanoBananaValidatedEdit
-        switch nanoBananaRequestContract.validate(request: request, state: state) {
+        switch nanoBananaRequestContract.validate(command: request, state: state) {
         case let .failure(error):
             state.application.presentFeedback(error.feedback)
             return .none
@@ -418,7 +393,7 @@ extension AppFeature {
             state: &state,
             preview: preview
         )
-        state.nanoBanana.completeAppliedEdit(request: preview.request)
+        state.nanoBanana.completeAppliedEdit(request: preview.descriptor)
         completeDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(

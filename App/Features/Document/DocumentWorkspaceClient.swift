@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import CryptoKit
 import Foundation
+import PrimoCoreTypes
 
 enum DocumentWorkspaceCatalogError: LocalizedError, Equatable, OperationFailure {
     case projectLoadFailed(String)

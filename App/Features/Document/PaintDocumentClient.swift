@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
 import Synchronization
 
 typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>

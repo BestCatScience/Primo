@@ -7,11 +7,14 @@ let package = Package(
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
+        .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
+        .library(name: "PrimoNanoBananaApplication", targets: ["PrimoNanoBananaApplication"]),
         .library(name: "PrimoNanoBananaInfrastructure", targets: ["PrimoNanoBananaInfrastructure"]),
         .library(name: "PrimoDocumentContracts", targets: ["PrimoDocumentContracts"]),
         .library(name: "PrimoWorkspaceDomain", targets: ["PrimoWorkspaceDomain"]),
+        .library(name: "PrimoWorkspaceApplication", targets: ["PrimoWorkspaceApplication"]),
         .library(name: "PrimoWorkspaceInfrastructure", targets: ["PrimoWorkspaceInfrastructure"]),
         .library(name: "PrimoBrushFileFormats", targets: ["PrimoBrushFileFormats"]),
         .library(name: "PrimoBrushInfrastructure", targets: ["PrimoBrushInfrastructure"]),
@@ -28,15 +31,27 @@ let package = Package(
             dependencies: ["PrimoCoreTypes"]
         ),
         .target(
+            name: "PrimoDocumentApplication",
+            dependencies: ["PrimoDocumentDomain"]
+        ),
+        .target(
             name: "PrimoBrushDomain"
         ),
         .target(
             name: "PrimoNanoBananaDomain"
         ),
         .target(
+            name: "PrimoNanoBananaApplication",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoNanoBananaDomain",
+            ]
+        ),
+        .target(
             name: "PrimoNanoBananaInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoNanoBananaApplication",
                 "PrimoNanoBananaDomain",
             ]
         ),
@@ -50,6 +65,13 @@ let package = Package(
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoCoreTypes",
+            ]
+        ),
+        .target(
+            name: "PrimoWorkspaceApplication",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoWorkspaceDomain",
             ]
         ),
         .target(
@@ -77,6 +99,10 @@ let package = Package(
             dependencies: ["PrimoWorkspaceDomain"]
         ),
         .testTarget(
+            name: "PrimoWorkspaceApplicationTests",
+            dependencies: ["PrimoWorkspaceApplication"]
+        ),
+        .testTarget(
             name: "PrimoWorkspaceInfrastructureTests",
             dependencies: ["PrimoWorkspaceInfrastructure"]
         ),
@@ -85,8 +111,16 @@ let package = Package(
             dependencies: ["PrimoBrushDomain"]
         ),
         .testTarget(
+            name: "PrimoDocumentApplicationTests",
+            dependencies: ["PrimoDocumentApplication"]
+        ),
+        .testTarget(
             name: "PrimoNanoBananaDomainTests",
             dependencies: ["PrimoNanoBananaDomain"]
+        ),
+        .testTarget(
+            name: "PrimoNanoBananaApplicationTests",
+            dependencies: ["PrimoNanoBananaApplication"]
         ),
         .testTarget(
             name: "PrimoNanoBananaInfrastructureTests",

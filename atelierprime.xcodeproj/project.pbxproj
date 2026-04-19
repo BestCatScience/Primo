@@ -179,7 +179,6 @@
 		E70000000000000000000018 /* NanoBananaDomain+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000008 /* NanoBananaDomain+Presentation.swift */; };
 		E70000000000000000000019 /* PrimoNanoBananaModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000009 /* PrimoNanoBananaModules.swift */; };
 		E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7000000000000000000000A /* NanoBananaFeatureTests.swift */; };
-		F10000000000000000000001 /* OperationContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000002 /* OperationContracts.swift */; };
 		F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* TextFontLibraryClient.swift */; };
 		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
 		F10000000000000000000007 /* DocumentImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* DocumentImportClient.swift */; };
@@ -351,7 +350,6 @@
 		E7000000000000000000000A /* NanoBananaFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaFeatureTests.swift; sourceTree = "<group>"; };
 		EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeRasterization.swift"; sourceTree = "<group>"; };
 		ED876FE803A549B6B0A5E369 /* AppFeature+DocumentActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DocumentActionRouting.swift"; sourceTree = "<group>"; };
-		F10000000000000000000002 /* OperationContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationContracts.swift; sourceTree = "<group>"; };
 		F10000000000000000000004 /* TextFontLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFontLibraryClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000006 /* BrushImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushImportClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000008 /* DocumentImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImportClient.swift; sourceTree = "<group>"; };
@@ -526,7 +524,6 @@
 			children = (
 				A0000000000000000000000A /* primo-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
-				F10000000000000000000002 /* OperationContracts.swift */,
 				A000000000000000000000C9 /* SystemClients.swift */,
 				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
 				E70000000000000000000009 /* PrimoNanoBananaModules.swift */,
@@ -920,7 +917,6 @@
 				D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */,
 				A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */,
 				A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */,
-				F10000000000000000000001 /* OperationContracts.swift in Sources */,
 				F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */,
 				F10000000000000000000005 /* BrushImportClient.swift in Sources */,
 				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,

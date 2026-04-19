@@ -1,7 +1,8 @@
 import ComposableArchitecture
+import PrimoNanoBananaApplication
 
 extension NanoBananaFeature {
-    func reduce(
+    func coreReduce(
         into state: inout State,
         action: Action
     ) -> Effect<Action> {
@@ -94,22 +95,74 @@ extension NanoBananaFeature {
             if closeSheet {
                 state.isSheetPresented = false
             }
-            return .send(.delegate(.requestEdit(state.buildGenerationRequest())))
+            switch nanoBananaCommandBuilder.build(
+                draft: state.buildDraft(),
+                apiKey: state.apiKey,
+                commerce: state.commerce
+            ) {
+            case let .success(command):
+                return .send(.delegate(.requestEdit(command)))
+            case .failure(.promptRequired):
+                return .none
+            case .failure(.apiKeyRequired):
+                return .none
+            case .failure(.endpointRequired):
+                return .none
+            case .failure(.entitlementRequired):
+                if state.accessMode == .appManaged {
+                    state.isPaywallPresented = true
+                }
+                return .none
+            }
 
         case .cancelGenerationTapped:
             return .send(.delegate(.cancelEdit))
 
         case let .retryJobTapped(jobID):
-            guard let request = state.retryRequest(for: jobID) else {
+            guard let descriptor = state.retryRequest(for: jobID) else {
                 return .none
             }
-            return .send(.delegate(.requestEdit(request)))
+            switch nanoBananaCommandBuilder.build(
+                draft: NanoBananaDraft(
+                    prompt: descriptor.prompt.rawValue,
+                    accessMode: descriptor.accessMode,
+                    model: descriptor.model,
+                    inputLayerIndex: descriptor.inputLayerIndex,
+                    editScope: descriptor.editScope,
+                    outputMode: descriptor.outputMode,
+                    maskSettings: descriptor.maskSettings
+                ),
+                apiKey: state.apiKey,
+                commerce: state.commerce
+            ) {
+            case let .success(command):
+                return .send(.delegate(.requestEdit(command)))
+            case .failure:
+                return .none
+            }
 
         case .regenerateTapped:
-            guard let request = state.regenerationRequest() else {
+            guard let descriptor = state.regenerationRequest() else {
                 return .none
             }
-            return .send(.delegate(.requestEdit(request)))
+            switch nanoBananaCommandBuilder.build(
+                draft: NanoBananaDraft(
+                    prompt: descriptor.prompt.rawValue,
+                    accessMode: descriptor.accessMode,
+                    model: descriptor.model,
+                    inputLayerIndex: descriptor.inputLayerIndex,
+                    editScope: descriptor.editScope,
+                    outputMode: descriptor.outputMode,
+                    maskSettings: descriptor.maskSettings
+                ),
+                apiKey: state.apiKey,
+                commerce: state.commerce
+            ) {
+            case let .success(command):
+                return .send(.delegate(.requestEdit(command)))
+            case .failure:
+                return .none
+            }
 
         case .purchasePrimaryProductTapped:
             return .run { [nanoBananaCommerceClient] send in
@@ -126,8 +179,8 @@ extension NanoBananaFeature {
                 await send(.commerceUpdated(await nanoBananaCommerceClient.clearPurchaseError()))
             }
 
-        case let .historyItemSelected(request):
-            state.applyHistoryItem(request)
+        case let .historyItemSelected(descriptor):
+            state.applyHistoryItem(descriptor)
             return .none
 
         case .generationSucceeded, .generationFailed:

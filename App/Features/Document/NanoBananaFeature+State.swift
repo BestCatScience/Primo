@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
 extension NanoBananaFeature {
@@ -26,7 +27,7 @@ extension NanoBananaFeature {
         var isGenerating = false
         var jobs: [NanoBananaJob] = []
         var history: [NanoBananaHistoryItem] = []
-        var pendingRequest: NanoBananaGenerationRequest?
+        var pendingRequest: NanoBananaEditDescriptor?
         var activeJobID: UUID?
         var isSheetPresented = false
         var isPaywallPresented = false
@@ -72,24 +73,21 @@ extension NanoBananaFeature {
             workspaceBottomPanelCollapsed = false
         }
 
-        mutating func applyHistoryItem(_ request: NanoBananaGenerationRequest) {
-            composer.prompt = request.prompt
-            composer.inputLayerIndex = request.inputLayerIndex
-            composer.editScope = request.editScope
-            composer.outputMode = request.outputMode
-            composer.maskSettings = request.maskSettings
-            composer.model = request.model
+        mutating func applyHistoryItem(_ descriptor: NanoBananaEditDescriptor) {
+            composer.prompt = descriptor.prompt.rawValue
+            composer.inputLayerIndex = descriptor.inputLayerIndex
+            composer.editScope = descriptor.editScope
+            composer.outputMode = descriptor.outputMode
+            composer.maskSettings = descriptor.maskSettings
+            composer.model = descriptor.model
+            accessMode = descriptor.accessMode
             workspaceBottomPanelSection = .nanoBanana
         }
 
-        func buildGenerationRequest() -> NanoBananaGenerationRequest {
-            NanoBananaGenerationRequest(
+        func buildDraft() -> NanoBananaDraft {
+            NanoBananaDraft(
                 prompt: composer.prompt,
-                config: NanoBananaRequestConfig(
-                    accessMode: accessMode,
-                    credential: accessMode == .userAPIKey ? apiKey : commerce.latestEntitlementJWS,
-                    endpoint: commerce.proxyEndpoint
-                ),
+                accessMode: accessMode,
                 model: composer.model,
                 inputLayerIndex: composer.inputLayerIndex,
                 editScope: composer.editScope,
@@ -99,17 +97,17 @@ extension NanoBananaFeature {
         }
 
         mutating func beginGeneration(
-            request: NanoBananaGenerationRequest,
+            descriptor: NanoBananaEditDescriptor,
             jobID: UUID,
             createdAt: Date
         ) {
             isGenerating = true
-            pendingRequest = request
+            pendingRequest = descriptor
             activeJobID = jobID
             jobs.insert(
                 NanoBananaJob(
                     id: jobID,
-                    request: request,
+                    descriptor: descriptor,
                     createdAt: createdAt,
                     status: .running,
                     message: nil
@@ -119,12 +117,12 @@ extension NanoBananaFeature {
             jobs = Array(jobs.prefix(12))
         }
 
-        func regenerationRequest() -> NanoBananaGenerationRequest? {
+        func regenerationRequest() -> NanoBananaEditDescriptor? {
             pendingRequest
         }
 
-        func retryRequest(for jobID: UUID) -> NanoBananaGenerationRequest? {
-            jobs.first(where: { $0.id == jobID })?.request
+        func retryRequest(for jobID: UUID) -> NanoBananaEditDescriptor? {
+            jobs.first(where: { $0.id == jobID })?.descriptor
         }
 
         mutating func recordSucceededGeneration(
@@ -136,7 +134,7 @@ extension NanoBananaFeature {
             history.insert(
                 NanoBananaHistoryItem(
                     id: historyID,
-                    request: preview.request,
+                    descriptor: preview.descriptor,
                     createdAt: createdAt,
                     previewImageData: preview.afterPreviewImageData
                 ),
@@ -150,7 +148,7 @@ extension NanoBananaFeature {
             }
         }
 
-        mutating func completeAppliedEdit(request: NanoBananaGenerationRequest) {
+        mutating func completeAppliedEdit(request: NanoBananaEditDescriptor) {
             pendingRequest = request
             activeJobID = nil
         }

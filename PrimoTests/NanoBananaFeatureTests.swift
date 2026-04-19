@@ -1,5 +1,6 @@
 import ComposableArchitecture
 @testable import Primo
+import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 import PrimoNanoBananaInfrastructure
 import XCTest
@@ -30,6 +31,7 @@ final class NanoBananaFeatureTests: XCTestCase {
                 restorePurchases: { snapshot },
                 clearPurchaseError: { snapshot }
             )
+            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.task)
@@ -73,18 +75,17 @@ final class NanoBananaFeatureTests: XCTestCase {
         initialState.composer.model = .flashImage31Preview
         initialState.isSheetPresented = true
 
-        let expectedRequest = NanoBananaGenerationRequest(
-            prompt: "Enhance linework",
-            config: NanoBananaRequestConfig(
+        let expectedRequest = SubmitNanoBananaEditCommand(
+            descriptor: NanoBananaEditDescriptor(
+                prompt: NonEmptyPrompt("Enhance linework")!,
                 accessMode: .userAPIKey,
-                credential: "user-key",
-                endpoint: "https://proxy.example.com/edit"
+                model: .flashImage31Preview,
+                inputLayerIndex: 3,
+                editScope: .selectedArea,
+                outputMode: .newLayer,
+                maskSettings: .init(expansion: 8, isInverted: true)
             ),
-            model: .flashImage31Preview,
-            inputLayerIndex: 3,
-            editScope: .selectedArea,
-            outputMode: .newLayer,
-            maskSettings: .init(expansion: 8, isInverted: true)
+            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("user-key")!)
         )
 
         let store = TestStore(initialState: initialState) {
@@ -98,17 +99,17 @@ final class NanoBananaFeatureTests: XCTestCase {
     }
 
     func testRetryRegenerateAndCancelDelegateActions() async {
-        let request = NanoBananaGenerationRequest(
-            prompt: "Retry me",
-            config: NanoBananaRequestConfig(
-                accessMode: .userAPIKey,
-                credential: "user-key",
-                endpoint: ""
-            ),
+        let descriptor = NanoBananaEditDescriptor(
+            prompt: NonEmptyPrompt("Retry me")!,
+            accessMode: .userAPIKey,
             model: .flashImage25,
             inputLayerIndex: 0,
             editScope: .wholeLayer,
             outputMode: .replaceCurrentLayer
+        )
+        let request = SubmitNanoBananaEditCommand(
+            descriptor: descriptor,
+            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("user-key")!)
         )
         let jobID = UUID()
         let createdAt = Date(timeIntervalSince1970: 1_234)
@@ -117,13 +118,13 @@ final class NanoBananaFeatureTests: XCTestCase {
         initialState.jobs = [
             NanoBananaJob(
                 id: jobID,
-                request: request,
+                descriptor: descriptor,
                 createdAt: createdAt,
                 status: .failed,
                 message: "failed"
             )
         ]
-        initialState.pendingRequest = request
+        initialState.pendingRequest = descriptor
 
         let store = TestStore(initialState: initialState) {
             NanoBananaFeature()

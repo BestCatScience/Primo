@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 import PrimoNanoBananaInfrastructure
 
@@ -7,10 +8,11 @@ import PrimoNanoBananaInfrastructure
 struct NanoBananaFeature {
     @Dependency(\.nanoBananaSettingsClient) var nanoBananaSettingsClient
     @Dependency(\.nanoBananaCommerceClient) var nanoBananaCommerceClient
+    @Dependency(\.nanoBananaCommandBuilder) var nanoBananaCommandBuilder
 
     var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            reduce(into: &state, action: action)
+        Reduce { [self] state, action in
+            self.coreReduce(into: &state, action: action)
         }
     }
 }
