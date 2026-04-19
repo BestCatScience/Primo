@@ -44,6 +44,7 @@ let package = Package(
             name: "PrimoNanoBananaApplication",
             dependencies: [
                 "PrimoCoreTypes",
+                "PrimoDocumentApplication",
                 "PrimoNanoBananaDomain",
             ]
         ),

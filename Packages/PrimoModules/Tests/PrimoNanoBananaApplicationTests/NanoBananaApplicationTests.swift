@@ -67,4 +67,45 @@ struct NanoBananaApplicationTests {
         #expect(recorder.calls.count >= 3)
         #expect(recorder.calls.contains { $0.1 == .flashImage31Preview })
     }
+
+    @Test
+    func previewPreparationServiceBuildsWholeLayerPreview() async throws {
+        let command = SubmitNanoBananaEditCommand(
+            descriptor: NanoBananaEditDescriptor(
+                prompt: NonEmptyPrompt("Retouch it")!,
+                accessMode: .userAPIKey,
+                model: .flashImage25,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
+        )
+        let pixelData = Data([
+            255, 0, 0, 255,
+            0, 255, 0, 255,
+            0, 0, 255, 255,
+            255, 255, 255, 255,
+        ])
+        let useCase = NanoBananaEditUseCase { request in
+            .success(request.inputPNGData)
+        }
+
+        let result = await NanoBananaPreviewPreparationService(editUseCase: useCase).preparePreview(
+            NanoBananaPreviewPreparationRequest(
+                command: command,
+                selectionRegion: nil,
+                outputLayerIndex: 0,
+                canvasWidth: 2,
+                canvasHeight: 2,
+                sourceLayerPixelData: pixelData
+            )
+        )
+
+        let preview = try #require(try result.get())
+        #expect(preview.outputLayerIndex == 0)
+        #expect(preview.pixelData.count == pixelData.count)
+        #expect(preview.beforePreviewImageData != nil)
+        #expect(preview.afterPreviewImageData != nil)
+    }
 }

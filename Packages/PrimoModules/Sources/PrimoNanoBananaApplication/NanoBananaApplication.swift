@@ -1,5 +1,7 @@
+import CoreGraphics
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoNanoBananaDomain
 
 public enum NanoBananaCommandBuilderFailure: Error, Equatable, Sendable {
@@ -72,6 +74,49 @@ public struct NanoBananaEditExecutionRequest: Equatable, Sendable {
         self.inputPNGData = inputPNGData
         self.command = command
     }
+}
+
+public struct NanoBananaSelectionRegion: Equatable, Sendable {
+    public let selectionBounds: CGRect
+    public let expandedMask: [UInt8]
+
+    public init(
+        selectionBounds: CGRect,
+        expandedMask: [UInt8]
+    ) {
+        self.selectionBounds = selectionBounds
+        self.expandedMask = expandedMask
+    }
+}
+
+public struct NanoBananaPreviewPreparationRequest: Equatable, Sendable {
+    public let command: SubmitNanoBananaEditCommand
+    public let selectionRegion: NanoBananaSelectionRegion?
+    public let outputLayerIndex: Int
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let sourceLayerPixelData: Data
+
+    public init(
+        command: SubmitNanoBananaEditCommand,
+        selectionRegion: NanoBananaSelectionRegion?,
+        outputLayerIndex: Int,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        sourceLayerPixelData: Data
+    ) {
+        self.command = command
+        self.selectionRegion = selectionRegion
+        self.outputLayerIndex = outputLayerIndex
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.sourceLayerPixelData = sourceLayerPixelData
+    }
+}
+
+public enum NanoBananaPreviewPreparationFailure: Error, Equatable, Sendable {
+    case unsupportedImage
+    case editFailed(NanoBananaEditFailure)
 }
 
 public struct NanoBananaRemoteEditClient: Sendable {
@@ -188,5 +233,143 @@ public struct NanoBananaEditUseCase: Sendable {
         default:
             return false
         }
+    }
+}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+public struct NanoBananaPreviewPreparationService: Sendable {
+    public let editUseCase: NanoBananaEditUseCase
+
+    public init(editUseCase: NanoBananaEditUseCase) {
+        self.editUseCase = editUseCase
+    }
+
+    public func preparePreview(
+        _ request: NanoBananaPreviewPreparationRequest
+    ) async -> Result<NanoBananaPreviewState, NanoBananaPreviewPreparationFailure> {
+        let beforePreviewImageData = DocumentRasterImageService.pngData(
+            fromLayerPixelData: request.command.descriptor.outputMode == .replaceCurrentLayer
+                ? request.sourceLayerPixelData
+                : Data(repeating: 0, count: request.canvasWidth * request.canvasHeight * 4),
+            width: request.canvasWidth,
+            height: request.canvasHeight
+        )
+
+        let finalPixelData: Data?
+        switch request.command.descriptor.editScope {
+        case .wholeLayer:
+            guard let inputPNGData = DocumentRasterImageService.pngData(
+                fromLayerPixelData: request.sourceLayerPixelData,
+                width: request.canvasWidth,
+                height: request.canvasHeight
+            ) else {
+                finalPixelData = nil
+                break
+            }
+
+            switch await executeEdit(
+                request.command,
+                inputPNGData: inputPNGData,
+                cropScoped: false
+            ) {
+            case let .success(imageData):
+                finalPixelData = DocumentRasterImageService.rawLayerPixelData(
+                    fromPNGData: imageData,
+                    width: request.canvasWidth,
+                    height: request.canvasHeight
+                )
+            case let .failure(failure):
+                return .failure(.editFailed(failure))
+            }
+
+        case .selectedArea:
+            guard
+                let selectionRegion = request.selectionRegion,
+                let crop = DocumentRasterImageService.inpaintCrop(
+                    source: request.sourceLayerPixelData,
+                    canvasWidth: request.canvasWidth,
+                    canvasHeight: request.canvasHeight,
+                    selectionBounds: selectionRegion.selectionBounds,
+                    expandedMask: selectionRegion.expandedMask
+                ),
+                let cropPNGData = DocumentRasterImageService.pngData(
+                    fromLayerPixelData: crop.pixelData,
+                    width: crop.width,
+                    height: crop.height
+                )
+            else {
+                finalPixelData = nil
+                break
+            }
+
+            switch await executeEdit(
+                request.command,
+                inputPNGData: cropPNGData,
+                cropScoped: true
+            ) {
+            case let .success(imageData):
+                guard let editedCropPixelData = DocumentRasterImageService.rawLayerPixelData(
+                    fromPNGData: imageData,
+                    width: crop.width,
+                    height: crop.height
+                ) else {
+                    finalPixelData = nil
+                    break
+                }
+
+                let baseLayerPixelData = request.command.descriptor.outputMode == .replaceCurrentLayer
+                    ? request.sourceLayerPixelData
+                    : Data(repeating: 0, count: request.canvasWidth * request.canvasHeight * 4)
+                finalPixelData = DocumentRasterImageService.applyingInpaintCrop(
+                    editedCropPixelData,
+                    to: baseLayerPixelData,
+                    canvasWidth: request.canvasWidth,
+                    canvasHeight: request.canvasHeight,
+                    crop: crop
+                )
+            case let .failure(failure):
+                return .failure(.editFailed(failure))
+            }
+        }
+
+        guard let finalPixelData else {
+            return .failure(.unsupportedImage)
+        }
+
+        return .success(
+            NanoBananaPreviewState(
+                descriptor: request.command.descriptor,
+                outputLayerIndex: request.outputLayerIndex,
+                pixelData: finalPixelData,
+                beforePreviewImageData: beforePreviewImageData,
+                afterPreviewImageData: DocumentRasterImageService.pngData(
+                    fromLayerPixelData: finalPixelData,
+                    width: request.canvasWidth,
+                    height: request.canvasHeight
+                )
+            )
+        )
+    }
+
+    private func executeEdit(
+        _ command: SubmitNanoBananaEditCommand,
+        inputPNGData: Data,
+        cropScoped: Bool
+    ) async -> Result<Data, NanoBananaEditFailure> {
+        var adjustedCommand = command
+        if cropScoped {
+            let prompt = "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(adjustedCommand.descriptor.prompt.rawValue)"
+            guard let adjustedPrompt = NonEmptyPrompt(prompt) else {
+                return .failure(.transport("Selected-area prompt normalization failed."))
+            }
+            adjustedCommand.descriptor.prompt = adjustedPrompt
+        }
+
+        return await editUseCase.execute(
+            NanoBananaEditExecutionRequest(
+                inputPNGData: inputPNGData,
+                command: adjustedCommand
+            )
+        )
     }
 }
