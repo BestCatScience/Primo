@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoLocalization
 
@@ -22,18 +23,8 @@ typealias DocumentFolderID = PrimoDocumentDomain.DocumentFolderID
 typealias ColorRangeSelectionSource = PrimoDocumentDomain.ColorRangeSelectionSource
 typealias ColorRangeSelectionRequest = PrimoDocumentDomain.ColorRangeSelectionRequest
 
-struct PaintDocumentPresentation: Equatable, Sendable {
-    var canvasSize: CGSize
-    var activeLayerIndex: Int
-    var layerRows: [LayerRowModel]
-    var layerSidebarRows: [LayerSidebarRowModel]
-    var renderSnapshot: MetalDocumentSnapshot?
-}
-
-struct LoadedPaintProject: Equatable, Sendable {
-    var presentation: PaintDocumentPresentation
-    var paperStyle: CanvasPaperStyle
-}
+typealias PaintDocumentPresentation = PrimoDocumentContracts.PaintDocumentPresentation
+typealias LoadedPaintProject = PrimoDocumentContracts.LoadedPaintProject
 
 enum WorkspaceLayoutMode: Equatable, Sendable {
     case single

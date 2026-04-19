@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import CoreGraphics
 import PrimoBrushDomain
+import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoLocalization
 import UIKit
@@ -16,6 +17,23 @@ typealias BrushTextureMode = PrimoBrushDomain.BrushTextureMode
 typealias BrushDualBlendMode = PrimoBrushDomain.BrushDualBlendMode
 typealias BrushScatterMode = PrimoBrushDomain.BrushScatterMode
 typealias BrushColorMixingMode = PrimoBrushDomain.BrushColorMixingMode
+typealias FillThresholdMode = PrimoDocumentContracts.FillThresholdMode
+typealias HueSaturationBrightnessSettings = PrimoDocumentContracts.HueSaturationBrightnessSettings
+typealias BrightnessContrastSettings = PrimoDocumentContracts.BrightnessContrastSettings
+typealias LevelsAdjustmentSettings = PrimoDocumentContracts.LevelsAdjustmentSettings
+typealias ToneCurveSettings = PrimoDocumentContracts.ToneCurveSettings
+typealias ColorBalanceSettings = PrimoDocumentContracts.ColorBalanceSettings
+typealias ThresholdSettings = PrimoDocumentContracts.ThresholdSettings
+typealias PosterizeSettings = PrimoDocumentContracts.PosterizeSettings
+typealias GradientMapPreset = PrimoDocumentContracts.GradientMapPreset
+typealias GradientMapStopSettings = PrimoDocumentContracts.GradientMapStopSettings
+typealias GradientMapSettings = PrimoDocumentContracts.GradientMapSettings
+typealias LayerProcessingRequest = PrimoDocumentContracts.LayerProcessingRequest
+typealias TimelapseFrame = PrimoDocumentContracts.TimelapseFrame
+typealias TimelapseOperation = PrimoDocumentContracts.TimelapseOperation
+typealias TimelapseCaptureSource = PrimoDocumentContracts.TimelapseCaptureSource
+typealias TimelapseCapture = PrimoDocumentContracts.TimelapseCapture
+typealias CanvasSelection = PrimoDocumentContracts.CanvasSelection
 
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
@@ -134,12 +152,7 @@ enum EyedropperSamplingSource: String, CaseIterable, Equatable, Sendable, Identi
     }
 }
 
-enum FillThresholdMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case opacity
-    case color
-
-    var id: String { rawValue }
-
+extension FillThresholdMode {
     var title: String {
         localizedTitle(.english)
     }
@@ -295,15 +308,7 @@ extension LayerBlendMode {
     }
 }
 
-enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case graphite
-    case sepia
-    case ocean
-    case sunset
-    case toxic
-
-    var id: String { rawValue }
-
+extension GradientMapPreset {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .graphite:
@@ -318,87 +323,6 @@ enum GradientMapPreset: String, CaseIterable, Equatable, Sendable, Identifiable 
             return language.localized("トキシック")
         }
     }
-}
-
-struct HueSaturationBrightnessSettings: Equatable, Sendable {
-    var hueDegrees: Double = 0
-    var saturation: Double = 1
-    var brightness: Double = 0
-}
-
-struct BrightnessContrastSettings: Equatable, Sendable {
-    var brightness: Double = 0
-    var contrast: Double = 1
-}
-
-struct LevelsAdjustmentSettings: Equatable, Sendable {
-    var inputBlack: Double = 0
-    var inputWhite: Double = 1
-    var gamma: Double = 1
-    var outputBlack: Double = 0
-    var outputWhite: Double = 1
-}
-
-struct ToneCurveSettings: Equatable, Sendable {
-    var shadows: Double = 0
-    var midtones: Double = 0
-    var highlights: Double = 0
-}
-
-struct ColorBalanceSettings: Equatable, Sendable {
-    var redCyan: Double = 0
-    var greenMagenta: Double = 0
-    var blueYellow: Double = 0
-}
-
-struct ThresholdSettings: Equatable, Sendable {
-    var threshold: Double = 0.5
-}
-
-struct PosterizeSettings: Equatable, Sendable {
-    var levels: Double = 6
-}
-
-struct GradientMapStopSettings: Equatable, Sendable, Identifiable {
-    let id: UUID
-    var position: Double
-    var red: UInt8
-    var green: UInt8
-    var blue: UInt8
-
-    init(
-        id: UUID = UUID(),
-        position: Double,
-        red: UInt8,
-        green: UInt8,
-        blue: UInt8
-    ) {
-        self.id = id
-        self.position = position
-        self.red = red
-        self.green = green
-        self.blue = blue
-    }
-}
-
-struct GradientMapSettings: Equatable, Sendable {
-    var stops: [GradientMapStopSettings] = [
-        GradientMapStopSettings(position: 0.0, red: 17, green: 21, blue: 27),
-        GradientMapStopSettings(position: 0.5, red: 84, green: 93, blue: 108),
-        GradientMapStopSettings(position: 1.0, red: 243, green: 244, blue: 246)
-    ]
-}
-
-enum LayerProcessingRequest: Equatable, Sendable {
-    case gradientMap(GradientMapPreset)
-    case hueSaturationBrightness(HueSaturationBrightnessSettings)
-    case brightnessContrast(BrightnessContrastSettings)
-    case levels(LevelsAdjustmentSettings)
-    case toneCurve(ToneCurveSettings)
-    case colorBalance(ColorBalanceSettings)
-    case threshold(ThresholdSettings)
-    case posterize(PosterizeSettings)
-    case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 }
 
 extension BrushTipKind {
@@ -1651,59 +1575,9 @@ private enum BuiltInBrushTipFactory {
     }
 }
 
-struct LayerRowModel: Identifiable, Equatable, Sendable {
-    var id: Int { index }
-    let index: Int
-    let name: String
-    let visible: Bool
-    let opacity: Double
-    let isLocked: Bool
-    let isAlphaLocked: Bool
-    let isClipped: Bool
-    let blendMode: LayerBlendMode
-    let folderID: Int?
-    let hasMask: Bool
-    let isTextLayer: Bool
-    let textLayer: TextLayerData?
-
-    static func == (lhs: LayerRowModel, rhs: LayerRowModel) -> Bool {
-        lhs.index == rhs.index &&
-        lhs.name == rhs.name &&
-        lhs.visible == rhs.visible &&
-        lhs.opacity == rhs.opacity &&
-        lhs.isLocked == rhs.isLocked &&
-        lhs.isAlphaLocked == rhs.isAlphaLocked &&
-        lhs.isClipped == rhs.isClipped &&
-        lhs.blendMode == rhs.blendMode &&
-        lhs.folderID == rhs.folderID &&
-        lhs.hasMask == rhs.hasMask &&
-        lhs.isTextLayer == rhs.isTextLayer &&
-        lhs.textLayer == rhs.textLayer
-    }
-}
-
-struct LayerFolderModel: Identifiable, Equatable, Sendable {
-    let id: Int
-    let name: String
-    let visible: Bool
-    let isExpanded: Bool
-    let anchorLayerIndex: Int?
-    let childLayerIndices: [Int]
-}
-
-enum LayerSidebarRowModel: Identifiable, Equatable, Sendable {
-    case folder(LayerFolderModel)
-    case layer(LayerRowModel, depth: Int)
-
-    var id: String {
-        switch self {
-        case let .folder(folder):
-            return "folder-\(folder.id)"
-        case let .layer(layer, _):
-            return "layer-\(layer.index)"
-        }
-    }
-}
+typealias LayerRowModel = PrimoDocumentContracts.LayerRowModel
+typealias LayerFolderModel = PrimoDocumentContracts.LayerFolderModel
+typealias LayerSidebarRowModel = PrimoDocumentContracts.LayerSidebarRowModel
 
 struct LayerCanvasBuffer: Identifiable, Equatable {
     var id: Int { index }
@@ -1715,21 +1589,7 @@ struct LayerCanvasBuffer: Identifiable, Equatable {
     var strokes: [PreviewStrokeTrack] = []
 }
 
-struct StylusSample: Equatable, Sendable {
-    let point: CGPoint
-    let pressure: CGFloat
-    let altitude: CGFloat
-    let azimuth: CGFloat
-    let timestamp: TimeInterval
-
-    static func == (lhs: StylusSample, rhs: StylusSample) -> Bool {
-        lhs.point == rhs.point &&
-        lhs.pressure == rhs.pressure &&
-        lhs.altitude == rhs.altitude &&
-        lhs.azimuth == rhs.azimuth &&
-        lhs.timestamp == rhs.timestamp
-    }
-}
+typealias StylusSample = PrimoDocumentContracts.StylusSample
 
 struct StrokePoint: Equatable {
     var position: SIMD2<Float>
@@ -1825,85 +1685,7 @@ struct SampledColor: Equatable {
     let alpha: UInt8
 }
 
-struct MetalLayerSnapshot: Identifiable, Equatable {
-    var id: Int { index }
-    let index: Int
-    let opacity: Float
-    let visible: Bool
-    let isClipped: Bool
-    let blendMode: LayerBlendMode
-    let thumbnailData: Data?
-    let pixelData: Data
+typealias MetalLayerSnapshot = PrimoDocumentContracts.MetalLayerSnapshot
 
-    static func == (lhs: MetalLayerSnapshot, rhs: MetalLayerSnapshot) -> Bool {
-        lhs.index == rhs.index &&
-        lhs.opacity == rhs.opacity &&
-        lhs.visible == rhs.visible &&
-        lhs.isClipped == rhs.isClipped &&
-        lhs.blendMode == rhs.blendMode &&
-        lhs.thumbnailData?.count == rhs.thumbnailData?.count &&
-        lhs.pixelData.count == rhs.pixelData.count
-    }
-}
-
-struct TimelapseFrame: Equatable, Sendable {
-    let imageURL: URL
-    let size: CGSize
-}
-
-enum TimelapseCaptureSource: Equatable, Sendable {
-    case frames([TimelapseFrame])
-    case operations([TimelapseOperation])
-}
-
-struct TimelapseCapture: Equatable, Sendable {
-    let canvasSize: CGSize
-    let paperStyle: CanvasPaperStyle
-    let previewImageData: Data?
-    let source: TimelapseCaptureSource
-    let framesPerSecond: Int
-}
-
-struct MetalDocumentSnapshot: Equatable {
-    let width: Int
-    let height: Int
-    let revision: Int
-    let compositePixelData: Data
-    let layers: [MetalLayerSnapshot]
-
-    static func == (lhs: MetalDocumentSnapshot, rhs: MetalDocumentSnapshot) -> Bool {
-        lhs.width == rhs.width &&
-        lhs.height == rhs.height &&
-        lhs.revision == rhs.revision &&
-        lhs.compositePixelData.count == rhs.compositePixelData.count &&
-        lhs.layers.count == rhs.layers.count
-    }
-}
-
-struct IncrementalLayerUpdate: Equatable, Identifiable {
-    let id = UUID()
-    let layerIndex: Int
-    let originX: Int
-    let originY: Int
-    let width: Int
-    let height: Int
-    let pixelData: Data
-
-    var isEmpty: Bool { width <= 0 || height <= 0 || pixelData.isEmpty }
-
-    static func == (lhs: IncrementalLayerUpdate, rhs: IncrementalLayerUpdate) -> Bool {
-        lhs.id == rhs.id
-    }
-}
-
-struct CanvasSelection: Equatable, Sendable {
-    let bounds: CGRect
-    let maskWidth: Int
-    let maskHeight: Int
-    let maskData: Data
-    let mode: SelectionToolMode
-
-    var isEmpty: Bool {
-        maskWidth <= 0 || maskHeight <= 0 || maskData.isEmpty || bounds.isNull || bounds.isEmpty
-    }
-}
+typealias MetalDocumentSnapshot = PrimoDocumentContracts.MetalDocumentSnapshot
+typealias IncrementalLayerUpdate = PrimoDocumentContracts.IncrementalLayerUpdate

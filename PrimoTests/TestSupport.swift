@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoWorkspaceInfrastructure
 @testable import Primo
 
 enum TestError: LocalizedError, Equatable {

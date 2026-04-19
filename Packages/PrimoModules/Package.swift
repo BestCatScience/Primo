@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
+        .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
         .library(name: "PrimoNanoBananaApplication", targets: ["PrimoNanoBananaApplication"]),
@@ -32,7 +33,16 @@ let package = Package(
         ),
         .target(
             name: "PrimoDocumentApplication",
-            dependencies: ["PrimoDocumentDomain"]
+            dependencies: ["PrimoDocumentDomain", "PrimoDocumentContracts"]
+        ),
+        .target(
+            name: "PrimoDocumentInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentApplication",
+            ]
         ),
         .target(
             name: "PrimoBrushDomain"
@@ -58,7 +68,12 @@ let package = Package(
         ),
         .target(
             name: "PrimoDocumentContracts",
-            dependencies: ["PrimoDocumentDomain"]
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+            ]
         ),
         .target(
             name: "PrimoWorkspaceDomain",

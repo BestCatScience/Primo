@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
 import PrimoWorkspaceDomain
+import PrimoWorkspaceInfrastructure
 
 extension AppFeature {
     typealias WorkspacePersistenceIssue = PrimoWorkspaceDomain.WorkspacePersistenceIssue

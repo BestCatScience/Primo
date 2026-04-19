@@ -2,25 +2,19 @@ import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentContracts
 import Synchronization
 
-typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
-typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
-
-enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
-    case invalidLayerIndex(Int)
-    case invalidFolderID(Int)
-    case layerLocked(Int)
-    case alphaLocked(Int)
-    case invalidCanvasSize(width: Int, height: Int)
-    case invalidOpacity(Double)
-    case emptyInput
-    case noUndoState
-    case noRedoState
-    case bridgeMutationFailed(String)
-    case incompatibleLayerType(Int)
-    indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)
-}
+typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
+typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
+typealias DocumentMutationFailure = PrimoDocumentContracts.DocumentMutationFailure
+typealias DocumentQueryGateway = PrimoDocumentContracts.DocumentQueryGateway
+typealias DocumentMutationGateway = PrimoDocumentContracts.DocumentMutationGateway
+typealias StrokeInputGateway = PrimoDocumentContracts.StrokeInputGateway
+typealias DocumentHistoryGateway = PrimoDocumentContracts.DocumentHistoryGateway
+typealias DocumentPersistenceGateway = PrimoDocumentContracts.DocumentPersistenceGateway
+typealias DocumentExportGateway = PrimoDocumentContracts.DocumentExportGateway
+typealias TextLayerGateway = PrimoDocumentContracts.TextLayerGateway
 
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
@@ -188,130 +182,6 @@ struct PaintDocumentClient: Sendable {
     }
 }
 
-struct DocumentQueryGateway: Sendable {
-    var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
-    var presentation: @Sendable () -> PaintDocumentPresentation
-    var compositePixelData: @Sendable () -> Data
-    var pixelDataForLayer: @Sendable (Int) -> Data
-    var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.lightweightPresentation = paintDocumentClient.lightweightPresentation
-        self.presentation = paintDocumentClient.presentation
-        self.compositePixelData = paintDocumentClient.compositePixelData
-        self.pixelDataForLayer = paintDocumentClient.pixelDataForLayer
-        self.consumeDirtyUpdate = paintDocumentClient.consumeDirtyUpdate
-    }
-}
-
-struct DocumentMutationGateway: Sendable {
-    var resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
-    var resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
-    var addLayer: @Sendable (String) -> DocumentIndexedMutationResult
-    var deleteLayer: @Sendable (Int) -> DocumentMutationResult
-    var setActiveLayer: @Sendable (Int) -> DocumentMutationResult
-    var setLayerName: @Sendable (Int, String) -> DocumentMutationResult
-    var setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
-    var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
-    var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
-    var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
-    var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
-    var clearLayer: @Sendable (Int) -> DocumentMutationResult
-    var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.resizeCanvas = paintDocumentClient.resizeCanvas
-        self.resizeCanvasExtent = paintDocumentClient.resizeCanvasExtent
-        self.addLayer = paintDocumentClient.addLayer
-        self.deleteLayer = paintDocumentClient.deleteLayer
-        self.setActiveLayer = paintDocumentClient.setActiveLayer
-        self.setLayerName = paintDocumentClient.setLayerName
-        self.setLayerVisibility = paintDocumentClient.setLayerVisibility
-        self.revealLayerForEditing = paintDocumentClient.revealLayerForEditing
-        self.replaceLayerPixels = paintDocumentClient.replaceLayerPixels
-        self.replaceLayerMask = paintDocumentClient.replaceLayerMask
-        self.clearLayerMask = paintDocumentClient.clearLayerMask
-        self.applyLayerMask = paintDocumentClient.applyLayerMask
-        self.clearLayer = paintDocumentClient.clearLayer
-        self.applyLayerProcessing = paintDocumentClient.applyLayerProcessing
-    }
-}
-
-struct StrokeInputGateway: Sendable {
-    var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
-    var appendStroke: @Sendable (StylusSample) -> Void
-    var endStroke: @Sendable () -> Void
-    var cancelStroke: @Sendable () -> Void
-    var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
-    var endBlurStroke: @Sendable () -> Void
-    var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
-    var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.beginStroke = paintDocumentClient.beginStroke
-        self.appendStroke = paintDocumentClient.appendStroke
-        self.endStroke = paintDocumentClient.endStroke
-        self.cancelStroke = paintDocumentClient.cancelStroke
-        self.blurStroke = paintDocumentClient.blurStroke
-        self.endBlurStroke = paintDocumentClient.endBlurStroke
-        self.fill = paintDocumentClient.fill
-        self.applySoftwareStroke = paintDocumentClient.applySoftwareStroke
-    }
-}
-
-struct DocumentHistoryGateway: Sendable {
-    var canUndo: @Sendable () -> Bool
-    var canRedo: @Sendable () -> Bool
-    var undo: @Sendable () -> DocumentMutationResult
-    var redo: @Sendable () -> DocumentMutationResult
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.canUndo = paintDocumentClient.canUndo
-        self.canRedo = paintDocumentClient.canRedo
-        self.undo = paintDocumentClient.undo
-        self.redo = paintDocumentClient.redo
-    }
-}
-
-struct DocumentPersistenceGateway: Sendable {
-    var saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
-    var loadProject: @Sendable (URL) throws -> LoadedPaintProject
-    var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
-    var newCanvas: @Sendable (Int, Int) -> Void
-    var prewarmDrawingResources: @Sendable () -> Void
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.saveProject = paintDocumentClient.saveProject
-        self.loadProject = paintDocumentClient.loadProject
-        self.setPaperStyle = paintDocumentClient.setPaperStyle
-        self.newCanvas = paintDocumentClient.newCanvas
-        self.prewarmDrawingResources = paintDocumentClient.prewarmDrawingResources
-    }
-}
-
-struct DocumentExportGateway: Sendable {
-    var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
-    var timelapseCapture: @Sendable () -> TimelapseCapture?
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.compositePNGData = paintDocumentClient.compositePNGData
-        self.timelapseCapture = paintDocumentClient.timelapseCapture
-    }
-}
-
-struct TextLayerGateway: Sendable {
-    var textLayerData: @Sendable (Int) -> TextLayerData?
-    var setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    var clearTextLayerData: @Sendable (Int) -> Void
-
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.textLayerData = paintDocumentClient.textLayerData
-        self.setTextLayer = paintDocumentClient.setTextLayer
-        self.clearTextLayerData = paintDocumentClient.clearTextLayerData
-    }
-}
-
 struct DocumentLayerClient: Sendable {
     let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
     let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
@@ -448,49 +318,97 @@ extension DependencyValues {
 private enum DocumentQueryGatewayKey: DependencyKey {
     static var liveValue: DocumentQueryGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentQueryGateway(paintDocumentClient: paintDocumentClient)
+        return DocumentQueryGateway(
+            lightweightPresentation: paintDocumentClient.lightweightPresentation,
+            presentation: paintDocumentClient.presentation,
+            compositePixelData: paintDocumentClient.compositePixelData,
+            pixelDataForLayer: paintDocumentClient.pixelDataForLayer,
+            consumeDirtyUpdate: paintDocumentClient.consumeDirtyUpdate
+        )
     }
 }
 
 private enum DocumentMutationGatewayKey: DependencyKey {
     static var liveValue: DocumentMutationGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentMutationGateway(paintDocumentClient: paintDocumentClient)
+        return DocumentMutationGateway(
+            resizeCanvas: paintDocumentClient.resizeCanvas,
+            resizeCanvasExtent: paintDocumentClient.resizeCanvasExtent,
+            addLayer: paintDocumentClient.addLayer,
+            deleteLayer: paintDocumentClient.deleteLayer,
+            setActiveLayer: paintDocumentClient.setActiveLayer,
+            setLayerName: paintDocumentClient.setLayerName,
+            setLayerVisibility: paintDocumentClient.setLayerVisibility,
+            revealLayerForEditing: paintDocumentClient.revealLayerForEditing,
+            replaceLayerPixels: paintDocumentClient.replaceLayerPixels,
+            replaceLayerMask: paintDocumentClient.replaceLayerMask,
+            clearLayerMask: paintDocumentClient.clearLayerMask,
+            applyLayerMask: paintDocumentClient.applyLayerMask,
+            clearLayer: paintDocumentClient.clearLayer,
+            applyLayerProcessing: paintDocumentClient.applyLayerProcessing
+        )
     }
 }
 
 private enum StrokeInputGatewayKey: DependencyKey {
     static var liveValue: StrokeInputGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return StrokeInputGateway(paintDocumentClient: paintDocumentClient)
+        return StrokeInputGateway(
+            beginStroke: paintDocumentClient.beginStroke,
+            appendStroke: paintDocumentClient.appendStroke,
+            endStroke: paintDocumentClient.endStroke,
+            cancelStroke: paintDocumentClient.cancelStroke,
+            blurStroke: paintDocumentClient.blurStroke,
+            endBlurStroke: paintDocumentClient.endBlurStroke,
+            fill: paintDocumentClient.fill,
+            applySoftwareStroke: paintDocumentClient.applySoftwareStroke
+        )
     }
 }
 
 private enum DocumentHistoryGatewayKey: DependencyKey {
     static var liveValue: DocumentHistoryGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentHistoryGateway(paintDocumentClient: paintDocumentClient)
+        return DocumentHistoryGateway(
+            canUndo: paintDocumentClient.canUndo,
+            canRedo: paintDocumentClient.canRedo,
+            undo: paintDocumentClient.undo,
+            redo: paintDocumentClient.redo
+        )
     }
 }
 
 private enum DocumentPersistenceGatewayKey: DependencyKey {
     static var liveValue: DocumentPersistenceGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentPersistenceGateway(paintDocumentClient: paintDocumentClient)
+        return DocumentPersistenceGateway(
+            saveProject: paintDocumentClient.saveProject,
+            loadProject: paintDocumentClient.loadProject,
+            setPaperStyle: paintDocumentClient.setPaperStyle,
+            newCanvas: paintDocumentClient.newCanvas,
+            prewarmDrawingResources: paintDocumentClient.prewarmDrawingResources
+        )
     }
 }
 
 private enum DocumentExportGatewayKey: DependencyKey {
     static var liveValue: DocumentExportGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentExportGateway(paintDocumentClient: paintDocumentClient)
+        return DocumentExportGateway(
+            compositePNGData: paintDocumentClient.compositePNGData,
+            timelapseCapture: paintDocumentClient.timelapseCapture
+        )
     }
 }
 
 private enum TextLayerGatewayKey: DependencyKey {
     static var liveValue: TextLayerGateway {
         @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return TextLayerGateway(paintDocumentClient: paintDocumentClient)
+        return TextLayerGateway(
+            textLayerData: paintDocumentClient.textLayerData,
+            setTextLayer: paintDocumentClient.setTextLayer,
+            clearTextLayerData: paintDocumentClient.clearTextLayerData
+        )
     }
 }
 

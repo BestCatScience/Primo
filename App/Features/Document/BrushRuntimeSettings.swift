@@ -1,74 +1,9 @@
 import Foundation
+import PrimoDocumentContracts
 
-struct BrushRuntimeSettings: Equatable, Sendable {
-    var tipKind: BrushTipKind
-    var radius: Double
-    var sizeSpeedSensitivity: Double = 0.0
-    var taperIn: Double = 0.0
-    var taperOut: Double = 0.0
-    var opacity: Double
-    var hardness: Double
-    var roundness: Double
-    var roundnessPressureSensitivity: Double = 0.0
-    var roundnessTiltSensitivity: Double = 0.0
-    var angle: Double
-    var anglePressureSensitivity: Double = 0.0
-    var angleTiltSensitivity: Double = 0.0
-    var angleMode: BrushAngleMode
-    var stampSpacing: Double
-    var spacingJitter: Double
-    var scatterEnabled: Bool = false
-    var scatterMode: BrushScatterMode = .directional
-    var scatterLateral: Double
-    var scatterLinear: Double
-    var count: Int
-    var countJitter: Double
-    var countSizeJitter: Double = 0.0
-    var countOpacityJitter: Double = 0.0
-    var angleJitter: Double
-    var roundnessJitter: Double
-    var textureMode: BrushTextureMode
-    var textureStrength: Double
-    var flow: Double = 1.0
-    var flowPressureSensitivity: Double = 0.0
-    var flowJitter: Double = 0.0
-    var velocityInfluence: Double = 0.0
-    var colorMixingMode: BrushColorMixingMode = .off
-    var wetness: Double = 0.0
-    var wetnessPressureSensitivity: Double = 0.0
-    var opacityPressureSensitivity: Double = 0.0
-    var colorMixStrength: Double = 0.0
-    var smudgeBlurEnabled: Bool = false
-    var smudgeBleed: Double = 0.0
-    var smudgeRadius: Double = 0.0
-    var paintLoad: Double = 1.0
-    var loadPressureSensitivity: Double = 0.0
-    var dualBrushEnabled: Bool = false
-    var dualTipKind: BrushTipKind = .ink
-    var dualScale: Double = 0.72
-    var dualSpacing: Double = 0.26
-    var dualScatter: Double = 0.18
-    var dualAngle: Double = 0.0
-    var dualBlendMode: BrushDualBlendMode = .multiply
-    var grainScale: Double = 1.35
-    var grainContrast: Double = 1.7
-    var paperScale: Double = 0.12
-    var paperStrength: Double = 0.32
-    var paperThreshold: Double = 0.42
-    var flipX: Bool = false
-    var flipY: Bool = false
-    var customTip: BrushTipRaster? = nil
-    var pressureSensitivity: Double
-    var stabilization: Double = 0.0
-    var fillThresholdMode: FillThresholdMode = .opacity
-    var fillOpacityTolerance: Double = 0.0
-    var fillColorTolerance: Double = 0.12
-    var fillExpansion: Int = 0
-    var red: UInt8
-    var green: UInt8
-    var blue: UInt8
-    var isEraser: Bool = false
+typealias BrushRuntimeSettings = PrimoDocumentContracts.BrushRuntimeSettings
 
+extension BrushRuntimeSettings {
     func withCustomTip(
         from sourceURL: URL,
         brushTipLibraryClient: BrushTipLibraryClient = .live(fileClient: .live)
