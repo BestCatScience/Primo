@@ -1,52 +1,78 @@
 import ComposableArchitecture
 import Foundation
 
-struct AppFeatureApplicationReducer: Reducer {
+struct WorkspaceShellFeature: Reducer {
     typealias State = AppFeature.State
     typealias Action = AppFeature.Action
 
-    let feature: AppFeature
+    private let feature = AppFeature()
 
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        guard case let .application(applicationAction) = action else {
+        switch action {
+        case let .application(applicationAction):
+            return feature.routeApplicationAction(state: &state, action: applicationAction)
+
+        case let .workspace(workspaceAction):
+            return feature.routeWorkspaceAction(state: &state, action: workspaceAction)
+
+        default:
             return .none
         }
-        return feature.routeApplicationAction(state: &state, action: applicationAction)
     }
 }
 
-struct AppFeatureWorkspaceReducer: Reducer {
+struct DocumentEditorFeature: Reducer {
     typealias State = AppFeature.State
     typealias Action = AppFeature.Action
 
-    let feature: AppFeature
+    private let feature = AppFeature()
 
-    func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        guard case let .workspace(workspaceAction) = action else {
-            return .none
+    var body: some ReducerOf<Self> {
+        CombineReducers {
+            Scope(state: \.brushPalette, action: \.brushPalette) {
+                BrushPaletteFeature()
+            }
+
+            Scope(state: \.layerSidebar, action: \.layerSidebar) {
+                LayerSidebarFeature()
+            }
+
+            Reduce { state, action in
+                if let effect = feature.routeDocumentEditorAction(state: &state, action: action) {
+                    return effect
+                }
+                return feature.routeDocumentEditorEditingAction(state: &state, action: action) ?? .none
+            }
         }
-        return feature.routeWorkspaceAction(state: &state, action: workspaceAction)
     }
 }
 
-struct AppFeatureDocumentReducer: Reducer {
+struct CanvasInteractionFeature: Reducer {
     typealias State = AppFeature.State
     typealias Action = AppFeature.Action
 
-    let feature: AppFeature
+    private let feature = AppFeature()
 
-    func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        feature.routeDocumentAction(state: &state, action: action) ?? .none
+    var body: some ReducerOf<Self> {
+        CombineReducers {
+            Scope(state: \.canvas, action: \.canvas) {
+                CanvasFeature()
+            }
+
+            Reduce { state, action in
+                feature.routeCanvasInteractionAction(state: &state, action: action) ?? .none
+            }
+        }
     }
 }
 
-struct AppFeatureEditingReducer: Reducer {
+struct AssetImportExportFeature: Reducer {
     typealias State = AppFeature.State
     typealias Action = AppFeature.Action
 
-    let feature: AppFeature
+    private let feature = AppFeature()
 
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
-        feature.routeEditingAction(state: &state, action: action) ?? .none
+        feature.routeAssetImportExportAction(state: &state, action: action) ?? .none
     }
 }

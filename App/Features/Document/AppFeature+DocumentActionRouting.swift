@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    func routeDocumentAction(
+    func routeDocumentEditorAction(
         state: inout State,
         action: Action
     ) -> Effect<Action>? {
@@ -19,6 +19,22 @@ extension AppFeature {
         case let .document(.resizeCanvasExtentRequested(width, height)):
             return handleResizeCanvasExtentRequest(state: &state, width: width, height: height)
 
+        case .document(.undoRequested):
+            return handleUndoRequested(state: &state)
+
+        case .document(.redoRequested):
+            return handleRedoRequested(state: &state)
+
+        default:
+            return nil
+        }
+    }
+
+    func routeAssetImportExportAction(
+        state: inout State,
+        action: Action
+    ) -> Effect<Action>? {
+        switch action {
         case let .document(.newCanvasFromImageReceived(name, data)):
             return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
 
@@ -28,12 +44,6 @@ extension AppFeature {
         case let .document(.newCanvasFromImageFailed(message)):
             handleNewCanvasFromImageFailed(state: &state, message: message)
             return .none
-
-        case .document(.undoRequested):
-            return handleUndoRequested(state: &state)
-
-        case .document(.redoRequested):
-            return handleRedoRequested(state: &state)
 
         case .document(.saveHistoryRequested):
             return handleSaveHistoryRequest(state: &state)
@@ -89,22 +99,6 @@ extension AppFeature {
         case .document(.exportTimelapseRequested):
             return handleTimelapseExportRequest(state: &state)
 
-        case let .nanoBanana(.delegate(delegateAction)):
-            switch delegateAction {
-            case let .requestEdit(request):
-                return handleNanoBananaEditRequest(state: &state, request: request)
-            case .cancelEdit:
-                return handleNanoBananaCancelRequested(state: &state)
-            }
-
-        case let .nanoBanana(.generationSucceeded(preview)):
-            handleNanoBananaEditSucceeded(state: &state, preview: preview)
-            return .none
-
-        case let .nanoBanana(.generationFailed(feedback)):
-            handleNanoBananaEditFailed(state: &state, feedback: feedback)
-            return .none
-
         case let .document(.timelapseExportProgressUpdated(progress)):
             handleTimelapseExportProgressUpdated(state: &state, progress: progress)
             return .none
@@ -124,8 +118,34 @@ extension AppFeature {
             handlePhotoImportFailed(state: &state, message: message)
             return .none
 
+        case let .nanoBanana(.delegate(delegateAction)):
+            switch delegateAction {
+            case let .requestEdit(request):
+                return handleNanoBananaEditRequest(state: &state, request: request)
+            case .cancelEdit:
+                return handleNanoBananaCancelRequested(state: &state)
+            }
+
+        case let .nanoBanana(.generationSucceeded(preview)):
+            handleNanoBananaEditSucceeded(state: &state, preview: preview)
+            return .none
+
+        case let .nanoBanana(.generationFailed(feedback)):
+            handleNanoBananaEditFailed(state: &state, feedback: feedback)
+            return .none
+
         default:
             return nil
         }
+    }
+
+    func routeDocumentAction(
+        state: inout State,
+        action: Action
+    ) -> Effect<Action>? {
+        if let effect = routeDocumentEditorAction(state: &state, action: action) {
+            return effect
+        }
+        return routeAssetImportExportAction(state: &state, action: action)
     }
 }

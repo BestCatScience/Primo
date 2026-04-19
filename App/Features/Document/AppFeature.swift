@@ -33,23 +33,14 @@ struct AppFeature {
 
     var body: some ReducerOf<Self> {
         CombineReducers {
-            Scope(state: \.brushPalette, action: \.brushPalette) {
-                BrushPaletteFeature()
-            }
+            WorkspaceShellFeature()
+            DocumentEditorFeature()
+            CanvasInteractionFeature()
+            AssetImportExportFeature()
+
             Scope(state: \.nanoBanana, action: \.nanoBanana) {
                 NanoBananaFeature()
             }
-            Scope(state: \.layerSidebar, action: \.layerSidebar) {
-                LayerSidebarFeature()
-            }
-            Scope(state: \.canvas, action: \.canvas) {
-                CanvasFeature()
-            }
-
-            AppFeatureApplicationReducer(feature: self)
-            AppFeatureWorkspaceReducer(feature: self)
-            AppFeatureDocumentReducer(feature: self)
-            AppFeatureEditingReducer(feature: self)
         }
     }
 }

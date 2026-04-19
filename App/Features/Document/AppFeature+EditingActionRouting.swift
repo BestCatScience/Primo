@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 extension AppFeature {
-    func routeEditingAction(
+    func routeDocumentEditorEditingAction(
         state: inout State,
         action: Action
     ) -> Effect<Action>? {
@@ -15,9 +15,23 @@ extension AppFeature {
         if let effect = routeLayerEditingAction(state: &state, action: action) {
             return effect
         }
-        if let effect = routeCanvasEditingAction(state: &state, action: action) {
+        return nil
+    }
+
+    func routeCanvasInteractionAction(
+        state: inout State,
+        action: Action
+    ) -> Effect<Action>? {
+        routeCanvasEditingAction(state: &state, action: action)
+    }
+
+    func routeEditingAction(
+        state: inout State,
+        action: Action
+    ) -> Effect<Action>? {
+        if let effect = routeDocumentEditorEditingAction(state: &state, action: action) {
             return effect
         }
-        return nil
+        return routeCanvasInteractionAction(state: &state, action: action)
     }
 }

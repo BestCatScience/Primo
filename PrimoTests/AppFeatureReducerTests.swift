@@ -440,4 +440,59 @@ final class AppFeatureReducerTests: XCTestCase {
         XCTAssertFalse(contents.contains("var feedback: ApplicationFeedback"))
         XCTAssertTrue(contents.contains("CanvasLifecycleFeedbackMapper"))
     }
+
+    func testWorkspaceShellFeatureHomeProjectsLoadRoutesToCatalogRequest() async {
+        let store = TestStore(initialState: AppFeature.State()) {
+            WorkspaceShellFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.homeProjectsLoadRequested) {
+            $0.application.isLoadingHomeProjects = true
+        }
+        await store.receive(.workspaceCatalogRequested(.loadSavedProjects))
+    }
+
+    func testDocumentEditorFeatureUndoRoutesToHistoryMutation() async {
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.application.showsHome = false
+                return state
+            }()
+        ) {
+            DocumentEditorFeature()
+        } withDependencies: {
+            $0.documentHistoryGateway = .stub(undo: { .success(()) })
+        }
+        store.exhaustivity = .off
+
+        await store.send(.undoRequested)
+        await store.receive(.refreshPresentationRequested)
+    }
+
+    func testAssetImportExportFeatureSaveHistoryRoutesToCatalogRequest() async {
+        let activeTab = OpenDocumentTab.testValue()
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.workspace.openTabs = [activeTab]
+                state.workspace.activeTabID = activeTab.id
+                state.workspace.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        ) {
+            AssetImportExportFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.saveHistoryRequested)
+        await store.receive(
+            .workspaceCatalogRequested(
+                .loadSaveHistoryEntries(
+                    AppFeature.WorkspaceSaveHistoryLoadRequest(activeTab: activeTab)
+                )
+            )
+        )
+    }
 }
