@@ -395,13 +395,12 @@ extension AppFeature {
             activationResult = activatePreparedTab(preparedTab, state: &state)
 
         case let .activeTab(title, sourceProjectURL):
+            let existingPreviewImageData = state.workspace.activeTab?.previewImageData
             applyLoadedProject(loaded, state: &state)
             state.workspace.updateActiveTabMetadata(
                 title: title,
                 sourceProjectURL: sourceProjectURL,
-                previewImageData: documentPresentationQueryService.compositePNGData(
-                    paperStyle: resolvedPaperStyle(for: state)
-                ),
+                previewImageData: existingPreviewImageData,
                 canvasSize: state.canvas.canvasSize
             )
             activationResult = .success(())
@@ -433,7 +432,10 @@ extension AppFeature {
             )
             return .none
         case let .success(.some(request)):
-            return .send(.workspacePersistenceRequested(request))
+            return .merge(
+                .send(.workspacePersistenceRequested(request)),
+                .send(.deferredPresentationRefresh)
+            )
         case .success(.none):
             applyLoadedWorkspaceSuccessEffects(
                 plan.successEffects,
@@ -445,7 +447,7 @@ extension AppFeature {
                     language: state.application.appLanguage
                 )
             )
-            return .none
+            return .send(.deferredPresentationRefresh)
         }
     }
 

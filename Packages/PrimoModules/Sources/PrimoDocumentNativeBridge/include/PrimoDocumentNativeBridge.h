@@ -247,6 +247,13 @@ typedef NS_ENUM(NSInteger, APPaintGradientMapPreset) {
 - (void)appendStroke:(APStrokePoint *)point NS_SWIFT_NAME(appendStroke(point:));
 - (void)endStroke NS_SWIFT_NAME(endStroke());
 - (void)cancelStroke NS_SWIFT_NAME(cancelStroke());
+- (BOOL)applyCommittedStrokeWithBrush:(APBrushDescriptor *)brush
+                               points:(NSArray<APStrokePoint *> *)points
+                           layerIndex:(NSInteger)layerIndex NS_SWIFT_NAME(applyCommittedStroke(brush:points:layerIndex:));
+- (BOOL)applyBlurStrokeWithBrush:(APBrushDescriptor *)brush
+                          points:(NSArray<APStrokePoint *> *)points
+                      layerIndex:(NSInteger)layerIndex
+                       transient:(BOOL)transient NS_SWIFT_NAME(applyBlurStroke(brush:points:layerIndex:transient:));
 - (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush NS_SWIFT_NAME(fill(at:brush:));
 - (BOOL)canUndo NS_SWIFT_NAME(canUndo());
 - (BOOL)canRedo NS_SWIFT_NAME(canRedo());

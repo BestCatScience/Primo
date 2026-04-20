@@ -89,48 +89,29 @@ extension PaintDocumentSession {
         guard !samples.isEmpty else {
             return .failure(.emptyInput)
         }
-        if let failure = validate(.layer(index: layerIndex, requiresUnlocked: true)) {
+        switch beginPixelLayerMutation(at: layerIndex) {
+        case let .failure(failure):
             return .failure(failure)
+        case .success:
+            break
         }
-        let basePixelData = pixelDataForLayer(index: layerIndex)
-        guard let rasterized = DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
-            basePixelData: basePixelData,
-            canvasWidth: documentGateway.queries.canvasWidth,
-            canvasHeight: documentGateway.queries.canvasHeight,
+        return documentGateway.strokes.applyCommittedStroke(
             samples: samples,
             brush: brush,
-            preserveAlphaLockedPixels: isLayerAlphaLocked(index: layerIndex)
-        ) else {
-            return .failure(.bridgeMutationFailed("applySoftwareStroke"))
-        }
-        return replaceLayerPixels(index: layerIndex, data: rasterized)
+            layerIndex: layerIndex
+        )
+            ? .success(())
+            : .failure(.bridgeMutationFailed("applyCommittedStroke"))
     }
 
     func applyBlurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, transient: Bool = false) {
         guard !samples.isEmpty else { return }
         guard validate(.layer(index: layerIndex, requiresUnlocked: true)) == nil else { return }
-        let canvasSize = PaintDocumentCanvasSize(
-            width: documentGateway.queries.canvasWidth,
-            height: documentGateway.queries.canvasHeight
-        )
-        let sourceData = pixelDataForLayer(index: layerIndex)
-        guard sourceData.count == canvasSize.rgbaByteCount else { return }
-
-        let original = [UInt8](sourceData)
-        guard let blurred = blurService.boxBlurredPixels(from: original, size: canvasSize, radius: brush.radius) else {
-            return
-        }
-
-        let blended = blurService.blendBlurredPixels(
-            original: original,
-            blurred: blurred,
-            size: canvasSize,
+        _ = documentGateway.strokes.applyBlurStroke(
             samples: samples,
-            brush: brush
+            brush: brush,
+            layerIndex: layerIndex,
+            transient: transient
         )
-        let outputData = isLayerAlphaLocked(index: layerIndex)
-            ? Self.pixelDataByPreservingExistingAlpha(source: Data(blended), existing: sourceData)
-            : Data(blended)
-        documentGateway.layers.replaceLayerPixels(index: layerIndex, data: outputData, transient: transient)
     }
 }

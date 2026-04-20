@@ -659,6 +659,32 @@ struct PaintDocumentSessionDocumentGateway {
             bridge.cancelStroke()
         }
 
+        func applyCommittedStroke(
+            samples: [StylusSample],
+            brush: BrushRuntimeSettings,
+            layerIndex: Int
+        ) -> Bool {
+            bridge.applyCommittedStroke(
+                brush: bridgeService.descriptors.makeBrushDescriptor(from: brush),
+                points: bridgeService.strokePoints.makeStrokePoints(from: samples),
+                layerIndex: layerIndex
+            )
+        }
+
+        func applyBlurStroke(
+            samples: [StylusSample],
+            brush: BrushRuntimeSettings,
+            layerIndex: Int,
+            transient: Bool
+        ) -> Bool {
+            bridge.applyBlurStroke(
+                brush: bridgeService.descriptors.makeBrushDescriptor(from: brush),
+                points: bridgeService.strokePoints.makeStrokePoints(from: samples),
+                layerIndex: layerIndex,
+                transient: transient
+            )
+        }
+
         func fill(sample: StylusSample, brush: BrushRuntimeSettings) {
             bridge.fill(
                 at: sample.point,

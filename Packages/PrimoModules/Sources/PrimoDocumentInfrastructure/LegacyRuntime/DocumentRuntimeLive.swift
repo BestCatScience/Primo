@@ -112,7 +112,7 @@ public enum DocumentRuntimeFactory {
                     uuidClient: uuidClient
                 )
                 let loadedProject = LoadedPaintProject(
-                    presentation: session.presentation(),
+                    presentation: session.lightweightPresentation(),
                     paperStyle: session.currentPaperStyle
                 )
                 runtimeBox.replaceRuntime(with: session)

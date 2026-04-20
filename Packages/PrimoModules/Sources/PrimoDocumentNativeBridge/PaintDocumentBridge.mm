@@ -233,6 +233,104 @@ primo::PaintDocumentSnapshot APReadSnapshot(const primo::PaintDocument& document
     return document.snapshot();
 }
 
+primo::BrushSettings APBrushSettingsFromDescriptor(APBrushDescriptor *brush) {
+    primo::BrushSettings settings;
+    settings.radius = (float)brush.radius;
+    settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
+    settings.taperIn = (float)brush.taperIn;
+    settings.taperOut = (float)brush.taperOut;
+    settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
+    settings.hardness = (float)brush.hardness;
+    settings.opacity = (float)brush.opacity;
+    settings.roundness = (float)brush.roundness;
+    settings.roundnessPressureSensitivity = (float)brush.roundnessPressureSensitivity;
+    settings.roundnessTiltSensitivity = (float)brush.roundnessTiltSensitivity;
+    settings.angle = (float)brush.angle;
+    settings.anglePressureSensitivity = (float)brush.anglePressureSensitivity;
+    settings.angleTiltSensitivity = (float)brush.angleTiltSensitivity;
+    settings.angleMode = (int)brush.angleMode;
+    settings.stampSpacing = (float)brush.stampSpacing;
+    settings.spacingJitter = (float)brush.spacingJitter;
+    settings.scatterEnabled = brush.scatterEnabled;
+    settings.scatterMode = (int)brush.scatterMode;
+    settings.scatterLateral = (float)brush.scatterLateral;
+    settings.scatterLinear = (float)brush.scatterLinear;
+    settings.count = (int)brush.count;
+    settings.countJitter = (float)brush.countJitter;
+    settings.countSizeJitter = (float)brush.countSizeJitter;
+    settings.countOpacityJitter = (float)brush.countOpacityJitter;
+    settings.angleJitter = (float)brush.angleJitter;
+    settings.roundnessJitter = (float)brush.roundnessJitter;
+    settings.textureMode = (int)brush.textureMode;
+    settings.textureStrength = (float)brush.textureStrength;
+    settings.flow = (float)brush.flow;
+    settings.flowPressureSensitivity = (float)brush.flowPressureSensitivity;
+    settings.flowJitter = (float)brush.flowJitter;
+    settings.colorMixingMode = (int)brush.colorMixingMode;
+    settings.wetness = (float)brush.wetness;
+    settings.wetnessPressureSensitivity = (float)brush.wetnessPressureSensitivity;
+    settings.opacityPressureSensitivity = (float)brush.opacityPressureSensitivity;
+    settings.colorMixStrength = (float)brush.colorMixStrength;
+    settings.smudgeBlurEnabled = brush.smudgeBlurEnabled;
+    settings.smudgeBleed = (float)brush.smudgeBleed;
+    settings.smudgeRadius = (float)brush.smudgeRadius;
+    settings.paintLoad = (float)brush.paintLoad;
+    settings.loadPressureSensitivity = (float)brush.loadPressureSensitivity;
+    settings.dualBrushEnabled = brush.dualBrushEnabled;
+    settings.dualTipKind = std::string(brush.dualTipKind.UTF8String ?: "ink");
+    settings.dualScale = (float)brush.dualScale;
+    settings.dualSpacing = (float)brush.dualSpacing;
+    settings.dualScatter = (float)brush.dualScatter;
+    settings.dualAngle = (float)brush.dualAngle;
+    settings.dualBlendMode = (int)brush.dualBlendMode;
+    settings.flipX = brush.flipX;
+    settings.flipY = brush.flipY;
+    settings.tipMaskWidth = (int)brush.tipMaskWidth;
+    settings.tipMaskHeight = (int)brush.tipMaskHeight;
+    if (brush.tipMaskData.length > 0) {
+        const auto *bytes = static_cast<const uint8_t *>(brush.tipMaskData.bytes);
+        settings.tipMaskAlpha.assign(bytes, bytes + brush.tipMaskData.length);
+    }
+    settings.grainScale = (float)brush.grainScale;
+    settings.grainContrast = (float)brush.grainContrast;
+    settings.paperScale = (float)brush.paperScale;
+    settings.paperThreshold = (float)brush.paperThreshold;
+    settings.paperStrength = (float)brush.paperStrength;
+    settings.velocityInfluence = (float)brush.velocityInfluence;
+    settings.tiltInfluence = (float)brush.tiltInfluence;
+    settings.maxDarkness = (float)brush.maxDarkness;
+    settings.pressureSensitivity = (float)brush.pressureSensitivity;
+    settings.fillThresholdMode = (int)brush.fillThresholdMode;
+    settings.fillOpacityTolerance = (float)brush.fillOpacityTolerance;
+    settings.fillColorTolerance = (float)brush.fillColorTolerance;
+    settings.fillExpansion = (int)brush.fillExpansion;
+    settings.red = brush.red;
+    settings.green = brush.green;
+    settings.blue = brush.blue;
+    settings.eraser = brush.eraser;
+    return settings;
+}
+
+primo::StrokePoint APStrokePointValueFromObject(APStrokePoint *point) {
+    primo::StrokePoint strokePoint;
+    strokePoint.x = (float)point.x;
+    strokePoint.y = (float)point.y;
+    strokePoint.pressure = (float)point.pressure;
+    strokePoint.altitude = (float)point.altitude;
+    strokePoint.azimuth = (float)point.azimuth;
+    strokePoint.timestamp = (float)point.timestamp;
+    return strokePoint;
+}
+
+std::vector<primo::StrokePoint> APStrokePointValuesFromArray(NSArray<APStrokePoint *> *points) {
+    std::vector<primo::StrokePoint> result;
+    result.reserve(points.count);
+    for (APStrokePoint *point in points) {
+        result.push_back(APStrokePointValueFromObject(point));
+    }
+    return result;
+}
+
 APPaintLayerInfo *APLayerInfoFromSnapshot(const primo::PaintLayerSnapshot& layer) {
     NSString *name = [NSString stringWithUTF8String:layer.name.c_str()];
     return [[APPaintLayerInfo alloc] initWithName:name
@@ -643,101 +741,11 @@ APPaintFolderInfo *APFolderInfoFromSnapshot(const primo::PaintFolderSnapshot& fo
 }
 
 - (void)beginStrokeWithBrush:(APBrushDescriptor *)brush point:(APStrokePoint *)point {
-    primo::BrushSettings settings;
-    settings.radius = (float)brush.radius;
-    settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
-    settings.taperIn = (float)brush.taperIn;
-    settings.taperOut = (float)brush.taperOut;
-    settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
-    settings.hardness = (float)brush.hardness;
-    settings.opacity = (float)brush.opacity;
-    settings.roundness = (float)brush.roundness;
-    settings.roundnessPressureSensitivity = (float)brush.roundnessPressureSensitivity;
-    settings.roundnessTiltSensitivity = (float)brush.roundnessTiltSensitivity;
-    settings.angle = (float)brush.angle;
-    settings.anglePressureSensitivity = (float)brush.anglePressureSensitivity;
-    settings.angleTiltSensitivity = (float)brush.angleTiltSensitivity;
-    settings.angleMode = (int)brush.angleMode;
-    settings.stampSpacing = (float)brush.stampSpacing;
-    settings.spacingJitter = (float)brush.spacingJitter;
-    settings.scatterEnabled = brush.scatterEnabled;
-    settings.scatterMode = (int)brush.scatterMode;
-    settings.scatterLateral = (float)brush.scatterLateral;
-    settings.scatterLinear = (float)brush.scatterLinear;
-    settings.count = (int)brush.count;
-    settings.countJitter = (float)brush.countJitter;
-    settings.countSizeJitter = (float)brush.countSizeJitter;
-    settings.countOpacityJitter = (float)brush.countOpacityJitter;
-    settings.angleJitter = (float)brush.angleJitter;
-    settings.roundnessJitter = (float)brush.roundnessJitter;
-    settings.textureMode = (int)brush.textureMode;
-    settings.textureStrength = (float)brush.textureStrength;
-    settings.flow = (float)brush.flow;
-    settings.flowPressureSensitivity = (float)brush.flowPressureSensitivity;
-    settings.flowJitter = (float)brush.flowJitter;
-    settings.colorMixingMode = (int)brush.colorMixingMode;
-    settings.wetness = (float)brush.wetness;
-    settings.wetnessPressureSensitivity = (float)brush.wetnessPressureSensitivity;
-    settings.opacityPressureSensitivity = (float)brush.opacityPressureSensitivity;
-    settings.colorMixStrength = (float)brush.colorMixStrength;
-    settings.smudgeBlurEnabled = brush.smudgeBlurEnabled;
-    settings.smudgeBleed = (float)brush.smudgeBleed;
-    settings.smudgeRadius = (float)brush.smudgeRadius;
-    settings.paintLoad = (float)brush.paintLoad;
-    settings.loadPressureSensitivity = (float)brush.loadPressureSensitivity;
-    settings.dualBrushEnabled = brush.dualBrushEnabled;
-    settings.dualTipKind = std::string(brush.dualTipKind.UTF8String ?: "ink");
-    settings.dualScale = (float)brush.dualScale;
-    settings.dualSpacing = (float)brush.dualSpacing;
-    settings.dualScatter = (float)brush.dualScatter;
-    settings.dualAngle = (float)brush.dualAngle;
-    settings.dualBlendMode = (int)brush.dualBlendMode;
-    settings.flipX = brush.flipX;
-    settings.flipY = brush.flipY;
-    settings.tipMaskWidth = (int)brush.tipMaskWidth;
-    settings.tipMaskHeight = (int)brush.tipMaskHeight;
-    if (brush.tipMaskData.length > 0) {
-        const auto *bytes = static_cast<const uint8_t *>(brush.tipMaskData.bytes);
-        settings.tipMaskAlpha.assign(bytes, bytes + brush.tipMaskData.length);
-    }
-    settings.grainScale = (float)brush.grainScale;
-    settings.grainContrast = (float)brush.grainContrast;
-    settings.paperScale = (float)brush.paperScale;
-    settings.paperThreshold = (float)brush.paperThreshold;
-    settings.paperStrength = (float)brush.paperStrength;
-    settings.velocityInfluence = (float)brush.velocityInfluence;
-    settings.tiltInfluence = (float)brush.tiltInfluence;
-    settings.maxDarkness = (float)brush.maxDarkness;
-    settings.pressureSensitivity = (float)brush.pressureSensitivity;
-    settings.fillThresholdMode = (int)brush.fillThresholdMode;
-    settings.fillOpacityTolerance = (float)brush.fillOpacityTolerance;
-    settings.fillColorTolerance = (float)brush.fillColorTolerance;
-    settings.fillExpansion = (int)brush.fillExpansion;
-    settings.red = brush.red;
-    settings.green = brush.green;
-    settings.blue = brush.blue;
-    settings.eraser = brush.eraser;
-
-    primo::StrokePoint startPoint;
-    startPoint.x = (float)point.x;
-    startPoint.y = (float)point.y;
-    startPoint.pressure = (float)point.pressure;
-    startPoint.altitude = (float)point.altitude;
-    startPoint.azimuth = (float)point.azimuth;
-    startPoint.timestamp = (float)point.timestamp;
-
-    _document->beginStroke(settings, startPoint);
+    _document->beginStroke(APBrushSettingsFromDescriptor(brush), APStrokePointValueFromObject(point));
 }
 
 - (void)appendStroke:(APStrokePoint *)point {
-    primo::StrokePoint strokePoint;
-    strokePoint.x = (float)point.x;
-    strokePoint.y = (float)point.y;
-    strokePoint.pressure = (float)point.pressure;
-    strokePoint.altitude = (float)point.altitude;
-    strokePoint.azimuth = (float)point.azimuth;
-    strokePoint.timestamp = (float)point.timestamp;
-    _document->appendStroke(strokePoint);
+    _document->appendStroke(APStrokePointValueFromObject(point));
 }
 
 - (void)endStroke {
@@ -748,83 +756,25 @@ APPaintFolderInfo *APFolderInfoFromSnapshot(const primo::PaintFolderSnapshot& fo
     _document->cancelStroke();
 }
 
-- (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
-    primo::BrushSettings settings;
-    settings.radius = (float)brush.radius;
-    settings.sizeSpeedSensitivity = (float)brush.sizeSpeedSensitivity;
-    settings.taperIn = (float)brush.taperIn;
-    settings.taperOut = (float)brush.taperOut;
-    settings.tipKind = std::string(brush.tipKind.UTF8String ?: "pencil");
-    settings.hardness = (float)brush.hardness;
-    settings.opacity = (float)brush.opacity;
-    settings.roundness = (float)brush.roundness;
-    settings.roundnessPressureSensitivity = (float)brush.roundnessPressureSensitivity;
-    settings.roundnessTiltSensitivity = (float)brush.roundnessTiltSensitivity;
-    settings.angle = (float)brush.angle;
-    settings.anglePressureSensitivity = (float)brush.anglePressureSensitivity;
-    settings.angleTiltSensitivity = (float)brush.angleTiltSensitivity;
-    settings.angleMode = (int)brush.angleMode;
-    settings.stampSpacing = (float)brush.stampSpacing;
-    settings.spacingJitter = (float)brush.spacingJitter;
-    settings.scatterEnabled = brush.scatterEnabled;
-    settings.scatterMode = (int)brush.scatterMode;
-    settings.scatterLateral = (float)brush.scatterLateral;
-    settings.scatterLinear = (float)brush.scatterLinear;
-    settings.count = (int)brush.count;
-    settings.countJitter = (float)brush.countJitter;
-    settings.countSizeJitter = (float)brush.countSizeJitter;
-    settings.countOpacityJitter = (float)brush.countOpacityJitter;
-    settings.angleJitter = (float)brush.angleJitter;
-    settings.roundnessJitter = (float)brush.roundnessJitter;
-    settings.textureMode = (int)brush.textureMode;
-    settings.textureStrength = (float)brush.textureStrength;
-    settings.flow = (float)brush.flow;
-    settings.flowPressureSensitivity = (float)brush.flowPressureSensitivity;
-    settings.flowJitter = (float)brush.flowJitter;
-    settings.colorMixingMode = (int)brush.colorMixingMode;
-    settings.wetness = (float)brush.wetness;
-    settings.wetnessPressureSensitivity = (float)brush.wetnessPressureSensitivity;
-    settings.opacityPressureSensitivity = (float)brush.opacityPressureSensitivity;
-    settings.colorMixStrength = (float)brush.colorMixStrength;
-    settings.smudgeBlurEnabled = brush.smudgeBlurEnabled;
-    settings.smudgeBleed = (float)brush.smudgeBleed;
-    settings.smudgeRadius = (float)brush.smudgeRadius;
-    settings.paintLoad = (float)brush.paintLoad;
-    settings.loadPressureSensitivity = (float)brush.loadPressureSensitivity;
-    settings.dualBrushEnabled = brush.dualBrushEnabled;
-    settings.dualTipKind = std::string(brush.dualTipKind.UTF8String ?: "ink");
-    settings.dualScale = (float)brush.dualScale;
-    settings.dualSpacing = (float)brush.dualSpacing;
-    settings.dualScatter = (float)brush.dualScatter;
-    settings.dualAngle = (float)brush.dualAngle;
-    settings.dualBlendMode = (int)brush.dualBlendMode;
-    settings.flipX = brush.flipX;
-    settings.flipY = brush.flipY;
-    settings.tipMaskWidth = (int)brush.tipMaskWidth;
-    settings.tipMaskHeight = (int)brush.tipMaskHeight;
-    if (brush.tipMaskData.length > 0) {
-        const auto *bytes = static_cast<const uint8_t *>(brush.tipMaskData.bytes);
-        settings.tipMaskAlpha.assign(bytes, bytes + brush.tipMaskData.length);
-    }
-    settings.grainScale = (float)brush.grainScale;
-    settings.grainContrast = (float)brush.grainContrast;
-    settings.paperScale = (float)brush.paperScale;
-    settings.paperThreshold = (float)brush.paperThreshold;
-    settings.paperStrength = (float)brush.paperStrength;
-    settings.velocityInfluence = (float)brush.velocityInfluence;
-    settings.tiltInfluence = (float)brush.tiltInfluence;
-    settings.maxDarkness = (float)brush.maxDarkness;
-    settings.pressureSensitivity = (float)brush.pressureSensitivity;
-    settings.fillThresholdMode = (int)brush.fillThresholdMode;
-    settings.fillOpacityTolerance = (float)brush.fillOpacityTolerance;
-    settings.fillColorTolerance = (float)brush.fillColorTolerance;
-    settings.fillExpansion = (int)brush.fillExpansion;
-    settings.red = brush.red;
-    settings.green = brush.green;
-    settings.blue = brush.blue;
-    settings.eraser = brush.eraser;
+- (BOOL)applyCommittedStrokeWithBrush:(APBrushDescriptor *)brush
+                               points:(NSArray<APStrokePoint *> *)points
+                           layerIndex:(NSInteger)layerIndex {
+    const auto settings = APBrushSettingsFromDescriptor(brush);
+    const auto strokePoints = APStrokePointValuesFromArray(points);
+    return _document->applyCommittedStroke((int)layerIndex, settings, strokePoints);
+}
 
-    _document->fill((int)std::lround(point.x), (int)std::lround(point.y), settings);
+- (BOOL)applyBlurStrokeWithBrush:(APBrushDescriptor *)brush
+                          points:(NSArray<APStrokePoint *> *)points
+                      layerIndex:(NSInteger)layerIndex
+                       transient:(BOOL)transient {
+    const auto settings = APBrushSettingsFromDescriptor(brush);
+    const auto strokePoints = APStrokePointValuesFromArray(points);
+    return _document->applyBlurStroke((int)layerIndex, settings, strokePoints, transient);
+}
+
+- (void)fillAtPoint:(CGPoint)point brush:(APBrushDescriptor *)brush {
+    _document->fill((int)std::lround(point.x), (int)std::lround(point.y), APBrushSettingsFromDescriptor(brush));
 }
 
 - (BOOL)canUndo {

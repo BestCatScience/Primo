@@ -12,6 +12,10 @@ struct PaintDocumentBridgeStrokeService {
         return point
     }
 
+    func makeStrokePoints(from samples: [StylusSample]) -> [APStrokePoint] {
+        samples.map(makeStrokePoint(from:))
+    }
+
     func normalizedPressure(_ pressure: CGFloat) -> CGFloat {
         max(0.08, min(max(pressure, 0.0), 1.0))
     }

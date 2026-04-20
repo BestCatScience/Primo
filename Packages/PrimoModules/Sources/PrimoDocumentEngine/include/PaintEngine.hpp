@@ -376,6 +376,39 @@ class PaintDocumentProcessingApplicator;
 
 class PaintDocument {
 public:
+    struct ResolvedSubDab {
+        float localX = 0.0F;
+        float localY = 0.0F;
+        float cosAngle = 1.0F;
+        float sinAngle = 0.0F;
+        float alongScale = 1.0F;
+        float acrossScale = 1.0F;
+        float majorRadius = 1.0F;
+        float opacity = 0.0F;
+        float seed = 0.0F;
+        float angle = 0.0F;
+        float clusterOffset = 0.0F;
+    };
+
+    struct ResolvedSmudgeBlendContext {
+        bool alphaLocked = false;
+        bool smudgeEnabled = false;
+        bool blurEnabled = false;
+        int mixingMode = 0;
+        float clampedPressure = 1.0F;
+        float lowPressureMix = 0.0F;
+        float spacingFactor = 0.0F;
+        float pigmentR = 0.0F;
+        float pigmentG = 0.0F;
+        float pigmentB = 0.0F;
+        float effectiveColorStretch = 0.0F;
+        float effectiveUndercoatMix = 0.0F;
+        float effectiveBlurAmount = 0.0F;
+        float effectiveBlurRadius = 0.0F;
+        float effectiveColorRate = 0.0F;
+        float effectivePigmentDensity = 0.0F;
+    };
+
     PaintDocument(int width, int height);
     ~PaintDocument();
 
@@ -423,6 +456,8 @@ public:
     void endStroke();
     void cancelStroke();
     void fill(int x, int y, const BrushSettings& brush);
+    bool applyCommittedStroke(int layerIndex, const BrushSettings& brush, std::span<const StrokePoint> points);
+    bool applyBlurStroke(int layerIndex, const BrushSettings& brush, std::span<const StrokePoint> points, bool transient);
     bool canUndo() const noexcept;
     bool canRedo() const noexcept;
     bool undo();
@@ -513,11 +548,8 @@ private:
     void renderShortStroke(Layer& layer, const StrokePoint& start, const StrokePoint& end);
     void blendPixel(
         uint8_t* dst,
-        uint8_t r,
-        uint8_t g,
-        uint8_t b,
         float alpha,
-        float pressure,
+        const ResolvedSmudgeBlendContext& context,
         float pulledR,
         float pulledG,
         float pulledB,
@@ -528,17 +560,6 @@ private:
     void beginSmudgeAccumulation() noexcept;
     void accumulateSmudgeSample(const uint8_t* src, float weight) noexcept;
     void commitSmudgeCarry() noexcept;
-    std::array<float, 4> sampleSmudgeNeighborhood(
-        const Layer& layer,
-        int x,
-        int y,
-        float tangentX,
-        float tangentY,
-        float normalX,
-        float normalY,
-        float radius,
-        bool wideSampling
-    ) const noexcept;
     void rebuildComposite() const;
 };
 
