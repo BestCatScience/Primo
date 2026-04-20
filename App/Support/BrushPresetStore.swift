@@ -232,7 +232,7 @@ private struct StoredBrushLibrary: Codable {
 }
 
 private struct StoredBrushPreset: Codable {
-    let name: String
+    var name: String
     let tipKindRawValue: String
     let radius: Double
     let sizeSpeedSensitivity: Double

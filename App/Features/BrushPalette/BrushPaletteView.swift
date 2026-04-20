@@ -17,6 +17,7 @@ struct BrushPaletteView: View {
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
+    @State var isImportingCustomTip = false
     @State var isImportingTextFont = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip

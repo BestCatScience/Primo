@@ -423,6 +423,7 @@ struct BrushPaletteFeature {
         case saveCurrentBrushButtonTapped
         case resetCurrentBrushSettingsButtonTapped
         case deleteSavedPresetButtonTapped(String)
+        case renameSavedPresetButtonTapped(String, String)
         case setTextPlacement(CGPoint)
         case configureTextForActiveLayer(TextLayerDraft?)
         case applyTextButtonTapped
@@ -934,9 +935,6 @@ private extension BrushPreset {
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
-            smudgeBlurEnabled: smudgeBlurEnabled,
-            smudgeBleed: smudgeBleed,
-            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,
