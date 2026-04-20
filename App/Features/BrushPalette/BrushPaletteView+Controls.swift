@@ -163,7 +163,7 @@ extension BrushPaletteView {
                     sliderRow(
                         title: language.localized("ぼかしの強さ"),
                         value: "\(Int(store.brush.flow * 100))%",
-                        slider: Slider(value: $store.brush.flow, in: 0.0...1.0)
+                        slider: Slider(value: $store.brush.flow, in: 0.1...1.0)
                     )
 
                     Text(language.localized("Apple Pencil でなぞった部分だけをぼかします。サイズは半径、強さはぼかしの効き方です。"))
@@ -522,110 +522,6 @@ extension BrushPaletteView {
             )
             sliderRow(title: language.localized("角度量"), value: "\(Int(angleAmountBinding.wrappedValue * 100))%", slider: Slider(value: angleAmountBinding, in: 0.0...1.0))
             sliderRow(title: language.localized("硬さ"), value: "\(Int(store.brush.hardness * 100))%", slider: Slider(value: $store.brush.hardness, in: 0.2...0.98))
-            subsectionLabel(language.localized("先端編集"))
-            segmentedModeRow(
-                title: language.localized("先端シェイプ"),
-                selectedTitle: customTipPresetBinding.wrappedValue.localizedTitle(language)
-            ) {
-                Picker(language.localized("先端シェイプ"), selection: customTipPresetBinding) {
-                    ForEach(BrushTipShapePreset.allCases) { preset in
-                        Text(preset.localizedTitle(language)).tag(preset)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-            HStack(spacing: 8) {
-                brushBooleanChip(title: language.localized("左右反転"), isOn: $store.brush.flipX)
-                brushBooleanChip(title: language.localized("上下反転"), isOn: $store.brush.flipY)
-            }
-            HStack(spacing: 8) {
-                Button {
-                    isImportingCustomTip = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "photo.badge.plus")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(language.localized("PNG先端を読み込む"))
-                            .font(StudioTheme.Typography.label(12))
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundStyle(panelPrimaryTextStyle)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 36)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(panelCardFillStrong)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(panelCardBorder, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    store.brush.customTip = nil
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.uturn.backward.circle")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text(language.localized("ラウンドに戻す"))
-                            .font(StudioTheme.Typography.label(12))
-                        Spacer(minLength: 0)
-                    }
-                    .foregroundStyle(panelPrimaryTextStyle)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 36)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(panelCardFillStrong)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(panelCardBorder, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-            subsectionLabel(language.localized("保存した先端"))
-            Button {
-                store.send(.saveCurrentBrushButtonTapped)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.down.on.square")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(language.localized("現在の先端を保存"))
-                        .font(StudioTheme.Typography.label(12))
-                    Spacer(minLength: 0)
-                }
-                .foregroundStyle(panelPrimaryTextStyle)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(panelCardFillStrong)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(panelCardBorder, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
-
-            let savedTipPresets = store.library.savedPresets.filter { $0.customTip != nil }
-            if !savedTipPresets.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(savedTipPresets, id: \.name) { preset in
-                            savedTipPresetChip(preset: preset)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-            }
-            Text(language.localized("ラウンドに戻すか、既存のカスタム先端や装飾先端へ切り替えられます。"))
-                .font(StudioTheme.Typography.body(11))
-                .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
         }
     }
 
@@ -673,24 +569,18 @@ extension BrushPaletteView {
             )
             sliderRow(title: language.localized("不透明度量"), value: "\(Int(opacityAmountBinding.wrappedValue * 100))%", slider: Slider(value: opacityAmountBinding, in: 0.0...1.0))
             sliderRow(
-                title: language.localized("速度で不透明度"),
-                value: "\(Int((store.brush.velocityInfluence * 100).rounded()))%",
+                title: language.localized("Speed Opacity"),
+                value: "\(Int(speedOpacityAmountBinding.wrappedValue.rounded()))",
                 slider: Slider(value: speedOpacityAmountBinding, in: 0...200, step: 1)
             )
-            sliderRow(title: language.localized("フロー"), value: "\(Int(store.brush.flow * 100))%", slider: Slider(value: $store.brush.flow, in: 0.0...1.0))
+            sliderRow(title: language.localized("フロー"), value: "\(Int(store.brush.flow * 100))%", slider: Slider(value: $store.brush.flow, in: 0.05...1.0))
             dynamicControlMenuRow(
                 title: language.localized("フローコントロール"),
                 selection: flowControlBinding,
                 allowed: [.off, .pressure, .random]
             )
             sliderRow(title: language.localized("フロー量"), value: "\(Int(flowAmountBinding.wrappedValue * 100))%", slider: Slider(value: flowAmountBinding, in: 0.0...1.0))
-            if flowControlBinding.wrappedValue == .random || store.brush.flowJitter > 0.001 {
-                sliderRow(title: language.localized("フローばらつき"), value: "\(Int(store.brush.flowJitter * 100))%", slider: Slider(value: $store.brush.flowJitter, in: 0.0...1.0))
-            }
             sliderRow(title: language.localized("手ぶれ補正"), value: "\(Int(store.brush.stabilization * 100))%", slider: Slider(value: $store.brush.stabilization, in: 0.0...1.0))
-            Text(language.localized("手ぶれ補正は描線を少し遅らせて整えます。高くするほど線は安定し、追従はゆっくりになります。"))
-                .font(StudioTheme.Typography.body(11))
-                .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
         }
     }
 
@@ -711,55 +601,24 @@ extension BrushPaletteView {
             sliderRow(title: language.localized("先端テクスチャ"), value: "\(Int(store.brush.textureStrength * 100))%", slider: Slider(value: $store.brush.textureStrength, in: 0.0...1.0))
             segmentedModeRow(
                 title: language.localized("ミキサーブラシ"),
-                selectedTitle: language.localized("色のび / 絵の具")
+                selectedTitle: "Wet / Load / Mix / Flow"
             ) {
                 VStack(alignment: .leading, spacing: 10) {
-                    subsectionLabel(language.localized("下地混色"))
-                    segmentedModeRow(
-                        title: language.localized("混色モード"),
-                        selectedTitle: store.brush.colorMixingMode.localizedTitle(language)
-                    ) {
-                        Picker(language.localized("混色モード"), selection: $store.brush.colorMixingMode) {
-                            ForEach(BrushColorMixingMode.allCases) { mode in
-                                Text(mode.localizedTitle(language)).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                    }
-                    if store.brush.colorMixingMode != .off {
-                        sliderRow(title: language.localized("色のび"), value: "\(Int(store.brush.wetness * 100))%", slider: Slider(value: $store.brush.wetness, in: 0.0...1.0))
-                        dynamicControlMenuRow(
-                            title: language.localized("色のびコントロール"),
-                            selection: wetnessControlBinding,
-                            allowed: [.off, .pressure]
-                        )
-                        sliderRow(title: language.localized("色のび量"), value: "\(Int(wetnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: wetnessAmountBinding, in: 0.0...1.0))
-                        sliderRow(title: language.localized("絵の具量"), value: "\(Int(store.brush.paintLoad * 100))%", slider: Slider(value: $store.brush.paintLoad, in: 0.0...1.0))
-                        if store.brush.colorMixingMode != .smear {
-                            sliderRow(title: language.localized("絵の具濃度"), value: "\(Int(store.brush.flow * 100))%", slider: Slider(value: $store.brush.flow, in: 0.0...1.0))
-                        }
-                        if store.brush.colorMixingMode == .runningColor {
-                            Toggle(isOn: $store.brush.smudgeBlurEnabled) {
-                                Text(language.localized("追加ぼかし"))
-                                    .font(StudioTheme.Typography.label(11))
-                                    .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.8) : .white.opacity(0.86))
-                            }
-                            .toggleStyle(.switch)
-                            if store.brush.smudgeBlurEnabled {
-                                sliderRow(title: language.localized("ぼかし強さ"), value: "\(Int(store.brush.smudgeBleed * 100))%", slider: Slider(value: $store.brush.smudgeBleed, in: 0.0...1.0))
-                                sliderRow(title: language.localized("ぼかし半径"), value: "\(Int(store.brush.smudgeRadius * 100))%", slider: Slider(value: $store.brush.smudgeRadius, in: 0.0...1.0))
-                            }
-                        }
-                        dynamicControlMenuRow(
-                            title: language.localized("絵の具量コントロール"),
-                            selection: loadControlBinding,
-                            allowed: [.off, .pressure]
-                        )
-                        sliderRow(title: language.localized("絵の具量補正"), value: "\(Int(loadAmountBinding.wrappedValue * 100))%", slider: Slider(value: loadAmountBinding, in: 0.0...1.0))
-                    }
-                    Text(language.localized("混色モードごとに使う項目が切り替わります。ブレンドは色のび・絵の具量・絵の具濃度、ランニングカラーは必要なら追加ぼかし、スメアは色のびと絵の具量を主に使います。"))
-                        .font(StudioTheme.Typography.body(11))
-                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
+                    sliderRow(title: language.localized("ウェット"), value: "\(Int(store.brush.wetness * 100))%", slider: Slider(value: $store.brush.wetness, in: 0.0...1.0))
+                    dynamicControlMenuRow(
+                        title: language.localized("ウェットコントロール"),
+                        selection: wetnessControlBinding,
+                        allowed: [.off, .pressure]
+                    )
+                    sliderRow(title: language.localized("ウェット量"), value: "\(Int(wetnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: wetnessAmountBinding, in: 0.0...1.0))
+                    sliderRow(title: language.localized("混色量"), value: "\(Int(store.brush.colorMixStrength * 100))%", slider: Slider(value: $store.brush.colorMixStrength, in: 0.0...1.0))
+                    sliderRow(title: language.localized("色の含み"), value: "\(Int(store.brush.paintLoad * 100))%", slider: Slider(value: $store.brush.paintLoad, in: 0.0...1.0))
+                    dynamicControlMenuRow(
+                        title: language.localized("含みコントロール"),
+                        selection: loadControlBinding,
+                        allowed: [.off, .pressure]
+                    )
+                    sliderRow(title: language.localized("含み量"), value: "\(Int(loadAmountBinding.wrappedValue * 100))%", slider: Slider(value: loadAmountBinding, in: 0.0...1.0))
                 }
             }
             segmentedModeRow(
@@ -801,98 +660,12 @@ extension BrushPaletteView {
                 selectedTitle: "\(Int(store.brush.paperStrength * 100))%"
             ) {
                 VStack(alignment: .leading, spacing: 10) {
-                    subsectionLabel(language.localized("紙質と粒状感"))
                     sliderRow(title: language.localized("用紙の強さ"), value: "\(Int(store.brush.paperStrength * 100))%", slider: Slider(value: $store.brush.paperStrength, in: 0.0...1.0))
                     sliderRow(title: language.localized("紙目スケール"), value: String(format: "%.2f", store.brush.paperScale), slider: Slider(value: $store.brush.paperScale, in: 0.04...0.30))
                     sliderRow(title: language.localized("紙目しきい値"), value: "\(Int(store.brush.paperThreshold * 100))%", slider: Slider(value: $store.brush.paperThreshold, in: 0.15...0.75))
                     sliderRow(title: language.localized("粒状感"), value: String(format: "%.2f", store.brush.grainScale), slider: Slider(value: $store.brush.grainScale, in: 0.6...2.8))
                     sliderRow(title: language.localized("粒コントラスト"), value: String(format: "%.2f", store.brush.grainContrast), slider: Slider(value: $store.brush.grainContrast, in: 0.8...2.8))
-                    Text(language.localized("紙質はストロークの引っ掛かり、粒状感はインクのざらつきを調整します。"))
-                        .font(StudioTheme.Typography.body(11))
-                        .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func subsectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(StudioTheme.Typography.label(11))
-            .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
-            .textCase(.uppercase)
-            .tracking(0.8)
-            .padding(.top, 4)
-    }
-
-    @ViewBuilder
-    private func brushBooleanChip(title: String, isOn: Binding<Bool>) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: isOn.wrappedValue ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 12, weight: .semibold))
-                Text(title)
-                    .font(StudioTheme.Typography.label(12))
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(isOn.wrappedValue ? Color.white.opacity(0.94) : panelPrimaryTextStyle)
-            .padding(.horizontal, 12)
-            .frame(minHeight: 36)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isOn.wrappedValue ? StudioTheme.Palette.accent : panelCardFillStrong)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isOn.wrappedValue ? StudioTheme.Palette.accentBright.opacity(0.55) : panelCardBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private func savedTipPresetChip(preset: BrushPreset) -> some View {
-        Button {
-            store.library.selectedBrush = preset
-            store.brush.applyPreset(preset)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                BrushStrokePreview(style: BrushPreviewStyle(preset: preset), compact: true)
-                    .frame(width: 112, height: 34)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 6)
-
-                Text(preset.name)
-                    .font(StudioTheme.Typography.label(11))
-                    .foregroundStyle(panelPrimaryTextStyle)
-                    .lineLimit(1)
-
-                Text("\(Int(preset.radius.rounded())) px · \(Int((preset.angle * 180 / .pi).rounded()))°")
-                    .font(StudioTheme.Typography.mono(9))
-                    .foregroundStyle(panelSecondaryTextStyle)
-                    .lineLimit(1)
-            }
-            .padding(8)
-            .frame(width: 132, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(panelCardFillStrong)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(panelCardBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            Button(language.localized("名前変更")) {
-                renamingSavedTipPresetName = preset.name
-                savedTipRenameDraft = preset.name
-            }
-            Button(language.localized("削除"), role: .destructive) {
-                store.send(.deleteSavedPresetButtonTapped(preset.name))
             }
         }
     }

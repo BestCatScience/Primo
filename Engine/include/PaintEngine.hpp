@@ -44,14 +44,10 @@ struct BrushSettings {
     float flow = 1.0F;
     float flowPressureSensitivity = 0.0F;
     float flowJitter = 0.0F;
-    int colorMixingMode = 0;
     float wetness = 0.0F;
     float wetnessPressureSensitivity = 0.0F;
     float opacityPressureSensitivity = 0.0F;
     float colorMixStrength = 0.0F;
-    bool smudgeBlurEnabled = false;
-    float smudgeBleed = 0.0F;
-    float smudgeRadius = 0.0F;
     float paintLoad = 1.0F;
     float loadPressureSensitivity = 0.0F;
     bool dualBrushEnabled = false;
@@ -466,16 +462,6 @@ private:
     float distanceUntilNextDab_ = 0.0F;
     bool strokeHasStampedDab_ = false;
     bool strokeInFlight_ = false;
-    bool smearCarryValid_ = false;
-    float smearCarryR_ = 0.0F;
-    float smearCarryG_ = 0.0F;
-    float smearCarryB_ = 0.0F;
-    float smearCarryA_ = 0.0F;
-    float smearAccumulatorR_ = 0.0F;
-    float smearAccumulatorG_ = 0.0F;
-    float smearAccumulatorB_ = 0.0F;
-    float smearAccumulatorA_ = 0.0F;
-    float smearAccumulatorWeight_ = 0.0F;
     std::optional<uint64_t> activeQueuedStrokeID_;
     DirtyRect dirtyRect_;
     std::vector<Layer> layers_;
@@ -511,34 +497,7 @@ private:
     void stampDab(Layer& layer, const StrokePoint& point);
     void renderStrokeSegment(Layer& layer, const StrokePoint& start, const StrokePoint& end);
     void renderShortStroke(Layer& layer, const StrokePoint& start, const StrokePoint& end);
-    void blendPixel(
-        uint8_t* dst,
-        uint8_t r,
-        uint8_t g,
-        uint8_t b,
-        float alpha,
-        float pressure,
-        float pulledR,
-        float pulledG,
-        float pulledB,
-        float pulledA
-    );
-    bool smudgeEnabledForActiveBrush() const noexcept;
-    void seedSmudgeCarry(const Layer& layer, const StrokePoint& point);
-    void beginSmudgeAccumulation() noexcept;
-    void accumulateSmudgeSample(const uint8_t* src, float weight) noexcept;
-    void commitSmudgeCarry() noexcept;
-    std::array<float, 4> sampleSmudgeNeighborhood(
-        const Layer& layer,
-        int x,
-        int y,
-        float tangentX,
-        float tangentY,
-        float normalX,
-        float normalY,
-        float radius,
-        bool wideSampling
-    ) const noexcept;
+    void blendPixel(uint8_t* dst, uint8_t r, uint8_t g, uint8_t b, float alpha, float pressure);
     void rebuildComposite() const;
 };
 

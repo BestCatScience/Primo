@@ -33,8 +33,6 @@ final class InputHandler {
     private var shapeStartPoint: StrokePoint?
     private var currentSelectionPoints: [CGPoint] = []
     private var transformStartPoint: CGPoint?
-    private var lastRawStrokePoint: StrokePoint?
-    private var lastStabilizedStrokePoint: StrokePoint?
 
     func handleTouches(_ touches: Set<UITouch>, with event: UIEvent?, in view: UIView) {
         guard let touch = touches.first,
@@ -53,14 +51,16 @@ final class InputHandler {
         if tool == .text {
             guard touch.phase == .began else { return }
             delegate?.didRequestTextPlacement(at: makePoint(touch, in: view, predicted: false).cgPoint)
-            resetStrokeTracking()
+            currentStroke = nil
+            shapeStartPoint = nil
             return
         }
 
         if tool == .fill {
             guard touch.phase == .began else { return }
             delegate?.didRequestFill(at: makePoint(touch, in: view, predicted: false).stylusSample)
-            resetStrokeTracking()
+            currentStroke = nil
+            shapeStartPoint = nil
             return
         }
 
@@ -70,7 +70,8 @@ final class InputHandler {
                 delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
             case .ended, .cancelled:
                 delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
-                resetStrokeTracking()
+                currentStroke = nil
+                shapeStartPoint = nil
             default:
                 break
             }
@@ -81,8 +82,6 @@ final class InputHandler {
         case .began:
             let firstPoint = makePoint(touch, in: view, predicted: false)
             shapeStartPoint = firstPoint
-            lastRawStrokePoint = firstPoint
-            lastStabilizedStrokePoint = firstPoint
             currentStroke = Stroke(points: [firstPoint], predictedPoints: [], color: brushColor, brushSize: brushSize)
             if let stroke = currentStroke {
                 delegate?.didUpdateStroke(stroke)
@@ -122,10 +121,12 @@ final class InputHandler {
                 finalStroke.predictedPoints.removeAll()
                 delegate?.didEndStroke(finalStroke)
             }
-            resetStrokeTracking()
+            currentStroke = nil
+            shapeStartPoint = nil
 
         case .cancelled:
-            resetStrokeTracking()
+            currentStroke = nil
+            shapeStartPoint = nil
             delegate?.didCancelStroke()
 
         default:
@@ -231,14 +232,11 @@ final class InputHandler {
 
     private func appendFilteredPoints(from touches: [UITouch], to stroke: inout Stroke, in view: UIView, isFinishingStroke: Bool) {
         for touch in touches {
-            let rawCandidate = makePoint(touch, in: view, predicted: false)
+            var candidate = makePoint(touch, in: view, predicted: false)
             guard let previous = stroke.points.last else {
-                lastRawStrokePoint = rawCandidate
-                lastStabilizedStrokePoint = rawCandidate
-                stroke.points.append(rawCandidate)
+                stroke.points.append(candidate)
                 continue
             }
-            var candidate = stabilizedPoint(from: rawCandidate, previousCommitted: previous, isFinishingStroke: isFinishingStroke)
 
             if candidate.pressure <= 0.001 {
                 candidate.pressure = max(previous.pressure * 0.92, 0.12)
@@ -272,66 +270,21 @@ final class InputHandler {
                 let steps = max(1, Int(ceil(distance / interpolationSpacing)))
                 for step in 1...steps {
                     let t = Float(step) / Float(steps)
-                    let interpolated = StrokePoint(
-                        position: previous.position + (delta * t),
-                        pressure: previous.pressure + ((candidate.pressure - previous.pressure) * t),
-                        altitude: previous.altitude + ((candidate.altitude - previous.altitude) * t),
-                        azimuth: previous.azimuth + ((candidate.azimuth - previous.azimuth) * t),
-                        timestamp: previous.timestamp + Double(Float(candidate.timestamp - previous.timestamp) * t),
-                        isPredicted: false
+                    stroke.points.append(
+                        StrokePoint(
+                            position: previous.position + (delta * t),
+                            pressure: previous.pressure + ((candidate.pressure - previous.pressure) * t),
+                            altitude: previous.altitude + ((candidate.altitude - previous.altitude) * t),
+                            azimuth: previous.azimuth + ((candidate.azimuth - previous.azimuth) * t),
+                            timestamp: previous.timestamp + Double(Float(candidate.timestamp - previous.timestamp) * t),
+                            isPredicted: false
+                        )
                     )
-                    lastStabilizedStrokePoint = interpolated
-                    stroke.points.append(interpolated)
                 }
             } else {
-                lastStabilizedStrokePoint = candidate
                 stroke.points.append(candidate)
             }
         }
-    }
-
-    private func stabilizedPoint(from raw: StrokePoint, previousCommitted: StrokePoint, isFinishingStroke: Bool) -> StrokePoint {
-        guard strokeStabilization > 0.001 else {
-            lastRawStrokePoint = raw
-            lastStabilizedStrokePoint = raw
-            return raw
-        }
-
-        let previousRaw = lastRawStrokePoint ?? previousCommitted
-        let previousStabilized = lastStabilizedStrokePoint ?? previousCommitted
-        let movement = simd_length(raw.position - previousRaw.position)
-        let brushReference = max(brushSize * 0.18, 1.0)
-        let normalizedMovement = min(max(movement / brushReference, 0.0), 1.0)
-        let baseFollow = max(0.14, 1.0 - (strokeStabilization * 0.82))
-        let adaptiveFollow = min(0.94, baseFollow + (normalizedMovement * 0.42) + (isFinishingStroke ? 0.18 : 0.0))
-
-        var stabilizedPosition = previousStabilized.position + ((raw.position - previousStabilized.position) * adaptiveFollow)
-        let maxLag = max(brushSize * (0.2 + (strokeStabilization * 1.25)), 6.0)
-        let lagVector = raw.position - stabilizedPosition
-        let lagDistance = simd_length(lagVector)
-        if lagDistance > maxLag, lagDistance > 0.001 {
-            stabilizedPosition = raw.position - ((lagVector / lagDistance) * maxLag)
-        }
-
-        let stabilized = StrokePoint(
-            position: stabilizedPosition,
-            pressure: previousStabilized.pressure + ((raw.pressure - previousStabilized.pressure) * adaptiveFollow),
-            altitude: previousStabilized.altitude + ((raw.altitude - previousStabilized.altitude) * adaptiveFollow),
-            azimuth: previousStabilized.azimuth + ((raw.azimuth - previousStabilized.azimuth) * adaptiveFollow),
-            timestamp: raw.timestamp,
-            isPredicted: false
-        )
-
-        lastRawStrokePoint = raw
-        lastStabilizedStrokePoint = stabilized
-        return stabilized
-    }
-
-    private func resetStrokeTracking() {
-        currentStroke = nil
-        shapeStartPoint = nil
-        lastRawStrokePoint = nil
-        lastStabilizedStrokePoint = nil
     }
 
     private func shouldRejectFinishingJump(_ candidate: StrokePoint, previous: StrokePoint, distance: Float) -> Bool {

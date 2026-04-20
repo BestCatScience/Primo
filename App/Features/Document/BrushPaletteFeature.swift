@@ -49,14 +49,10 @@ struct BrushPaletteFeature {
             var flowPressureSensitivity: Double = BrushPreset.defaultPencil.flowPressureSensitivity
             var flowJitter: Double = BrushPreset.defaultPencil.flowJitter
             var velocityInfluence: Double = BrushPreset.defaultPencil.velocityInfluence
-            var colorMixingMode: BrushColorMixingMode = BrushPreset.defaultPencil.colorMixingMode
             var wetness: Double = BrushPreset.defaultPencil.wetness
             var wetnessPressureSensitivity: Double = BrushPreset.defaultPencil.wetnessPressureSensitivity
             var opacityPressureSensitivity: Double = BrushPreset.defaultPencil.opacityPressureSensitivity
             var colorMixStrength: Double = BrushPreset.defaultPencil.colorMixStrength
-            var smudgeBlurEnabled: Bool = BrushPreset.defaultPencil.smudgeBlurEnabled
-            var smudgeBleed: Double = BrushPreset.defaultPencil.smudgeBleed
-            var smudgeRadius: Double = BrushPreset.defaultPencil.smudgeRadius
             var paintLoad: Double = BrushPreset.defaultPencil.paintLoad
             var loadPressureSensitivity: Double = BrushPreset.defaultPencil.loadPressureSensitivity
             var dualEnabled: Bool = BrushPreset.defaultPencil.dualBrushEnabled
@@ -154,14 +150,10 @@ struct BrushPaletteFeature {
                     flowPressureSensitivity: flowPressureSensitivity,
                     flowJitter: flowJitter,
                     velocityInfluence: velocityInfluence,
-                    colorMixingMode: colorMixingMode,
                     wetness: wetness,
                     wetnessPressureSensitivity: wetnessPressureSensitivity,
                     opacityPressureSensitivity: opacityPressureSensitivity,
                     colorMixStrength: colorMixStrength,
-                    smudgeBlurEnabled: smudgeBlurEnabled,
-                    smudgeBleed: smudgeBleed,
-                    smudgeRadius: smudgeRadius,
                     paintLoad: paintLoad,
                     loadPressureSensitivity: loadPressureSensitivity,
                     dualBrushEnabled: dualEnabled,
@@ -225,14 +217,10 @@ struct BrushPaletteFeature {
                 flowPressureSensitivity = preset.flowPressureSensitivity
                 flowJitter = preset.flowJitter
                 velocityInfluence = preset.velocityInfluence
-                colorMixingMode = preset.colorMixingMode
                 wetness = preset.wetness
                 wetnessPressureSensitivity = preset.wetnessPressureSensitivity
                 opacityPressureSensitivity = preset.opacityPressureSensitivity
                 colorMixStrength = preset.colorMixStrength
-                smudgeBlurEnabled = preset.smudgeBlurEnabled
-                smudgeBleed = preset.smudgeBleed
-                smudgeRadius = preset.smudgeRadius
                 paintLoad = preset.paintLoad
                 loadPressureSensitivity = preset.loadPressureSensitivity
                 dualEnabled = preset.dualBrushEnabled
@@ -317,9 +305,6 @@ struct BrushPaletteFeature {
                     wetnessPressureSensitivity: wetnessPressureSensitivity,
                     opacityPressureSensitivity: opacityPressureSensitivity,
                     colorMixStrength: colorMixStrength,
-                    smudgeBlurEnabled: smudgeBlurEnabled,
-                    smudgeBleed: smudgeBleed,
-                    smudgeRadius: smudgeRadius,
                     paintLoad: paintLoad,
                     loadPressureSensitivity: loadPressureSensitivity,
                     dualBrushEnabled: dualEnabled,
@@ -438,7 +423,6 @@ struct BrushPaletteFeature {
         case saveCurrentBrushButtonTapped
         case resetCurrentBrushSettingsButtonTapped
         case deleteSavedPresetButtonTapped(String)
-        case renameSavedPresetButtonTapped(oldName: String, newName: String)
         case setTextPlacement(CGPoint)
         case configureTextForActiveLayer(TextLayerDraft?)
         case applyTextButtonTapped
@@ -795,7 +779,6 @@ struct BrushPaletteFeature {
                         await send(.brushLibraryErrorOccurred(error.localizedDescription))
                     }
                 }
-
             case .clearActiveLayerButtonTapped:
                 return .send(.delegate(.clearActiveLayer))
 

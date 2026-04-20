@@ -17,7 +17,6 @@ struct BrushPaletteView: View {
     let language: AppLanguage
     var showsTitle = true
     @State var isImportingBrush = false
-    @State var isImportingCustomTip = false
     @State var isImportingTextFont = false
     @State var showsSavedBrushDeleteMode = false
     @State var selectedBrushSettingsCategory: BrushSettingsCategory = .tip
@@ -129,35 +128,6 @@ struct BrushPaletteView: View {
             },
             message: {
                 Text(store.ui.textFontImportErrorMessage ?? "")
-            }
-        )
-        .alert(
-            language.localized("先端名を変更"),
-            isPresented: Binding(
-                get: { renamingSavedTipPresetName != nil },
-                set: { newValue in
-                    if !newValue {
-                        renamingSavedTipPresetName = nil
-                        savedTipRenameDraft = ""
-                    }
-                }
-            ),
-            actions: {
-                TextField(language.localized("先端名"), text: $savedTipRenameDraft)
-                Button(language.localized("キャンセル"), role: .cancel) {
-                    renamingSavedTipPresetName = nil
-                    savedTipRenameDraft = ""
-                }
-                Button(language.localized("保存")) {
-                    if let oldName = renamingSavedTipPresetName {
-                        store.send(.renameSavedPresetButtonTapped(oldName: oldName, newName: savedTipRenameDraft))
-                    }
-                    renamingSavedTipPresetName = nil
-                    savedTipRenameDraft = ""
-                }
-            },
-            message: {
-                Text(language.localized("保存した先端の名前を変更します。"))
             }
         )
     }

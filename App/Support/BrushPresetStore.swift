@@ -232,7 +232,7 @@ private struct StoredBrushLibrary: Codable {
 }
 
 private struct StoredBrushPreset: Codable {
-    var name: String
+    let name: String
     let tipKindRawValue: String
     let radius: Double
     let sizeSpeedSensitivity: Double
@@ -265,14 +265,10 @@ private struct StoredBrushPreset: Codable {
     let flowPressureSensitivity: Double
     let flowJitter: Double
     let velocityInfluence: Double
-    let colorMixingModeRawValue: String
     let wetness: Double
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
     let colorMixStrength: Double
-    let smudgeBlurEnabled: Bool
-    let smudgeBleed: Double
-    let smudgeRadius: Double
     let paintLoad: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
@@ -329,14 +325,10 @@ private struct StoredBrushPreset: Codable {
         case flowPressureSensitivity
         case flowJitter
         case velocityInfluence
-        case colorMixingModeRawValue
         case wetness
         case wetnessPressureSensitivity
         case opacityPressureSensitivity
         case colorMixStrength
-        case smudgeBlurEnabled
-        case smudgeBleed
-        case smudgeRadius
         case paintLoad
         case loadPressureSensitivity
         case dualBrushEnabled
@@ -394,14 +386,10 @@ private struct StoredBrushPreset: Codable {
         flowPressureSensitivity = preset.flowPressureSensitivity
         flowJitter = preset.flowJitter
         velocityInfluence = preset.velocityInfluence
-        colorMixingModeRawValue = preset.colorMixingMode.rawValue
         wetness = preset.wetness
         wetnessPressureSensitivity = preset.wetnessPressureSensitivity
         opacityPressureSensitivity = preset.opacityPressureSensitivity
         colorMixStrength = preset.colorMixStrength
-        smudgeBlurEnabled = preset.smudgeBlurEnabled
-        smudgeBleed = preset.smudgeBleed
-        smudgeRadius = preset.smudgeRadius
         paintLoad = preset.paintLoad
         loadPressureSensitivity = preset.loadPressureSensitivity
         dualBrushEnabled = preset.dualBrushEnabled
@@ -460,21 +448,10 @@ private struct StoredBrushPreset: Codable {
         flowPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .flowPressureSensitivity) ?? 0.0
         flowJitter = try container.decodeIfPresent(Double.self, forKey: .flowJitter) ?? 0.0
         velocityInfluence = try container.decodeIfPresent(Double.self, forKey: .velocityInfluence) ?? 0.0
-        colorMixingModeRawValue = try container.decodeIfPresent(String.self, forKey: .colorMixingModeRawValue) ?? BrushColorMixingMode.inferred(
-            wetness: try container.decodeIfPresent(Double.self, forKey: .wetness) ?? 0.0,
-            colorMixStrength: try container.decodeIfPresent(Double.self, forKey: .colorMixStrength) ?? 0.0,
-            smudgeBlurEnabled: try container.decodeIfPresent(Bool.self, forKey: .smudgeBlurEnabled) ?? false,
-            smudgeBleed: try container.decodeIfPresent(Double.self, forKey: .smudgeBleed) ?? 0.0,
-            smudgeRadius: try container.decodeIfPresent(Double.self, forKey: .smudgeRadius) ?? 0.0,
-            paintLoad: try container.decodeIfPresent(Double.self, forKey: .paintLoad) ?? 1.0
-        ).rawValue
         wetness = try container.decodeIfPresent(Double.self, forKey: .wetness) ?? 0.0
         wetnessPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .wetnessPressureSensitivity) ?? 0.0
         opacityPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .opacityPressureSensitivity) ?? 0.0
         colorMixStrength = try container.decodeIfPresent(Double.self, forKey: .colorMixStrength) ?? 0.0
-        smudgeBlurEnabled = try container.decodeIfPresent(Bool.self, forKey: .smudgeBlurEnabled) ?? false
-        smudgeBleed = try container.decodeIfPresent(Double.self, forKey: .smudgeBleed) ?? 0.0
-        smudgeRadius = try container.decodeIfPresent(Double.self, forKey: .smudgeRadius) ?? 0.0
         paintLoad = try container.decodeIfPresent(Double.self, forKey: .paintLoad) ?? 1.0
         loadPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .loadPressureSensitivity) ?? 0.0
         dualBrushEnabled = try container.decodeIfPresent(Bool.self, forKey: .dualBrushEnabled) ?? false
@@ -508,7 +485,6 @@ private struct StoredBrushPreset: Codable {
         let textureMode = BrushTextureMode(rawValue: textureModeRawValue) ?? .off
         let dualTipKind = BrushTipKind(rawValue: dualTipKindRawValue) ?? .ink
         let dualBlendMode = BrushDualBlendMode(rawValue: dualBlendModeRawValue) ?? .multiply
-        let colorMixingMode = BrushColorMixingMode(rawValue: colorMixingModeRawValue) ?? .off
         let customTip: BrushTipRaster?
         if let tipFileName {
             let url = baseDirectory.appendingPathComponent(tipFileName, isDirectory: false)
@@ -552,14 +528,10 @@ private struct StoredBrushPreset: Codable {
             flowPressureSensitivity: flowPressureSensitivity,
             flowJitter: flowJitter,
             velocityInfluence: velocityInfluence,
-            colorMixingMode: colorMixingMode,
             wetness: wetness,
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
-            smudgeBlurEnabled: smudgeBlurEnabled,
-            smudgeBleed: smudgeBleed,
-            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,

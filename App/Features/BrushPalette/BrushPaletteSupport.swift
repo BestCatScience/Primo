@@ -304,63 +304,7 @@ struct BrushStrokePreview: View {
             height: size.height
         )
 
-        let customTipShape = BrushTipShapePreset.matching(customTip: style.customTip)
         let path: Path = {
-            switch customTipShape {
-            case .block:
-                return Path(roundedRect: rect, cornerRadius: rect.height * 0.18)
-            case .diamond:
-                var path = Path()
-                path.move(to: CGPoint(x: rect.midX, y: rect.minY))
-                path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
-                path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
-                path.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
-                path.closeSubpath()
-                return path
-            case .ribbon:
-                return Path(roundedRect: rect.insetBy(dx: rect.width * 0.06, dy: rect.height * 0.32), cornerRadius: rect.height * 0.12)
-            case .petal:
-                let petalRect = rect.insetBy(dx: rect.width * 0.12, dy: rect.height * 0.12)
-                var path = Path()
-                path.addEllipse(in: CGRect(x: petalRect.midX - petalRect.width * 0.14, y: petalRect.minY, width: petalRect.width * 0.28, height: petalRect.height * 0.54))
-                path.addEllipse(in: CGRect(x: petalRect.maxX - petalRect.width * 0.54, y: petalRect.midY - petalRect.height * 0.14, width: petalRect.width * 0.54, height: petalRect.height * 0.28))
-                path.addEllipse(in: CGRect(x: petalRect.midX - petalRect.width * 0.14, y: petalRect.maxY - petalRect.height * 0.54, width: petalRect.width * 0.28, height: petalRect.height * 0.54))
-                path.addEllipse(in: CGRect(x: petalRect.minX, y: petalRect.midY - petalRect.height * 0.14, width: petalRect.width * 0.54, height: petalRect.height * 0.28))
-                path.addEllipse(in: CGRect(x: rect.midX - rect.width * 0.10, y: rect.midY - rect.height * 0.10, width: rect.width * 0.20, height: rect.height * 0.20))
-                return path
-            case .rake:
-                var path = Path()
-                let toothGap = rect.width * 0.05
-                let toothWidth = (rect.width - toothGap * 3.0) / 4.0
-                for index in 0..<4 {
-                    let x = rect.minX + CGFloat(index) * (toothWidth + toothGap)
-                    let topInset = rect.height * [0.18, 0.06, 0.12, 0.22][index]
-                    path.addRoundedRect(in: CGRect(x: x, y: rect.minY + topInset, width: toothWidth, height: rect.height - topInset), cornerSize: CGSize(width: toothWidth * 0.28, height: toothWidth * 0.28))
-                }
-                return path
-            case .star:
-                var path = Path()
-                let center = CGPoint(x: rect.midX, y: rect.midY)
-                let outerRadius = min(rect.width, rect.height) * 0.5
-                let innerRadius = outerRadius * 0.44
-                for index in 0..<10 {
-                    let theta = (Double(index) * .pi / 5.0) - (.pi / 2.0)
-                    let radius = index.isMultiple(of: 2) ? outerRadius : innerRadius
-                    let point = CGPoint(
-                        x: center.x + (cos(theta) * radius),
-                        y: center.y + (sin(theta) * radius)
-                    )
-                    if index == 0 {
-                        path.move(to: point)
-                    } else {
-                        path.addLine(to: point)
-                    }
-                }
-                path.closeSubpath()
-                return path
-            case .round, .custom:
-                break
-            }
             switch style.tipKind {
             case .oil:
                 return Path(roundedRect: rect, cornerRadius: rect.height * 0.22)

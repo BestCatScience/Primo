@@ -56,6 +56,7 @@ fragment float4 layerFragment(VertexOut in [[stage_in]],
                               constant MetalQuadUniforms& uniforms [[buffer(0)]]) {
     constexpr sampler textureSampler(address::clamp_to_edge, filter::linear);
     float4 color = layerTexture.sample(textureSampler, in.uv);
-    color *= uniforms.opacity;
+    color.a *= uniforms.opacity;
+    color.rgb *= color.a;
     return color;
 }

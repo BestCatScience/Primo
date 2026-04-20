@@ -950,9 +950,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     private func previewStampAlpha(style: PreviewStrokeStyle) -> CGFloat {
         let base = min(max(style.opacity, 0.04), 1.0)
-        let flow = min(max(style.flow, 0.0), 1.0)
+        let flow = min(max(style.flow, 0.04), 1.0)
         let hardnessBias = 0.55 + (style.hardness * 0.45)
-        return min(max(base * flow * hardnessBias * 0.55, 0.0), 1.0)
+        return min(max(base * flow * hardnessBias * 0.55, 0.03), 1.0)
     }
 
     private func tipMaskImage(for raster: BrushTipRaster) -> CGImage? {
