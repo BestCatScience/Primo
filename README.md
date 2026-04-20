@@ -95,6 +95,21 @@ open Primo.xcodeproj
 - Swift 側はプレビュー用に合成済みピクセルデータを Metal テクスチャへアップロードします。
 - インタラクション状態は SwiftUI が管理し、描画コア自体はプラットフォーム非依存に保たれます。
 
+### 現在の設計原則
+
+現在のアプリ層と package 層の分割は、次の原則を明確に意識して進めています。
+
+- カプセル化
+  `AppFeature`、workspace、NanoBanana、document runtime はそれぞれが自分の状態遷移と操作 API を持ち、内部の表現や補助処理を外へ漏らしにくい構造を目指しています。特に document runtime は `PaintDocumentClient` と各 gateway の後ろに隠し、UI から engine や bridge の詳細へ直接触れなくて済むようにしています。
+- 関心の分離
+  UI、workflow orchestration、document mutation、workspace 永続化、brush import、NanoBanana 生成を別々の関心として扱います。`AppFeature` は画面とユースケースの接続に集中し、document の実処理は session / runtime / package 側へ寄せます。
+- 契約による設計
+  query、mutation、stroke、history、persistence、export といった document 操作は contract と gateway で表現します。実装より先に「何を受け取り何を返すか」を揃えることで、app 層、runtime 層、テストが同じ言葉で接続できるようにしています。
+- 副作用の隔離
+  ファイル I/O、日時、UUID、エクスポート、サブスクリプション、外部サービス呼び出しのような副作用は dependency や infrastructure 層へ閉じ込めます。reducer や domain ロジックでは、できるだけ純粋な状態遷移と command の決定だけを行い、副作用の発火点を追いやすくしています。
+
+この原則に沿って、巨大な型にロジックを集約するのではなく、責務ごとに分かれた workflow、coordinator、gateway、package を組み合わせる方向へ設計を寄せています。
+
 ### 描画コアの設計
 
 - レイヤーは 64x64 タイル単位で保持され、変更された領域だけを再合成できます
@@ -140,6 +155,7 @@ open Primo.xcodeproj
 - C++ コアは SwiftUI や UIKit に依存しません
 - `PaintDocumentClient` を介して reducer から document 実装を差し替えやすい構造です
 - 描画結果の表示は Metal、保存やエクスポートは Swift 側ユーティリティが担当します
+- 2026-04-16 から 2026-04-20 にかけてのドキュメント機能リファクタリング記録は [docs/document-refactors-2026-04-16-to-2026-04-20.md](/Users/goldstein/git/Primo/docs/document-refactors-2026-04-16-to-2026-04-20.md) にまとめています
 
 ## この README を読んだあとにおすすめの読む順番
 
