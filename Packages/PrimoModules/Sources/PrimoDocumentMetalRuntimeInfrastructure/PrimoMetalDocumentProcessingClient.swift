@@ -28,6 +28,53 @@ private struct PrimoMetalCompositeRequestDescriptor {
     let includeActiveLayerWhenHidden: UInt32
 }
 
+private struct PrimoMetalMaskKernelDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let radius: UInt32
+}
+
+private struct PrimoMetalColorRangeSelectionDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let red: UInt32
+    let green: UInt32
+    let blue: UInt32
+    let tolerance: Float
+    let minimumAlpha: Float
+}
+
+private struct PrimoMetalSelectionOverlayDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let red: UInt32
+    let green: UInt32
+    let blue: UInt32
+    let maximumAlpha: Float
+}
+
+private struct PrimoMetalEyedropperLoupeDescriptor {
+    let sourceWidth: UInt32
+    let sourceHeight: UInt32
+    let centerX: Int32
+    let centerY: Int32
+    let gridSize: UInt32
+    let blendWithPaper: UInt32
+    let paperRed: Float
+    let paperGreen: Float
+    let paperBlue: Float
+}
+
+private struct PrimoMetalPaperCompositeDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let paperRed: Float
+    let paperGreen: Float
+    let paperBlue: Float
+    let paperAlpha: Float
+    let checkerboard: UInt32
+}
+
 private struct PrimoMetalStrokeSampleDescriptor: Equatable {
     let x: Float
     let y: Float
@@ -243,6 +290,15 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     private let commandQueue: MTLCommandQueue?
     private let library: MTLLibrary?
     private let compositePipeline: MTLComputePipelineState?
+    private let invertMaskPipeline: MTLComputePipelineState?
+    private let dilateMaskPipeline: MTLComputePipelineState?
+    private let erodeMaskPipeline: MTLComputePipelineState?
+    private let featherHorizontalPipeline: MTLComputePipelineState?
+    private let featherVerticalPipeline: MTLComputePipelineState?
+    private let colorRangePipeline: MTLComputePipelineState?
+    private let selectionOverlayPipeline: MTLComputePipelineState?
+    private let eyedropperLoupePipeline: MTLComputePipelineState?
+    private let paperCompositePipeline: MTLComputePipelineState?
     private let strokeRasterPipeline: MTLComputePipelineState?
     private let copyStrokeRectPipeline: MTLComputePipelineState?
 
@@ -256,12 +312,272 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.commandQueue = device?.makeCommandQueue()
         self.library = device?.makeDefaultLibrary()
         self.compositePipeline = Self.makePipeline(device: device, library: library, functionName: "compositePreviewKernel")
+        self.invertMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "invertMaskKernel")
+        self.dilateMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "dilateMaskKernel")
+        self.erodeMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "erodeMaskKernel")
+        self.featherHorizontalPipeline = Self.makePipeline(device: device, library: library, functionName: "featherHorizontalKernel")
+        self.featherVerticalPipeline = Self.makePipeline(device: device, library: library, functionName: "featherVerticalKernel")
+        self.colorRangePipeline = Self.makePipeline(device: device, library: library, functionName: "colorRangeSelectionKernel")
+        self.selectionOverlayPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionOverlayKernel")
+        self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
+        self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
         self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
         self.copyStrokeRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copyStrokeRectKernel")
     }
 
+    public var isAvailable: Bool {
+        device != nil &&
+        commandQueue != nil &&
+        compositePipeline != nil &&
+        invertMaskPipeline != nil &&
+        dilateMaskPipeline != nil &&
+        erodeMaskPipeline != nil &&
+        featherHorizontalPipeline != nil &&
+        featherVerticalPipeline != nil &&
+        colorRangePipeline != nil &&
+        selectionOverlayPipeline != nil &&
+        eyedropperLoupePipeline != nil &&
+        paperCompositePipeline != nil &&
+        strokeRasterPipeline != nil &&
+        copyStrokeRectPipeline != nil
+    }
+
     public func resetStrokeExecutionSession() {
         cachedStrokeExecution = nil
+    }
+
+    public func selectionOverlayRGBA(
+        maskData: Data,
+        width: Int,
+        height: Int,
+        red: UInt8 = 91,
+        green: UInt8 = 181,
+        blue: UInt8 = 255,
+        maximumAlpha: Float = 96.0 / 255.0
+    ) -> Data? {
+        guard
+            width > 0,
+            height > 0,
+            maskData.count == width * height,
+            let commandQueue,
+            let pipeline = selectionOverlayPipeline,
+            let sourceBuffer = makeBuffer(maskData),
+            let outputBuffer = device?.makeBuffer(length: width * height * 4, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalSelectionOverlayDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    red: UInt32(red),
+                    green: UInt32(green),
+                    blue: UInt32(blue),
+                    maximumAlpha: maximumAlpha
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: width * height * 4)
+    }
+
+    public func eyedropperLoupeRGBA(
+        sourcePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> Data? {
+        guard
+            gridSize > 0,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            sourcePixelData.count == canvasWidth * canvasHeight * 4,
+            let commandQueue,
+            let pipeline = eyedropperLoupePipeline,
+            let sourceBuffer = makeBuffer(sourcePixelData),
+            let outputBuffer = device?.makeBuffer(length: gridSize * gridSize * 4, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalEyedropperLoupeDescriptor(
+                    sourceWidth: UInt32(canvasWidth),
+                    sourceHeight: UInt32(canvasHeight),
+                    centerX: Int32(centerX),
+                    centerY: Int32(centerY),
+                    gridSize: UInt32(gridSize),
+                    blendWithPaper: blendWithPaper ? 1 : 0,
+                    paperRed: paperStyle.red,
+                    paperGreen: paperStyle.green,
+                    paperBlue: paperStyle.blue
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: gridSize, height: gridSize)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: gridSize * gridSize * 4)
+    }
+
+    public func compositedPaperPreviewRGBA(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        paperStyle: CanvasPaperStyle
+    ) -> Data? {
+        guard
+            width > 0,
+            height > 0,
+            pixelData.count == width * height * 4,
+            let commandQueue,
+            let pipeline = paperCompositePipeline,
+            let sourceBuffer = makeBuffer(pixelData),
+            let outputBuffer = device?.makeBuffer(length: pixelData.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalPaperCompositeDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    paperRed: paperStyle.red,
+                    paperGreen: paperStyle.green,
+                    paperBlue: paperStyle.blue,
+                    paperAlpha: paperStyle.alpha,
+                    checkerboard: paperStyle.isTransparent ? 1 : 0
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: pixelData.count)
+    }
+
+    public func invertMask(_ source: [UInt8]) -> [UInt8]? {
+        mutateMask(source, pipeline: invertMaskPipeline, radius: 0)
+    }
+
+    public func expandedMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8]? {
+        iterateMask(source, width: width, height: height, iterations: expansion, pipeline: dilateMaskPipeline)
+    }
+
+    public func contractedMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8]? {
+        iterateMask(source, width: width, height: height, iterations: contraction, pipeline: erodeMaskPipeline)
+    }
+
+    public func featheredMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8]? {
+        guard radius > 0 else { return source }
+        guard
+            let device,
+            let commandQueue,
+            let horizontalPipeline = featherHorizontalPipeline,
+            let verticalPipeline = featherVerticalPipeline,
+            let sourceBuffer = makeBuffer(source),
+            let temporary = device.makeBuffer(length: source.count * MemoryLayout<Float>.stride, options: .storageModeShared),
+            let outputBuffer = device.makeBuffer(length: source.count, options: .storageModeShared),
+            let requestBuffer = makeBuffer(
+                PrimoMetalMaskKernelDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    radius: UInt32(radius)
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let horizontalEncoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        horizontalEncoder.setComputePipelineState(horizontalPipeline)
+        horizontalEncoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        horizontalEncoder.setBuffer(temporary, offset: 0, index: 1)
+        horizontalEncoder.setBuffer(requestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: horizontalEncoder, pipeline: horizontalPipeline, width: width, height: height)
+        horizontalEncoder.endEncoding()
+
+        guard let verticalEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        verticalEncoder.setComputePipelineState(verticalPipeline)
+        verticalEncoder.setBuffer(temporary, offset: 0, index: 0)
+        verticalEncoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        verticalEncoder.setBuffer(requestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: verticalEncoder, pipeline: verticalPipeline, width: width, height: height)
+        verticalEncoder.endEncoding()
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return byteArray(from: outputBuffer, count: source.count)
+    }
+
+    public func colorRangeSelection(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        request: ColorRangeSelectionRequest
+    ) -> [UInt8]? {
+        guard
+            let commandQueue,
+            let pipeline = colorRangePipeline,
+            let pixelBuffer = makeBuffer(pixelData),
+            let outputBuffer = device?.makeBuffer(length: width * height, options: .storageModeShared),
+            let requestBuffer = makeBuffer(
+                PrimoMetalColorRangeSelectionDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    red: UInt32(request.red),
+                    green: UInt32(request.green),
+                    blue: UInt32(request.blue),
+                    tolerance: Float(min(max(request.tolerance, 0.0), 1.0)),
+                    minimumAlpha: Float(min(max(request.minimumAlpha, 0.0), 1.0))
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(pixelBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(requestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return byteArray(from: outputBuffer, count: width * height)
     }
 
     public func compositedPixelData(
@@ -725,8 +1041,98 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
+    private func makeBuffer(_ values: [UInt8]) -> MTLBuffer? {
+        values.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else { return nil }
+            return device?.makeBuffer(bytes: baseAddress, length: values.count, options: .storageModeShared)
+        }
+    }
+
     private func bytes(from buffer: MTLBuffer, count: Int) -> Data {
         Data(bytes: buffer.contents(), count: count)
+    }
+
+    private func byteArray(from buffer: MTLBuffer, count: Int) -> [UInt8] {
+        Array(UnsafeBufferPointer(start: buffer.contents().assumingMemoryBound(to: UInt8.self), count: count))
+    }
+
+    private func mutateMask(_ source: [UInt8], pipeline: MTLComputePipelineState?, radius: Int) -> [UInt8]? {
+        guard
+            let commandQueue,
+            let pipeline,
+            let inputBuffer = makeBuffer(source),
+            let outputBuffer = device?.makeBuffer(length: source.count, options: .storageModeShared),
+            let requestBuffer = makeBuffer(
+                PrimoMetalMaskKernelDescriptor(
+                    width: UInt32(source.isEmpty ? 0 : source.count),
+                    height: 1,
+                    radius: UInt32(radius)
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(inputBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(requestBuffer, offset: 0, index: 2)
+        dispatchLinear(encoder: encoder, pipeline: pipeline, count: source.count)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return byteArray(from: outputBuffer, count: source.count)
+    }
+
+    private func iterateMask(
+        _ source: [UInt8],
+        width: Int,
+        height: Int,
+        iterations: Int,
+        pipeline: MTLComputePipelineState?
+    ) -> [UInt8]? {
+        guard iterations > 0 else { return source }
+        guard
+            let device,
+            let commandQueue,
+            let pipeline,
+            let first = makeBuffer(source),
+            let second = device.makeBuffer(length: source.count, options: .storageModeShared),
+            let requestBuffer = makeBuffer(
+                PrimoMetalMaskKernelDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    radius: 1
+                )
+            )
+        else {
+            return nil
+        }
+
+        var buffers = PrimoMetalBufferPair(current: first, scratch: second)
+        for _ in 0..<iterations {
+            guard
+                let commandBuffer = commandQueue.makeCommandBuffer(),
+                let encoder = commandBuffer.makeComputeCommandEncoder()
+            else {
+                return nil
+            }
+
+            encoder.setComputePipelineState(pipeline)
+            encoder.setBuffer(buffers.current, offset: 0, index: 0)
+            encoder.setBuffer(buffers.scratch, offset: 0, index: 1)
+            encoder.setBuffer(requestBuffer, offset: 0, index: 2)
+            dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+            encoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            guard commandBuffer.status == .completed else { return nil }
+            swap(&buffers.current, &buffers.scratch)
+        }
+        return byteArray(from: buffers.current, count: source.count)
     }
 
     private func bytes(
@@ -762,6 +1168,18 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         encoder.dispatchThreads(
             MTLSize(width: max(width, 1), height: max(height, 1), depth: 1),
             threadsPerThreadgroup: MTLSize(width: threadWidth, height: threadHeight, depth: 1)
+        )
+    }
+
+    private func dispatchLinear(
+        encoder: MTLComputeCommandEncoder,
+        pipeline: MTLComputePipelineState,
+        count: Int
+    ) {
+        let width = max(1, min(pipeline.threadExecutionWidth, count))
+        encoder.dispatchThreads(
+            MTLSize(width: max(count, 1), height: 1, depth: 1),
+            threadsPerThreadgroup: MTLSize(width: width, height: 1, depth: 1)
         )
     }
 
