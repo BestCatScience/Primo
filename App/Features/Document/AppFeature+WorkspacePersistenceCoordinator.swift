@@ -261,7 +261,9 @@ extension AppFeature {
     ) -> OpenDocumentTab? {
         let paperStyle = resolvedPaperStyle(for: state)
         state.workspace.updateActiveTabMetadata(
-            previewImageData: documentPresentationQueryService.compositePNGData(
+            previewImageData: state.canvas.renderSnapshot.flatMap {
+                AppFeature.renderedCompositePNGData(snapshot: $0, paperStyle: paperStyle)
+            } ?? documentPresentationQueryService.compositePNGData(
                 paperStyle: paperStyle
             ),
             canvasSize: state.canvas.canvasSize
@@ -313,7 +315,12 @@ extension AppFeature {
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
             pane: preparedTab.pane,
-            previewImageData: documentPresentationQueryService.compositePNGData(
+            previewImageData: state.canvas.renderSnapshot.flatMap {
+                AppFeature.renderedCompositePNGData(
+                    snapshot: $0,
+                    paperStyle: resolvedPaperStyle(for: state)
+                )
+            } ?? documentPresentationQueryService.compositePNGData(
                 paperStyle: resolvedPaperStyle(for: state)
             )
         )
@@ -881,7 +888,12 @@ extension AppFeature {
         }
         state.workspace.setActiveTabDirty(true)
         state.workspace.updateActiveTabMetadata(
-            previewImageData: documentPresentationQueryService.compositePNGData(
+            previewImageData: state.canvas.renderSnapshot.flatMap {
+                AppFeature.renderedCompositePNGData(
+                    snapshot: $0,
+                    paperStyle: resolvedPaperStyle(for: state)
+                )
+            } ?? documentPresentationQueryService.compositePNGData(
                 paperStyle: resolvedPaperStyle(for: state)
             ),
             canvasSize: state.canvas.canvasSize

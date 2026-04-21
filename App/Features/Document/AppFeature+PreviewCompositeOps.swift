@@ -40,6 +40,125 @@ private struct MetalColorRangeSelectionDescriptor {
     let minimumAlpha: Float
 }
 
+private struct MetalSelectionOverlayDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let red: UInt32
+    let green: UInt32
+    let blue: UInt32
+    let maximumAlpha: Float
+}
+
+private struct MetalEyedropperLoupeDescriptor {
+    let sourceWidth: UInt32
+    let sourceHeight: UInt32
+    let centerX: Int32
+    let centerY: Int32
+    let gridSize: UInt32
+    let blendWithPaper: UInt32
+    let paperRed: Float
+    let paperGreen: Float
+    let paperBlue: Float
+}
+
+private struct MetalPaperCompositeDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let paperRed: Float
+    let paperGreen: Float
+    let paperBlue: Float
+    let paperAlpha: Float
+    let checkerboard: UInt32
+}
+
+private struct MetalStrokeSampleDescriptor {
+    let x: Float
+    let y: Float
+    let pressure: Float
+    let progress: Float
+}
+
+private struct MetalStrokeBrushDescriptor {
+    let radius: Float
+    let pressureSensitivity: Float
+    let taperIn: Float
+    let taperOut: Float
+    let opacity: Float
+    let flow: Float
+    let hardness: Float
+    let opacityPressureSensitivity: Float
+    let flowPressureSensitivity: Float
+    let grainScale: Float
+    let grainContrast: Float
+    let paperScale: Float
+    let paperStrength: Float
+    let paperThreshold: Float
+    let textureStrength: Float
+    let wetness: Float
+    let colorMixStrength: Float
+    let smudgeBleed: Float
+    let smudgeRadius: Float
+    let paintLoad: Float
+    let red: Float
+    let green: Float
+    let blue: Float
+    let scatterLateral: Float
+    let scatterLinear: Float
+    let dualScale: Float
+    let dualSpacing: Float
+    let dualScatter: Float
+    let customTipWidth: UInt32
+    let customTipHeight: UInt32
+    let isEraser: UInt32
+    let isPencil: UInt32
+    let isOil: UInt32
+    let isAirbrush: UInt32
+    let dualBrushEnabled: UInt32
+    let customTipEnabled: UInt32
+    let scatterMode: UInt32
+    let textureMode: UInt32
+    let dualBlendMode: UInt32
+    let colorMixingMode: UInt32
+}
+
+private struct MetalStrokeRasterRequestDescriptor {
+    let canvasWidth: UInt32
+    let canvasHeight: UInt32
+    let originX: UInt32
+    let originY: UInt32
+    let rectWidth: UInt32
+    let rectHeight: UInt32
+    let sampleCount: UInt32
+}
+
+private struct MetalStrokeRasterProfile {
+    let wetness: Float
+    let colorMixStrength: Float
+    let smudgeBleed: Float
+    let smudgeRadius: Float
+    let paintLoad: Float
+}
+
+enum MetalStrokeExecutionMode: Equatable, Sendable {
+    case interactive
+    case commit
+    case previewAdopt
+}
+
+struct MetalStrokeExecutionRequest: Sendable {
+    let basePixelData: Data
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let samples: [StylusSample]
+    let brush: BrushRuntimeSettings
+    let mode: MetalStrokeExecutionMode
+}
+
+struct MetalStrokeExecutionResult: Sendable {
+    let pixelData: Data
+    let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+}
+
 private struct MetalBufferPair {
     var current: MTLBuffer
     var scratch: MTLBuffer
@@ -55,6 +174,12 @@ final class MetalDocumentProcessingClient {
         let layerIndices: [Int]
     }
 
+    private struct StrokeExecutionCache {
+        let width: Int
+        let height: Int
+        var buffers: MetalBufferPair
+    }
+
     private static let logger = Logger(subsystem: "com.primo.app", category: "MetalDocumentProcessing")
 
     private let device: MTLDevice?
@@ -67,9 +192,14 @@ final class MetalDocumentProcessingClient {
     private let featherHorizontalPipeline: MTLComputePipelineState?
     private let featherVerticalPipeline: MTLComputePipelineState?
     private let colorRangePipeline: MTLComputePipelineState?
+    private let selectionOverlayPipeline: MTLComputePipelineState?
+    private let eyedropperLoupePipeline: MTLComputePipelineState?
+    private let paperCompositePipeline: MTLComputePipelineState?
+    private let strokeRasterPipeline: MTLComputePipelineState?
 
     private var cachedSignature: SnapshotTextureSignature?
     private var cachedLayerTexture: MTLTexture?
+    private var cachedStrokeExecution: StrokeExecutionCache?
 
     private init() {
         let device = MTLCreateSystemDefaultDevice()
@@ -83,6 +213,10 @@ final class MetalDocumentProcessingClient {
         self.featherHorizontalPipeline = Self.makePipeline(device: device, library: library, functionName: "featherHorizontalKernel")
         self.featherVerticalPipeline = Self.makePipeline(device: device, library: library, functionName: "featherVerticalKernel")
         self.colorRangePipeline = Self.makePipeline(device: device, library: library, functionName: "colorRangeSelectionKernel")
+        self.selectionOverlayPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionOverlayKernel")
+        self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
+        self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
+        self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
     }
 
     var isAvailable: Bool {
@@ -94,7 +228,279 @@ final class MetalDocumentProcessingClient {
         erodeMaskPipeline != nil &&
         featherHorizontalPipeline != nil &&
         featherVerticalPipeline != nil &&
-        colorRangePipeline != nil
+        colorRangePipeline != nil &&
+        selectionOverlayPipeline != nil &&
+        eyedropperLoupePipeline != nil &&
+        paperCompositePipeline != nil &&
+        strokeRasterPipeline != nil
+    }
+
+    func resetStrokeExecutionSession() {
+        cachedStrokeExecution = nil
+    }
+
+    func selectionOverlayRGBA(
+        maskData: Data,
+        width: Int,
+        height: Int,
+        red: UInt8 = 91,
+        green: UInt8 = 181,
+        blue: UInt8 = 255,
+        maximumAlpha: Float = 96.0 / 255.0
+    ) -> Data? {
+        guard
+            width > 0,
+            height > 0,
+            maskData.count == width * height,
+            let commandQueue,
+            let pipeline = selectionOverlayPipeline,
+            let sourceBuffer = makeBuffer(maskData),
+            let outputBuffer = device?.makeBuffer(length: width * height * 4, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                MetalSelectionOverlayDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    red: UInt32(red),
+                    green: UInt32(green),
+                    blue: UInt32(blue),
+                    maximumAlpha: maximumAlpha
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: width * height * 4)
+    }
+
+    func eyedropperLoupeRGBA(
+        sourcePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> Data? {
+        guard
+            gridSize > 0,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            sourcePixelData.count == canvasWidth * canvasHeight * 4,
+            let commandQueue,
+            let pipeline = eyedropperLoupePipeline,
+            let sourceBuffer = makeBuffer(sourcePixelData),
+            let outputBuffer = device?.makeBuffer(length: gridSize * gridSize * 4, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                MetalEyedropperLoupeDescriptor(
+                    sourceWidth: UInt32(canvasWidth),
+                    sourceHeight: UInt32(canvasHeight),
+                    centerX: Int32(centerX),
+                    centerY: Int32(centerY),
+                    gridSize: UInt32(gridSize),
+                    blendWithPaper: blendWithPaper ? 1 : 0,
+                    paperRed: paperStyle.red,
+                    paperGreen: paperStyle.green,
+                    paperBlue: paperStyle.blue
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: gridSize, height: gridSize)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: gridSize * gridSize * 4)
+    }
+
+    func compositedPaperPreviewRGBA(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        paperStyle: CanvasPaperStyle
+    ) -> Data? {
+        guard
+            width > 0,
+            height > 0,
+            pixelData.count == width * height * 4,
+            let commandQueue,
+            let pipeline = paperCompositePipeline,
+            let sourceBuffer = makeBuffer(pixelData),
+            let outputBuffer = device?.makeBuffer(length: pixelData.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                MetalPaperCompositeDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    paperRed: paperStyle.red,
+                    paperGreen: paperStyle.green,
+                    paperBlue: paperStyle.blue,
+                    paperAlpha: paperStyle.alpha,
+                    checkerboard: paperStyle.isTransparent ? 1 : 0
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: pixelData.count)
+    }
+
+    func executeStroke(
+        _ request: MetalStrokeExecutionRequest
+    ) -> MetalStrokeExecutionResult? {
+        let basePixelData = request.basePixelData
+        let canvasWidth = request.canvasWidth
+        let canvasHeight = request.canvasHeight
+        let brush = request.brush
+        guard Self.supportsStrokeRasterization(brush) else { return nil }
+        let normalizedSamples = AppFeature.normalizedCommittedStrokeSamples(request.samples, brush: brush)
+        guard !normalizedSamples.isEmpty else { return nil }
+        let progressTable = AppFeature.strokeProgressTable(normalizedSamples)
+        let descriptors = zip(normalizedSamples, progressTable).map { sample, progress in
+            MetalStrokeSampleDescriptor(
+                x: Float(sample.point.x),
+                y: Float(sample.point.y),
+                pressure: Float(sample.pressure),
+                progress: Float(progress)
+            )
+        }
+
+        guard
+            canvasWidth > 0,
+            canvasHeight > 0,
+            basePixelData.count == canvasWidth * canvasHeight * 4,
+            let dirtyRect = AppFeature.strokePreviewDirtyRect(
+                samples: normalizedSamples,
+                brush: brush,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight
+            ),
+            dirtyRect.width > 0,
+            dirtyRect.height > 0,
+            let commandQueue,
+            let pipeline = strokeRasterPipeline,
+            let executionBuffers = prepareStrokeExecutionBuffers(
+                basePixelData: basePixelData,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                mode: request.mode
+            )
+        else {
+            return nil
+        }
+        let customTip = Self.makeCustomTipMask(brush.customTip)
+        guard
+            let refreshedSamplesBuffer = makeBuffer(descriptors),
+            let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(brush, customTip: customTip)),
+            let customTipBuffer = makeBuffer(customTip.alphaData),
+            let requestBuffer = makeBuffer(
+                MetalStrokeRasterRequestDescriptor(
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    originX: UInt32(dirtyRect.originX),
+                    originY: UInt32(dirtyRect.originY),
+                    rectWidth: UInt32(dirtyRect.width),
+                    rectHeight: UInt32(dirtyRect.height),
+                    sampleCount: UInt32(descriptors.count)
+                )
+            )
+        else {
+            return nil
+        }
+
+        guard
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let blitEncoder = commandBuffer.makeBlitCommandEncoder()
+        else {
+            return nil
+        }
+
+        blitEncoder.copy(
+            from: executionBuffers.current,
+            sourceOffset: 0,
+            to: executionBuffers.scratch,
+            destinationOffset: 0,
+            size: basePixelData.count
+        )
+        blitEncoder.endEncoding()
+
+        guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(executionBuffers.current, offset: 0, index: 0)
+        encoder.setBuffer(executionBuffers.scratch, offset: 0, index: 1)
+        encoder.setBuffer(refreshedSamplesBuffer, offset: 0, index: 2)
+        encoder.setBuffer(brushBuffer, offset: 0, index: 3)
+        encoder.setBuffer(requestBuffer, offset: 0, index: 4)
+        encoder.setBuffer(customTipBuffer, offset: 0, index: 5)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: dirtyRect.width, height: dirtyRect.height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        cachedStrokeExecution = StrokeExecutionCache(
+            width: canvasWidth,
+            height: canvasHeight,
+            buffers: MetalBufferPair(current: executionBuffers.scratch, scratch: executionBuffers.current)
+        )
+        return MetalStrokeExecutionResult(
+            pixelData: bytes(from: executionBuffers.scratch, count: basePixelData.count),
+            dirtyRect: dirtyRect
+        )
+    }
+
+    func rasterizedStrokePixelData(
+        basePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        mode: MetalStrokeExecutionMode = .commit
+    ) -> Data? {
+        executeStroke(
+            MetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                samples: samples,
+                brush: brush,
+                mode: mode
+            )
+        )?.pixelData
     }
 
     func compositedPreviewPixelData(
@@ -169,10 +575,7 @@ final class MetalDocumentProcessingClient {
         }
 
         guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
-        guard
-            let horizontalEncoder = commandBuffer.makeComputeCommandEncoder(),
-            let verticalEncoder = commandBuffer.makeComputeCommandEncoder()
-        else {
+        guard let horizontalEncoder = commandBuffer.makeComputeCommandEncoder() else {
             return nil
         }
 
@@ -182,6 +585,10 @@ final class MetalDocumentProcessingClient {
         horizontalEncoder.setBuffer(requestBuffer, offset: 0, index: 2)
         dispatch2D(encoder: horizontalEncoder, pipeline: horizontalPipeline, width: width, height: height)
         horizontalEncoder.endEncoding()
+
+        guard let verticalEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return nil
+        }
 
         verticalEncoder.setComputePipelineState(verticalPipeline)
         verticalEncoder.setBuffer(temporary, offset: 0, index: 0)
@@ -477,6 +884,37 @@ final class MetalDocumentProcessingClient {
         }
     }
 
+    private func prepareStrokeExecutionBuffers(
+        basePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        mode: MetalStrokeExecutionMode
+    ) -> MetalBufferPair? {
+        let expectedCount = canvasWidth * canvasHeight * 4
+        guard basePixelData.count == expectedCount else { return nil }
+        if mode == .interactive,
+           let cachedStrokeExecution,
+           cachedStrokeExecution.width == canvasWidth,
+           cachedStrokeExecution.height == canvasHeight {
+            return cachedStrokeExecution.buffers
+        }
+        guard
+            let current = makeBuffer(basePixelData),
+            let scratch = makeBuffer(basePixelData)
+        else {
+            return nil
+        }
+        let buffers = MetalBufferPair(current: current, scratch: scratch)
+        if mode == .interactive {
+            cachedStrokeExecution = StrokeExecutionCache(
+                width: canvasWidth,
+                height: canvasHeight,
+                buffers: buffers
+            )
+        }
+        return buffers
+    }
+
     private func bytes(from buffer: MTLBuffer, count: Int) -> [UInt8] {
         Array(UnsafeBufferPointer(start: buffer.contents().assumingMemoryBound(to: UInt8.self), count: count))
     }
@@ -528,6 +966,185 @@ final class MetalDocumentProcessingClient {
         )
     }
 
+    private static func makeStrokeBrushDescriptor(
+        _ brush: BrushRuntimeSettings,
+        customTip: BrushTipRaster
+    ) -> MetalStrokeBrushDescriptor {
+        let profile = strokeRasterProfile(for: brush)
+        return MetalStrokeBrushDescriptor(
+            radius: Float(brush.radius),
+            pressureSensitivity: Float(brush.pressureSensitivity),
+            taperIn: Float(brush.taperIn),
+            taperOut: Float(brush.taperOut),
+            opacity: Float(brush.opacity),
+            flow: Float(brush.flow),
+            hardness: Float(brush.hardness),
+            opacityPressureSensitivity: Float(brush.opacityPressureSensitivity),
+            flowPressureSensitivity: Float(brush.flowPressureSensitivity),
+            grainScale: Float(brush.grainScale),
+            grainContrast: Float(brush.grainContrast),
+            paperScale: Float(brush.paperScale),
+            paperStrength: Float(brush.paperStrength),
+            paperThreshold: Float(brush.paperThreshold),
+            textureStrength: Float(brush.textureStrength),
+            wetness: profile.wetness,
+            colorMixStrength: profile.colorMixStrength,
+            smudgeBleed: profile.smudgeBleed,
+            smudgeRadius: profile.smudgeRadius,
+            paintLoad: profile.paintLoad,
+            red: Float(brush.red) / 255.0,
+            green: Float(brush.green) / 255.0,
+            blue: Float(brush.blue) / 255.0,
+            scatterLateral: Float(brush.scatterEnabled ? brush.scatterLateral : 0),
+            scatterLinear: Float(brush.scatterEnabled ? brush.scatterLinear : 0),
+            dualScale: Float(brush.dualBrushEnabled ? brush.dualScale : 0),
+            dualSpacing: Float(brush.dualBrushEnabled ? brush.dualSpacing : 0),
+            dualScatter: Float(brush.dualBrushEnabled ? brush.dualScatter : 0),
+            customTipWidth: UInt32(customTip.width),
+            customTipHeight: UInt32(customTip.height),
+            isEraser: brush.isEraser ? 1 : 0,
+            isPencil: brush.tipKind == .pencil ? 1 : 0,
+            isOil: brush.tipKind == .oil ? 1 : 0,
+            isAirbrush: brush.tipKind == .airbrush ? 1 : 0,
+            dualBrushEnabled: brush.dualBrushEnabled ? 1 : 0,
+            customTipEnabled: brush.customTip == nil ? 0 : 1,
+            scatterMode: {
+                switch brush.scatterMode {
+                case .directional: return 0
+                case .spray: return 1
+                }
+            }(),
+            textureMode: {
+                switch brush.textureMode {
+                case .off: return 0
+                case .strokeLocked: return 1
+                case .eachTip: return 2
+                case .moving: return 3
+                }
+            }(),
+            dualBlendMode: {
+                switch brush.dualBlendMode {
+                case .multiply: return 0
+                case .darker: return 1
+                case .subtract: return 2
+                }
+            }(),
+            colorMixingMode: {
+                switch brush.colorMixingMode {
+                case .off: return 0
+                case .blend: return 1
+                case .runningColor: return 2
+                case .smear: return 3
+                }
+            }()
+        )
+    }
+
+    private static func supportsStrokeRasterization(_ brush: BrushRuntimeSettings) -> Bool {
+        guard brush.radius >= 0.5 else { return false }
+        let isOil = brush.tipKind == .oil
+        if brush.dualBrushEnabled,
+           ((isOil ? brush.dualScale > 2.6 : brush.dualScale > 1.8) ||
+            (isOil ? brush.dualScatter > 2.2 : brush.dualScatter > 1.6) ||
+            (!isOil && brush.count > 1) ||
+            (!isOil && brush.countJitter > 0.001)) {
+            return false
+        }
+        if brush.scatterEnabled,
+           ((!isOil && brush.count > 1) ||
+            (!isOil && brush.countJitter > 0.001) ||
+            brush.scatterLateral > brush.radius * (isOil ? 2.1 : 1.35) ||
+            brush.scatterLinear > brush.radius * (isOil ? 2.1 : 1.35)) {
+            return false
+        }
+        if brush.tipKind == .airbrush, brush.colorMixingMode == .runningColor || brush.smudgeBleed > 0.001 {
+            return false
+        }
+        if brush.textureMode == .moving && brush.tipKind == .oil && brush.textureStrength > 0.98 {
+            return false
+        }
+        return true
+    }
+
+    private static func makeCustomTipMask(_ raster: BrushTipRaster?) -> BrushTipRaster {
+        guard let raster else {
+            return BrushTipRaster(width: 1, height: 1, alphaData: Data([255]))
+        }
+        guard raster.width > 0, raster.height > 0, raster.alphaData.count == raster.width * raster.height else {
+            return BrushTipRaster(width: 1, height: 1, alphaData: Data([255]))
+        }
+
+        let maxDimension = 64
+        if max(raster.width, raster.height) <= maxDimension {
+            return raster
+        }
+
+        let scale = min(Double(maxDimension) / Double(raster.width), Double(maxDimension) / Double(raster.height))
+        let targetWidth = max(1, Int((Double(raster.width) * scale).rounded(.toNearestOrEven)))
+        let targetHeight = max(1, Int((Double(raster.height) * scale).rounded(.toNearestOrEven)))
+        var output = [UInt8](repeating: 0, count: targetWidth * targetHeight)
+
+        raster.alphaData.withUnsafeBytes { sourceBytes in
+            guard let source = sourceBytes.bindMemory(to: UInt8.self).baseAddress else { return }
+            for y in 0..<targetHeight {
+                let sourceY0 = Int((Double(y) * Double(raster.height) / Double(targetHeight)).rounded(.down))
+                let sourceY1 = max(sourceY0 + 1, Int((Double(y + 1) * Double(raster.height) / Double(targetHeight)).rounded(.up)))
+                for x in 0..<targetWidth {
+                    let sourceX0 = Int((Double(x) * Double(raster.width) / Double(targetWidth)).rounded(.down))
+                    let sourceX1 = max(sourceX0 + 1, Int((Double(x + 1) * Double(raster.width) / Double(targetWidth)).rounded(.up)))
+                    var total = 0
+                    var count = 0
+                    for sampleY in sourceY0..<min(sourceY1, raster.height) {
+                        for sampleX in sourceX0..<min(sourceX1, raster.width) {
+                            total += Int(source[(sampleY * raster.width) + sampleX])
+                            count += 1
+                        }
+                    }
+                    output[(y * targetWidth) + x] = UInt8(max(0, min(255, count > 0 ? total / count : 0)))
+                }
+            }
+        }
+
+        return BrushTipRaster(width: targetWidth, height: targetHeight, alphaData: Data(output))
+    }
+
+    private static func strokeRasterProfile(for brush: BrushRuntimeSettings) -> MetalStrokeRasterProfile {
+        switch brush.tipKind {
+        case .pencil:
+            return MetalStrokeRasterProfile(
+                wetness: 0,
+                colorMixStrength: 0,
+                smudgeBleed: 0,
+                smudgeRadius: 0,
+                paintLoad: 1
+            )
+        case .ink:
+            return MetalStrokeRasterProfile(
+                wetness: Float(min(max(brush.wetness * 0.35, 0), 0.22)),
+                colorMixStrength: Float(min(max(brush.colorMixStrength * 0.28, 0), 0.18)),
+                smudgeBleed: Float(min(max(brush.smudgeBleed * 0.22, 0), 0.16)),
+                smudgeRadius: Float(min(max(brush.smudgeRadius * 0.20, 0), 0.18)),
+                paintLoad: Float(max(0.82, min(brush.paintLoad, 1.0)))
+            )
+        case .oil:
+            return MetalStrokeRasterProfile(
+                wetness: Float(min(max((brush.wetness * 0.88) + 0.08, 0), 1)),
+                colorMixStrength: Float(min(max((brush.colorMixStrength * 0.92) + 0.06, 0), 1)),
+                smudgeBleed: Float(min(max((brush.smudgeBleed * 0.78) + 0.08, 0), 1)),
+                smudgeRadius: Float(min(max((brush.smudgeRadius * 0.82) + 0.06, 0), 1)),
+                paintLoad: Float(min(max((brush.paintLoad * 0.90) + 0.05, 0.08), 1))
+            )
+        case .airbrush:
+            return MetalStrokeRasterProfile(
+                wetness: Float(min(max(brush.wetness * 0.16, 0), 0.12)),
+                colorMixStrength: Float(min(max(brush.colorMixStrength * 0.12, 0), 0.10)),
+                smudgeBleed: 0,
+                smudgeRadius: Float(min(max(brush.smudgeRadius * 0.08, 0), 0.08)),
+                paintLoad: Float(max(0.88, min(brush.paintLoad, 1.0)))
+            )
+        }
+    }
+
     private static func blendModeIdentifier(_ mode: LayerBlendMode) -> Int {
         switch mode {
         case .normal: return 0
@@ -563,6 +1180,29 @@ final class MetalDocumentProcessingClient {
 }
 
 extension AppFeature {
+    static func renderedCompositePNGData(
+        snapshot: MetalDocumentSnapshot,
+        paperStyle: CanvasPaperStyle
+    ) -> Data? {
+        let pixelData: Data
+        if let composited = MetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+            pixelData: snapshot.compositePixelData,
+            width: snapshot.width,
+            height: snapshot.height,
+            paperStyle: paperStyle
+        ) {
+            pixelData = composited
+        } else {
+            pixelData = snapshot.compositePixelData
+        }
+
+        return pngData(
+            fromLayerPixelData: pixelData,
+            width: snapshot.width,
+            height: snapshot.height
+        )
+    }
+
     static func compositedPreviewPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,

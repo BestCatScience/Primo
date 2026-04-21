@@ -67,8 +67,22 @@ extension AppFeature {
         canvasHeight: Int,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
+        mode: MetalStrokeExecutionMode = .commit,
         preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
+        if let gpuOutput = MetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
+            basePixelData: basePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            samples: samples,
+            brush: brush,
+            mode: mode
+        ) {
+            return preserveAlphaLockedPixels
+                ? pixelDataByPreservingExistingAlpha(source: gpuOutput, existing: basePixelData)
+                : gpuOutput
+        }
+
         let expectedCount = canvasWidth * canvasHeight * 4
         guard basePixelData.count == expectedCount else { return nil }
 

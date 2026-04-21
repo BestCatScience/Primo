@@ -1121,10 +1121,40 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     private func makeEyedropperLoupeImage(around point: CGPoint, source: EyedropperSamplingSource) -> UIImage? {
-        guard touchEyedropperPreviewGridSize > 0 else { return nil }
+        guard
+            touchEyedropperPreviewGridSize > 0,
+            let snapshot = currentSnapshot
+        else { return nil }
         let grid = touchEyedropperPreviewGridSize
         let centerX = Int(point.x.rounded())
         let centerY = Int(point.y.rounded())
+
+        let sourcePixelData: Data?
+        let blendWithPaper: Bool
+        switch source {
+        case .activeLayer:
+            sourcePixelData = snapshot.layers.first(where: { $0.index == metalCanvasView.currentActiveLayerIndex })?.pixelData
+            blendWithPaper = false
+        case .canvas:
+            sourcePixelData = snapshot.compositePixelData
+            blendWithPaper = !paperStyle.isTransparent
+        }
+
+        if let sourcePixelData,
+           let rgba = MetalDocumentProcessingClient.shared.eyedropperLoupeRGBA(
+                sourcePixelData: sourcePixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                centerX: centerX,
+                centerY: centerY,
+                gridSize: grid,
+                paperStyle: paperStyle,
+                blendWithPaper: blendWithPaper
+           ),
+           let image = upscaledGridImage(from: rgba, grid: grid) {
+            return image
+        }
+
         var rgba = [UInt8](repeating: 255, count: grid * grid * 4)
         for row in 0..<grid {
             for column in 0..<grid {
@@ -1141,6 +1171,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
 
         let data = Data(rgba)
+        return upscaledGridImage(from: data, grid: grid)
+    }
+
+    private func upscaledGridImage(from data: Data, grid: Int) -> UIImage? {
         guard let provider = CGDataProvider(data: data as CFData) else { return nil }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let cgImage = CGImage(
@@ -1258,6 +1292,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let expectedCount = width * height
         guard selection.maskData.count == expectedCount else { return nil }
 
+        if let rgba = MetalDocumentProcessingClient.shared.selectionOverlayRGBA(
+            maskData: selection.maskData,
+            width: width,
+            height: height
+        ) {
+            return rgbaImage(from: rgba, width: width, height: height)
+        }
+
         var rgba = Data(count: expectedCount * 4)
         rgba.withUnsafeMutableBytes { destinationBytes in
             selection.maskData.withUnsafeBytes { sourceBytes in
@@ -1277,6 +1319,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             }
         }
 
+        return rgbaImage(from: rgba, width: width, height: height)
+    }
+
+    private func rgbaImage(from rgba: Data, width: Int, height: Int) -> UIImage? {
         guard let provider = CGDataProvider(data: rgba as CFData) else { return nil }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let image = CGImage(
@@ -1334,32 +1380,39 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
         guard let transformedLayerData else { return nil }
 
-        var composite = Data(count: snapshot.width * snapshot.height * 4)
-        var clipMask = [CGFloat](repeating: 0, count: snapshot.width * snapshot.height)
-        composite.withUnsafeMutableBytes { destinationBytes in
-            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
-                let sourceData = layer.index == activeLayerIndex ? transformedLayerData : layer.pixelData
-                sourceData.withUnsafeBytes { sourceBytes in
-                    guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                    for pixelIndex in 0..<(snapshot.width * snapshot.height) {
-                        let offset = pixelIndex * 4
-                        let alphaOffset = offset + 3
-                        let baseAlpha = (CGFloat(source[alphaOffset]) / 255.0) * CGFloat(layer.opacity)
-                        let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
-                        if !layer.isClipped {
-                            clipMask[pixelIndex] = baseAlpha
+        let composite = MetalDocumentProcessingClient.shared.compositedPreviewPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: transformedLayerData
+        ) ?? {
+            var composite = Data(count: snapshot.width * snapshot.height * 4)
+            var clipMask = [CGFloat](repeating: 0, count: snapshot.width * snapshot.height)
+            composite.withUnsafeMutableBytes { destinationBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
+                    let sourceData = layer.index == activeLayerIndex ? transformedLayerData : layer.pixelData
+                    sourceData.withUnsafeBytes { sourceBytes in
+                        guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                        for pixelIndex in 0..<(snapshot.width * snapshot.height) {
+                            let offset = pixelIndex * 4
+                            let alphaOffset = offset + 3
+                            let baseAlpha = (CGFloat(source[alphaOffset]) / 255.0) * CGFloat(layer.opacity)
+                            let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
+                            if !layer.isClipped {
+                                clipMask[pixelIndex] = baseAlpha
+                            }
+                            blendPixel(
+                                destination: destination + offset,
+                                source: source + offset,
+                                opacity: effectiveAlpha,
+                                blendMode: layer.blendMode
+                            )
                         }
-                        blendPixel(
-                            destination: destination + offset,
-                            source: source + offset,
-                            opacity: effectiveAlpha,
-                            blendMode: layer.blendMode
-                        )
                     }
                 }
             }
-        }
+            return composite
+        }()
 
         return makeLayerImage(pixelData: composite, width: snapshot.width, height: snapshot.height, paperStyle: paperStyle)
     }
@@ -1367,31 +1420,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private func makeLayerImage(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle? = nil) -> UIImage? {
         guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
         if let paperStyle {
-            let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
-            return renderer.image { context in
-                drawPaperBackground(
-                    in: CGRect(x: 0, y: 0, width: width, height: height),
-                    context: context.cgContext,
-                    paperStyle: paperStyle
-                )
-                if let provider = CGDataProvider(data: pixelData as CFData) {
-                    let colorSpace = CGColorSpaceCreateDeviceRGB()
-                    if let image = CGImage(
-                        width: width,
-                        height: height,
-                        bitsPerComponent: 8,
-                        bitsPerPixel: 32,
-                        bytesPerRow: width * 4,
-                        space: colorSpace,
-                        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
-                        provider: provider,
-                        decode: nil,
-                        shouldInterpolate: false,
-                        intent: .defaultIntent
-                    ) {
-                        UIImage(cgImage: image).draw(in: CGRect(x: 0, y: 0, width: width, height: height))
-                    }
-                }
+            if let composited = MetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+                pixelData: pixelData,
+                width: width,
+                height: height,
+                paperStyle: paperStyle
+            ) {
+                return rgbaImage(from: composited, width: width, height: height)
             }
         }
         guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
@@ -1412,32 +1447,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return nil
         }
         return UIImage(cgImage: image)
-    }
-
-    private func drawPaperBackground(in rect: CGRect, context: CGContext, paperStyle: CanvasPaperStyle) {
-        if paperStyle.isTransparent {
-            let tileSize: CGFloat = 12
-            let light = UIColor(white: 0.94, alpha: 1.0)
-            let dark = UIColor(white: 0.82, alpha: 1.0)
-            for row in stride(from: CGFloat(0), to: rect.height, by: tileSize) {
-                for column in stride(from: CGFloat(0), to: rect.width, by: tileSize) {
-                    let isDarkTile = Int((row / tileSize) + (column / tileSize)).isMultiple(of: 2)
-                    context.setFillColor((isDarkTile ? dark : light).cgColor)
-                    context.fill(CGRect(x: column, y: row, width: tileSize, height: tileSize))
-                }
-            }
-            return
-        }
-
-        context.setFillColor(
-            UIColor(
-                red: CGFloat(paperStyle.red),
-                green: CGFloat(paperStyle.green),
-                blue: CGFloat(paperStyle.blue),
-                alpha: CGFloat(paperStyle.alpha)
-            ).cgColor
-        )
-        context.fill(rect)
     }
 
     private func makeTransformedLayerPreview(

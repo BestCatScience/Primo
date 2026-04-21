@@ -496,6 +496,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
+        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -518,6 +519,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
+        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -691,6 +693,7 @@ extension AppFeature {
             canvasHeight: snapshot.height,
             samples: samples,
             brush: brush,
+            mode: .interactive,
             preserveAlphaLockedPixels: preserveAlphaLockedPixels
         ) else {
             return nil
