@@ -388,6 +388,7 @@ public:
         float seed = 0.0F;
         float angle = 0.0F;
         float clusterOffset = 0.0F;
+        float approxInfluenceRadius = 1.0F;
     };
 
     struct ResolvedSmudgeBlendContext {
@@ -477,6 +478,7 @@ private:
 
     struct HistorySnapshot {
         bool capturesEntireDocument = false;
+        bool capturesSparseLayerTiles = false;
         int activeLayerIndex = 0;
         int layerIndex = -1;
         Layer layer;
@@ -484,6 +486,24 @@ private:
         std::vector<LayerFolder> folders;
         std::vector<int> layerFolderIDs;
         int nextFolderID = 1;
+        std::vector<size_t> tileIndices;
+        std::vector<uint8_t> tileBytes;
+    };
+
+    struct PendingStrokeTileHistory {
+        int layerIndex = -1;
+        std::vector<uint8_t> capturedTileFlags;
+        std::vector<size_t> tileIndices;
+        std::vector<uint8_t> tileBytes;
+
+        bool active() const noexcept { return layerIndex >= 0; }
+        bool empty() const noexcept { return tileIndices.empty(); }
+        void reset() noexcept {
+            layerIndex = -1;
+            capturedTileFlags.clear();
+            tileIndices.clear();
+            tileBytes.clear();
+        }
     };
 
     static constexpr size_t kMaxHistoryDepth = 24;
@@ -522,12 +542,19 @@ private:
     mutable std::vector<uint8_t> dirtyTileFlags_;
     mutable std::vector<uint8_t> compositeBuffer_;
     mutable bool compositeDirty_ = true;
+    PendingStrokeTileHistory pendingStrokeTileHistory_{};
     int nextFolderID_ = 1;
 
     friend class PaintDocumentProcessingApplicator;
 
     void pushHistorySnapshot();
     void pushLayerHistorySnapshot(int layerIndex);
+    void beginPendingStrokeTileHistory(int layerIndex);
+    void capturePendingStrokeTilesForRect(int minX, int minY, int maxX, int maxY);
+    void restorePendingStrokeTileHistory() noexcept;
+    void commitPendingStrokeTileHistory();
+    void restoreSparseLayerSnapshot(const HistorySnapshot& snapshot) noexcept;
+    HistorySnapshot makeSparseLayerCurrentSnapshot(const HistorySnapshot& reference) const;
     void beginStrokeImmediate(const BrushSettings& brush, StrokePoint point);
     void appendStrokeImmediate(StrokePoint point);
     void endStrokeImmediate();

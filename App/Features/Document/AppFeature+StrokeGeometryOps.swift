@@ -20,15 +20,17 @@ extension AppFeature {
         }
         guard normalized.count > 1 else { return normalized }
 
-        let jumpThreshold = max(CGFloat(brush.radius) * 8.0, 24.0)
+        let jumpThreshold = min(max(CGFloat(brush.radius) * 1.35, 14.0), 96.0)
         while normalized.count > 1 {
             let last = normalized[normalized.count - 1]
             let previous = normalized[normalized.count - 2]
             let dx = last.point.x - previous.point.x
             let dy = last.point.y - previous.point.y
             let distance = sqrt((dx * dx) + (dy * dy))
-            let pressureDropThreshold = max(0.08, previous.pressure * 0.5)
-            let isTrailingJump = distance > jumpThreshold && last.pressure < pressureDropThreshold
+            let pressureDropThreshold = max(0.08, previous.pressure * 0.72)
+            let isTrailingJump =
+                (distance > jumpThreshold && last.pressure < pressureDropThreshold) ||
+                distance > jumpThreshold * 2.0
             if !isTrailingJump {
                 break
             }

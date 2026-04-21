@@ -6,8 +6,16 @@ extension AppFeature {
         let documentQueryGateway: DocumentQueryGateway
         let documentExportGateway: DocumentExportGateway
 
+        func lightweightPresentation() -> PaintDocumentPresentation {
+            documentQueryGateway.lightweightPresentation()
+        }
+
         func presentation() -> PaintDocumentPresentation {
             documentQueryGateway.presentation()
+        }
+
+        func pixelDataForLayer(_ index: Int) -> Data {
+            documentQueryGateway.pixelDataForLayer(index)
         }
 
         func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {

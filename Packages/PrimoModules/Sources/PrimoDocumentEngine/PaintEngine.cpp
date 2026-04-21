@@ -18,6 +18,13 @@ float clamp01(float value) {
     return std::clamp(value, 0.0F, 1.0F);
 }
 
+template <typename T>
+T safeClamp(T value, T a, T b) {
+    const T lower = std::min(a, b);
+    const T upper = std::max(a, b);
+    return std::clamp(value, lower, upper);
+}
+
 float lerp(float a, float b, float t) {
     return a + ((b - a) * t);
 }
@@ -91,6 +98,68 @@ size_t expectedLayerPixelCount(int width, int height) {
 
 float brushSpacingDistance(const BrushSettings& brush) {
     return std::max(0.35F, brush.radius * std::clamp(brush.stampSpacing, 0.08F, 2.0F));
+}
+
+bool isOilBrush(const BrushSettings& brush) {
+    return brush.tipKind == "oil";
+}
+
+float largeBrushOptimizationFactor(float radius) {
+    return clamp01(remap(radius, 18.0F, 160.0F, 0.0F, 1.0F));
+}
+
+float adaptiveStrokeStepDistance(
+    const BrushSettings& brush,
+    float minimumRadius,
+    float segmentSpeed,
+    bool shortStroke
+) {
+    float stepDistance = std::max(
+        std::min(brushSpacingDistance(brush) * 0.05F, minimumRadius * 0.04F),
+        0.015F
+    );
+    if (!isOilBrush(brush)) {
+        return stepDistance;
+    }
+
+    const float largeBrushFactor = largeBrushOptimizationFactor(minimumRadius);
+    if (largeBrushFactor <= 0.0F) {
+        return stepDistance;
+    }
+
+    const float speedFactor = clamp01(segmentSpeed / std::max(24.0F, minimumRadius * 6.0F));
+    const float baseSpacing = shortStroke
+        ? lerp(0.022F, 0.034F, speedFactor)
+        : lerp(0.018F, 0.055F, speedFactor);
+    const float radiusMultiplier = shortStroke
+        ? lerp(1.0F, 1.35F, largeBrushFactor)
+        : lerp(1.0F, 1.9F, largeBrushFactor);
+    return std::max(stepDistance, minimumRadius * baseSpacing * radiusMultiplier);
+}
+
+float giantBrushTextureBypassFactor(const BrushSettings& brush, float radius) {
+    if (!isOilBrush(brush) || brush.dualBrushEnabled || brush.textureMode == 0) {
+        return 0.0F;
+    }
+    if (brush.textureStrength > 0.4F) {
+        return 0.0F;
+    }
+    return clamp01(remap(radius, 72.0F, 196.0F, 0.0F, 1.0F));
+}
+
+int optimizedSubDabCount(const BrushSettings& brush, float radius, int requestedCount) {
+    const int clampedCount = std::max(1, requestedCount);
+    if (!isOilBrush(brush)) {
+        return clampedCount;
+    }
+
+    const float optimizationFactor = largeBrushOptimizationFactor(radius);
+    if (optimizationFactor <= 0.0F) {
+        return clampedCount;
+    }
+
+    const int cappedCount = optimizationFactor >= 0.65F ? 1 : 2;
+    return std::min(clampedCount, cappedCount);
 }
 
 void constrainPixelsToAlphaLock(std::span<uint8_t> pixels, std::span<const uint8_t> source) {
@@ -441,8 +510,8 @@ private:
             return {};
         }
 
-        const int clampedX = std::clamp(x, sourceMinX, sourceMinX + sourceWidth - 1);
-        const int clampedY = std::clamp(y, sourceMinY, sourceMinY + sourceHeight - 1);
+        const int clampedX = safeClamp(x, sourceMinX, sourceMinX + sourceWidth - 1);
+        const int clampedY = safeClamp(y, sourceMinY, sourceMinY + sourceHeight - 1);
         const size_t offset =
             (static_cast<size_t>(clampedY - sourceMinY) * static_cast<size_t>(sourceWidth) +
              static_cast<size_t>(clampedX - sourceMinX)) *
@@ -686,10 +755,12 @@ float textureMaskForTip(
         std::clamp(primaryNoise, 0.001F, 1.0F),
         std::max(0.35F, grainContrast)
     );
+    const float paperThresholdLow = std::clamp(paperThreshold - 0.34F, 0.0F, 1.0F);
+    const float paperThresholdHigh = std::clamp(paperThreshold + 0.22F, 0.0F, 1.0F);
     const float paperCut = clamp01(remap(
         paperNoise,
-        std::clamp(paperThreshold - 0.34F, 0.0F, 1.0F),
-        std::clamp(paperThreshold + 0.22F, 0.0F, 1.0F),
+        std::min(paperThresholdLow, paperThresholdHigh),
+        std::max(paperThresholdLow, paperThresholdHigh),
         0.0F,
         1.0F
     ));
@@ -2631,14 +2702,19 @@ void PaintDocument::beginStrokeImmediate(const BrushSettings& brush, StrokePoint
     if (point.x < 0.0F || point.x >= static_cast<float>(width_) || point.y < 0.0F || point.y >= static_cast<float>(height_)) {
         return;
     }
-    pushLayerHistorySnapshot(activeLayerIndex_);
     activeBrush_ = brush;
     invalidateLayerPixelCache(layers_[static_cast<size_t>(activeLayerIndex_)]);
+    beginPendingStrokeTileHistory(activeLayerIndex_);
     previousPoint_ = point;
     lastDabPoint_ = point;
     strokeOriginPoint_ = point;
     strokeAccumulatedDistance_ = 0.0F;
-    distanceUntilNextDab_ = 0.0F;
+    distanceUntilNextDab_ = adaptiveStrokeStepDistance(
+        activeBrush_,
+        resolvedStrokeRadius(activeBrush_, point.pressure, 0.0F),
+        0.0F,
+        false
+    );
     strokeHasStampedDab_ = true;
     strokeInFlight_ = true;
     smearCarryValid_ = false;
@@ -2672,27 +2748,14 @@ void PaintDocument::endStrokeImmediate() {
     distanceUntilNextDab_ = 0.0F;
     strokeHasStampedDab_ = false;
     smearCarryValid_ = false;
+    commitPendingStrokeTileHistory();
 }
 
 void PaintDocument::cancelStrokeImmediate() {
-    if (!strokeInFlight_ || undoStack_.empty()) {
+    if (!strokeInFlight_) {
         return;
     }
-
-    HistorySnapshot snapshot = std::move(undoStack_.back());
-    undoStack_.pop_back();
-    redoStack_.clear();
-
-    if (snapshot.capturesEntireDocument) {
-        layers_ = std::move(snapshot.layers);
-        folders_ = std::move(snapshot.folders);
-        layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
-        nextFolderID_ = snapshot.nextFolderID;
-    } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
-        layers_[snapshot.layerIndex] = std::move(snapshot.layer);
-    }
-
-    activeLayerIndex_ = std::clamp(snapshot.activeLayerIndex, 0, layerCount() - 1);
+    restorePendingStrokeTileHistory();
     strokeInFlight_ = false;
     strokeAccumulatedDistance_ = 0.0F;
     distanceUntilNextDab_ = 0.0F;
@@ -2866,6 +2929,8 @@ bool PaintDocument::undo() {
         current.folders = folders_;
         current.layerFolderIDs = layerFolderIDs_;
         current.nextFolderID = nextFolderID_;
+    } else if (undoStack_.back().capturesSparseLayerTiles) {
+        current = makeSparseLayerCurrentSnapshot(undoStack_.back());
     } else {
         current.layerIndex = undoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
@@ -2883,6 +2948,8 @@ bool PaintDocument::undo() {
         folders_ = std::move(snapshot.folders);
         layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
         nextFolderID_ = snapshot.nextFolderID;
+    } else if (snapshot.capturesSparseLayerTiles) {
+        restoreSparseLayerSnapshot(snapshot);
     } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
         layers_[snapshot.layerIndex] = std::move(snapshot.layer);
     }
@@ -2910,6 +2977,8 @@ bool PaintDocument::redo() {
         current.folders = folders_;
         current.layerFolderIDs = layerFolderIDs_;
         current.nextFolderID = nextFolderID_;
+    } else if (redoStack_.back().capturesSparseLayerTiles) {
+        current = makeSparseLayerCurrentSnapshot(redoStack_.back());
     } else {
         current.layerIndex = redoStack_.back().layerIndex;
         if (current.layerIndex >= 0 && current.layerIndex < layerCount()) {
@@ -2930,6 +2999,8 @@ bool PaintDocument::redo() {
         folders_ = std::move(snapshot.folders);
         layerFolderIDs_ = std::move(snapshot.layerFolderIDs);
         nextFolderID_ = snapshot.nextFolderID;
+    } else if (snapshot.capturesSparseLayerTiles) {
+        restoreSparseLayerSnapshot(snapshot);
     } else if (snapshot.layerIndex >= 0 && snapshot.layerIndex < layerCount()) {
         layers_[snapshot.layerIndex] = std::move(snapshot.layer);
     }
@@ -3252,6 +3323,146 @@ void PaintDocument::pushLayerHistorySnapshot(int layerIndex) {
     redoStack_.clear();
 }
 
+void PaintDocument::beginPendingStrokeTileHistory(int layerIndex) {
+    pendingStrokeTileHistory_.reset();
+    if (layerIndex < 0 || layerIndex >= layerCount()) {
+        return;
+    }
+    pendingStrokeTileHistory_.layerIndex = layerIndex;
+    pendingStrokeTileHistory_.capturedTileFlags.assign(
+        static_cast<size_t>(tileColumns_ * tileRows_),
+        0U
+    );
+}
+
+void PaintDocument::capturePendingStrokeTilesForRect(int minX, int minY, int maxX, int maxY) {
+    if (!pendingStrokeTileHistory_.active() ||
+        pendingStrokeTileHistory_.layerIndex < 0 ||
+        pendingStrokeTileHistory_.layerIndex >= layerCount()) {
+        return;
+    }
+
+    minX = std::clamp(minX, 0, width_ - 1);
+    minY = std::clamp(minY, 0, height_ - 1);
+    maxX = std::clamp(maxX, 0, width_ - 1);
+    maxY = std::clamp(maxY, 0, height_ - 1);
+    if (maxX < minX || maxY < minY) {
+        return;
+    }
+
+    Layer& layer = layers_[pendingStrokeTileHistory_.layerIndex];
+    const int minTileX = minX / Layer::kTileSize;
+    const int minTileY = minY / Layer::kTileSize;
+    const int maxTileX = maxX / Layer::kTileSize;
+    const int maxTileY = maxY / Layer::kTileSize;
+    for (int tileY = minTileY; tileY <= maxTileY; ++tileY) {
+        for (int tileX = minTileX; tileX <= maxTileX; ++tileX) {
+            const size_t index = tileIndex(tileX, tileY);
+            if (index >= pendingStrokeTileHistory_.capturedTileFlags.size() ||
+                pendingStrokeTileHistory_.capturedTileFlags[index] != 0U) {
+                continue;
+            }
+            pendingStrokeTileHistory_.capturedTileFlags[index] = 1U;
+            pendingStrokeTileHistory_.tileIndices.push_back(index);
+            const size_t tileOffset = index * kTileByteCount;
+            pendingStrokeTileHistory_.tileBytes.insert(
+                pendingStrokeTileHistory_.tileBytes.end(),
+                layer.tiles.begin() + static_cast<std::ptrdiff_t>(tileOffset),
+                layer.tiles.begin() + static_cast<std::ptrdiff_t>(tileOffset + kTileByteCount)
+            );
+        }
+    }
+}
+
+void PaintDocument::restorePendingStrokeTileHistory() noexcept {
+    if (!pendingStrokeTileHistory_.active() ||
+        pendingStrokeTileHistory_.layerIndex < 0 ||
+        pendingStrokeTileHistory_.layerIndex >= layerCount()) {
+        pendingStrokeTileHistory_.reset();
+        return;
+    }
+
+    Layer& layer = layers_[pendingStrokeTileHistory_.layerIndex];
+    for (size_t snapshotIndex = 0; snapshotIndex < pendingStrokeTileHistory_.tileIndices.size(); ++snapshotIndex) {
+        const size_t tile = pendingStrokeTileHistory_.tileIndices[snapshotIndex];
+        const size_t tileOffset = tile * kTileByteCount;
+        const size_t sourceOffset = snapshotIndex * kTileByteCount;
+        std::copy_n(
+            pendingStrokeTileHistory_.tileBytes.data() + sourceOffset,
+            kTileByteCount,
+            layer.tiles.data() + tileOffset
+        );
+    }
+    layer.pixelsDirty = true;
+    pendingStrokeTileHistory_.reset();
+}
+
+void PaintDocument::commitPendingStrokeTileHistory() {
+    if (!pendingStrokeTileHistory_.active()) {
+        return;
+    }
+    if (pendingStrokeTileHistory_.empty()) {
+        pendingStrokeTileHistory_.reset();
+        return;
+    }
+
+    HistorySnapshot snapshot;
+    snapshot.capturesSparseLayerTiles = true;
+    snapshot.activeLayerIndex = activeLayerIndex_;
+    snapshot.layerIndex = pendingStrokeTileHistory_.layerIndex;
+    snapshot.tileIndices = std::move(pendingStrokeTileHistory_.tileIndices);
+    snapshot.tileBytes = std::move(pendingStrokeTileHistory_.tileBytes);
+    undoStack_.push_back(std::move(snapshot));
+    if (undoStack_.size() > kMaxHistoryDepth) {
+        undoStack_.erase(undoStack_.begin());
+    }
+    redoStack_.clear();
+    pendingStrokeTileHistory_.reset();
+}
+
+void PaintDocument::restoreSparseLayerSnapshot(const HistorySnapshot& snapshot) noexcept {
+    if (snapshot.layerIndex < 0 || snapshot.layerIndex >= layerCount()) {
+        return;
+    }
+    Layer& layer = layers_[snapshot.layerIndex];
+    for (size_t snapshotIndex = 0; snapshotIndex < snapshot.tileIndices.size(); ++snapshotIndex) {
+        const size_t tile = snapshot.tileIndices[snapshotIndex];
+        const size_t tileOffset = tile * kTileByteCount;
+        const size_t sourceOffset = snapshotIndex * kTileByteCount;
+        std::copy_n(
+            snapshot.tileBytes.data() + sourceOffset,
+            kTileByteCount,
+            layer.tiles.data() + tileOffset
+        );
+    }
+    layer.pixelsDirty = true;
+}
+
+PaintDocument::HistorySnapshot PaintDocument::makeSparseLayerCurrentSnapshot(const HistorySnapshot& reference) const {
+    HistorySnapshot current;
+    current.capturesSparseLayerTiles = true;
+    current.activeLayerIndex = activeLayerIndex_;
+    current.layerIndex = reference.layerIndex;
+    current.tileIndices = reference.tileIndices;
+    current.tileBytes.resize(reference.tileIndices.size() * kTileByteCount);
+    if (reference.layerIndex < 0 || reference.layerIndex >= layerCount()) {
+        return current;
+    }
+
+    const Layer& layer = layers_[reference.layerIndex];
+    for (size_t snapshotIndex = 0; snapshotIndex < reference.tileIndices.size(); ++snapshotIndex) {
+        const size_t tile = reference.tileIndices[snapshotIndex];
+        const size_t tileOffset = tile * kTileByteCount;
+        const size_t destinationOffset = snapshotIndex * kTileByteCount;
+        std::copy_n(
+            layer.tiles.data() + tileOffset,
+            kTileByteCount,
+            current.tileBytes.data() + destinationOffset
+        );
+    }
+    return current;
+}
+
 void PaintDocument::markEntireDocumentDirty() noexcept {
     markDirtyRect(0, 0, width_ - 1, height_ - 1);
 }
@@ -3322,8 +3533,9 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float effectiveOpacity = clamp01(activeBrush_.opacity * coverageFlow * opacityPressure * speedOpacity);
     const bool isPencil = activeBrush_.tipKind == "pencil";
     const bool isInk = activeBrush_.tipKind == "ink";
-    const bool isOil = activeBrush_.tipKind == "oil";
+    const bool isOil = isOilBrush(activeBrush_);
     const bool isAirbrush = activeBrush_.tipKind == "airbrush";
+    const float largeBrushFactor = isOil ? largeBrushOptimizationFactor(radius) : 0.0F;
     const float altitudeFactor = clamp01((1.5707963F - point.altitude) / 1.5707963F);
     const float strokeDX = point.x - lastDabPoint_.x;
     const float strokeDY = point.y - lastDabPoint_.y;
@@ -3335,9 +3547,11 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float tangentY = strokeDistance > 0.001F ? (strokeDY / strokeDistance) : std::sin(point.azimuth);
     const float normalX = -tangentY;
     const float normalY = tangentX;
-    const int resolvedCount = std::max(1, activeBrush_.count + static_cast<int>(std::round(jitterValue(point.x + 3.7F, point.y - 1.9F, activeBrush_.countJitter * static_cast<float>(std::max(activeBrush_.count, 1))))));
-    const float maxRoundnessJitter = activeBrush_.roundnessJitter;
-    const float maxAngleJitter = activeBrush_.angleJitter;
+    const int requestedCount = std::max(1, activeBrush_.count + static_cast<int>(std::round(jitterValue(point.x + 3.7F, point.y - 1.9F, activeBrush_.countJitter * static_cast<float>(std::max(activeBrush_.count, 1))))));
+    const int resolvedCount = optimizedSubDabCount(activeBrush_, radius, requestedCount);
+    const float subDabJitterScale = 1.0F - (largeBrushFactor * 0.72F);
+    const float maxRoundnessJitter = activeBrush_.roundnessJitter * subDabJitterScale;
+    const float maxAngleJitter = activeBrush_.angleJitter * subDabJitterScale;
     float baseRoundness = effectiveRoundness(activeBrush_, activeBrush_.tipKind, altitudeFactor);
     const float shortStrokeRoundnessDistance = std::max(radius * 1.35F, 2.5F);
     const float shortStrokeRoundnessBlend = std::clamp(
@@ -3355,16 +3569,21 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         0.12F,
         1.0F
     );
-    const float scatterExtent = activeBrush_.scatterEnabled ? std::max(activeBrush_.scatterLateral, activeBrush_.scatterLinear) : 0.0F;
+    const float scatterOptimizationScale = 1.0F - (largeBrushFactor * 0.45F);
+    const float effectiveScatterLateral = activeBrush_.scatterLateral * scatterOptimizationScale;
+    const float effectiveScatterLinear = activeBrush_.scatterLinear * scatterOptimizationScale;
+    const float scatterExtent = activeBrush_.scatterEnabled ? std::max(effectiveScatterLateral, effectiveScatterLinear) : 0.0F;
     const float softness = std::clamp(1.0F - activeBrush_.hardness, 0.0F, 1.0F);
+    const float featherOptimizationScale = isOil ? (1.0F - (largeBrushFactor * 0.22F)) : 1.0F;
     const float featherPadding = isAirbrush
         ? std::max(radius * (0.9F + softness * 0.6F), 18.0F)
-        : std::max(radius * (0.35F + softness * 0.75F), 10.0F);
+        : std::max(radius * (0.35F + softness * 0.75F) * featherOptimizationScale, 10.0F);
     const float boundRadius = radius + scatterExtent * radius + featherPadding + 6.0F;
     const int minX = std::max(0, static_cast<int>(std::floor(point.x - boundRadius)));
     const int maxX = std::min(width_ - 1, static_cast<int>(std::ceil(point.x + boundRadius)));
     const int minY = std::max(0, static_cast<int>(std::floor(point.y - boundRadius)));
     const int maxY = std::min(height_ - 1, static_cast<int>(std::ceil(point.y + boundRadius)));
+    capturePendingStrokeTilesForRect(minX, minY, maxX, maxY);
     markDirtyRect(minX, minY, maxX, maxY);
     beginSmudgeAccumulation();
     const int centerSampleX = std::clamp(static_cast<int>(std::lround(point.x)), 0, width_ - 1);
@@ -3385,9 +3604,16 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
          activeBrush_.smudgeRadius > 0.08F ||
          activeBrush_.colorMixStrength > 0.16F ||
          zeroDensityMixing ||
-         clampedPressure < 0.55F);
+         clampedPressure < 0.55F) &&
+        (!isOil ||
+         largeBrushFactor < 0.35F ||
+         activeBrush_.smudgeBlurEnabled ||
+         activeBrush_.smudgeRadius > 0.26F ||
+         activeBrush_.smudgeBleed > 0.38F ||
+         zeroDensityMixing ||
+         clampedPressure < 0.42F);
     const bool preferWideNeighborhood =
-        activeBrush_.tipKind == "oil" ||
+        (isOil && largeBrushFactor < 0.65F) ||
         activeBrush_.smudgeRadius > 0.35F ||
         activeBrush_.smudgeBleed > 0.45F;
     const bool alphaLocked = activeLayerIndex_ >= 0 &&
@@ -3415,6 +3641,8 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
         radius,
         preferWideNeighborhood
     );
+    const bool useFastOilShape = isOil && largeBrushFactor >= 0.52F;
+    const bool bypassTextureSampling = giantBrushTextureBypassFactor(activeBrush_, radius) >= 0.5F;
     std::vector<ResolvedSubDab> resolvedDabs;
     resolvedDabs.reserve(static_cast<size_t>(resolvedCount));
 
@@ -3454,25 +3682,25 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
                 dabOffsetAcross =
                     std::cos(scatterTheta) *
                     scatterRadius *
-                    activeBrush_.scatterLateral *
+                    effectiveScatterLateral *
                     majorRadius;
                 dabOffsetAlong =
                     std::sin(scatterTheta) *
                     scatterRadius *
-                    activeBrush_.scatterLinear *
+                    effectiveScatterLinear *
                     majorRadius;
             } else {
                 dabOffsetAcross =
                     std::cos(scatterTheta) *
                     scatterRadius *
-                    activeBrush_.scatterLateral *
+                    effectiveScatterLateral *
                     majorRadius;
                 dabOffsetAlong =
                     (
                         std::sin(scatterTheta) * scatterRadius * 0.65F +
                         softScatterNoise(point.x + dabSeed, point.y - dabSeed) * 0.35F
                     ) *
-                    activeBrush_.scatterLinear *
+                    effectiveScatterLinear *
                     majorRadius;
             }
         }
@@ -3488,7 +3716,8 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
             .opacity = effectiveOpacity * dabOpacityScale * inverseResolvedCount,
             .seed = dabSeed,
             .angle = dabAngle,
-            .clusterOffset = static_cast<float>(dabIndex) * 0.11F
+            .clusterOffset = static_cast<float>(dabIndex) * 0.11F,
+            .approxInfluenceRadius = std::max(majorRadius, minorRadius) + 1.0F
         });
     }
 
@@ -3497,18 +3726,42 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
     const float pressureNeighborhoodGate = neighborhoodAlphaGate * (0.52F + (clampedPressure * 0.48F));
     std::vector<uint8_t> sourcePixels;
 
+    const auto blockCouldBeAffected = [&](int blockMinX, int blockMinY, int blockMaxX, int blockMaxY) {
+        const float blockStartX = static_cast<float>(blockMinX) + 0.5F;
+        const float blockStartY = static_cast<float>(blockMinY) + 0.5F;
+        const float blockEndX = static_cast<float>(blockMaxX) + 0.5F;
+        const float blockEndY = static_cast<float>(blockMaxY) + 0.5F;
+        for (const ResolvedSubDab& dab : resolvedDabs) {
+            const float closestX = safeClamp(dab.localX, blockStartX, blockEndX);
+            const float closestY = safeClamp(dab.localY, blockStartY, blockEndY);
+            if (std::abs(closestX - dab.localX) <= dab.approxInfluenceRadius &&
+                std::abs(closestY - dab.localY) <= dab.approxInfluenceRadius) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     for (int blockMinY = minY; blockMinY <= maxY; blockMinY += kStrokeBlockSize) {
         const int blockMaxY = std::min(maxY, blockMinY + kStrokeBlockSize - 1);
         for (int blockMinX = minX; blockMinX <= maxX; blockMinX += kStrokeBlockSize) {
             const int blockMaxX = std::min(maxX, blockMinX + kStrokeBlockSize - 1);
-            const int sourcePadding = neighborhoodSampler.enabled() ? neighborhoodSampler.samplePadding() : 0;
+            if (!blockCouldBeAffected(blockMinX, blockMinY, blockMaxX, blockMaxY)) {
+                continue;
+            }
+            const int sourcePadding = (allowNeighborhoodSampling && neighborhoodSampler.enabled())
+                ? std::max(0, neighborhoodSampler.samplePadding())
+                : 0;
             const int sourceMinX = std::max(0, blockMinX - sourcePadding);
             const int sourceMinY = std::max(0, blockMinY - sourcePadding);
             const int sourceMaxX = std::min(width_ - 1, blockMaxX + sourcePadding);
             const int sourceMaxY = std::min(height_ - 1, blockMaxY + sourcePadding);
+            if (sourceMaxX < sourceMinX || sourceMaxY < sourceMinY) {
+                continue;
+            }
             const int sourceWidth = sourceMaxX - sourceMinX + 1;
             const int sourceHeight = sourceMaxY - sourceMinY + 1;
-            if (neighborhoodSampler.enabled()) {
+            if (allowNeighborhoodSampling && neighborhoodSampler.enabled()) {
                 sourcePixels.resize(static_cast<size_t>(sourceWidth) * static_cast<size_t>(sourceHeight) * kPixelStride);
 
                 for (int sampleY = sourceMinY; sampleY <= sourceMaxY; ++sampleY) {
@@ -3529,12 +3782,20 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
                     for (const ResolvedSubDab& dab : resolvedDabs) {
                         const float dx = (static_cast<float>(x) + 0.5F) - dab.localX;
                         const float dy = (static_cast<float>(y) + 0.5F) - dab.localY;
+                        if (std::abs(dx) > dab.approxInfluenceRadius || std::abs(dy) > dab.approxInfluenceRadius) {
+                            continue;
+                        }
                         const float along = rotatedX(dx, dy, dab.cosAngle, dab.sinAngle);
                         const float across = rotatedY(dx, dy, dab.cosAngle, dab.sinAngle);
                         const float normalizedAlong = along * dab.alongScale;
                         const float normalizedAcross = across * dab.acrossScale;
+                        if (std::abs(normalizedAlong) > 1.08F || std::abs(normalizedAcross) > 1.08F) {
+                            continue;
+                        }
 
-                        const float shapeDistance = shapeDistanceForTip(activeBrush_.tipKind, normalizedAlong, normalizedAcross);
+                        const float shapeDistance = useFastOilShape
+                            ? std::sqrt((normalizedAlong * normalizedAlong) + (normalizedAcross * normalizedAcross))
+                            : shapeDistanceForTip(activeBrush_.tipKind, normalizedAlong, normalizedAcross);
                         const float tipAlpha = hasCustomTip
                             ? sampleBrushTipAlpha(activeBrush_, normalizedAlong, normalizedAcross)
                             : 1.0F;
@@ -3566,7 +3827,7 @@ void PaintDocument::stampDab(Layer& layer, const StrokePoint& point) {
                             const float mist = std::exp(-(shapeDistance * shapeDistance) * 2.6F);
                             falloff = mist;
                         }
-                        const float textureMask = textureMaskForTip(
+                        const float textureMask = bypassTextureSampling ? 1.0F : textureMaskForTip(
                             activeBrush_.tipKind,
                             normalizedAlong,
                             normalizedAcross,
@@ -3683,7 +3944,7 @@ void PaintDocument::renderShortStroke(Layer& layer, const StrokePoint& start, co
             resolvedStrokeRadius(activeBrush_, end.pressure, 0.0F)
         )
     );
-    const float stepDistance = std::max(shortStrokeRadius * 0.04F, 0.015F);
+    const float stepDistance = adaptiveStrokeStepDistance(activeBrush_, shortStrokeRadius, 0.0F, true);
     const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
     for (int step = 0; step <= steps; ++step) {
         const float t = static_cast<float>(step) / static_cast<float>(steps);
@@ -3719,15 +3980,17 @@ void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, 
     const float segmentSpeed = distance / segmentTimeDelta;
     const float startRadius = resolvedStrokeRadius(activeBrush_, start.pressure, segmentSpeed);
     const float endRadius = resolvedStrokeRadius(activeBrush_, end.pressure, segmentSpeed);
-    const float minimumRadius = std::max(0.4F, std::min(startRadius, endRadius));
-    const float stepDistance = std::max(
-        std::min(brushSpacingDistance(activeBrush_) * 0.05F, minimumRadius * 0.04F),
-        0.015F
-    );
-    const int steps = std::max(1, static_cast<int>(std::ceil(distance / stepDistance)));
-    StrokePoint priorStamped = start;
-    for (int step = 1; step <= steps; ++step) {
-        const float t = static_cast<float>(step) / static_cast<float>(steps);
+    const float initialRadius = std::max(0.4F, std::min(startRadius, endRadius));
+    float remainingUntilStamp = distanceUntilNextDab_;
+    if (remainingUntilStamp <= 0.0001F) {
+        remainingUntilStamp = adaptiveStrokeStepDistance(activeBrush_, initialRadius, segmentSpeed, false);
+    }
+
+    StrokePoint priorStamped = lastDabPoint_;
+    float traveled = 0.0F;
+    while ((distance - traveled) + 0.0001F >= remainingUntilStamp) {
+        traveled += remainingUntilStamp;
+        const float t = std::clamp(traveled / distance, 0.0F, 1.0F);
         StrokePoint point;
         point.x = start.x + (dx * t);
         point.y = start.y + (dy * t);
@@ -3744,7 +4007,12 @@ void PaintDocument::renderStrokeSegment(Layer& layer, const StrokePoint& start, 
         stampDab(layer, point);
         lastDabPoint_ = point;
         priorStamped = point;
+        strokeHasStampedDab_ = true;
+        const float pointRadius = resolvedStrokeRadius(activeBrush_, point.pressure, point.speed);
+        remainingUntilStamp = adaptiveStrokeStepDistance(activeBrush_, pointRadius, point.speed, false);
     }
+
+    distanceUntilNextDab_ = std::max(0.0F, remainingUntilStamp - (distance - traveled));
 }
 
 void PaintDocument::blendPixel(

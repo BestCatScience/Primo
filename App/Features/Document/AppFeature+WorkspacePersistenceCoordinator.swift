@@ -843,8 +843,11 @@ extension AppFeature {
         }
     }
 
-    func applyDirtyPresentation(state: inout State) -> Effect<Action> {
-        let presentation = documentPresentationQueryService.presentation()
+    func applyDirtyPresentation(
+        state: inout State,
+        updatesWorkspaceArtifacts: Bool = true
+    ) -> Effect<Action> {
+        let presentation = documentPresentationQueryService.lightweightPresentation()
         applyPresentation(
             PaintDocumentPresentation(
                 canvasSize: presentation.canvasSize,
@@ -862,16 +865,19 @@ extension AppFeature {
             )
         if canApplyIncrementalUpdate,
            let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
-            let activeLayerPixels = presentation.renderSnapshot?.layers.first(where: {
-                $0.index == presentation.activeLayerIndex
-            })?.pixelData
+            let activeLayerPixels = documentPresentationQueryService.pixelDataForLayer(
+                presentation.activeLayerIndex
+            )
             state.canvas.applyIncrementalRenderUpdate(
                 dirtyUpdate,
                 activeLayerIndex: presentation.activeLayerIndex,
                 activeLayerPixelData: activeLayerPixels
             )
         } else {
-            applyPresentation(presentation, state: &state)
+            applyPresentation(documentPresentationQueryService.presentation(), state: &state)
+        }
+        guard updatesWorkspaceArtifacts else {
+            return .none
         }
         state.workspace.setActiveTabDirty(true)
         state.workspace.updateActiveTabMetadata(
@@ -890,23 +896,24 @@ extension AppFeature {
         presentation: PaintDocumentPresentation,
         state: State
     ) -> Bool {
-        guard let currentSnapshot = state.canvas.renderSnapshot,
-              let nextSnapshot = presentation.renderSnapshot else {
+        guard let currentSnapshot = state.canvas.renderSnapshot else {
             return false
         }
-        guard currentSnapshot.width == nextSnapshot.width,
-              currentSnapshot.height == nextSnapshot.height,
-              currentSnapshot.layers.count == nextSnapshot.layers.count else {
+        let nextWidth = max(Int(presentation.canvasSize.width.rounded()), 1)
+        let nextHeight = max(Int(presentation.canvasSize.height.rounded()), 1)
+        guard currentSnapshot.width == nextWidth,
+              currentSnapshot.height == nextHeight,
+              currentSnapshot.layers.count == presentation.layerRows.count else {
             return false
         }
 
         let currentLayerIndices = currentSnapshot.layers.map(\.index)
-        let nextLayerIndices = nextSnapshot.layers.map(\.index)
+        let nextLayerIndices = presentation.layerRows.map(\.index).sorted()
         guard currentLayerIndices == nextLayerIndices else {
             return false
         }
 
-        return nextSnapshot.layers.contains(where: { $0.index == presentation.activeLayerIndex })
+        return presentation.layerRows.contains(where: { $0.index == presentation.activeLayerIndex })
     }
 
     func applyLoadedWorkspaceSuccessEffects(

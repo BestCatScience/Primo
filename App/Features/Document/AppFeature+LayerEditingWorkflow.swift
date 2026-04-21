@@ -27,15 +27,18 @@ extension AppFeature {
         var canvasMutation: DocumentCanvasMutation
         var refresh: DocumentPresentationRefresh
         var successFeedback: ApplicationFeedback?
+        var updatesWorkspaceArtifacts: Bool
 
         init(
             canvasMutation: DocumentCanvasMutation = .none,
             refresh: DocumentPresentationRefresh = .dirty,
-            successFeedback: ApplicationFeedback? = nil
+            successFeedback: ApplicationFeedback? = nil,
+            updatesWorkspaceArtifacts: Bool = true
         ) {
             self.canvasMutation = canvasMutation
             self.refresh = refresh
             self.successFeedback = successFeedback
+            self.updatesWorkspaceArtifacts = updatesWorkspaceArtifacts
         }
 
         static let dirty = DocumentMutationContract()
@@ -328,7 +331,10 @@ extension AppFeature {
             applyPresentation(documentPresentationQueryService.presentation(), state: &state)
             effect = .none
         case .dirty:
-            effect = applyDirtyPresentation(state: &state)
+            effect = applyDirtyPresentation(
+                state: &state,
+                updatesWorkspaceArtifacts: contract.updatesWorkspaceArtifacts
+            )
         }
         documentMutationFeedbackCoordinator.apply(
             contract.successFeedback,

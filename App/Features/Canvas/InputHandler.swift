@@ -290,9 +290,11 @@ final class InputHandler {
     private func shouldRejectFinishingJump(_ candidate: StrokePoint, previous: StrokePoint, distance: Float) -> Bool {
         // Lift-off samples can occasionally jump away from the nib while pressure drops rapidly.
         // Reject those trailing points to keep ink anchored under the pencil tip.
-        let jumpThreshold = max(brushSize * 3.0, 12.0)
-        let pressureDropThreshold = max(0.08, previous.pressure * 0.5)
-        return distance > jumpThreshold && candidate.pressure < pressureDropThreshold
+        let jumpThreshold = min(max(brushSize * 1.15, 10.0), 72.0)
+        let pressureDropThreshold = max(0.08, previous.pressure * 0.72)
+        let isPressureDropJump = distance > jumpThreshold && candidate.pressure < pressureDropThreshold
+        let isExtremeJump = distance > jumpThreshold * 2.0
+        return isPressureDropJump || isExtremeJump
     }
 
     private func preferredInterpolationSpacing(from previous: StrokePoint, to candidate: StrokePoint, distance: Float) -> Float {

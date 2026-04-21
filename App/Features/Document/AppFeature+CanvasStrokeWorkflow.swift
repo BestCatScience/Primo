@@ -264,7 +264,8 @@ extension AppFeature {
             return .committed(
                 DocumentMutationContract(
                     canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
-                    refresh: refreshViaDirtyPresentation ? .dirty : .current
+                    refresh: refreshViaDirtyPresentation ? .dirty : .current,
+                    updatesWorkspaceArtifacts: false
                 )
             )
         }

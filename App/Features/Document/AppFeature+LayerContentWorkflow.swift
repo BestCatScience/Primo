@@ -50,7 +50,7 @@ extension AppFeature {
         private func resolve(
             _ target: LayerContentMutationTarget
         ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), DocumentMutationFailure> {
-            let originalActiveLayerIndex = documentQueryGateway.presentation().activeLayerIndex
+            let originalActiveLayerIndex = documentQueryGateway.lightweightPresentation().activeLayerIndex
             switch target {
             case let .existingLayer(index):
                 return .success((index, false, originalActiveLayerIndex))
