@@ -136,10 +136,16 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
     }
 }
 
+public enum MetalSnapshotTransferKind: String, Equatable, Sendable {
+    case fullSnapshot
+    case dirtyRect
+}
+
 public struct MetalDocumentSnapshot: Equatable, Sendable {
     public let width: Int
     public let height: Int
     public let revision: Int
+    public let transferKind: MetalSnapshotTransferKind
     public let compositePixelData: Data
     public let layers: [MetalLayerSnapshot]
 
@@ -147,12 +153,14 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         width: Int,
         height: Int,
         revision: Int,
+        transferKind: MetalSnapshotTransferKind = .fullSnapshot,
         compositePixelData: Data,
         layers: [MetalLayerSnapshot]
     ) {
         self.width = width
         self.height = height
         self.revision = revision
+        self.transferKind = transferKind
         self.compositePixelData = compositePixelData
         self.layers = layers
     }
@@ -165,6 +173,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
     public let originY: Int
     public let width: Int
     public let height: Int
+    public let transferKind: MetalSnapshotTransferKind
     public let pixelData: Data
 
     public init(
@@ -174,6 +183,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         originY: Int,
         width: Int,
         height: Int,
+        transferKind: MetalSnapshotTransferKind = .dirtyRect,
         pixelData: Data
     ) {
         self.id = id
@@ -182,6 +192,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         self.originY = originY
         self.width = width
         self.height = height
+        self.transferKind = transferKind
         self.pixelData = pixelData
     }
 

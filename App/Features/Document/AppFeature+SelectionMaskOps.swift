@@ -78,7 +78,7 @@ extension AppFeature {
         }
 
         if isInverted {
-            mask = mask.map { $0 == 0 ? 255 : 0 }
+            mask = invertedSelectionMask(mask)
         }
 
         return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
@@ -282,6 +282,30 @@ extension AppFeature {
         }
 
         guard pixelData.count == width * height * 4 else { return nil }
+        let selected = MetalDocumentProcessingClient.shared.colorRangeSelection(
+            pixelData: pixelData,
+            width: width,
+            height: height,
+            request: request
+        ) ?? cpuColorRangeSelectionMask(
+            pixelData: pixelData,
+            width: width,
+            height: height,
+            request: request
+        )
+
+        let expandedMask = request.expansion > 0
+            ? expandedSelectionMask(selected, width: width, height: height, expansion: request.expansion)
+            : selected
+        return croppedSelection(from: expandedMask, width: width, height: height, mode: mode)
+    }
+
+    static func cpuColorRangeSelectionMask(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        request: ColorRangeSelectionRequest
+    ) -> [UInt8] {
         let tolerance = min(max(request.tolerance, 0.0), 1.0)
         let minimumAlpha = min(max(request.minimumAlpha, 0.0), 1.0)
         var selected = [UInt8](repeating: 0, count: width * height)
@@ -303,13 +327,30 @@ extension AppFeature {
             }
         }
 
-        let expandedMask = request.expansion > 0
-            ? expandedSelectionMask(selected, width: width, height: height, expansion: request.expansion)
-            : selected
-        return croppedSelection(from: expandedMask, width: width, height: height, mode: mode)
+        return selected
     }
 
     static func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
+        MetalDocumentProcessingClient.shared.expandedMask(source, width: width, height: height, expansion: expansion)
+            ?? cpuExpandedSelectionMask(source, width: width, height: height, expansion: expansion)
+    }
+
+    static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
+        MetalDocumentProcessingClient.shared.contractedMask(source, width: width, height: height, contraction: contraction)
+            ?? cpuContractedSelectionMask(source, width: width, height: height, contraction: contraction)
+    }
+
+    static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
+        MetalDocumentProcessingClient.shared.featheredMask(source, width: width, height: height, radius: radius)
+            ?? cpuFeatheredSelectionMask(source, width: width, height: height, radius: radius)
+    }
+
+    static func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
+        MetalDocumentProcessingClient.shared.invertMask(source)
+            ?? source.map { $0 == 0 ? 255 : 0 }
+    }
+
+    static func cpuExpandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
         var result = source
         let selectedPoints = source.enumerated().compactMap { index, value -> (Int, Int)? in
@@ -331,7 +372,7 @@ extension AppFeature {
         return result
     }
 
-    static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
+    static func cpuContractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
         var current = source
 
@@ -360,7 +401,7 @@ extension AppFeature {
         return current
     }
 
-    static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
+    static func cpuFeatheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0, width > 0, height > 0 else { return source }
 
         let kernelSize = (radius * 2) + 1
