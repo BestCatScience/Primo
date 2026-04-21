@@ -2389,6 +2389,40 @@ void PaintDocument::replaceLayerPixels(int index, std::span<const uint8_t> pixel
     (void)applyLayerProcessing(index, processing);
 }
 
+bool PaintDocument::replaceLayerPixelsInRect(int index, const DirtyRect& rect, std::span<const uint8_t> pixels) {
+    if (index < 0 || index >= layerCount() || strokeInFlight_ || activeQueuedStrokeID_.has_value()) {
+        return false;
+    }
+    if (layers_[static_cast<size_t>(index)].locked || rect.empty()) {
+        return false;
+    }
+    if (rect.minX < 0 || rect.minY < 0 || rect.maxX >= width_ || rect.maxY >= height_) {
+        return false;
+    }
+    if (pixels.size() != expectedLayerPixelCount(rect.width(), rect.height())) {
+        return false;
+    }
+
+    pushLayerHistorySnapshot(index);
+    auto& layer = layers_[static_cast<size_t>(index)];
+    if (layer.tiles.size() != static_cast<size_t>(tileColumns_) * static_cast<size_t>(tileRows_) * kTileByteCount) {
+        initializeLayerStorage(layer);
+    }
+
+    for (int row = 0; row < rect.height(); ++row) {
+        const size_t rowOffset = static_cast<size_t>(row) * static_cast<size_t>(rect.width()) * kPixelStride;
+        for (int column = 0; column < rect.width(); ++column) {
+            uint8_t* dst = tilePixelPointer(layer, rect.minX + column, rect.minY + row);
+            const uint8_t* src = pixels.data() + rowOffset + (static_cast<size_t>(column) * kPixelStride);
+            std::copy_n(src, kPixelStride, dst);
+        }
+    }
+
+    invalidateLayerPixelCache(layer);
+    markDirtyRect(rect.minX, rect.minY, rect.maxX, rect.maxY);
+    return true;
+}
+
 void PaintDocument::replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels) {
     if (index < 0 || index >= layerCount()) {
         return;

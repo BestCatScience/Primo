@@ -60,7 +60,6 @@ fragment float4 layerFragment(VertexOut in [[stage_in]],
     color.rgb *= color.a;
     return color;
 }
-
 struct MetalCompositeLayerDescriptor {
     int documentIndex;
     float opacity;

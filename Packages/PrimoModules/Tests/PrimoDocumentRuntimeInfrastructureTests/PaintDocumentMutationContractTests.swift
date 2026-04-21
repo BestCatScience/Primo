@@ -41,6 +41,23 @@ struct PaintDocumentMutationContractTests {
         expectFailure(runtime.mutationGateway.replaceLayerPixels(0, Data()), .emptyInput)
     }
 
+    @Test
+    func replaceLayerPixelsInRectRejectsEmptyInput() {
+        let runtime = DocumentRuntimeFactory.live()
+        let rect = LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+        expectFailure(runtime.mutationGateway.replaceLayerPixelsInRect(0, rect, Data()), .emptyInput)
+    }
+
+    @Test
+    func replaceLayerPixelsInRectRejectsMismatchedRectPayload() {
+        let runtime = DocumentRuntimeFactory.live()
+        let rect = LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+        expectFailure(
+            runtime.mutationGateway.replaceLayerPixelsInRect(0, rect, Data(count: 4)),
+            .bridgeMutationFailed("replaceLayerPixelsInRect")
+        )
+    }
+
     private func expectSuccess(_ result: DocumentMutationResult) {
         switch result {
         case .success:

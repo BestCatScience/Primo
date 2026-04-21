@@ -20,6 +20,17 @@ struct PaintDocumentBridgeQueryService {
         bridge.pixelDataForLayer(at: index) as Data
     }
 
+    func pixelDataForLayer(index: Int, rect: LayerPixelRect, bridge: APPaintDocumentBridge) -> Data {
+        guard !rect.isEmpty else { return Data() }
+        let dirtyRect = APDirtyRect(
+            originX: rect.originX,
+            originY: rect.originY,
+            width: rect.width,
+            height: rect.height
+        )
+        return bridge.pixelDataForLayer(at: index, in: dirtyRect) as Data
+    }
+
     func isLayerLocked(index: Int, bridge: APPaintDocumentBridge) -> Bool {
         guard let layer = bridge.layerInfos().enumerated().first(where: { $0.offset == index })?.element else {
             return false

@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "PrimoDocumentEngine", targets: ["PrimoDocumentEngine"]),
         .library(name: "PrimoDocumentNativeBridge", targets: ["PrimoDocumentNativeBridge"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
+        .library(name: "PrimoDocumentMetalRuntimeInfrastructure", targets: ["PrimoDocumentMetalRuntimeInfrastructure"]),
         .library(name: "PrimoDocumentRuntimeInfrastructure", targets: ["PrimoDocumentRuntimeInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
@@ -62,6 +63,15 @@ let package = Package(
             exclude: ["LegacyRuntime"]
         ),
         .target(
+            name: "PrimoDocumentMetalRuntimeInfrastructure",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+            ]
+        ),
+        .target(
             name: "PrimoDocumentRuntimeInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
@@ -69,6 +79,7 @@ let package = Package(
                 "PrimoDocumentDomain",
                 "PrimoDocumentApplication",
                 "PrimoDocumentInfrastructure",
+                "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentNativeBridge",
             ],
             path: "Sources/PrimoDocumentInfrastructure/LegacyRuntime"

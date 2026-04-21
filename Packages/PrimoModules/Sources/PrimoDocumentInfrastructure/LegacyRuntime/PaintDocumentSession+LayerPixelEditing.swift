@@ -135,6 +135,47 @@ extension PaintDocumentSession {
         return .success(())
     }
 
+    func replaceLayerPixels(
+        index: Int,
+        in rect: LayerPixelRect,
+        data: Data,
+        preservesTextLayerMetadata: Bool = false
+    ) -> DocumentMutationResult {
+        guard !data.isEmpty else {
+            return .failure(.emptyInput)
+        }
+        guard validate(rect: rect) else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        let expectedCount = rect.width * rect.height * 4
+        guard data.count == expectedCount else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        switch beginPixelLayerMutation(
+            at: index,
+            preservesTextLayerMetadata: preservesTextLayerMetadata
+        ) {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success:
+            break
+        }
+        let adjustedData = isLayerAlphaLocked(index: index)
+            ? Self.pixelDataByPreservingExistingAlpha(
+                source: data,
+                existing: documentGateway.queries.pixelDataForLayer(index: index, rect: rect)
+            )
+            : data
+        guard documentGateway.layers.replaceLayerPixels(index: index, rect: rect, data: adjustedData) else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        applyLayerLifecycleMutation(
+            at: index,
+            captureFrame: true
+        )
+        return .success(())
+    }
+
     func replaceLayerMask(index: Int, maskData: Data) -> DocumentMutationResult {
         if let failure = validate(.layer(index: index)) {
             return .failure(failure)
@@ -210,5 +251,13 @@ extension PaintDocumentSession {
             )
             return .success(())
         }
+    }
+
+    private func validate(rect: LayerPixelRect) -> Bool {
+        guard !rect.isEmpty else { return false }
+        guard rect.originX >= 0, rect.originY >= 0 else { return false }
+        guard rect.originX + rect.width <= documentGateway.queries.canvasWidth else { return false }
+        guard rect.originY + rect.height <= documentGateway.queries.canvasHeight else { return false }
+        return true
     }
 }

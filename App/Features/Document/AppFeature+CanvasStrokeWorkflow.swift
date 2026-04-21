@@ -5,6 +5,8 @@ extension AppFeature {
     struct StrokePreviewPlan {
         let baseSnapshot: MetalDocumentSnapshot
         let adjustedPixels: Data
+        let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
+        let rectPixelData: Data?
         let incrementalUpdate: IncrementalLayerUpdate?
     }
 
@@ -230,7 +232,14 @@ extension AppFeature {
                 clearSelectionWithoutRefresh(&state)
             }
             let commitResult: DocumentMutationResult
-            if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+            if let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
+               let rectPixelData = state.canvas.activeStrokePreviewRectPixelData {
+                commitResult = workflowService.replaceLayerPixels(
+                    context.activeLayerIndex,
+                    in: dirtyRect,
+                    pixelData: rectPixelData
+                )
+            } else if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
                 commitResult = workflowService.replaceLayerPixels(
                     context.activeLayerIndex,
                     pixelData: previewPixels
@@ -277,8 +286,8 @@ extension AppFeature {
             }
 
             let compositePixelData: Data
-            if let previewCompositePixelData = state.canvas.activeStrokePreviewCompositePixelData {
-                compositePixelData = previewCompositePixelData
+            if let stagedCompositePixelData = state.canvas.stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) {
+                compositePixelData = stagedCompositePixelData
             } else if let composited = AppFeature.compositedPreviewPixelData(
                 snapshot: baseSnapshot,
                 activeLayerIndex: activeLayerIndex,
@@ -472,6 +481,14 @@ extension AppFeature {
             pixelData: Data
         ) -> DocumentMutationResult {
             documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
+        }
+
+        func replaceLayerPixels(
+            _ layerIndex: Int,
+            in dirtyRect: LayerPixelRect,
+            pixelData: Data
+        ) -> DocumentMutationResult {
+            documentMutationGateway.replaceLayerPixelsInRect(layerIndex, dirtyRect, pixelData)
         }
 
         func applySoftwareStroke(
@@ -734,6 +751,7 @@ extension AppFeature {
         let metalExecutionMode: MetalStrokeExecutionMode = .interactive
         let adjustedPixels: Data
         let rasterDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
+        let rectPixelData: Data?
         if let gpuResult = MetalDocumentProcessingClient.shared.executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
@@ -750,6 +768,7 @@ extension AppFeature {
                 ? Self.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
                 : gpuResult.pixelData
             rasterDirtyRect = gpuResult.dirtyRect
+            rectPixelData = gpuResult.rectPixelData
         } else if let fallbackPixels = Self.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
             canvasWidth: snapshot.width,
@@ -763,6 +782,7 @@ extension AppFeature {
         ) {
             adjustedPixels = fallbackPixels
             rasterDirtyRect = nil
+            rectPixelData = nil
         } else {
             return nil
         }
@@ -787,6 +807,15 @@ extension AppFeature {
         return StrokePreviewPlan(
             baseSnapshot: snapshot,
             adjustedPixels: adjustedPixels,
+            dirtyRect: previewDirtyRect,
+            rectPixelData: rectPixelData ?? previewDirtyRect.flatMap {
+                Self.pixelData(
+                    in: $0,
+                    from: adjustedPixels,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height
+                )
+            },
             incrementalUpdate: incrementalUpdate
         )
     }
@@ -797,6 +826,17 @@ extension AppFeature {
         state: inout State
     ) {
         state.canvas.setStrokePreviewLayerPixelData(plan.adjustedPixels)
+        state.canvas.setStrokePreviewRectPixelData(
+            plan.rectPixelData,
+            dirtyRect: plan.dirtyRect.map {
+                LayerPixelRect(
+                    originX: $0.originX,
+                    originY: $0.originY,
+                    width: $0.width,
+                    height: $0.height
+                )
+            }
+        )
         if let incrementalUpdate = plan.incrementalUpdate {
             state.canvas.applyIncrementalRenderUpdate(
                 incrementalUpdate,
@@ -847,6 +887,37 @@ extension AppFeature {
             state.canvas.activeLayerIndex,
             pixelData: adjustedPixels
         )
+    }
+
+    static func pixelData(
+        in dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
+        from pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> Data? {
+        guard dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth else { return nil }
+        guard dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard pixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
+
+        var rectPixelData = Data(count: dirtyRect.width * dirtyRect.height * 4)
+        rectPixelData.withUnsafeMutableBytes { destinationBytes in
+            pixelData.withUnsafeBytes { sourceBytes in
+                guard
+                    let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else {
+                    return
+                }
+                for row in 0..<dirtyRect.height {
+                    let srcOffset = ((dirtyRect.originY + row) * canvasWidth + dirtyRect.originX) * 4
+                    let dstOffset = row * dirtyRect.width * 4
+                    memcpy(destination + dstOffset, source + srcOffset, dirtyRect.width * 4)
+                }
+            }
+        }
+        return rectPixelData
     }
 
     func activeEditableCanvasLayer(in state: State) -> LayerRowModel? {

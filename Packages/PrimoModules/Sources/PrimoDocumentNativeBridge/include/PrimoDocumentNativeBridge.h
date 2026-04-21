@@ -226,6 +226,7 @@ typedef NS_ENUM(NSInteger, APPaintGradientMapPreset) {
 - (nullable NSData *)layerMaskDataForLayerAtIndex:(NSInteger)index NS_SWIFT_NAME(layerMaskDataForLayer(at:));
 - (BOOL)applyLayerProcessingAtIndex:(NSInteger)index descriptor:(APPaintLayerProcessingDescriptor *)descriptor NS_SWIFT_NAME(applyLayerProcessing(at:descriptor:));
 - (void)replaceLayerPixelsAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:data:));
+- (BOOL)replaceLayerPixelsAtIndex:(NSInteger)index rect:(APDirtyRect *)rect data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixels(at:rect:data:));
 - (void)replaceLayerPixelsTransientAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerPixelsTransient(at:data:));
 - (void)replaceLayerMaskAtIndex:(NSInteger)index data:(NSData *)data NS_SWIFT_NAME(replaceLayerMask(at:data:));
 - (void)clearLayerMaskAtIndex:(NSInteger)index NS_SWIFT_NAME(clearLayerMask(at:));

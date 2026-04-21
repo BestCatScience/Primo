@@ -597,6 +597,10 @@ struct PaintDocumentSessionDocumentGateway {
             bridgeService.queries.pixelDataForLayer(index: index, bridge: bridge)
         }
 
+        func pixelDataForLayer(index: Int, rect: LayerPixelRect) -> Data {
+            bridgeService.queries.pixelDataForLayer(index: index, rect: rect, bridge: bridge)
+        }
+
         func isLayerLocked(index: Int) -> Bool {
             bridgeService.queries.isLayerLocked(index: index, bridge: bridge)
         }
@@ -785,6 +789,17 @@ struct PaintDocumentSessionDocumentGateway {
             } else {
                 bridge.replaceLayerPixels(at: index, data: data)
             }
+        }
+
+        func replaceLayerPixels(index: Int, rect: LayerPixelRect, data: Data) -> Bool {
+            guard !rect.isEmpty else { return false }
+            let dirtyRect = APDirtyRect(
+                originX: rect.originX,
+                originY: rect.originY,
+                width: rect.width,
+                height: rect.height
+            )
+            return bridge.replaceLayerPixels(at: index, rect: dirtyRect, data: data)
         }
 
         func replaceLayerMask(index: Int, data: Data) {

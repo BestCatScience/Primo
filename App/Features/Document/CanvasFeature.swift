@@ -40,6 +40,8 @@ struct CanvasFeature {
         var activeLayerIndex = 0
         var activeStrokeBaseSnapshot: MetalDocumentSnapshot?
         var activeStrokePreviewLayerPixelData: Data?
+        var activeStrokePreviewRectPixelData: Data?
+        var activeStrokePreviewDirtyRect: LayerPixelRect?
         var activeStrokePreviewCompositePixelData: Data?
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
@@ -221,6 +223,11 @@ struct CanvasFeature {
             activeStrokePreviewLayerPixelData = pixelData
         }
 
+        mutating func setStrokePreviewRectPixelData(_ pixelData: Data?, dirtyRect: LayerPixelRect?) {
+            activeStrokePreviewRectPixelData = pixelData
+            activeStrokePreviewDirtyRect = dirtyRect
+        }
+
         mutating func setStrokePreviewCompositePixelData(_ pixelData: Data?) {
             activeStrokePreviewCompositePixelData = pixelData
         }
@@ -243,6 +250,19 @@ struct CanvasFeature {
             }
             setStrokePreviewCompositePixelData(nil)
             pendingIncrementalUpdate = update
+        }
+
+        func stagedPreviewCompositePixelData(baseSnapshot: MetalDocumentSnapshot) -> Data? {
+            if let activeStrokePreviewCompositePixelData {
+                return activeStrokePreviewCompositePixelData
+            }
+            guard let pendingIncrementalUpdate else { return nil }
+            return Self.replacingCompositeRegion(
+                in: baseSnapshot.compositePixelData,
+                canvasWidth: baseSnapshot.width,
+                canvasHeight: baseSnapshot.height,
+                update: pendingIncrementalUpdate
+            )
         }
 
         mutating func applyCommittedRenderSnapshot(
@@ -280,6 +300,8 @@ struct CanvasFeature {
             }
             activeStrokeBaseSnapshot = nil
             activeStrokePreviewLayerPixelData = nil
+            activeStrokePreviewRectPixelData = nil
+            activeStrokePreviewDirtyRect = nil
             activeStrokePreviewCompositePixelData = nil
             pendingStrokeFinalizationSamples = []
             pendingIncrementalUpdate = nil
@@ -582,7 +604,9 @@ struct CanvasFeature {
             case let .strokeUpdated(stroke):
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
-                state.pendingStrokeFinalizationSamples = []
+                state.pendingStrokeFinalizationSamples = Self.trimmingDuplicateTrailingSamples(
+                    stroke.points.map(\.stylusSample)
+                )
                 if state.currentTool == .shape {
                     state.activeStroke = nil
                     guard stroke.points.count >= 2 else { return .none }
@@ -644,17 +668,23 @@ struct CanvasFeature {
                     Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample),
                     after: previousLastSample
                 )
-                state.pendingStrokeFinalizationSamples = Self.trimmingDuplicateTrailingSamples(
+                let finalSamples = Self.trimmingDuplicateTrailingSamples(
                     stroke.points.map(\.stylusSample)
                 )
+                state.pendingStrokeFinalizationSamples = finalSamples
                 state.activeStroke = nil
                 let didCommitStroke = state.activeStrokeCommittedPointCount > 0
                 state.activeStrokeCommittedPointCount = 0
                 if didCommitStroke {
-                    return .send(.delegate(.endStroke(stroke.points.map(\.stylusSample))))
+                    var effects: [Effect<Action>] = []
+                    if !appendedSamples.isEmpty {
+                        effects.append(.send(.delegate(.appendSamples(appendedSamples))))
+                    }
+                    effects.append(.send(.delegate(.endStroke(finalSamples))))
+                    return .concatenate(effects)
                 }
-                if !stroke.points.isEmpty {
-                    return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
+                if !finalSamples.isEmpty {
+                    return .send(.delegate(.commitStroke(finalSamples)))
                 }
                 return .none
 

@@ -25,6 +25,7 @@ public typealias LoadedPaintProject = PrimoDocumentContracts.LoadedPaintProject
 public typealias LayerRowModel = PrimoDocumentContracts.LayerRowModel
 public typealias LayerFolderModel = PrimoDocumentContracts.LayerFolderModel
 public typealias LayerSidebarRowModel = PrimoDocumentContracts.LayerSidebarRowModel
+public typealias LayerPixelRect = PrimoDocumentContracts.LayerPixelRect
 public typealias MetalLayerSnapshot = PrimoDocumentContracts.MetalLayerSnapshot
 public typealias MetalDocumentSnapshot = PrimoDocumentContracts.MetalDocumentSnapshot
 public typealias TimelapseFrame = PrimoDocumentContracts.TimelapseFrame

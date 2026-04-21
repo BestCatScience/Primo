@@ -625,6 +625,23 @@ APPaintFolderInfo *APFolderInfoFromSnapshot(const primo::PaintFolderSnapshot& fo
     _document->replaceLayerPixels((int)index, std::span<const uint8_t>(bytes, data.length));
 }
 
+- (BOOL)replaceLayerPixelsAtIndex:(NSInteger)index rect:(APDirtyRect *)rect data:(NSData *)data {
+    const auto *bytes = static_cast<const uint8_t *>(data.bytes);
+    if (bytes == nullptr || rect.empty) {
+        return NO;
+    }
+    primo::DirtyRect engineRect;
+    engineRect.minX = (int)rect.originX;
+    engineRect.minY = (int)rect.originY;
+    engineRect.maxX = (int)(rect.originX + rect.width - 1);
+    engineRect.maxY = (int)(rect.originY + rect.height - 1);
+    return _document->replaceLayerPixelsInRect(
+        (int)index,
+        engineRect,
+        std::span<const uint8_t>(bytes, data.length)
+    );
+}
+
 - (void)replaceLayerPixelsTransientAtIndex:(NSInteger)index data:(NSData *)data {
     const auto *bytes = static_cast<const uint8_t *>(data.bytes);
     if (bytes == nullptr) {

@@ -444,6 +444,7 @@ public:
     void setLayerBlendMode(int index, Layer::BlendMode blendMode);
     bool applyLayerProcessing(int index, const LayerProcessing& processing);
     void replaceLayerPixels(int index, std::span<const uint8_t> pixels);
+    bool replaceLayerPixelsInRect(int index, const DirtyRect& rect, std::span<const uint8_t> pixels);
     void replaceLayerPixelsTransient(int index, std::span<const uint8_t> pixels);
     bool hasLayerMask(int index) const noexcept;
     std::vector<uint8_t> layerMaskData(int index) const;

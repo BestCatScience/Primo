@@ -36,7 +36,7 @@ public enum DocumentRuntimeFactory {
         uuidClient: PrimoCoreTypes.UUIDClient = .live
     ) -> DocumentRuntimeLive {
         let runtimeBox = LockedDocumentRuntimeBox(
-            runtime: PaintDocumentSession(
+            runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient
@@ -65,7 +65,10 @@ public enum DocumentRuntimeFactory {
             },
             revealLayerForEditing: { index in runtimeBox.withRuntime { $0.revealLayerForEditing(index: index) } },
             replaceLayerPixels: { index, data in runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, data: data) } },
-            replaceLayerMask: { index, data in runtimeBox.withRuntime { $0.replaceLayerMask(index: index, maskData: data) } },
+            replaceLayerPixelsInRect: { index, rect, data in
+                runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, in: rect, data: data) }
+            },
+            replaceLayerMask: { index, data in runtimeBox.withRuntime { $0.replaceLayerMask(index: index, data: data) } },
             clearLayerMask: { index in runtimeBox.withRuntime { $0.clearLayerMask(index: index) } },
             applyLayerMask: { index in runtimeBox.withRuntime { $0.applyLayerMask(index: index) } },
             clearLayer: { index in runtimeBox.withRuntime { $0.clearLayer(index: index) } },
@@ -105,23 +108,23 @@ public enum DocumentRuntimeFactory {
                 }
             },
             loadProject: { url in
-                let session = try PaintDocumentSession.loadProject(
+                let runtime = try SwiftDocumentRuntime.loadProject(
                     from: url,
                     fileClient: fileClient,
                     dateClient: dateClient,
                     uuidClient: uuidClient
                 )
                 let loadedProject = LoadedPaintProject(
-                    presentation: session.lightweightPresentation(),
-                    paperStyle: session.currentPaperStyle
+                    presentation: runtime.lightweightPresentation(),
+                    paperStyle: runtime.currentPaperStyle
                 )
-                runtimeBox.replaceRuntime(with: session)
+                runtimeBox.replaceRuntime(with: runtime)
                 return loadedProject
             },
             setPaperStyle: { style in runtimeBox.withRuntime { $0.setPaperStyle(style) } },
             newCanvas: { width, height in
                 runtimeBox.replaceRuntime(
-                    with: PaintDocumentSession(
+                    with: SwiftDocumentRuntime(
                         width: width,
                         height: height,
                         fileClient: fileClient,
@@ -166,7 +169,7 @@ public enum DocumentRuntimeFactory {
                 runtimeBox.withRuntime { $0.setFolderExpanded(folderID: folderID, isExpanded: isExpanded) }
             },
             assignLayerToFolder: { index, folderID in
-                runtimeBox.withRuntime { $0.assignLayer(index: index, toFolder: folderID) }
+                runtimeBox.withRuntime { $0.assignLayerToFolder(index: index, folderID: folderID) }
             },
             setLayerLocked: { index, isLocked in
                 runtimeBox.withRuntime { $0.setLayerLocked(index: index, isLocked: isLocked) }
@@ -189,7 +192,7 @@ public enum DocumentRuntimeFactory {
 }
 
 public final class DocumentTimelapseReplayService: @unchecked Sendable {
-    private let session: PaintDocumentSession
+    private let runtime: SwiftDocumentRuntime
     private var folderIDMap: [DocumentFolderID: Int] = [:]
 
     public init(
@@ -198,7 +201,7 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
     ) {
-        self.session = PaintDocumentSession(
+        self.runtime = SwiftDocumentRuntime(
             width: max(Int(canvasSize.width.rounded()), 1),
             height: max(Int(canvasSize.height.rounded()), 1),
             fileClient: fileClient,
@@ -208,7 +211,7 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
     }
 
     public func replay(_ operation: TimelapseOperation) -> CGImage? {
-        session.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
-        return session.timelapseCompositeImage()
+        runtime.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
+        return runtime.timelapseCompositeImage()
     }
 }

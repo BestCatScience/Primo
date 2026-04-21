@@ -1,0 +1,1485 @@
+import Accelerate
+import CoreGraphics
+import Foundation
+import PrimoDocumentApplication
+import PrimoDocumentInfrastructure
+import PrimoDocumentMetalRuntimeInfrastructure
+
+final class SwiftDocumentRuntime: @unchecked Sendable {
+    private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
+
+    private let services: PaintDocumentSessionServices
+    private let store: SwiftDocumentStore
+    private var undoStack: [SwiftDocumentStoreSnapshot] = []
+    private var redoStack: [SwiftDocumentStoreSnapshot] = []
+    private var pendingDirtyUpdate: IncrementalLayerUpdate?
+    private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+    private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+
+    init(
+        width: Int = 1152,
+        height: Int = 1536,
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) {
+        self.services = PaintDocumentSessionServices(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
+        self.store = SwiftDocumentStore(width: width, height: height)
+        captureDirtyUpdate()
+    }
+
+    var currentPaperStyle: CanvasPaperStyle {
+        store.snapshot.paperStyle
+    }
+
+    func lightweightPresentation() -> PaintDocumentPresentation {
+        PaintDocumentPresentation(
+            canvasSize: canvasSize,
+            activeLayerIndex: store.snapshot.activeLayerIndex,
+            layerRows: buildLayerRows(),
+            layerSidebarRows: buildSidebarRows(),
+            renderSnapshot: nil
+        )
+    }
+
+    func presentation() -> PaintDocumentPresentation {
+        PaintDocumentPresentation(
+            canvasSize: canvasSize,
+            activeLayerIndex: store.snapshot.activeLayerIndex,
+            layerRows: buildLayerRows(),
+            layerSidebarRows: buildSidebarRows(),
+            renderSnapshot: makeRenderSnapshot()
+        )
+    }
+
+    func prewarmDrawingResources() {
+        _ = compositePixelData()
+    }
+
+    func compositePixelData() -> Data {
+        compositePixelDataForSnapshot(store.snapshot)
+    }
+
+    func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
+        defer { pendingDirtyUpdate = nil }
+        return pendingDirtyUpdate
+    }
+
+    func pixelDataForLayer(index: Int) -> Data {
+        guard store.snapshot.layers.indices.contains(index) else { return Data() }
+        return store.snapshot.layers[index].pixelData
+    }
+
+    func canUndo() -> Bool {
+        !undoStack.isEmpty
+    }
+
+    func canRedo() -> Bool {
+        !redoStack.isEmpty
+    }
+
+    func undo() -> DocumentMutationResult {
+        guard let previous = undoStack.popLast() else {
+            return .failure(.noUndoState)
+        }
+        redoStack.append(store.snapshot)
+        store.restore(previous)
+        store.snapshot.timelapseEvents.append(.undo)
+        store.snapshot.revision += 1
+        captureDirtyUpdate()
+        return .success(())
+    }
+
+    func redo() -> DocumentMutationResult {
+        guard let next = redoStack.popLast() else {
+            return .failure(.noRedoState)
+        }
+        undoStack.append(store.snapshot)
+        store.restore(next)
+        store.snapshot.timelapseEvents.append(.redo)
+        store.snapshot.revision += 1
+        captureDirtyUpdate()
+        return .success(())
+    }
+
+    func resizeCanvas(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0 && height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
+        let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let targetSize = PaintDocumentCanvasSize(width: width, height: height)
+        guard sourceSize != targetSize else { return .success(()) }
+        let before = store.snapshot
+        let widthScale = Double(targetSize.width) / Double(sourceSize.width)
+        let heightScale = Double(targetSize.height) / Double(sourceSize.height)
+        let textScale = min(widthScale, heightScale)
+        for index in store.snapshot.layers.indices {
+            var layer = store.snapshot.layers[index]
+            if let scaled = services.geometry.scaledLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize) {
+                layer.pixelData = scaled
+            }
+            if let mask = layer.maskData,
+               let scaledMask = services.geometry.scaledLayerMaskData(mask, from: sourceSize, to: targetSize) {
+                layer.maskData = scaledMask
+            }
+            if let textLayer = layer.textLayer {
+                layer.textLayer = TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX * widthScale,
+                    positionY: textLayer.positionY * heightScale,
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: max(1, textLayer.fontSize * textScale),
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            }
+            store.snapshot.layers[index] = layer
+        }
+        store.snapshot.canvasWidth = targetSize.width
+        store.snapshot.canvasHeight = targetSize.height
+        store.snapshot.thumbnailCache.removeAll()
+        recordMutation(before: before, timelapseEvent: nil)
+        return .success(())
+    }
+
+    func resizeCanvasExtent(width: Int, height: Int) -> DocumentMutationResult {
+        guard width > 0 && height > 0 else {
+            return .failure(.invalidCanvasSize(width: width, height: height))
+        }
+        let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let targetSize = PaintDocumentCanvasSize(width: width, height: height)
+        guard sourceSize != targetSize else { return .success(()) }
+        let before = store.snapshot
+        let offsetX = (targetSize.width - sourceSize.width) / 2
+        let offsetY = (targetSize.height - sourceSize.height) / 2
+        for index in store.snapshot.layers.indices {
+            var layer = store.snapshot.layers[index]
+            if let translated = services.geometry.translatedLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
+                layer.pixelData = translated
+            }
+            if let mask = layer.maskData,
+               let translatedMask = services.geometry.translatedLayerMaskData(mask, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
+                layer.maskData = translatedMask
+            }
+            if let textLayer = layer.textLayer {
+                layer.textLayer = TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX + Double(offsetX),
+                    positionY: textLayer.positionY + Double(offsetY),
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: textLayer.fontSize,
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            }
+            store.snapshot.layers[index] = layer
+        }
+        store.snapshot.canvasWidth = targetSize.width
+        store.snapshot.canvasHeight = targetSize.height
+        store.snapshot.thumbnailCache.removeAll()
+        recordMutation(before: before, timelapseEvent: nil)
+        return .success(())
+    }
+
+    func addLayer(name: String) -> DocumentIndexedMutationResult {
+        let before = store.snapshot
+        let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let layer = SwiftDocumentLayerRecord(
+            name: name,
+            visible: true,
+            locked: false,
+            alphaLocked: false,
+            clipped: false,
+            opacity: 1.0,
+            blendMode: .normal,
+            folderID: nil,
+            textLayer: nil,
+            pixelData: Data(count: size.rgbaByteCount),
+            maskData: nil
+        )
+        store.snapshot.layers.append(layer)
+        let index = store.snapshot.layers.count - 1
+        store.snapshot.activeLayerIndex = index
+        recordMutation(before: before, timelapseEvent: .addLayer(name: name))
+        return .success(index)
+    }
+
+    func setActiveLayer(index: Int) -> DocumentMutationResult {
+        guard store.snapshot.layers.indices.contains(index) else {
+            return .failure(.invalidLayerIndex(index))
+        }
+        store.snapshot.activeLayerIndex = index
+        return .success(())
+    }
+
+    func setLayerName(index: Int, name: String) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        store.snapshot.layers[index].name = name
+        return .success(())
+    }
+
+    func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        store.snapshot.layers[index].visible = isVisible
+        recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
+        return .success(())
+    }
+
+    func revealLayerForEditing(index: Int) -> DocumentMutationResult {
+        setLayerVisibility(index: index, isVisible: true)
+    }
+
+    func replaceLayerPixels(index: Int, data: Data) -> DocumentMutationResult {
+        guard !data.isEmpty else { return .failure(.emptyInput) }
+        guard let failure = validateEditableLayer(index) else {
+            return replaceLayerPixelsUnchecked(index: index, data: data, timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: data))
+        }
+        return .failure(failure)
+    }
+
+    func replaceLayerPixels(index: Int, in rect: LayerPixelRect, data: Data) -> DocumentMutationResult {
+        guard !data.isEmpty else { return .failure(.emptyInput) }
+        guard rect.width > 0, rect.height > 0 else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        guard data.count == rect.width * rect.height * 4 else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        guard rect.originX >= 0,
+              rect.originY >= 0,
+              rect.originX + rect.width <= store.snapshot.canvasWidth,
+              rect.originY + rect.height <= store.snapshot.canvasHeight
+        else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
+        }
+        guard let failure = validateEditableLayer(index) else {
+            let before = store.snapshot
+            var output = store.snapshot.layers[index].pixelData
+            output.withUnsafeMutableBytes { destinationBytes in
+                data.withUnsafeBytes { sourceBytes in
+                    guard let destination = destinationBytes.bindMemory(to: UInt8.self).baseAddress,
+                          let source = sourceBytes.bindMemory(to: UInt8.self).baseAddress
+                    else { return }
+                    for row in 0..<rect.height {
+                        let destOffset = (((rect.originY + row) * store.snapshot.canvasWidth) + rect.originX) * 4
+                        let srcOffset = row * rect.width * 4
+                        memcpy(destination + destOffset, source + srcOffset, rect.width * 4)
+                    }
+                }
+            }
+            if store.snapshot.layers[index].alphaLocked {
+                output = PaintDocumentSession.pixelDataByPreservingExistingAlpha(
+                    source: output,
+                    existing: store.snapshot.layers[index].pixelData
+                )
+            }
+            store.snapshot.layers[index].pixelData = output
+            invalidateThumbnail(for: index)
+            recordMutation(before: before, timelapseEvent: nil, dirtyRect: rect)
+            return .success(())
+        }
+        return .failure(failure)
+    }
+
+    func replaceLayerMask(index: Int, data: Data) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        guard !data.isEmpty else { return .failure(.emptyInput) }
+        guard data.count == store.snapshot.canvasWidth * store.snapshot.canvasHeight else {
+            return .failure(.bridgeMutationFailed("replaceLayerMask"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[index].maskData = data
+        invalidateThumbnail(for: index)
+        recordMutation(before: before, timelapseEvent: .replaceLayerMask(index: .unchecked(index), data: data))
+        return .success(())
+    }
+
+    func clearLayerMask(index: Int) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        guard store.snapshot.layers[index].maskData != nil else { return .success(()) }
+        let before = store.snapshot
+        store.snapshot.layers[index].maskData = nil
+        invalidateThumbnail(for: index)
+        recordMutation(before: before, timelapseEvent: .clearLayerMask(index: .unchecked(index)))
+        return .success(())
+    }
+
+    func applyLayerMask(index: Int) -> DocumentMutationResult {
+        guard let failure = validateLayer(index) else {
+            guard let mask = store.snapshot.layers[index].maskData else { return .success(()) }
+            let before = store.snapshot
+            var output = store.snapshot.layers[index].pixelData
+            output.withUnsafeMutableBytes { outputBytes in
+                mask.withUnsafeBytes { maskBytes in
+                    guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                          let maskBase = maskBytes.bindMemory(to: UInt8.self).baseAddress
+                    else { return }
+                    for pixelIndex in 0..<mask.count {
+                        let alphaOffset = pixelIndex * 4 + 3
+                        let sourceAlpha = Int(dst[alphaOffset])
+                        let maskAlpha = Int(maskBase[pixelIndex])
+                        dst[alphaOffset] = UInt8((sourceAlpha * maskAlpha) / 255)
+                    }
+                }
+            }
+            store.snapshot.layers[index].pixelData = output
+            store.snapshot.layers[index].maskData = nil
+            invalidateThumbnail(for: index)
+            recordMutation(
+                before: before,
+                timelapseEvent: .applyLayerMask(index: .unchecked(index))
+            )
+            return .success(())
+        }
+        return .failure(failure)
+    }
+
+    func clearLayer(index: Int) -> DocumentMutationResult {
+        guard let failure = validateEditableLayer(index) else {
+            let before = store.snapshot
+            store.snapshot.layers[index].pixelData = Data(count: rgbaByteCount)
+            invalidateThumbnail(for: index)
+            recordMutation(before: before, timelapseEvent: .clearLayer(index: .unchecked(index)))
+            return .success(())
+        }
+        return .failure(failure)
+    }
+
+    func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
+        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        let before = store.snapshot
+        do {
+            let session = PaintDocumentSession(
+                width: store.snapshot.canvasWidth,
+                height: store.snapshot.canvasHeight,
+                fileClient: services.fileIO,
+                dateClient: services.clock,
+                uuidClient: services.ids
+            )
+            try populateLegacySession(session)
+            switch session.applyLayerProcessing(index: index, request: request) {
+            case let .failure(failure):
+                return .failure(failure)
+            case .success:
+                break
+            }
+            store.snapshot.layers[index].pixelData = session.pixelDataForLayer(index: index)
+            invalidateThumbnail(for: index)
+            recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: store.snapshot.layers[index].pixelData))
+            return .success(())
+        } catch {
+            return .failure(.bridgeMutationFailed("applyLayerProcessing"))
+        }
+    }
+
+    func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        var layer = store.snapshot.layers[index]
+        layer.name = name
+        let duplicatedIndex = index + 1
+        store.snapshot.layers.insert(layer, at: duplicatedIndex)
+        remapFoldersAfterInsertion(at: duplicatedIndex)
+        store.snapshot.activeLayerIndex = duplicatedIndex
+        recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
+        return .success(duplicatedIndex)
+    }
+
+    func deleteLayer(index: Int) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
+        let before = store.snapshot
+        store.snapshot.layers.remove(at: index)
+        remapFoldersAfterDeletion(of: index)
+        store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
+        invalidateAllThumbnails()
+        recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
+        return .success(())
+    }
+
+    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        guard validateLayer(destinationIndex) == nil else { return .failure(validateLayer(destinationIndex)!) }
+        guard index != destinationIndex else { return .success(()) }
+        let before = store.snapshot
+        let layer = store.snapshot.layers.remove(at: index)
+        store.snapshot.layers.insert(layer, at: destinationIndex)
+        remapFoldersAfterMove(from: index, to: destinationIndex)
+        if store.snapshot.activeLayerIndex == index {
+            store.snapshot.activeLayerIndex = destinationIndex
+        }
+        invalidateAllThumbnails()
+        recordMutation(before: before, timelapseEvent: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)))
+        return .success(())
+    }
+
+    func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
+        guard layerIndex < 0 || store.snapshot.layers.indices.contains(layerIndex) else {
+            return .failure(.invalidLayerIndex(layerIndex))
+        }
+        let before = store.snapshot
+        let id = store.snapshot.nextFolderID
+        store.snapshot.nextFolderID += 1
+        store.snapshot.folders.append(
+            SwiftDocumentFolderRecord(
+                id: id,
+                name: name,
+                visible: true,
+                expanded: true,
+                anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil
+            )
+        )
+        recordMutation(
+            before: before,
+            timelapseEvent: .createFolder(folderID: .unchecked(id), name: name, anchorLayerIndex: layerIndex >= 0 ? .unchecked(layerIndex) : nil)
+        )
+        return .success(id)
+    }
+
+    func deleteFolder(folderID: Int) -> DocumentMutationResult {
+        guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
+            return .failure(.invalidFolderID(folderID))
+        }
+        let before = store.snapshot
+        store.snapshot.folders.remove(at: folderIndex)
+        for index in store.snapshot.layers.indices where store.snapshot.layers[index].folderID == folderID {
+            store.snapshot.layers[index].folderID = nil
+        }
+        recordMutation(before: before, timelapseEvent: .deleteFolder(folderID: .unchecked(folderID)))
+        return .success(())
+    }
+
+    func setFolderVisibility(folderID: Int, isVisible: Bool) -> DocumentMutationResult {
+        guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
+            return .failure(.invalidFolderID(folderID))
+        }
+        let before = store.snapshot
+        store.snapshot.folders[folderIndex].visible = isVisible
+        recordMutation(before: before, timelapseEvent: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible))
+        return .success(())
+    }
+
+    func setFolderName(folderID: Int, name: String) -> DocumentMutationResult {
+        guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
+            return .failure(.invalidFolderID(folderID))
+        }
+        store.snapshot.folders[folderIndex].name = name
+        return .success(())
+    }
+
+    func setFolderExpanded(folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
+        guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
+            return .failure(.invalidFolderID(folderID))
+        }
+        store.snapshot.folders[folderIndex].expanded = isExpanded
+        return .success(())
+    }
+
+    func assignLayerToFolder(index: Int, folderID: Int) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if folderID >= 0, !store.snapshot.folders.contains(where: { $0.id == folderID }) {
+            return .failure(.invalidFolderID(folderID))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[index].folderID = folderID >= 0 ? folderID : nil
+        recordMutation(before: before, timelapseEvent: .assignLayerToFolder(index: .unchecked(index), folderID: folderID >= 0 ? .unchecked(folderID) : nil))
+        return .success(())
+    }
+
+    func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        store.snapshot.layers[index].locked = isLocked
+        recordMutation(before: before, timelapseEvent: .setLayerLocked(index: .unchecked(index), isLocked: isLocked))
+        return .success(())
+    }
+
+    func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        store.snapshot.layers[index].alphaLocked = isAlphaLocked
+        recordMutation(before: before, timelapseEvent: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked))
+        return .success(())
+    }
+
+    func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        store.snapshot.layers[index].clipped = isClipped
+        recordMutation(before: before, timelapseEvent: .setLayerClipped(index: .unchecked(index), isClipped: isClipped))
+        return .success(())
+    }
+
+    func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        guard (0...1).contains(opacity) else { return .failure(.invalidOpacity(opacity)) }
+        let before = store.snapshot
+        store.snapshot.layers[index].opacity = opacity
+        recordMutation(before: before, timelapseEvent: .setLayerOpacity(index: .unchecked(index), opacity: opacity))
+        return .success(())
+    }
+
+    func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
+        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        let before = store.snapshot
+        store.snapshot.layers[index].blendMode = blendMode
+        recordMutation(before: before, timelapseEvent: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode))
+        return .success(())
+    }
+
+    func mergeLayerDown(index: Int) -> DocumentMutationResult {
+        guard index > 0 else { return .failure(.invalidLayerIndex(index)) }
+        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        guard validateEditableLayer(index - 1) == nil else { return .failure(validateEditableLayer(index - 1)!) }
+        guard let merged = mergedLayerDownPixelData(upperIndex: index, lowerIndex: index - 1) else {
+            return .failure(.bridgeMutationFailed("mergeLayerDown"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[index - 1].pixelData = merged
+        store.snapshot.layers[index - 1].textLayer = nil
+        _ = deleteLayer(index: index)
+        invalidateThumbnail(for: index - 1)
+        recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index - 1), data: merged))
+        return .success(())
+    }
+
+    func textLayerData(index: Int) -> TextLayerData? {
+        guard store.snapshot.layers.indices.contains(index) else { return nil }
+        return store.snapshot.layers[index].textLayer
+    }
+
+    func setTextLayer(index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
+        guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .failure(.emptyInput)
+        }
+        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        guard let rasterized = DocumentTextRasterizer.rasterizedPixelData(for: textLayer, canvasSize: canvasSize) else {
+            return .failure(.bridgeMutationFailed("setTextLayer"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[index].textLayer = textLayer
+        store.snapshot.layers[index].pixelData = rasterized
+        invalidateThumbnail(for: index)
+        recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: rasterized))
+        return .success(())
+    }
+
+    func clearTextLayerData(index: Int) {
+        guard store.snapshot.layers.indices.contains(index) else { return }
+        store.snapshot.layers[index].textLayer = nil
+    }
+
+    func beginStroke(sample: StylusSample, brush: BrushRuntimeSettings) {
+        currentStroke = (layerIndex: store.snapshot.activeLayerIndex, brush: brush, samples: [sample])
+    }
+
+    func appendStroke(sample: StylusSample) {
+        currentStroke?.samples.append(sample)
+    }
+
+    func endStroke() {
+        guard let currentStroke else { return }
+        _ = applySoftwareStroke(samples: currentStroke.samples, brush: currentStroke.brush, layerIndex: currentStroke.layerIndex)
+        self.currentStroke = nil
+    }
+
+    func cancelStroke() {
+        currentStroke = nil
+    }
+
+    func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        let baseline = currentBlurStroke?.baseline ?? store.snapshot
+        currentBlurStroke = (
+            baseline: baseline,
+            layerIndex: layerIndex,
+            brush: brush,
+            samples: (currentBlurStroke?.samples ?? []) + samples
+        )
+        guard let blurred = blurPixelData(layerIndex: layerIndex, samples: samples, brush: brush) else {
+            return .failure(.bridgeMutationFailed("blurStroke"))
+        }
+        store.snapshot.layers[layerIndex].pixelData = blurred
+        invalidateThumbnail(for: layerIndex)
+        captureDirtyUpdate()
+        if captureTimelapse {
+            captureTimelapseFrame()
+        }
+        return .success(())
+    }
+
+    func endBlurStroke() {
+        guard let currentBlurStroke,
+              let baseline = currentBlurStroke.baseline
+        else { return }
+        undoStack.append(baseline)
+        redoStack.removeAll(keepingCapacity: true)
+        store.snapshot.timelapseEvents.append(
+            .blurStroke(
+                layerIndex: .unchecked(currentBlurStroke.layerIndex),
+                brush: currentBlurStroke.brush,
+                samples: currentBlurStroke.samples
+            )
+        )
+        store.snapshot.revision += 1
+        captureDirtyUpdate()
+        self.currentBlurStroke = nil
+    }
+
+    func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
+        let layerIndex = store.snapshot.activeLayerIndex
+        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        guard let filled = fillPixelData(layerIndex: layerIndex, sample: sample, brush: brush) else {
+            return .failure(.bridgeMutationFailed("fill"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[layerIndex].pixelData = filled
+        invalidateThumbnail(for: layerIndex)
+        recordMutation(
+            before: before,
+            timelapseEvent: .fill(layerIndex: .unchecked(layerIndex), brush: brush, sample: sample)
+        )
+        return .success(())
+    }
+
+    func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        let gpuOutput = PrimoMetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
+            basePixelData: store.snapshot.layers[layerIndex].pixelData,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            samples: samples,
+            brush: brush,
+            mode: .commit,
+            snapshotRevision: store.snapshot.revision,
+            activeLayerIndex: layerIndex
+        )
+        guard let output = gpuOutput ?? DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
+            basePixelData: store.snapshot.layers[layerIndex].pixelData,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            samples: samples,
+            brush: brush,
+            preserveAlphaLockedPixels: store.snapshot.layers[layerIndex].alphaLocked
+        ) else {
+            return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[layerIndex].textLayer = nil
+        store.snapshot.layers[layerIndex].pixelData = output
+        invalidateThumbnail(for: layerIndex)
+        recordMutation(
+            before: before,
+            timelapseEvent: .stroke(layerIndex: .unchecked(layerIndex), brush: brush, samples: samples)
+        )
+        return .success(())
+    }
+
+    func saveProject(to url: URL, paperStyle: CanvasPaperStyle) throws {
+        let persistenceService = services.persistence
+        try persistenceService.prepareProjectDirectory(at: url)
+        let directories = try persistenceService.createProjectSubdirectories(
+            in: url,
+            usesOperationTimelapsePersistence: store.snapshot.timelapseUsesOperationPersistence
+        )
+
+        for index in store.snapshot.layers.indices {
+            let filename = String(format: "layer-%04d.rgba", index)
+            try persistenceService.writeAtomic(
+                store.snapshot.layers[index].pixelData,
+                to: directories.layersDirectory.appendingPathComponent(filename, isDirectory: false)
+            )
+            if let maskData = store.snapshot.layers[index].maskData {
+                let maskFilename = String(format: "layer-mask-%04d.mask", index)
+                try persistenceService.writeAtomic(
+                    maskData,
+                    to: directories.layersDirectory.appendingPathComponent(maskFilename, isDirectory: false)
+                )
+            }
+        }
+
+        if !store.snapshot.timelapseUsesOperationPersistence {
+            for (index, frame) in store.snapshot.timelapseFrames.enumerated() {
+                let relativeFilename = String(format: "frame-%06d.jpg", index)
+                try persistenceService.replaceItemIfNeeded(
+                    at: directories.timelapseDirectory.appendingPathComponent(relativeFilename, isDirectory: false),
+                    with: frame.imageURL
+                )
+            }
+        }
+
+        let storedOperations = store.snapshot.timelapseUsesOperationPersistence
+            ? try store.snapshot.timelapseEvents.enumerated().map {
+                try $0.element.storedRepresentation(
+                    index: $0.offset,
+                    dataDirectory: directories.timelapseDataDirectory,
+                    fileClient: services.fileIO
+                )
+            }
+            : []
+
+        let document = StoredPrimoDocument(
+            version: 5,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            activeLayerIndex: .unchecked(store.snapshot.activeLayerIndex),
+            paperStyle: StoredPrimoDocument.PaperStyle(
+                red: Double(paperStyle.red),
+                green: Double(paperStyle.green),
+                blue: Double(paperStyle.blue),
+                alpha: Double(paperStyle.alpha),
+                isTransparent: paperStyle.isTransparent
+            ),
+            layers: store.snapshot.layers.enumerated().map { index, layer in
+                StoredPrimoDocument.Layer(
+                    index: .unchecked(index),
+                    name: layer.name,
+                    visible: layer.visible,
+                    locked: layer.locked,
+                    alphaLocked: layer.alphaLocked,
+                    clipped: layer.clipped,
+                    opacity: layer.opacity,
+                    blendMode: layer.blendMode.rawValue,
+                    folderID: layer.folderID.map(DocumentFolderID.unchecked),
+                    textLayer: layer.textLayer,
+                    pixelFilename: String(format: "Layers/layer-%04d.rgba", index),
+                    maskFilename: layer.maskData == nil ? nil : String(format: "Layers/layer-mask-%04d.mask", index)
+                )
+            },
+            folders: store.snapshot.folders.map {
+                StoredPrimoDocument.Folder(
+                    id: .unchecked($0.id),
+                    name: $0.name,
+                    visible: $0.visible,
+                    expanded: $0.expanded,
+                    anchorLayerIndex: $0.anchorLayerIndex.map(DocumentLayerIndex.unchecked)
+                )
+            },
+            timelapseFrames: store.snapshot.timelapseUsesOperationPersistence ? [] : store.snapshot.timelapseFrames.map {
+                StoredPrimoDocument.TimelapseFrame(
+                    filename: "Timelapse/\($0.imageURL.lastPathComponent)",
+                    width: Double($0.size.width),
+                    height: Double($0.size.height)
+                )
+            },
+            timelapseOperations: storedOperations
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let manifest = try encoder.encode(document)
+        try persistenceService.writeAtomic(manifest, to: url.appendingPathComponent("manifest.json", isDirectory: false))
+    }
+
+    static func loadProject(
+        from url: URL,
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) throws -> SwiftDocumentRuntime {
+        let runtime = SwiftDocumentRuntime(
+            width: 1,
+            height: 1,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
+        let legacy = try PaintDocumentSession.loadProject(
+            from: url,
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
+        runtime.importLegacySession(legacy)
+        return runtime
+    }
+
+    func setPaperStyle(_ style: CanvasPaperStyle) {
+        let before = store.snapshot
+        store.snapshot.paperStyle = style
+        recordMutation(before: before, timelapseEvent: .setPaperStyle(style))
+    }
+
+    func newCanvas(width: Int, height: Int) {
+        let newRuntime = SwiftDocumentRuntime(
+            width: width,
+            height: height,
+            fileClient: services.fileIO,
+            dateClient: services.clock,
+            uuidClient: services.ids
+        )
+        store.restore(newRuntime.store.snapshot)
+        undoStack.removeAll(keepingCapacity: true)
+        redoStack.removeAll(keepingCapacity: true)
+        currentStroke = nil
+        currentBlurStroke = nil
+        captureDirtyUpdate()
+    }
+
+    func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
+        guard let image = renderedCompositeImage(paperStyle: paperStyle) else { return nil }
+        return DocumentImageCodec.pngData(from: image)
+    }
+
+    func timelapseCapture() -> TimelapseCapture? {
+        let preview = makeTimelapseThumbnail().flatMap { DocumentImageCodec.jpegData(from: $0) }
+        if store.snapshot.timelapseUsesOperationPersistence, !store.snapshot.timelapseEvents.isEmpty {
+            return TimelapseCapture(
+                canvasSize: canvasSize,
+                paperStyle: store.snapshot.paperStyle,
+                previewImageData: preview,
+                source: .operations(store.snapshot.timelapseEvents),
+                framesPerSecond: 24
+            )
+        }
+        guard store.snapshot.timelapseFrames.count >= 2 else { return nil }
+        return TimelapseCapture(
+            canvasSize: canvasSize,
+            paperStyle: store.snapshot.paperStyle,
+            previewImageData: preview,
+            source: .frames(store.snapshot.timelapseFrames),
+            framesPerSecond: 24
+        )
+    }
+
+    func timelapseCompositeImage() -> CGImage? {
+        renderedCompositeImage(paperStyle: store.snapshot.paperStyle)
+    }
+
+    func replayTimelapseOperation(_ operation: TimelapseOperation, folderIDMap: inout [DocumentFolderID: Int]) {
+        switch operation {
+        case let .stroke(layerIndex, brush, samples):
+            _ = setActiveLayer(index: layerIndex.rawValue)
+            _ = applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex.rawValue)
+        case let .blurStroke(layerIndex, brush, samples):
+            _ = blur(samples: samples, brush: brush, layerIndex: layerIndex.rawValue, captureTimelapse: false)
+            endBlurStroke()
+        case let .fill(layerIndex, brush, sample):
+            _ = setActiveLayer(index: layerIndex.rawValue)
+            _ = fill(sample: sample, brush: brush)
+        case .undo:
+            _ = undo()
+        case .redo:
+            _ = redo()
+        case let .addLayer(name):
+            _ = addLayer(name: name)
+        case let .duplicateLayer(index, name):
+            _ = duplicateLayer(index: index.rawValue, name: name)
+        case let .deleteLayer(index):
+            _ = deleteLayer(index: index.rawValue)
+        case let .moveLayer(index, destinationIndex):
+            _ = moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
+        case let .createFolder(folderID, name, anchorLayerIndex):
+            let resolved = (try? createFolder(name: name, layerIndex: anchorLayerIndex?.rawValue ?? -1).get()) ?? -1
+            folderIDMap[folderID] = resolved
+        case let .deleteFolder(folderID):
+            if let resolved = folderIDMap[folderID] { _ = deleteFolder(folderID: resolved) }
+        case let .setFolderVisibility(folderID, isVisible):
+            if let resolved = folderIDMap[folderID] { _ = setFolderVisibility(folderID: resolved, isVisible: isVisible) }
+        case let .assignLayerToFolder(index, folderID):
+            let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
+            _ = assignLayerToFolder(index: index.rawValue, folderID: resolvedFolderID)
+        case let .setLayerVisibility(index, isVisible):
+            _ = setLayerVisibility(index: index.rawValue, isVisible: isVisible)
+        case let .setLayerLocked(index, isLocked):
+            _ = setLayerLocked(index: index.rawValue, isLocked: isLocked)
+        case let .setLayerAlphaLocked(index, isAlphaLocked):
+            _ = setLayerAlphaLocked(index: index.rawValue, isAlphaLocked: isAlphaLocked)
+        case let .setLayerClipped(index, isClipped):
+            _ = setLayerClipped(index: index.rawValue, isClipped: isClipped)
+        case let .setLayerOpacity(index, opacity):
+            _ = setLayerOpacity(index: index.rawValue, opacity: opacity)
+        case let .setLayerBlendMode(index, blendMode):
+            _ = setLayerBlendMode(index: index.rawValue, blendMode: blendMode)
+        case let .replaceLayerPixels(index, data):
+            _ = replaceLayerPixelsUnchecked(index: index.rawValue, data: data, timelapseEvent: nil)
+        case let .replaceLayerMask(index, data):
+            _ = replaceLayerMask(index: index.rawValue, data: data)
+        case let .clearLayerMask(index):
+            _ = clearLayerMask(index: index.rawValue)
+        case let .applyLayerMask(index):
+            _ = applyLayerMask(index: index.rawValue)
+        case let .clearLayer(index):
+            _ = clearLayer(index: index.rawValue)
+        case let .setPaperStyle(style):
+            setPaperStyle(style)
+        }
+    }
+
+    private var canvasSize: CGSize {
+        CGSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+    }
+
+    private var rgbaByteCount: Int {
+        store.snapshot.canvasWidth * store.snapshot.canvasHeight * 4
+    }
+
+    private func validateLayer(_ index: Int) -> DocumentMutationFailure? {
+        store.snapshot.layers.indices.contains(index) ? nil : .invalidLayerIndex(index)
+    }
+
+    private func validateEditableLayer(_ index: Int) -> DocumentMutationFailure? {
+        if let failure = validateLayer(index) { return failure }
+        return store.snapshot.layers[index].locked ? .layerLocked(index) : nil
+    }
+
+    private func replaceLayerPixelsUnchecked(index: Int, data: Data, timelapseEvent: TimelapseOperation?) -> DocumentMutationResult {
+        guard data.count == rgbaByteCount else {
+            return .failure(.bridgeMutationFailed("replaceLayerPixels"))
+        }
+        let before = store.snapshot
+        let adjusted = store.snapshot.layers[index].alphaLocked
+            ? PaintDocumentSession.pixelDataByPreservingExistingAlpha(source: data, existing: store.snapshot.layers[index].pixelData)
+            : data
+        store.snapshot.layers[index].pixelData = adjusted
+        store.snapshot.layers[index].textLayer = nil
+        invalidateThumbnail(for: index)
+        recordMutation(before: before, timelapseEvent: timelapseEvent)
+        return .success(())
+    }
+
+    private func recordMutation(
+        before: SwiftDocumentStoreSnapshot,
+        timelapseEvent: TimelapseOperation?,
+        dirtyRect: LayerPixelRect? = nil
+    ) {
+        undoStack.append(before)
+        redoStack.removeAll(keepingCapacity: true)
+        if let timelapseEvent {
+            store.snapshot.timelapseUsesOperationPersistence = true
+            store.snapshot.timelapseEvents.append(timelapseEvent)
+        }
+        store.snapshot.revision += 1
+        captureDirtyUpdate(rect: dirtyRect)
+    }
+
+    private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {
+        let composite = compositePixelDataForSnapshot(store.snapshot)
+        let rect = rect ?? LayerPixelRect(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let pixelData = crop(pixelData: composite, width: store.snapshot.canvasWidth, rect: rect)
+        pendingDirtyUpdate = IncrementalLayerUpdate(
+            layerIndex: -1,
+            originX: rect.originX,
+            originY: rect.originY,
+            width: rect.width,
+            height: rect.height,
+            pixelData: pixelData
+        )
+    }
+
+    private func compositePixelDataForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> Data {
+        let metalSnapshot = MetalDocumentSnapshot(
+            width: snapshot.canvasWidth,
+            height: snapshot.canvasHeight,
+            revision: snapshot.revision,
+            compositePixelData: Data(),
+            layers: snapshot.layers.enumerated().map { index, layer in
+                MetalLayerSnapshot(
+                    index: index,
+                    opacity: Float(layer.opacity),
+                    visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
+                    isClipped: layer.clipped,
+                    blendMode: layer.blendMode,
+                    thumbnailData: nil,
+                    pixelData: layer.pixelData
+                )
+            }
+        )
+        if let gpuComposite = PrimoMetalDocumentProcessingClient.shared.compositedPixelData(
+            snapshot: metalSnapshot,
+            activeLayerIndex: nil,
+            adjustedActiveLayerPixels: nil,
+            dirtyRect: nil
+        ) {
+            return gpuComposite
+        }
+        var composite = Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
+        var clipMask = [CGFloat](repeating: 0, count: snapshot.canvasWidth * snapshot.canvasHeight)
+        let folderVisibility = Dictionary(uniqueKeysWithValues: snapshot.folders.map { ($0.id, $0.visible) })
+        composite.withUnsafeMutableBytes { destinationBytes in
+            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for layer in snapshot.layers.enumerated().map({ (index: $0.offset, layer: $0.element) })
+                .filter({ $0.layer.visible && ($0.layer.folderID == nil || (folderVisibility[$0.layer.folderID!] ?? true)) }) {
+                layer.layer.pixelData.withUnsafeBytes { sourceBytes in
+                    guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                    for pixelIndex in 0..<(snapshot.canvasWidth * snapshot.canvasHeight) {
+                        let offset = pixelIndex * 4
+                        let baseAlpha = (CGFloat(source[offset + 3]) / 255.0) * CGFloat(layer.layer.opacity)
+                        let effectiveOpacity = layer.layer.clipped
+                            ? CGFloat(layer.layer.opacity) * clipMask[pixelIndex]
+                            : CGFloat(layer.layer.opacity)
+                        if !layer.layer.clipped {
+                            clipMask[pixelIndex] = baseAlpha
+                        }
+                        DocumentPreviewComposite.blendPreviewPixel(
+                            destination: destination + offset,
+                            source: source + offset,
+                            opacity: effectiveOpacity,
+                            blendMode: layer.layer.blendMode
+                        )
+                    }
+                }
+            }
+        }
+        return composite
+    }
+
+    private func crop(pixelData: Data, width: Int, rect: LayerPixelRect) -> Data {
+        guard rect.width > 0, rect.height > 0 else { return Data() }
+        var output = Data(count: rect.width * rect.height * 4)
+        output.withUnsafeMutableBytes { destinationBytes in
+            pixelData.withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<rect.height {
+                    let srcOffset = ((rect.originY + row) * width + rect.originX) * 4
+                    let dstOffset = row * rect.width * 4
+                    memcpy(destination + dstOffset, source + srcOffset, rect.width * 4)
+                }
+            }
+        }
+        return output
+    }
+
+    private func makeRenderSnapshot() -> MetalDocumentSnapshot? {
+        MetalDocumentSnapshot(
+            width: store.snapshot.canvasWidth,
+            height: store.snapshot.canvasHeight,
+            revision: store.snapshot.revision,
+            compositePixelData: compositePixelData(),
+            layers: store.snapshot.layers.enumerated().map { index, layer in
+                MetalLayerSnapshot(
+                    index: index,
+                    opacity: Float(layer.opacity),
+                    visible: layer.visible && (layer.folderID == nil || (store.snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
+                    isClipped: layer.clipped,
+                    blendMode: layer.blendMode,
+                    thumbnailData: cachedLayerThumbnailData(index: index),
+                    pixelData: layer.pixelData
+                )
+            }
+        )
+    }
+
+    private func buildLayerRows() -> [LayerRowModel] {
+        store.snapshot.layers.enumerated().map { index, layer in
+            LayerRowModel(
+                index: index,
+                name: layer.name,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                isLocked: layer.locked,
+                isAlphaLocked: layer.alphaLocked,
+                isClipped: layer.clipped,
+                blendMode: layer.blendMode,
+                folderID: layer.folderID,
+                hasMask: layer.maskData != nil,
+                isTextLayer: layer.textLayer != nil,
+                textLayer: layer.textLayer
+            )
+        }.reversed()
+    }
+
+    private func buildSidebarRows() -> [LayerSidebarRowModel] {
+        let layerRows = buildLayerRows()
+        let layerRowsByIndex = Dictionary(uniqueKeysWithValues: layerRows.map { ($0.index, $0) })
+        let orderedFolders = store.snapshot.folders.map { folder in
+            LayerFolderModel(
+                id: folder.id,
+                name: folder.name,
+                visible: folder.visible,
+                isExpanded: folder.expanded,
+                anchorLayerIndex: folder.anchorLayerIndex,
+                childLayerIndices: store.snapshot.layers.enumerated().compactMap { index, layer in
+                    layer.folderID == folder.id ? index : nil
+                }.sorted(by: >)
+            )
+        }
+        var emittedFolderIDs = Set<Int>()
+        var rows: [LayerSidebarRowModel] = []
+        for layer in layerRows {
+            for folder in orderedFolders where folder.anchorLayerIndex == layer.index && !emittedFolderIDs.contains(folder.id) {
+                rows.append(.folder(folder))
+                emittedFolderIDs.insert(folder.id)
+                if folder.isExpanded {
+                    for childIndex in folder.childLayerIndices {
+                        if let child = layerRowsByIndex[childIndex] {
+                            rows.append(.layer(child, depth: 1))
+                        }
+                    }
+                }
+            }
+            if let folderID = layer.folderID {
+                if !orderedFolders.contains(where: { $0.id == folderID }) {
+                    rows.append(.layer(layer, depth: 0))
+                }
+            } else {
+                rows.append(.layer(layer, depth: 0))
+            }
+        }
+        for folder in orderedFolders where !emittedFolderIDs.contains(folder.id) {
+            rows.append(.folder(folder))
+        }
+        return rows
+    }
+
+    private func cachedLayerThumbnailData(index: Int) -> Data? {
+        if let cached = store.snapshot.thumbnailCache[index] {
+            return cached
+        }
+        guard let image = cgImage(from: store.snapshot.layers[index].pixelData, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight) else {
+            return nil
+        }
+        let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 96)
+        guard let thumbnail = DocumentImageCodec.scaledImage(image, to: targetSize),
+              let data = DocumentImageCodec.pngData(from: thumbnail) else {
+            return nil
+        }
+        store.snapshot.thumbnailCache[index] = data
+        return data
+    }
+
+    private func invalidateThumbnail(for index: Int) {
+        store.snapshot.thumbnailCache[index] = nil
+    }
+
+    private func invalidateAllThumbnails() {
+        store.snapshot.thumbnailCache.removeAll(keepingCapacity: true)
+    }
+
+    private func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
+        guard canvasSize.width > 0, canvasSize.height > 0 else {
+            return CGSize(width: maxDimension, height: maxDimension)
+        }
+        let scale = min(maxDimension / canvasSize.width, maxDimension / canvasSize.height, 1.0)
+        return CGSize(width: max(2, Int((canvasSize.width * scale).rounded())), height: max(2, Int((canvasSize.height * scale).rounded())))
+    }
+
+    private func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> CGImage? {
+        guard let base = cgImage(from: compositePixelData(), width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight) else {
+            return nil
+        }
+        return DocumentImageCodec.compositedImage(base: base, canvasSize: canvasSize, paperStyle: paperStyle)
+    }
+
+    private func makeTimelapseThumbnail() -> CGImage? {
+        guard let source = renderedCompositeImage(paperStyle: store.snapshot.paperStyle) else { return nil }
+        let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 512)
+        return DocumentImageCodec.scaledImage(source, to: targetSize)
+    }
+
+    private func captureTimelapseFrame() {
+        guard let source = makeTimelapseThumbnail(), let jpegData = DocumentImageCodec.jpegData(from: source) else { return }
+        let frameURL = services.timelapse.makeFrameURL(in: services.timelapse.makeDirectoryURL(), frameID: store.snapshot.timelapseFrames.count)
+        do {
+            try services.timelapse.persistFrameData(jpegData, to: frameURL)
+            store.snapshot.timelapseFrames.append(TimelapseFrame(imageURL: frameURL, size: CGSize(width: source.width, height: source.height)))
+            store.snapshot.timelapseUsesOperationPersistence = false
+        } catch {
+            Self.logger.error("Failed to persist timelapse frame: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func cgImage(from pixelData: Data, width: Int, height: Int) -> CGImage? {
+        guard pixelData.count == width * height * 4 else { return nil }
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
+
+    private func blurPixelData(layerIndex: Int, samples: [StylusSample], brush: BrushRuntimeSettings) -> Data? {
+        let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let original = [UInt8](store.snapshot.layers[layerIndex].pixelData)
+        guard let blurred = services.blur.boxBlurredPixels(from: original, size: size, radius: max(brush.radius * 0.75, 3.0)) else {
+            return nil
+        }
+        let blended = services.blur.blendBlurredPixels(
+            original: original,
+            blurred: blurred,
+            size: size,
+            samples: samples,
+            brush: brush
+        )
+        return Data(blended)
+    }
+
+    private func fillPixelData(layerIndex: Int, sample: StylusSample, brush: BrushRuntimeSettings) -> Data? {
+        let width = store.snapshot.canvasWidth
+        let height = store.snapshot.canvasHeight
+        let x = Int(sample.point.x.rounded())
+        let y = Int(sample.point.y.rounded())
+        guard x >= 0, x < width, y >= 0, y < height else { return store.snapshot.layers[layerIndex].pixelData }
+        var output = [UInt8](store.snapshot.layers[layerIndex].pixelData)
+        let original = output
+        let startOffset = ((y * width) + x) * 4
+        let seed = (r: original[startOffset], g: original[startOffset + 1], b: original[startOffset + 2], a: original[startOffset + 3])
+        let target = (r: brush.red, g: brush.green, b: brush.blue, a: UInt8(max(0, min(255, Int((brush.opacity * 255).rounded())))))
+        if seed == target { return Data(output) }
+
+        var visited = [UInt8](repeating: 0, count: width * height)
+        var queue: [(Int, Int)] = [(x, y)]
+        var cursor = 0
+        visited[y * width + x] = 1
+
+        while cursor < queue.count {
+            let (currentX, currentY) = queue[cursor]
+            cursor += 1
+            let offset = ((currentY * width) + currentX) * 4
+            if !matchesFillSeed(seed: seed, pixelOffset: offset, pixels: original, brush: brush) {
+                continue
+            }
+            output[offset] = target.r
+            output[offset + 1] = target.g
+            output[offset + 2] = target.b
+            output[offset + 3] = target.a
+
+            let neighbors = [(currentX - 1, currentY), (currentX + 1, currentY), (currentX, currentY - 1), (currentX, currentY + 1)]
+            for (neighborX, neighborY) in neighbors where neighborX >= 0 && neighborX < width && neighborY >= 0 && neighborY < height {
+                let neighborIndex = neighborY * width + neighborX
+                guard visited[neighborIndex] == 0 else { continue }
+                visited[neighborIndex] = 1
+                queue.append((neighborX, neighborY))
+            }
+        }
+
+        if brush.fillExpansion > 0 {
+            for _ in 0..<brush.fillExpansion {
+                let snapshot = output
+                for pixelY in 1..<(height - 1) {
+                    for pixelX in 1..<(width - 1) {
+                        let offset = ((pixelY * width) + pixelX) * 4
+                        if snapshot[offset] == target.r && snapshot[offset + 1] == target.g && snapshot[offset + 2] == target.b && snapshot[offset + 3] == target.a {
+                            continue
+                        }
+                        let neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+                        if neighbors.contains(where: { delta in
+                            let neighborOffset = (((pixelY + delta.1) * width) + (pixelX + delta.0)) * 4
+                            return snapshot[neighborOffset] == target.r &&
+                                snapshot[neighborOffset + 1] == target.g &&
+                                snapshot[neighborOffset + 2] == target.b &&
+                                snapshot[neighborOffset + 3] == target.a
+                        }) {
+                            output[offset] = target.r
+                            output[offset + 1] = target.g
+                            output[offset + 2] = target.b
+                            output[offset + 3] = target.a
+                        }
+                    }
+                }
+            }
+        }
+
+        let result = Data(output)
+        return store.snapshot.layers[layerIndex].alphaLocked
+            ? PaintDocumentSession.pixelDataByPreservingExistingAlpha(source: result, existing: store.snapshot.layers[layerIndex].pixelData)
+            : result
+    }
+
+    private func matchesFillSeed(seed: (r: UInt8, g: UInt8, b: UInt8, a: UInt8), pixelOffset: Int, pixels: [UInt8], brush: BrushRuntimeSettings) -> Bool {
+        switch brush.fillThresholdMode {
+        case .opacity:
+            let alphaDistance = abs(Int(seed.a) - Int(pixels[pixelOffset + 3]))
+            let tolerance = Int((max(0, min(1, brush.fillOpacityTolerance)) * 255.0).rounded())
+            return alphaDistance <= tolerance
+        case .color:
+            let dr = Double(Int(seed.r) - Int(pixels[pixelOffset]))
+            let dg = Double(Int(seed.g) - Int(pixels[pixelOffset + 1]))
+            let db = Double(Int(seed.b) - Int(pixels[pixelOffset + 2]))
+            let distance = sqrt((dr * dr) + (dg * dg) + (db * db)) / 441.67295593
+            return distance <= max(0, min(1, brush.fillColorTolerance))
+        }
+    }
+
+    private func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
+        let upper = store.snapshot.layers[upperIndex]
+        let lower = store.snapshot.layers[lowerIndex]
+        var maskedUpper = upper.pixelData
+        if let mask = upper.maskData, mask.count * 4 == upper.pixelData.count {
+            maskedUpper.withUnsafeMutableBytes { upperBytes in
+                mask.withUnsafeBytes { maskBytes in
+                    guard let upperBase = upperBytes.bindMemory(to: UInt8.self).baseAddress,
+                          let maskBase = maskBytes.bindMemory(to: UInt8.self).baseAddress
+                    else { return }
+                    for pixelIndex in 0..<mask.count {
+                        let alphaOffset = pixelIndex * 4 + 3
+                        upperBase[alphaOffset] = UInt8((Int(upperBase[alphaOffset]) * Int(maskBase[pixelIndex])) / 255)
+                    }
+                }
+            }
+        }
+
+        var output = lower.pixelData
+        let outputCount = output.count
+        output.withUnsafeMutableBytes { outputBytes in
+            maskedUpper.withUnsafeBytes { upperBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = upperBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: outputCount, by: 4) {
+                    DocumentPreviewComposite.blendPreviewPixel(
+                        destination: dst + offset,
+                        source: src + offset,
+                        opacity: CGFloat(upper.opacity),
+                        blendMode: upper.blendMode
+                    )
+                }
+            }
+        }
+
+        return lower.alphaLocked
+            ? PaintDocumentSession.pixelDataByPreservingExistingAlpha(source: output, existing: lower.pixelData)
+            : output
+    }
+
+    private func remapFoldersAfterInsertion(at insertedIndex: Int) {
+        for index in store.snapshot.folders.indices {
+            if let anchor = store.snapshot.folders[index].anchorLayerIndex, anchor >= insertedIndex {
+                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
+            }
+        }
+    }
+
+    private func remapFoldersAfterDeletion(of deletedIndex: Int) {
+        for index in store.snapshot.folders.indices {
+            if let anchor = store.snapshot.folders[index].anchorLayerIndex {
+                if anchor == deletedIndex {
+                    store.snapshot.folders[index].anchorLayerIndex = nil
+                } else if anchor > deletedIndex {
+                    store.snapshot.folders[index].anchorLayerIndex = anchor - 1
+                }
+            }
+        }
+    }
+
+    private func remapFoldersAfterMove(from sourceIndex: Int, to destinationIndex: Int) {
+        for index in store.snapshot.folders.indices {
+            guard let anchor = store.snapshot.folders[index].anchorLayerIndex else { continue }
+            if anchor == sourceIndex {
+                store.snapshot.folders[index].anchorLayerIndex = destinationIndex
+            } else if sourceIndex < destinationIndex, anchor > sourceIndex, anchor <= destinationIndex {
+                store.snapshot.folders[index].anchorLayerIndex = anchor - 1
+            } else if sourceIndex > destinationIndex, anchor >= destinationIndex, anchor < sourceIndex {
+                store.snapshot.folders[index].anchorLayerIndex = anchor + 1
+            }
+        }
+    }
+
+    private func populateLegacySession(_ session: PaintDocumentSession) throws {
+        while session.documentGateway.queries.layerInfos().count < store.snapshot.layers.count {
+            _ = session.addLayer(name: "Layer \(session.documentGateway.queries.layerInfos().count + 1)")
+        }
+        for index in store.snapshot.layers.indices {
+            let layer = store.snapshot.layers[index]
+            _ = session.replaceLayerPixels(index: index, data: layer.pixelData, preservesTextLayerMetadata: layer.textLayer != nil)
+            if let mask = layer.maskData {
+                _ = session.replaceLayerMask(index: index, maskData: mask)
+            } else {
+                _ = session.clearLayerMask(index: index)
+            }
+            _ = session.setLayerName(index: index, name: layer.name)
+            _ = session.setLayerVisibility(index: index, isVisible: layer.visible)
+            _ = session.setLayerLocked(index: index, isLocked: layer.locked)
+            _ = session.setLayerAlphaLocked(index: index, isAlphaLocked: layer.alphaLocked)
+            _ = session.setLayerClipped(index: index, isClipped: layer.clipped)
+            _ = session.setLayerOpacity(index: index, opacity: layer.opacity)
+            _ = session.setLayerBlendMode(index: index, blendMode: layer.blendMode)
+            if let textLayer = layer.textLayer {
+                _ = session.setTextLayer(index: index, textLayer: textLayer)
+            }
+        }
+        var folderIDMap: [Int: Int] = [:]
+        for folder in store.snapshot.folders {
+            let created = try session.createFolder(name: folder.name, layerIndex: folder.anchorLayerIndex ?? -1).get()
+            folderIDMap[folder.id] = created
+            _ = session.setFolderVisibility(folderID: created, isVisible: folder.visible)
+            _ = session.setFolderExpanded(folderID: created, isExpanded: folder.expanded)
+            _ = session.setFolderName(folderID: created, name: folder.name)
+        }
+        for index in store.snapshot.layers.indices {
+            if let folderID = store.snapshot.layers[index].folderID, let mapped = folderIDMap[folderID] {
+                _ = session.assignLayer(index: index, toFolder: mapped)
+            }
+        }
+        _ = session.setActiveLayer(index: store.snapshot.activeLayerIndex)
+        session.setPaperStyle(store.snapshot.paperStyle)
+    }
+
+    private func importLegacySession(_ session: PaintDocumentSession) {
+        let infos = session.documentGateway.queries.layerInfos()
+        let folders = session.documentGateway.queries.folderInfos()
+        let folderRecords = folders.map {
+            SwiftDocumentFolderRecord(
+                id: Int($0.folderID),
+                name: $0.name,
+                visible: $0.visible,
+                expanded: $0.expanded,
+                anchorLayerIndex: $0.anchorLayerIndex >= 0 ? Int($0.anchorLayerIndex) : nil
+            )
+        }
+        let layerRecords = infos.enumerated().map { index, info in
+            SwiftDocumentLayerRecord(
+                name: info.name,
+                visible: info.visible,
+                locked: info.locked,
+                alphaLocked: info.alphaLocked,
+                clipped: info.clipped,
+                opacity: info.opacity,
+                blendMode: LayerBlendMode(rawValue: info.blendMode) ?? .normal,
+                folderID: info.folderID >= 0 ? Int(info.folderID) : nil,
+                textLayer: session.storedTextLayer(at: index),
+                pixelData: session.pixelDataForLayer(index: index),
+                maskData: session.documentGateway.queries.layerMaskDataForLayer(index: index)
+            )
+        }
+        let nextFolderID = (folderRecords.map(\.id).max() ?? 0) + 1
+        store.restore(
+            SwiftDocumentStoreSnapshot(
+                canvasWidth: Int(session.documentGateway.queries.canvasSize.width),
+                canvasHeight: Int(session.documentGateway.queries.canvasSize.height),
+                activeLayerIndex: session.documentGateway.queries.activeLayerIndex(),
+                paperStyle: session.currentPaperStyle,
+                revision: 0,
+                nextFolderID: nextFolderID,
+                layers: layerRecords,
+                folders: folderRecords,
+                thumbnailCache: [:],
+                timelapseFrames: session.timelapseFramesSnapshot,
+                timelapseEvents: session.timelapseEventsSnapshot,
+                timelapseUsesOperationPersistence: session.timelapseUsesOperationPersistence
+            )
+        )
+        undoStack.removeAll(keepingCapacity: true)
+        redoStack.removeAll(keepingCapacity: true)
+        captureDirtyUpdate()
+    }
+}

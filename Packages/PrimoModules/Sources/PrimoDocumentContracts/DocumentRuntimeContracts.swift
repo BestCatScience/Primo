@@ -399,6 +399,22 @@ public struct TimelapseFrame: Equatable, Sendable {
     }
 }
 
+public struct LayerPixelRect: Equatable, Sendable {
+    public let originX: Int
+    public let originY: Int
+    public let width: Int
+    public let height: Int
+
+    public init(originX: Int, originY: Int, width: Int, height: Int) {
+        self.originX = originX
+        self.originY = originY
+        self.width = width
+        self.height = height
+    }
+
+    public var isEmpty: Bool { width <= 0 || height <= 0 }
+}
+
 public enum TimelapseOperation: Equatable, Sendable {
     case stroke(layerIndex: DocumentLayerIndex, brush: BrushRuntimeSettings, samples: [StylusSample])
     case blurStroke(layerIndex: DocumentLayerIndex, brush: BrushRuntimeSettings, samples: [StylusSample])
@@ -486,6 +502,7 @@ public struct DocumentMutationGateway: Sendable {
     public var setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
     public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
     public var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    public var replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
     public var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
     public var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
     public var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
@@ -502,6 +519,7 @@ public struct DocumentMutationGateway: Sendable {
         setLayerVisibility: @escaping @Sendable (Int, Bool) -> DocumentMutationResult,
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult,
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
+        replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult,
         replaceLayerMask: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
         clearLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult,
         applyLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult,
@@ -517,6 +535,7 @@ public struct DocumentMutationGateway: Sendable {
         self.setLayerVisibility = setLayerVisibility
         self.revealLayerForEditing = revealLayerForEditing
         self.replaceLayerPixels = replaceLayerPixels
+        self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
         self.replaceLayerMask = replaceLayerMask
         self.clearLayerMask = clearLayerMask
         self.applyLayerMask = applyLayerMask

@@ -190,6 +190,14 @@ struct MetalStrokeExecutionRequest: Sendable {
 struct MetalStrokeExecutionResult: Sendable {
     let pixelData: Data
     let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    let rectPixelData: Data?
+}
+
+private struct MetalStrokeDirtyRect: Equatable {
+    let originX: Int
+    let originY: Int
+    let width: Int
+    let height: Int
 }
 
 private struct MetalBufferPair {
@@ -213,7 +221,10 @@ final class MetalDocumentProcessingClient {
         let baseSnapshotRevision: Int?
         let activeLayerIndex: Int?
         let brush: BrushRuntimeSettings
-        let samples: [MetalStrokeSampleDescriptor]
+        let previewSamples: [MetalStrokeSampleDescriptor]
+        let committableSamples: [MetalStrokeSampleDescriptor]
+        let dirtyRect: MetalStrokeDirtyRect?
+        let rectPixelData: Data?
         var buffers: MetalBufferPair
         var lastOutputValid: Bool
     }
@@ -437,16 +448,8 @@ final class MetalDocumentProcessingClient {
         let brush = request.brush
         guard Self.supportsStrokeRasterization(brush) else { return nil }
         let normalizedSamples = AppFeature.normalizedCommittedStrokeSamples(request.samples, brush: brush)
-        guard !normalizedSamples.isEmpty else { return nil }
-        let progressTable = AppFeature.strokeProgressTable(normalizedSamples)
-        let descriptors = zip(normalizedSamples, progressTable).map { sample, progress in
-            MetalStrokeSampleDescriptor(
-                x: Float(sample.point.x),
-                y: Float(sample.point.y),
-                pressure: Float(sample.pressure),
-                progress: Float(progress)
-            )
-        }
+        let descriptors = Self.strokeSampleDescriptors(samples: normalizedSamples)
+        guard !descriptors.isEmpty else { return nil }
 
         guard
             canvasWidth > 0,
@@ -473,9 +476,21 @@ final class MetalDocumentProcessingClient {
             return nil
         }
         if executionContext.shouldAdoptCachedOutput {
+            let cachedDirtyRect = executionContext.cachedDirtyRect
+            let resolvedDirtyRect = fullDirtyRect
+                ?? cachedDirtyRect.map { (originX: $0.originX, originY: $0.originY, width: $0.width, height: $0.height) }
+                ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+            let logMessage = request.mode == .commit
+                ? "commit adopted cached output"
+                : "interactive preview reused"
+            AppDiagnostics.debug(
+                Self.logger,
+                "\(logMessage); dirty rect: \(Self.describe(cachedDirtyRect))"
+            )
             return MetalStrokeExecutionResult(
                 pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
-                dirtyRect: fullDirtyRect ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+                dirtyRect: resolvedDirtyRect,
+                rectPixelData: executionContext.cachedRectPixelData
             )
         }
 
@@ -497,7 +512,8 @@ final class MetalDocumentProcessingClient {
         else {
             return MetalStrokeExecutionResult(
                 pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
-                dirtyRect: fullDirtyRect ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+                dirtyRect: fullDirtyRect ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight),
+                rectPixelData: nil
             )
         }
         guard let primitiveBinning = Self.makeStrokePrimitiveBinning(
@@ -586,19 +602,40 @@ final class MetalDocumentProcessingClient {
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
+        let cachedDirtyRect = MetalStrokeDirtyRect(
+            originX: dirtyRect.originX,
+            originY: dirtyRect.originY,
+            width: dirtyRect.width,
+            height: dirtyRect.height
+        )
+        let rectPixelData = bytes(
+            from: executionContext.buffers.current,
+            dirtyRect: cachedDirtyRect,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
         cachedStrokeExecution = StrokeExecutionCache(
             width: canvasWidth,
             height: canvasHeight,
             baseSnapshotRevision: request.snapshotRevision,
             activeLayerIndex: request.activeLayerIndex,
             brush: brush,
-            samples: descriptors,
+            previewSamples: descriptors,
+            committableSamples: descriptors,
+            dirtyRect: cachedDirtyRect,
+            rectPixelData: rectPixelData,
             buffers: executionContext.buffers,
             lastOutputValid: true
         )
+        let logMessage = request.mode == .commit ? "commit rerasterized" : "interactive preview rerasterized"
+        AppDiagnostics.debug(
+            Self.logger,
+            "\(logMessage); dirty rect: \(Self.describe(cachedDirtyRect))"
+        )
         return MetalStrokeExecutionResult(
             pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
-            dirtyRect: dirtyRect
+            dirtyRect: dirtyRect,
+            rectPixelData: rectPixelData
         )
     }
 
@@ -1125,6 +1162,8 @@ final class MetalDocumentProcessingClient {
         let buffers: MetalBufferPair
         let sampleRange: Range<Int>
         let shouldAdoptCachedOutput: Bool
+        let cachedDirtyRect: MetalStrokeDirtyRect?
+        let cachedRectPixelData: Data?
     }
 
     private func prepareStrokeExecutionContext(
@@ -1139,21 +1178,32 @@ final class MetalDocumentProcessingClient {
         if let cachedStrokeExecution,
            cachedStrokeExecution.width == canvasWidth,
            cachedStrokeExecution.height == canvasHeight,
-           cachedStrokeExecution.baseSnapshotRevision == request.snapshotRevision,
-           cachedStrokeExecution.activeLayerIndex == request.activeLayerIndex,
-           cachedStrokeExecution.brush == request.brush,
-           cachedStrokeExecution.lastOutputValid {
+            cachedStrokeExecution.baseSnapshotRevision == request.snapshotRevision,
+            cachedStrokeExecution.activeLayerIndex == request.activeLayerIndex,
+            cachedStrokeExecution.brush == request.brush,
+            cachedStrokeExecution.lastOutputValid {
             switch request.mode {
             case .interactive:
+                if descriptors == cachedStrokeExecution.previewSamples {
+                    return StrokeExecutionContext(
+                        buffers: cachedStrokeExecution.buffers,
+                        sampleRange: descriptors.count..<descriptors.count,
+                        shouldAdoptCachedOutput: true,
+                        cachedDirtyRect: cachedStrokeExecution.dirtyRect,
+                        cachedRectPixelData: cachedStrokeExecution.rectPixelData
+                    )
+                }
                 break
             case .previewAdopt:
                 break
             case .commit:
-                if descriptors == cachedStrokeExecution.samples {
+                if descriptors == cachedStrokeExecution.committableSamples {
                     return StrokeExecutionContext(
                         buffers: cachedStrokeExecution.buffers,
                         sampleRange: descriptors.count..<descriptors.count,
-                        shouldAdoptCachedOutput: true
+                        shouldAdoptCachedOutput: true,
+                        cachedDirtyRect: cachedStrokeExecution.dirtyRect,
+                        cachedRectPixelData: cachedStrokeExecution.rectPixelData
                     )
                 }
             }
@@ -1167,8 +1217,30 @@ final class MetalDocumentProcessingClient {
         return StrokeExecutionContext(
             buffers: MetalBufferPair(current: current, scratch: scratch),
             sampleRange: 0..<descriptors.count,
-            shouldAdoptCachedOutput: false
+            shouldAdoptCachedOutput: false,
+            cachedDirtyRect: nil,
+            cachedRectPixelData: nil
         )
+    }
+
+    private static func strokeSampleDescriptors(
+        samples: [StylusSample]
+    ) -> [MetalStrokeSampleDescriptor] {
+        guard !samples.isEmpty else { return [] }
+        let progressTable = AppFeature.strokeProgressTable(samples)
+        return zip(samples, progressTable).map { sample, progress in
+            MetalStrokeSampleDescriptor(
+                x: Float(sample.point.x),
+                y: Float(sample.point.y),
+                pressure: Float(sample.pressure),
+                progress: Float(progress)
+            )
+        }
+    }
+
+    private static func describe(_ dirtyRect: MetalStrokeDirtyRect?) -> String {
+        guard let dirtyRect else { return "full canvas" }
+        return "\(dirtyRect.originX),\(dirtyRect.originY) \(dirtyRect.width)x\(dirtyRect.height)"
     }
 
     private func bytes(from buffer: MTLBuffer, count: Int) -> [UInt8] {
@@ -1177,6 +1249,30 @@ final class MetalDocumentProcessingClient {
 
     private func bytes(from buffer: MTLBuffer, count: Int) -> Data {
         Data(bytes: buffer.contents(), count: count)
+    }
+
+    private func bytes(
+        from buffer: MTLBuffer,
+        dirtyRect: MetalStrokeDirtyRect,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> Data? {
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth else { return nil }
+        guard dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
+
+        let source = buffer.contents().assumingMemoryBound(to: UInt8.self)
+        var data = Data(count: dirtyRect.width * dirtyRect.height * 4)
+        data.withUnsafeMutableBytes { destinationBytes in
+            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            for row in 0..<dirtyRect.height {
+                let srcOffset = ((dirtyRect.originY + row) * canvasWidth + dirtyRect.originX) * 4
+                let dstOffset = row * dirtyRect.width * 4
+                memcpy(destination + dstOffset, source + srcOffset, dirtyRect.width * 4)
+            }
+        }
+        return data
     }
 
     private func dispatch2D(

@@ -15,6 +15,7 @@ typealias DocumentHistoryGateway = PrimoDocumentContracts.DocumentHistoryGateway
 typealias DocumentPersistenceGateway = PrimoDocumentContracts.DocumentPersistenceGateway
 typealias DocumentExportGateway = PrimoDocumentContracts.DocumentExportGateway
 typealias TextLayerGateway = PrimoDocumentContracts.TextLayerGateway
+typealias LayerPixelRect = PrimoDocumentContracts.LayerPixelRect
 
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
@@ -67,6 +68,7 @@ struct PaintDocumentClient: Sendable {
     var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     var pixelDataForLayer: @Sendable (Int) -> Data
     var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    var replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
     var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
     var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
     var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
@@ -134,6 +136,7 @@ struct PaintDocumentClient: Sendable {
             applySoftwareStroke: runtime.strokeGateway.applySoftwareStroke,
             pixelDataForLayer: runtime.queryGateway.pixelDataForLayer,
             replaceLayerPixels: runtime.mutationGateway.replaceLayerPixels,
+            replaceLayerPixelsInRect: runtime.mutationGateway.replaceLayerPixelsInRect,
             replaceLayerMask: runtime.mutationGateway.replaceLayerMask,
             clearLayerMask: runtime.mutationGateway.clearLayerMask,
             applyLayerMask: runtime.mutationGateway.applyLayerMask,
@@ -168,6 +171,7 @@ struct DocumentLayerClient: Sendable {
     let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
     let clearTextLayerData: @Sendable (Int) -> Void
     let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
     let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
     let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
     let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
@@ -198,6 +202,7 @@ struct DocumentLayerClient: Sendable {
         self.setTextLayer = paintDocumentClient.setTextLayer
         self.clearTextLayerData = paintDocumentClient.clearTextLayerData
         self.replaceLayerPixels = paintDocumentClient.replaceLayerPixels
+        self.replaceLayerPixelsInRect = paintDocumentClient.replaceLayerPixelsInRect
         self.replaceLayerMask = paintDocumentClient.replaceLayerMask
         self.clearLayerMask = paintDocumentClient.clearLayerMask
         self.applyLayerMask = paintDocumentClient.applyLayerMask
@@ -282,6 +287,7 @@ private enum DocumentMutationGatewayKey: DependencyKey {
             setLayerVisibility: paintDocumentClient.setLayerVisibility,
             revealLayerForEditing: paintDocumentClient.revealLayerForEditing,
             replaceLayerPixels: paintDocumentClient.replaceLayerPixels,
+            replaceLayerPixelsInRect: paintDocumentClient.replaceLayerPixelsInRect,
             replaceLayerMask: paintDocumentClient.replaceLayerMask,
             clearLayerMask: paintDocumentClient.clearLayerMask,
             applyLayerMask: paintDocumentClient.applyLayerMask,
