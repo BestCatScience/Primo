@@ -557,7 +557,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
-        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
+        MetalDocumentProcessingClient.shared.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -580,7 +580,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
-        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
+        MetalDocumentProcessingClient.shared.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -748,75 +748,22 @@ extension AppFeature {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> StrokePreviewPlan? {
-        let metalExecutionMode: MetalStrokeExecutionMode = .interactive
-        let adjustedPixels: Data
-        let rasterDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
-        let rectPixelData: Data?
-        if let gpuResult = MetalDocumentProcessingClient.shared.executeStroke(
-            MetalStrokeExecutionRequest(
-                basePixelData: basePixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                samples: samples,
-                brush: brush,
-                mode: metalExecutionMode,
-                snapshotRevision: snapshot.revision,
-                activeLayerIndex: activeLayerIndex
-            )
-        ) {
-            adjustedPixels = preserveAlphaLockedPixels
-                ? Self.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
-                : gpuResult.pixelData
-            rasterDirtyRect = gpuResult.dirtyRect
-            rectPixelData = gpuResult.rectPixelData
-        } else if let fallbackPixels = Self.layerPixelDataByApplyingCommittedStroke(
-            basePixelData: basePixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            samples: samples,
-            brush: brush,
-            mode: metalExecutionMode,
-            snapshotRevision: snapshot.revision,
+        guard let preview = MetalDocumentProcessingClient.shared.makeInteractiveStrokePreview(
+            snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels
-        ) {
-            adjustedPixels = fallbackPixels
-            rasterDirtyRect = nil
-            rectPixelData = nil
-        } else {
-            return nil
-        }
-        let incrementalUpdate: IncrementalLayerUpdate?
-        let previewDirtyRect = rasterDirtyRect ?? Self.strokePreviewDirtyRect(
+            basePixelData: basePixelData,
             samples: samples,
             brush: brush,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height
-        )
-        if Self.shouldUseIncrementalPreviewUpdate(for: brush),
-           let dirtyRect = previewDirtyRect {
-            incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedPixels,
-                dirtyRect: dirtyRect
-            )
-        } else {
-            incrementalUpdate = nil
+            preserveAlphaLockedPixels: preserveAlphaLockedPixels
+        ) else {
+            return nil
         }
         return StrokePreviewPlan(
             baseSnapshot: snapshot,
-            adjustedPixels: adjustedPixels,
-            dirtyRect: previewDirtyRect,
-            rectPixelData: rectPixelData ?? previewDirtyRect.flatMap {
-                Self.pixelData(
-                    in: $0,
-                    from: adjustedPixels,
-                    canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height
-                )
-            },
-            incrementalUpdate: incrementalUpdate
+            adjustedPixels: preview.pixelData,
+            dirtyRect: preview.dirtyRect,
+            rectPixelData: preview.rectPixelData,
+            incrementalUpdate: preview.incrementalUpdate
         )
     }
 
@@ -887,37 +834,6 @@ extension AppFeature {
             state.canvas.activeLayerIndex,
             pixelData: adjustedPixels
         )
-    }
-
-    static func pixelData(
-        in dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
-        from pixelData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> Data? {
-        guard dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
-        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
-        guard dirtyRect.originX + dirtyRect.width <= canvasWidth else { return nil }
-        guard dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
-        guard pixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
-
-        var rectPixelData = Data(count: dirtyRect.width * dirtyRect.height * 4)
-        rectPixelData.withUnsafeMutableBytes { destinationBytes in
-            pixelData.withUnsafeBytes { sourceBytes in
-                guard
-                    let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                else {
-                    return
-                }
-                for row in 0..<dirtyRect.height {
-                    let srcOffset = ((dirtyRect.originY + row) * canvasWidth + dirtyRect.originX) * 4
-                    let dstOffset = row * dirtyRect.width * 4
-                    memcpy(destination + dstOffset, source + srcOffset, dirtyRect.width * 4)
-                }
-            }
-        }
-        return rectPixelData
     }
 
     func activeEditableCanvasLayer(in state: State) -> LayerRowModel? {

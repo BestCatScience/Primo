@@ -245,7 +245,7 @@ extension AppFeature {
         state.canvas.resetStrokePreview()
         state.canvas.clearAdjustmentPreview()
         state.canvas.stagePendingCommittedSnapshot(nil)
-        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
+        MetalDocumentProcessingClient.shared.resetInteractiveStrokeState()
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(

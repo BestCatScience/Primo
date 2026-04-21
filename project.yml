@@ -12,8 +12,6 @@ settings:
   base:
     PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo
     SWIFT_VERSION: 5.10
-    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
-    CLANG_CXX_LIBRARY: libc++
 targets:
   Primo:
     type: application

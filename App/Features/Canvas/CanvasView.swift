@@ -52,7 +52,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     var documentSize: CGSize = .zero
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
-    private let metalCanvasView = MetalCanvasView()
+    private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
+    private let canvasImageRenderer = CanvasImageRenderer.live
     private let selectionOverlayView = UIImageView()
     private let compositePreviewImageView = UIImageView()
     private let shapePreviewImageView = UIImageView()
@@ -128,8 +129,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return SIMD2(Float(point.x), Float(point.y))
         }
 
-        metalCanvasView.isUserInteractionEnabled = false
-        addSubview(metalCanvasView)
+        addSubview(canvasRenderSurfaceView)
 
         selectionOverlayView.isUserInteractionEnabled = false
         selectionOverlayView.contentMode = .scaleToFill
@@ -326,7 +326,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        metalCanvasView.frame = bounds
+        canvasRenderSurfaceView.frame = bounds
         shapePreviewImageView.frame = bounds
         selectionOutlineLayer.frame = bounds
         selectionPreviewLayer.frame = bounds
@@ -374,16 +374,19 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         self.activeTextLayer = activeTextLayer
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
-        metalCanvasView.currentActiveLayerIndex = activeLayerIndex
-        metalCanvasView.updateDocumentSize(documentSize)
-        if previewResetNonce != lastPreviewResetNonce {
-            metalCanvasView.reloadSnapshot(snapshot)
-            lastPreviewResetNonce = previewResetNonce
-        }
-        metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale, paperStyle: paperStyle)
-        if let incrementalUpdate {
-            metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
-        }
+        canvasRenderSurfaceView.render(
+            CanvasRenderSurfaceUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                incrementalUpdate: incrementalUpdate,
+                documentSize: documentSize,
+                viewportOffset: viewportOffset,
+                zoomScale: zoomScale,
+                paperStyle: paperStyle,
+                previewResetNonce: previewResetNonce
+            )
+        )
+        lastPreviewResetNonce = previewResetNonce
         inputHandler.tool = currentTool
         inputHandler.selectionMode = selectionMode
         inputHandler.shapeMode = shapeMode
@@ -543,16 +546,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     }
 
     private func contentRect() -> CGRect {
-        let paperRect = bounds.insetBy(dx: 6, dy: 6)
-        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
-        guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledSize = CGSize(width: fittedRect.width * zoomScale, height: fittedRect.height * zoomScale)
-        return CGRect(
-            x: fittedRect.midX - (scaledSize.width / 2) + viewportOffset.width,
-            y: fittedRect.midY - (scaledSize.height / 2) + viewportOffset.height,
-            width: scaledSize.width,
-            height: scaledSize.height
+        canvasRenderSurfaceView.contentRect(
+            for: bounds.size,
+            documentSize: documentSize,
+            viewportOffset: viewportOffset,
+            zoomScale: zoomScale
         )
     }
 
@@ -748,7 +746,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             {
                 compositePreviewImageView.image = image
                 compositePreviewImageView.frame = contentRect()
-                metalCanvasView.isHidden = true
+                canvasRenderSurfaceView.isHidden = true
                 return
             }
 
@@ -764,13 +762,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             {
                 compositePreviewImageView.image = image
                 compositePreviewImageView.frame = contentRect()
-                metalCanvasView.isHidden = true
+                canvasRenderSurfaceView.isHidden = true
                 return
             }
 
             compositePreviewImageView.image = nil
             compositePreviewImageView.frame = .zero
-            metalCanvasView.isHidden = false
+            canvasRenderSurfaceView.isHidden = false
             return
         }
 
@@ -786,13 +784,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         ) else {
             compositePreviewImageView.image = nil
             compositePreviewImageView.frame = .zero
-            metalCanvasView.isHidden = false
+            canvasRenderSurfaceView.isHidden = false
             return
         }
 
         compositePreviewImageView.image = image
         compositePreviewImageView.frame = contentRect()
-        metalCanvasView.isHidden = true
+        canvasRenderSurfaceView.isHidden = true
     }
 
     private func updateSelectionPreview(_ points: [CGPoint]) {
@@ -1023,7 +1021,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         switch source {
         case .activeLayer:
-            guard let layer = snapshot.layers.first(where: { $0.index == metalCanvasView.currentActiveLayerIndex }) else {
+            guard let layer = snapshot.layers.first(where: { $0.index == canvasRenderSurfaceView.currentActiveLayerIndex }) else {
                 return nil
             }
             return samplePixel(in: layer.pixelData, width: snapshot.width, height: snapshot.height, x: x, y: y)
@@ -1160,7 +1158,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let blendWithPaper: Bool
         switch source {
         case .activeLayer:
-            sourcePixelData = snapshot.layers.first(where: { $0.index == metalCanvasView.currentActiveLayerIndex })?.pixelData
+            sourcePixelData = snapshot.layers.first(where: { $0.index == canvasRenderSurfaceView.currentActiveLayerIndex })?.pixelData
             blendWithPaper = false
         case .canvas:
             sourcePixelData = snapshot.compositePixelData
@@ -1168,7 +1166,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
 
         if let sourcePixelData,
-           let rgba = MetalDocumentProcessingClient.shared.eyedropperLoupeRGBA(
+           let image = canvasImageRenderer.eyedropperLoupeImage(
                 sourcePixelData: sourcePixelData,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,
@@ -1176,9 +1174,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                 centerY: centerY,
                 gridSize: grid,
                 paperStyle: paperStyle,
-                blendWithPaper: blendWithPaper
-           ),
-           let image = upscaledGridImage(from: rgba, grid: grid) {
+                blendWithPaper: blendWithPaper,
+                imageBuilder: { rgba, grid in
+                    upscaledGridImage(from: rgba, grid: grid)
+                }
+           ) {
             return image
         }
 
@@ -1319,12 +1319,15 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         let expectedCount = width * height
         guard selection.maskData.count == expectedCount else { return nil }
 
-        if let rgba = MetalDocumentProcessingClient.shared.selectionOverlayRGBA(
+        if let image = canvasImageRenderer.selectionOverlayImage(
             maskData: selection.maskData,
             width: width,
-            height: height
+            height: height,
+            imageBuilder: { rgba, width, height in
+                rgbaImage(from: rgba, width: width, height: height)
+            }
         ) {
-            return rgbaImage(from: rgba, width: width, height: height)
+            return image
         }
 
         var rgba = Data(count: expectedCount * 4)
@@ -1407,7 +1410,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
         guard let transformedLayerData else { return nil }
 
-        let composite = MetalDocumentProcessingClient.shared.compositedPreviewPixelData(
+        let composite = canvasImageRenderer.compositePreviewImageData(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: transformedLayerData
@@ -1447,13 +1450,16 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private func makeLayerImage(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle? = nil) -> UIImage? {
         guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
         if let paperStyle {
-            if let composited = MetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+            if let composited = canvasImageRenderer.paperCompositeImage(
                 pixelData: pixelData,
                 width: width,
                 height: height,
-                paperStyle: paperStyle
+                paperStyle: paperStyle,
+                imageBuilder: { rgba, width, height in
+                    rgbaImage(from: rgba, width: width, height: height)
+                }
             ) {
-                return rgbaImage(from: composited, width: width, height: height)
+                return composited
             }
         }
         guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }

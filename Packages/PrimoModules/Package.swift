@@ -181,6 +181,5 @@ let package = Package(
             name: "PrimoBrushFileFormatsTests",
             dependencies: ["PrimoBrushFileFormats"]
         ),
-    ],
-    cxxLanguageStandard: .gnucxx20
+    ]
 )
