@@ -27,10 +27,7 @@ extension AppFeature {
 
     struct CanvasStrokeContextResolver {
         func previewBrush(for brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
-            var previewBrush = brush
-            previewBrush.taperIn = 0
-            previewBrush.taperOut = 0
-            return previewBrush
+            brush
         }
 
         func resolve(
@@ -84,6 +81,10 @@ extension AppFeature {
             ensureCurrentPresentationLoaded: (inout State) -> Void
         ) {
             guard state.canvas.activeStrokeBaseSnapshot == nil else { return }
+            if let pendingCommittedSnapshot = state.canvas.pendingCommittedSnapshot {
+                state.canvas.captureStrokeBaseSnapshot(pendingCommittedSnapshot)
+                return
+            }
             ensureCurrentPresentationLoaded(&state)
             if let renderSnapshot = state.canvas.renderSnapshot {
                 state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
@@ -123,7 +124,7 @@ extension AppFeature {
     }
 
     struct CanvasStrokePreviewResolver {
-        func resolveInitial(
+        fileprivate func resolveInitial(
             state: State,
             sample: StylusSample,
             context: CanvasStrokeContext,
@@ -152,7 +153,7 @@ extension AppFeature {
             return StrokePreviewResolution(plan: previewPlan)
         }
 
-        func resolveAppended(
+        fileprivate func resolveAppended(
             state: State,
             samples: [StylusSample],
             context: CanvasStrokeContext,
@@ -170,16 +171,14 @@ extension AppFeature {
                 let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
                 let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex })
             {
-                let fullSamples = state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples
-                let anchorIndex = max(fullSamples.count - samples.count - 1, 0)
-                let anchor = fullSamples.indices.contains(anchorIndex) ? fullSamples[anchorIndex] : nil
-                let previewSamples = anchor.map { [$0] + samples } ?? samples
-                let basePixelData = state.canvas.activeStrokePreviewLayerPixelData ?? baseLayer.pixelData
+                let fullSamples = !state.canvas.pendingStrokeFinalizationSamples.isEmpty
+                    ? state.canvas.pendingStrokeFinalizationSamples
+                    : (state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples)
                 guard let previewPlan = makePreviewPlan(
                     baseSnapshot,
                     context.activeLayerIndex,
-                    basePixelData,
-                    previewSamples,
+                    baseLayer.pixelData,
+                    fullSamples,
                     context.previewBrush,
                     context.activeLayer.isAlphaLocked
                 ) else {
@@ -212,7 +211,7 @@ extension AppFeature {
     struct CanvasStrokeCommitService {
         let workflowService: CanvasStrokeWorkflowService
 
-        func resolve(
+        fileprivate func resolve(
             state: inout State,
             samples: [StylusSample],
             context: CanvasStrokeContext,
@@ -221,7 +220,6 @@ extension AppFeature {
             clearSelectionWithoutRefresh: (inout State) -> Void,
             commitFallbackPixels: (inout State, [StylusSample], BrushRuntimeSettings, LayerRowModel, Bool) -> DocumentMutationResult
         ) -> StrokeCommitResolution {
-            let shouldApplyTaperOnCommit = context.brush.taperIn > 0.001 || context.brush.taperOut > 0.001
             if keepsSelectionCleared {
                 switch workflowService.ensureLayerVisible(context.activeLayerIndex) {
                 case .success:
@@ -232,31 +230,28 @@ extension AppFeature {
                 clearSelectionWithoutRefresh(&state)
             }
             let commitResult: DocumentMutationResult
-            if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData, !shouldApplyTaperOnCommit {
+            if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
                 commitResult = workflowService.replaceLayerPixels(
                     context.activeLayerIndex,
                     pixelData: previewPixels
                 )
             } else {
-                switch workflowService.applySoftwareStroke(
+                commitResult = commitFallbackPixels(
+                    &state,
                     samples,
-                    brush: context.brush,
-                    layerIndex: context.activeLayerIndex
-                ) {
-                case .success:
-                    commitResult = .success(())
-                case .failure:
-                    commitResult = commitFallbackPixels(
-                        &state,
-                        samples,
-                        context.brush,
-                        context.activeLayer,
-                        refreshViaDirtyPresentation
-                    )
-                }
+                    context.previewBrush,
+                    context.activeLayer,
+                    refreshViaDirtyPresentation
+                )
             }
             switch commitResult {
             case .success:
+                if let stagedSnapshot = Self.stagedCommittedSnapshot(
+                    state: state,
+                    activeLayerIndex: context.activeLayerIndex
+                ) {
+                    state.canvas.stagePendingCommittedSnapshot(stagedSnapshot)
+                }
                 break
             case let .failure(failure):
                 return .failed(failure)
@@ -267,6 +262,52 @@ extension AppFeature {
                     refresh: refreshViaDirtyPresentation ? .dirty : .current,
                     updatesWorkspaceArtifacts: false
                 )
+            )
+        }
+
+        private static func stagedCommittedSnapshot(
+            state: State,
+            activeLayerIndex: Int
+        ) -> MetalDocumentSnapshot? {
+            guard
+                let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
+                let committedPixels = state.canvas.activeStrokePreviewLayerPixelData
+            else {
+                return nil
+            }
+
+            let compositePixelData: Data
+            if let previewCompositePixelData = state.canvas.activeStrokePreviewCompositePixelData {
+                compositePixelData = previewCompositePixelData
+            } else if let composited = AppFeature.compositedPreviewPixelData(
+                snapshot: baseSnapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerPixels: committedPixels
+            ) {
+                compositePixelData = composited
+            } else {
+                return nil
+            }
+
+            let layers = baseSnapshot.layers.map { layer in
+                guard layer.index == activeLayerIndex else { return layer }
+                return MetalLayerSnapshot(
+                    index: layer.index,
+                    opacity: layer.opacity,
+                    visible: layer.visible,
+                    isClipped: layer.isClipped,
+                    blendMode: layer.blendMode,
+                    thumbnailData: layer.thumbnailData,
+                    pixelData: committedPixels
+                )
+            }
+
+            return MetalDocumentSnapshot(
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                revision: max(baseSnapshot.revision, state.canvas.lastCommittedRenderRevision) + 1,
+                compositePixelData: compositePixelData,
+                layers: layers
             )
         }
     }
@@ -280,6 +321,9 @@ extension AppFeature {
             applyFailureFeedback: (DocumentMutationFailure, inout State) -> Void,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
+            if case .failed = resolution {
+                state.canvas.isAwaitingCommittedRender = false
+            }
             resetPreview(&state)
             switch resolution {
             case let .committed(contract):
@@ -679,7 +723,7 @@ extension AppFeature {
         )
     }
 
-    func makeStrokePreviewPlan(
+    fileprivate func makeStrokePreviewPlan(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         basePixelData: Data,
@@ -687,25 +731,50 @@ extension AppFeature {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> StrokePreviewPlan? {
-        guard let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
+        let metalExecutionMode: MetalStrokeExecutionMode = .interactive
+        let adjustedPixels: Data
+        let rasterDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
+        if let gpuResult = MetalDocumentProcessingClient.shared.executeStroke(
+            MetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                samples: samples,
+                brush: brush,
+                mode: metalExecutionMode,
+                snapshotRevision: snapshot.revision,
+                activeLayerIndex: activeLayerIndex
+            )
+        ) {
+            adjustedPixels = preserveAlphaLockedPixels
+                ? Self.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
+                : gpuResult.pixelData
+            rasterDirtyRect = gpuResult.dirtyRect
+        } else if let fallbackPixels = Self.layerPixelDataByApplyingCommittedStroke(
             basePixelData: basePixelData,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,
             samples: samples,
             brush: brush,
-            mode: .interactive,
+            mode: metalExecutionMode,
+            snapshotRevision: snapshot.revision,
+            activeLayerIndex: activeLayerIndex,
             preserveAlphaLockedPixels: preserveAlphaLockedPixels
-        ) else {
+        ) {
+            adjustedPixels = fallbackPixels
+            rasterDirtyRect = nil
+        } else {
             return nil
         }
         let incrementalUpdate: IncrementalLayerUpdate?
-        if Self.shouldUseIncrementalPreviewUpdate(for: brush),
-           let dirtyRect = Self.strokePreviewDirtyRect(
+        let previewDirtyRect = rasterDirtyRect ?? Self.strokePreviewDirtyRect(
             samples: samples,
             brush: brush,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height
-           ) {
+        )
+        if Self.shouldUseIncrementalPreviewUpdate(for: brush),
+           let dirtyRect = previewDirtyRect {
             incrementalUpdate = Self.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
@@ -766,6 +835,9 @@ extension AppFeature {
                 canvasHeight: snapshot.height,
                 samples: samples,
                 brush: brush,
+                mode: .interactive,
+                snapshotRevision: snapshot.revision,
+                activeLayerIndex: state.canvas.activeLayerIndex,
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
             )
         else {

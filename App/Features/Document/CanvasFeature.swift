@@ -7,6 +7,27 @@ import simd
 struct CanvasFeature {
     static let defaultCanvasSize = CGSize(width: 1152, height: 1536)
 
+    static func trimmingDuplicateLeadingSamples(
+        _ samples: [StylusSample],
+        after previousSample: StylusSample?
+    ) -> [StylusSample] {
+        guard let previousSample else { return samples }
+        var trimmed = samples
+        while trimmed.first == previousSample {
+            trimmed.removeFirst()
+        }
+        return trimmed
+    }
+
+    static func trimmingDuplicateTrailingSamples(_ samples: [StylusSample]) -> [StylusSample] {
+        guard samples.count >= 2 else { return samples }
+        var trimmed = samples
+        while trimmed.count >= 2, trimmed[trimmed.count - 1] == trimmed[trimmed.count - 2] {
+            trimmed.removeLast()
+        }
+        return trimmed
+    }
+
     @ObservableState
     struct State: Equatable {
         var canvasSize: CGSize = CanvasFeature.defaultCanvasSize
@@ -15,13 +36,16 @@ struct CanvasFeature {
         var lastCommittedRenderRevision: Int = -1
         var localBufferRevision: Int = 0
         var lastRenderedLocalBufferRevision: Int = -1
+        var pendingCommittedSnapshot: MetalDocumentSnapshot?
         var activeLayerIndex = 0
         var activeStrokeBaseSnapshot: MetalDocumentSnapshot?
         var activeStrokePreviewLayerPixelData: Data?
+        var activeStrokePreviewCompositePixelData: Data?
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
         var activeStroke: Stroke?
+        var pendingStrokeFinalizationSamples: [StylusSample] = []
         var activeStrokeCommittedPointCount = 0
         var shapePreviewIsLive = false
         var isStrokeActive = false
@@ -64,6 +88,7 @@ struct CanvasFeature {
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )
         var pendingIncrementalUpdate: IncrementalLayerUpdate?
+        var previewResetNonce: Int = 0
 
         var transformPreviewScale: CGFloat {
             get { transformPreviewScaleX }
@@ -175,14 +200,29 @@ struct CanvasFeature {
         mutating func resetTransientEditingState() {
             clearSelectionState()
             clearAdjustmentPreview()
+            activeStroke = nil
+            pendingCommittedSnapshot = nil
+            activeStrokeCommittedPointCount = 0
+            shapePreviewIsLive = false
+            isStrokeActive = false
+            isAwaitingCommittedRender = false
+            resetStrokePreview()
         }
 
         mutating func captureStrokeBaseSnapshot(_ snapshot: MetalDocumentSnapshot) {
             activeStrokeBaseSnapshot = snapshot
         }
 
+        mutating func stagePendingCommittedSnapshot(_ snapshot: MetalDocumentSnapshot?) {
+            pendingCommittedSnapshot = snapshot
+        }
+
         mutating func setStrokePreviewLayerPixelData(_ pixelData: Data?) {
             activeStrokePreviewLayerPixelData = pixelData
+        }
+
+        mutating func setStrokePreviewCompositePixelData(_ pixelData: Data?) {
+            activeStrokePreviewCompositePixelData = pixelData
         }
 
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
@@ -195,52 +235,13 @@ struct CanvasFeature {
 
         mutating func applyIncrementalRenderUpdate(
             _ update: IncrementalLayerUpdate,
-            activeLayerIndex: Int? = nil,
+            activeLayerIndex _: Int? = nil,
             activeLayerPixelData: Data? = nil
         ) {
-            guard let snapshot = renderSnapshot else {
-                pendingIncrementalUpdate = update
-                if let activeLayerPixelData {
-                    setStrokePreviewLayerPixelData(activeLayerPixelData)
-                }
-                return
-            }
-
-            guard let nextComposite = Self.replacingCompositeRegion(
-                in: snapshot.compositePixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                update: update
-            ) else {
-                pendingIncrementalUpdate = update
-                return
-            }
-
-            let nextLayers = snapshot.layers.map { layer in
-                guard let activeLayerIndex, let activeLayerPixelData, layer.index == activeLayerIndex else {
-                    return layer
-                }
-                return MetalLayerSnapshot(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: layer.visible,
-                    isClipped: layer.isClipped,
-                    blendMode: layer.blendMode,
-                    thumbnailData: layer.thumbnailData,
-                    pixelData: activeLayerPixelData
-                )
-            }
-
-            renderSnapshot = MetalDocumentSnapshot(
-                width: snapshot.width,
-                height: snapshot.height,
-                revision: max(snapshot.revision, lastCommittedRenderRevision) + 1,
-                compositePixelData: nextComposite,
-                layers: nextLayers
-            )
             if let activeLayerPixelData {
                 setStrokePreviewLayerPixelData(activeLayerPixelData)
             }
+            setStrokePreviewCompositePixelData(nil)
             pendingIncrementalUpdate = update
         }
 
@@ -249,8 +250,11 @@ struct CanvasFeature {
             previousRevision: Int
         ) {
             self.renderSnapshot = renderSnapshot
+            pendingCommittedSnapshot = nil
             lastCommittedRenderRevision = renderSnapshot.revision
-            resetStrokePreview()
+            if !isStrokeActive {
+                resetStrokePreview()
+            }
             if !isStrokeActive &&
                 isAwaitingCommittedRender &&
                 renderSnapshot.revision > previousRevision {
@@ -263,16 +267,21 @@ struct CanvasFeature {
             _ renderSnapshot: MetalDocumentSnapshot,
             previewLayerPixelData: Data? = nil
         ) {
-            self.renderSnapshot = renderSnapshot
             if let previewLayerPixelData {
                 setStrokePreviewLayerPixelData(previewLayerPixelData)
             }
+            setStrokePreviewCompositePixelData(renderSnapshot.compositePixelData)
             clearPendingIncrementalUpdate()
         }
 
         mutating func resetStrokePreview() {
+            if !isAwaitingCommittedRender {
+                previewResetNonce += 1
+            }
             activeStrokeBaseSnapshot = nil
             activeStrokePreviewLayerPixelData = nil
+            activeStrokePreviewCompositePixelData = nil
+            pendingStrokeFinalizationSamples = []
             pendingIncrementalUpdate = nil
         }
 
@@ -573,6 +582,7 @@ struct CanvasFeature {
             case let .strokeUpdated(stroke):
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
+                state.pendingStrokeFinalizationSamples = []
                 if state.currentTool == .shape {
                     state.activeStroke = nil
                     guard stroke.points.count >= 2 else { return .none }
@@ -580,9 +590,14 @@ struct CanvasFeature {
                     return .send(.delegate(.previewShapeStroke(stroke.points.map(\.stylusSample))))
                 }
 
-                let previousPointCount = state.activeStroke?.points.count ?? 0
+                let previousStroke = state.activeStroke
+                let previousPointCount = previousStroke?.points.count ?? 0
                 state.activeStroke = stroke
-                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
+                let previousLastSample = previousStroke?.points.last?.stylusSample
+                let appendedSamples = Self.trimmingDuplicateLeadingSamples(
+                    Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample),
+                    after: previousLastSample
+                )
                 if state.currentTool == .blur {
                     guard !appendedSamples.isEmpty else { return .none }
                     return .send(.delegate(.blurSamples(appendedSamples)))
@@ -622,18 +637,21 @@ struct CanvasFeature {
                     state.activeStrokeCommittedPointCount = 0
                     return .send(.delegate(.endBlurStroke))
                 }
-                let previousPointCount = state.activeStroke?.points.count ?? 0
-                let appendedSamples = Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample)
+                let previousStroke = state.activeStroke
+                let previousPointCount = previousStroke?.points.count ?? 0
+                let previousLastSample = previousStroke?.points.last?.stylusSample
+                let appendedSamples = Self.trimmingDuplicateLeadingSamples(
+                    Array(stroke.points.dropFirst(previousPointCount)).map(\.stylusSample),
+                    after: previousLastSample
+                )
+                state.pendingStrokeFinalizationSamples = Self.trimmingDuplicateTrailingSamples(
+                    stroke.points.map(\.stylusSample)
+                )
                 state.activeStroke = nil
                 let didCommitStroke = state.activeStrokeCommittedPointCount > 0
                 state.activeStrokeCommittedPointCount = 0
                 if didCommitStroke {
-                    var effects: [Effect<Action>] = []
-                    if !appendedSamples.isEmpty {
-                        effects.append(.send(.delegate(.appendSamples(appendedSamples))))
-                    }
-                    effects.append(.send(.delegate(.endStroke(stroke.points.map(\.stylusSample)))))
-                    return .concatenate(effects)
+                    return .send(.delegate(.endStroke(stroke.points.map(\.stylusSample))))
                 }
                 if !stroke.points.isEmpty {
                     return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
@@ -644,6 +662,7 @@ struct CanvasFeature {
                 let cancelledStroke = state.activeStroke
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = false
+                state.pendingStrokeFinalizationSamples = []
                 state.activeStroke = nil
                 let didCommitStroke = state.activeStrokeCommittedPointCount > 0
                 state.activeStrokeCommittedPointCount = 0

@@ -237,6 +237,8 @@ extension AppFeature {
 
     func handleClearActiveLayer(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
+        state.canvas.resetTransientEditingState()
+        MetalDocumentProcessingClient.shared.resetStrokeExecutionSession()
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(

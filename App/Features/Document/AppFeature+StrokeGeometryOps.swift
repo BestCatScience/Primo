@@ -53,6 +53,50 @@ extension AppFeature {
         }
         guard deduplicated.count > 1 else { return deduplicated }
 
+        let terminalClusterRadius = min(max(CGFloat(brush.radius) * 0.55, 2.0), 24.0)
+        let terminalClusterTravelLimit = terminalClusterRadius * 1.6
+        let terminalDirectionAlignmentThreshold: CGFloat = 0.82
+        guard strokePathLength(deduplicated) > terminalClusterRadius * 1.25 else {
+            return deduplicated
+        }
+        let lastIndex = deduplicated.index(before: deduplicated.endIndex)
+        let finalSample = deduplicated[lastIndex]
+        var clusterStart = lastIndex
+        var cumulativeTravel: CGFloat = 0
+
+        while clusterStart > 0 {
+            let previousIndex = deduplicated.index(before: clusterStart)
+            let previous = deduplicated[previousIndex]
+            let current = deduplicated[clusterStart]
+            let stepDX = current.point.x - previous.point.x
+            let stepDY = current.point.y - previous.point.y
+            let stepDistance = sqrt((stepDX * stepDX) + (stepDY * stepDY))
+            let finalDX = finalSample.point.x - previous.point.x
+            let finalDY = finalSample.point.y - previous.point.y
+            let distanceToFinal = sqrt((finalDX * finalDX) + (finalDY * finalDY))
+            let directionAlignment: CGFloat
+            if stepDistance > 0.001, distanceToFinal > 0.001 {
+                directionAlignment = ((stepDX * finalDX) + (stepDY * finalDY)) / (stepDistance * distanceToFinal)
+            } else {
+                directionAlignment = 1.0
+            }
+
+            guard distanceToFinal <= terminalClusterRadius,
+                  stepDistance <= terminalClusterRadius,
+                  cumulativeTravel + stepDistance <= terminalClusterTravelLimit,
+                  directionAlignment >= terminalDirectionAlignmentThreshold
+            else {
+                break
+            }
+
+            cumulativeTravel += stepDistance
+            clusterStart = previousIndex
+        }
+
+        if clusterStart > 0, clusterStart < lastIndex - 1 {
+            deduplicated.removeSubrange((clusterStart + 1)..<lastIndex)
+        }
+
         return deduplicated
     }
 

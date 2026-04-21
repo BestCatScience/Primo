@@ -187,6 +187,37 @@ struct MetalStrokeRasterRequestDescriptor {
     uint rectWidth;
     uint rectHeight;
     uint sampleCount;
+    uint tileSize;
+    uint tileColumns;
+};
+
+struct MetalStrokePrimitiveDescriptor {
+    float startX;
+    float startY;
+    float endX;
+    float endY;
+    float startPressure;
+    float endPressure;
+    float startProgress;
+    float endProgress;
+    float maxRadius;
+    uint isSegment;
+    uint _padding0;
+    uint _padding1;
+};
+
+struct MetalStrokeTileRangeDescriptor {
+    uint startIndex;
+    uint primitiveCount;
+};
+
+struct MetalStrokeRectCopyDescriptor {
+    uint canvasWidth;
+    uint canvasHeight;
+    uint originX;
+    uint originY;
+    uint rectWidth;
+    uint rectHeight;
 };
 
 constant int BlendModeNormal = 0;
@@ -594,7 +625,11 @@ inline float4 strokeNeighborhoodSample(
     float radius,
     constant MetalStrokeBrushDescriptor& brush
 ) {
+    bool usesFastOilPath = brush.isOil != 0u && brush.radius >= 96.0f;
     float spread = max(1.0f, radius * (0.24f + (brush.smudgeRadius * 1.45f) + (brush.wetness * 0.35f) + (brush.isOil != 0u ? 0.18f : 0.0f)));
+    if (usesFastOilPath) {
+        spread = min(spread, radius * 0.85f);
+    }
     float4 accumulated = float4(0.0f);
     float totalWeight = 0.0f;
 
@@ -604,8 +639,9 @@ inline float4 strokeNeighborhoodSample(
         int2(1, -1), int2(-1, 1), int2(1, 1)
     };
     const float weights[9] = { 0.24f, 0.12f, 0.12f, 0.12f, 0.12f, 0.07f, 0.07f, 0.07f, 0.07f };
+    uint sampleCount = usesFastOilPath ? 5u : 9u;
 
-    for (uint index = 0; index < 9; ++index) {
+    for (uint index = 0; index < sampleCount; ++index) {
         int sampleX = centerX + int(round(float(offsets[index].x) * spread));
         int sampleY = centerY + int(round(float(offsets[index].y) * spread));
         float4 sample = strokeSourcePixel(pixels, request, sampleX, sampleY);
@@ -619,13 +655,92 @@ inline float4 strokeNeighborhoodSample(
     return accumulated / totalWeight;
 }
 
+inline float strokeSegmentEndpointFalloff(float t) {
+    float endpointBlend = smoothstep(0.92f, 1.0f, strokeClampUnit(t));
+    return 1.0f - (0.14f * endpointBlend);
+}
+
+inline float strokePrimitiveSourceAlpha(
+    constant MetalStrokePrimitiveDescriptor& primitive,
+    constant MetalStrokeBrushDescriptor& brush,
+    const device uchar *customTipPixels,
+    float2 pixelCenter,
+    thread float2 &candidatePoint,
+    thread float &candidatePressure,
+    thread float &candidateProgress,
+    thread float &candidateRadius
+) {
+    candidatePressure = primitive.startPressure;
+    candidateProgress = primitive.startProgress;
+    candidateRadius = resolvedStrokeRadius(brush, candidatePressure, candidateProgress);
+    candidatePoint = float2(primitive.startX, primitive.startY);
+
+    if (primitive.isSegment == 0u) {
+        return rasterizedSourceAlpha(
+            brush,
+            customTipPixels,
+            candidatePoint,
+            candidatePressure,
+            candidateProgress,
+            candidateRadius,
+            pixelCenter
+        );
+    }
+
+    float2 start = float2(primitive.startX, primitive.startY);
+    float2 end = float2(primitive.endX, primitive.endY);
+    float2 segment = end - start;
+    float lengthSquared = max(dot(segment, segment), 0.0001f);
+    float projection = dot(pixelCenter - start, segment) / lengthSquared;
+    float t = strokeClampUnit(projection);
+    candidatePoint = start + (segment * t);
+    candidatePressure = primitive.startPressure + ((primitive.endPressure - primitive.startPressure) * t);
+    candidateProgress = primitive.startProgress + ((primitive.endProgress - primitive.startProgress) * t);
+    candidateRadius = resolvedStrokeRadius(brush, candidatePressure, candidateProgress);
+    float sourceAlpha = rasterizedSourceAlpha(
+        brush,
+        customTipPixels,
+        candidatePoint,
+        candidatePressure,
+        candidateProgress,
+        candidateRadius,
+        pixelCenter
+    );
+    return sourceAlpha * strokeSegmentEndpointFalloff(t);
+}
+
+kernel void copyStrokeRectKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalStrokeRectCopyDescriptor& request [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= request.rectWidth || gid.y >= request.rectHeight) {
+        return;
+    }
+
+    uint x = request.originX + gid.x;
+    uint y = request.originY + gid.y;
+    if (x >= request.canvasWidth || y >= request.canvasHeight) {
+        return;
+    }
+
+    uint offset = ((y * request.canvasWidth) + x) * 4u;
+    outputPixels[offset] = sourcePixels[offset];
+    outputPixels[offset + 1u] = sourcePixels[offset + 1u];
+    outputPixels[offset + 2u] = sourcePixels[offset + 2u];
+    outputPixels[offset + 3u] = sourcePixels[offset + 3u];
+}
+
 kernel void strokeRasterKernel(
     const device uchar *sourcePixels [[buffer(0)]],
     device uchar *outputPixels [[buffer(1)]],
-    constant MetalStrokeSampleDescriptor *samples [[buffer(2)]],
+    constant MetalStrokePrimitiveDescriptor *primitives [[buffer(2)]],
     constant MetalStrokeBrushDescriptor& brush [[buffer(3)]],
     constant MetalStrokeRasterRequestDescriptor& request [[buffer(4)]],
     const device uchar *customTipPixels [[buffer(5)]],
+    constant MetalStrokeTileRangeDescriptor *tileRanges [[buffer(6)]],
+    const device uint *primitiveIndices [[buffer(7)]],
     uint2 gid [[thread_position_in_grid]]
 ) {
     if (gid.x >= request.rectWidth || gid.y >= request.rectHeight || request.sampleCount == 0) {
@@ -647,51 +762,34 @@ kernel void strokeRasterKernel(
     float destinationGreen = destination.g;
     float destinationBlue = destination.b;
 
-    float maxSourceAlpha = 0.0f;
-    float bestPressure = samples[0].pressure;
-    float bestProgress = samples[0].progress;
+    uint tileSize = max(request.tileSize, 1u);
+    uint tileX = gid.x / tileSize;
+    uint tileY = gid.y / tileSize;
+    uint tileIndex = tileY * max(request.tileColumns, 1u) + tileX;
+    MetalStrokeTileRangeDescriptor tileRange = tileRanges[tileIndex];
+
+    float accumulatedSourceAlpha = 0.0f;
+    float strongestSourceAlpha = 0.0f;
+    float bestPressure = primitives[0].startPressure;
+    float bestProgress = primitives[0].startProgress;
     float bestRadius = resolvedStrokeRadius(brush, bestPressure, bestProgress);
-    for (uint index = 0; index < request.sampleCount; ++index) {
-        float sourceAlpha = 0.0f;
-        float candidatePressure = samples[index].pressure;
-        float candidateProgress = samples[index].progress;
-        float candidateRadius = resolvedStrokeRadius(brush, candidatePressure, candidateProgress);
-        float2 candidatePoint = float2(samples[index].x, samples[index].y);
-        if (request.sampleCount == 1 || index == request.sampleCount - 1u) {
-            sourceAlpha = rasterizedSourceAlpha(
-                brush,
-                customTipPixels,
-                candidatePoint,
-                candidatePressure,
-                candidateProgress,
-                candidateRadius,
-                pixelCenter
-            );
-        } else {
-            MetalStrokeSampleDescriptor start = samples[index];
-            MetalStrokeSampleDescriptor end = samples[index + 1u];
-            float2 segment = float2(end.x - start.x, end.y - start.y);
-            float lengthSquared = max(dot(segment, segment), 0.0001f);
-            float projection = dot(pixelCenter - float2(start.x, start.y), segment) / lengthSquared;
-            float t = strokeClampUnit(projection);
-            float2 samplePoint = float2(start.x, start.y) + (segment * t);
-            float pressure = start.pressure + ((end.pressure - start.pressure) * t);
-            float progress = start.progress + ((end.progress - start.progress) * t);
-            float radius = resolvedStrokeRadius(brush, pressure, progress);
-            candidatePoint = samplePoint;
-            candidatePressure = pressure;
-            candidateProgress = progress;
-            candidateRadius = radius;
-            sourceAlpha = rasterizedSourceAlpha(
-                brush,
-                customTipPixels,
-                samplePoint,
-                pressure,
-                progress,
-                radius,
-                pixelCenter
-            );
-        }
+    for (uint rangeIndex = 0; rangeIndex < tileRange.primitiveCount; ++rangeIndex) {
+        uint primitiveIndex = primitiveIndices[tileRange.startIndex + rangeIndex];
+        constant MetalStrokePrimitiveDescriptor& primitive = primitives[primitiveIndex];
+        float2 candidatePoint;
+        float candidatePressure;
+        float candidateProgress;
+        float candidateRadius;
+        float sourceAlpha = strokePrimitiveSourceAlpha(
+            primitive,
+            brush,
+            customTipPixels,
+            pixelCenter,
+            candidatePoint,
+            candidatePressure,
+            candidateProgress,
+            candidateRadius
+        );
         if (sourceAlpha > 0.0f) {
             float appliedMask = dualBrushMask(
                 brush,
@@ -702,20 +800,22 @@ kernel void strokeRasterKernel(
             );
             sourceAlpha *= appliedMask;
         }
-        if (sourceAlpha > maxSourceAlpha) {
-            maxSourceAlpha = sourceAlpha;
+        accumulatedSourceAlpha += sourceAlpha * (1.0f - accumulatedSourceAlpha);
+        accumulatedSourceAlpha = strokeClampUnit(accumulatedSourceAlpha);
+        if (sourceAlpha > strongestSourceAlpha) {
+            strongestSourceAlpha = sourceAlpha;
             bestPressure = candidatePressure;
             bestProgress = candidateProgress;
             bestRadius = candidateRadius;
         }
     }
 
-    if (maxSourceAlpha <= 0.001f) {
+    if (accumulatedSourceAlpha <= 0.001f) {
         return;
     }
 
     if (brush.isEraser != 0u) {
-        float outAlpha = destinationAlpha * (1.0f - maxSourceAlpha);
+        float outAlpha = destinationAlpha * (1.0f - accumulatedSourceAlpha);
         outputPixels[offset] = sourcePixels[offset];
         outputPixels[offset + 1u] = sourcePixels[offset + 1u];
         outputPixels[offset + 2u] = sourcePixels[offset + 2u];
@@ -750,22 +850,22 @@ kernel void strokeRasterKernel(
             strokeClampUnit(smearStrength + mixStrength * 0.35f)
         );
         sourceColor = mix(neighborhoodColor, sourceColor, strokeClampUnit((pigmentLoad * 0.88f) + 0.12f));
-        maxSourceAlpha *= mix(
+        accumulatedSourceAlpha *= mix(
             1.0f,
             max(neighborhood.a, destinationAlpha),
             strokeClampUnit((1.0f - pigmentLoad) * 0.42f + mixStrength * 0.26f)
         );
-        maxSourceAlpha = strokeClampUnit(maxSourceAlpha);
+        accumulatedSourceAlpha = strokeClampUnit(accumulatedSourceAlpha);
     }
 
-    float outAlpha = destinationAlpha + (maxSourceAlpha * (1.0f - destinationAlpha));
+    float outAlpha = destinationAlpha + (accumulatedSourceAlpha * (1.0f - destinationAlpha));
     if (outAlpha <= 0.001f) {
         return;
     }
 
-    float outRed = ((sourceColor.r * maxSourceAlpha) + (destinationRed * destinationAlpha * (1.0f - maxSourceAlpha))) / outAlpha;
-    float outGreen = ((sourceColor.g * maxSourceAlpha) + (destinationGreen * destinationAlpha * (1.0f - maxSourceAlpha))) / outAlpha;
-    float outBlue = ((sourceColor.b * maxSourceAlpha) + (destinationBlue * destinationAlpha * (1.0f - maxSourceAlpha))) / outAlpha;
+    float outRed = ((sourceColor.r * accumulatedSourceAlpha) + (destinationRed * destinationAlpha * (1.0f - accumulatedSourceAlpha))) / outAlpha;
+    float outGreen = ((sourceColor.g * accumulatedSourceAlpha) + (destinationGreen * destinationAlpha * (1.0f - accumulatedSourceAlpha))) / outAlpha;
+    float outBlue = ((sourceColor.b * accumulatedSourceAlpha) + (destinationBlue * destinationAlpha * (1.0f - accumulatedSourceAlpha))) / outAlpha;
 
     outputPixels[offset] = uchar(clamp(int(round(outRed * 255.0f)), 0, 255));
     outputPixels[offset + 1u] = uchar(clamp(int(round(outGreen * 255.0f)), 0, 255));

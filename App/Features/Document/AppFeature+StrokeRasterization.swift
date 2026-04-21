@@ -68,6 +68,8 @@ extension AppFeature {
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         mode: MetalStrokeExecutionMode = .commit,
+        snapshotRevision: Int? = nil,
+        activeLayerIndex: Int? = nil,
         preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
         if let gpuOutput = MetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
@@ -76,7 +78,9 @@ extension AppFeature {
             canvasHeight: canvasHeight,
             samples: samples,
             brush: brush,
-            mode: mode
+            mode: mode,
+            snapshotRevision: snapshotRevision,
+            activeLayerIndex: activeLayerIndex
         ) {
             return preserveAlphaLockedPixels
                 ? pixelDataByPreservingExistingAlpha(source: gpuOutput, existing: basePixelData)

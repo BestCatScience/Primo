@@ -22,6 +22,7 @@ struct CanvasView: UIViewRepresentable {
             activeLayerIndex: store.activeLayerIndex,
             activeStroke: store.activeStroke,
             incrementalUpdate: store.pendingIncrementalUpdate,
+            strokePreviewCompositePixelData: store.activeStrokePreviewCompositePixelData,
             adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
@@ -42,6 +43,7 @@ struct CanvasView: UIViewRepresentable {
             activeTextLayer: store.activeTextLayer,
             viewportOffset: store.viewportOffset,
             zoomScale: store.zoomScale,
+            previewResetNonce: store.previewResetNonce
         )
     }
 }
@@ -103,6 +105,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
     private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
     private var currentSnapshot: MetalDocumentSnapshot?
+    private var lastPreviewResetNonce: Int = 0
     private var isTouchEyedropperActive = false
 
     private let touchEyedropperLoupeSize = CGSize(width: 102, height: 102)
@@ -334,6 +337,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         activeLayerIndex: Int,
         activeStroke: Stroke?,
         incrementalUpdate: IncrementalLayerUpdate?,
+        strokePreviewCompositePixelData: Data?,
         adjustmentPreviewPixelData: Data?,
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
@@ -353,7 +357,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         transformQuadOffsets: TransformQuadOffsets,
         activeTextLayer: TextLayerData?,
         viewportOffset: CGSize,
-        zoomScale: CGFloat
+        zoomScale: CGFloat,
+        previewResetNonce: Int
     ) {
         currentSnapshot = snapshot
         self.currentTool = currentTool
@@ -371,6 +376,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         self.zoomScale = zoomScale
         metalCanvasView.currentActiveLayerIndex = activeLayerIndex
         metalCanvasView.updateDocumentSize(documentSize)
+        if previewResetNonce != lastPreviewResetNonce {
+            metalCanvasView.reloadSnapshot(snapshot)
+            lastPreviewResetNonce = previewResetNonce
+        }
         metalCanvasView.update(snapshot: snapshot, viewportOffset: viewportOffset, zoomScale: zoomScale, paperStyle: paperStyle)
         if let incrementalUpdate {
             metalCanvasView.applyIncrementalUpdate(incrementalUpdate)
@@ -393,6 +402,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         updateTransformPreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
+            strokePreviewCompositePixelData: strokePreviewCompositePixelData,
             adjustmentPreviewPixelData: adjustmentPreviewPixelData,
             selection: selection,
             paperStyle: paperStyle,
@@ -708,6 +718,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private func updateTransformPreview(
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
+        strokePreviewCompositePixelData: Data?,
         adjustmentPreviewPixelData: Data?,
         selection: CanvasSelection?,
         paperStyle: CanvasPaperStyle,
@@ -725,6 +736,22 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             !transformQuadOffsets.isZero,
             let snapshot
         else {
+            if
+                let snapshot,
+                let strokePreviewCompositePixelData,
+                let image = makeLayerImage(
+                    pixelData: strokePreviewCompositePixelData,
+                    width: snapshot.width,
+                    height: snapshot.height,
+                    paperStyle: paperStyle
+                )
+            {
+                compositePreviewImageView.image = image
+                compositePreviewImageView.frame = contentRect()
+                metalCanvasView.isHidden = true
+                return
+            }
+
             if
                 let snapshot,
                 let adjustmentPreviewPixelData,

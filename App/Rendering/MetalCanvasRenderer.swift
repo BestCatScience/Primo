@@ -165,6 +165,17 @@ final class MetalCanvasView: MTKView, MTKViewDelegate {
         scheduleRedraw()
     }
 
+    func reloadSnapshot(_ snapshot: MetalDocumentSnapshot?) {
+        pendingSnapshot = snapshot
+        currentSnapshot = snapshot
+        appliedRevision = -1
+        lastAppliedIncrementalUpdateID = nil
+        if let snapshot {
+            documentSize = CGSize(width: snapshot.width, height: snapshot.height)
+        }
+        scheduleRedraw()
+    }
+
     func updateDocumentSize(_ size: CGSize) {
         if documentSize != size {
             documentSize = size

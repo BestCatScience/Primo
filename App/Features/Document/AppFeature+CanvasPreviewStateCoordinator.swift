@@ -12,32 +12,8 @@ extension AppFeature {
             guard compositePixelData.count == width * height * 4 else {
                 return false
             }
-
-            let layerSnapshots: [MetalLayerSnapshot]
-            if let existingLayers = state.canvas.renderSnapshot?.layers, !existingLayers.isEmpty {
-                layerSnapshots = existingLayers
-            } else {
-                layerSnapshots = state.canvas.layerBuffers.map { buffer in
-                    MetalLayerSnapshot(
-                        index: buffer.index,
-                        opacity: Float(buffer.opacity),
-                        visible: buffer.visible,
-                        isClipped: false,
-                        blendMode: buffer.blendMode,
-                        thumbnailData: nil,
-                        pixelData: Data()
-                    )
-                }
-            }
-
-            let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.applyPreviewRenderSnapshot(MetalDocumentSnapshot(
-                width: width,
-                height: height,
-                revision: nextRevision,
-                compositePixelData: compositePixelData,
-                layers: layerSnapshots
-            ))
+            state.canvas.setStrokePreviewCompositePixelData(compositePixelData)
+            state.canvas.clearPendingIncrementalUpdate()
             return true
         }
 

@@ -71,7 +71,7 @@ private struct MetalPaperCompositeDescriptor {
     let checkerboard: UInt32
 }
 
-private struct MetalStrokeSampleDescriptor {
+private struct MetalStrokeSampleDescriptor: Equatable {
     let x: Float
     let y: Float
     let pressure: Float
@@ -129,6 +129,8 @@ private struct MetalStrokeRasterRequestDescriptor {
     let rectWidth: UInt32
     let rectHeight: UInt32
     let sampleCount: UInt32
+    let tileSize: UInt32
+    let tileColumns: UInt32
 }
 
 private struct MetalStrokeRasterProfile {
@@ -137,6 +139,35 @@ private struct MetalStrokeRasterProfile {
     let smudgeBleed: Float
     let smudgeRadius: Float
     let paintLoad: Float
+}
+
+private struct MetalStrokePrimitiveDescriptor {
+    let startX: Float
+    let startY: Float
+    let endX: Float
+    let endY: Float
+    let startPressure: Float
+    let endPressure: Float
+    let startProgress: Float
+    let endProgress: Float
+    let maxRadius: Float
+    let isSegment: UInt32
+    let _padding0: UInt32
+    let _padding1: UInt32
+}
+
+private struct MetalStrokeTileRangeDescriptor {
+    let startIndex: UInt32
+    let primitiveCount: UInt32
+}
+
+private struct MetalStrokeRectCopyDescriptor {
+    let canvasWidth: UInt32
+    let canvasHeight: UInt32
+    let originX: UInt32
+    let originY: UInt32
+    let rectWidth: UInt32
+    let rectHeight: UInt32
 }
 
 enum MetalStrokeExecutionMode: Equatable, Sendable {
@@ -152,6 +183,8 @@ struct MetalStrokeExecutionRequest: Sendable {
     let samples: [StylusSample]
     let brush: BrushRuntimeSettings
     let mode: MetalStrokeExecutionMode
+    let snapshotRevision: Int?
+    let activeLayerIndex: Int?
 }
 
 struct MetalStrokeExecutionResult: Sendable {
@@ -177,7 +210,22 @@ final class MetalDocumentProcessingClient {
     private struct StrokeExecutionCache {
         let width: Int
         let height: Int
+        let baseSnapshotRevision: Int?
+        let activeLayerIndex: Int?
+        let brush: BrushRuntimeSettings
+        let samples: [MetalStrokeSampleDescriptor]
         var buffers: MetalBufferPair
+        var lastOutputValid: Bool
+    }
+
+    private struct StrokePrimitiveBinning {
+        let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+        let tileSize: Int
+        let tileColumns: Int
+        let tileRows: Int
+        let primitives: [MetalStrokePrimitiveDescriptor]
+        let tileRanges: [MetalStrokeTileRangeDescriptor]
+        let primitiveIndices: [UInt32]
     }
 
     private static let logger = Logger(subsystem: "com.primo.app", category: "MetalDocumentProcessing")
@@ -196,6 +244,7 @@ final class MetalDocumentProcessingClient {
     private let eyedropperLoupePipeline: MTLComputePipelineState?
     private let paperCompositePipeline: MTLComputePipelineState?
     private let strokeRasterPipeline: MTLComputePipelineState?
+    private let copyStrokeRectPipeline: MTLComputePipelineState?
 
     private var cachedSignature: SnapshotTextureSignature?
     private var cachedLayerTexture: MTLTexture?
@@ -217,6 +266,7 @@ final class MetalDocumentProcessingClient {
         self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
         self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
         self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
+        self.copyStrokeRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copyStrokeRectKernel")
     }
 
     var isAvailable: Bool {
@@ -232,7 +282,8 @@ final class MetalDocumentProcessingClient {
         selectionOverlayPipeline != nil &&
         eyedropperLoupePipeline != nil &&
         paperCompositePipeline != nil &&
-        strokeRasterPipeline != nil
+        strokeRasterPipeline != nil &&
+        copyStrokeRectPipeline != nil
     }
 
     func resetStrokeExecutionSession() {
@@ -401,28 +452,68 @@ final class MetalDocumentProcessingClient {
             canvasWidth > 0,
             canvasHeight > 0,
             basePixelData.count == canvasWidth * canvasHeight * 4,
+            let commandQueue,
+            let pipeline = strokeRasterPipeline
+        else {
+            return nil
+        }
+        let fullDirtyRect = AppFeature.strokePreviewDirtyRect(
+            samples: normalizedSamples,
+            brush: brush,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+        guard let executionContext = prepareStrokeExecutionContext(
+            request: request,
+            descriptors: descriptors,
+            basePixelData: basePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        ) else {
+            return nil
+        }
+        if executionContext.shouldAdoptCachedOutput {
+            return MetalStrokeExecutionResult(
+                pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
+                dirtyRect: fullDirtyRect ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+            )
+        }
+
+        let dirtySamples = executionContext.sampleRange.isEmpty
+            ? normalizedSamples
+            : Array(normalizedSamples[executionContext.sampleRange])
+        let dirtyDescriptors = executionContext.sampleRange.isEmpty
+            ? descriptors
+            : Array(descriptors[executionContext.sampleRange])
+        guard
             let dirtyRect = AppFeature.strokePreviewDirtyRect(
-                samples: normalizedSamples,
+                samples: dirtySamples,
                 brush: brush,
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight
             ),
             dirtyRect.width > 0,
-            dirtyRect.height > 0,
-            let commandQueue,
-            let pipeline = strokeRasterPipeline,
-            let executionBuffers = prepareStrokeExecutionBuffers(
-                basePixelData: basePixelData,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight,
-                mode: request.mode
-            )
+            dirtyRect.height > 0
         else {
+            return MetalStrokeExecutionResult(
+                pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
+                dirtyRect: fullDirtyRect ?? (originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+            )
+        }
+        guard let primitiveBinning = Self.makeStrokePrimitiveBinning(
+            descriptors: dirtyDescriptors,
+            brush: brush,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            dirtyRect: dirtyRect
+        ) else {
             return nil
         }
         let customTip = Self.makeCustomTipMask(brush.customTip)
         guard
-            let refreshedSamplesBuffer = makeBuffer(descriptors),
+            let primitiveBuffer = makeBuffer(primitiveBinning.primitives),
+            let tileRangeBuffer = makeBuffer(primitiveBinning.tileRanges),
+            let primitiveIndexBuffer = makeBuffer(primitiveBinning.primitiveIndices),
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(brush, customTip: customTip)),
             let customTipBuffer = makeBuffer(customTip.alphaData),
             let requestBuffer = makeBuffer(
@@ -433,7 +524,19 @@ final class MetalDocumentProcessingClient {
                     originY: UInt32(dirtyRect.originY),
                     rectWidth: UInt32(dirtyRect.width),
                     rectHeight: UInt32(dirtyRect.height),
-                    sampleCount: UInt32(descriptors.count)
+                    sampleCount: UInt32(primitiveBinning.primitives.count),
+                    tileSize: UInt32(primitiveBinning.tileSize),
+                    tileColumns: UInt32(primitiveBinning.tileColumns)
+                )
+            ),
+            let copyRequestBuffer = makeBuffer(
+                MetalStrokeRectCopyDescriptor(
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    originX: UInt32(dirtyRect.originX),
+                    originY: UInt32(dirtyRect.originY),
+                    rectWidth: UInt32(dirtyRect.width),
+                    rectHeight: UInt32(dirtyRect.height)
                 )
             )
         else {
@@ -442,43 +545,59 @@ final class MetalDocumentProcessingClient {
 
         guard
             let commandBuffer = commandQueue.makeCommandBuffer(),
-            let blitEncoder = commandBuffer.makeBlitCommandEncoder()
+            let copyPipeline = copyStrokeRectPipeline,
+            let copyEncoder = commandBuffer.makeComputeCommandEncoder()
         else {
             return nil
         }
 
-        blitEncoder.copy(
-            from: executionBuffers.current,
-            sourceOffset: 0,
-            to: executionBuffers.scratch,
-            destinationOffset: 0,
-            size: basePixelData.count
-        )
-        blitEncoder.endEncoding()
+        copyEncoder.setComputePipelineState(copyPipeline)
+        copyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
+        copyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
+        copyEncoder.setBuffer(copyRequestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: copyEncoder, pipeline: copyPipeline, width: dirtyRect.width, height: dirtyRect.height)
+        copyEncoder.endEncoding()
 
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else {
             return nil
         }
 
         encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(executionBuffers.current, offset: 0, index: 0)
-        encoder.setBuffer(executionBuffers.scratch, offset: 0, index: 1)
-        encoder.setBuffer(refreshedSamplesBuffer, offset: 0, index: 2)
+        encoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
+        encoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
+        encoder.setBuffer(primitiveBuffer, offset: 0, index: 2)
         encoder.setBuffer(brushBuffer, offset: 0, index: 3)
         encoder.setBuffer(requestBuffer, offset: 0, index: 4)
         encoder.setBuffer(customTipBuffer, offset: 0, index: 5)
+        encoder.setBuffer(tileRangeBuffer, offset: 0, index: 6)
+        encoder.setBuffer(primitiveIndexBuffer, offset: 0, index: 7)
         dispatch2D(encoder: encoder, pipeline: pipeline, width: dirtyRect.width, height: dirtyRect.height)
         encoder.endEncoding()
+
+        guard let finalizeCopyEncoder = commandBuffer.makeComputeCommandEncoder() else {
+            return nil
+        }
+        finalizeCopyEncoder.setComputePipelineState(copyPipeline)
+        finalizeCopyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 0)
+        finalizeCopyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 1)
+        finalizeCopyEncoder.setBuffer(copyRequestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: finalizeCopyEncoder, pipeline: copyPipeline, width: dirtyRect.width, height: dirtyRect.height)
+        finalizeCopyEncoder.endEncoding()
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
         cachedStrokeExecution = StrokeExecutionCache(
             width: canvasWidth,
             height: canvasHeight,
-            buffers: MetalBufferPair(current: executionBuffers.scratch, scratch: executionBuffers.current)
+            baseSnapshotRevision: request.snapshotRevision,
+            activeLayerIndex: request.activeLayerIndex,
+            brush: brush,
+            samples: descriptors,
+            buffers: executionContext.buffers,
+            lastOutputValid: true
         )
         return MetalStrokeExecutionResult(
-            pixelData: bytes(from: executionBuffers.scratch, count: basePixelData.count),
+            pixelData: bytes(from: executionContext.buffers.current, count: basePixelData.count),
             dirtyRect: dirtyRect
         )
     }
@@ -489,7 +608,9 @@ final class MetalDocumentProcessingClient {
         canvasHeight: Int,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
-        mode: MetalStrokeExecutionMode = .commit
+        mode: MetalStrokeExecutionMode = .commit,
+        snapshotRevision: Int? = nil,
+        activeLayerIndex: Int? = nil
     ) -> Data? {
         executeStroke(
             MetalStrokeExecutionRequest(
@@ -498,7 +619,9 @@ final class MetalDocumentProcessingClient {
                 canvasHeight: canvasHeight,
                 samples: samples,
                 brush: brush,
-                mode: mode
+                mode: mode,
+                snapshotRevision: snapshotRevision,
+                activeLayerIndex: activeLayerIndex
             )
         )?.pixelData
     }
@@ -884,19 +1007,156 @@ final class MetalDocumentProcessingClient {
         }
     }
 
-    private func prepareStrokeExecutionBuffers(
-        basePixelData: Data,
+    private static func makeStrokePrimitiveBinning(
+        descriptors: [MetalStrokeSampleDescriptor],
+        brush: BrushRuntimeSettings,
         canvasWidth: Int,
         canvasHeight: Int,
-        mode: MetalStrokeExecutionMode
-    ) -> MetalBufferPair? {
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> StrokePrimitiveBinning? {
+        guard !descriptors.isEmpty, dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
+        let tileSize = 32
+        let tileColumns = max(1, (dirtyRect.width + tileSize - 1) / tileSize)
+        let tileRows = max(1, (dirtyRect.height + tileSize - 1) / tileSize)
+        var tileBuckets = Array(repeating: [UInt32](), count: tileColumns * tileRows)
+        var primitives: [MetalStrokePrimitiveDescriptor] = []
+        let primitiveCapacity = descriptors.count > 1 ? descriptors.count - 1 : descriptors.count
+        primitives.reserveCapacity(primitiveCapacity)
+
+        let scatterExtent = brush.scatterEnabled ? max(brush.scatterLateral, brush.scatterLinear) : 0.0
+        let softness = max(0.0, 1.0 - brush.hardness)
+
+        let primitiveSourceIndices: [Int]
+        if descriptors.count > 1 {
+            primitiveSourceIndices = Array(descriptors.indices.dropLast())
+        } else {
+            primitiveSourceIndices = Array(descriptors.indices)
+        }
+
+        for index in primitiveSourceIndices {
+            let start = descriptors[index]
+            let hasFollowingDescriptor = index + 1 < descriptors.count
+            let end = hasFollowingDescriptor ? descriptors[index + 1] : start
+            let startRadius = max(
+                1.5,
+                brush.radius * max(0.1, 1.0 + ((Double(start.pressure) - 1.0) * brush.pressureSensitivity))
+            )
+            let endRadius = max(
+                1.5,
+                brush.radius * max(0.1, 1.0 + ((Double(end.pressure) - 1.0) * brush.pressureSensitivity))
+            )
+            let maxRadius = max(startRadius, endRadius)
+            let featherPadding = brush.tipKind == .airbrush
+                ? max(18.0, maxRadius * (0.9 + softness * 0.6))
+                : max(10.0, maxRadius * (0.35 + softness * 0.75))
+            let oilSpread = brush.tipKind == .oil
+                ? maxRadius * min(0.85, 0.24 + (brush.smudgeRadius * 1.45) + (brush.wetness * 0.35) + 0.18)
+                : 0.0
+            let padding = maxRadius + featherPadding + oilSpread + (scatterExtent * brush.radius) + 6.0
+            let minX = min(Double(start.x), Double(end.x)) - padding
+            let minY = min(Double(start.y), Double(end.y)) - padding
+            let maxX = max(Double(start.x), Double(end.x)) + padding
+            let maxY = max(Double(start.y), Double(end.y)) + padding
+
+            let clampedMinX = max(Double(dirtyRect.originX), minX)
+            let clampedMinY = max(Double(dirtyRect.originY), minY)
+            let clampedMaxX = min(Double(dirtyRect.originX + dirtyRect.width - 1), maxX)
+            let clampedMaxY = min(Double(dirtyRect.originY + dirtyRect.height - 1), maxY)
+            guard clampedMinX <= clampedMaxX, clampedMinY <= clampedMaxY else { continue }
+
+            let primitiveIndex = UInt32(primitives.count)
+            primitives.append(
+                MetalStrokePrimitiveDescriptor(
+                    startX: start.x,
+                    startY: start.y,
+                    endX: end.x,
+                    endY: end.y,
+                    startPressure: start.pressure,
+                    endPressure: end.pressure,
+                    startProgress: start.progress,
+                    endProgress: end.progress,
+                    maxRadius: Float(maxRadius),
+                    isSegment: hasFollowingDescriptor ? 1 : 0,
+                    _padding0: 0,
+                    _padding1: 0
+                )
+            )
+
+            let tileMinX = max(0, Int((clampedMinX - Double(dirtyRect.originX)) / Double(tileSize)))
+            let tileMinY = max(0, Int((clampedMinY - Double(dirtyRect.originY)) / Double(tileSize)))
+            let tileMaxX = min(tileColumns - 1, Int((clampedMaxX - Double(dirtyRect.originX)) / Double(tileSize)))
+            let tileMaxY = min(tileRows - 1, Int((clampedMaxY - Double(dirtyRect.originY)) / Double(tileSize)))
+            for tileY in tileMinY...tileMaxY {
+                for tileX in tileMinX...tileMaxX {
+                    tileBuckets[(tileY * tileColumns) + tileX].append(primitiveIndex)
+                }
+            }
+        }
+
+        guard !primitives.isEmpty else { return nil }
+        var tileRanges: [MetalStrokeTileRangeDescriptor] = []
+        tileRanges.reserveCapacity(tileBuckets.count)
+        var primitiveIndices: [UInt32] = []
+        primitiveIndices.reserveCapacity(tileBuckets.reduce(0) { $0 + $1.count })
+        var cursor: UInt32 = 0
+        for bucket in tileBuckets {
+            tileRanges.append(
+                MetalStrokeTileRangeDescriptor(
+                    startIndex: cursor,
+                    primitiveCount: UInt32(bucket.count)
+                )
+            )
+            primitiveIndices.append(contentsOf: bucket)
+            cursor += UInt32(bucket.count)
+        }
+
+        return StrokePrimitiveBinning(
+            dirtyRect: dirtyRect,
+            tileSize: tileSize,
+            tileColumns: tileColumns,
+            tileRows: tileRows,
+            primitives: primitives,
+            tileRanges: tileRanges,
+            primitiveIndices: primitiveIndices
+        )
+    }
+
+    private struct StrokeExecutionContext {
+        let buffers: MetalBufferPair
+        let sampleRange: Range<Int>
+        let shouldAdoptCachedOutput: Bool
+    }
+
+    private func prepareStrokeExecutionContext(
+        request: MetalStrokeExecutionRequest,
+        descriptors: [MetalStrokeSampleDescriptor],
+        basePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> StrokeExecutionContext? {
         let expectedCount = canvasWidth * canvasHeight * 4
         guard basePixelData.count == expectedCount else { return nil }
-        if mode == .interactive,
-           let cachedStrokeExecution,
+        if let cachedStrokeExecution,
            cachedStrokeExecution.width == canvasWidth,
-           cachedStrokeExecution.height == canvasHeight {
-            return cachedStrokeExecution.buffers
+           cachedStrokeExecution.height == canvasHeight,
+           cachedStrokeExecution.baseSnapshotRevision == request.snapshotRevision,
+           cachedStrokeExecution.activeLayerIndex == request.activeLayerIndex,
+           cachedStrokeExecution.brush == request.brush,
+           cachedStrokeExecution.lastOutputValid {
+            switch request.mode {
+            case .interactive:
+                break
+            case .previewAdopt:
+                break
+            case .commit:
+                if descriptors == cachedStrokeExecution.samples {
+                    return StrokeExecutionContext(
+                        buffers: cachedStrokeExecution.buffers,
+                        sampleRange: descriptors.count..<descriptors.count,
+                        shouldAdoptCachedOutput: true
+                    )
+                }
+            }
         }
         guard
             let current = makeBuffer(basePixelData),
@@ -904,15 +1164,11 @@ final class MetalDocumentProcessingClient {
         else {
             return nil
         }
-        let buffers = MetalBufferPair(current: current, scratch: scratch)
-        if mode == .interactive {
-            cachedStrokeExecution = StrokeExecutionCache(
-                width: canvasWidth,
-                height: canvasHeight,
-                buffers: buffers
-            )
-        }
-        return buffers
+        return StrokeExecutionContext(
+            buffers: MetalBufferPair(current: current, scratch: scratch),
+            sampleRange: 0..<descriptors.count,
+            shouldAdoptCachedOutput: false
+        )
     }
 
     private func bytes(from buffer: MTLBuffer, count: Int) -> [UInt8] {
