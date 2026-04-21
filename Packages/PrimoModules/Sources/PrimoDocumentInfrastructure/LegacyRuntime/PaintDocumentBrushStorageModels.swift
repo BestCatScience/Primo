@@ -1,5 +1,8 @@
 import CoreGraphics
 import Foundation
+import PrimoBrushDomain
+import PrimoBrushFileFormats
+import PrimoDocumentContracts
 
 struct StoredStylusSample: Codable, Equatable, Sendable {
     let x: Double

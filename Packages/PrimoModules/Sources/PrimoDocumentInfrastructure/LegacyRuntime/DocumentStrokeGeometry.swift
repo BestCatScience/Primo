@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
 
 enum DocumentStrokeGeometry {
     static func normalizedCommittedStrokeSamples(

@@ -1,5 +1,7 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 enum DocumentPreviewComposite {
     static func compositedPreviewPixelData(

@@ -1,4 +1,5 @@
 import CoreGraphics
+import PrimoDocumentContracts
 
 enum BrushStrokeKernel {
     static func taperScale(

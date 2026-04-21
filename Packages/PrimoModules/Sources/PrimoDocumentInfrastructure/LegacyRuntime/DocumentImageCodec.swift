@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import PrimoDocumentDomain
 import UniformTypeIdentifiers
 
 enum DocumentImageCodec {

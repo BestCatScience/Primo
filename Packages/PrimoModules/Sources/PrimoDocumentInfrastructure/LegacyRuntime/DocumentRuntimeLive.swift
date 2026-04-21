@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 
 public struct DocumentRuntimeLive: Sendable {

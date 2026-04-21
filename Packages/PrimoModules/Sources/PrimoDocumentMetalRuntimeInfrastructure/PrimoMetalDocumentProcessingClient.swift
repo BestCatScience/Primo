@@ -172,6 +172,19 @@ public struct PrimoMetalStrokeExecutionResult: Sendable {
     }
 }
 
+public struct PrimoMetalStrokeMutationResult: Sendable {
+    public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    public let rectPixelData: Data?
+
+    public init(
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
+        rectPixelData: Data?
+    ) {
+        self.dirtyRect = dirtyRect
+        self.rectPixelData = rectPixelData
+    }
+}
+
 private struct PrimoMetalStrokeDirtyRect: Equatable {
     let originX: Int
     let originY: Int
@@ -315,6 +328,28 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return bytes(from: outputBuffer, count: outputWidth * outputHeight * 4)
     }
 
+    public func compositedIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        guard let pixelData = compositedPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: nil,
+            adjustedActiveLayerPixels: nil,
+            dirtyRect: dirtyRect
+        ) else {
+            return nil
+        }
+        return IncrementalLayerUpdate(
+            layerIndex: -1,
+            originX: dirtyRect.originX,
+            originY: dirtyRect.originY,
+            width: dirtyRect.width,
+            height: dirtyRect.height,
+            pixelData: pixelData
+        )
+    }
+
     public func compositedPreviewPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
@@ -355,6 +390,39 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     public func executeStroke(
         _ request: PrimoMetalStrokeExecutionRequest
     ) -> PrimoMetalStrokeExecutionResult? {
+        guard let result = executeStroke(
+            request,
+            includeFullPixelData: true
+        ) else {
+            return nil
+        }
+        guard let pixelData = result.pixelData else { return nil }
+        return PrimoMetalStrokeExecutionResult(
+            pixelData: pixelData,
+            dirtyRect: result.dirtyRect,
+            rectPixelData: result.rectPixelData
+        )
+    }
+
+    public func executeStrokeMutation(
+        _ request: PrimoMetalStrokeExecutionRequest
+    ) -> PrimoMetalStrokeMutationResult? {
+        guard let result = executeStroke(
+            request,
+            includeFullPixelData: false
+        ) else {
+            return nil
+        }
+        return PrimoMetalStrokeMutationResult(
+            dirtyRect: result.dirtyRect,
+            rectPixelData: result.rectPixelData
+        )
+    }
+
+    private func executeStroke(
+        _ request: PrimoMetalStrokeExecutionRequest,
+        includeFullPixelData: Bool
+    ) -> (pixelData: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int), rectPixelData: Data?)? {
         guard Self.supportsStrokeRasterization(request.brush) else { return nil }
         let normalizedSamples = Self.normalizedCommittedStrokeSamples(request.samples, brush: request.brush)
         let descriptors = Self.strokeSampleDescriptors(samples: normalizedSamples)
@@ -383,8 +451,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             let resolvedDirtyRect = fullDirtyRect
                 ?? executionContext.cachedDirtyRect.map { ($0.originX, $0.originY, $0.width, $0.height) }
                 ?? (0, 0, request.canvasWidth, request.canvasHeight)
-            return PrimoMetalStrokeExecutionResult(
-                pixelData: bytes(from: executionContext.buffers.current, count: request.basePixelData.count),
+            return (
+                pixelData: includeFullPixelData
+                    ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
+                    : nil,
                 dirtyRect: resolvedDirtyRect,
                 rectPixelData: executionContext.cachedRectPixelData
             )
@@ -405,8 +475,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 dirtyRect: dirtyRect
             )
         else {
-            return PrimoMetalStrokeExecutionResult(
-                pixelData: bytes(from: executionContext.buffers.current, count: request.basePixelData.count),
+            return (
+                pixelData: includeFullPixelData
+                    ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
+                    : nil,
                 dirtyRect: fullDirtyRect ?? (0, 0, request.canvasWidth, request.canvasHeight),
                 rectPixelData: nil
             )
@@ -505,8 +577,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             buffers: executionContext.buffers,
             lastOutputValid: true
         )
-        return PrimoMetalStrokeExecutionResult(
-            pixelData: bytes(from: executionContext.buffers.current, count: request.basePixelData.count),
+        return (
+            pixelData: includeFullPixelData
+                ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
+                : nil,
             dirtyRect: dirtyRect,
             rectPixelData: rectPixelData
         )

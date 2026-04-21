@@ -1,5 +1,6 @@
 import Accelerate
 import Foundation
+import PrimoDocumentContracts
 
 struct PaintDocumentBlurService {
     func boxBlurredPixels(

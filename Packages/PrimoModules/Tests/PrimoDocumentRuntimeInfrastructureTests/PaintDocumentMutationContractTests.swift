@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentContracts
 import Testing
 @testable import PrimoDocumentRuntimeInfrastructure
 

@@ -1,4 +1,6 @@
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 struct StoredPrimoDocument: Codable {
     struct PaperStyle: Codable, Equatable, Sendable {

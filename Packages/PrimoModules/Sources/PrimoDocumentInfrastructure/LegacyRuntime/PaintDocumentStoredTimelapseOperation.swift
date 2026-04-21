@@ -1,4 +1,6 @@
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     enum Kind: String, Codable, Equatable, Sendable {

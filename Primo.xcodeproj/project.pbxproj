@@ -25,8 +25,6 @@
 		A00000000000000000000025 /* CanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* CanvasView.swift */; };
 		A00000000000000000000026 /* BrushPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* BrushPaletteView.swift */; };
 		A00000000000000000000027 /* LayerSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* LayerSidebarView.swift */; };
-		A00000000000000000000028 /* PaintDocumentBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000009 /* PaintDocumentBridge.mm */; };
-		A00000000000000000000029 /* PaintEngine.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* PaintEngine.cpp */; };
 		A0000000000000000000002A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* UIKit.framework */; };
 		A0000000000000000000002B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* Foundation.framework */; };
 		A0000000000000000000002C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* CoreGraphics.framework */; };
@@ -218,12 +216,8 @@
 		A00000000000000000000005 /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
 		A00000000000000000000006 /* BrushPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteView.swift; sourceTree = "<group>"; };
 		A00000000000000000000007 /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
-		A00000000000000000000008 /* PaintDocumentBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PaintDocumentBridge.h; sourceTree = "<group>"; };
-		A00000000000000000000009 /* PaintDocumentBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = PaintDocumentBridge.mm; sourceTree = "<group>"; };
 		A0000000000000000000000A /* primo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "primo-Bridging-Header.h"; sourceTree = "<group>"; };
 		A0000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A00000000000000000000011 /* PaintEngine.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PaintEngine.cpp; sourceTree = "<group>"; };
-		A00000000000000000000012 /* PaintEngine.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = PaintEngine.hpp; sourceTree = "<group>"; };
 		A00000000000000000000013 /* MetalCanvasRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalCanvasRenderer.swift; sourceTree = "<group>"; };
 		A00000000000000000000014 /* PaintShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PaintShaders.metal; sourceTree = "<group>"; };
 		A00000000000000000000015 /* BrushRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushRuntimeSettings.swift; sourceTree = "<group>"; };
@@ -417,8 +411,6 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000051 /* App */,
-				A00000000000000000000052 /* Bridge */,
-				A00000000000000000000053 /* Engine */,
 				AA3000000000000000000001 /* PrimoTests */,
 				A00000000000000000000054 /* Frameworks */,
 				A00000000000000000000055 /* Products */,
@@ -436,24 +428,6 @@
 				A0000000000000000000005B /* Support */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		A00000000000000000000052 /* Bridge */ = {
-			isa = PBXGroup;
-			children = (
-				A00000000000000000000008 /* PaintDocumentBridge.h */,
-				A00000000000000000000009 /* PaintDocumentBridge.mm */,
-			);
-			path = Bridge;
-			sourceTree = "<group>";
-		};
-		A00000000000000000000053 /* Engine */ = {
-			isa = PBXGroup;
-			children = (
-				A00000000000000000000011 /* PaintEngine.cpp */,
-				A00000000000000000000056 /* include */,
-			);
-			path = Engine;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000054 /* Frameworks */ = {
@@ -477,14 +451,6 @@
 				AA2000000000000000000001 /* PrimoTests.xctest */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		A00000000000000000000056 /* include */ = {
-			isa = PBXGroup;
-			children = (
-				A00000000000000000000012 /* PaintEngine.hpp */,
-			);
-			path = include;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000057 /* Application */ = {

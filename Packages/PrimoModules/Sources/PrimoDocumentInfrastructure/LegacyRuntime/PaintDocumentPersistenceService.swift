@@ -1,4 +1,5 @@
 import Foundation
+import PrimoCoreTypes
 
 struct PaintDocumentPersistenceService {
     let fileClient: FileClient

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
 
 extension DocumentStrokeRasterizer {
     private static func clampUnit(_ value: CGFloat) -> CGFloat {

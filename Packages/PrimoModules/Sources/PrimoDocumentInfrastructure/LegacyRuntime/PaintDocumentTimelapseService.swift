@@ -1,4 +1,5 @@
 import Foundation
+import PrimoCoreTypes
 
 struct PaintDocumentTimelapseService {
     let fileClient: FileClient

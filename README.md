@@ -1,8 +1,8 @@
 # primo
 
-`primo` は、SwiftUI フロントエンドと C++ 描画コアを組み合わせた iPad ファーストのペイントプロトタイプです。
+`primo` は、SwiftUI フロントエンドと Swift / Metal ベースの描画ランタイムを組み合わせた iPad ファーストのペイントプロトタイプです。
 
-このリポジトリは「Apple Pencil での描画体験」と「Krita のような本格的な画像処理コア」のあいだをつなぐ実験場として作られています。UI は SwiftUI と TCA で組み、描画本体は C++ で持ち、Swift からは Objective-C++ ブリッジ越しに利用します。
+このリポジトリは「Apple Pencil での描画体験」と「リアルタイムに反応する GPU 中心の画像処理パイプライン」のあいだをつなぐ実験場として作られています。UI は SwiftUI と TCA で組み、document runtime は Swift package 側で管理し、表示と描画更新は Metal を主軸にしています。
 
 ## プロジェクトの目的
 
@@ -16,14 +16,13 @@
 - 複数レイヤー対応のラスター document model
 - 筆圧に応じて不透明度と半径が変化する鉛筆風ブラシ
 - 消しゴム、ぼかし、塗りつぶし、スポイト、選択、移動、シェイプ系ツールの UI と状態管理
-- 高速な C++ ストロークラスタライズと Metal ベースの画面合成
+- Swift / Metal ベースのストローク処理と画面合成
 - レイヤーの表示・不透明度・ブレンドモード変更
 - レイヤーフォルダの作成、表示切り替え、並び替え
 - 選択範囲の作成と変形プレビュー
 - キャンバス紙色の変更と透明背景プレビュー
 - プロジェクト保存 / 読み込み
 - タイムラプス用の操作履歴またはフレーム書き出し
-- Swift から利用するための Objective-C++ ブリッジ
 - TCA ベースの SwiftUI アプリ構成
 - レイヤー一覧、ブラシコントロール、キャンバスを備えた iPad 向け SwiftUI UI
 - そのまま開けるチェックイン済みの Xcode プロジェクト
@@ -40,10 +39,8 @@
 
 - `App/`
   SwiftUI / TCA 側のアプリ本体です。UI、状態管理、ジェスチャ入力、保存メニュー、レイヤー UI などを持ちます。
-- `Bridge/`
-  Swift と C++ の橋渡し層です。`APPaintDocumentBridge` が `PaintDocument` を Objective-C API として公開します。
-- `Engine/`
-  描画コアです。レイヤー、ストローク、塗りつぶし、合成、dirty 管理などの中核処理があります。
+- `Packages/PrimoModules/`
+  document runtime、履歴、保存、タイムラプス、描画処理、Metal runtime などの shared modules です。
 - `Primo.xcodeproj`
   依存関係込みでそのまま開ける Xcode プロジェクトです。
 
@@ -51,20 +48,16 @@
 
 - [App/Features/Document/AppFeature.swift](/Users/goldstein/git/primo/App/Features/Document/AppFeature.swift)
   アプリ全体のドキュメント操作を束ねる TCA reducer です。
-- [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift)
-  Swift 側の document session です。保存、読み込み、タイムラプス、presentation 生成を担当します。
+- [Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/SwiftDocumentRuntime.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/SwiftDocumentRuntime.swift)
+  現在の document runtime 実装です。保存、読み込み、履歴、presentation、描画 commit を担当します。
 - [App/Features/Canvas/CanvasView.swift](/Users/goldstein/git/primo/App/Features/Canvas/CanvasView.swift)
   UIKit ベースのキャンバスコンテナです。入力を受けて Metal 表示へ渡します。
 - [App/Features/Canvas/InputHandler.swift](/Users/goldstein/git/primo/App/Features/Canvas/InputHandler.swift)
   Apple Pencil / touch をストロークや選択操作へ変換します。
 - [App/Rendering/MetalCanvasRenderer.swift](/Users/goldstein/git/primo/App/Rendering/MetalCanvasRenderer.swift)
   合成済みピクセルデータを Metal テクスチャへ載せて描画します。
-- [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/primo/Bridge/PaintDocumentBridge.mm)
-  C++ エンジンを Swift から呼べるように変換するブリッジ実装です。
-- [Engine/include/PaintEngine.hpp](/Users/goldstein/git/primo/Engine/include/PaintEngine.hpp)
-  描画エンジンの公開インターフェースです。
-- [Engine/PaintEngine.cpp](/Users/goldstein/git/primo/Engine/PaintEngine.cpp)
-  ブラシ描画、ストロークキュー、タイルストレージ、レイヤー合成などの本体です。
+- [Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift)
+  package 側の Metal 描画処理です。stroke / dirty rect composite / GPU 更新を担当します。
 
 ## はじめ方
 
@@ -83,13 +76,12 @@ open Primo.xcodeproj
 
 1. `InputHandler` が Pencil / touch を `Stroke` やツール操作へ変換します。
 2. `CanvasFeature` と `AppFeature` が TCA 上でその入力を解釈し、document client に渡します。
-3. `PaintDocumentSession` が Swift 側の状態管理、保存、タイムラプス記録、presentation 生成を担当します。
-4. `APPaintDocumentBridge` が Swift と C++ のデータ型を相互変換します。
-5. `PaintDocument` がレイヤー更新、描画、合成、undo / redo を処理します。
-6. `MetalCanvasRenderer` が合成済みピクセルデータを表示用テクスチャへ反映します。
+3. `DocumentRuntimeLive` と `SwiftDocumentRuntime` が document 状態、保存、履歴、presentation 生成を担当します。
+4. `PrimoMetalDocumentProcessingClient` が stroke / composite などの描画処理を package 側で実行します。
+5. `MetalCanvasRenderer` が合成済みピクセルデータを表示用テクスチャへ反映します。
 
-- 各レイヤーは、C++ 側で tile-backed な RGBA ラスターモデルとして保持されます。
-- インタラクティブな描画操作は、Krita に着想を得た小さな `stroke / job / strategy / queue` パイプラインでスケジューリングされます。
+- 各レイヤーは runtime 側で保持され、通常編集は dirty rect ベースで更新されます。
+- インタラクティブな描画操作は Swift / Metal の stroke / composite パイプラインで処理されます。
 - ストロークは dab ベースのブラシでアクティブレイヤーへ直接描画されます。
 - 描画コアは dirty rect と dirty tile を追跡し、合成結果を段階的に再構築できます。
 - Swift 側はプレビュー用に合成済みピクセルデータを Metal テクスチャへアップロードします。
@@ -122,7 +114,7 @@ open Primo.xcodeproj
 
 - レイヤーごとに可視状態、不透明度、ブレンドモードを持ちます
 - レイヤーフォルダを作成でき、可視状態や展開状態を管理できます
-- 合成結果は C++ 側で計算し、Metal では主に表示に集中します
+- 合成結果は package 側 runtime と Metal 処理で構築され、viewer 側の Metal は主に表示に集中します
 - レイヤーサムネイルや保存用 RGBA は必要に応じて Swift 側へ取り出します
 
 ### ブラシシステム
@@ -147,12 +139,11 @@ open Primo.xcodeproj
 - `TimelapseData/`
   操作ベースのタイムラプス保存で使う補助データです。
 
-この形式は [PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift) と [StoredAtelierDocument](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift#L1249) で定義されています。
+この形式は package 側の runtime / persistence 実装で定義されています。
 
 ## 開発メモ
 
-- UI 状態は TCA reducer に寄せてあり、描画ロジックは `PaintDocumentSession` と C++ 側へ分離しています
-- C++ コアは SwiftUI や UIKit に依存しません
+- UI 状態は TCA reducer に寄せてあり、描画ロジックは package runtime と Metal backend へ分離しています
 - `PaintDocumentClient` を介して reducer から document 実装を差し替えやすい構造です
 - 描画結果の表示は Metal、保存やエクスポートは Swift 側ユーティリティが担当します
 - 2026-04-16 から 2026-04-20 にかけてのドキュメント機能リファクタリング記録は [docs/document-refactors-2026-04-16-to-2026-04-20.md](/Users/goldstein/git/Primo/docs/document-refactors-2026-04-16-to-2026-04-20.md) にまとめています
@@ -160,16 +151,15 @@ open Primo.xcodeproj
 ## この README を読んだあとにおすすめの読む順番
 
 1. [App/Features/Document/AppFeature.swift](/Users/goldstein/git/primo/App/Features/Document/AppFeature.swift)
-2. [App/Features/Document/PaintDocumentSession.swift](/Users/goldstein/git/primo/App/Features/Document/PaintDocumentSession.swift)
-3. [Bridge/PaintDocumentBridge.mm](/Users/goldstein/git/primo/Bridge/PaintDocumentBridge.mm)
-4. [Engine/include/PaintEngine.hpp](/Users/goldstein/git/primo/Engine/include/PaintEngine.hpp)
-5. [Engine/PaintEngine.cpp](/Users/goldstein/git/primo/Engine/PaintEngine.cpp)
+2. [Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/DocumentRuntimeLive.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/DocumentRuntimeLive.swift)
+3. [Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/SwiftDocumentRuntime.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/LegacyRuntime/SwiftDocumentRuntime.swift)
+4. [Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalDocumentProcessingClient.swift)
 
 ## 現状の注意点
 
 - これは完成品というより、描画体験と内部アーキテクチャを前に進めるための試作プロジェクトです
 - 一部のツールや UI は先行して存在し、仕上がりの度合いに差があります
-- ストロークキューは Krita の考え方を取り入れていますが、現時点では本格的な並列 scheduler までは実装していません
+- 連続描画の遅延削減を優先しており、runtime 内部は引き続き整理中です
 
 ## 今後の予定
 
