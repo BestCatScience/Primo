@@ -14,7 +14,11 @@ let package = Package(
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoDocumentMetalRuntimeInfrastructure", targets: ["PrimoDocumentMetalRuntimeInfrastructure"]),
-        .library(name: "PrimoDocumentRuntimeInfrastructure", targets: ["PrimoDocumentRuntimeInfrastructure"]),
+        .library(name: "PrimoDocumentEngineInfrastructure", targets: ["PrimoDocumentEngineInfrastructure"]),
+        .library(name: "PrimoDocumentRenderingInfrastructure", targets: ["PrimoDocumentRenderingInfrastructure"]),
+        .library(name: "PrimoDocumentPersistenceInfrastructure", targets: ["PrimoDocumentPersistenceInfrastructure"]),
+        .library(name: "PrimoDocumentStrokeInfrastructure", targets: ["PrimoDocumentStrokeInfrastructure"]),
+        .library(name: "PrimoDocumentTimelapseInfrastructure", targets: ["PrimoDocumentTimelapseInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
         .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
         .library(name: "PrimoNanoBananaApplication", targets: ["PrimoNanoBananaApplication"]),
@@ -48,8 +52,7 @@ let package = Package(
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoDocumentApplication",
-            ],
-            exclude: ["LegacyRuntime"]
+            ]
         ),
         .target(
             name: "PrimoDocumentMetalRuntimeInfrastructure",
@@ -61,7 +64,47 @@ let package = Package(
             ]
         ),
         .target(
-            name: "PrimoDocumentRuntimeInfrastructure",
+            name: "PrimoDocumentRenderingInfrastructure",
+            dependencies: [
+                "PrimoDocumentApplication",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentStrokeInfrastructure",
+            ],
+            path: "Sources/PrimoDocumentRenderingInfrastructure"
+        ),
+        .target(
+            name: "PrimoDocumentPersistenceInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+            ],
+            path: "Sources/PrimoDocumentPersistenceInfrastructure"
+        ),
+        .target(
+            name: "PrimoDocumentStrokeInfrastructure",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+            ],
+            path: "Sources/PrimoDocumentStrokeInfrastructure"
+        ),
+        .target(
+            name: "PrimoDocumentTimelapseInfrastructure",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentPersistenceInfrastructure",
+            ],
+            path: "Sources/PrimoDocumentTimelapseInfrastructure"
+        ),
+        .target(
+            name: "PrimoDocumentEngineInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
@@ -69,8 +112,12 @@ let package = Package(
                 "PrimoDocumentApplication",
                 "PrimoDocumentInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentRenderingInfrastructure",
+                "PrimoDocumentPersistenceInfrastructure",
+                "PrimoDocumentStrokeInfrastructure",
+                "PrimoDocumentTimelapseInfrastructure",
             ],
-            path: "Sources/PrimoDocumentInfrastructure/LegacyRuntime"
+            path: "Sources/PrimoDocumentEngineInfrastructure"
         ),
         .target(
             name: "PrimoBrushDomain"
@@ -159,10 +206,18 @@ let package = Package(
             dependencies: ["PrimoDocumentApplication"]
         ),
         .testTarget(
-            name: "PrimoDocumentRuntimeInfrastructureTests",
+            name: "PrimoDocumentEngineInfrastructureTests",
             dependencies: [
                 "PrimoDocumentContracts",
-                "PrimoDocumentRuntimeInfrastructure",
+                "PrimoDocumentEngineInfrastructure",
+            ]
+        ),
+        .testTarget(
+            name: "PrimoDocumentRenderingInfrastructureTests",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentRenderingInfrastructure",
             ]
         ),
         .testTarget(

@@ -2,16 +2,20 @@ import Accelerate
 import CoreGraphics
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentApplication
 import PrimoDocumentInfrastructure
 import PrimoDocumentMetalRuntimeInfrastructure
+import PrimoDocumentPersistenceInfrastructure
+import PrimoDocumentRenderingInfrastructure
+import PrimoDocumentStrokeInfrastructure
+import PrimoDocumentTimelapseInfrastructure
 
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
-    private let services: DocumentRuntimeServices
+    private let services: DocumentEngineServices
     private let store: SwiftDocumentStore
     private var undoStack: [SwiftDocumentStoreSnapshot] = []
     private var redoStack: [SwiftDocumentStoreSnapshot] = []
@@ -26,7 +30,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live
     ) {
-        self.services = DocumentRuntimeServices(
+        self.services = DocumentEngineServices(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
@@ -122,11 +126,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let textScale = min(widthScale, heightScale)
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            if let scaled = services.geometry.scaledLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize) {
+            if let scaled = services.stroke.geometry.scaledLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize) {
                 layer.pixelData = scaled
             }
             if let mask = layer.maskData,
-               let scaledMask = services.geometry.scaledLayerMaskData(mask, from: sourceSize, to: targetSize) {
+               let scaledMask = services.stroke.geometry.scaledLayerMaskData(mask, from: sourceSize, to: targetSize) {
                 layer.maskData = scaledMask
             }
             if let textLayer = layer.textLayer {
@@ -166,11 +170,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let offsetY = (targetSize.height - sourceSize.height) / 2
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            if let translated = services.geometry.translatedLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
+            if let translated = services.stroke.geometry.translatedLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
                 layer.pixelData = translated
             }
             if let mask = layer.maskData,
-               let translatedMask = services.geometry.translatedLayerMaskData(mask, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
+               let translatedMask = services.stroke.geometry.translatedLayerMaskData(mask, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
                 layer.maskData = translatedMask
             }
             if let textLayer = layer.textLayer {
@@ -712,7 +716,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func saveProject(to url: URL, paperStyle: CanvasPaperStyle) throws {
-        let persistenceService = services.persistence
+        let persistenceService = services.persistence.projectStore
         try persistenceService.prepareProjectDirectory(at: url)
         let directories = try persistenceService.createProjectSubdirectories(
             in: url,
@@ -869,12 +873,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         let timelapseFrames: [TimelapseFrame]
         if timelapseEvents.isEmpty {
-            let frameDirectory = runtime.services.timelapse.makeDirectoryURL()
+            let frameDirectory = runtime.services.timelapse.frameStore.makeDirectoryURL()
             try fileClient.createDirectory(frameDirectory, true)
             timelapseFrames = try document.timelapseFrames.enumerated().map { index, frame in
                 let sourceURL = url.appendingPathComponent(frame.filename, isDirectory: false)
-                let destinationURL = runtime.services.timelapse.makeFrameURL(in: frameDirectory, frameID: index)
-                try runtime.services.persistence.replaceItemIfNeeded(at: destinationURL, with: sourceURL)
+                let destinationURL = runtime.services.timelapse.frameStore.makeFrameURL(in: frameDirectory, frameID: index)
+                try runtime.services.persistence.projectStore.replaceItemIfNeeded(at: destinationURL, with: sourceURL)
                 return TimelapseFrame(
                     imageURL: destinationURL,
                     size: CGSize(width: frame.width, height: frame.height)
@@ -1304,9 +1308,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private func captureTimelapseFrame() {
         guard let source = makeTimelapseThumbnail(), let jpegData = DocumentImageCodec.jpegData(from: source) else { return }
-        let frameURL = services.timelapse.makeFrameURL(in: services.timelapse.makeDirectoryURL(), frameID: store.snapshot.timelapseFrames.count)
+        let frameURL = services.timelapse.frameStore.makeFrameURL(
+            in: services.timelapse.frameStore.makeDirectoryURL(),
+            frameID: store.snapshot.timelapseFrames.count
+        )
         do {
-            try services.timelapse.persistFrameData(jpegData, to: frameURL)
+            try services.timelapse.frameStore.persistFrameData(jpegData, to: frameURL)
             store.snapshot.timelapseFrames.append(TimelapseFrame(imageURL: frameURL, size: CGSize(width: source.width, height: source.height)))
             store.snapshot.timelapseUsesOperationPersistence = false
         } catch {
@@ -1336,10 +1343,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func blurPixelData(layerIndex: Int, samples: [StylusSample], brush: BrushRuntimeSettings) -> Data? {
         let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let original = [UInt8](store.snapshot.layers[layerIndex].pixelData)
-        guard let blurred = services.blur.boxBlurredPixels(from: original, size: size, radius: max(brush.radius * 0.75, 3.0)) else {
+        guard let blurred = services.stroke.blur.boxBlurredPixels(from: original, size: size, radius: max(brush.radius * 0.75, 3.0)) else {
             return nil
         }
-        let blended = services.blur.blendBlurredPixels(
+        let blended = services.stroke.blur.blendBlurredPixels(
             original: original,
             blurred: blurred,
             size: size,

@@ -1,8 +1,9 @@
 import CoreGraphics
 import Foundation
 
-struct PaintDocumentGeometryService {
-    func scaledLayerPixelData(
+public struct PaintDocumentGeometryService {
+    public init() {}
+    public func scaledLayerPixelData(
         _ source: Data,
         from sourceSize: PaintDocumentCanvasSize,
         to targetSize: PaintDocumentCanvasSize
@@ -44,7 +45,7 @@ struct PaintDocumentGeometryService {
         return Data(bytes)
     }
 
-    func scaledLayerMaskData(
+    public func scaledLayerMaskData(
         _ source: Data,
         from sourceSize: PaintDocumentCanvasSize,
         to targetSize: PaintDocumentCanvasSize
@@ -86,7 +87,7 @@ struct PaintDocumentGeometryService {
         return Data(bytes)
     }
 
-    func translatedLayerPixelData(
+    public func translatedLayerPixelData(
         _ source: Data,
         from sourceSize: PaintDocumentCanvasSize,
         to targetSize: PaintDocumentCanvasSize,
@@ -115,7 +116,7 @@ struct PaintDocumentGeometryService {
         return Data(bytes)
     }
 
-    func translatedLayerMaskData(
+    public func translatedLayerMaskData(
         _ source: Data,
         from sourceSize: PaintDocumentCanvasSize,
         to targetSize: PaintDocumentCanvasSize,

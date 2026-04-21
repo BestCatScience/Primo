@@ -2,11 +2,11 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentRuntimeInfrastructure
+import PrimoDocumentRenderingInfrastructure
 
-typealias MetalStrokeExecutionMode = PrimoDocumentRuntimeInfrastructure.MetalStrokeExecutionMode
-typealias MetalStrokeExecutionRequest = PrimoDocumentRuntimeInfrastructure.MetalStrokeExecutionRequest
-typealias MetalStrokeExecutionResult = PrimoDocumentRuntimeInfrastructure.MetalStrokeExecutionResult
+typealias MetalStrokeExecutionMode = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionMode
+typealias MetalStrokeExecutionRequest = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionRequest
+typealias MetalStrokeExecutionResult = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionResult
 
 enum MetalDocumentProcessingClient {
     static let shared = DocumentRenderingClient.live

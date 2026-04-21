@@ -2,7 +2,7 @@ import CoreGraphics
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
-import PrimoDocumentRuntimeInfrastructure
+import PrimoDocumentRenderingInfrastructure
 import UIKit
 
 struct CanvasRenderSurfaceUpdate {

@@ -3,6 +3,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
+import PrimoDocumentStrokeInfrastructure
 
 public typealias MetalStrokeExecutionMode = PrimoMetalStrokeExecutionMode
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest

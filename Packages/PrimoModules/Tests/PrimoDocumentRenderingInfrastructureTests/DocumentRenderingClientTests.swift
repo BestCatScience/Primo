@@ -2,7 +2,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import Testing
-@testable import PrimoDocumentRuntimeInfrastructure
+@testable import PrimoDocumentRenderingInfrastructure
 
 struct DocumentRenderingClientTests {
     @Test

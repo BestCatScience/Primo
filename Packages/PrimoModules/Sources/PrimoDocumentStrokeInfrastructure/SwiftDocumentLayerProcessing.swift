@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 
-enum SwiftDocumentLayerProcessing {
+public enum SwiftDocumentLayerProcessing {
     struct GradientStop {
         let position: Double
         let red: UInt8
@@ -10,7 +10,7 @@ enum SwiftDocumentLayerProcessing {
         let blue: UInt8
     }
 
-    static func apply(
+    public static func apply(
         _ request: LayerProcessingRequest,
         to source: Data,
         canvasWidth: Int,

@@ -3,8 +3,8 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-enum DocumentPreviewComposite {
-    static func compositedPreviewPixelData(
+public enum DocumentPreviewComposite {
+    public static func compositedPreviewPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
@@ -41,7 +41,7 @@ enum DocumentPreviewComposite {
         return composite
     }
 
-    static func strokePreviewDirtyRect(
+    public static func strokePreviewDirtyRect(
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         canvasWidth: Int,
@@ -89,7 +89,7 @@ enum DocumentPreviewComposite {
         )
     }
 
-    static func compositedPreviewIncrementalUpdate(
+    public static func compositedPreviewIncrementalUpdate(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data,
@@ -145,7 +145,7 @@ enum DocumentPreviewComposite {
         )
     }
 
-    static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+    public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
         let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
         let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
         let softness = 1.0 - CGFloat(brush.hardness)
@@ -159,7 +159,7 @@ enum DocumentPreviewComposite {
         return true
     }
 
-    static func blendPreviewPixel(
+    public static func blendPreviewPixel(
         destination: UnsafeMutablePointer<UInt8>,
         source: UnsafePointer<UInt8>,
         opacity: CGFloat,

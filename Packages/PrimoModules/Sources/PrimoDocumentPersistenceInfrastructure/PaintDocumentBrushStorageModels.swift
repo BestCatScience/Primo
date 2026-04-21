@@ -4,7 +4,7 @@ import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 
-struct StoredStylusSample: Codable, Equatable, Sendable {
+public struct StoredStylusSample: Codable, Equatable, Sendable {
     let x: Double
     let y: Double
     let pressure: Double
@@ -12,7 +12,7 @@ struct StoredStylusSample: Codable, Equatable, Sendable {
     let azimuth: Double
     let timestamp: Double
 
-    init(_ sample: StylusSample) {
+    public init(_ sample: StylusSample) {
         x = Double(sample.point.x)
         y = Double(sample.point.y)
         pressure = Double(sample.pressure)
@@ -21,7 +21,7 @@ struct StoredStylusSample: Codable, Equatable, Sendable {
         timestamp = sample.timestamp
     }
 
-    var stylusSample: StylusSample {
+    public var stylusSample: StylusSample {
         StylusSample(
             point: CGPoint(x: CGFloat(x), y: CGFloat(y)),
             pressure: CGFloat(pressure),
@@ -32,23 +32,23 @@ struct StoredStylusSample: Codable, Equatable, Sendable {
     }
 }
 
-struct StoredBrushTipRaster: Codable, Equatable, Sendable {
+public struct StoredBrushTipRaster: Codable, Equatable, Sendable {
     let width: Int
     let height: Int
     let alphaData: Data
 
-    init(_ raster: BrushTipRaster) {
+    public init(_ raster: BrushTipRaster) {
         width = raster.width
         height = raster.height
         alphaData = raster.alphaData
     }
 
-    var raster: BrushTipRaster {
+    public var raster: BrushTipRaster {
         BrushTipRaster(width: width, height: height, alphaData: alphaData)
     }
 }
 
-struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
+public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let tipKind: String
     let radius: Double
     let sizeSpeedSensitivity: Double
@@ -117,7 +117,7 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let blue: UInt8
     let isEraser: Bool
 
-    init(_ brush: BrushRuntimeSettings) {
+    public init(_ brush: BrushRuntimeSettings) {
         tipKind = brush.tipKind.rawValue
         radius = brush.radius
         sizeSpeedSensitivity = brush.sizeSpeedSensitivity
@@ -187,7 +187,7 @@ struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         isEraser = brush.isEraser
     }
 
-    var runtimeSettings: BrushRuntimeSettings? {
+    public var runtimeSettings: BrushRuntimeSettings? {
         guard let tipKind = BrushTipKind(rawValue: tipKind),
               let angleMode = BrushAngleMode(rawValue: angleMode),
               let scatterMode = BrushScatterMode(rawValue: scatterMode),

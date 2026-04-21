@@ -2,28 +2,36 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-struct StoredPrimoDocument: Codable {
-    struct PaperStyle: Codable, Equatable, Sendable {
-        let red: Double
-        let green: Double
-        let blue: Double
-        let alpha: Double
-        let isTransparent: Bool
+public struct StoredPrimoDocument: Codable {
+    public struct PaperStyle: Codable, Equatable, Sendable {
+        public let red: Double
+        public let green: Double
+        public let blue: Double
+        public let alpha: Double
+        public let isTransparent: Bool
+
+        public init(red: Double, green: Double, blue: Double, alpha: Double, isTransparent: Bool) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+            self.alpha = alpha
+            self.isTransparent = isTransparent
+        }
     }
 
-    struct Layer: Codable {
-        let index: DocumentLayerIndex
-        let name: String
-        let visible: Bool
-        let locked: Bool
-        let alphaLocked: Bool
-        let clipped: Bool
-        let opacity: Double
-        let blendMode: String
-        let folderID: DocumentFolderID?
-        let textLayer: TextLayerData?
-        let pixelFilename: String
-        let maskFilename: String?
+    public struct Layer: Codable {
+        public let index: DocumentLayerIndex
+        public let name: String
+        public let visible: Bool
+        public let locked: Bool
+        public let alphaLocked: Bool
+        public let clipped: Bool
+        public let opacity: Double
+        public let blendMode: String
+        public let folderID: DocumentFolderID?
+        public let textLayer: TextLayerData?
+        public let pixelFilename: String
+        public let maskFilename: String?
 
         enum CodingKeys: String, CodingKey {
             case index
@@ -40,7 +48,7 @@ struct StoredPrimoDocument: Codable {
             case maskFilename
         }
 
-        init(
+        public init(
             index: DocumentLayerIndex,
             name: String,
             visible: Bool,
@@ -68,7 +76,7 @@ struct StoredPrimoDocument: Codable {
             self.maskFilename = maskFilename
         }
 
-        init(from decoder: Decoder) throws {
+        public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             index = try container.decode(DocumentLayerIndex.self, forKey: .index)
             name = try container.decode(String.self, forKey: .name)
@@ -85,29 +93,43 @@ struct StoredPrimoDocument: Codable {
         }
     }
 
-    struct Folder: Codable {
-        let id: DocumentFolderID
-        let name: String
-        let visible: Bool
-        let expanded: Bool
-        let anchorLayerIndex: DocumentLayerIndex?
+    public struct Folder: Codable {
+        public let id: DocumentFolderID
+        public let name: String
+        public let visible: Bool
+        public let expanded: Bool
+        public let anchorLayerIndex: DocumentLayerIndex?
+
+        public init(id: DocumentFolderID, name: String, visible: Bool, expanded: Bool, anchorLayerIndex: DocumentLayerIndex?) {
+            self.id = id
+            self.name = name
+            self.visible = visible
+            self.expanded = expanded
+            self.anchorLayerIndex = anchorLayerIndex
+        }
     }
 
-    struct TimelapseFrame: Codable {
-        let filename: String
-        let width: Double
-        let height: Double
+    public struct TimelapseFrame: Codable {
+        public let filename: String
+        public let width: Double
+        public let height: Double
+
+        public init(filename: String, width: Double, height: Double) {
+            self.filename = filename
+            self.width = width
+            self.height = height
+        }
     }
 
-    let version: Int
-    let canvasWidth: Int
-    let canvasHeight: Int
-    let activeLayerIndex: DocumentLayerIndex
-    let paperStyle: PaperStyle
-    let layers: [Layer]
-    let folders: [Folder]
-    let timelapseFrames: [TimelapseFrame]
-    let timelapseOperations: [StoredTimelapseOperation]
+    public let version: Int
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let activeLayerIndex: DocumentLayerIndex
+    public let paperStyle: PaperStyle
+    public let layers: [Layer]
+    public let folders: [Folder]
+    public let timelapseFrames: [TimelapseFrame]
+    public let timelapseOperations: [StoredTimelapseOperation]
 
     enum CodingKeys: String, CodingKey {
         case version
@@ -121,7 +143,7 @@ struct StoredPrimoDocument: Codable {
         case timelapseOperations
     }
 
-    init(
+    public init(
         version: Int,
         canvasWidth: Int,
         canvasHeight: Int,
@@ -143,7 +165,7 @@ struct StoredPrimoDocument: Codable {
         self.timelapseOperations = timelapseOperations
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         canvasWidth = try container.decode(Int.self, forKey: .canvasWidth)

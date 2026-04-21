@@ -2,7 +2,8 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
-import PrimoDocumentRuntimeInfrastructure
+import PrimoDocumentEngineInfrastructure
+import PrimoDocumentTimelapseInfrastructure
 import UIKit
 
 enum TimelapseExporter {

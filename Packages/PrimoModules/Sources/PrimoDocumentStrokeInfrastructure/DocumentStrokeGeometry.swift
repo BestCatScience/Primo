@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 
-enum DocumentStrokeGeometry {
+public enum DocumentStrokeGeometry {
     static func normalizedCommittedStrokeSamples(
         _ samples: [StylusSample],
         brush: BrushRuntimeSettings

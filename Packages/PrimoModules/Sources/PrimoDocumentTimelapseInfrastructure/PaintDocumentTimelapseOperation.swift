@@ -2,9 +2,10 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceInfrastructure
 
 extension TimelapseOperation {
-    func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live) throws -> StoredTimelapseOperation {
+    public func storedRepresentation(index: Int, dataDirectory: URL, fileClient: FileClient = .live) throws -> StoredTimelapseOperation {
         let dataFilename: String?
         switch self {
         case let .replaceLayerPixels(_, data):
@@ -102,7 +103,7 @@ extension TimelapseOperation {
         }
     }
 
-    init(
+    public init(
         stored: StoredTimelapseOperation,
         baseURL: URL,
         fileClient: FileClient = .live

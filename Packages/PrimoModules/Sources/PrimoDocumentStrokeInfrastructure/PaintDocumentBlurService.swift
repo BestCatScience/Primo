@@ -2,8 +2,9 @@ import Accelerate
 import Foundation
 import PrimoDocumentContracts
 
-struct PaintDocumentBlurService {
-    func boxBlurredPixels(
+public struct PaintDocumentBlurService {
+    public init() {}
+    public func boxBlurredPixels(
         from original: [UInt8],
         size: PaintDocumentCanvasSize,
         radius: Double
@@ -53,7 +54,7 @@ struct PaintDocumentBlurService {
         return source
     }
 
-    func blendBlurredPixels(
+    public func blendBlurredPixels(
         original: [UInt8],
         blurred: [UInt8],
         size: PaintDocumentCanvasSize,

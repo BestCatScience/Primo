@@ -1,17 +1,21 @@
 import Foundation
 import PrimoCoreTypes
 
-struct PaintDocumentPersistenceService {
+public struct PaintDocumentPersistenceService {
     let fileClient: FileClient
 
-    func prepareProjectDirectory(at url: URL) throws {
+    public init(fileClient: FileClient) {
+        self.fileClient = fileClient
+    }
+
+    public func prepareProjectDirectory(at url: URL) throws {
         if fileClient.fileExists(url.path) {
             try fileClient.removeItem(url)
         }
         try fileClient.createDirectory(url, true)
     }
 
-    func createProjectSubdirectories(
+    public func createProjectSubdirectories(
         in projectURL: URL,
         usesOperationTimelapsePersistence: Bool
     ) throws -> (layersDirectory: URL, timelapseDirectory: URL, timelapseDataDirectory: URL) {
@@ -27,15 +31,15 @@ struct PaintDocumentPersistenceService {
         return (layersDirectory, timelapseDirectory, timelapseDataDirectory)
     }
 
-    func writeAtomic(_ data: Data, to url: URL) throws {
+    public func writeAtomic(_ data: Data, to url: URL) throws {
         try fileClient.writeData(data, url, Data.WritingOptions.atomic)
     }
 
-    func loadData(from url: URL) throws -> Data {
+    public func loadData(from url: URL) throws -> Data {
         try fileClient.readData(url)
     }
 
-    func replaceItemIfNeeded(at destinationURL: URL, with sourceURL: URL) throws {
+    public func replaceItemIfNeeded(at destinationURL: URL, with sourceURL: URL) throws {
         if fileClient.fileExists(destinationURL.path) {
             try fileClient.removeItem(destinationURL)
         }

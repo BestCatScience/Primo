@@ -4,12 +4,12 @@ import ImageIO
 import PrimoDocumentDomain
 import UniformTypeIdentifiers
 
-enum DocumentImageCodec {
-    static func pngData(from image: CGImage) -> Data? {
+public enum DocumentImageCodec {
+    public static func pngData(from image: CGImage) -> Data? {
         encodedData(from: image, typeIdentifier: UTType.png.identifier as CFString)
     }
 
-    static func jpegData(from image: CGImage, compressionQuality: CGFloat = 0.72) -> Data? {
+    public static func jpegData(from image: CGImage, compressionQuality: CGFloat = 0.72) -> Data? {
         encodedData(
             from: image,
             typeIdentifier: UTType.jpeg.identifier as CFString,
@@ -17,13 +17,13 @@ enum DocumentImageCodec {
         )
     }
 
-    static func scaledImage(_ image: CGImage, to targetSize: CGSize, opaque: Bool = false) -> CGImage? {
+    public static func scaledImage(_ image: CGImage, to targetSize: CGSize, opaque: Bool = false) -> CGImage? {
         renderedImage(size: targetSize, opaque: opaque) { context in
             context.draw(image, in: CGRect(origin: .zero, size: targetSize))
         }
     }
 
-    static func compositedImage(
+    public static func compositedImage(
         base image: CGImage,
         canvasSize: CGSize,
         paperStyle: CanvasPaperStyle

@@ -29,7 +29,11 @@ targets:
     dependencies:
       - package: ComposableArchitecture
       - package: PrimoModules
-        product: PrimoDocumentRuntimeInfrastructure
+        product: PrimoDocumentEngineInfrastructure
+      - package: PrimoModules
+        product: PrimoDocumentRenderingInfrastructure
+      - package: PrimoModules
+        product: PrimoDocumentTimelapseInfrastructure
       - package: PrimoModules
         product: PrimoDocumentInfrastructure
       - sdk: AVFoundation.framework

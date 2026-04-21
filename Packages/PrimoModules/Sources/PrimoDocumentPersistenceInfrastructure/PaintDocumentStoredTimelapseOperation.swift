@@ -2,8 +2,8 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-struct StoredTimelapseOperation: Codable, Equatable, Sendable {
-    enum Kind: String, Codable, Equatable, Sendable {
+public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
+    public enum Kind: String, Codable, Equatable, Sendable {
         case stroke
         case blurStroke
         case fill
@@ -31,25 +31,25 @@ struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case setPaperStyle
     }
 
-    let kind: Kind
-    var layerIndex: DocumentLayerIndex?
-    var destinationIndex: DocumentLayerIndex?
-    var folderID: DocumentFolderID?
-    var anchorLayerIndex: DocumentLayerIndex?
-    var name: String?
-    var isVisible: Bool?
-    var isLocked: Bool?
-    var isAlphaLocked: Bool?
-    var isClipped: Bool?
-    var opacity: Double?
-    var blendMode: String?
-    var brush: StoredBrushRuntimeSettings?
-    var samples: [StoredStylusSample]?
-    var sample: StoredStylusSample?
-    var dataFilename: String?
-    var paperStyle: StoredPrimoDocument.PaperStyle?
+    public let kind: Kind
+    public var layerIndex: DocumentLayerIndex?
+    public var destinationIndex: DocumentLayerIndex?
+    public var folderID: DocumentFolderID?
+    public var anchorLayerIndex: DocumentLayerIndex?
+    public var name: String?
+    public var isVisible: Bool?
+    public var isLocked: Bool?
+    public var isAlphaLocked: Bool?
+    public var isClipped: Bool?
+    public var opacity: Double?
+    public var blendMode: String?
+    public var brush: StoredBrushRuntimeSettings?
+    public var samples: [StoredStylusSample]?
+    public var sample: StoredStylusSample?
+    public var dataFilename: String?
+    public var paperStyle: StoredPrimoDocument.PaperStyle?
 
-    init(
+    public init(
         kind: Kind,
         layerIndex: DocumentLayerIndex? = nil,
         destinationIndex: DocumentLayerIndex? = nil,

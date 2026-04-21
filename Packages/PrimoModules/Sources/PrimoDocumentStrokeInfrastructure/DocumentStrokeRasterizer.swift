@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 
 extension DocumentStrokeRasterizer {
-    static func layerPixelDataByApplyingCommittedShortStroke(
+    public static func layerPixelDataByApplyingCommittedShortStroke(
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
         samples: [StylusSample],
@@ -62,7 +62,7 @@ extension DocumentStrokeRasterizer {
             : output
     }
 
-    static func layerPixelDataByApplyingCommittedStroke(
+    public static func layerPixelDataByApplyingCommittedStroke(
         basePixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int,
@@ -114,7 +114,7 @@ extension DocumentStrokeRasterizer {
             : output
     }
 
-    static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
+    public static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
         guard source.count == existing.count else { return source }
         var output = source
         output.withUnsafeMutableBytes { outputBytes in
@@ -138,7 +138,7 @@ extension DocumentStrokeRasterizer {
         return output
     }
 
-    static func shouldRasterizeCommittedShortStroke(
+    public static func shouldRasterizeCommittedShortStroke(
         _ samples: [StylusSample],
         brush: BrushRuntimeSettings
     ) -> Bool {

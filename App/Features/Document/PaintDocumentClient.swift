@@ -3,7 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentRuntimeInfrastructure
+import PrimoDocumentEngineInfrastructure
 
 typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
 typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
@@ -80,7 +80,7 @@ struct PaintDocumentClient: Sendable {
         dateClient: DateClient,
         uuidClient: UUIDClient
     ) -> PaintDocumentClient {
-        let runtime = DocumentRuntimeFactory.live(
+        let runtime = DocumentEngineFactory.live(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient

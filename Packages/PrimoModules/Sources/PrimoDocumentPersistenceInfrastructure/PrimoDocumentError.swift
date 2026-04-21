@@ -1,10 +1,10 @@
 import Foundation
 
-enum PrimoDocumentError: LocalizedError {
+public enum PrimoDocumentError: LocalizedError {
     case invalidDocument
     case contractViolation(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .invalidDocument:
             return "The selected Primo document is invalid."

@@ -5,7 +5,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 
-public struct DocumentRuntimeLive: Sendable {
+public struct DocumentEngineLive: Sendable {
     public let queryGateway: DocumentQueryGateway
     public let mutationGateway: DocumentMutationGateway
     public let strokeGateway: StrokeInputGateway
@@ -30,12 +30,12 @@ public struct DocumentRuntimeLive: Sendable {
     public let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
 }
 
-public enum DocumentRuntimeFactory {
+public enum DocumentEngineFactory {
     public static func live(
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
-    ) -> DocumentRuntimeLive {
+    ) -> DocumentEngineLive {
         let runtimeBox = LockedDocumentRuntimeBox(
             runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,
@@ -150,7 +150,7 @@ public enum DocumentRuntimeFactory {
             clearTextLayerData: { index in runtimeBox.withRuntime { $0.clearTextLayerData(index: index) } }
         )
 
-        return DocumentRuntimeLive(
+        return DocumentEngineLive(
             queryGateway: queryGateway,
             mutationGateway: mutationGateway,
             strokeGateway: strokeGateway,
