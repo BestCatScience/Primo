@@ -725,7 +725,11 @@ extension AppFeature {
     ) {
         state.canvas.setStrokePreviewLayerPixelData(plan.adjustedPixels)
         if let incrementalUpdate = plan.incrementalUpdate {
-            state.canvas.setPendingIncrementalUpdate(incrementalUpdate)
+            state.canvas.applyIncrementalRenderUpdate(
+                incrementalUpdate,
+                activeLayerIndex: activeLayerIndex,
+                activeLayerPixelData: plan.adjustedPixels
+            )
         } else {
             applyLiveStrokePreview(
                 baseSnapshot: plan.baseSnapshot,

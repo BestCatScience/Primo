@@ -844,7 +844,35 @@ extension AppFeature {
     }
 
     func applyDirtyPresentation(state: inout State) -> Effect<Action> {
-        applyPresentation(documentPresentationQueryService.presentation(), state: &state)
+        let presentation = documentPresentationQueryService.presentation()
+        applyPresentation(
+            PaintDocumentPresentation(
+                canvasSize: presentation.canvasSize,
+                activeLayerIndex: presentation.activeLayerIndex,
+                layerRows: presentation.layerRows,
+                layerSidebarRows: presentation.layerSidebarRows,
+                renderSnapshot: nil
+            ),
+            state: &state
+        )
+        let canApplyIncrementalUpdate =
+            canApplyDirtyUpdateIncrementally(
+                presentation: presentation,
+                state: state
+            )
+        if canApplyIncrementalUpdate,
+           let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
+            let activeLayerPixels = presentation.renderSnapshot?.layers.first(where: {
+                $0.index == presentation.activeLayerIndex
+            })?.pixelData
+            state.canvas.applyIncrementalRenderUpdate(
+                dirtyUpdate,
+                activeLayerIndex: presentation.activeLayerIndex,
+                activeLayerPixelData: activeLayerPixels
+            )
+        } else {
+            applyPresentation(presentation, state: &state)
+        }
         state.workspace.setActiveTabDirty(true)
         state.workspace.updateActiveTabMetadata(
             previewImageData: documentPresentationQueryService.compositePNGData(
@@ -856,6 +884,29 @@ extension AppFeature {
             return .none
         }
         return .send(.workspacePersistenceRequested(request))
+    }
+
+    private func canApplyDirtyUpdateIncrementally(
+        presentation: PaintDocumentPresentation,
+        state: State
+    ) -> Bool {
+        guard let currentSnapshot = state.canvas.renderSnapshot,
+              let nextSnapshot = presentation.renderSnapshot else {
+            return false
+        }
+        guard currentSnapshot.width == nextSnapshot.width,
+              currentSnapshot.height == nextSnapshot.height,
+              currentSnapshot.layers.count == nextSnapshot.layers.count else {
+            return false
+        }
+
+        let currentLayerIndices = currentSnapshot.layers.map(\.index)
+        let nextLayerIndices = nextSnapshot.layers.map(\.index)
+        guard currentLayerIndices == nextLayerIndices else {
+            return false
+        }
+
+        return nextSnapshot.layers.contains(where: { $0.index == presentation.activeLayerIndex })
     }
 
     func applyLoadedWorkspaceSuccessEffects(

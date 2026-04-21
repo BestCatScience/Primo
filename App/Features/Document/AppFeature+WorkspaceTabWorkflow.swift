@@ -110,6 +110,7 @@ extension AppFeature {
                 await send(onFailure(failure))
             }
         }
+        .cancellable(id: CancelID.workspaceProjectLoad, cancelInFlight: true)
     }
 
     func beginImportedWorkspaceProjectLoad(
@@ -155,5 +156,6 @@ extension AppFeature {
                 await send(onFailure(failure))
             }
         }
+        .cancellable(id: CancelID.workspaceProjectLoad, cancelInFlight: true)
     }
 }

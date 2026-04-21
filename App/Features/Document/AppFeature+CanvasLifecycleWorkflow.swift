@@ -285,7 +285,8 @@ extension AppFeature {
     func cancelStartupPresentationEffects() -> Effect<Action> {
         .merge(
             .cancel(id: CancelID.startupPresentationLoad),
-            .cancel(id: CancelID.deferredPresentationRefresh)
+            .cancel(id: CancelID.deferredPresentationRefresh),
+            .cancel(id: CancelID.workspaceProjectLoad)
         )
     }
 

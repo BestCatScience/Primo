@@ -193,6 +193,57 @@ struct CanvasFeature {
             pendingIncrementalUpdate = nil
         }
 
+        mutating func applyIncrementalRenderUpdate(
+            _ update: IncrementalLayerUpdate,
+            activeLayerIndex: Int? = nil,
+            activeLayerPixelData: Data? = nil
+        ) {
+            guard let snapshot = renderSnapshot else {
+                pendingIncrementalUpdate = update
+                if let activeLayerPixelData {
+                    setStrokePreviewLayerPixelData(activeLayerPixelData)
+                }
+                return
+            }
+
+            guard let nextComposite = Self.replacingCompositeRegion(
+                in: snapshot.compositePixelData,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                update: update
+            ) else {
+                pendingIncrementalUpdate = update
+                return
+            }
+
+            let nextLayers = snapshot.layers.map { layer in
+                guard let activeLayerIndex, let activeLayerPixelData, layer.index == activeLayerIndex else {
+                    return layer
+                }
+                return MetalLayerSnapshot(
+                    index: layer.index,
+                    opacity: layer.opacity,
+                    visible: layer.visible,
+                    isClipped: layer.isClipped,
+                    blendMode: layer.blendMode,
+                    thumbnailData: layer.thumbnailData,
+                    pixelData: activeLayerPixelData
+                )
+            }
+
+            renderSnapshot = MetalDocumentSnapshot(
+                width: snapshot.width,
+                height: snapshot.height,
+                revision: max(snapshot.revision, lastCommittedRenderRevision) + 1,
+                compositePixelData: nextComposite,
+                layers: nextLayers
+            )
+            if let activeLayerPixelData {
+                setStrokePreviewLayerPixelData(activeLayerPixelData)
+            }
+            pendingIncrementalUpdate = update
+        }
+
         mutating func applyCommittedRenderSnapshot(
             _ renderSnapshot: MetalDocumentSnapshot,
             previousRevision: Int
@@ -286,6 +337,44 @@ struct CanvasFeature {
             discardBufferedStrokes(for: layerIndex, incrementsRevision: true)
             setSelection(selection)
             resetTransformPreview()
+        }
+
+        private static func replacingCompositeRegion(
+            in compositePixelData: Data,
+            canvasWidth: Int,
+            canvasHeight: Int,
+            update: IncrementalLayerUpdate
+        ) -> Data? {
+            guard compositePixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
+            guard !update.isEmpty else { return compositePixelData }
+            guard
+                update.originX >= 0,
+                update.originY >= 0,
+                update.originX + update.width <= canvasWidth,
+                update.originY + update.height <= canvasHeight,
+                update.pixelData.count >= update.width * update.height * 4
+            else {
+                return nil
+            }
+
+            var nextComposite = compositePixelData
+            nextComposite.withUnsafeMutableBytes { destinationBytes in
+                update.pixelData.withUnsafeBytes { sourceBytes in
+                    guard
+                        let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    else {
+                        return
+                    }
+
+                    for row in 0..<update.height {
+                        let sourceOffset = row * update.width * 4
+                        let destinationOffset = ((update.originY + row) * canvasWidth + update.originX) * 4
+                        memcpy(destinationBase + destinationOffset, sourceBase + sourceOffset, update.width * 4)
+                    }
+                }
+            }
+            return nextComposite
         }
     }
 

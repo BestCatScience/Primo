@@ -6,6 +6,7 @@ extension AppFeature {
         let layerName = namingPolicy(for: state).defaultLayerName(for: state.layerSidebar)
         return performDocumentMutation(
             state: &state,
+            contract: .currentPresentation,
             mutation: {
                 layerWorkflowService.addLayer(
                     named: layerName
@@ -28,6 +29,7 @@ extension AppFeature {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         return performDocumentMutation(
             state: &state,
+            contract: .currentPresentation,
             mutation: {
                 layerWorkflowService.createFolder(
                     named: folderName,
@@ -43,6 +45,7 @@ extension AppFeature {
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
+            contract: .currentPresentation,
             mutation: {
                 layerWorkflowService.deleteFolder(folderID)
             }
@@ -55,7 +58,10 @@ extension AppFeature {
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .current
+            ),
             mutation: {
                 layerWorkflowService.deleteLayer(index)
             }
@@ -72,7 +78,10 @@ extension AppFeature {
         let duplicateName = namingPolicy(for: state).duplicatedLayerName(for: layer.name)
         return performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .current
+            ),
             mutation: {
                 layerWorkflowService.duplicateLayer(index, named: duplicateName)
             }
@@ -86,7 +95,10 @@ extension AppFeature {
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .current
+            ),
             mutation: {
                 layerWorkflowService.moveLayer(index, to: destinationIndex)
             }
@@ -100,6 +112,7 @@ extension AppFeature {
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
+            contract: .currentPresentation,
             mutation: {
                 layerWorkflowService.assignLayer(index, toFolder: folderID)
             }
@@ -112,7 +125,10 @@ extension AppFeature {
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .current
+            ),
             mutation: {
                 layerWorkflowService.mergeLayerDown(index)
             }

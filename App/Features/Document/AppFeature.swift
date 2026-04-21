@@ -11,6 +11,7 @@ struct AppFeature {
     enum CancelID {
         case deferredPresentationRefresh
         case startupPresentationLoad
+        case workspaceProjectLoad
         case timelapseExport
         case nanoBananaEdit
     }
