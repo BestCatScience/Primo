@@ -1,7 +1,7 @@
 import Foundation
 import PrimoCoreTypes
 
-struct PaintDocumentSessionServices {
+struct DocumentRuntimeServices {
     let fileIO: FileClient
     let clock: DateClient
     let ids: UUIDClient

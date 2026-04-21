@@ -11,7 +11,7 @@ import PrimoDocumentMetalRuntimeInfrastructure
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
-    private let services: PaintDocumentSessionServices
+    private let services: DocumentRuntimeServices
     private let store: SwiftDocumentStore
     private var undoStack: [SwiftDocumentStoreSnapshot] = []
     private var redoStack: [SwiftDocumentStoreSnapshot] = []
@@ -26,7 +26,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live
     ) {
-        self.services = PaintDocumentSessionServices(
+        self.services = DocumentRuntimeServices(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient

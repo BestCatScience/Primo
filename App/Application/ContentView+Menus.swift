@@ -1925,18 +1925,20 @@ extension ContentView {
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .minimumHitTarget(30)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .minimumHitTarget(44)
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(StudioTheme.Palette.cardFillStrong)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             }
             .disabled(activeLayer == nil)

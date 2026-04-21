@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -34,23 +34,8 @@
 		A00000000000000000000035 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* Metal.framework */; };
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
 		A00000000000000000000039 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
-		B90000000000000000000001 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
-		B90000000000000000000015 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
-		B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
-		B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
-		B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
-		B90000000000000000000018 /* PrimoWorkspaceInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000019 /* PrimoWorkspaceInfrastructure */; };
-		B9000000000000000000001A /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
-		B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
-		B90000000000000000000021 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
-		B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
-		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
-		B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
-		B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
-		B90000000000000000000033 /* PrimoDocumentRuntimeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000034 /* PrimoDocumentRuntimeInfrastructure */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
-		A0000000000000000000003C /* PaintDocumentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* PaintDocumentSession.swift */; };
 		A0000000000000000000003D /* PaintDocumentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PaintDocumentClient.swift */; };
 		A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* BrushPaletteFeature.swift */; };
 		A0000000000000000000003F /* LayerSidebarFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* LayerSidebarFeature.swift */; };
@@ -80,14 +65,8 @@
 		A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */; };
 		A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BD /* AppFeature+SelectionTransform.swift */; };
 		A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BF /* DocumentWorkspaceClient.swift */; };
-		A000000000000000000000C0 /* PaintDocumentSession+TextLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */; };
-		A000000000000000000000C2 /* PaintDocumentSession+Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */; };
-		A000000000000000000000C4 /* PaintDocumentSession+Timelapse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */; };
-		A000000000000000000000C6 /* PaintDocumentSession+BridgeFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */; };
 		A000000000000000000000C8 /* SystemClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C9 /* SystemClients.swift */; };
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
-		A000000000000000000000CC /* PaintDocumentSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CD /* PaintDocumentSessionState.swift */; };
-		A000000000000000000000CE /* PaintDocumentSessionServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CF /* PaintDocumentSessionServices.swift */; };
 		A000000000000000000000D2 /* AppFeature+NanoBananaGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */; };
 		A000000000000000000000D4 /* AppFeatureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D5 /* AppFeatureModels.swift */; };
 		A000000000000000000000D6 /* AppFeature+StateCoordinators.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */; };
@@ -99,30 +78,9 @@
 		A000000000000000000000E2 /* AppFeature+CanvasStrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */; };
 		A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */; };
 		A000000000000000000000E6 /* AppFeature+ReducerRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */; };
-		A000000000000000000000E8 /* PaintDocumentSession+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */; };
-		A000000000000000000000EC /* PaintDocumentSessionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000ED /* PaintDocumentSessionModels.swift */; };
-		A000000000000000000000EE /* PaintDocumentSession+StrokeEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */; };
-		A000000000000000000000F0 /* PaintDocumentSession+LayerEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */; };
-		A000000000000000000000F2 /* PaintDocumentSession+CanvasGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */; };
 		A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* AppFeature+ActionRouting.swift */; };
-		A000000000000000000000F8 /* PaintDocumentBridgeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F9 /* PaintDocumentBridgeService.swift */; };
-		A000000000000000000000FA /* PaintDocumentRasterServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FB /* PaintDocumentRasterServices.swift */; };
-		A000000000000000000000FC /* PaintDocumentSessionSideEffectServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */; };
 		AA1000000000000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000002 /* XCTest.framework */; };
 		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
-		B90000000000000000000005 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
-		B90000000000000000000017 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
-		B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
-		B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
-		B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
-		B9000000000000000000001C /* PrimoWorkspaceInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000019 /* PrimoWorkspaceInfrastructure */; };
-		B9000000000000000000001D /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
-		B90000000000000000000020 /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
-		B90000000000000000000023 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
-		B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
-		B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
-		B9000000000000000000002C /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
-		B90000000000000000000031 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
 		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
@@ -134,21 +92,39 @@
 		B1C0A1D2E3F4456789ABC003 /* AppFeature+SelectionActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC004 /* AppFeature+SelectionActionRouting.swift */; };
 		B1C0A1D2E3F4456789ABC005 /* AppFeature+LayerActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC006 /* AppFeature+LayerActionRouting.swift */; };
 		B1C0A1D2E3F4456789ABC007 /* AppFeature+CanvasEditingActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C0A1D2E3F4456789ABC008 /* AppFeature+CanvasEditingActionRouting.swift */; };
-		C10000000000000000000001 /* PaintDocumentTimelapseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* PaintDocumentTimelapseOperation.swift */; };
-		C10000000000000000000003 /* PaintDocumentBrushStorageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000004 /* PaintDocumentBrushStorageModels.swift */; };
-		C10000000000000000000005 /* PaintDocumentStoredTimelapseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000006 /* PaintDocumentStoredTimelapseOperation.swift */; };
-		C10000000000000000000007 /* PaintDocumentSessionError.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000008 /* PaintDocumentSessionError.swift */; };
+		B90000000000000000000001 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
+		B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
+		B90000000000000000000004 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
+		B90000000000000000000005 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
+		B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
+		B90000000000000000000007 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
+		B90000000000000000000008 /* PrimoWorkspaceDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000014 /* PrimoWorkspaceDomain */; };
+		B90000000000000000000015 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
+		B90000000000000000000017 /* PrimoLocalization in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000016 /* PrimoLocalization */; };
+		B90000000000000000000018 /* PrimoWorkspaceInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000019 /* PrimoWorkspaceInfrastructure */; };
+		B9000000000000000000001A /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
+		B9000000000000000000001C /* PrimoWorkspaceInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000019 /* PrimoWorkspaceInfrastructure */; };
+		B9000000000000000000001D /* PrimoBrushInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001B /* PrimoBrushInfrastructure */; };
+		B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
+		B90000000000000000000020 /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
+		B90000000000000000000021 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
+		B90000000000000000000023 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
+		B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
+		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
+		B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
+		B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
+		B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
+		B9000000000000000000002C /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
+		B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
+		B90000000000000000000031 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
+		B90000000000000000000033 /* PrimoDocumentRuntimeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000034 /* PrimoDocumentRuntimeInfrastructure */; };
 		C20000000000000000000001 /* AppFeature+StrokeGeometryOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* AppFeature+StrokeGeometryOps.swift */; };
 		C20000000000000000000003 /* AppFeature+StrokeRasterizationCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* AppFeature+StrokeRasterizationCore.swift */; };
 		C20000000000000000000005 /* AppFeature+StrokeBlendOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000006 /* AppFeature+StrokeBlendOps.swift */; };
 		C8C52E9EC0B44A888AEB7B2F /* AppFeature+ImageImportOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */; };
 		D30000000000000000000001 /* AppFeature+CanvasPreviewStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */; };
 		D30000000000000000000003 /* AppFeature+CanvasToolStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */; };
-		D30000000000000000000005 /* PaintDocumentSession+FolderEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */; };
-		D30000000000000000000007 /* PaintDocumentSession+LayerPropertiesEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */; };
-		D30000000000000000000009 /* PaintDocumentSession+LayerPixelEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */; };
-		D3000000000000000000000B /* PaintDocumentSession+TimelapseReplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */; };
-		D3000000000000000000000D /* PaintDocumentSession+TimelapseFrames.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */; };
 		D40000000000000000000001 /* AppFeature+StartupLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000002 /* AppFeature+StartupLifecycleWorkflow.swift */; };
 		D40000000000000000000003 /* AppFeature+CanvasLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000004 /* AppFeature+CanvasLifecycleWorkflow.swift */; };
 		D40000000000000000000005 /* AppFeature+ExportWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000006 /* AppFeature+ExportWorkflow.swift */; };
@@ -158,15 +134,6 @@
 		D4000000000000000000000D /* AppFeature+LayerContentWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */; };
 		D4000000000000000000000F /* AppFeature+LayerStructureWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */; };
 		D40000000000000000000011 /* AppFeature+LayerPropertiesWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */; };
-		D50000000000000000000001 /* PaintDocumentEditingLifecycleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */; };
-		D50000000000000000000003 /* PaintDocumentPersistenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000004 /* PaintDocumentPersistenceService.swift */; };
-		D50000000000000000000005 /* PaintDocumentTimelapseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000006 /* PaintDocumentTimelapseService.swift */; };
-		D50000000000000000000007 /* PaintDocumentGeometryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50000000000000000000008 /* PaintDocumentGeometryService.swift */; };
-		D50000000000000000000009 /* PaintDocumentBlurService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5000000000000000000000A /* PaintDocumentBlurService.swift */; };
-		D60000000000000000000001 /* PaintDocumentBridgeQueryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */; };
-		D60000000000000000000003 /* PaintDocumentBridgePixelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */; };
-		D60000000000000000000005 /* PaintDocumentBridgeDescriptorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */; };
-		D60000000000000000000007 /* PaintDocumentBridgeStrokeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */; };
 		D6B81F2981D84D67805BFF2F /* AppFeature+StrokeRasterization.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */; };
 		DE2EE6961B83425CAAFEACBC /* AppFeature+DocumentActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED876FE803A549B6B0A5E369 /* AppFeature+DocumentActionRouting.swift */; };
 		E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AppFeature+DomainState.swift */; };
@@ -222,7 +189,6 @@
 		A00000000000000000000014 /* PaintShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PaintShaders.metal; sourceTree = "<group>"; };
 		A00000000000000000000015 /* BrushRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushRuntimeSettings.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PaintDocumentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPresentation.swift; sourceTree = "<group>"; };
-		A00000000000000000000017 /* PaintDocumentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSession.swift; sourceTree = "<group>"; };
 		A00000000000000000000018 /* PaintDocumentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentClient.swift; sourceTree = "<group>"; };
 		A00000000000000000000019 /* BrushPaletteFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteFeature.swift; sourceTree = "<group>"; };
 		A0000000000000000000001A /* LayerSidebarFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarFeature.swift; sourceTree = "<group>"; };
@@ -259,14 +225,8 @@
 		A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BD /* AppFeature+SelectionTransform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionTransform.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BF /* DocumentWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkspaceClient.swift; sourceTree = "<group>"; };
-		A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TextLayer.swift"; sourceTree = "<group>"; };
-		A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Persistence.swift"; sourceTree = "<group>"; };
-		A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Timelapse.swift"; sourceTree = "<group>"; };
-		A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+BridgeFacade.swift"; sourceTree = "<group>"; };
 		A000000000000000000000C9 /* SystemClients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemClients.swift; sourceTree = "<group>"; };
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
-		A000000000000000000000CD /* PaintDocumentSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionState.swift; sourceTree = "<group>"; };
-		A000000000000000000000CF /* PaintDocumentSessionServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionServices.swift; sourceTree = "<group>"; };
 		A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+NanoBananaGenerationService.swift"; sourceTree = "<group>"; };
 		A000000000000000000000D5 /* AppFeatureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeatureModels.swift; sourceTree = "<group>"; };
 		A000000000000000000000D7 /* AppFeature+StateCoordinators.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StateCoordinators.swift"; sourceTree = "<group>"; };
@@ -278,15 +238,7 @@
 		A000000000000000000000E3 /* AppFeature+CanvasStrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasStrokeWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionToolWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ReducerRouting.swift"; sourceTree = "<group>"; };
-		A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+Presentation.swift"; sourceTree = "<group>"; };
-		A000000000000000000000ED /* PaintDocumentSessionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionModels.swift; sourceTree = "<group>"; };
-		A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+StrokeEditing.swift"; sourceTree = "<group>"; };
-		A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerEditing.swift"; sourceTree = "<group>"; };
-		A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+CanvasGeometry.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* AppFeature+ActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ActionRouting.swift"; sourceTree = "<group>"; };
-		A000000000000000000000F9 /* PaintDocumentBridgeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeService.swift; sourceTree = "<group>"; };
-		A000000000000000000000FB /* PaintDocumentRasterServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentRasterServices.swift; sourceTree = "<group>"; };
-		A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionSideEffectServices.swift; sourceTree = "<group>"; };
 		AA2000000000000000000001 /* PrimoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrimoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA2000000000000000000002 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		AA2000000000000000000003 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
@@ -301,20 +253,11 @@
 		B1C0A1D2E3F4456789ABC006 /* AppFeature+LayerActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerActionRouting.swift"; sourceTree = "<group>"; };
 		B1C0A1D2E3F4456789ABC008 /* AppFeature+CanvasEditingActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasEditingActionRouting.swift"; sourceTree = "<group>"; };
 		BC5624D1427F44FDAE81DC45 /* AppFeature+ApplicationActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ApplicationActionRouting.swift"; sourceTree = "<group>"; };
-		C10000000000000000000002 /* PaintDocumentTimelapseOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentTimelapseOperation.swift; sourceTree = "<group>"; };
-		C10000000000000000000004 /* PaintDocumentBrushStorageModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBrushStorageModels.swift; sourceTree = "<group>"; };
-		C10000000000000000000006 /* PaintDocumentStoredTimelapseOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentStoredTimelapseOperation.swift; sourceTree = "<group>"; };
-		C10000000000000000000008 /* PaintDocumentSessionError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentSessionError.swift; sourceTree = "<group>"; };
 		C20000000000000000000002 /* AppFeature+StrokeGeometryOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeGeometryOps.swift"; sourceTree = "<group>"; };
 		C20000000000000000000004 /* AppFeature+StrokeRasterizationCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeRasterizationCore.swift"; sourceTree = "<group>"; };
 		C20000000000000000000006 /* AppFeature+StrokeBlendOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StrokeBlendOps.swift"; sourceTree = "<group>"; };
 		D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasPreviewStateCoordinator.swift"; sourceTree = "<group>"; };
 		D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasToolStateCoordinator.swift"; sourceTree = "<group>"; };
-		D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+FolderEditing.swift"; sourceTree = "<group>"; };
-		D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerPropertiesEditing.swift"; sourceTree = "<group>"; };
-		D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+LayerPixelEditing.swift"; sourceTree = "<group>"; };
-		D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TimelapseReplay.swift"; sourceTree = "<group>"; };
-		D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaintDocumentSession+TimelapseFrames.swift"; sourceTree = "<group>"; };
 		D40000000000000000000002 /* AppFeature+StartupLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+StartupLifecycleWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000004 /* AppFeature+CanvasLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasLifecycleWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000006 /* AppFeature+ExportWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ExportWorkflow.swift"; sourceTree = "<group>"; };
@@ -324,15 +267,6 @@
 		D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerContentWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerStructureWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerPropertiesWorkflow.swift"; sourceTree = "<group>"; };
-		D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentEditingLifecycleService.swift; sourceTree = "<group>"; };
-		D50000000000000000000004 /* PaintDocumentPersistenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPersistenceService.swift; sourceTree = "<group>"; };
-		D50000000000000000000006 /* PaintDocumentTimelapseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentTimelapseService.swift; sourceTree = "<group>"; };
-		D50000000000000000000008 /* PaintDocumentGeometryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentGeometryService.swift; sourceTree = "<group>"; };
-		D5000000000000000000000A /* PaintDocumentBlurService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBlurService.swift; sourceTree = "<group>"; };
-		D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeQueryService.swift; sourceTree = "<group>"; };
-		D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgePixelService.swift; sourceTree = "<group>"; };
-		D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeDescriptorService.swift; sourceTree = "<group>"; };
-		D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentBridgeStrokeService.swift; sourceTree = "<group>"; };
 		D6E00941144B432589C8F631 /* AppFeature+WorkspaceActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceActionRouting.swift"; sourceTree = "<group>"; };
 		E10000000000000000000002 /* AppFeature+DomainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DomainState.swift"; sourceTree = "<group>"; };
 		E70000000000000000000001 /* AppFeature+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+State.swift"; sourceTree = "<group>"; };
@@ -595,39 +529,6 @@
 				A000000000000000000000D3 /* AppFeature+NanoBananaGenerationService.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
-				A00000000000000000000017 /* PaintDocumentSession.swift */,
-				A000000000000000000000F9 /* PaintDocumentBridgeService.swift */,
-				D60000000000000000000002 /* PaintDocumentBridgeQueryService.swift */,
-				D60000000000000000000004 /* PaintDocumentBridgePixelService.swift */,
-				D60000000000000000000006 /* PaintDocumentBridgeDescriptorService.swift */,
-				D60000000000000000000008 /* PaintDocumentBridgeStrokeService.swift */,
-				A000000000000000000000FB /* PaintDocumentRasterServices.swift */,
-				D50000000000000000000008 /* PaintDocumentGeometryService.swift */,
-				D5000000000000000000000A /* PaintDocumentBlurService.swift */,
-				A000000000000000000000FD /* PaintDocumentSessionSideEffectServices.swift */,
-				D50000000000000000000002 /* PaintDocumentEditingLifecycleService.swift */,
-				D50000000000000000000004 /* PaintDocumentPersistenceService.swift */,
-				D50000000000000000000006 /* PaintDocumentTimelapseService.swift */,
-				A000000000000000000000E9 /* PaintDocumentSession+Presentation.swift */,
-				A000000000000000000000EF /* PaintDocumentSession+StrokeEditing.swift */,
-				A000000000000000000000F1 /* PaintDocumentSession+LayerEditing.swift */,
-				D30000000000000000000006 /* PaintDocumentSession+FolderEditing.swift */,
-				D30000000000000000000008 /* PaintDocumentSession+LayerPropertiesEditing.swift */,
-				D3000000000000000000000A /* PaintDocumentSession+LayerPixelEditing.swift */,
-				A000000000000000000000F3 /* PaintDocumentSession+CanvasGeometry.swift */,
-				D3000000000000000000000C /* PaintDocumentSession+TimelapseReplay.swift */,
-				D3000000000000000000000E /* PaintDocumentSession+TimelapseFrames.swift */,
-				A000000000000000000000ED /* PaintDocumentSessionModels.swift */,
-				C10000000000000000000002 /* PaintDocumentTimelapseOperation.swift */,
-				C10000000000000000000004 /* PaintDocumentBrushStorageModels.swift */,
-				C10000000000000000000006 /* PaintDocumentStoredTimelapseOperation.swift */,
-				C10000000000000000000008 /* PaintDocumentSessionError.swift */,
-				A000000000000000000000CD /* PaintDocumentSessionState.swift */,
-				A000000000000000000000CF /* PaintDocumentSessionServices.swift */,
-				A000000000000000000000C1 /* PaintDocumentSession+TextLayer.swift */,
-				A000000000000000000000C3 /* PaintDocumentSession+Persistence.swift */,
-				A000000000000000000000C5 /* PaintDocumentSession+Timelapse.swift */,
-				A000000000000000000000C7 /* PaintDocumentSession+BridgeFacade.swift */,
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
 				A000000000000000000000BF /* DocumentWorkspaceClient.swift */,
 				A000000000000000000000B7 /* NanoBananaClient.swift */,
@@ -1180,6 +1081,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PrimoModules;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		A00000000000000000000092 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1193,13 +1101,6 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/PrimoModules;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		A00000000000000000000093 /* ComposableArchitecture */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1211,10 +1112,40 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoCoreTypes;
 		};
+		B90000000000000000000012 /* PrimoDocumentDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentDomain;
+		};
+		B90000000000000000000013 /* PrimoDocumentContracts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentContracts;
+		};
+		B90000000000000000000014 /* PrimoWorkspaceDomain */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoWorkspaceDomain;
+		};
 		B90000000000000000000016 /* PrimoLocalization */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoLocalization;
+		};
+		B90000000000000000000019 /* PrimoWorkspaceInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoWorkspaceInfrastructure;
+		};
+		B9000000000000000000001B /* PrimoBrushInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoBrushInfrastructure;
+		};
+		B9000000000000000000001F /* PrimoBrushFileFormats */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoBrushFileFormats;
 		};
 		B90000000000000000000022 /* PrimoBrushDomain */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1245,36 +1176,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentRuntimeInfrastructure;
-		};
-		B90000000000000000000019 /* PrimoWorkspaceInfrastructure */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoWorkspaceInfrastructure;
-		};
-		B9000000000000000000001F /* PrimoBrushFileFormats */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoBrushFileFormats;
-		};
-		B9000000000000000000001B /* PrimoBrushInfrastructure */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoBrushInfrastructure;
-		};
-		B90000000000000000000012 /* PrimoDocumentDomain */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoDocumentDomain;
-		};
-		B90000000000000000000013 /* PrimoDocumentContracts */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoDocumentContracts;
-		};
-		B90000000000000000000014 /* PrimoWorkspaceDomain */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoWorkspaceDomain;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
