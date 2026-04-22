@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentEngineInfrastructure
 
 extension AppFeature {
     private struct ExportWorkflowService {
@@ -23,7 +24,7 @@ extension AppFeature {
         ) -> Effect<Action> {
             .run { [workspaceArtifactService, fileClient, dateClient] send in
                 do {
-                    let result = try TimelapseExporter.exportVideo(
+                    let result = try TimelapseExportService.exportVideo(
                         from: capture,
                         to: workspaceArtifactService.timelapseTemporaryDirectory(),
                         fileClient: fileClient,

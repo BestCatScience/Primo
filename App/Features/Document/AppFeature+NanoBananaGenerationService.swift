@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
 import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
@@ -110,28 +111,16 @@ extension AppFeature {
             let targetLayerIndex: Int
         }
 
-        let documentMutationGateway: DocumentMutationGateway
-        let layerContentTransactionService: LayerContentTransactionService
+        let contentService: DocumentContentService
 
         func apply(
             _ plan: NanoBananaPreviewApplicationPlan
         ) -> Result<AppliedPreview, DocumentMutationFailure> {
-            layerContentTransactionService.apply(target: plan.target) { targetLayerIndex in
-                switch documentMutationGateway.setActiveLayer(targetLayerIndex) {
-                case let .failure(failure):
-                    return .failure(failure)
-                case .success:
-                    return documentMutationGateway.replaceLayerPixels(
-                        targetLayerIndex,
-                        plan.preview.pixelData
-                    )
-                }
-            }
-            .map {
-                AppliedPreview(
-                    targetLayerIndex: $0.targetLayerIndex
-                )
-            }
+            contentService.applyPixels(
+                plan.preview.pixelData,
+                to: plan.target
+            )
+            .map { AppliedPreview(targetLayerIndex: $0.targetLayerIndex) }
         }
     }
 
@@ -238,8 +227,7 @@ extension AppFeature {
 
     private var nanoBananaDocumentService: NanoBananaDocumentService {
         NanoBananaDocumentService(
-            documentMutationGateway: documentMutationGateway,
-            layerContentTransactionService: layerContentTransactionService
+            contentService: layerContentWorkflowService
         )
     }
 

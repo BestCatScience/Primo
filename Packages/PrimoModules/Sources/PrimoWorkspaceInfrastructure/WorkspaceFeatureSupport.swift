@@ -57,10 +57,7 @@ public struct WorkspaceBackingStoreService: Sendable {
         self.documentWorkspaceClient = documentWorkspaceClient
     }
 
-    public func saveProject(
-        at fileURL: URL,
-        paperStyle: CanvasPaperStyle
-    ) throws {
+    public func saveProject(at fileURL: URL, paperStyle: CanvasPaperStyle) throws {
         try documentPersistenceGateway.saveProject(fileURL, paperStyle)
     }
 

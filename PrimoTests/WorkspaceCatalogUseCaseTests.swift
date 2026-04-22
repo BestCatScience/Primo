@@ -1,4 +1,5 @@
 import Foundation
+import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest
 @testable import Primo

@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceDomain
 
 struct ShareExport: Equatable, Identifiable {
@@ -16,14 +17,8 @@ struct TimelapseExportPreview: Equatable {
     var previewImageData: Data?
 }
 
-struct TimelapseExportProgress: Equatable, Sendable {
-    var progress: Double
-    var previewImageData: Data?
-}
-
-struct TimelapseExportResult: Equatable, Sendable {
-    var url: URL
-}
+typealias TimelapseExportProgress = PrimoDocumentEngineInfrastructure.TimelapseExportProgress
+typealias TimelapseExportResult = PrimoDocumentEngineInfrastructure.TimelapseExportResult
 
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush

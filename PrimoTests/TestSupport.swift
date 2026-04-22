@@ -3,6 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentEngineInfrastructure
+import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 @testable import Primo
 

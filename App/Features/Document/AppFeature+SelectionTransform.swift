@@ -1,36 +1,11 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 
 extension AppFeature {
-    enum SelectionTransformCommit {
-        case text(layerIndex: Int, textLayer: TextLayerData)
-        case pixels(layerIndex: Int, pixelData: Data, selection: CanvasSelection?)
-    }
-
-    struct SelectionTransformService {
-        let documentQueryGateway: DocumentQueryGateway
-        let documentMutationGateway: DocumentMutationGateway
-        let textLayerGateway: TextLayerGateway
-
-        func setTextLayer(
-            _ layerIndex: Int,
-            _ textLayer: TextLayerData
-        ) -> DocumentMutationResult {
-            textLayerGateway.setTextLayer(layerIndex, textLayer)
-        }
-
-        func pixelDataForLayer(_ layerIndex: Int) -> Data {
-            documentQueryGateway.pixelDataForLayer(layerIndex)
-        }
-
-        func replaceLayerPixels(
-            _ layerIndex: Int,
-            _ pixelData: Data
-        ) -> DocumentMutationResult {
-            documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
-        }
-    }
+    typealias SelectionTransformCommit = PrimoDocumentApplication.SelectionTransformCommit
+    typealias SelectionTransformService = PrimoDocumentApplication.DocumentContentService
 
     var selectionTransformService: SelectionTransformService {
         SelectionTransformService(
@@ -70,7 +45,9 @@ extension AppFeature {
             )
             textLayer.scale = min(max(textLayer.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
             textLayer.rotationDegrees += rotationDegrees
-            return .text(layerIndex: activeLayerIndex, textLayer: textLayer)
+            return SelectionTransformCommit(
+                payload: .text(layerIndex: activeLayerIndex, textLayer: textLayer)
+            )
         }
         let source = selectionTransformService.pixelDataForLayer(activeLayerIndex)
         let canvasWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
@@ -90,19 +67,21 @@ extension AppFeature {
         ) else {
             return nil
         }
-        return .pixels(
-            layerIndex: activeLayerIndex,
-            pixelData: transformed,
-            selection: Self.transformedSelection(
-                state.canvas.selection,
-                translation: translation,
-                scaleX: scaleX,
-                scaleY: scaleY,
-                rotationDegrees: rotationDegrees,
-                pivot: transformPivot,
-                mode: transformMode,
-                quadOffsets: quadOffsets,
-                canvasSize: state.canvas.canvasSize
+        return SelectionTransformCommit(
+            payload: .pixels(
+                layerIndex: activeLayerIndex,
+                pixelData: transformed,
+                selection: Self.transformedSelection(
+                    state.canvas.selection,
+                    translation: translation,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    rotationDegrees: rotationDegrees,
+                    pivot: transformPivot,
+                    mode: transformMode,
+                    quadOffsets: quadOffsets,
+                    canvasSize: state.canvas.canvasSize
+                )
             )
         )
     }
@@ -113,7 +92,7 @@ extension AppFeature {
             discardTransformPreview(state: &state)
             return .none
         }
-        switch commit {
+        switch commit.payload {
         case let .text(layerIndex, textLayer):
             return performDocumentMutation(
                 state: &state,

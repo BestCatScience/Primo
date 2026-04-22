@@ -1,143 +1,18 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
 import UIKit
 
 extension AppFeature {
-    enum LayerContentMutationTarget {
-        case existingLayer(index: Int)
-        case newLayer(name: String)
-    }
-
-    struct AppliedLayerContentMutation {
-        let targetLayerIndex: Int
-    }
-
-    struct LayerContentTransactionService {
-        let documentQueryGateway: DocumentQueryGateway
-        let documentMutationGateway: DocumentMutationGateway
-
-        func apply(
-            target: LayerContentMutationTarget,
-            mutation: (Int) -> DocumentMutationResult
-        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
-            let resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
-            switch resolve(target) {
-            case let .failure(failure):
-                return .failure(failure)
-            case let .success(target):
-                resolvedTarget = target
-            }
-            switch mutation(resolvedTarget.index) {
-            case let .failure(failure):
-                if let rollbackFailure = rollbackResolvedTargetIfNeeded(resolvedTarget) {
-                    return .failure(
-                        .transactionFailure(
-                            primary: failure,
-                            rollback: rollbackFailure
-                        )
-                    )
-                }
-                return .failure(failure)
-            case .success:
-                return .success(
-                    AppliedLayerContentMutation(
-                        targetLayerIndex: resolvedTarget.index
-                    )
-                )
-            }
-        }
-
-        private func resolve(
-            _ target: LayerContentMutationTarget
-        ) -> Result<(index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int), DocumentMutationFailure> {
-            let originalActiveLayerIndex = documentQueryGateway.lightweightPresentation().activeLayerIndex
-            switch target {
-            case let .existingLayer(index):
-                return .success((index, false, originalActiveLayerIndex))
-            case let .newLayer(name):
-                switch documentMutationGateway.addLayer(name) {
-                case let .success(index):
-                    return .success((index, true, originalActiveLayerIndex))
-                case let .failure(failure):
-                    return .failure(failure)
-                }
-            }
-        }
-
-        private func rollbackResolvedTargetIfNeeded(
-            _ resolvedTarget: (index: Int, createdNewLayer: Bool, originalActiveLayerIndex: Int)
-        ) -> DocumentMutationFailure? {
-            var rollbackFailure: DocumentMutationFailure?
-            if resolvedTarget.createdNewLayer, resolvedTarget.index >= 0 {
-                switch documentMutationGateway.deleteLayer(resolvedTarget.index) {
-                case .success:
-                    break
-                case let .failure(failure):
-                    rollbackFailure = failure
-                }
-            }
-            switch documentMutationGateway.setActiveLayer(resolvedTarget.originalActiveLayerIndex) {
-            case .success:
-                break
-            case let .failure(failure):
-                if let rollbackFailure {
-                    return .transactionFailure(
-                        primary: rollbackFailure,
-                        rollback: failure
-                    )
-                }
-                return failure
-            }
-            return rollbackFailure
-        }
-    }
-
-    struct LayerContentWorkflowService {
-        let documentMutationGateway: DocumentMutationGateway
-        let textLayerGateway: TextLayerGateway
-        let layerContentTransactionService: LayerContentTransactionService
-
-        func applyPixels(
-            _ pixelData: Data,
-            to target: LayerContentMutationTarget
-        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
-            layerContentTransactionService.apply(target: target) { targetLayerIndex in
-                switch documentMutationGateway.replaceLayerPixels(targetLayerIndex, pixelData) {
-                case let .failure(failure):
-                    return .failure(failure)
-                case .success:
-                    return documentMutationGateway.setActiveLayer(targetLayerIndex)
-                }
-            }
-        }
-
-        func applyTextLayer(
-            _ textLayer: TextLayerData,
-            to target: LayerContentMutationTarget
-        ) -> Result<AppliedLayerContentMutation, DocumentMutationFailure> {
-            layerContentTransactionService.apply(target: target) { targetLayerIndex in
-                switch textLayerGateway.setTextLayer(targetLayerIndex, textLayer) {
-                case let .failure(failure):
-                    return .failure(failure)
-                case .success:
-                    return documentMutationGateway.setActiveLayer(targetLayerIndex)
-                }
-            }
-        }
-    }
-
-    var layerContentTransactionService: LayerContentTransactionService {
-        LayerContentTransactionService(
-            documentQueryGateway: documentQueryGateway,
-            documentMutationGateway: documentMutationGateway
-        )
-    }
+    typealias LayerContentMutationTarget = PrimoDocumentApplication.LayerContentMutationTarget
+    typealias AppliedLayerContentMutation = PrimoDocumentApplication.AppliedLayerContentMutation
+    typealias LayerContentWorkflowService = PrimoDocumentApplication.DocumentContentService
 
     var layerContentWorkflowService: LayerContentWorkflowService {
         LayerContentWorkflowService(
+            documentQueryGateway: documentQueryGateway,
             documentMutationGateway: documentMutationGateway,
             textLayerGateway: textLayerGateway,
-            layerContentTransactionService: layerContentTransactionService
         )
     }
 

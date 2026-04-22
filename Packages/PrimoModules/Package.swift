@@ -161,8 +161,11 @@ let package = Package(
         .target(
             name: "PrimoWorkspaceApplication",
             dependencies: [
+                "PrimoCoreTypes",
                 "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
                 "PrimoWorkspaceDomain",
+                "PrimoWorkspaceInfrastructure",
             ]
         ),
         .target(
