@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PhotosUI
+import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import SwiftUI
@@ -8,6 +9,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct ContentView: View {
+    @Dependency(\.mainQueueClient) private var mainQueueClient
     enum NanoBananaFocusedField: Hashable {
         case prompt
         case apiKey
@@ -469,7 +471,7 @@ struct ContentView: View {
 
     func beginCreateCanvasFromImageFlow() {
         showsNewCanvasSheet = false
-        DispatchQueue.main.async {
+        mainQueueClient.async {
             showsNewCanvasPhotoImporter = true
         }
     }

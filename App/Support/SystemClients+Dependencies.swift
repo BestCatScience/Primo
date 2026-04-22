@@ -13,6 +13,10 @@ private enum FileClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.FileClient.live
 }
 
+private enum ProcessEnvironmentClientKey: DependencyKey {
+    static let liveValue = PrimoCoreTypes.ProcessEnvironmentClient.live
+}
+
 private enum HTTPClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.HTTPClient.live
 }
@@ -32,6 +36,11 @@ private enum AppLanguageClientKey: DependencyKey {
     }
 }
 
+@MainActor
+private enum MainQueueClientKey: DependencyKey {
+    static let liveValue = PrimoCoreTypes.MainQueueClient.live
+}
+
 extension DependencyValues {
     var dateClient: PrimoCoreTypes.DateClient {
         get { self[DateClientKey.self] }
@@ -46,6 +55,11 @@ extension DependencyValues {
     var fileClient: PrimoCoreTypes.FileClient {
         get { self[FileClientKey.self] }
         set { self[FileClientKey.self] = newValue }
+    }
+
+    var processEnvironmentClient: PrimoCoreTypes.ProcessEnvironmentClient {
+        get { self[ProcessEnvironmentClientKey.self] }
+        set { self[ProcessEnvironmentClientKey.self] = newValue }
     }
 
     var httpClient: PrimoCoreTypes.HTTPClient {
@@ -66,5 +80,11 @@ extension DependencyValues {
     var appLanguageClient: AppLanguageClient {
         get { self[AppLanguageClientKey.self] }
         set { self[AppLanguageClientKey.self] = newValue }
+    }
+
+    @MainActor
+    var mainQueueClient: PrimoCoreTypes.MainQueueClient {
+        get { self[MainQueueClientKey.self] }
+        set { self[MainQueueClientKey.self] = newValue }
     }
 }

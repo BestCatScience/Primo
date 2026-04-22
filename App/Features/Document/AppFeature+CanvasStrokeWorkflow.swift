@@ -3,15 +3,10 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentRenderingInfrastructure
 
 extension AppFeature {
-    struct StrokePreviewPlan {
-        let baseSnapshot: MetalDocumentSnapshot
-        let adjustedPixels: Data
-        let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
-        let rectPixelData: Data?
-        let incrementalUpdate: IncrementalLayerUpdate?
-    }
+    typealias StrokePreviewPlan = DocumentStrokePreviewPlan
 
     struct CanvasStrokeContext {
         let activeLayer: LayerRowModel
@@ -215,6 +210,7 @@ extension AppFeature {
 
     struct CanvasStrokeCommitService {
         let workflowService: DocumentInteractionService
+        let strokeProcessingService: DocumentStrokeProcessingService
 
         fileprivate func resolve(
             state: inout State,
@@ -260,7 +256,8 @@ extension AppFeature {
             case .success:
                 if let stagedSnapshot = Self.stagedCommittedSnapshot(
                     state: state,
-                    activeLayerIndex: context.activeLayerIndex
+                    activeLayerIndex: context.activeLayerIndex,
+                    strokeProcessingService: strokeProcessingService
                 ) {
                     state.canvas.stagePendingCommittedSnapshot(stagedSnapshot)
                 }
@@ -279,7 +276,8 @@ extension AppFeature {
 
         private static func stagedCommittedSnapshot(
             state: State,
-            activeLayerIndex: Int
+            activeLayerIndex: Int,
+            strokeProcessingService: DocumentStrokeProcessingService
         ) -> MetalDocumentSnapshot? {
             guard
                 let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
@@ -288,38 +286,12 @@ extension AppFeature {
                 return nil
             }
 
-            let compositePixelData: Data
-            if let stagedCompositePixelData = state.canvas.stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) {
-                compositePixelData = stagedCompositePixelData
-            } else if let composited = AppFeature.compositedPreviewPixelData(
-                snapshot: baseSnapshot,
+            return strokeProcessingService.stageCommittedSnapshot(
+                baseSnapshot: baseSnapshot,
+                committedPixels: committedPixels,
+                lastCommittedRenderRevision: state.canvas.lastCommittedRenderRevision,
                 activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: committedPixels
-            ) {
-                compositePixelData = composited
-            } else {
-                return nil
-            }
-
-            let layers = baseSnapshot.layers.map { layer in
-                guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot(
-                    index: layer.index,
-                    opacity: layer.opacity,
-                    visible: layer.visible,
-                    isClipped: layer.isClipped,
-                    blendMode: layer.blendMode,
-                    thumbnailData: layer.thumbnailData,
-                    pixelData: committedPixels
-                )
-            }
-
-            return MetalDocumentSnapshot(
-                width: baseSnapshot.width,
-                height: baseSnapshot.height,
-                revision: max(baseSnapshot.revision, state.canvas.lastCommittedRenderRevision) + 1,
-                compositePixelData: compositePixelData,
-                layers: layers
+                stagedCompositePixelData: state.canvas.stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot)
             )
         }
     }
@@ -460,7 +432,14 @@ extension AppFeature {
     }
 
     var canvasStrokeCommitService: CanvasStrokeCommitService {
-        CanvasStrokeCommitService(workflowService: documentInteractionService)
+        CanvasStrokeCommitService(
+            workflowService: documentInteractionService,
+            strokeProcessingService: canvasStrokeProcessingService
+        )
+    }
+
+    var canvasStrokeProcessingService: DocumentStrokeProcessingService {
+        DocumentStrokeProcessingService()
     }
 
     var canvasStrokeEffectCoordinator: CanvasStrokeEffectCoordinator {
@@ -472,7 +451,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
-        MetalDocumentProcessingClient.shared.resetInteractiveStrokeState()
+        canvasStrokeProcessingService.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -495,7 +474,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
-        MetalDocumentProcessingClient.shared.resetInteractiveStrokeState()
+        canvasStrokeProcessingService.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -663,22 +642,13 @@ extension AppFeature {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> StrokePreviewPlan? {
-        guard let preview = MetalDocumentProcessingClient.shared.makeInteractiveStrokePreview(
+        canvasStrokeProcessingService.makePreviewPlan(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             basePixelData: basePixelData,
             samples: samples,
             brush: brush,
             preserveAlphaLockedPixels: preserveAlphaLockedPixels
-        ) else {
-            return nil
-        }
-        return StrokePreviewPlan(
-            baseSnapshot: snapshot,
-            adjustedPixels: preview.pixelData,
-            dirtyRect: preview.dirtyRect,
-            rectPixelData: preview.rectPixelData,
-            incrementalUpdate: preview.incrementalUpdate
         )
     }
 
@@ -730,16 +700,11 @@ extension AppFeature {
             : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
         guard
             let snapshot = fallbackSnapshot,
-            let baseLayer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
-            let adjustedPixels = Self.layerPixelDataByApplyingCommittedStroke(
-                basePixelData: baseLayer.pixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
+            let adjustedPixels = canvasStrokeProcessingService.makeFallbackCommittedPixels(
+                snapshot: snapshot,
+                activeLayerIndex: state.canvas.activeLayerIndex,
                 samples: samples,
                 brush: brush,
-                mode: .interactive,
-                snapshotRevision: snapshot.revision,
-                activeLayerIndex: state.canvas.activeLayerIndex,
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
             )
         else {

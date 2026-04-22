@@ -10,7 +10,11 @@ extension AppFeature {
     ) {
         applyPresentation(presentation, state: &state)
         state.application.finishHydration()
-        AppDiagnostics.debug(Self.startupLogger, "Bootstrap presentation applied; initial UI is ready")
+        AppDiagnostics.debug(
+            Self.startupLogger,
+            "Bootstrap presentation applied; initial UI is ready",
+            processEnvironmentClient: processEnvironmentClient
+        )
     }
 
     func handleAutosaveRecoveryLoaded(
@@ -37,7 +41,11 @@ extension AppFeature {
     ) {
         guard !state.canvas.isStrokeActive else { return }
         applyPresentation(presentation, state: &state)
-        AppDiagnostics.debug(Self.startupLogger, "Full presentation applied")
+        AppDiagnostics.debug(
+            Self.startupLogger,
+            "Full presentation applied",
+            processEnvironmentClient: processEnvironmentClient
+        )
     }
 
     func handleBannerDismissed(state: inout State) {

@@ -4,20 +4,22 @@ import PrimoCoreTypes
 import PrimoLocalization
 
 enum AppDiagnostics {
-    static let isVerboseLoggingEnabled: Bool = {
-        let environment = ProcessInfo.processInfo.environment
-        if let rawValue = environment["PRIMO_VERBOSE_LOGGING"] {
+    static func isVerboseLoggingEnabled(
+        processEnvironmentClient: ProcessEnvironmentClient
+    ) -> Bool {
+        if let rawValue = processEnvironmentClient.stringValue("PRIMO_VERBOSE_LOGGING") {
             let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
         }
         return false
-    }()
+    }
 
     static func debug(
         _ logger: Logger,
-        _ message: String
+        _ message: String,
+        processEnvironmentClient: ProcessEnvironmentClient
     ) {
-        guard isVerboseLoggingEnabled else { return }
+        guard isVerboseLoggingEnabled(processEnvironmentClient: processEnvironmentClient) else { return }
         logger.debug("\(message)")
     }
 }

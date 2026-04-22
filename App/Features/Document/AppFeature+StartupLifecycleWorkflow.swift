@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
@@ -7,18 +8,24 @@ extension AppFeature {
     struct StartupPresentationService {
         let documentQueryGateway: DocumentQueryGateway
         let documentPersistenceGateway: DocumentPersistenceGateway
+        let processEnvironmentClient: ProcessEnvironmentClient
 
         func bootstrapPresentationEffect() -> Effect<Action> {
             .run { [documentPersistenceGateway, documentQueryGateway] send in
                 let startupClock = ContinuousClock()
                 let bootstrapStart = startupClock.now
 
-                AppDiagnostics.debug(AppFeature.startupLogger, "Loading lightweight presentation")
+                AppDiagnostics.debug(
+                    AppFeature.startupLogger,
+                    "Loading lightweight presentation",
+                    processEnvironmentClient: processEnvironmentClient
+                )
                 let lightweightPresentation = documentQueryGateway.lightweightPresentation()
                 let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
                 AppDiagnostics.debug(
                     AppFeature.startupLogger,
-                    "Lightweight presentation loaded in \(String(describing: bootstrapDuration))"
+                    "Lightweight presentation loaded in \(String(describing: bootstrapDuration))",
+                    processEnvironmentClient: processEnvironmentClient
                 )
                 await send(.bootstrapPresentationLoaded(lightweightPresentation))
                 documentPersistenceGateway.prewarmDrawingResources()
@@ -36,12 +43,17 @@ extension AppFeature {
                 }
 
                 let presentationStart = clock.now
-                AppDiagnostics.debug(AppFeature.startupLogger, "Loading full presentation after initial launch")
+                AppDiagnostics.debug(
+                    AppFeature.startupLogger,
+                    "Loading full presentation after initial launch",
+                    processEnvironmentClient: processEnvironmentClient
+                )
                 let presentation = documentQueryGateway.presentation()
                 let presentationDuration = presentationStart.duration(to: clock.now)
                 AppDiagnostics.debug(
                     AppFeature.startupLogger,
-                    "Full presentation loaded in \(String(describing: presentationDuration))"
+                    "Full presentation loaded in \(String(describing: presentationDuration))",
+                    processEnvironmentClient: processEnvironmentClient
                 )
                 await send(.presentationLoaded(presentation))
             }
@@ -59,7 +71,8 @@ extension AppFeature {
     var startupPresentationService: StartupPresentationService {
         StartupPresentationService(
             documentQueryGateway: documentQueryGateway,
-            documentPersistenceGateway: documentPersistenceGateway
+            documentPersistenceGateway: documentPersistenceGateway,
+            processEnvironmentClient: processEnvironmentClient
         )
     }
 
@@ -77,7 +90,11 @@ extension AppFeature {
 
     func handleTask(state: inout State) -> Effect<Action> {
         state.application.beginStartup(language: state.application.appLanguage)
-        AppDiagnostics.debug(Self.startupLogger, "AppFeature.task started")
+        AppDiagnostics.debug(
+            Self.startupLogger,
+            "AppFeature.task started",
+            processEnvironmentClient: processEnvironmentClient
+        )
         return .merge(
             startupPresentationService.bootstrapPresentationEffect(),
             startupLanguageLoadEffect(),

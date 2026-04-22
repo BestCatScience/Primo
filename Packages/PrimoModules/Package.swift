@@ -206,6 +206,13 @@ let package = Package(
             dependencies: ["PrimoBrushDomain"]
         ),
         .testTarget(
+            name: "PrimoBrushInfrastructureTests",
+            dependencies: [
+                "PrimoBrushInfrastructure",
+                "PrimoDocumentContracts",
+            ]
+        ),
+        .testTarget(
             name: "PrimoDocumentApplicationTests",
             dependencies: ["PrimoDocumentApplication"]
         ),

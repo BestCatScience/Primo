@@ -1,5 +1,32 @@
 import Foundation
 
+public struct ProcessEnvironmentClient: Sendable {
+    public var stringValue: @Sendable (String) -> String?
+
+    public init(stringValue: @escaping @Sendable (String) -> String?) {
+        self.stringValue = stringValue
+    }
+
+    public static let live = ProcessEnvironmentClient { key in
+        ProcessInfo.processInfo.environment[key]
+    }
+}
+
+@MainActor
+public struct MainQueueClient: Sendable {
+    public var async: @Sendable (@escaping @MainActor () -> Void) -> Void
+
+    public init(async: @escaping @Sendable (@escaping @MainActor () -> Void) -> Void) {
+        self.async = async
+    }
+
+    public static let live = MainQueueClient { operation in
+        DispatchQueue.main.async {
+            operation()
+        }
+    }
+}
+
 public struct DateClient: Sendable {
     public var now: @Sendable () -> Date
 

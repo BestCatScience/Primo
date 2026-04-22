@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoBrushDomain
 import PrimoBrushFileFormats
+import PrimoBrushInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import SwiftUI
@@ -113,78 +114,6 @@ struct BrushPaletteFeature {
                 case .transparent:
                     break
                 }
-            }
-
-            func runtimeSettings(fill: FillSettings) -> BrushRuntimeSettings {
-                let resolved = UIColor(activeOpaqueColor)
-                var red: CGFloat = 0
-                var green: CGFloat = 0
-                var blue: CGFloat = 0
-                resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
-                return BrushRuntimeSettings(
-                    tipKind: tipKind,
-                    radius: radius,
-                    sizeSpeedSensitivity: sizeSpeedSensitivity,
-                    taperIn: taperIn,
-                    taperOut: taperOut,
-                    opacity: opacity,
-                    hardness: hardness,
-                    roundness: roundness,
-                    roundnessPressureSensitivity: roundnessPressureSensitivity,
-                    roundnessTiltSensitivity: roundnessTiltSensitivity,
-                    angle: angle,
-                    anglePressureSensitivity: anglePressureSensitivity,
-                    angleTiltSensitivity: angleTiltSensitivity,
-                    angleMode: angleMode,
-                    stampSpacing: spacing,
-                    spacingJitter: spacingJitter,
-                    scatterEnabled: scatterEnabled,
-                    scatterMode: scatterMode,
-                    scatterLateral: scatterLateral,
-                    scatterLinear: scatterLinear,
-                    count: Int(count.rounded()),
-                    countJitter: countJitter,
-                    countSizeJitter: countSizeJitter,
-                    countOpacityJitter: countOpacityJitter,
-                    angleJitter: angleJitter,
-                    roundnessJitter: roundnessJitter,
-                    textureMode: textureMode,
-                    textureStrength: textureStrength,
-                    flow: flow,
-                    flowPressureSensitivity: flowPressureSensitivity,
-                    flowJitter: flowJitter,
-                    velocityInfluence: velocityInfluence,
-                    wetness: wetness,
-                    wetnessPressureSensitivity: wetnessPressureSensitivity,
-                    opacityPressureSensitivity: opacityPressureSensitivity,
-                    colorMixStrength: colorMixStrength,
-                    paintLoad: paintLoad,
-                    loadPressureSensitivity: loadPressureSensitivity,
-                    dualBrushEnabled: dualEnabled,
-                    dualTipKind: dualTipKind,
-                    dualScale: dualScale,
-                    dualSpacing: dualSpacing,
-                    dualScatter: dualScatter,
-                    dualAngle: dualAngle,
-                    dualBlendMode: dualBlendMode,
-                    grainScale: grainScale,
-                    grainContrast: grainContrast,
-                    paperScale: paperScale,
-                    paperStrength: paperStrength,
-                    paperThreshold: paperThreshold,
-                    flipX: flipX,
-                    flipY: flipY,
-                    customTip: customTip,
-                    pressureSensitivity: pressureSensitivity,
-                    stabilization: stabilization,
-                    fillThresholdMode: fill.thresholdMode,
-                    fillOpacityTolerance: fill.opacityTolerance,
-                    fillColorTolerance: fill.colorTolerance,
-                    fillExpansion: Int(fill.expansion.rounded()),
-                    red: UInt8(min(max(Double(red) * 255.0, 0), 255)),
-                    green: UInt8(min(max(Double(green) * 255.0, 0), 255)),
-                    blue: UInt8(min(max(Double(blue) * 255.0, 0), 255))
-                )
             }
 
             mutating func applyPreset(_ preset: BrushPreset) {
@@ -405,7 +334,11 @@ struct BrushPaletteFeature {
         var ui = UIState()
 
         var runtimeSettings: BrushRuntimeSettings {
-            brush.runtimeSettings(fill: fill)
+            BrushRuntimeSettingsAssemblyService().makeRuntimeSettings(
+                brush: brush.runtimeDescriptor,
+                fill: fill.runtimeDescriptor,
+                color: brush.activeOpaqueColor.runtimeColorComponents
+            )
         }
     }
 
@@ -800,6 +733,94 @@ struct BrushPaletteFeature {
                 return .none
             }
         }
+    }
+}
+
+private extension BrushPaletteFeature.State.BrushSettings {
+    var runtimeDescriptor: BrushRuntimeDescriptor {
+        BrushRuntimeDescriptor(
+            tipKind: tipKind,
+            radius: radius,
+            sizeSpeedSensitivity: sizeSpeedSensitivity,
+            taperIn: taperIn,
+            taperOut: taperOut,
+            opacity: opacity,
+            hardness: hardness,
+            roundness: roundness,
+            roundnessPressureSensitivity: roundnessPressureSensitivity,
+            roundnessTiltSensitivity: roundnessTiltSensitivity,
+            angle: angle,
+            anglePressureSensitivity: anglePressureSensitivity,
+            angleTiltSensitivity: angleTiltSensitivity,
+            angleMode: angleMode,
+            spacing: spacing,
+            spacingJitter: spacingJitter,
+            scatterEnabled: scatterEnabled,
+            scatterMode: scatterMode,
+            scatterLateral: scatterLateral,
+            scatterLinear: scatterLinear,
+            count: count,
+            countJitter: countJitter,
+            countSizeJitter: countSizeJitter,
+            countOpacityJitter: countOpacityJitter,
+            angleJitter: angleJitter,
+            roundnessJitter: roundnessJitter,
+            textureMode: textureMode,
+            textureStrength: textureStrength,
+            flow: flow,
+            flowPressureSensitivity: flowPressureSensitivity,
+            flowJitter: flowJitter,
+            velocityInfluence: velocityInfluence,
+            wetness: wetness,
+            wetnessPressureSensitivity: wetnessPressureSensitivity,
+            opacityPressureSensitivity: opacityPressureSensitivity,
+            colorMixStrength: colorMixStrength,
+            paintLoad: paintLoad,
+            loadPressureSensitivity: loadPressureSensitivity,
+            dualEnabled: dualEnabled,
+            dualTipKind: dualTipKind,
+            dualScale: dualScale,
+            dualSpacing: dualSpacing,
+            dualScatter: dualScatter,
+            dualAngle: dualAngle,
+            dualBlendMode: dualBlendMode,
+            grainScale: grainScale,
+            grainContrast: grainContrast,
+            paperScale: paperScale,
+            paperStrength: paperStrength,
+            paperThreshold: paperThreshold,
+            flipX: flipX,
+            flipY: flipY,
+            customTip: customTip,
+            pressureSensitivity: pressureSensitivity,
+            stabilization: stabilization
+        )
+    }
+}
+
+private extension BrushPaletteFeature.State.FillSettings {
+    var runtimeDescriptor: BrushFillRuntimeDescriptor {
+        BrushFillRuntimeDescriptor(
+            thresholdMode: thresholdMode,
+            opacityTolerance: opacityTolerance,
+            colorTolerance: colorTolerance,
+            expansion: expansion
+        )
+    }
+}
+
+private extension Color {
+    var runtimeColorComponents: BrushColorComponents {
+        let resolved = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        return BrushColorComponents(
+            red: Double(red),
+            green: Double(green),
+            blue: Double(blue)
+        )
     }
 }
 

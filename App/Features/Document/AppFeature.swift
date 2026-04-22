@@ -30,6 +30,7 @@ struct AppFeature {
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.documentImportClient) var documentImportClient
     @Dependency(\.fileClient) var fileClient
+    @Dependency(\.processEnvironmentClient) var processEnvironmentClient
     @Dependency(\.dateClient) var dateClient
     @Dependency(\.uuidClient) var uuidClient
     @Dependency(\.appLanguageClient) var appLanguageClient
