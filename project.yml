@@ -29,6 +29,8 @@ targets:
     dependencies:
       - package: ComposableArchitecture
       - package: PrimoModules
+        product: PrimoWorkspaceApplication
+      - package: PrimoModules
         product: PrimoDocumentEngineInfrastructure
       - package: PrimoModules
         product: PrimoDocumentRenderingInfrastructure

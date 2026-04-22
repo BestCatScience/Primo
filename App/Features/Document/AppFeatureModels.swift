@@ -1,6 +1,6 @@
 import Foundation
 import PrimoDocumentEngineInfrastructure
-import PrimoWorkspaceDomain
+import PrimoWorkspaceApplication
 
 struct ShareExport: Equatable, Identifiable {
     let id: UUID
@@ -61,7 +61,7 @@ struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
 }
 
-typealias PendingCloseOperation = PrimoWorkspaceDomain.PendingCloseOperation
+typealias PendingCloseOperation = PrimoWorkspaceApplication.PendingCloseOperation
 
 struct PendingCloseConfirmationState: Equatable, Sendable {
     let operation: PendingCloseOperation

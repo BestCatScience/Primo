@@ -1,6 +1,5 @@
 import Foundation
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 import XCTest
 @testable import Primo
 
@@ -22,7 +21,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
                 saveHistoryTriggers.record(trigger)
             }
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: UUIDClient(
@@ -68,7 +67,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
                 throw TestError.expected("save history unavailable")
             }
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: UUIDClient(
@@ -100,7 +99,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
     func testAutosaveCleanupFailureReturnsSaveIssue() {
         let savedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/saved-document.atelier"))
         let activeTab = OpenDocumentTab.testValue(previewImageData: Data([0xAB]))
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 persistProjectSnapshot: { _, _ in savedURL },
@@ -143,7 +142,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
     func testReserveNewTabBackingStoreReturnsPreparedTab() {
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
         let reservedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/reserved-tab.atelier"))
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 createTabBackingStoreURL: { _ in reservedURL }
@@ -177,7 +176,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
 
     func testReserveNewTabBackingStoreMapsCreateFailure() {
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 createTabBackingStoreURL: { _ in

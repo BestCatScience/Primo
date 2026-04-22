@@ -1,6 +1,6 @@
 import CasePaths
 import Foundation
-import PrimoWorkspaceDomain
+import PrimoWorkspaceApplication
 
 extension AppFeature {
     enum ApplicationAction: Equatable {

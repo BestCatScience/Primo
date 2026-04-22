@@ -1,6 +1,5 @@
 import Foundation
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 import XCTest
 @testable import Primo
 
@@ -18,7 +17,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
             }
         )
         let documentWorkspaceClient = DocumentWorkspaceClient.stub()
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: UUIDClient(
@@ -94,7 +93,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 return .success(())
             }
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: .stub(),
             uuidClient: UUIDClient(generate: UUID.init)
@@ -147,7 +146,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 .failure(.stagingFailed("cleanup failed"))
             }
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: .stub(),
             uuidClient: UUIDClient(generate: UUID.init)
@@ -199,7 +198,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
                 throw TestError.expected("workspace cleanup failed")
             }
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: UUIDClient(generate: UUID.init)

@@ -28,7 +28,7 @@ struct WorkspaceApplicationTests {
             )
         )
 
-        let result = try #require(try useCase.execute(.loadSavedProjects).get())
+        let result = try useCase.execute(.loadSavedProjects).get()
         #expect(result == .savedProjectsLoaded(expectedProjects))
     }
 }

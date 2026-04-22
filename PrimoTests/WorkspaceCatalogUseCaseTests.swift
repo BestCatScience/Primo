@@ -1,6 +1,5 @@
 import Foundation
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 import XCTest
 @testable import Primo
 
@@ -17,7 +16,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil,
             )
         ]
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 loadSavedProjects: { expectedProjects }
@@ -42,7 +41,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil
             )
         ]
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 loadAutosaveRecoveryItems: { expectedItems }
@@ -68,7 +67,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil
             )
         ]
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 loadSaveHistoryEntries: { tab in
@@ -100,7 +99,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 openTabID: nil
             )
         )
-        let support = WorkspaceFeatureSupport(
+        let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
                 moveSavedProject: { _, _ in

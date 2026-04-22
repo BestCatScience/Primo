@@ -40,6 +40,7 @@ public typealias WorkspaceProjectLoadRequest = PrimoWorkspaceDomain.WorkspacePro
 public typealias WorkspaceProjectLoadFailure = PrimoWorkspaceDomain.WorkspaceProjectLoadFailure
 public typealias WorkspaceProjectLoadResult<LoadedProject: Equatable> = PrimoWorkspaceDomain.WorkspaceProjectLoadResult<LoadedProject>
 public typealias WorkspaceProjectLoadCommand = PrimoWorkspaceDomain.WorkspaceProjectLoadCommand
+public typealias WorkspaceProjectLoadingService<LoadedProject: Equatable> = PrimoWorkspaceDomain.WorkspaceProjectLoadingService<LoadedProject>
 public typealias WorkspaceProjectCleanupService = PrimoWorkspaceDomain.WorkspaceProjectCleanupService
 
 public struct WorkspaceBackingStoreService: Sendable {
@@ -172,7 +173,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
     }
 }
 
-public struct WorkspaceFeatureSupport: Sendable {
+public struct WorkspaceApplicationServices: Sendable {
     public let backingStoreService: WorkspaceBackingStoreService
     public let catalogService: WorkspaceCatalogService
     public let artifactService: WorkspaceArtifactService

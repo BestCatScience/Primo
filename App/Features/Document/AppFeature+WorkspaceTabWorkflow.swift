@@ -1,34 +1,34 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
 
 extension AppFeature {
-    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadIssue
-    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadFailureReason
-    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadOperation
-    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceInfrastructure.WorkspaceImportedProjectLoadOperation
-    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadRequest
-    typealias WorkspaceProjectLoadResult = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadResult<LoadedPaintProject>
-    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadFailure
-    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceInfrastructure.WorkspaceProjectPreparationUseCase
-    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadUseCase<LoadedPaintProject>
-    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadCommand
-    typealias WorkspaceProjectLoadingService = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadingService<LoadedPaintProject>
+    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceApplication.WorkspaceProjectLoadIssue
+    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceApplication.WorkspaceProjectLoadFailureReason
+    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceApplication.WorkspaceProjectLoadOperation
+    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceApplication.WorkspaceImportedProjectLoadOperation
+    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceApplication.WorkspaceProjectLoadRequest
+    typealias WorkspaceProjectLoadResult = PrimoWorkspaceApplication.WorkspaceProjectLoadResult<LoadedPaintProject>
+    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceApplication.WorkspaceProjectLoadFailure
+    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceApplication.WorkspaceProjectPreparationUseCase
+    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceApplication.WorkspaceProjectLoadUseCase<LoadedPaintProject>
+    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceApplication.WorkspaceProjectLoadCommand
+    typealias WorkspaceProjectLoadingService = PrimoWorkspaceApplication.WorkspaceProjectLoadingService<LoadedPaintProject>
 
     var workspaceProjectPreparationUseCase: WorkspaceProjectPreparationUseCase {
-        workspaceFeatureSupport.projectPreparationUseCase
+        workspaceApplicationServices.projectPreparationUseCase
     }
 
     var workspaceProjectLoadUseCase: WorkspaceProjectLoadUseCase {
-        workspaceFeatureSupport.projectLoadUseCase(
+        workspaceApplicationServices.projectLoadUseCase(
             projectLoader: workspaceProjectLoaderGateway,
             documentImport: documentImportGateway
         )
     }
 
     var workspaceProjectLoadingService: WorkspaceProjectLoadingService {
-        workspaceFeatureSupport.projectLoadingService(
+        workspaceApplicationServices.projectLoadingService(
             projectLoader: workspaceProjectLoaderGateway,
             documentImport: documentImportGateway
         )
@@ -56,7 +56,7 @@ extension AppFeature {
     }
 
     var workspaceDomainProjectCleanupService: WorkspaceProjectCleanupService {
-        workspaceFeatureSupport.projectCleanupService(
+        workspaceApplicationServices.projectCleanupService(
             documentImport: documentImportGateway
         )
     }

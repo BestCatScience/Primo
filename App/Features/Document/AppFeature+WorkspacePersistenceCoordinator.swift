@@ -1,41 +1,41 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
 
 extension AppFeature {
-    typealias WorkspacePersistenceIssue = PrimoWorkspaceInfrastructure.WorkspacePersistenceIssue
-    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceInfrastructure.WorkspacePersistenceFailureReason
-    typealias WorkspacePersistenceFailure = PrimoWorkspaceInfrastructure.WorkspacePersistenceFailure
-    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceInfrastructure.WorkspaceDirtyPresentationRequest
-    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceInfrastructure.WorkspaceDocumentSavePurpose
-    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceInfrastructure.WorkspaceDocumentSaveRequest
-    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceInfrastructure.WorkspaceDocumentSaveResult
-    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceInfrastructure.WorkspaceDocumentReplacementRequest
-    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceInfrastructure.LoadedWorkspaceFollowUpPersistenceRequest
-    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceInfrastructure.LoadedWorkspaceFollowUpPersistenceResult
-    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceInfrastructure.WorkspaceCloseTabsSaveRequest
-    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceInfrastructure.WorkspaceCloseTabsSaveResult
-    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceInfrastructure.WorkspaceArtifactDiscardRequest
-    typealias WorkspaceTabReservationRequest = PrimoWorkspaceInfrastructure.WorkspaceTabReservationRequest
-    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceInfrastructure.WorkspaceSavedProjectMoveRequest
-    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceInfrastructure.WorkspaceSavedProjectMoveResult
-    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceInfrastructure.WorkspaceAutosaveEntryDiscardRequest
-    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceInfrastructure.WorkspaceSaveHistoryLoadRequest
-    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceInfrastructure.WorkspaceCatalogFailureReason
-    typealias WorkspaceCatalogFailure = PrimoWorkspaceInfrastructure.WorkspaceCatalogFailure
-    typealias WorkspacePersistenceRequest = PrimoWorkspaceInfrastructure.WorkspacePersistenceRequest
-    typealias WorkspacePersistenceResult = PrimoWorkspaceInfrastructure.WorkspacePersistenceResult
-    typealias WorkspaceCatalogRequest = PrimoWorkspaceInfrastructure.WorkspaceCatalogRequest
-    typealias WorkspaceCatalogResult = PrimoWorkspaceInfrastructure.WorkspaceCatalogResult
-    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceInfrastructure.LoadedWorkspaceProjectPlan
-    typealias WorkspacePersistenceUseCase = PrimoWorkspaceInfrastructure.WorkspacePersistenceUseCase
-    typealias WorkspaceCatalogUseCase = PrimoWorkspaceInfrastructure.WorkspaceCatalogUseCase
-    typealias WorkspaceBackingStoreService = PrimoWorkspaceInfrastructure.WorkspaceBackingStoreService
-    typealias WorkspaceCatalogService = PrimoWorkspaceInfrastructure.WorkspaceCatalogService
-    typealias WorkspaceArtifactService = PrimoWorkspaceInfrastructure.WorkspaceArtifactService
-    typealias WorkspaceIdentityService = PrimoWorkspaceInfrastructure.WorkspaceIdentityService
-    typealias PreparedWorkspaceTab = PrimoWorkspaceInfrastructure.PreparedWorkspaceTab
+    typealias WorkspacePersistenceIssue = PrimoWorkspaceApplication.WorkspacePersistenceIssue
+    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceApplication.WorkspacePersistenceFailureReason
+    typealias WorkspacePersistenceFailure = PrimoWorkspaceApplication.WorkspacePersistenceFailure
+    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceApplication.WorkspaceDirtyPresentationRequest
+    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceApplication.WorkspaceDocumentSavePurpose
+    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceApplication.WorkspaceDocumentSaveRequest
+    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceApplication.WorkspaceDocumentSaveResult
+    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceApplication.WorkspaceDocumentReplacementRequest
+    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceRequest
+    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceResult
+    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceApplication.WorkspaceCloseTabsSaveRequest
+    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceApplication.WorkspaceCloseTabsSaveResult
+    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceApplication.WorkspaceArtifactDiscardRequest
+    typealias WorkspaceTabReservationRequest = PrimoWorkspaceApplication.WorkspaceTabReservationRequest
+    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceApplication.WorkspaceSavedProjectMoveRequest
+    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceApplication.WorkspaceSavedProjectMoveResult
+    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceApplication.WorkspaceAutosaveEntryDiscardRequest
+    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceApplication.WorkspaceSaveHistoryLoadRequest
+    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceApplication.WorkspaceCatalogFailureReason
+    typealias WorkspaceCatalogFailure = PrimoWorkspaceApplication.WorkspaceCatalogFailure
+    typealias WorkspacePersistenceRequest = PrimoWorkspaceApplication.WorkspacePersistenceRequest
+    typealias WorkspacePersistenceResult = PrimoWorkspaceApplication.WorkspacePersistenceResult
+    typealias WorkspaceCatalogRequest = PrimoWorkspaceApplication.WorkspaceCatalogRequest
+    typealias WorkspaceCatalogResult = PrimoWorkspaceApplication.WorkspaceCatalogResult
+    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceApplication.LoadedWorkspaceProjectPlan
+    typealias WorkspacePersistenceUseCase = PrimoWorkspaceApplication.WorkspacePersistenceUseCase
+    typealias WorkspaceCatalogUseCase = PrimoWorkspaceApplication.WorkspaceCatalogUseCase
+    typealias WorkspaceBackingStoreService = PrimoWorkspaceApplication.WorkspaceBackingStoreService
+    typealias WorkspaceCatalogService = PrimoWorkspaceApplication.WorkspaceCatalogService
+    typealias WorkspaceArtifactService = PrimoWorkspaceApplication.WorkspaceArtifactService
+    typealias WorkspaceIdentityService = PrimoWorkspaceApplication.WorkspaceIdentityService
+    typealias PreparedWorkspaceTab = PrimoWorkspaceApplication.PreparedWorkspaceTab
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)
@@ -58,8 +58,8 @@ extension AppFeature {
         let operation: Operation
     }
 
-    var workspaceFeatureSupport: WorkspaceFeatureSupport {
-        WorkspaceFeatureSupport(
+    var workspaceApplicationServices: WorkspaceApplicationServices {
+        WorkspaceApplicationServices(
             documentPersistenceGateway: documentPersistenceGateway,
             documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: uuidClient
@@ -67,39 +67,39 @@ extension AppFeature {
     }
 
     var workspaceBackingStoreService: WorkspaceBackingStoreService {
-        workspaceFeatureSupport.backingStoreService
+        workspaceApplicationServices.backingStoreService
     }
 
     var workspaceCatalogService: WorkspaceCatalogService {
-        workspaceFeatureSupport.catalogService
+        workspaceApplicationServices.catalogService
     }
 
     var workspaceArtifactService: WorkspaceArtifactService {
-        workspaceFeatureSupport.artifactService
+        workspaceApplicationServices.artifactService
     }
 
     var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
-        workspaceFeatureSupport.persistenceUseCase
+        workspaceApplicationServices.persistenceUseCase
     }
 
     var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
-        workspaceFeatureSupport.catalogUseCase
+        workspaceApplicationServices.catalogUseCase
     }
 
     var workspaceIdentityService: WorkspaceIdentityService {
-        workspaceFeatureSupport.identityService
+        workspaceApplicationServices.identityService
     }
 
     var workspaceBackingStoreGateway: WorkspaceBackingStoreGateway {
-        workspaceFeatureSupport.backingStoreGateway
+        workspaceApplicationServices.backingStoreGateway
     }
 
     var workspaceCatalogGateway: WorkspaceCatalogGateway {
-        workspaceFeatureSupport.catalogGateway
+        workspaceApplicationServices.catalogGateway
     }
 
     var workspaceIdentityGenerator: WorkspaceIdentityGenerator {
-        workspaceFeatureSupport.identityGenerator
+        workspaceApplicationServices.identityGenerator
     }
 
     func saveFailureFeedback(_ error: Error) -> ApplicationFeedback {
