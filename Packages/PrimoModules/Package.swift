@@ -165,7 +165,6 @@ let package = Package(
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoWorkspaceDomain",
-                "PrimoWorkspaceInfrastructure",
             ]
         ),
         .target(
@@ -174,6 +173,7 @@ let package = Package(
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoWorkspaceApplication",
                 "PrimoWorkspaceDomain",
             ]
         ),
@@ -195,7 +195,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoWorkspaceApplicationTests",
-            dependencies: ["PrimoWorkspaceApplication"]
+            dependencies: ["PrimoWorkspaceApplication", "PrimoWorkspaceInfrastructure"]
         ),
         .testTarget(
             name: "PrimoWorkspaceInfrastructureTests",

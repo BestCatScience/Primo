@@ -1,10 +1,8 @@
 import Foundation
 import SwiftUI
 import CoreGraphics
-import PrimoBrushInfrastructure
 import PrimoBrushFileFormats
 import PrimoBrushDomain
-import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoLocalization
@@ -72,20 +70,6 @@ enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
         case .text:
             return "textformat"
         }
-    }
-}
-
-enum TextFontLibrary {
-    private static let liveClient = PrimoBrushInfrastructure.TextFontLibraryClient.live(
-        fileClient: PrimoCoreTypes.FileClient.live
-    )
-
-    static func availableFonts() -> [TextFontOption] {
-        liveClient.loadAvailableFonts()
-    }
-
-    static func importFonts(from urls: [URL]) throws -> [TextFontOption] {
-        try liveClient.importFonts(urls)
     }
 }
 

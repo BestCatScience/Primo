@@ -3,6 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
+import PrimoWorkspaceInfrastructure
 
 extension AppFeature {
     typealias WorkspacePersistenceIssue = PrimoWorkspaceApplication.WorkspacePersistenceIssue
@@ -32,11 +33,13 @@ extension AppFeature {
     typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceApplication.LoadedWorkspaceProjectPlan
     typealias WorkspacePersistenceUseCase = PrimoWorkspaceApplication.WorkspacePersistenceUseCase
     typealias WorkspaceCatalogUseCase = PrimoWorkspaceApplication.WorkspaceCatalogUseCase
-    typealias WorkspaceBackingStoreService = PrimoWorkspaceApplication.WorkspaceBackingStoreService
-    typealias WorkspaceCatalogService = PrimoWorkspaceApplication.WorkspaceCatalogService
-    typealias WorkspaceArtifactService = PrimoWorkspaceApplication.WorkspaceArtifactService
-    typealias WorkspaceIdentityService = PrimoWorkspaceApplication.WorkspaceIdentityService
+    typealias WorkspaceBackingStoreService = PrimoWorkspaceInfrastructure.WorkspaceBackingStoreService
+    typealias WorkspaceCatalogService = PrimoWorkspaceInfrastructure.WorkspaceCatalogService
+    typealias WorkspaceArtifactService = PrimoWorkspaceInfrastructure.WorkspaceArtifactService
+    typealias WorkspaceIdentityService = PrimoWorkspaceInfrastructure.WorkspaceIdentityService
+    typealias WorkspaceApplicationServices = PrimoWorkspaceInfrastructure.WorkspaceApplicationServices
     typealias PreparedWorkspaceTab = PrimoWorkspaceApplication.PreparedWorkspaceTab
+    typealias WorkspaceLoadedProjectFollowUpPlanner = PrimoWorkspaceApplication.WorkspaceLoadedProjectFollowUpPlanner
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)
@@ -349,34 +352,8 @@ extension AppFeature {
         )
     }
 
-    struct LoadedWorkspaceFollowUpPlanner: Sendable {
-        func request(
-            plan: LoadedWorkspaceProjectPlan,
-            context: WorkspaceDocumentReplacementRequest,
-            requiresBackingStorePersistence: Bool
-        ) -> WorkspacePersistenceRequest? {
-            let shouldPersistToBackingStore = requiresBackingStorePersistence || plan.followUp.persistsToBackingStore
-            guard shouldPersistToBackingStore
-                || plan.followUp.persistsAutosave
-                || plan.successEffects.discardedAutosaveEntryID != nil
-            else {
-                return nil
-            }
-
-            return .loadedWorkspaceFollowUp(
-                LoadedWorkspaceFollowUpPersistenceRequest(
-                    activeTab: context.activeTab,
-                    paperStyle: context.paperStyle,
-                    persistsToBackingStore: shouldPersistToBackingStore,
-                    persistsAutosave: plan.followUp.persistsAutosave,
-                    successEffects: plan.successEffects
-                )
-            )
-        }
-    }
-
-    var loadedWorkspaceFollowUpPlanner: LoadedWorkspaceFollowUpPlanner {
-        LoadedWorkspaceFollowUpPlanner()
+    var loadedWorkspaceFollowUpPlanner: WorkspaceLoadedProjectFollowUpPlanner {
+        WorkspaceLoadedProjectFollowUpPlanner()
     }
 
     func loadedWorkspaceFollowUpRequest(
