@@ -79,7 +79,6 @@
 		A000000000000000000000E4 /* AppFeature+SelectionToolWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* AppFeature+SelectionToolWorkflow.swift */; };
 		A000000000000000000000E6 /* AppFeature+ReducerRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */; };
 		A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* AppFeature+ActionRouting.swift */; };
-		AA1000000000000000000001 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000002 /* XCTest.framework */; };
 		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
@@ -187,7 +186,6 @@
 		A00000000000000000000005 /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
 		A00000000000000000000006 /* BrushPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteView.swift; sourceTree = "<group>"; };
 		A00000000000000000000007 /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
-		A0000000000000000000000A /* primo-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "primo-Bridging-Header.h"; sourceTree = "<group>"; };
 		A0000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000013 /* MetalCanvasRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalCanvasRenderer.swift; sourceTree = "<group>"; };
 		A00000000000000000000014 /* PaintShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PaintShaders.metal; sourceTree = "<group>"; };
@@ -244,7 +242,6 @@
 		A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ReducerRouting.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* AppFeature+ActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ActionRouting.swift"; sourceTree = "<group>"; };
 		AA2000000000000000000001 /* PrimoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PrimoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		AA2000000000000000000002 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = System/Library/Frameworks/XCTest.framework; sourceTree = SDKROOT; };
 		AA2000000000000000000003 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePersistenceUseCaseTests.swift; sourceTree = "<group>"; };
 		AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceProjectLoadUseCaseTests.swift; sourceTree = "<group>"; };
@@ -342,7 +339,6 @@
 				B90000000000000000000017 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000005 /* PrimoCoreTypes in Frameworks */,
 				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
-				AA1000000000000000000001 /* XCTest.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,7 +371,6 @@
 		A00000000000000000000054 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				AA2000000000000000000002 /* XCTest.framework */,
 				A00000000000000000000038 /* MetalKit.framework */,
 				A00000000000000000000036 /* Metal.framework */,
 				A00000000000000000000034 /* AVFoundation.framework */,
@@ -438,7 +433,6 @@
 		A0000000000000000000005B /* Support */ = {
 			isa = PBXGroup;
 			children = (
-				A0000000000000000000000A /* primo-Bridging-Header.h */,
 				A0000000000000000000000B /* Info.plist */,
 				A000000000000000000000C9 /* SystemClients.swift */,
 				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
