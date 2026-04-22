@@ -1,3 +1,6 @@
+import PrimoBrushDomain
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import SwiftUI
 
 enum PhotoshopDynamicControl: String, CaseIterable, Identifiable {

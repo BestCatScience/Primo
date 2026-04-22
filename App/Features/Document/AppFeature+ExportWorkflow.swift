@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 
 extension AppFeature {

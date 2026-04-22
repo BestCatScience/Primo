@@ -1,3 +1,5 @@
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import SwiftUI
 
 extension LayerSidebarView {

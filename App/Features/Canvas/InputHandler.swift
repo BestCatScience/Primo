@@ -1,3 +1,6 @@
+import PrimoBrushDomain
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import UIKit
 import simd
 

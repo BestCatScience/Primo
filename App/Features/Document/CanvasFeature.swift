@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import simd
 
 @Reducer

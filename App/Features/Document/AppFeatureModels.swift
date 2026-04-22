@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceApplication
 
@@ -16,9 +17,6 @@ struct TimelapseExportPreview: Equatable {
     var progress: Double
     var previewImageData: Data?
 }
-
-typealias TimelapseExportProgress = PrimoDocumentEngineInfrastructure.TimelapseExportProgress
-typealias TimelapseExportResult = PrimoDocumentEngineInfrastructure.TimelapseExportResult
 
 enum StudioPanelKind: String, CaseIterable, Equatable {
     case brush
@@ -60,8 +58,6 @@ enum HomeSidebarSection: String, CaseIterable, Equatable {
 struct StudioPanelLayoutState: Equatable {
     var isCollapsed: Bool = false
 }
-
-typealias PendingCloseOperation = PrimoWorkspaceApplication.PendingCloseOperation
 
 struct PendingCloseConfirmationState: Equatable, Sendable {
     let operation: PendingCloseOperation

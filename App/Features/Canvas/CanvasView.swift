@@ -1,5 +1,7 @@
 import AVFoundation
 import ComposableArchitecture
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 import QuartzCore
 import SwiftUI

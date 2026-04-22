@@ -3,6 +3,8 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {

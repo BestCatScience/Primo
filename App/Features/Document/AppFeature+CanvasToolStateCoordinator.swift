@@ -1,4 +1,6 @@
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import UIKit
 
 extension AppFeature {

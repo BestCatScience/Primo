@@ -7,6 +7,26 @@ import Testing
 
 struct DocumentInteractionServiceTests {
     @Test
+    func compositePixelDataReturnsQueryGatewayPayload() {
+        let expected = Data([0x10, 0x20, 0x30])
+        let service = DocumentInteractionService(
+            queryGateway: DocumentQueryGateway(
+                lightweightPresentation: { queryGateway().lightweightPresentation() },
+                presentation: { queryGateway().presentation() },
+                compositePixelData: { expected },
+                pixelDataForLayer: { _ in Data() },
+                consumeDirtyUpdate: { nil }
+            ),
+            mutationGateway: mutationGateway(recorder: CallRecorder()),
+            strokeGateway: strokeGateway(),
+            historyGateway: historyGateway(recorder: CallRecorder()),
+            persistenceGateway: persistenceGateway(recorder: CallRecorder())
+        )
+
+        #expect(service.compositePixelData() == expected)
+    }
+
+    @Test
     func initializeImportedCanvasCreatesCanvasAndActivatesImportedLayer() {
         let recorder = CallRecorder()
         let service = DocumentInteractionService(
@@ -157,4 +177,3 @@ private func persistenceGateway(recorder: CallRecorder) -> DocumentPersistenceGa
         }
     )
 }
-

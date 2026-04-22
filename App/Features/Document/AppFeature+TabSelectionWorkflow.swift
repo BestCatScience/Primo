@@ -1,5 +1,7 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     func handleTabSelection(
@@ -17,9 +19,9 @@ extension AppFeature {
             state: &state,
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
-            onSuccess: { loaded, _ in .tabSelectionLoaded(tabID, loaded) },
+            onSuccess: { loaded, _ in Action.tabSelectionLoaded(tabID, loaded) },
             onFailure: {
-                .tabSelectionFailed(
+                Action.tabSelectionFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
                         language: language

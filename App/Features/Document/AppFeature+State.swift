@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentDomain
 
 extension AppFeature {
     struct ApplicationState: Equatable {

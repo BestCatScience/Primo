@@ -1,3 +1,4 @@
+import PrimoBrushDomain
 import Foundation
 import PrimoBrushFileFormats
 import SwiftUI

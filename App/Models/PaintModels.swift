@@ -8,33 +8,6 @@ import PrimoLocalization
 import UIKit
 import simd
 
-typealias SelectionToolMode = PrimoDocumentDomain.SelectionToolMode
-typealias ShapeToolMode = PrimoDocumentDomain.ShapeToolMode
-typealias LayerBlendMode = PrimoDocumentDomain.LayerBlendMode
-typealias BrushTipKind = PrimoBrushDomain.BrushTipKind
-typealias BrushAngleMode = PrimoBrushDomain.BrushAngleMode
-typealias BrushTextureMode = PrimoBrushDomain.BrushTextureMode
-typealias BrushDualBlendMode = PrimoBrushDomain.BrushDualBlendMode
-typealias BrushScatterMode = PrimoBrushDomain.BrushScatterMode
-typealias BrushColorMixingMode = PrimoBrushDomain.BrushColorMixingMode
-typealias FillThresholdMode = PrimoDocumentContracts.FillThresholdMode
-typealias HueSaturationBrightnessSettings = PrimoDocumentContracts.HueSaturationBrightnessSettings
-typealias BrightnessContrastSettings = PrimoDocumentContracts.BrightnessContrastSettings
-typealias LevelsAdjustmentSettings = PrimoDocumentContracts.LevelsAdjustmentSettings
-typealias ToneCurveSettings = PrimoDocumentContracts.ToneCurveSettings
-typealias ColorBalanceSettings = PrimoDocumentContracts.ColorBalanceSettings
-typealias ThresholdSettings = PrimoDocumentContracts.ThresholdSettings
-typealias PosterizeSettings = PrimoDocumentContracts.PosterizeSettings
-typealias GradientMapPreset = PrimoDocumentContracts.GradientMapPreset
-typealias GradientMapStopSettings = PrimoDocumentContracts.GradientMapStopSettings
-typealias GradientMapSettings = PrimoDocumentContracts.GradientMapSettings
-typealias LayerProcessingRequest = PrimoDocumentContracts.LayerProcessingRequest
-typealias TimelapseFrame = PrimoDocumentContracts.TimelapseFrame
-typealias TimelapseOperation = PrimoDocumentContracts.TimelapseOperation
-typealias TimelapseCaptureSource = PrimoDocumentContracts.TimelapseCaptureSource
-typealias TimelapseCapture = PrimoDocumentContracts.TimelapseCapture
-typealias CanvasSelection = PrimoDocumentContracts.CanvasSelection
-
 enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
     case brush
     case erase
@@ -1446,10 +1419,6 @@ private enum BuiltInBrushTipFactory {
     }
 }
 
-typealias LayerRowModel = PrimoDocumentContracts.LayerRowModel
-typealias LayerFolderModel = PrimoDocumentContracts.LayerFolderModel
-typealias LayerSidebarRowModel = PrimoDocumentContracts.LayerSidebarRowModel
-
 struct LayerCanvasBuffer: Identifiable, Equatable {
     var id: Int { index }
     let index: Int
@@ -1459,8 +1428,6 @@ struct LayerCanvasBuffer: Identifiable, Equatable {
     var blendMode: LayerBlendMode = .normal
     var strokes: [PreviewStrokeTrack] = []
 }
-
-typealias StylusSample = PrimoDocumentContracts.StylusSample
 
 struct StrokePoint: Equatable {
     var position: SIMD2<Float>
@@ -1555,8 +1522,3 @@ struct SampledColor: Equatable {
     let blue: UInt8
     let alpha: UInt8
 }
-
-typealias MetalLayerSnapshot = PrimoDocumentContracts.MetalLayerSnapshot
-
-typealias MetalDocumentSnapshot = PrimoDocumentContracts.MetalDocumentSnapshot
-typealias IncrementalLayerUpdate = PrimoDocumentContracts.IncrementalLayerUpdate

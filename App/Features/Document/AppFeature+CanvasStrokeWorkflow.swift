@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     struct StrokePreviewPlan {

@@ -1,5 +1,7 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentDomain
+import PrimoWorkspaceApplication
 
 extension AppFeature {
     func requestCloseOperation(

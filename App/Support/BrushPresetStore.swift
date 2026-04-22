@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import CryptoKit
 import Foundation
+import PrimoBrushDomain
 import SwiftUI
 
 struct BrushPresetLibraryClient: Sendable {

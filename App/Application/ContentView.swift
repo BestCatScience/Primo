@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import Foundation
 import PhotosUI
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit

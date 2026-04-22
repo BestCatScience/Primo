@@ -1,5 +1,7 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentDomain
+import PrimoWorkspaceApplication
 
 extension AppFeature {
     enum WorkspaceTabClosureDisposition {

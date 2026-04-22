@@ -1,4 +1,6 @@
 import ComposableArchitecture
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import SwiftUI
 
 struct LayerSidebarView: View {

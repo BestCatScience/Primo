@@ -1,5 +1,7 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     static func combinedSelection(

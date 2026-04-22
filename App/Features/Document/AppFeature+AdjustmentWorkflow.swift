@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
 
 extension AppFeature {
     struct ActiveLayerPixelContext {

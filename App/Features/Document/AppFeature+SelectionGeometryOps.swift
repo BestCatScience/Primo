@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
 
 extension AppFeature {
     static func affineTransformedPoint(

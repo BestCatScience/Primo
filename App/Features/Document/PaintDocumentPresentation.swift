@@ -4,30 +4,6 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoLocalization
 
-typealias CanvasPaperStyle = PrimoDocumentDomain.CanvasPaperStyle
-typealias DocumentProjectPath = PrimoDocumentDomain.DocumentProjectPath
-typealias WorkspaceItemID = PrimoDocumentDomain.WorkspaceItemID
-typealias RelativeProjectFolderPath = PrimoDocumentDomain.RelativeProjectFolderPath
-typealias DocumentWorkspaceError = PrimoDocumentDomain.DocumentWorkspaceError
-typealias SavedProjectSummary = PrimoDocumentDomain.SavedProjectSummary
-typealias WorkspacePane = PrimoDocumentDomain.WorkspacePane
-typealias OpenDocumentTab = PrimoDocumentDomain.OpenDocumentTab
-typealias AutosaveRecoveryItem = PrimoDocumentDomain.AutosaveRecoveryItem
-typealias SaveHistoryTrigger = PrimoDocumentDomain.SaveHistoryTrigger
-typealias SaveHistoryEntry = PrimoDocumentDomain.SaveHistoryEntry
-typealias TextFontOption = PrimoDocumentDomain.TextFontOption
-typealias TextLayerData = PrimoDocumentDomain.TextLayerData
-typealias TextLayerDraft = PrimoDocumentDomain.TextLayerDraft
-typealias DocumentLayerIndex = PrimoDocumentDomain.DocumentLayerIndex
-typealias DocumentFolderID = PrimoDocumentDomain.DocumentFolderID
-typealias ColorRangeSelectionSource = PrimoDocumentDomain.ColorRangeSelectionSource
-typealias ColorRangeSelectionRequest = PrimoDocumentDomain.ColorRangeSelectionRequest
-
-typealias PaintDocumentPresentation = PrimoDocumentContracts.PaintDocumentPresentation
-typealias LoadedPaintProject = PrimoDocumentContracts.LoadedPaintProject
-typealias TransformQuad = PrimoDocumentContracts.TransformQuad
-typealias TransformQuadOffsets = PrimoDocumentContracts.TransformQuadOffsets
-
 enum WorkspaceLayoutMode: Equatable, Sendable {
     case single
     case split

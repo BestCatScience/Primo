@@ -1,5 +1,7 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     func handleOpenImportedDocumentRequest(
@@ -10,9 +12,9 @@ extension AppFeature {
         return beginImportedWorkspaceProjectLoad(
             state: &state,
             sourceURL: sourceURL,
-            onSuccess: { .openImportedDocumentLoaded($0, $1, $2) },
+            onSuccess: { Action.openImportedDocumentLoaded($0, $1, $2) },
             onFailure: {
-                .openDocumentFailed(
+                Action.openDocumentFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .importDocument),
                         language: language
@@ -81,9 +83,9 @@ extension AppFeature {
             state: &state,
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
-            onSuccess: { .openDocumentLoaded($0, url, $1) },
+            onSuccess: { Action.openDocumentLoaded($0, url, $1) },
             onFailure: {
-                .openDocumentFailed(
+                Action.openDocumentFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
                         language: language

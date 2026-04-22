@@ -1,5 +1,8 @@
 import CasePaths
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceApplication
 
 extension AppFeature {

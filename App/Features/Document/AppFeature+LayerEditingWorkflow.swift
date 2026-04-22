@@ -1,5 +1,8 @@
 import ComposableArchitecture
 import Foundation
+import PrimoBrushDomain
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 extension AppFeature {
     enum DocumentCanvasMutation {

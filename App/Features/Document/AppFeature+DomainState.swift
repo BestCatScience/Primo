@@ -1,4 +1,7 @@
 import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentEngineInfrastructure
 
 extension AppFeature {
     struct DocumentNamingPolicy: Equatable {
