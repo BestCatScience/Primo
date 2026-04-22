@@ -233,3 +233,93 @@ public struct LoadedPaintProject: Equatable, Sendable {
         self.paperStyle = paperStyle
     }
 }
+
+public struct TransformQuad: Equatable, Sendable {
+    public var topLeft: CGPoint
+    public var topRight: CGPoint
+    public var bottomLeft: CGPoint
+    public var bottomRight: CGPoint
+
+    public init(
+        topLeft: CGPoint,
+        topRight: CGPoint,
+        bottomLeft: CGPoint,
+        bottomRight: CGPoint
+    ) {
+        self.topLeft = topLeft
+        self.topRight = topRight
+        self.bottomLeft = bottomLeft
+        self.bottomRight = bottomRight
+    }
+
+    public var points: [CGPoint] {
+        [topLeft, topRight, bottomLeft, bottomRight]
+    }
+
+    public static func lerp(_ start: CGPoint, _ end: CGPoint, t: CGFloat) -> CGPoint {
+        CGPoint(
+            x: start.x + ((end.x - start.x) * t),
+            y: start.y + ((end.y - start.y) * t)
+        )
+    }
+
+    public var bounds: CGRect {
+        let xs = points.map(\.x)
+        let ys = points.map(\.y)
+        guard
+            let minX = xs.min(),
+            let maxX = xs.max(),
+            let minY = ys.min(),
+            let maxY = ys.max()
+        else {
+            return .zero
+        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
+    public var center: CGPoint {
+        CGPoint(
+            x: (topLeft.x + topRight.x + bottomLeft.x + bottomRight.x) / 4.0,
+            y: (topLeft.y + topRight.y + bottomLeft.y + bottomRight.y) / 4.0
+        )
+    }
+
+    public var topMidpoint: CGPoint { Self.lerp(topLeft, topRight, t: 0.5) }
+    public var leftMidpoint: CGPoint { Self.lerp(topLeft, bottomLeft, t: 0.5) }
+    public var rightMidpoint: CGPoint { Self.lerp(topRight, bottomRight, t: 0.5) }
+    public var bottomMidpoint: CGPoint { Self.lerp(bottomLeft, bottomRight, t: 0.5) }
+}
+
+public struct TransformQuadOffsets: Equatable, Sendable {
+    public var topLeft: CGSize = .zero
+    public var topRight: CGSize = .zero
+    public var bottomLeft: CGSize = .zero
+    public var bottomRight: CGSize = .zero
+
+    public init(
+        topLeft: CGSize = .zero,
+        topRight: CGSize = .zero,
+        bottomLeft: CGSize = .zero,
+        bottomRight: CGSize = .zero
+    ) {
+        self.topLeft = topLeft
+        self.topRight = topRight
+        self.bottomLeft = bottomLeft
+        self.bottomRight = bottomRight
+    }
+
+    public static let zero = TransformQuadOffsets()
+
+    public var isZero: Bool {
+        topLeft == .zero && topRight == .zero && bottomLeft == .zero && bottomRight == .zero
+    }
+
+    public func applying(to quad: TransformQuad) -> TransformQuad {
+        TransformQuad(
+            topLeft: CGPoint(x: quad.topLeft.x + topLeft.width, y: quad.topLeft.y + topLeft.height),
+            topRight: CGPoint(x: quad.topRight.x + topRight.width, y: quad.topRight.y + topRight.height),
+            bottomLeft: CGPoint(x: quad.bottomLeft.x + bottomLeft.width, y: quad.bottomLeft.y + bottomLeft.height),
+            bottomRight: CGPoint(x: quad.bottomRight.x + bottomRight.width, y: quad.bottomRight.y + bottomRight.height)
+        )
+    }
+}

@@ -140,162 +140,183 @@ extension AppFeature {
     }
 
     struct LayerWorkflowService {
-        let documentLayerClient: DocumentLayerClient
+        let documentEditingGateway: DocumentEditingGateway
+        let documentLayerEffectsGateway: DocumentLayerEffectsGateway
+        let documentMutationGateway: DocumentMutationGateway
+        let textLayerGateway: TextLayerGateway
 
         func addLayer(named name: String) -> DocumentIndexedMutationResult {
-            documentLayerClient.addLayer(name)
+            executeIndexed(.structure(.addLayer(name: name)))
         }
 
         func createFolder(
             named name: String,
             afterLayerAt activeLayerIndex: Int
         ) -> DocumentIndexedMutationResult {
-            documentLayerClient.createFolder(name, activeLayerIndex)
+            executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: activeLayerIndex)))
         }
 
         func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
-            documentLayerClient.deleteFolder(folderID)
+            execute(.structure(.deleteFolder(folderID: folderID)))
         }
 
         func deleteLayer(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.deleteLayer(index)
+            execute(.structure(.deleteLayer(index: index)))
         }
 
         func duplicateLayer(
             _ index: Int,
             named duplicateName: String
         ) -> DocumentIndexedMutationResult {
-            documentLayerClient.duplicateLayer(index, duplicateName)
+            executeIndexed(.structure(.duplicateLayer(index: index, name: duplicateName)))
         }
 
         func moveLayer(
             _ index: Int,
             to destinationIndex: Int
         ) -> DocumentMutationResult {
-            documentLayerClient.moveLayer(index, destinationIndex)
+            execute(.structure(.moveLayer(index: index, destinationIndex: destinationIndex)))
         }
 
         func assignLayer(
             _ index: Int,
             toFolder folderID: Int
         ) -> DocumentMutationResult {
-            documentLayerClient.assignLayerToFolder(index, folderID)
+            execute(.structure(.assignLayerToFolder(index: index, folderID: folderID)))
         }
 
         func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.mergeLayerDown(index)
+            documentLayerEffectsGateway.mergeLayerDown(index)
         }
 
         func setLayerVisibility(
             _ index: Int,
             visible: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerVisibility(index, visible)
+            execute(.attribute(.setLayerVisibility(index: index, isVisible: visible)))
         }
 
         func setActiveLayer(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.setActiveLayer(index)
+            execute(.attribute(.setActiveLayer(index: index)))
         }
 
         func setLayerOpacity(
             _ index: Int,
             opacity: Double
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerOpacity(index, opacity)
+            execute(.attribute(.setLayerOpacity(index: index, opacity: opacity)))
         }
 
         func setLayerLocked(
             _ index: Int,
             isLocked: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerLocked(index, isLocked)
+            execute(.attribute(.setLayerLocked(index: index, isLocked: isLocked)))
         }
 
         func setLayerAlphaLocked(
             _ index: Int,
             isAlphaLocked: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerAlphaLocked(index, isAlphaLocked)
+            execute(.attribute(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)))
         }
 
         func setLayerClipped(
             _ index: Int,
             isClipped: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerClipped(index, isClipped)
+            execute(.attribute(.setLayerClipped(index: index, isClipped: isClipped)))
         }
 
         func setFolderExpanded(
             _ folderID: Int,
             isExpanded: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setFolderExpanded(folderID, isExpanded)
+            execute(.attribute(.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)))
         }
 
         func setFolderVisibility(
             _ folderID: Int,
             visible: Bool
         ) -> DocumentMutationResult {
-            documentLayerClient.setFolderVisibility(folderID, visible)
+            execute(.attribute(.setFolderVisibility(folderID: folderID, isVisible: visible)))
         }
 
         func setFolderName(
             _ folderID: Int,
             name: String
         ) -> DocumentMutationResult {
-            documentLayerClient.setFolderName(folderID, name)
+            execute(.attribute(.setFolderName(folderID: folderID, name: name)))
         }
 
         func setLayerBlendMode(
             _ index: Int,
             blendMode: LayerBlendMode
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerBlendMode(index, blendMode)
+            execute(.attribute(.setLayerBlendMode(index: index, blendMode: blendMode)))
         }
 
         func setLayerName(
             _ index: Int,
             name: String
         ) -> DocumentMutationResult {
-            documentLayerClient.setLayerName(index, name)
+            execute(.attribute(.setLayerName(index: index, name: name)))
         }
 
         func replaceLayerPixels(
             _ index: Int,
             pixelData: Data
         ) -> DocumentMutationResult {
-            documentLayerClient.replaceLayerPixels(index, pixelData)
+            documentMutationGateway.replaceLayerPixels(index, pixelData)
         }
 
         func setTextLayer(
             _ index: Int,
             textLayer: TextLayerData
         ) -> DocumentMutationResult {
-            documentLayerClient.setTextLayer(index, textLayer)
+            textLayerGateway.setTextLayer(index, textLayer)
         }
 
         func clearLayer(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.clearLayer(index)
+            documentMutationGateway.clearLayer(index)
         }
 
         func replaceLayerMask(
             _ index: Int,
             maskData: Data
         ) -> DocumentMutationResult {
-            documentLayerClient.replaceLayerMask(index, maskData)
+            documentMutationGateway.replaceLayerMask(index, maskData)
         }
 
         func clearLayerMask(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.clearLayerMask(index)
+            documentMutationGateway.clearLayerMask(index)
         }
 
         func applyLayerMask(_ index: Int) -> DocumentMutationResult {
-            documentLayerClient.applyLayerMask(index)
+            documentMutationGateway.applyLayerMask(index)
+        }
+
+        private func execute(_ request: DocumentEditingRequest) -> DocumentMutationResult {
+            documentEditingGateway.execute(request).map { _ in () }
+        }
+
+        private func executeIndexed(_ request: DocumentEditingRequest) -> DocumentIndexedMutationResult {
+            documentEditingGateway.execute(request).flatMap { result in
+                guard case let .structure(plan) = result, let index = plan.resultingIndex else {
+                    return .failure(.bridgeMutationFailed("documentEditingGateway"))
+                }
+                return .success(index)
+            }
         }
     }
 
     var layerWorkflowService: LayerWorkflowService {
-        LayerWorkflowService(documentLayerClient: DocumentLayerClient(paintDocumentClient: paintDocumentClient))
+        LayerWorkflowService(
+            documentEditingGateway: documentEditingGateway,
+            documentLayerEffectsGateway: documentLayerEffectsGateway,
+            documentMutationGateway: documentMutationGateway,
+            textLayerGateway: textLayerGateway
+        )
     }
 
     var documentCanvasMutationCoordinator: DocumentCanvasMutationCoordinator {

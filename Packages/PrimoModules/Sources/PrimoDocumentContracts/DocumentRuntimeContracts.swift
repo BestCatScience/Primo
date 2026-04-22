@@ -644,3 +644,13 @@ public struct TextLayerGateway: Sendable {
         self.clearTextLayerData = clearTextLayerData
     }
 }
+
+public struct DocumentLayerEffectsGateway: Sendable {
+    public var mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+
+    public init(
+        mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult
+    ) {
+        self.mergeLayerDown = mergeLayerDown
+    }
+}

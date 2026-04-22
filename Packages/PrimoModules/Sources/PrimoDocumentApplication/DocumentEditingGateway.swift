@@ -1,0 +1,15 @@
+import Foundation
+import PrimoDocumentContracts
+
+public typealias DocumentEditingRequest = DocumentEditorRequest
+public typealias DocumentEditingResult = DocumentEditorResult
+
+public struct DocumentEditingGateway: Sendable {
+    public var execute: @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
+
+    public init(
+        execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure>
+    ) {
+        self.execute = execute
+    }
+}

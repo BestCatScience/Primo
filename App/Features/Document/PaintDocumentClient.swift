@@ -15,7 +15,11 @@ typealias DocumentHistoryGateway = PrimoDocumentContracts.DocumentHistoryGateway
 typealias DocumentPersistenceGateway = PrimoDocumentContracts.DocumentPersistenceGateway
 typealias DocumentExportGateway = PrimoDocumentContracts.DocumentExportGateway
 typealias TextLayerGateway = PrimoDocumentContracts.TextLayerGateway
+typealias DocumentLayerEffectsGateway = PrimoDocumentContracts.DocumentLayerEffectsGateway
 typealias LayerPixelRect = PrimoDocumentContracts.LayerPixelRect
+typealias DocumentEditingRequest = PrimoDocumentApplication.DocumentEditingRequest
+typealias DocumentEditingResult = PrimoDocumentApplication.DocumentEditingResult
+typealias DocumentEditingGateway = PrimoDocumentApplication.DocumentEditingGateway
 
 struct PaintDocumentClient: Sendable {
     var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
@@ -80,133 +84,147 @@ struct PaintDocumentClient: Sendable {
         dateClient: DateClient,
         uuidClient: UUIDClient
     ) -> PaintDocumentClient {
-        let runtime = DocumentEngineFactory.live(
+        let composition = DocumentRuntimeCompositionFactory.live(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
         )
-        return PaintDocumentClient(
-            lightweightPresentation: runtime.queryGateway.lightweightPresentation,
-            presentation: runtime.queryGateway.presentation,
-            compositePixelData: runtime.queryGateway.compositePixelData,
-            prewarmDrawingResources: runtime.persistenceGateway.prewarmDrawingResources,
-            compositePNGData: runtime.exportGateway.compositePNGData,
-            timelapseCapture: runtime.exportGateway.timelapseCapture,
-            saveProject: runtime.persistenceGateway.saveProject,
-            loadProject: runtime.persistenceGateway.loadProject,
-            setPaperStyle: runtime.persistenceGateway.setPaperStyle,
-            newCanvas: runtime.persistenceGateway.newCanvas,
-            resizeCanvas: runtime.mutationGateway.resizeCanvas,
-            resizeCanvasExtent: runtime.mutationGateway.resizeCanvasExtent,
-            beginStroke: runtime.strokeGateway.beginStroke,
-            appendStroke: runtime.strokeGateway.appendStroke,
-            endStroke: runtime.strokeGateway.endStroke,
-            cancelStroke: runtime.strokeGateway.cancelStroke,
-            blurStroke: runtime.strokeGateway.blurStroke,
-            endBlurStroke: runtime.strokeGateway.endBlurStroke,
-            fill: runtime.strokeGateway.fill,
-            canUndo: runtime.historyGateway.canUndo,
-            canRedo: runtime.historyGateway.canRedo,
-            undo: runtime.historyGateway.undo,
-            redo: runtime.historyGateway.redo,
-            addLayer: runtime.mutationGateway.addLayer,
-            duplicateLayer: runtime.duplicateLayer,
-            deleteLayer: runtime.mutationGateway.deleteLayer,
-            moveLayer: runtime.moveLayer,
-            createFolder: runtime.createFolder,
-            deleteFolder: runtime.deleteFolder,
-            setFolderVisibility: runtime.setFolderVisibility,
-            setFolderName: runtime.setFolderName,
-            setFolderExpanded: runtime.setFolderExpanded,
-            assignLayerToFolder: runtime.assignLayerToFolder,
-            setActiveLayer: runtime.mutationGateway.setActiveLayer,
-            setLayerName: runtime.mutationGateway.setLayerName,
-            setLayerVisibility: runtime.mutationGateway.setLayerVisibility,
-            setLayerLocked: runtime.setLayerLocked,
-            setLayerAlphaLocked: runtime.setLayerAlphaLocked,
-            setLayerClipped: runtime.setLayerClipped,
-            revealLayerForEditing: runtime.mutationGateway.revealLayerForEditing,
-            setLayerOpacity: runtime.setLayerOpacity,
-            setLayerBlendMode: runtime.setLayerBlendMode,
-            mergeLayerDown: runtime.mergeLayerDown,
-            textLayerData: runtime.textLayerGateway.textLayerData,
-            setTextLayer: runtime.textLayerGateway.setTextLayer,
-            clearTextLayerData: runtime.textLayerGateway.clearTextLayerData,
-            applyLayerProcessing: runtime.mutationGateway.applyLayerProcessing,
-            applySoftwareStroke: runtime.strokeGateway.applySoftwareStroke,
-            pixelDataForLayer: runtime.queryGateway.pixelDataForLayer,
-            replaceLayerPixels: runtime.mutationGateway.replaceLayerPixels,
-            replaceLayerPixelsInRect: runtime.mutationGateway.replaceLayerPixelsInRect,
-            replaceLayerMask: runtime.mutationGateway.replaceLayerMask,
-            clearLayerMask: runtime.mutationGateway.clearLayerMask,
-            applyLayerMask: runtime.mutationGateway.applyLayerMask,
-            clearLayer: runtime.mutationGateway.clearLayer,
-            consumeDirtyUpdate: runtime.queryGateway.consumeDirtyUpdate
-        )
+        return PaintDocumentClient(composition: composition)
     }
 }
 
-struct DocumentLayerClient: Sendable {
-    let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
-    let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
-    let deleteLayer: @Sendable (Int) -> DocumentMutationResult
-    let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
-    let createFolder: @Sendable (String, Int) -> DocumentIndexedMutationResult
-    let deleteFolder: @Sendable (Int) -> DocumentMutationResult
-    let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
-    let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
-    let assignLayerToFolder: @Sendable (Int, Int) -> DocumentMutationResult
-    let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
-    let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
-    let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
-    let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
-    let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
-    let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
-    let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
-    let textLayerData: @Sendable (Int) -> TextLayerData?
-    let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    let clearTextLayerData: @Sendable (Int) -> Void
-    let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
-    let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
-    let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
-    let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
-    let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
-    let clearLayer: @Sendable (Int) -> DocumentMutationResult
+extension PaintDocumentClient {
+    init(composition: DocumentRuntimeComposition) {
+        self.init(
+            lightweightPresentation: composition.queryGateway.lightweightPresentation,
+            presentation: composition.queryGateway.presentation,
+            compositePixelData: composition.queryGateway.compositePixelData,
+            prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources,
+            compositePNGData: composition.exportGateway.compositePNGData,
+            timelapseCapture: composition.exportGateway.timelapseCapture,
+            saveProject: composition.persistenceGateway.saveProject,
+            loadProject: composition.persistenceGateway.loadProject,
+            setPaperStyle: composition.persistenceGateway.setPaperStyle,
+            newCanvas: composition.persistenceGateway.newCanvas,
+            resizeCanvas: composition.mutationGateway.resizeCanvas,
+            resizeCanvasExtent: composition.mutationGateway.resizeCanvasExtent,
+            beginStroke: composition.strokeGateway.beginStroke,
+            appendStroke: composition.strokeGateway.appendStroke,
+            endStroke: composition.strokeGateway.endStroke,
+            cancelStroke: composition.strokeGateway.cancelStroke,
+            blurStroke: composition.strokeGateway.blurStroke,
+            endBlurStroke: composition.strokeGateway.endBlurStroke,
+            fill: composition.strokeGateway.fill,
+            canUndo: composition.historyGateway.canUndo,
+            canRedo: composition.historyGateway.canRedo,
+            undo: composition.historyGateway.undo,
+            redo: composition.historyGateway.redo,
+            addLayer: { name in
+                composition.editingGateway.execute(.structure(.addLayer(name: name))).flatMap(Self.extractIndexResult)
+            },
+            duplicateLayer: { index, name in
+                composition.editingGateway.execute(.structure(.duplicateLayer(index: index, name: name)))
+                    .flatMap(Self.extractIndexResult)
+            },
+            deleteLayer: { index in
+                composition.editingGateway.execute(.structure(.deleteLayer(index: index))).map { _ in () }
+            },
+            moveLayer: { index, destinationIndex in
+                composition.editingGateway.execute(
+                    .structure(.moveLayer(index: index, destinationIndex: destinationIndex))
+                ).map { _ in () }
+            },
+            createFolder: { name, layerIndex in
+                composition.editingGateway.execute(
+                    .structure(.createFolder(name: name, anchorLayerIndex: layerIndex))
+                ).flatMap(Self.extractIndexResult)
+            },
+            deleteFolder: { folderID in
+                composition.editingGateway.execute(.structure(.deleteFolder(folderID: folderID))).map { _ in () }
+            },
+            setFolderVisibility: { folderID, isVisible in
+                composition.editingGateway.execute(
+                    .attribute(.setFolderVisibility(folderID: folderID, isVisible: isVisible))
+                ).map { _ in () }
+            },
+            setFolderName: { folderID, name in
+                composition.editingGateway.execute(.attribute(.setFolderName(folderID: folderID, name: name))).map { _ in () }
+            },
+            setFolderExpanded: { folderID, isExpanded in
+                composition.editingGateway.execute(
+                    .attribute(.setFolderExpanded(folderID: folderID, isExpanded: isExpanded))
+                ).map { _ in () }
+            },
+            assignLayerToFolder: { index, folderID in
+                composition.editingGateway.execute(
+                    .structure(.assignLayerToFolder(index: index, folderID: folderID))
+                ).map { _ in () }
+            },
+            setActiveLayer: { index in
+                composition.editingGateway.execute(.attribute(.setActiveLayer(index: index))).map { _ in () }
+            },
+            setLayerName: { index, name in
+                composition.editingGateway.execute(.attribute(.setLayerName(index: index, name: name))).map { _ in () }
+            },
+            setLayerVisibility: { index, isVisible in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerVisibility(index: index, isVisible: isVisible))
+                ).map { _ in () }
+            },
+            setLayerLocked: { index, isLocked in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerLocked(index: index, isLocked: isLocked))
+                ).map { _ in () }
+            },
+            setLayerAlphaLocked: { index, isAlphaLocked in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked))
+                ).map { _ in () }
+            },
+            setLayerClipped: { index, isClipped in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerClipped(index: index, isClipped: isClipped))
+                ).map { _ in () }
+            },
+            revealLayerForEditing: { index in
+                composition.editingGateway.execute(
+                    .attribute(.revealLayerForEditing(index: index))
+                ).map { _ in () }
+            },
+            setLayerOpacity: { index, opacity in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerOpacity(index: index, opacity: opacity))
+                ).map { _ in () }
+            },
+            setLayerBlendMode: { index, blendMode in
+                composition.editingGateway.execute(
+                    .attribute(.setLayerBlendMode(index: index, blendMode: blendMode))
+                ).map { _ in () }
+            },
+            mergeLayerDown: composition.layerEffectsGateway.mergeLayerDown,
+            textLayerData: composition.textLayerGateway.textLayerData,
+            setTextLayer: composition.textLayerGateway.setTextLayer,
+            clearTextLayerData: composition.textLayerGateway.clearTextLayerData,
+            applyLayerProcessing: composition.mutationGateway.applyLayerProcessing,
+            applySoftwareStroke: composition.strokeGateway.applySoftwareStroke,
+            pixelDataForLayer: composition.queryGateway.pixelDataForLayer,
+            replaceLayerPixels: composition.mutationGateway.replaceLayerPixels,
+            replaceLayerPixelsInRect: composition.mutationGateway.replaceLayerPixelsInRect,
+            replaceLayerMask: composition.mutationGateway.replaceLayerMask,
+            clearLayerMask: composition.mutationGateway.clearLayerMask,
+            applyLayerMask: composition.mutationGateway.applyLayerMask,
+            clearLayer: composition.mutationGateway.clearLayer,
+            consumeDirtyUpdate: composition.queryGateway.consumeDirtyUpdate
+        )
+    }
 
-    init(paintDocumentClient: PaintDocumentClient) {
-        self.addLayer = paintDocumentClient.addLayer
-        self.duplicateLayer = paintDocumentClient.duplicateLayer
-        self.deleteLayer = paintDocumentClient.deleteLayer
-        self.moveLayer = paintDocumentClient.moveLayer
-        self.createFolder = paintDocumentClient.createFolder
-        self.deleteFolder = paintDocumentClient.deleteFolder
-        self.setFolderVisibility = paintDocumentClient.setFolderVisibility
-        self.setFolderName = paintDocumentClient.setFolderName
-        self.setFolderExpanded = paintDocumentClient.setFolderExpanded
-        self.assignLayerToFolder = paintDocumentClient.assignLayerToFolder
-        self.setActiveLayer = paintDocumentClient.setActiveLayer
-        self.setLayerName = paintDocumentClient.setLayerName
-        self.setLayerVisibility = paintDocumentClient.setLayerVisibility
-        self.setLayerLocked = paintDocumentClient.setLayerLocked
-        self.setLayerAlphaLocked = paintDocumentClient.setLayerAlphaLocked
-        self.setLayerClipped = paintDocumentClient.setLayerClipped
-        self.revealLayerForEditing = paintDocumentClient.revealLayerForEditing
-        self.setLayerOpacity = paintDocumentClient.setLayerOpacity
-        self.setLayerBlendMode = paintDocumentClient.setLayerBlendMode
-        self.mergeLayerDown = paintDocumentClient.mergeLayerDown
-        self.textLayerData = paintDocumentClient.textLayerData
-        self.setTextLayer = paintDocumentClient.setTextLayer
-        self.clearTextLayerData = paintDocumentClient.clearTextLayerData
-        self.replaceLayerPixels = paintDocumentClient.replaceLayerPixels
-        self.replaceLayerPixelsInRect = paintDocumentClient.replaceLayerPixelsInRect
-        self.replaceLayerMask = paintDocumentClient.replaceLayerMask
-        self.clearLayerMask = paintDocumentClient.clearLayerMask
-        self.applyLayerMask = paintDocumentClient.applyLayerMask
-        self.clearLayer = paintDocumentClient.clearLayer
+    private static func extractIndexResult(
+        _ result: DocumentEditingResult
+    ) -> Result<Int, DocumentMutationFailure> {
+        guard case let .structure(plan) = result, let index = plan.resultingIndex else {
+            return .failure(.bridgeMutationFailed("documentEditingGateway"))
+        }
+        return .success(index)
     }
 }
 
@@ -219,142 +237,359 @@ private enum PaintDocumentClientKey: DependencyKey {
     }
 }
 
+private enum DocumentRuntimeCompositionKey: DependencyKey {
+    static var liveValue: DocumentRuntimeComposition {
+        @Dependency(\.fileClient) var fileClient
+        @Dependency(\.dateClient) var dateClient
+        @Dependency(\.uuidClient) var uuidClient
+        return DocumentRuntimeCompositionFactory.live(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient
+        )
+    }
+}
+
 extension DependencyValues {
     var paintDocumentClient: PaintDocumentClient {
         get { self[PaintDocumentClientKey.self] }
-        set { self[PaintDocumentClientKey.self] = newValue }
+        set {
+            self[PaintDocumentClientKey.self] = newValue
+            self[DocumentRuntimeCompositionKey.self] = .init(paintDocumentClient: newValue)
+        }
+    }
+
+    var documentRuntimeComposition: DocumentRuntimeComposition {
+        get { self[DocumentRuntimeCompositionKey.self] }
+        set { self[DocumentRuntimeCompositionKey.self] = newValue }
     }
 
     var documentQueryGateway: DocumentQueryGateway {
-        get { self[DocumentQueryGatewayKey.self] }
-        set { self[DocumentQueryGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.queryGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.queryGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var documentMutationGateway: DocumentMutationGateway {
-        get { self[DocumentMutationGatewayKey.self] }
-        set { self[DocumentMutationGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.mutationGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.mutationGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var strokeInputGateway: StrokeInputGateway {
-        get { self[StrokeInputGatewayKey.self] }
-        set { self[StrokeInputGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.strokeGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.strokeGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var documentHistoryGateway: DocumentHistoryGateway {
-        get { self[DocumentHistoryGatewayKey.self] }
-        set { self[DocumentHistoryGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.historyGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.historyGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
-        get { self[DocumentPersistenceGatewayKey.self] }
-        set { self[DocumentPersistenceGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.persistenceGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.persistenceGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var documentExportGateway: DocumentExportGateway {
-        get { self[DocumentExportGatewayKey.self] }
-        set { self[DocumentExportGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.exportGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.exportGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 
     var textLayerGateway: TextLayerGateway {
-        get { self[TextLayerGatewayKey.self] }
-        set { self[TextLayerGatewayKey.self] = newValue }
+        get { documentRuntimeComposition.textLayerGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.textLayerGateway = newValue
+            documentRuntimeComposition = composition
+        }
+    }
+
+    var documentLayerEffectsGateway: DocumentLayerEffectsGateway {
+        get { documentRuntimeComposition.layerEffectsGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.layerEffectsGateway = newValue
+            documentRuntimeComposition = composition
+        }
+    }
+
+    var documentEditingGateway: DocumentEditingGateway {
+        get { documentRuntimeComposition.editingGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.editingGateway = newValue
+            documentRuntimeComposition = composition
+        }
     }
 }
 
-private enum DocumentQueryGatewayKey: DependencyKey {
-    static var liveValue: DocumentQueryGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentQueryGateway(
-            lightweightPresentation: paintDocumentClient.lightweightPresentation,
-            presentation: paintDocumentClient.presentation,
-            compositePixelData: paintDocumentClient.compositePixelData,
-            pixelDataForLayer: paintDocumentClient.pixelDataForLayer,
-            consumeDirtyUpdate: paintDocumentClient.consumeDirtyUpdate
+extension DocumentRuntimeComposition {
+    init(paintDocumentClient: PaintDocumentClient) {
+        self.init(
+            queryGateway: DocumentQueryGateway(
+                lightweightPresentation: paintDocumentClient.lightweightPresentation,
+                presentation: paintDocumentClient.presentation,
+                compositePixelData: paintDocumentClient.compositePixelData,
+                pixelDataForLayer: paintDocumentClient.pixelDataForLayer,
+                consumeDirtyUpdate: paintDocumentClient.consumeDirtyUpdate
+            ),
+            mutationGateway: DocumentMutationGateway(
+                resizeCanvas: paintDocumentClient.resizeCanvas,
+                resizeCanvasExtent: paintDocumentClient.resizeCanvasExtent,
+                addLayer: paintDocumentClient.addLayer,
+                deleteLayer: paintDocumentClient.deleteLayer,
+                setActiveLayer: paintDocumentClient.setActiveLayer,
+                setLayerName: paintDocumentClient.setLayerName,
+                setLayerVisibility: paintDocumentClient.setLayerVisibility,
+                revealLayerForEditing: paintDocumentClient.revealLayerForEditing,
+                replaceLayerPixels: paintDocumentClient.replaceLayerPixels,
+                replaceLayerPixelsInRect: paintDocumentClient.replaceLayerPixelsInRect,
+                replaceLayerMask: paintDocumentClient.replaceLayerMask,
+                clearLayerMask: paintDocumentClient.clearLayerMask,
+                applyLayerMask: paintDocumentClient.applyLayerMask,
+                clearLayer: paintDocumentClient.clearLayer,
+                applyLayerProcessing: paintDocumentClient.applyLayerProcessing
+            ),
+            strokeGateway: StrokeInputGateway(
+                beginStroke: paintDocumentClient.beginStroke,
+                appendStroke: paintDocumentClient.appendStroke,
+                endStroke: paintDocumentClient.endStroke,
+                cancelStroke: paintDocumentClient.cancelStroke,
+                blurStroke: paintDocumentClient.blurStroke,
+                endBlurStroke: paintDocumentClient.endBlurStroke,
+                fill: paintDocumentClient.fill,
+                applySoftwareStroke: paintDocumentClient.applySoftwareStroke
+            ),
+            historyGateway: DocumentHistoryGateway(
+                canUndo: paintDocumentClient.canUndo,
+                canRedo: paintDocumentClient.canRedo,
+                undo: paintDocumentClient.undo,
+                redo: paintDocumentClient.redo
+            ),
+            persistenceGateway: DocumentPersistenceGateway(
+                saveProject: paintDocumentClient.saveProject,
+                loadProject: paintDocumentClient.loadProject,
+                setPaperStyle: paintDocumentClient.setPaperStyle,
+                newCanvas: paintDocumentClient.newCanvas,
+                prewarmDrawingResources: paintDocumentClient.prewarmDrawingResources
+            ),
+            exportGateway: DocumentExportGateway(
+                compositePNGData: paintDocumentClient.compositePNGData,
+                timelapseCapture: paintDocumentClient.timelapseCapture
+            ),
+            textLayerGateway: TextLayerGateway(
+                textLayerData: paintDocumentClient.textLayerData,
+                setTextLayer: paintDocumentClient.setTextLayer,
+                clearTextLayerData: paintDocumentClient.clearTextLayerData
+            ),
+            layerEffectsGateway: DocumentLayerEffectsGateway(
+                mergeLayerDown: paintDocumentClient.mergeLayerDown
+            ),
+            editingGateway: DocumentEditingGateway(paintDocumentClient: paintDocumentClient)
         )
     }
 }
 
-private enum DocumentMutationGatewayKey: DependencyKey {
-    static var liveValue: DocumentMutationGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentMutationGateway(
-            resizeCanvas: paintDocumentClient.resizeCanvas,
-            resizeCanvasExtent: paintDocumentClient.resizeCanvasExtent,
-            addLayer: paintDocumentClient.addLayer,
-            deleteLayer: paintDocumentClient.deleteLayer,
-            setActiveLayer: paintDocumentClient.setActiveLayer,
-            setLayerName: paintDocumentClient.setLayerName,
-            setLayerVisibility: paintDocumentClient.setLayerVisibility,
-            revealLayerForEditing: paintDocumentClient.revealLayerForEditing,
-            replaceLayerPixels: paintDocumentClient.replaceLayerPixels,
-            replaceLayerPixelsInRect: paintDocumentClient.replaceLayerPixelsInRect,
-            replaceLayerMask: paintDocumentClient.replaceLayerMask,
-            clearLayerMask: paintDocumentClient.clearLayerMask,
-            applyLayerMask: paintDocumentClient.applyLayerMask,
-            clearLayer: paintDocumentClient.clearLayer,
-            applyLayerProcessing: paintDocumentClient.applyLayerProcessing
-        )
+extension DocumentEditingGateway {
+    init(paintDocumentClient: PaintDocumentClient) {
+        let useCase = DocumentEditorUseCase()
+
+        self.init { request in
+            let presentation = paintDocumentClient.lightweightPresentation()
+            let context = DocumentLayerMutationContext(
+                layerCount: presentation.layerRows.count,
+                folderIDs: Set(
+                    presentation.layerSidebarRows.compactMap { row in
+                        guard case let .folder(folder) = row else { return nil }
+                        return folder.id
+                    }
+                ),
+                isLayerLocked: { index in
+                    presentation.layerRows.first(where: { $0.index == index })?.isLocked ?? false
+                }
+            )
+
+            let gateway = PaintDocumentEditorAdapter(paintDocumentClient: paintDocumentClient)
+            return useCase.execute(request, in: context, gateway: gateway)
+                .mapError(mapEditingFailure)
+        }
     }
 }
 
-private enum StrokeInputGatewayKey: DependencyKey {
-    static var liveValue: StrokeInputGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return StrokeInputGateway(
-            beginStroke: paintDocumentClient.beginStroke,
-            appendStroke: paintDocumentClient.appendStroke,
-            endStroke: paintDocumentClient.endStroke,
-            cancelStroke: paintDocumentClient.cancelStroke,
-            blurStroke: paintDocumentClient.blurStroke,
-            endBlurStroke: paintDocumentClient.endBlurStroke,
-            fill: paintDocumentClient.fill,
-            applySoftwareStroke: paintDocumentClient.applySoftwareStroke
-        )
+private struct PaintDocumentEditorAdapter: DocumentEditorGateway {
+    let paintDocumentClient: PaintDocumentClient
+
+    func addLayer(name: String) -> Int {
+        switch paintDocumentClient.addLayer(name) {
+        case let .success(index):
+            return index
+        case .failure:
+            return -1
+        }
+    }
+
+    func setActiveLayerIndex(_ index: Int) {
+        _ = paintDocumentClient.setActiveLayer(index)
+    }
+
+    func duplicateLayer(index: Int, name: String) -> Int {
+        switch paintDocumentClient.duplicateLayer(index, name) {
+        case let .success(duplicatedIndex):
+            return duplicatedIndex
+        case .failure:
+            return -1
+        }
+    }
+
+    func deleteLayer(index: Int) -> DocumentLayerMutationResult {
+        switch paintDocumentClient.deleteLayer(index) {
+        case .success:
+            return .success(())
+        case let .failure(failure):
+            return .failure(mapRuntimeFailure(failure))
+        }
+    }
+
+    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult {
+        switch paintDocumentClient.moveLayer(index, destinationIndex) {
+        case .success:
+            return .success(())
+        case let .failure(failure):
+            return .failure(mapRuntimeFailure(failure))
+        }
+    }
+
+    func createFolder(name: String, anchorLayerIndex: Int) -> Int {
+        switch paintDocumentClient.createFolder(name, anchorLayerIndex) {
+        case let .success(folderID):
+            return folderID
+        case .failure:
+            return -1
+        }
+    }
+
+    func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult {
+        switch paintDocumentClient.deleteFolder(folderID) {
+        case .success:
+            return .success(())
+        case let .failure(failure):
+            return .failure(mapRuntimeFailure(failure))
+        }
+    }
+
+    func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult {
+        switch paintDocumentClient.assignLayerToFolder(index, folderID) {
+        case .success:
+            return .success(())
+        case let .failure(failure):
+            return .failure(mapRuntimeFailure(failure))
+        }
+    }
+
+    func setLayerName(_ name: String, index: Int) {
+        _ = paintDocumentClient.setLayerName(index, name)
+    }
+
+    func setLayerVisible(_ isVisible: Bool, index: Int) {
+        _ = paintDocumentClient.setLayerVisibility(index, isVisible)
+    }
+
+    func setLayerLocked(_ isLocked: Bool, index: Int) {
+        _ = paintDocumentClient.setLayerLocked(index, isLocked)
+    }
+
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) {
+        _ = paintDocumentClient.setLayerAlphaLocked(index, isAlphaLocked)
+    }
+
+    func setLayerClipped(_ isClipped: Bool, index: Int) {
+        _ = paintDocumentClient.setLayerClipped(index, isClipped)
+    }
+
+    func setLayerOpacity(_ opacity: Double, index: Int) {
+        _ = paintDocumentClient.setLayerOpacity(index, opacity)
+    }
+
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) {
+        _ = paintDocumentClient.setLayerBlendMode(index, blendMode)
+    }
+
+    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) {
+        _ = paintDocumentClient.setFolderExpanded(folderID, isExpanded)
+    }
+
+    func setFolderVisible(_ isVisible: Bool, folderID: Int) {
+        _ = paintDocumentClient.setFolderVisibility(folderID, isVisible)
+    }
+
+    func setFolderName(_ name: String, folderID: Int) {
+        _ = paintDocumentClient.setFolderName(folderID, name)
     }
 }
 
-private enum DocumentHistoryGatewayKey: DependencyKey {
-    static var liveValue: DocumentHistoryGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentHistoryGateway(
-            canUndo: paintDocumentClient.canUndo,
-            canRedo: paintDocumentClient.canRedo,
-            undo: paintDocumentClient.undo,
-            redo: paintDocumentClient.redo
-        )
+private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure {
+    switch failure {
+    case let .invalidLayerIndex(index):
+        return .invalidLayerIndex(index)
+    case let .invalidFolderID(folderID):
+        return .invalidFolderID(folderID)
+    case let .layerLocked(index):
+        return .layerLocked(index)
+    case let .invalidOpacity(opacity):
+        return .invalidOpacity(opacity)
+    case let .bridgeMutationFailed(message):
+        return .bridgeMutationFailed(message)
     }
 }
 
-private enum DocumentPersistenceGatewayKey: DependencyKey {
-    static var liveValue: DocumentPersistenceGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentPersistenceGateway(
-            saveProject: paintDocumentClient.saveProject,
-            loadProject: paintDocumentClient.loadProject,
-            setPaperStyle: paintDocumentClient.setPaperStyle,
-            newCanvas: paintDocumentClient.newCanvas,
-            prewarmDrawingResources: paintDocumentClient.prewarmDrawingResources
-        )
-    }
-}
-
-private enum DocumentExportGatewayKey: DependencyKey {
-    static var liveValue: DocumentExportGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return DocumentExportGateway(
-            compositePNGData: paintDocumentClient.compositePNGData,
-            timelapseCapture: paintDocumentClient.timelapseCapture
-        )
-    }
-}
-
-private enum TextLayerGatewayKey: DependencyKey {
-    static var liveValue: TextLayerGateway {
-        @Dependency(\.paintDocumentClient) var paintDocumentClient
-        return TextLayerGateway(
-            textLayerData: paintDocumentClient.textLayerData,
-            setTextLayer: paintDocumentClient.setTextLayer,
-            clearTextLayerData: paintDocumentClient.clearTextLayerData
-        )
+private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLayerMutationFailure {
+    switch failure {
+    case let .invalidLayerIndex(index):
+        return .invalidLayerIndex(index)
+    case let .invalidFolderID(folderID):
+        return .invalidFolderID(folderID)
+    case let .layerLocked(index):
+        return .layerLocked(index)
+    case let .invalidOpacity(opacity):
+        return .invalidOpacity(opacity)
+    case let .bridgeMutationFailed(message):
+        return .bridgeMutationFailed(message)
+    case .alphaLocked:
+        return .bridgeMutationFailed("alphaLocked")
+    case .invalidCanvasSize:
+        return .bridgeMutationFailed("invalidCanvasSize")
+    case .emptyInput:
+        return .bridgeMutationFailed("emptyInput")
+    case .noUndoState:
+        return .bridgeMutationFailed("noUndoState")
+    case .noRedoState:
+        return .bridgeMutationFailed("noRedoState")
+    case .incompatibleLayerType:
+        return .bridgeMutationFailed("incompatibleLayerType")
+    case let .transactionFailure(primary, rollback):
+        return .bridgeMutationFailed("transactionFailure(\(primary),\(rollback))")
     }
 }
