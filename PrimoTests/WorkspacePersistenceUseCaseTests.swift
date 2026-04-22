@@ -10,7 +10,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         let saveHistoryTriggers = TestRecorder<SaveHistoryTrigger>()
         let activeTab = OpenDocumentTab.testValue(previewImageData: Data([0xAB]))
 
-        let paintDocumentClient = PaintDocumentClient.stub(
+        let documentPersistenceGateway = DocumentPersistenceGateway.stub(
             saveProject: { url, _ in
                 saveProjectCalls.record(url)
             }
@@ -21,18 +21,11 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
                 saveHistoryTriggers.record(trigger)
             }
         )
-        let useCase = AppFeature.WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: paintDocumentClient,
-                documentWorkspaceClient: documentWorkspaceClient
-            ),
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: documentWorkspaceClient
-            ),
-            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                uuidClient: UUIDClient(
-                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A1")! }
-                )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: documentPersistenceGateway,
+            documentWorkspaceClient: documentWorkspaceClient,
+            uuidClient: UUIDClient(
+                generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A1")! }
             )
         )
 
@@ -46,7 +39,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             )
         )
 
-        let result = useCase.execute(request)
+        let result = support.persistenceUseCase.execute(request)
 
         XCTAssertEqual(
             result,
@@ -69,24 +62,16 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
 
     func testSaveHistoryFailureReturnsCloseSaveIssue() {
         let tab = OpenDocumentTab.testValue()
-        let paintDocumentClient = PaintDocumentClient.stub()
         let documentWorkspaceClient = DocumentWorkspaceClient.stub(
             persistSaveHistorySnapshot: { _, _, _ in
                 throw TestError.expected("save history unavailable")
             }
         )
-        let useCase = AppFeature.WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: paintDocumentClient,
-                documentWorkspaceClient: documentWorkspaceClient
-            ),
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: documentWorkspaceClient
-            ),
-            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                uuidClient: UUIDClient(
-                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A2")! }
-                )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: documentWorkspaceClient,
+            uuidClient: UUIDClient(
+                generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A2")! }
             )
         )
 
@@ -99,7 +84,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            useCase.execute(request),
+            support.persistenceUseCase.execute(request),
             .success(
                 .tabsSavedForClose(
                     AppFeature.WorkspaceCloseTabsSaveResult(
@@ -114,28 +99,21 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
     func testAutosaveCleanupFailureReturnsSaveIssue() {
         let savedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/saved-document.atelier"))
         let activeTab = OpenDocumentTab.testValue(previewImageData: Data([0xAB]))
-        let useCase = AppFeature.WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: .stub(),
-                documentWorkspaceClient: .stub(
-                    persistProjectSnapshot: { _, _ in savedURL },
-                    discardAutosaveSnapshot: { _ in
-                        throw TestError.expected("autosave cleanup failed")
-                    }
-                )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                persistProjectSnapshot: { _, _ in savedURL },
+                discardAutosaveSnapshot: { _ in
+                    throw TestError.expected("autosave cleanup failed")
+                }
             ),
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub()
-            ),
-            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                uuidClient: UUIDClient(
-                    generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A3")! }
-                )
+            uuidClient: UUIDClient(
+                generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A3")! }
             )
         )
 
         XCTAssertEqual(
-            useCase.execute(
+            support.persistenceUseCase.execute(
                 .saveActiveDocument(
                     AppFeature.WorkspaceDocumentSaveRequest(
                         activeTab: activeTab,
@@ -164,19 +142,12 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
     func testReserveNewTabBackingStoreReturnsPreparedTab() {
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
         let reservedURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/reserved-tab.atelier"))
-        let useCase = AppFeature.WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: .stub(),
-                documentWorkspaceClient: .stub(
-                    createTabBackingStoreURL: { _ in reservedURL }
-                )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                createTabBackingStoreURL: { _ in reservedURL }
             ),
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub()
-            ),
-            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                uuidClient: UUIDClient(generate: { reservedID })
-            )
+            uuidClient: UUIDClient(generate: { reservedID })
         )
 
         let request = AppFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
@@ -188,7 +159,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            useCase.execute(request),
+            support.persistenceUseCase.execute(request),
             .success(
                 .newTabBackingStoreReserved(
                     AppFeature.PreparedWorkspaceTab(
@@ -205,21 +176,14 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
 
     func testReserveNewTabBackingStoreMapsCreateFailure() {
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000B2")!
-        let useCase = AppFeature.WorkspacePersistenceUseCase(
-            workspaceBackingStoreService: AppFeature.WorkspaceBackingStoreService(
-                paintDocumentClient: .stub(),
-                documentWorkspaceClient: .stub(
-                    createTabBackingStoreURL: { _ in
-                        throw TestError.expected("create tab failed")
-                    }
-                )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                createTabBackingStoreURL: { _ in
+                    throw TestError.expected("create tab failed")
+                }
             ),
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub()
-            ),
-            workspaceIdentityService: AppFeature.WorkspaceIdentityService(
-                uuidClient: UUIDClient(generate: { reservedID })
-            )
+            uuidClient: UUIDClient(generate: { reservedID })
         )
 
         let request = AppFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
@@ -231,7 +195,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            useCase.execute(request),
+            support.persistenceUseCase.execute(request),
             .failure(
                 AppFeature.WorkspacePersistenceFailure(
                     request: request,

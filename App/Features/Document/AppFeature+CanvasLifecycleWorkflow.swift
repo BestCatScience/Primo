@@ -2,6 +2,7 @@ import ComposableArchitecture
 import CoreGraphics
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 
 extension AppFeature {
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {
@@ -29,11 +30,6 @@ extension AppFeature {
         var size: CGSize {
             CGSize(width: width, height: height)
         }
-    }
-
-    struct ImportedCanvasRequest: Equatable, Sendable {
-        let dimensions: CanvasDimensions
-        let pixelData: Data
     }
 
     struct ImportedCanvasPlan: Equatable, Sendable {
@@ -170,67 +166,6 @@ extension AppFeature {
         }
     }
 
-    struct CanvasLifecycleService {
-        let documentPersistenceGateway: DocumentPersistenceGateway
-        let documentMutationGateway: DocumentMutationGateway
-        let documentHistoryGateway: DocumentHistoryGateway
-
-        func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            documentPersistenceGateway.newCanvas(dimensions.width, dimensions.height)
-            documentPersistenceGateway.prewarmDrawingResources()
-            return .success(())
-        }
-
-        func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            documentMutationGateway.resizeCanvas(dimensions.width, dimensions.height)
-        }
-
-        func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-            documentMutationGateway.resizeCanvasExtent(dimensions.width, dimensions.height)
-        }
-
-        func initializeImportedCanvas(
-            _ request: ImportedCanvasRequest,
-            layerName: String
-        ) -> DocumentMutationResult {
-            switch createCanvas(request.dimensions) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-            switch documentMutationGateway.replaceLayerPixels(0, request.pixelData) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-            switch documentMutationGateway.setLayerName(0, layerName) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-            return documentMutationGateway.setActiveLayer(0)
-        }
-
-        func undo() -> DocumentMutationResult {
-            documentHistoryGateway.undo()
-        }
-
-        func redo() -> DocumentMutationResult {
-            documentHistoryGateway.redo()
-        }
-    }
-
-    var canvasLifecycleService: CanvasLifecycleService {
-        CanvasLifecycleService(
-            documentPersistenceGateway: documentPersistenceGateway,
-            documentMutationGateway: documentMutationGateway,
-            documentHistoryGateway: documentHistoryGateway
-        )
-    }
-
     struct CanvasLifecycleFeedbackMapper: Sendable {
         func feedback(for failure: CanvasLifecycleContractFailure) -> ApplicationFeedback {
             switch failure {
@@ -258,6 +193,45 @@ extension AppFeature {
 
     var freshDocumentWorkspaceCoordinator: FreshDocumentWorkspaceCoordinator {
         FreshDocumentWorkspaceCoordinator()
+    }
+
+    func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+        documentInteractionService.createCanvas(
+            width: dimensions.width,
+            height: dimensions.height
+        )
+    }
+
+    func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+        documentInteractionService.resizeCanvas(
+            width: dimensions.width,
+            height: dimensions.height
+        )
+    }
+
+    func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+        documentInteractionService.resizeCanvasExtent(
+            width: dimensions.width,
+            height: dimensions.height
+        )
+    }
+
+    func initializeImportedCanvas(
+        _ request: ImportedCanvasRequest,
+        layerName: String
+    ) -> DocumentMutationResult {
+        documentInteractionService.initializeImportedCanvas(
+            request,
+            layerName: layerName
+        )
+    }
+
+    func undoCanvasMutation() -> DocumentMutationResult {
+        documentInteractionService.undo()
+    }
+
+    func redoCanvasMutation() -> DocumentMutationResult {
+        documentInteractionService.redo()
     }
 
     var freshDocumentActivationCoordinator: FreshDocumentActivationCoordinator {
@@ -305,7 +279,8 @@ extension AppFeature {
         }
         return .success(
             ImportedCanvasRequest(
-                dimensions: dimensions,
+                width: dimensions.width,
+                height: dimensions.height,
                 pixelData: importedImage.pixelData
             )
         )
@@ -407,9 +382,9 @@ extension AppFeature {
     ) -> DocumentMutationResult {
         switch pendingMutation.operation {
         case let .newCanvas(dimensions):
-            return canvasLifecycleService.createCanvas(dimensions)
+            return createCanvas(dimensions)
         case let .importedCanvas(plan):
-            return canvasLifecycleService.initializeImportedCanvas(
+            return initializeImportedCanvas(
                 plan.request,
                 layerName: plan.layerName
             )
@@ -583,7 +558,7 @@ extension AppFeature {
                     successFeedback: plan.successFeedback
                 ),
                 mutation: {
-                    canvasLifecycleService.resizeCanvas(plan.dimensions)
+                    resizeCanvas(plan.dimensions)
                 }
             )
         }
@@ -613,7 +588,7 @@ extension AppFeature {
                     successFeedback: plan.successFeedback
                 ),
                 mutation: {
-                    canvasLifecycleService.resizeCanvasExtent(plan.dimensions)
+                    resizeCanvasExtent(plan.dimensions)
                 }
             )
         }
@@ -668,7 +643,7 @@ extension AppFeature {
         return beginFreshDocumentTabReservation(
             state: &state,
             contract: FreshDocumentReplacementContract(
-                canvasSize: plan.request.dimensions.size,
+                canvasSize: CGSize(width: plan.request.width, height: plan.request.height),
                 tabTitle: plan.layerName,
                 successFeedback: .canvasCreatedFromImage,
                 mutationFailureFeedback: .couldNotCreateCanvasFromImage(nil)
@@ -681,7 +656,7 @@ extension AppFeature {
         handleHistoryMutationRequest(
             state: &state,
             operation: .undo,
-            performMutation: { canvasLifecycleService.undo() }
+            performMutation: { undoCanvasMutation() }
         )
     }
 
@@ -689,7 +664,7 @@ extension AppFeature {
         handleHistoryMutationRequest(
             state: &state,
             operation: .redo,
-            performMutation: { canvasLifecycleService.redo() }
+            performMutation: { redoCanvasMutation() }
         )
     }
 }

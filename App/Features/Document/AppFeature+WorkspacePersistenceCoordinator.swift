@@ -1,135 +1,41 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
-import PrimoWorkspaceDomain
 import PrimoWorkspaceInfrastructure
 
 extension AppFeature {
-    typealias WorkspacePersistenceIssue = PrimoWorkspaceDomain.WorkspacePersistenceIssue
-    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceDomain.WorkspacePersistenceFailureReason
-    typealias WorkspacePersistenceFailure = PrimoWorkspaceDomain.WorkspacePersistenceFailure
-    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceDomain.WorkspaceDirtyPresentationRequest
-    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceDomain.WorkspaceDocumentSavePurpose
-    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceDomain.WorkspaceDocumentSaveRequest
-    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceDomain.WorkspaceDocumentSaveResult
-    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceDomain.WorkspaceDocumentReplacementRequest
-    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceDomain.LoadedWorkspaceFollowUpPersistenceRequest
-    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceDomain.LoadedWorkspaceFollowUpPersistenceResult
-    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceDomain.WorkspaceCloseTabsSaveRequest
-    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceDomain.WorkspaceCloseTabsSaveResult
-    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceDomain.WorkspaceArtifactDiscardRequest
-    typealias WorkspaceTabReservationRequest = PrimoWorkspaceDomain.WorkspaceTabReservationRequest
-    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceDomain.WorkspaceSavedProjectMoveRequest
-    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceDomain.WorkspaceSavedProjectMoveResult
-    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceDomain.WorkspaceAutosaveEntryDiscardRequest
-    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceDomain.WorkspaceSaveHistoryLoadRequest
-    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceDomain.WorkspaceCatalogFailureReason
-    typealias WorkspaceCatalogFailure = PrimoWorkspaceDomain.WorkspaceCatalogFailure
-    typealias WorkspacePersistenceRequest = PrimoWorkspaceDomain.WorkspacePersistenceRequest
-    typealias WorkspacePersistenceResult = PrimoWorkspaceDomain.WorkspacePersistenceResult
-    typealias WorkspaceCatalogRequest = PrimoWorkspaceDomain.WorkspaceCatalogRequest
-    typealias WorkspaceCatalogResult = PrimoWorkspaceDomain.WorkspaceCatalogResult
-    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceDomain.LoadedWorkspaceProjectPlan
-    typealias WorkspacePersistenceUseCase = PrimoWorkspaceDomain.WorkspacePersistenceUseCase
-    typealias WorkspaceCatalogUseCase = PrimoWorkspaceDomain.WorkspaceCatalogUseCase
-
-    struct WorkspaceBackingStoreService: Sendable {
-        let documentPersistenceGateway: DocumentPersistenceGateway
-        let documentWorkspaceClient: DocumentWorkspaceClient
-
-        func saveProject(
-            at fileURL: URL,
-            paperStyle: CanvasPaperStyle
-        ) throws {
-            try documentPersistenceGateway.saveProject(fileURL, paperStyle)
-        }
-
-        func persistProjectSnapshot(
-            _ sourceURL: DocumentProjectPath,
-            preferredDestinationURL: DocumentProjectPath?
-        ) throws -> DocumentProjectPath {
-            try documentWorkspaceClient.persistProjectSnapshot(
-                sourceURL,
-                preferredDestinationURL
-            )
-        }
-
-        func createTabBackingStoreURL(_ tabID: OpenDocumentTab.ID) throws -> DocumentProjectPath {
-            try documentWorkspaceClient.createTabBackingStoreURL(tabID)
-        }
-
-        func persistAutosaveSnapshot(
-            _ backingStoreURL: DocumentProjectPath,
-            _ tab: OpenDocumentTab
-        ) throws {
-            try documentWorkspaceClient.persistAutosaveSnapshot(backingStoreURL, tab)
-        }
-
-        func discardAutosaveSnapshot(_ tab: OpenDocumentTab) throws {
-            try documentWorkspaceClient.discardAutosaveSnapshot(tab)
-        }
-
-        func persistSaveHistorySnapshot(
-            _ backingStoreURL: DocumentProjectPath,
-            _ tab: OpenDocumentTab,
-            _ trigger: SaveHistoryTrigger
-        ) throws {
-            try documentWorkspaceClient.persistSaveHistorySnapshot(backingStoreURL, tab, trigger)
-        }
-
-        func removeWorkspaceItem(_ url: DocumentProjectPath) throws {
-            try documentWorkspaceClient.removeWorkspaceItem(url)
-        }
-    }
-
-    struct WorkspaceCatalogService: Sendable {
-        let documentWorkspaceClient: DocumentWorkspaceClient
-
-        func loadSavedProjects() throws -> [SavedProjectSummary] {
-            try documentWorkspaceClient.loadSavedProjects()
-        }
-
-        func moveSavedProject(
-            _ url: DocumentProjectPath,
-            to relativeFolderPath: RelativeProjectFolderPath?
-        ) throws -> DocumentProjectPath {
-            try documentWorkspaceClient.moveSavedProject(url, relativeFolderPath)
-        }
-
-        func loadAutosaveRecoveryItems() throws -> [AutosaveRecoveryItem] {
-            try documentWorkspaceClient.loadAutosaveRecoveryItems()
-        }
-
-        func discardAutosaveEntry(_ id: WorkspaceItemID) throws {
-            try documentWorkspaceClient.discardAutosaveEntry(id)
-        }
-
-        func loadSaveHistoryEntries(for tab: OpenDocumentTab) throws -> [SaveHistoryEntry] {
-            try documentWorkspaceClient.loadSaveHistoryEntries(tab)
-        }
-    }
-
-    struct WorkspaceArtifactService: Sendable {
-        let documentWorkspaceClient: DocumentWorkspaceClient
-
-        func timelapseTemporaryDirectory() -> URL {
-            documentWorkspaceClient.timelapseTemporaryDirectory()
-        }
-
-        func writePNGToTemporaryDirectory(_ data: Data) throws -> URL {
-            try documentWorkspaceClient.writePNGToTemporaryDirectory(data)
-        }
-    }
-
-    struct WorkspaceIdentityService: Sendable {
-        let uuidClient: UUIDClient
-
-        func generateTabID() -> OpenDocumentTab.ID {
-            uuidClient.generate()
-        }
-    }
-
-    typealias PreparedWorkspaceTab = PrimoWorkspaceDomain.PreparedWorkspaceTab
+    typealias WorkspacePersistenceIssue = PrimoWorkspaceInfrastructure.WorkspacePersistenceIssue
+    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceInfrastructure.WorkspacePersistenceFailureReason
+    typealias WorkspacePersistenceFailure = PrimoWorkspaceInfrastructure.WorkspacePersistenceFailure
+    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceInfrastructure.WorkspaceDirtyPresentationRequest
+    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceInfrastructure.WorkspaceDocumentSavePurpose
+    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceInfrastructure.WorkspaceDocumentSaveRequest
+    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceInfrastructure.WorkspaceDocumentSaveResult
+    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceInfrastructure.WorkspaceDocumentReplacementRequest
+    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceInfrastructure.LoadedWorkspaceFollowUpPersistenceRequest
+    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceInfrastructure.LoadedWorkspaceFollowUpPersistenceResult
+    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceInfrastructure.WorkspaceCloseTabsSaveRequest
+    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceInfrastructure.WorkspaceCloseTabsSaveResult
+    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceInfrastructure.WorkspaceArtifactDiscardRequest
+    typealias WorkspaceTabReservationRequest = PrimoWorkspaceInfrastructure.WorkspaceTabReservationRequest
+    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceInfrastructure.WorkspaceSavedProjectMoveRequest
+    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceInfrastructure.WorkspaceSavedProjectMoveResult
+    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceInfrastructure.WorkspaceAutosaveEntryDiscardRequest
+    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceInfrastructure.WorkspaceSaveHistoryLoadRequest
+    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceInfrastructure.WorkspaceCatalogFailureReason
+    typealias WorkspaceCatalogFailure = PrimoWorkspaceInfrastructure.WorkspaceCatalogFailure
+    typealias WorkspacePersistenceRequest = PrimoWorkspaceInfrastructure.WorkspacePersistenceRequest
+    typealias WorkspacePersistenceResult = PrimoWorkspaceInfrastructure.WorkspacePersistenceResult
+    typealias WorkspaceCatalogRequest = PrimoWorkspaceInfrastructure.WorkspaceCatalogRequest
+    typealias WorkspaceCatalogResult = PrimoWorkspaceInfrastructure.WorkspaceCatalogResult
+    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceInfrastructure.LoadedWorkspaceProjectPlan
+    typealias WorkspacePersistenceUseCase = PrimoWorkspaceInfrastructure.WorkspacePersistenceUseCase
+    typealias WorkspaceCatalogUseCase = PrimoWorkspaceInfrastructure.WorkspaceCatalogUseCase
+    typealias WorkspaceBackingStoreService = PrimoWorkspaceInfrastructure.WorkspaceBackingStoreService
+    typealias WorkspaceCatalogService = PrimoWorkspaceInfrastructure.WorkspaceCatalogService
+    typealias WorkspaceArtifactService = PrimoWorkspaceInfrastructure.WorkspaceArtifactService
+    typealias WorkspaceIdentityService = PrimoWorkspaceInfrastructure.WorkspaceIdentityService
+    typealias PreparedWorkspaceTab = PrimoWorkspaceInfrastructure.PreparedWorkspaceTab
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)
@@ -152,104 +58,48 @@ extension AppFeature {
         let operation: Operation
     }
 
-    var workspaceBackingStoreService: WorkspaceBackingStoreService {
-        WorkspaceBackingStoreService(
+    var workspaceFeatureSupport: WorkspaceFeatureSupport {
+        WorkspaceFeatureSupport(
             documentPersistenceGateway: documentPersistenceGateway,
-            documentWorkspaceClient: documentWorkspaceClient
-        )
-    }
-
-    var workspaceCatalogService: WorkspaceCatalogService {
-        WorkspaceCatalogService(
-            documentWorkspaceClient: documentWorkspaceClient
-        )
-    }
-
-    var workspaceArtifactService: WorkspaceArtifactService {
-        WorkspaceArtifactService(
-            documentWorkspaceClient: documentWorkspaceClient
-        )
-    }
-
-    var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
-        WorkspacePersistenceUseCase(
-            workspaceBackingStore: workspaceBackingStoreGateway,
-            workspaceCatalog: workspaceCatalogGateway,
-            identityGenerator: workspaceIdentityGenerator
-        )
-    }
-
-    var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
-        WorkspaceCatalogUseCase(
-            workspaceCatalog: workspaceCatalogGateway
-        )
-    }
-
-    var workspaceIdentityService: WorkspaceIdentityService {
-        WorkspaceIdentityService(
+            documentWorkspaceClient: documentWorkspaceClient,
             uuidClient: uuidClient
         )
     }
 
+    var workspaceBackingStoreService: WorkspaceBackingStoreService {
+        workspaceFeatureSupport.backingStoreService
+    }
+
+    var workspaceCatalogService: WorkspaceCatalogService {
+        workspaceFeatureSupport.catalogService
+    }
+
+    var workspaceArtifactService: WorkspaceArtifactService {
+        workspaceFeatureSupport.artifactService
+    }
+
+    var workspacePersistenceUseCase: WorkspacePersistenceUseCase {
+        workspaceFeatureSupport.persistenceUseCase
+    }
+
+    var workspaceCatalogUseCase: WorkspaceCatalogUseCase {
+        workspaceFeatureSupport.catalogUseCase
+    }
+
+    var workspaceIdentityService: WorkspaceIdentityService {
+        workspaceFeatureSupport.identityService
+    }
+
     var workspaceBackingStoreGateway: WorkspaceBackingStoreGateway {
-        WorkspaceBackingStoreGateway(
-            saveProject: { fileURL, paperStyle in
-                try workspaceBackingStoreService.saveProject(at: fileURL, paperStyle: paperStyle)
-            },
-            persistProjectSnapshot: { sourceURL, preferredDestinationURL in
-                try workspaceBackingStoreService.persistProjectSnapshot(
-                    sourceURL,
-                    preferredDestinationURL: preferredDestinationURL
-                )
-            },
-            createTabBackingStoreURL: { tabID in
-                try workspaceBackingStoreService.createTabBackingStoreURL(tabID)
-            },
-            persistAutosaveSnapshot: { backingStoreURL, tab in
-                try workspaceBackingStoreService.persistAutosaveSnapshot(backingStoreURL, tab)
-            },
-            discardAutosaveSnapshot: { tab in
-                try workspaceBackingStoreService.discardAutosaveSnapshot(tab)
-            },
-            persistSaveHistorySnapshot: { backingStoreURL, tab, trigger in
-                try workspaceBackingStoreService.persistSaveHistorySnapshot(
-                    backingStoreURL,
-                    tab,
-                    trigger
-                )
-            },
-            removeWorkspaceItem: { url in
-                try workspaceBackingStoreService.removeWorkspaceItem(url)
-            }
-        )
+        workspaceFeatureSupport.backingStoreGateway
     }
 
     var workspaceCatalogGateway: WorkspaceCatalogGateway {
-        WorkspaceCatalogGateway(
-            loadSavedProjects: {
-                try workspaceCatalogService.loadSavedProjects()
-            },
-            moveSavedProject: { sourceURL, relativeFolderPath in
-                try workspaceCatalogService.moveSavedProject(sourceURL, to: relativeFolderPath)
-            },
-            loadAutosaveRecoveryItems: {
-                try workspaceCatalogService.loadAutosaveRecoveryItems()
-            },
-            discardAutosaveEntry: { autosaveID in
-                try workspaceCatalogService.discardAutosaveEntry(autosaveID)
-            },
-            loadSaveHistoryEntries: { activeTab in
-                try workspaceCatalogService.loadSaveHistoryEntries(for: activeTab)
-            }
-        )
+        workspaceFeatureSupport.catalogGateway
     }
 
     var workspaceIdentityGenerator: WorkspaceIdentityGenerator {
-        WorkspaceIdentityGenerator(
-            generateTabID: {
-                workspaceIdentityService.generateTabID()
-            }
-        )
+        workspaceFeatureSupport.identityGenerator
     }
 
     func saveFailureFeedback(_ error: Error) -> ApplicationFeedback {

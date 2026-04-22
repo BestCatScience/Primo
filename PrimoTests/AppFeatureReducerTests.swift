@@ -26,8 +26,10 @@ final class AppFeatureReducerTests: XCTestCase {
         ) {
             AppFeature()
         } withDependencies: {
-            $0.paintDocumentClient = .stub(
-                compositePNGData: { _ in previewData }
+            $0.documentRuntimeComposition = .stub(
+                exportGateway: .stub(
+                    compositePNGData: { _ in previewData }
+                )
             )
             $0.documentWorkspaceClient = .stub()
         }
@@ -70,8 +72,10 @@ final class AppFeatureReducerTests: XCTestCase {
         ) {
             AppFeature()
         } withDependencies: {
-            $0.paintDocumentClient = .stub(
-                compositePNGData: { _ in previewData }
+            $0.documentRuntimeComposition = .stub(
+                exportGateway: .stub(
+                    compositePNGData: { _ in previewData }
+                )
             )
             $0.documentWorkspaceClient = .stub()
         }

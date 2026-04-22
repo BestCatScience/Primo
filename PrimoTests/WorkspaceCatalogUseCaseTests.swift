@@ -16,16 +16,16 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil,
             )
         ]
-        let useCase = AppFeature.WorkspaceCatalogUseCase(
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub(
-                    loadSavedProjects: { expectedProjects }
-                )
-            )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                loadSavedProjects: { expectedProjects }
+            ),
+            uuidClient: UUIDClient(generate: UUID.init)
         )
 
         XCTAssertEqual(
-            useCase.execute(.loadSavedProjects),
+            support.catalogUseCase.execute(.loadSavedProjects),
             .success(.savedProjectsLoaded(expectedProjects))
         )
     }
@@ -41,16 +41,16 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil
             )
         ]
-        let useCase = AppFeature.WorkspaceCatalogUseCase(
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub(
-                    loadAutosaveRecoveryItems: { expectedItems }
-                )
-            )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                loadAutosaveRecoveryItems: { expectedItems }
+            ),
+            uuidClient: UUIDClient(generate: UUID.init)
         )
 
         XCTAssertEqual(
-            useCase.execute(.loadAutosaveRecoveryItems),
+            support.catalogUseCase.execute(.loadAutosaveRecoveryItems),
             .success(.autosaveRecoveryItemsLoaded(expectedItems))
         )
     }
@@ -67,19 +67,19 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 previewImageData: nil
             )
         ]
-        let useCase = AppFeature.WorkspaceCatalogUseCase(
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub(
-                    loadSaveHistoryEntries: { tab in
-                        XCTAssertEqual(tab, activeTab)
-                        return expectedEntries
-                    }
-                )
-            )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                loadSaveHistoryEntries: { tab in
+                    XCTAssertEqual(tab, activeTab)
+                    return expectedEntries
+                }
+            ),
+            uuidClient: UUIDClient(generate: UUID.init)
         )
 
         XCTAssertEqual(
-            useCase.execute(
+            support.catalogUseCase.execute(
                 .loadSaveHistoryEntries(
                     AppFeature.WorkspaceSaveHistoryLoadRequest(
                         activeTab: activeTab
@@ -99,18 +99,18 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
                 openTabID: nil
             )
         )
-        let useCase = AppFeature.WorkspaceCatalogUseCase(
-            workspaceCatalogService: AppFeature.WorkspaceCatalogService(
-                documentWorkspaceClient: .stub(
-                    moveSavedProject: { _, _ in
-                        throw TestError.expected("move failed")
-                    }
-                )
-            )
+        let support = WorkspaceFeatureSupport(
+            documentPersistenceGateway: .stub(),
+            documentWorkspaceClient: .stub(
+                moveSavedProject: { _, _ in
+                    throw TestError.expected("move failed")
+                }
+            ),
+            uuidClient: UUIDClient(generate: UUID.init)
         )
 
         XCTAssertEqual(
-            useCase.execute(request),
+            support.catalogUseCase.execute(request),
             .failure(
                 AppFeature.WorkspaceCatalogFailure(
                     request: request,

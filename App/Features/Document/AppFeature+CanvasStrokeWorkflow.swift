@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
 
 extension AppFeature {
     struct StrokePreviewPlan {
@@ -51,7 +52,7 @@ extension AppFeature {
     }
 
     struct CanvasStrokeStateCoordinator {
-        let workflowService: CanvasStrokeWorkflowService
+        let workflowService: DocumentInteractionService
 
         func resetPreview(state: inout State) {
             state.canvas.resetStrokePreview()
@@ -211,7 +212,7 @@ extension AppFeature {
     }
 
     struct CanvasStrokeCommitService {
-        let workflowService: CanvasStrokeWorkflowService
+        let workflowService: DocumentInteractionService
 
         fileprivate func resolve(
             state: inout State,
@@ -444,100 +445,12 @@ extension AppFeature {
         }
     }
 
-    struct CanvasStrokeWorkflowService {
-        let documentQueryGateway: DocumentQueryGateway
-        let documentMutationGateway: DocumentMutationGateway
-        let strokeInputGateway: StrokeInputGateway
-
-        func ensureLayerVisible(_ layerIndex: Int) -> DocumentMutationResult {
-            documentMutationGateway.setLayerVisibility(layerIndex, true)
-        }
-
-        func cancelStroke() {
-            strokeInputGateway.cancelStroke()
-        }
-
-        func beginStroke(
-            _ sample: StylusSample,
-            brush: BrushRuntimeSettings
-        ) {
-            strokeInputGateway.beginStroke(sample, brush)
-        }
-
-        func appendStroke(_ sample: StylusSample) {
-            strokeInputGateway.appendStroke(sample)
-        }
-
-        func compositePixelData() -> Data {
-            documentQueryGateway.compositePixelData()
-        }
-
-        func endStroke() {
-            strokeInputGateway.endStroke()
-        }
-
-        func replaceLayerPixels(
-            _ layerIndex: Int,
-            pixelData: Data
-        ) -> DocumentMutationResult {
-            documentMutationGateway.replaceLayerPixels(layerIndex, pixelData)
-        }
-
-        func replaceLayerPixels(
-            _ layerIndex: Int,
-            in dirtyRect: LayerPixelRect,
-            pixelData: Data
-        ) -> DocumentMutationResult {
-            documentMutationGateway.replaceLayerPixelsInRect(layerIndex, dirtyRect, pixelData)
-        }
-
-        func applySoftwareStroke(
-            _ samples: [StylusSample],
-            brush: BrushRuntimeSettings,
-            layerIndex: Int
-        ) -> DocumentMutationResult {
-            strokeInputGateway.applySoftwareStroke(samples, brush, layerIndex)
-        }
-
-        func revealLayerForEditing(_ layerIndex: Int) -> DocumentMutationResult {
-            documentMutationGateway.revealLayerForEditing(layerIndex)
-        }
-
-        func blurStroke(
-            _ samples: [StylusSample],
-            brush: BrushRuntimeSettings,
-            layerIndex: Int,
-            clearSelectionAfterBlur: Bool
-        ) -> DocumentMutationResult {
-            strokeInputGateway.blurStroke(samples, brush, layerIndex, clearSelectionAfterBlur)
-        }
-
-        func endBlurStroke() {
-            strokeInputGateway.endBlurStroke()
-        }
-
-        func fill(
-            _ sample: StylusSample,
-            brush: BrushRuntimeSettings
-        ) -> DocumentMutationResult {
-            strokeInputGateway.fill(sample, brush)
-        }
-    }
-
-    var canvasStrokeWorkflowService: CanvasStrokeWorkflowService {
-        CanvasStrokeWorkflowService(
-            documentQueryGateway: documentQueryGateway,
-            documentMutationGateway: documentMutationGateway,
-            strokeInputGateway: strokeInputGateway
-        )
-    }
-
     var canvasStrokeContextResolver: CanvasStrokeContextResolver {
         CanvasStrokeContextResolver()
     }
 
     var canvasStrokeStateCoordinator: CanvasStrokeStateCoordinator {
-        CanvasStrokeStateCoordinator(workflowService: canvasStrokeWorkflowService)
+        CanvasStrokeStateCoordinator(workflowService: documentInteractionService)
     }
 
     var canvasStrokePreviewResolver: CanvasStrokePreviewResolver {
@@ -545,7 +458,7 @@ extension AppFeature {
     }
 
     var canvasStrokeCommitService: CanvasStrokeCommitService {
-        CanvasStrokeCommitService(workflowService: canvasStrokeWorkflowService)
+        CanvasStrokeCommitService(workflowService: documentInteractionService)
     }
 
     var canvasStrokeEffectCoordinator: CanvasStrokeEffectCoordinator {
@@ -830,7 +743,7 @@ extension AppFeature {
         else {
             return .failure(.bridgeMutationFailed("Missing fallback stroke snapshot"))
         }
-        return canvasStrokeWorkflowService.replaceLayerPixels(
+        return documentInteractionService.replaceLayerPixels(
             state.canvas.activeLayerIndex,
             pixelData: adjustedPixels
         )
@@ -933,16 +846,16 @@ extension AppFeature {
             applyCanvasStrokeFailure(failure, state: &state)
             return .none
         }
-        canvasStrokeWorkflowService.beginStroke(first, brush: resolvedBrushSettings(for: state))
+        documentInteractionService.beginStroke(first, brush: resolvedBrushSettings(for: state))
         for sample in samples.dropFirst() {
-            canvasStrokeWorkflowService.appendStroke(sample)
+            documentInteractionService.appendStroke(sample)
         }
-        applyLiveCompositePixelData(canvasStrokeWorkflowService.compositePixelData(), state: &state)
+        applyLiveCompositePixelData(documentInteractionService.compositePixelData(), state: &state)
         return cancelStartupPresentationEffects()
     }
 
     func handleCommitPreviewShapeStroke(state: inout State) -> Effect<Action> {
-        canvasStrokeWorkflowService.endStroke()
+        documentInteractionService.endStroke()
         return completeCanvasStrokeMutation(state: &state)
     }
 
@@ -986,7 +899,7 @@ extension AppFeature {
             state: &state,
             cancelShapeStrokeIfNeeded: { state in
                 if state.canvas.currentTool == .shape {
-                    canvasStrokeWorkflowService.cancelStroke()
+                    documentInteractionService.cancelStroke()
                 }
             },
             resetPreview: { state in
@@ -1015,9 +928,9 @@ extension AppFeature {
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
             mutation: {
-                switch canvasStrokeWorkflowService.revealLayerForEditing(activeLayerIndex) {
+                switch documentInteractionService.revealLayerForEditing(activeLayerIndex) {
                 case .success:
-                    return canvasStrokeWorkflowService.blurStroke(
+                    return documentInteractionService.blurStroke(
                         samples,
                         brush: brush,
                         layerIndex: activeLayerIndex,
@@ -1031,7 +944,7 @@ extension AppFeature {
     }
 
     func handleEndBlurStroke(state: inout State) -> Effect<Action> {
-        canvasStrokeWorkflowService.endBlurStroke()
+        documentInteractionService.endBlurStroke()
         return completeCanvasStrokeMutation(state: &state)
     }
 
@@ -1048,9 +961,9 @@ extension AppFeature {
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
             mutation: {
-                switch canvasStrokeWorkflowService.ensureLayerVisible(activeLayerIndex) {
+                switch documentInteractionService.ensureLayerVisible(activeLayerIndex) {
                 case .success:
-                    return canvasStrokeWorkflowService.fill(
+                    return documentInteractionService.fill(
                         sample,
                         brush: brush
                     )

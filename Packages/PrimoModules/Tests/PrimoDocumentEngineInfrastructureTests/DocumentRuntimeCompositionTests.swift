@@ -26,6 +26,6 @@ struct DocumentRuntimeCompositionTests {
         let presentation = runtime.queryGateway.lightweightPresentation()
         #expect(presentation.activeLayerIndex == 1)
         #expect(presentation.layerRows.count == 2)
-        #expect(presentation.layerRows[1].name == "Ink")
+        #expect(presentation.layerRows.first(where: { $0.index == 1 })?.name == "Ink")
     }
 }

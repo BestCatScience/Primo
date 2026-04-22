@@ -1,6 +1,8 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
+import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceInfrastructure
 @testable import Primo
 
@@ -119,83 +121,6 @@ extension WorkspaceItemID {
     }
 }
 
-extension PaintDocumentClient {
-    static func stub(
-        presentation: PaintDocumentPresentation = .testValue(),
-        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data? = { _ in nil },
-        saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void = { _, _ in },
-        loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject = { _ in .testValue() },
-        addLayer: @escaping @Sendable (String) -> DocumentIndexedMutationResult = { _ in .success(0) },
-        deleteLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
-        setActiveLayer: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
-        setLayerVisibility: @escaping @Sendable (Int, Bool) -> DocumentMutationResult = { _, _ in .success(()) },
-        setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult = { _, _ in .success(()) },
-        replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .success(()) },
-        applySoftwareStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult = { _, _, _ in .success(()) },
-        revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
-        blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult = { _, _, _, _ in .success(()) },
-        fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult = { _, _ in .success(()) }
-    ) -> Self {
-        Self(
-            lightweightPresentation: { presentation },
-            presentation: { presentation },
-            compositePixelData: { Data() },
-            prewarmDrawingResources: {},
-            compositePNGData: compositePNGData,
-            timelapseCapture: { nil },
-            saveProject: saveProject,
-            loadProject: loadProject,
-            setPaperStyle: { _ in },
-            newCanvas: { _, _ in },
-            resizeCanvas: { _, _ in .success(()) },
-            resizeCanvasExtent: { _, _ in .success(()) },
-            beginStroke: { _, _ in },
-            appendStroke: { _ in },
-            endStroke: {},
-            cancelStroke: {},
-            blurStroke: blurStroke,
-            endBlurStroke: {},
-            fill: fill,
-            canUndo: { true },
-            canRedo: { true },
-            undo: { .success(()) },
-            redo: { .success(()) },
-            addLayer: addLayer,
-            duplicateLayer: { _, _ in .success(0) },
-            deleteLayer: deleteLayer,
-            moveLayer: { _, _ in .success(()) },
-            createFolder: { _, _ in .success(0) },
-            deleteFolder: { _ in .success(()) },
-            setFolderVisibility: { _, _ in .success(()) },
-            setFolderName: { _, _ in .success(()) },
-            setFolderExpanded: { _, _ in .success(()) },
-            assignLayerToFolder: { _, _ in .success(()) },
-            setActiveLayer: setActiveLayer,
-            setLayerName: { _, _ in .success(()) },
-            setLayerVisibility: setLayerVisibility,
-            setLayerLocked: { _, _ in .success(()) },
-            setLayerAlphaLocked: { _, _ in .success(()) },
-            setLayerClipped: { _, _ in .success(()) },
-            revealLayerForEditing: revealLayerForEditing,
-            setLayerOpacity: { _, _ in .success(()) },
-            setLayerBlendMode: { _, _ in .success(()) },
-            mergeLayerDown: { _ in .success(()) },
-            textLayerData: { _ in nil },
-            setTextLayer: setTextLayer,
-            clearTextLayerData: { _ in },
-            applyLayerProcessing: { _, _ in .success(()) },
-            applySoftwareStroke: applySoftwareStroke,
-            pixelDataForLayer: { _ in Data() },
-            replaceLayerPixels: replaceLayerPixels,
-            replaceLayerMask: { _, _ in .success(()) },
-            clearLayerMask: { _ in .success(()) },
-            applyLayerMask: { _ in .success(()) },
-            clearLayer: { _ in .success(()) },
-            consumeDirtyUpdate: { nil }
-        )
-    }
-}
-
 extension DocumentQueryGateway {
     static func stub(
         presentation: PaintDocumentPresentation = .testValue(),
@@ -223,6 +148,7 @@ extension DocumentMutationGateway {
         setLayerVisibility: @escaping @Sendable (Int, Bool) -> DocumentMutationResult = { _, _ in .success(()) },
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .success(()) },
+        replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult = { _, _, _ in .success(()) },
         applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .success(()) }
     ) -> Self {
         Self(
@@ -235,6 +161,7 @@ extension DocumentMutationGateway {
             setLayerVisibility: setLayerVisibility,
             revealLayerForEditing: revealLayerForEditing,
             replaceLayerPixels: replaceLayerPixels,
+            replaceLayerPixelsInRect: replaceLayerPixelsInRect,
             replaceLayerMask: { _, _ in .success(()) },
             clearLayerMask: { _ in .success(()) },
             applyLayerMask: { _ in .success(()) },
@@ -277,6 +204,39 @@ extension DocumentHistoryGateway {
     }
 }
 
+extension DocumentLayerEffectsGateway {
+    static func stub(
+        mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) }
+    ) -> Self {
+        Self(mergeLayerDown: mergeLayerDown)
+    }
+}
+
+extension DocumentEditingGateway {
+    static func stub(
+        execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> = { _ in
+            .success(.none)
+        }
+    ) -> Self {
+        Self(execute: execute)
+    }
+}
+
+extension DocumentInteractionService {
+    static func stub(
+        execute: @escaping @Sendable (DocumentInteractionRequest) -> Result<DocumentInteractionResult, DocumentMutationFailure> = { request in
+            switch request {
+            case .compositePixelData:
+                return .success(.compositePixelData(Data()))
+            default:
+                return .success(.none)
+            }
+        }
+    ) -> Self {
+        Self(execute: execute)
+    }
+}
+
 extension DocumentPersistenceGateway {
     static func stub(
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void = { _, _ in },
@@ -300,6 +260,33 @@ extension DocumentExportGateway {
         Self(
             compositePNGData: compositePNGData,
             timelapseCapture: timelapseCapture
+        )
+    }
+}
+
+extension DocumentRuntimeComposition {
+    static func stub(
+        queryGateway: DocumentQueryGateway = .stub(),
+        mutationGateway: DocumentMutationGateway = .stub(),
+        strokeGateway: StrokeInputGateway = .stub(),
+        historyGateway: DocumentHistoryGateway = .stub(),
+        persistenceGateway: DocumentPersistenceGateway = .stub(),
+        exportGateway: DocumentExportGateway = .stub(),
+        textLayerGateway: TextLayerGateway = .stub(),
+        layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
+        editingGateway: DocumentEditingGateway? = nil
+    ) -> Self {
+        let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
+        return Self(
+            queryGateway: queryGateway,
+            mutationGateway: mutationGateway,
+            strokeGateway: strokeGateway,
+            historyGateway: historyGateway,
+            persistenceGateway: persistenceGateway,
+            exportGateway: exportGateway,
+            textLayerGateway: textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway,
+            editingGateway: resolvedEditingGateway
         )
     }
 }

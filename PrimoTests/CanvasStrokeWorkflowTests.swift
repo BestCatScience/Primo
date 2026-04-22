@@ -5,9 +5,14 @@ import XCTest
 final class CanvasStrokeWorkflowTests: XCTestCase {
     func testPrepareCanvasStrokeEditingReturnsTypedFailure() {
         let result = withDependencies {
-            $0.paintDocumentClient = .stub(
-                setLayerVisibility: { _, _ in
-                    .failure(.layerLocked(0))
+            $0.documentInteractionService = .stub(
+                execute: { request in
+                    switch request {
+                    case .ensureLayerVisible:
+                        return .failure(.layerLocked(0))
+                    default:
+                        return .success(.none)
+                    }
                 }
             )
         } operation: {
@@ -21,7 +26,6 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testFallbackStrokeCommitReturnsBridgeFailureWhenSnapshotIsMissing() {
         let result = withDependencies {
-            $0.paintDocumentClient = .stub()
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
@@ -43,14 +47,19 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testFillFailureRemainsTyped() {
         let sample = StylusSample.testValue()
         let result = withDependencies {
-            $0.paintDocumentClient = .stub(
-                fill: { _, _ in
-                    .failure(.invalidLayerIndex(4))
+            $0.documentInteractionService = .stub(
+                execute: { request in
+                    switch request {
+                    case .fill:
+                        return .failure(.invalidLayerIndex(4))
+                    default:
+                        return .success(.none)
+                    }
                 }
             )
         } operation: {
             let feature = AppFeature()
-            return feature.canvasStrokeWorkflowService.fill(
+            return feature.documentInteractionService.fill(
                 sample,
                 brush: feature.resolvedBrushSettings(for: AppFeature.State())
             )
@@ -65,23 +74,27 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         let result = withDependencies {
-            $0.paintDocumentClient = .stub(
-                presentation: .testValue(activeLayerIndex: 3),
-                addLayer: { name in
-                    addLayerCalls.record(name)
-                    return .success(7)
-                },
-                deleteLayer: { index in
-                    deleteLayerCalls.record(index)
-                    return .success(())
-                },
-                setActiveLayer: { index in
-                    setActiveLayerCalls.record(index)
-                    return .success(())
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("replace failed"))
-                }
+            $0.documentRuntimeComposition = .stub(
+                queryGateway: .stub(
+                    presentation: .testValue(activeLayerIndex: 3)
+                ),
+                mutationGateway: .stub(
+                    addLayer: { name in
+                        addLayerCalls.record(name)
+                        return .success(7)
+                    },
+                    deleteLayer: { index in
+                        deleteLayerCalls.record(index)
+                        return .success(())
+                    },
+                    setActiveLayer: { index in
+                        setActiveLayerCalls.record(index)
+                        return .success(())
+                    },
+                    replaceLayerPixels: { _, _ in
+                        .failure(.bridgeMutationFailed("replace failed"))
+                    }
+                )
             )
         } operation: {
             let feature = AppFeature()
@@ -99,18 +112,22 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testLayerContentTransactionSurfacesRollbackFailure() {
         let result = withDependencies {
-            $0.paintDocumentClient = .stub(
-                presentation: .testValue(activeLayerIndex: 3),
-                addLayer: { _ in .success(7) },
-                deleteLayer: { _ in
-                    .failure(.bridgeMutationFailed("delete rollback failed"))
-                },
-                setActiveLayer: { _ in
-                    .failure(.bridgeMutationFailed("active layer rollback failed"))
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("replace failed"))
-                }
+            $0.documentRuntimeComposition = .stub(
+                queryGateway: .stub(
+                    presentation: .testValue(activeLayerIndex: 3)
+                ),
+                mutationGateway: .stub(
+                    addLayer: { _ in .success(7) },
+                    deleteLayer: { _ in
+                        .failure(.bridgeMutationFailed("delete rollback failed"))
+                    },
+                    setActiveLayer: { _ in
+                        .failure(.bridgeMutationFailed("active layer rollback failed"))
+                    },
+                    replaceLayerPixels: { _, _ in
+                        .failure(.bridgeMutationFailed("replace failed"))
+                    }
+                )
             )
         } operation: {
             let feature = AppFeature()
@@ -140,23 +157,27 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         withDependencies {
-            $0.paintDocumentClient = .stub(
-                presentation: .testValue(activeLayerIndex: 2),
-                addLayer: { name in
-                    addLayerCalls.record(name)
-                    return .success(9)
-                },
-                deleteLayer: { index in
-                    deleteLayerCalls.record(index)
-                    return .success(())
-                },
-                setActiveLayer: { index in
-                    setActiveLayerCalls.record(index)
-                    return .success(())
-                },
-                replaceLayerPixels: { _, _ in
-                    .failure(.bridgeMutationFailed("apply failed"))
-                }
+            $0.documentRuntimeComposition = .stub(
+                queryGateway: .stub(
+                    presentation: .testValue(activeLayerIndex: 2)
+                ),
+                mutationGateway: .stub(
+                    addLayer: { name in
+                        addLayerCalls.record(name)
+                        return .success(9)
+                    },
+                    deleteLayer: { index in
+                        deleteLayerCalls.record(index)
+                        return .success(())
+                    },
+                    setActiveLayer: { index in
+                        setActiveLayerCalls.record(index)
+                        return .success(())
+                    },
+                    replaceLayerPixels: { _, _ in
+                        .failure(.bridgeMutationFailed("apply failed"))
+                    }
+                )
             )
         } operation: {
             let feature = AppFeature()

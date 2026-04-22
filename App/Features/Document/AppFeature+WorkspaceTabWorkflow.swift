@@ -1,39 +1,36 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
-import PrimoWorkspaceDomain
+import PrimoWorkspaceInfrastructure
 
 extension AppFeature {
-    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceDomain.WorkspaceProjectLoadIssue
-    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceDomain.WorkspaceProjectLoadFailureReason
-    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceDomain.WorkspaceProjectLoadOperation
-    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceDomain.WorkspaceImportedProjectLoadOperation
-    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceDomain.WorkspaceProjectLoadRequest
-    typealias WorkspaceProjectLoadResult = PrimoWorkspaceDomain.WorkspaceProjectLoadResult<LoadedPaintProject>
-    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceDomain.WorkspaceProjectLoadFailure
-    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceDomain.WorkspaceProjectPreparationUseCase
-    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceDomain.WorkspaceProjectLoadUseCase<LoadedPaintProject>
-    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceDomain.WorkspaceProjectLoadCommand
-    typealias WorkspaceProjectLoadingService = PrimoWorkspaceDomain.WorkspaceProjectLoadingService<LoadedPaintProject>
+    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadIssue
+    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadFailureReason
+    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadOperation
+    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceInfrastructure.WorkspaceImportedProjectLoadOperation
+    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadRequest
+    typealias WorkspaceProjectLoadResult = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadResult<LoadedPaintProject>
+    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadFailure
+    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceInfrastructure.WorkspaceProjectPreparationUseCase
+    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadUseCase<LoadedPaintProject>
+    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadCommand
+    typealias WorkspaceProjectLoadingService = PrimoWorkspaceInfrastructure.WorkspaceProjectLoadingService<LoadedPaintProject>
 
     var workspaceProjectPreparationUseCase: WorkspaceProjectPreparationUseCase {
-        WorkspaceProjectPreparationUseCase(
-            workspacePersistenceUseCase: workspacePersistenceUseCase
-        )
+        workspaceFeatureSupport.projectPreparationUseCase
     }
 
     var workspaceProjectLoadUseCase: WorkspaceProjectLoadUseCase {
-        WorkspaceProjectLoadUseCase(
+        workspaceFeatureSupport.projectLoadUseCase(
             projectLoader: workspaceProjectLoaderGateway,
-            documentImport: documentImportGateway,
-            cleanupService: workspaceDomainProjectCleanupService
+            documentImport: documentImportGateway
         )
     }
 
     var workspaceProjectLoadingService: WorkspaceProjectLoadingService {
-        WorkspaceProjectLoadingService(
-            preparationUseCase: workspaceProjectPreparationUseCase,
-            loadUseCase: workspaceProjectLoadUseCase
+        workspaceFeatureSupport.projectLoadingService(
+            projectLoader: workspaceProjectLoaderGateway,
+            documentImport: documentImportGateway
         )
     }
 
@@ -58,9 +55,8 @@ extension AppFeature {
         )
     }
 
-    var workspaceDomainProjectCleanupService: PrimoWorkspaceDomain.WorkspaceProjectCleanupService {
-        PrimoWorkspaceDomain.WorkspaceProjectCleanupService(
-            workspaceBackingStore: workspaceBackingStoreGateway,
+    var workspaceDomainProjectCleanupService: WorkspaceProjectCleanupService {
+        workspaceFeatureSupport.projectCleanupService(
             documentImport: documentImportGateway
         )
     }

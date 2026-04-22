@@ -171,6 +171,7 @@ let package = Package(
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoWorkspaceDomain",
             ]
         ),
         .target(
