@@ -1,27 +1,28 @@
 import ComposableArchitecture
+import PrimoCoreTypes
 
 private enum DateClientKey: DependencyKey {
-    static let liveValue = DateClient.live
+    static let liveValue = PrimoCoreTypes.DateClient.live
 }
 
 private enum UUIDClientKey: DependencyKey {
-    static let liveValue = UUIDClient.live
+    static let liveValue = PrimoCoreTypes.UUIDClient.live
 }
 
 private enum FileClientKey: DependencyKey {
-    static let liveValue = FileClient.live
+    static let liveValue = PrimoCoreTypes.FileClient.live
 }
 
 private enum HTTPClientKey: DependencyKey {
-    static let liveValue = HTTPClient.live
+    static let liveValue = PrimoCoreTypes.HTTPClient.live
 }
 
 private enum KeyValueStoreClientKey: DependencyKey {
-    static let liveValue = KeyValueStoreClient.live
+    static let liveValue = PrimoCoreTypes.KeyValueStoreClient.live
 }
 
 private enum SecurityScopedResourceClientKey: DependencyKey {
-    static let liveValue = SecurityScopedResourceClient.live
+    static let liveValue = PrimoCoreTypes.SecurityScopedResourceClient.live
 }
 
 private enum AppLanguageClientKey: DependencyKey {
@@ -32,32 +33,32 @@ private enum AppLanguageClientKey: DependencyKey {
 }
 
 extension DependencyValues {
-    var dateClient: DateClient {
+    var dateClient: PrimoCoreTypes.DateClient {
         get { self[DateClientKey.self] }
         set { self[DateClientKey.self] = newValue }
     }
 
-    var uuidClient: UUIDClient {
+    var uuidClient: PrimoCoreTypes.UUIDClient {
         get { self[UUIDClientKey.self] }
         set { self[UUIDClientKey.self] = newValue }
     }
 
-    var fileClient: FileClient {
+    var fileClient: PrimoCoreTypes.FileClient {
         get { self[FileClientKey.self] }
         set { self[FileClientKey.self] = newValue }
     }
 
-    var httpClient: HTTPClient {
+    var httpClient: PrimoCoreTypes.HTTPClient {
         get { self[HTTPClientKey.self] }
         set { self[HTTPClientKey.self] = newValue }
     }
 
-    var keyValueStoreClient: KeyValueStoreClient {
+    var keyValueStoreClient: PrimoCoreTypes.KeyValueStoreClient {
         get { self[KeyValueStoreClientKey.self] }
         set { self[KeyValueStoreClientKey.self] = newValue }
     }
 
-    var securityScopedResourceClient: SecurityScopedResourceClient {
+    var securityScopedResourceClient: PrimoCoreTypes.SecurityScopedResourceClient {
         get { self[SecurityScopedResourceClientKey.self] }
         set { self[SecurityScopedResourceClientKey.self] = newValue }
     }

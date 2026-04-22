@@ -4,10 +4,6 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentRenderingInfrastructure
 
-typealias MetalStrokeExecutionMode = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionMode
-typealias MetalStrokeExecutionRequest = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionRequest
-typealias MetalStrokeExecutionResult = PrimoDocumentRenderingInfrastructure.MetalStrokeExecutionResult
-
 enum MetalDocumentProcessingClient {
     static let shared = DocumentRenderingClient.live
 }

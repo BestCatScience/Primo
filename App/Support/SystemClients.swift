@@ -3,13 +3,6 @@ import os
 import PrimoCoreTypes
 import PrimoLocalization
 
-typealias DateClient = PrimoCoreTypes.DateClient
-typealias UUIDClient = PrimoCoreTypes.UUIDClient
-typealias FileClient = PrimoCoreTypes.FileClient
-typealias HTTPClient = PrimoCoreTypes.HTTPClient
-typealias KeyValueStoreClient = PrimoCoreTypes.KeyValueStoreClient
-typealias SecurityScopedResourceClient = PrimoCoreTypes.SecurityScopedResourceClient
-
 enum AppDiagnostics {
     static let isVerboseLoggingEnabled: Bool = {
         let environment = ProcessInfo.processInfo.environment

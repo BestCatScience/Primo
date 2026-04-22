@@ -2,18 +2,15 @@ import ComposableArchitecture
 import Foundation
 import PrimoBrushFileFormats
 import PrimoBrushInfrastructure
+import PrimoCoreTypes
 import UniformTypeIdentifiers
 
-typealias BrushTipRaster = PrimoBrushFileFormats.BrushTipRaster
-typealias BrushTipFile = PrimoBrushFileFormats.BrushTipFile
-typealias BrushTipFileError = PrimoBrushFileFormats.BrushTipFileError
-
 struct BrushTipLibraryClient: Sendable {
-    var loadRaster: @Sendable (URL) throws -> BrushTipRaster
+    var loadRaster: @Sendable (URL) throws -> PrimoBrushFileFormats.BrushTipRaster
     var prepareBrushTipFile: @Sendable (URL) throws -> URL
     var importPhotoshopBrushes: @Sendable (URL) throws -> [ImportedPhotoshopBrush]
 
-    static func live(fileClient: FileClient) -> BrushTipLibraryClient {
+    static func live(fileClient: PrimoCoreTypes.FileClient) -> BrushTipLibraryClient {
         let client = PrimoBrushInfrastructure.BrushTipLibraryClient.live(fileClient: fileClient)
         return BrushTipLibraryClient(
             loadRaster: client.loadRaster,

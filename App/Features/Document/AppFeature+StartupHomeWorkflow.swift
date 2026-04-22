@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
 
 extension AppFeature {
     struct ShareExportFactory {

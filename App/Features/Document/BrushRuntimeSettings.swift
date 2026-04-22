@@ -1,7 +1,6 @@
 import Foundation
+import PrimoCoreTypes
 import PrimoDocumentContracts
-
-typealias BrushRuntimeSettings = PrimoDocumentContracts.BrushRuntimeSettings
 
 extension BrushRuntimeSettings {
     func withCustomTip(

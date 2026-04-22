@@ -1,7 +1,9 @@
 import ComposableArchitecture
 import CryptoKit
 import Foundation
+import PrimoBrushFileFormats
 import PrimoBrushDomain
+import PrimoCoreTypes
 import SwiftUI
 
 struct BrushPresetLibraryClient: Sendable {
@@ -12,8 +14,8 @@ struct BrushPresetLibraryClient: Sendable {
     var renamePreset: @Sendable (String, String) throws -> [BrushPreset]
 
     static func live(
-        fileClient: FileClient,
-        uuidClient: UUIDClient,
+        fileClient: PrimoCoreTypes.FileClient,
+        uuidClient: PrimoCoreTypes.UUIDClient,
         brushTipLibraryClient: BrushTipLibraryClient
     ) -> BrushPresetLibraryClient {
         let storage = BrushPresetLibraryStorage(
@@ -52,8 +54,8 @@ extension DependencyValues {
 }
 
 private struct BrushPresetLibraryStorage {
-    let fileClient: FileClient
-    let uuidClient: UUIDClient
+    let fileClient: PrimoCoreTypes.FileClient
+    let uuidClient: PrimoCoreTypes.UUIDClient
     let brushTipLibraryClient: BrushTipLibraryClient
 
     func loadSavedPresets() -> [BrushPreset] {
@@ -91,7 +93,7 @@ private struct BrushPresetLibraryStorage {
         }
 
         let data = try JSONEncoder().encode(payload)
-        try fileClient.writeData(data, indexURL(in: directory), .atomic)
+        try fileClient.writeData(data, indexURL(in: directory), Data.WritingOptions.atomic)
         return try payload.presets.map {
             try $0.makePreset(
                 baseDirectory: directory,
@@ -141,7 +143,7 @@ private struct BrushPresetLibraryStorage {
         }
 
         let data = try JSONEncoder().encode(payload)
-        try fileClient.writeData(data, indexURL(in: directory), .atomic)
+        try fileClient.writeData(data, indexURL(in: directory), Data.WritingOptions.atomic)
         return try payload.presets.map {
             try $0.makePreset(
                 baseDirectory: directory,
@@ -169,7 +171,7 @@ private struct BrushPresetLibraryStorage {
         payload.presets[index].name = resolvedName
 
         let data = try JSONEncoder().encode(payload)
-        try fileClient.writeData(data, indexURL(in: directory), .atomic)
+        try fileClient.writeData(data, indexURL(in: directory), Data.WritingOptions.atomic)
         return try payload.presets.map {
             try $0.makePreset(
                 baseDirectory: directory,
@@ -184,11 +186,16 @@ private struct BrushPresetLibraryStorage {
     ) throws -> String? {
         guard let tip = preset.customTip else { return nil }
         let hash = SHA256.hash(data: tip.alphaData).compactMap { String(format: "%02x", $0) }.joined()
-        let fileName = "\(sanitizeFileName(preset.name))-\(hash.prefix(12)).\(BrushTipFile.fileExtension)"
+        let fileName = "\(sanitizeFileName(preset.name))-\(hash.prefix(12)).\(PrimoBrushFileFormats.BrushTipFile.fileExtension)"
         let targetURL = directory.appendingPathComponent(fileName, isDirectory: false)
         if !fileClient.fileExists(targetURL.path) {
-            let brushTip = BrushTipFile(name: preset.name, width: tip.width, height: tip.height, alphaData: tip.alphaData)
-            try fileClient.writeData(brushTip.encodedData(), targetURL, .atomic)
+            let brushTip = PrimoBrushFileFormats.BrushTipFile(
+                name: preset.name,
+                width: tip.width,
+                height: tip.height,
+                alphaData: tip.alphaData
+            )
+            try fileClient.writeData(brushTip.encodedData(), targetURL, Data.WritingOptions.atomic)
         }
         return fileName
     }
@@ -204,7 +211,10 @@ private struct BrushPresetLibraryStorage {
     }
 
     private func libraryDirectory() throws -> URL {
-        let base = fileClient.urls(.applicationSupportDirectory, .userDomainMask)[0]
+        let base = fileClient.urls(
+            FileManager.SearchPathDirectory.applicationSupportDirectory,
+            FileManager.SearchPathDomainMask.userDomainMask
+        )[0]
         let directory = base
             .appendingPathComponent("primo", isDirectory: true)
             .appendingPathComponent("BrushLibrary", isDirectory: true)
@@ -478,7 +488,9 @@ private struct StoredBrushPreset: Codable {
 
     func makePreset(
         baseDirectory: URL,
-        brushTipLibraryClient: BrushTipLibraryClient = .live(fileClient: .live)
+        brushTipLibraryClient: BrushTipLibraryClient = .live(
+            fileClient: PrimoCoreTypes.FileClient.live
+        )
     ) throws -> BrushPreset {
         let tipKind = BrushTipKind(rawValue: tipKindRawValue) ?? .ink
         let angleMode = BrushAngleMode(rawValue: angleModeRawValue) ?? .fixed
@@ -486,7 +498,7 @@ private struct StoredBrushPreset: Codable {
         let textureMode = BrushTextureMode(rawValue: textureModeRawValue) ?? .off
         let dualTipKind = BrushTipKind(rawValue: dualTipKindRawValue) ?? .ink
         let dualBlendMode = BrushDualBlendMode(rawValue: dualBlendModeRawValue) ?? .multiply
-        let customTip: BrushTipRaster?
+        let customTip: PrimoBrushFileFormats.BrushTipRaster?
         if let tipFileName {
             let url = baseDirectory.appendingPathComponent(tipFileName, isDirectory: false)
             customTip = try brushTipLibraryClient.loadRaster(url)

@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
+import PrimoDocumentRenderingInfrastructure
 
 extension AppFeature {
     static func layerPixelDataByApplyingCommittedShortStroke(

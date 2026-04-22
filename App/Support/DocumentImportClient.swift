@@ -3,13 +3,8 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoWorkspaceInfrastructure
 
-typealias ImportedDocumentStageRequest = PrimoDocumentContracts.ImportedDocumentStageRequest
-typealias ImportedDocumentStageResult = PrimoDocumentContracts.ImportedDocumentStageResult
-typealias ImportedDocumentStageFailure = PrimoDocumentContracts.ImportedDocumentStageFailure
-typealias DocumentImportClient = PrimoWorkspaceInfrastructure.DocumentImportClient
-
 private enum DocumentImportClientKey: DependencyKey {
-    static var liveValue: DocumentImportClient {
+    static var liveValue: PrimoWorkspaceInfrastructure.DocumentImportClient {
         @Dependency(\.fileClient) var fileClient
         @Dependency(\.uuidClient) var uuidClient
         @Dependency(\.securityScopedResourceClient) var securityScopedResourceClient
@@ -22,7 +17,7 @@ private enum DocumentImportClientKey: DependencyKey {
 }
 
 extension DependencyValues {
-    var documentImportClient: DocumentImportClient {
+    var documentImportClient: PrimoWorkspaceInfrastructure.DocumentImportClient {
         get { self[DocumentImportClientKey.self] }
         set { self[DocumentImportClientKey.self] = newValue }
     }

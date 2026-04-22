@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentContracts
 
 extension AppFeature {
     private struct RasterizedSmudgeSample {
@@ -423,7 +424,9 @@ extension AppFeature {
                 let mixedBlue = mixedPremulBlue / mixedColorAlpha
                 let mixedLuminance = rasterizedLuminance(red: mixedRed, green: mixedGreen, blue: mixedBlue)
                 let pigmentLuminance = rasterizedLuminance(red: sourceRed, green: sourceGreen, blue: sourceBlue)
-                let luminanceSimilarity = clampUnit(1.0 - abs(mixedLuminance - pigmentLuminance) * 0.38)
+                let luminanceSimilarity = clampUnit(
+                    1.0 - Swift.abs(mixedLuminance - pigmentLuminance) * 0.38
+                )
                 let undercoatBlend = clampUnit(edgeMixGuard * (0.18 + (effectiveUndercoatMix * 0.82)) * luminanceSimilarity * (1.0 - (corePresence * 0.18)))
                 let baseBlend = (mode == .smear ? edgeMixGuard : undercoatBlend) * (1.0 - (corePresence * 0.12))
                 let centerPigmentRetention = clampUnit(effectivePigmentDensity * (1.0 + (corePresence * 0.30)))

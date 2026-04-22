@@ -5,26 +5,6 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 
-typealias DocumentMutationResult = PrimoDocumentContracts.DocumentMutationResult
-typealias DocumentIndexedMutationResult = PrimoDocumentContracts.DocumentIndexedMutationResult
-typealias DocumentMutationFailure = PrimoDocumentContracts.DocumentMutationFailure
-typealias DocumentQueryGateway = PrimoDocumentContracts.DocumentQueryGateway
-typealias DocumentMutationGateway = PrimoDocumentContracts.DocumentMutationGateway
-typealias StrokeInputGateway = PrimoDocumentContracts.StrokeInputGateway
-typealias DocumentHistoryGateway = PrimoDocumentContracts.DocumentHistoryGateway
-typealias DocumentPersistenceGateway = PrimoDocumentContracts.DocumentPersistenceGateway
-typealias DocumentExportGateway = PrimoDocumentContracts.DocumentExportGateway
-typealias TextLayerGateway = PrimoDocumentContracts.TextLayerGateway
-typealias DocumentLayerEffectsGateway = PrimoDocumentContracts.DocumentLayerEffectsGateway
-typealias LayerPixelRect = PrimoDocumentContracts.LayerPixelRect
-typealias DocumentEditingRequest = PrimoDocumentApplication.DocumentEditingRequest
-typealias DocumentEditingResult = PrimoDocumentApplication.DocumentEditingResult
-typealias DocumentEditingGateway = PrimoDocumentApplication.DocumentEditingGateway
-typealias DocumentInteractionRequest = PrimoDocumentApplication.DocumentInteractionRequest
-typealias DocumentInteractionResult = PrimoDocumentApplication.DocumentInteractionResult
-typealias DocumentInteractionService = PrimoDocumentApplication.DocumentInteractionService
-typealias ImportedCanvasRequest = PrimoDocumentApplication.ImportedCanvasRequest
-
 private enum DocumentRuntimeCompositionKey: DependencyKey {
     static var liveValue: DocumentRuntimeComposition {
         @Dependency(\.fileClient) var fileClient

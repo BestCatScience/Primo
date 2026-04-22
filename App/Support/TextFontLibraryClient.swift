@@ -3,17 +3,15 @@ import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoBrushInfrastructure
 
-typealias TextFontLibraryClient = PrimoBrushInfrastructure.TextFontLibraryClient
-
 private enum TextFontLibraryClientKey: DependencyKey {
-    static var liveValue: TextFontLibraryClient {
+    static var liveValue: PrimoBrushInfrastructure.TextFontLibraryClient {
         @Dependency(\.fileClient) var fileClient
         return .live(fileClient: fileClient)
     }
 }
 
 extension DependencyValues {
-    var textFontLibraryClient: TextFontLibraryClient {
+    var textFontLibraryClient: PrimoBrushInfrastructure.TextFontLibraryClient {
         get { self[TextFontLibraryClientKey.self] }
         set { self[TextFontLibraryClientKey.self] = newValue }
     }
