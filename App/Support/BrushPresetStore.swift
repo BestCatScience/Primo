@@ -280,7 +280,12 @@ private struct StoredBrushPreset: Codable {
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
     let colorMixStrength: Double
+    let smudgeRadius: Double
     let paintLoad: Double
+    let smudgeEngineEnabled: Bool
+    let smudgeModeRawValue: String
+    let smudgeLength: Double
+    let colorRate: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
     let dualTipKindRawValue: String
@@ -340,7 +345,12 @@ private struct StoredBrushPreset: Codable {
         case wetnessPressureSensitivity
         case opacityPressureSensitivity
         case colorMixStrength
+        case smudgeRadius
         case paintLoad
+        case smudgeEngineEnabled
+        case smudgeModeRawValue
+        case smudgeLength
+        case colorRate
         case loadPressureSensitivity
         case dualBrushEnabled
         case dualTipKindRawValue
@@ -401,7 +411,12 @@ private struct StoredBrushPreset: Codable {
         wetnessPressureSensitivity = preset.wetnessPressureSensitivity
         opacityPressureSensitivity = preset.opacityPressureSensitivity
         colorMixStrength = preset.colorMixStrength
+        smudgeRadius = preset.smudgeRadius
         paintLoad = preset.paintLoad
+        smudgeEngineEnabled = preset.smudgeEngineEnabled
+        smudgeModeRawValue = preset.smudgeMode.rawValue
+        smudgeLength = preset.smudgeLength
+        colorRate = preset.colorRate
         loadPressureSensitivity = preset.loadPressureSensitivity
         dualBrushEnabled = preset.dualBrushEnabled
         dualTipKindRawValue = preset.dualTipKind.rawValue
@@ -463,7 +478,12 @@ private struct StoredBrushPreset: Codable {
         wetnessPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .wetnessPressureSensitivity) ?? 0.0
         opacityPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .opacityPressureSensitivity) ?? 0.0
         colorMixStrength = try container.decodeIfPresent(Double.self, forKey: .colorMixStrength) ?? 0.0
+        smudgeRadius = try container.decodeIfPresent(Double.self, forKey: .smudgeRadius) ?? 0.0
         paintLoad = try container.decodeIfPresent(Double.self, forKey: .paintLoad) ?? 1.0
+        smudgeEngineEnabled = try container.decodeIfPresent(Bool.self, forKey: .smudgeEngineEnabled) ?? false
+        smudgeModeRawValue = try container.decodeIfPresent(String.self, forKey: .smudgeModeRawValue) ?? BrushSmudgeMode.smearing.rawValue
+        smudgeLength = try container.decodeIfPresent(Double.self, forKey: .smudgeLength) ?? 0.0
+        colorRate = try container.decodeIfPresent(Double.self, forKey: .colorRate) ?? 1.0
         loadPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .loadPressureSensitivity) ?? 0.0
         dualBrushEnabled = try container.decodeIfPresent(Bool.self, forKey: .dualBrushEnabled) ?? false
         dualTipKindRawValue = try container.decodeIfPresent(String.self, forKey: .dualTipKindRawValue) ?? BrushTipKind.ink.rawValue
@@ -498,6 +518,7 @@ private struct StoredBrushPreset: Codable {
         let textureMode = BrushTextureMode(rawValue: textureModeRawValue) ?? .off
         let dualTipKind = BrushTipKind(rawValue: dualTipKindRawValue) ?? .ink
         let dualBlendMode = BrushDualBlendMode(rawValue: dualBlendModeRawValue) ?? .multiply
+        let smudgeMode = BrushSmudgeMode(rawValue: smudgeModeRawValue) ?? .smearing
         let customTip: PrimoBrushFileFormats.BrushTipRaster?
         if let tipFileName {
             let url = baseDirectory.appendingPathComponent(tipFileName, isDirectory: false)
@@ -545,7 +566,12 @@ private struct StoredBrushPreset: Codable {
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: smudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,

@@ -156,6 +156,9 @@ struct MetalStrokeBrushDescriptor {
     float smudgeBleed;
     float smudgeRadius;
     float paintLoad;
+    float loadPressureSensitivity;
+    float smudgeLength;
+    float colorRate;
     float red;
     float green;
     float blue;
@@ -176,6 +179,23 @@ struct MetalStrokeBrushDescriptor {
     uint textureMode;
     uint dualBlendMode;
     uint colorMixingMode;
+    uint smudgeMode;
+};
+
+struct MetalColorSmudgeDabDescriptor {
+    uint canvasWidth;
+    uint canvasHeight;
+    uint rectOriginX;
+    uint rectOriginY;
+    uint rectWidth;
+    uint rectHeight;
+    float centerX;
+    float centerY;
+    float previousCenterX;
+    float previousCenterY;
+    float pressure;
+    float progress;
+    float radius;
 };
 
 struct MetalStrokeRasterRequestDescriptor {
@@ -616,6 +636,23 @@ inline float4 strokeSourcePixel(
     );
 }
 
+inline float4 smudgeSourcePixel(
+    const device uchar *pixels,
+    constant MetalColorSmudgeDabDescriptor& dab,
+    int x,
+    int y
+) {
+    int clampedX = clamp(x, 0, int(dab.canvasWidth) - 1);
+    int clampedY = clamp(y, 0, int(dab.canvasHeight) - 1);
+    uint offset = (uint(clampedY) * dab.canvasWidth + uint(clampedX)) * 4u;
+    return float4(
+        float(pixels[offset]) / 255.0f,
+        float(pixels[offset + 1u]) / 255.0f,
+        float(pixels[offset + 2u]) / 255.0f,
+        float(pixels[offset + 3u]) / 255.0f
+    );
+}
+
 inline float4 strokeNeighborhoodSample(
     const device uchar *pixels,
     constant MetalStrokeRasterRequestDescriptor& request,
@@ -652,6 +689,91 @@ inline float4 strokeNeighborhoodSample(
         return strokeSourcePixel(pixels, request, centerX, centerY);
     }
     return accumulated / totalWeight;
+}
+
+inline float4 smudgeRepresentativeColor(
+    const device uchar *pixels,
+    constant MetalColorSmudgeDabDescriptor& dab,
+    constant MetalStrokeBrushDescriptor& brush,
+    const device uchar *customTipPixels
+) {
+    float radiusFactor = 0.18f + (strokeClampUnit(brush.smudgeRadius) * 0.82f);
+    float sampleRadius = max(1.0f, dab.radius * radiusFactor);
+    const float2 offsets[9] = {
+        float2(0.0f, 0.0f),
+        float2(-0.6f, 0.0f),
+        float2(0.6f, 0.0f),
+        float2(0.0f, -0.6f),
+        float2(0.0f, 0.6f),
+        float2(-0.42f, -0.42f),
+        float2(0.42f, -0.42f),
+        float2(-0.42f, 0.42f),
+        float2(0.42f, 0.42f)
+    };
+
+    float4 accumulated = float4(0.0f);
+    float totalWeight = 0.0f;
+    for (uint index = 0; index < 9u; ++index) {
+        float2 point = float2(
+            dab.centerX + (offsets[index].x * sampleRadius),
+            dab.centerY + (offsets[index].y * sampleRadius)
+        );
+        float4 sample = smudgeSourcePixel(pixels, dab, int(round(point.x)), int(round(point.y)));
+        float weight = max(
+            0.05f,
+            rasterizedSourceAlpha(
+                brush,
+                customTipPixels,
+                float2(dab.centerX, dab.centerY),
+                dab.pressure,
+                dab.progress,
+                max(sampleRadius, dab.radius),
+                point
+            )
+        );
+        accumulated += sample * weight;
+        totalWeight += weight;
+    }
+
+    if (totalWeight <= 0.0001f) {
+        return smudgeSourcePixel(pixels, dab, int(round(dab.centerX)), int(round(dab.centerY)));
+    }
+    return accumulated / totalWeight;
+}
+
+inline float4 sampleSmearingColor(
+    const device uchar *pixels,
+    constant MetalColorSmudgeDabDescriptor& dab,
+    constant MetalStrokeBrushDescriptor& brush,
+    const device uchar *customTipPixels,
+    float2 point,
+    float4 representative
+) {
+    float softness = 1.0f - strokeClampUnit(brush.hardness);
+    float sampleRadius = max(0.2f, dab.radius * (0.025f + (softness * 0.05f)));
+    const float2 taps[7] = {
+        float2(0.0f, 0.0f),
+        float2(-0.55f, 0.0f),
+        float2(0.55f, 0.0f),
+        float2(0.0f, -0.55f),
+        float2(0.0f, 0.55f),
+        float2(-0.4f, -0.4f),
+        float2(0.4f, 0.4f)
+    };
+    const float weights[7] = { 0.58f, 0.10f, 0.10f, 0.10f, 0.10f, 0.06f, 0.06f };
+
+    float4 accumulated = float4(0.0f);
+    float totalWeight = 0.0f;
+    for (uint index = 0; index < 7u; ++index) {
+        float2 tapPoint = point + (taps[index] * sampleRadius);
+        accumulated += smudgeSourcePixel(pixels, dab, int(round(tapPoint.x)), int(round(tapPoint.y))) * weights[index];
+        totalWeight += weights[index];
+    }
+    float4 sampled = totalWeight > 0.0001f ? accumulated / totalWeight : representative;
+    float mixRatio = 0.12f + (0.18f * (1.0f - strokeClampUnit(brush.hardness)));
+    sampled.rgb = mix(sampled.rgb, representative.rgb, mixRatio);
+    sampled.a = max(sampled.a, representative.a * 0.12f);
+    return sampled;
 }
 
 inline float strokeSegmentEndpointFalloff(float t) {
@@ -869,6 +991,107 @@ kernel void strokeRasterKernel(
     outputPixels[offset] = uchar(clamp(int(round(outRed * 255.0f)), 0, 255));
     outputPixels[offset + 1u] = uchar(clamp(int(round(outGreen * 255.0f)), 0, 255));
     outputPixels[offset + 2u] = uchar(clamp(int(round(outBlue * 255.0f)), 0, 255));
+    outputPixels[offset + 3u] = uchar(clamp(int(round(outAlpha * 255.0f)), 0, 255));
+}
+
+kernel void strokeColorSmudgeKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalColorSmudgeDabDescriptor& dab [[buffer(2)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(3)]],
+    const device uchar *customTipPixels [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= dab.rectWidth || gid.y >= dab.rectHeight) {
+        return;
+    }
+
+    uint x = dab.rectOriginX + gid.x;
+    uint y = dab.rectOriginY + gid.y;
+    if (x >= dab.canvasWidth || y >= dab.canvasHeight) {
+        return;
+    }
+
+    uint offset = ((y * dab.canvasWidth) + x) * 4u;
+    float2 pixelCenter = float2(float(x) + 0.5f, float(y) + 0.5f);
+    float maskAlpha = rasterizedSourceAlpha(
+        brush,
+        customTipPixels,
+        float2(dab.centerX, dab.centerY),
+        dab.pressure,
+        dab.progress,
+        dab.radius,
+        pixelCenter
+    );
+    if (maskAlpha <= 0.001f) {
+        return;
+    }
+
+    float4 destination = smudgeSourcePixel(sourcePixels, dab, int(x), int(y));
+    float4 representative = smudgeRepresentativeColor(
+        sourcePixels,
+        dab,
+        brush,
+        customTipPixels
+    );
+
+    float4 sourceColor;
+    if (brush.smudgeMode == 0u) {
+        float2 sourcePoint = float2(
+            pixelCenter.x + (dab.previousCenterX - dab.centerX),
+            pixelCenter.y + (dab.previousCenterY - dab.centerY)
+        );
+        float4 sampled = sampleSmearingColor(
+            sourcePixels,
+            dab,
+            brush,
+            customTipPixels,
+            sourcePoint,
+            representative
+        );
+        sourceColor = sampled.a > 0.001f ? sampled : representative;
+    } else {
+        sourceColor = representative;
+    }
+
+    float baseOpacity = strokeClampUnit(brush.opacity * brush.flow);
+    float spacingInfluence = 0.2f;
+    float pressureMixScale = max(
+        0.12f,
+        1.0f - brush.loadPressureSensitivity + (brush.loadPressureSensitivity * strokeClampUnit(dab.pressure))
+    );
+    float smudgeBlend = strokeClampUnit(brush.smudgeLength * pressureMixScale);
+    float colorBlend = strokeClampUnit(brush.colorRate * pressureMixScale);
+    float colorContribution = min(colorBlend * colorBlend * baseOpacity * (1.0f - (smudgeBlend * 0.55f)), 0.85f);
+    float smudgeContribution = strokeClampUnit(smudgeBlend * (0.35f + (baseOpacity * 0.65f)) * (1.08f - min(spacingInfluence, 0.9f) * 0.35f));
+
+    float4 smudged = sourceColor;
+    smudged.a *= maskAlpha * smudgeContribution;
+    smudged.rgb *= smudged.a;
+
+    float pigmentAlpha = maskAlpha * colorContribution;
+    float3 pigmentRGB = float3(brush.red, brush.green, brush.blue) * pigmentAlpha;
+
+    float combinedAlpha;
+    float3 combinedRGB;
+    if (colorContribution > 0.001f) {
+        combinedAlpha = pigmentAlpha + (smudged.a * (1.0f - pigmentAlpha));
+        combinedRGB = pigmentRGB + (smudged.rgb * (1.0f - pigmentAlpha));
+    } else {
+        combinedAlpha = smudged.a;
+        combinedRGB = smudged.rgb;
+    }
+    if (combinedAlpha <= 0.001f) {
+        return;
+    }
+
+    float outAlpha = combinedAlpha + (destination.a * (1.0f - combinedAlpha));
+    float3 outRGB = combinedRGB + (destination.rgb * destination.a * (1.0f - combinedAlpha));
+    float3 resolved = outAlpha > 0.0001f ? outRGB / outAlpha : float3(0.0f);
+
+    outputPixels[offset] = uchar(clamp(int(round(resolved.r * 255.0f)), 0, 255));
+    outputPixels[offset + 1u] = uchar(clamp(int(round(resolved.g * 255.0f)), 0, 255));
+    outputPixels[offset + 2u] = uchar(clamp(int(round(resolved.b * 255.0f)), 0, 255));
     outputPixels[offset + 3u] = uchar(clamp(int(round(outAlpha * 255.0f)), 0, 255));
 }
 

@@ -58,7 +58,12 @@ struct BrushPaletteFeature {
             var wetnessPressureSensitivity: Double = BrushPreset.defaultPencil.wetnessPressureSensitivity
             var opacityPressureSensitivity: Double = BrushPreset.defaultPencil.opacityPressureSensitivity
             var colorMixStrength: Double = BrushPreset.defaultPencil.colorMixStrength
+            var smudgeRadius: Double = BrushPreset.defaultPencil.smudgeRadius
             var paintLoad: Double = BrushPreset.defaultPencil.paintLoad
+            var smudgeEngineEnabled: Bool = BrushPreset.defaultPencil.smudgeEngineEnabled
+            var smudgeMode: BrushSmudgeMode = BrushPreset.defaultPencil.smudgeMode
+            var smudgeLength: Double = BrushPreset.defaultPencil.smudgeLength
+            var colorRate: Double = BrushPreset.defaultPencil.colorRate
             var loadPressureSensitivity: Double = BrushPreset.defaultPencil.loadPressureSensitivity
             var dualEnabled: Bool = BrushPreset.defaultPencil.dualBrushEnabled
             var dualTipKind: BrushTipKind = BrushPreset.defaultPencil.dualTipKind
@@ -154,7 +159,12 @@ struct BrushPaletteFeature {
                 wetnessPressureSensitivity = preset.wetnessPressureSensitivity
                 opacityPressureSensitivity = preset.opacityPressureSensitivity
                 colorMixStrength = preset.colorMixStrength
+                smudgeRadius = preset.smudgeRadius
                 paintLoad = preset.paintLoad
+                smudgeEngineEnabled = preset.smudgeEngineEnabled
+                smudgeMode = preset.smudgeMode
+                smudgeLength = preset.smudgeLength
+                colorRate = preset.colorRate
                 loadPressureSensitivity = preset.loadPressureSensitivity
                 dualEnabled = preset.dualBrushEnabled
                 dualTipKind = preset.dualTipKind
@@ -238,7 +248,12 @@ struct BrushPaletteFeature {
                     wetnessPressureSensitivity: wetnessPressureSensitivity,
                     opacityPressureSensitivity: opacityPressureSensitivity,
                     colorMixStrength: colorMixStrength,
+                    smudgeRadius: smudgeRadius,
                     paintLoad: paintLoad,
+                    smudgeEngineEnabled: smudgeEngineEnabled,
+                    smudgeMode: smudgeMode,
+                    smudgeLength: smudgeLength,
+                    colorRate: colorRate,
                     loadPressureSensitivity: loadPressureSensitivity,
                     dualBrushEnabled: dualEnabled,
                     dualTipKind: dualTipKind,
@@ -456,7 +471,12 @@ struct BrushPaletteFeature {
                  .binding(\.brush.wetnessPressureSensitivity),
                  .binding(\.brush.opacityPressureSensitivity),
                  .binding(\.brush.colorMixStrength),
+                 .binding(\.brush.smudgeRadius),
                  .binding(\.brush.paintLoad),
+                 .binding(\.brush.smudgeEngineEnabled),
+                 .binding(\.brush.smudgeMode),
+                 .binding(\.brush.smudgeLength),
+                 .binding(\.brush.colorRate),
                  .binding(\.brush.loadPressureSensitivity),
                  .binding(\.brush.dualEnabled),
                  .binding(\.brush.dualTipKind),
@@ -775,7 +795,12 @@ private extension BrushPaletteFeature.State.BrushSettings {
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: smudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
             dualEnabled: dualEnabled,
             dualTipKind: dualTipKind,
@@ -960,7 +985,12 @@ private extension BrushPreset {
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: smudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,

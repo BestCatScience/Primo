@@ -589,7 +589,7 @@ extension BrushPaletteView {
 
     func textureControls() -> some View {
         Group {
-            sectionLabel("Texture")
+            sectionLabel(language.localized("Texture"))
             segmentedModeRow(
                 title: language.localized("テクスチャ適用"),
                 selectedTitle: store.brush.textureMode.localizedTitle(language)
@@ -603,25 +603,46 @@ extension BrushPaletteView {
             }
             sliderRow(title: language.localized("先端テクスチャ"), value: "\(Int(store.brush.textureStrength * 100))%", slider: Slider(value: $store.brush.textureStrength, in: 0.0...1.0))
             segmentedModeRow(
-                title: language.localized("ミキサーブラシ"),
-                selectedTitle: "Wet / Load / Mix / Flow"
+                title: language.localized("Color Smudge"),
+                selectedTitle: store.brush.smudgeEngineEnabled ? store.brush.smudgeMode.localizedTitle(language) : language.localized("オフ")
             ) {
                 VStack(alignment: .leading, spacing: 10) {
-                    sliderRow(title: language.localized("ウェット"), value: "\(Int(store.brush.wetness * 100))%", slider: Slider(value: $store.brush.wetness, in: 0.0...1.0))
-                    dynamicControlMenuRow(
-                        title: language.localized("ウェットコントロール"),
-                        selection: wetnessControlBinding,
-                        allowed: [.off, .pressure]
-                    )
-                    sliderRow(title: language.localized("ウェット量"), value: "\(Int(wetnessAmountBinding.wrappedValue * 100))%", slider: Slider(value: wetnessAmountBinding, in: 0.0...1.0))
-                    sliderRow(title: language.localized("混色量"), value: "\(Int(store.brush.colorMixStrength * 100))%", slider: Slider(value: $store.brush.colorMixStrength, in: 0.0...1.0))
-                    sliderRow(title: language.localized("色の含み"), value: "\(Int(store.brush.paintLoad * 100))%", slider: Slider(value: $store.brush.paintLoad, in: 0.0...1.0))
-                    dynamicControlMenuRow(
-                        title: language.localized("含みコントロール"),
-                        selection: loadControlBinding,
-                        allowed: [.off, .pressure]
-                    )
-                    sliderRow(title: language.localized("含み量"), value: "\(Int(loadAmountBinding.wrappedValue * 100))%", slider: Slider(value: loadAmountBinding, in: 0.0...1.0))
+                    Toggle(isOn: $store.brush.smudgeEngineEnabled) {
+                        Text(language.localized("Enable Color Smudge"))
+                            .font(StudioTheme.Typography.label(11))
+                            .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.8) : .white.opacity(0.86))
+                    }
+                    .toggleStyle(.switch)
+
+                    if store.brush.smudgeEngineEnabled {
+                        Picker(language.localized("Smudge Mode"), selection: $store.brush.smudgeMode) {
+                            ForEach(BrushSmudgeMode.allCases) { mode in
+                                Text(mode.localizedTitle(language)).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+
+                        sliderRow(
+                            title: language.localized("Smudge Length"),
+                            value: "\(Int(store.brush.smudgeLength * 100))%",
+                            slider: Slider(value: $store.brush.smudgeLength, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Color Rate"),
+                            value: "\(Int(store.brush.colorRate * 100))%",
+                            slider: Slider(value: $store.brush.colorRate, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Smudge Radius"),
+                            value: "\(Int(store.brush.smudgeRadius * 100))%",
+                            slider: Slider(value: $store.brush.smudgeRadius, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Mix Pressure"),
+                            value: "\(Int(store.brush.loadPressureSensitivity * 100))%",
+                            slider: Slider(value: $store.brush.loadPressureSensitivity, in: 0.0...1.0)
+                        )
+                    }
                 }
             }
             segmentedModeRow(

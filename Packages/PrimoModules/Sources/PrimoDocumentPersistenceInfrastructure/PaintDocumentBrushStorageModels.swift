@@ -90,6 +90,10 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let smudgeBleed: Double
     let smudgeRadius: Double
     let paintLoad: Double
+    let smudgeEngineEnabled: Bool
+    let smudgeMode: String
+    let smudgeLength: Double
+    let colorRate: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
     let dualTipKind: String
@@ -159,6 +163,10 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         smudgeBleed = brush.smudgeBleed
         smudgeRadius = brush.smudgeRadius
         paintLoad = brush.paintLoad
+        smudgeEngineEnabled = brush.smudgeEngineEnabled
+        smudgeMode = brush.smudgeMode.rawValue
+        smudgeLength = brush.smudgeLength
+        colorRate = brush.colorRate
         loadPressureSensitivity = brush.loadPressureSensitivity
         dualBrushEnabled = brush.dualBrushEnabled
         dualTipKind = brush.dualTipKind.rawValue
@@ -198,6 +206,7 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         else {
             return nil
         }
+        let resolvedSmudgeMode = BrushSmudgeMode(rawValue: smudgeMode) ?? .smearing
         let resolvedColorMixingMode = BrushColorMixingMode(rawValue: colorMixingMode ?? "") ?? BrushColorMixingMode.inferred(
             wetness: wetness,
             colorMixStrength: colorMixStrength,
@@ -249,6 +258,10 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
             smudgeBleed: smudgeBleed,
             smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: resolvedSmudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,

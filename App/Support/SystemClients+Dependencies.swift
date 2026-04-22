@@ -36,7 +36,6 @@ private enum AppLanguageClientKey: DependencyKey {
     }
 }
 
-@MainActor
 private enum MainQueueClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.MainQueueClient.live
 }
@@ -82,7 +81,6 @@ extension DependencyValues {
         set { self[AppLanguageClientKey.self] = newValue }
     }
 
-    @MainActor
     var mainQueueClient: PrimoCoreTypes.MainQueueClient {
         get { self[MainQueueClientKey.self] }
         set { self[MainQueueClientKey.self] = newValue }

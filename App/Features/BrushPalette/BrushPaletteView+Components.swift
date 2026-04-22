@@ -192,7 +192,7 @@ extension BrushPaletteView {
                 .padding(.vertical, 8)
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(preset.name)
+                Text(preset.localizedDisplayName(language))
                     .font(StudioTheme.Typography.label(11))
                     .foregroundStyle(.white.opacity(0.96))
                     .lineLimit(1)

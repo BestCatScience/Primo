@@ -70,6 +70,19 @@ extension DocumentStrokeRasterizer {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
+        if brush.smudgeEngineEnabled,
+           let smudgePixels = DocumentColorSmudgeEngine().applyStroke(
+                basePixelData: basePixelData,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                samples: samples,
+                brush: brush
+           )?.pixelData {
+            return preserveAlphaLockedPixels
+                ? pixelDataByPreservingExistingAlpha(source: smudgePixels, existing: basePixelData)
+                : smudgePixels
+        }
+
         let expectedCount = canvasWidth * canvasHeight * 4
         guard basePixelData.count == expectedCount else { return nil }
 
@@ -112,6 +125,40 @@ extension DocumentStrokeRasterizer {
         return preserveAlphaLockedPixels
             ? pixelDataByPreservingExistingAlpha(source: output, existing: basePixelData)
             : output
+    }
+
+    public static func colorSmudgeResult(
+        basePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool = false
+    ) -> DocumentColorSmudgeResult? {
+        guard brush.smudgeEngineEnabled else { return nil }
+        guard let result = DocumentColorSmudgeEngine().applyStroke(
+            basePixelData: basePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            samples: samples,
+            brush: brush
+        ) else {
+            return nil
+        }
+        guard preserveAlphaLockedPixels else { return result }
+        let resolvedPixels = pixelDataByPreservingExistingAlpha(source: result.pixelData, existing: basePixelData)
+        let resolvedRectData = result.dirtyRect.map {
+            extractRectPixelData(
+                from: resolvedPixels,
+                canvasWidth: canvasWidth,
+                rect: $0
+            )
+        }
+        return DocumentColorSmudgeResult(
+            pixelData: resolvedPixels,
+            dirtyRect: result.dirtyRect,
+            rectPixelData: resolvedRectData ?? result.rectPixelData
+        )
     }
 
     public static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
@@ -157,5 +204,21 @@ extension DocumentStrokeRasterizer {
             return true
         }
         return DocumentStrokeGeometry.strokeVisualSpan(samples) <= visualThreshold
+    }
+
+    private static func extractRectPixelData(
+        from pixelData: Data,
+        canvasWidth: Int,
+        rect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> Data {
+        var output = Data(capacity: rect.width * rect.height * 4)
+        pixelData.withUnsafeBytes { rawBytes in
+            guard let base = rawBytes.bindMemory(to: UInt8.self).baseAddress else { return }
+            for row in 0..<rect.height {
+                let offset = (((rect.originY + row) * canvasWidth) + rect.originX) * 4
+                output.append(base + offset, count: rect.width * 4)
+            }
+        }
+        return output
     }
 }

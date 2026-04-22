@@ -66,3 +66,10 @@ public enum BrushColorMixingMode: String, CaseIterable, Equatable, Sendable, Ide
         return .off
     }
 }
+
+public enum BrushSmudgeMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case smearing
+    case dulling
+
+    public var id: String { rawValue }
+}

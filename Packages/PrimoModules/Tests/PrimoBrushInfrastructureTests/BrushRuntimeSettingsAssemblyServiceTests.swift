@@ -45,7 +45,12 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
                 wetnessPressureSensitivity: 0.14,
                 opacityPressureSensitivity: 0.77,
                 colorMixStrength: 0.41,
+                smudgeRadius: 0.52,
                 paintLoad: 0.91,
+                smudgeEngineEnabled: true,
+                smudgeMode: .dulling,
+                smudgeLength: 0.67,
+                colorRate: 0.23,
                 loadPressureSensitivity: 0.27,
                 dualEnabled: true,
                 dualTipKind: .oil,
@@ -81,6 +86,11 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
         #expect(settings.blue == 255)
         #expect(settings.scatterMode == BrushScatterMode.spray)
         #expect(settings.dualBrushEnabled)
+        #expect(settings.smudgeEngineEnabled)
+        #expect(settings.smudgeMode == .dulling)
+        #expect(settings.smudgeLength == 0.67)
+        #expect(settings.colorRate == 0.23)
+        #expect(settings.smudgeRadius == 0.52)
     }
 
     @Test
@@ -124,6 +134,7 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
                 wetnessPressureSensitivity: 0.0,
                 opacityPressureSensitivity: 0.0,
                 colorMixStrength: 0.0,
+                smudgeRadius: 0.0,
                 paintLoad: 1.0,
                 loadPressureSensitivity: 0.0,
                 dualEnabled: false,

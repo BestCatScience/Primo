@@ -12,7 +12,6 @@ public struct ProcessEnvironmentClient: Sendable {
     }
 }
 
-@MainActor
 public struct MainQueueClient: Sendable {
     public var async: @Sendable (@escaping @MainActor () -> Void) -> Void
 

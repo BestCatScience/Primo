@@ -121,7 +121,7 @@ public struct DocumentRenderingClient: Sendable {
         snapshotRevision: Int? = nil,
         activeLayerIndex: Int? = nil
     ) -> Data? {
-        backend.rasterizedStrokePixelData(
+        if let gpuPixels = backend.rasterizedStrokePixelData(
             basePixelData: basePixelData,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -130,6 +130,15 @@ public struct DocumentRenderingClient: Sendable {
             mode: mode,
             snapshotRevision: snapshotRevision,
             activeLayerIndex: activeLayerIndex
+        ) {
+            return gpuPixels
+        }
+        return DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
+            basePixelData: basePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            samples: samples,
+            brush: brush
         )
     }
 
@@ -212,6 +221,66 @@ public struct DocumentRenderingClient: Sendable {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> DocumentInteractiveStrokePreviewResult? {
+        if brush.smudgeEngineEnabled,
+           let gpuResult = executeStroke(
+                MetalStrokeExecutionRequest(
+                    basePixelData: basePixelData,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height,
+                    samples: samples,
+                    brush: brush,
+                    mode: .interactive,
+                    snapshotRevision: snapshot.revision,
+                    activeLayerIndex: activeLayerIndex
+                )
+           ) {
+            let incrementalUpdate: IncrementalLayerUpdate?
+            if shouldUseIncrementalPreviewUpdate(for: brush),
+               let dirtyRect = Optional(gpuResult.dirtyRect) {
+                incrementalUpdate = compositedPreviewIncrementalUpdate(
+                    snapshot: snapshot,
+                    activeLayerIndex: activeLayerIndex,
+                    adjustedActiveLayerPixels: gpuResult.pixelData,
+                    dirtyRect: dirtyRect
+                )
+            } else {
+                incrementalUpdate = nil
+            }
+            return DocumentInteractiveStrokePreviewResult(
+                pixelData: gpuResult.pixelData,
+                dirtyRect: gpuResult.dirtyRect,
+                rectPixelData: gpuResult.rectPixelData,
+                incrementalUpdate: incrementalUpdate
+            )
+        } else if brush.smudgeEngineEnabled,
+                  let smudgeResult = DocumentStrokeRasterizer.colorSmudgeResult(
+                    basePixelData: basePixelData,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height,
+                    samples: samples,
+                    brush: brush,
+                    preserveAlphaLockedPixels: preserveAlphaLockedPixels
+                  ) {
+            let incrementalUpdate: IncrementalLayerUpdate?
+            if shouldUseIncrementalPreviewUpdate(for: brush),
+               let dirtyRect = smudgeResult.dirtyRect {
+                incrementalUpdate = compositedPreviewIncrementalUpdate(
+                    snapshot: snapshot,
+                    activeLayerIndex: activeLayerIndex,
+                    adjustedActiveLayerPixels: smudgeResult.pixelData,
+                    dirtyRect: dirtyRect
+                )
+            } else {
+                incrementalUpdate = nil
+            }
+            return DocumentInteractiveStrokePreviewResult(
+                pixelData: smudgeResult.pixelData,
+                dirtyRect: smudgeResult.dirtyRect,
+                rectPixelData: smudgeResult.rectPixelData,
+                incrementalUpdate: incrementalUpdate
+            )
+        }
+
         let adjustedPixels: Data
         let rasterDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
         let rasterRectPixelData: Data?

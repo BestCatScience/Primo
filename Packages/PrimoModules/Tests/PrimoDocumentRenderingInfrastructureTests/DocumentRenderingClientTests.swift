@@ -175,4 +175,79 @@ struct DocumentRenderingClientTests {
         #expect(preview != nil)
         #expect(preview?.pixelData.count == basePixels.count)
     }
+
+    @Test
+    func compositedPreviewDoesNotReuseStaleLayerTextureAcrossDistinctSnapshots() {
+        let client = DocumentRenderingClient.live
+        let transparentActivePixels = Data([0, 0, 0, 0])
+        let redBackground = Data([255, 0, 0, 255])
+        let blueBackground = Data([0, 0, 255, 255])
+
+        let firstSnapshot = MetalDocumentSnapshot(
+            width: 1,
+            height: 1,
+            revision: 0,
+            compositePixelData: redBackground,
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: redBackground
+                ),
+                MetalLayerSnapshot(
+                    index: 1,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: transparentActivePixels
+                )
+            ]
+        )
+        let secondSnapshot = MetalDocumentSnapshot(
+            width: 1,
+            height: 1,
+            revision: 0,
+            compositePixelData: blueBackground,
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: blueBackground
+                ),
+                MetalLayerSnapshot(
+                    index: 1,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: transparentActivePixels
+                )
+            ]
+        )
+
+        let firstComposite = client.compositedPreviewPixelData(
+            snapshot: firstSnapshot,
+            activeLayerIndex: 1,
+            adjustedActiveLayerPixels: transparentActivePixels
+        )
+        let secondComposite = client.compositedPreviewPixelData(
+            snapshot: secondSnapshot,
+            activeLayerIndex: 1,
+            adjustedActiveLayerPixels: transparentActivePixels
+        )
+
+        #expect(firstComposite == redBackground)
+        #expect(secondComposite == blueBackground)
+    }
 }

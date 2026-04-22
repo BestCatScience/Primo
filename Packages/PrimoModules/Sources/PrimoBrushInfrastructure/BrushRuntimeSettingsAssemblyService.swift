@@ -71,7 +71,12 @@ public struct BrushRuntimeDescriptor: Sendable {
     public var wetnessPressureSensitivity: Double
     public var opacityPressureSensitivity: Double
     public var colorMixStrength: Double
+    public var smudgeRadius: Double
     public var paintLoad: Double
+    public var smudgeEngineEnabled: Bool
+    public var smudgeMode: BrushSmudgeMode
+    public var smudgeLength: Double
+    public var colorRate: Double
     public var loadPressureSensitivity: Double
     public var dualEnabled: Bool
     public var dualTipKind: BrushTipKind
@@ -129,7 +134,12 @@ public struct BrushRuntimeDescriptor: Sendable {
         wetnessPressureSensitivity: Double,
         opacityPressureSensitivity: Double,
         colorMixStrength: Double,
+        smudgeRadius: Double = 0.0,
         paintLoad: Double,
+        smudgeEngineEnabled: Bool = false,
+        smudgeMode: BrushSmudgeMode = .smearing,
+        smudgeLength: Double = 0.0,
+        colorRate: Double = 1.0,
         loadPressureSensitivity: Double,
         dualEnabled: Bool,
         dualTipKind: BrushTipKind,
@@ -186,7 +196,12 @@ public struct BrushRuntimeDescriptor: Sendable {
         self.wetnessPressureSensitivity = wetnessPressureSensitivity
         self.opacityPressureSensitivity = opacityPressureSensitivity
         self.colorMixStrength = colorMixStrength
+        self.smudgeRadius = smudgeRadius
         self.paintLoad = paintLoad
+        self.smudgeEngineEnabled = smudgeEngineEnabled
+        self.smudgeMode = smudgeMode
+        self.smudgeLength = smudgeLength
+        self.colorRate = colorRate
         self.loadPressureSensitivity = loadPressureSensitivity
         self.dualEnabled = dualEnabled
         self.dualTipKind = dualTipKind
@@ -254,7 +269,14 @@ public struct BrushRuntimeSettingsAssemblyService: Sendable {
             wetnessPressureSensitivity: brush.wetnessPressureSensitivity,
             opacityPressureSensitivity: brush.opacityPressureSensitivity,
             colorMixStrength: brush.colorMixStrength,
+            smudgeBlurEnabled: false,
+            smudgeBleed: 0.0,
+            smudgeRadius: brush.smudgeRadius,
             paintLoad: brush.paintLoad,
+            smudgeEngineEnabled: brush.smudgeEngineEnabled,
+            smudgeMode: brush.smudgeMode,
+            smudgeLength: brush.smudgeLength,
+            colorRate: brush.colorRate,
             loadPressureSensitivity: brush.loadPressureSensitivity,
             dualBrushEnabled: brush.dualEnabled,
             dualTipKind: brush.dualTipKind,

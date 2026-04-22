@@ -387,6 +387,23 @@ extension BrushColorMixingMode {
 
 }
 
+extension BrushSmudgeMode {
+    func localizedTitle(_ language: AppLanguage) -> String {
+        switch self {
+        case .smearing:
+            return language.localized("Smearing")
+        case .dulling:
+            return language.localized("Dulling")
+        }
+    }
+}
+
+extension BrushPreset {
+    func localizedDisplayName(_ language: AppLanguage) -> String {
+        language.localized(name)
+    }
+}
+
 enum BrushTipShapePreset: String, CaseIterable, Equatable, Sendable, Identifiable {
     case round
     case block
@@ -492,7 +509,12 @@ struct BrushPreset: Identifiable, Equatable {
     let wetnessPressureSensitivity: Double
     let opacityPressureSensitivity: Double
     let colorMixStrength: Double
+    let smudgeRadius: Double
     let paintLoad: Double
+    let smudgeEngineEnabled: Bool
+    let smudgeMode: BrushSmudgeMode
+    let smudgeLength: Double
+    let colorRate: Double
     let loadPressureSensitivity: Double
     let dualBrushEnabled: Bool
     let dualTipKind: BrushTipKind
@@ -552,7 +574,12 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.wetnessPressureSensitivity == rhs.wetnessPressureSensitivity &&
         lhs.opacityPressureSensitivity == rhs.opacityPressureSensitivity &&
         lhs.colorMixStrength == rhs.colorMixStrength &&
+        lhs.smudgeRadius == rhs.smudgeRadius &&
         lhs.paintLoad == rhs.paintLoad &&
+        lhs.smudgeEngineEnabled == rhs.smudgeEngineEnabled &&
+        lhs.smudgeMode == rhs.smudgeMode &&
+        lhs.smudgeLength == rhs.smudgeLength &&
+        lhs.colorRate == rhs.colorRate &&
         lhs.loadPressureSensitivity == rhs.loadPressureSensitivity &&
         lhs.dualBrushEnabled == rhs.dualBrushEnabled &&
         lhs.dualTipKind == rhs.dualTipKind &&
@@ -614,7 +641,12 @@ struct BrushPreset: Identifiable, Equatable {
         wetnessPressureSensitivity: Double = 0.0,
         opacityPressureSensitivity: Double = 0.0,
         colorMixStrength: Double = 0.0,
+        smudgeRadius: Double = 0.0,
         paintLoad: Double = 1.0,
+        smudgeEngineEnabled: Bool = false,
+        smudgeMode: BrushSmudgeMode = .smearing,
+        smudgeLength: Double = 0.0,
+        colorRate: Double = 1.0,
         loadPressureSensitivity: Double = 0.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
@@ -674,7 +706,12 @@ struct BrushPreset: Identifiable, Equatable {
         self.wetnessPressureSensitivity = wetnessPressureSensitivity
         self.opacityPressureSensitivity = opacityPressureSensitivity
         self.colorMixStrength = colorMixStrength
+        self.smudgeRadius = smudgeRadius
         self.paintLoad = paintLoad
+        self.smudgeEngineEnabled = smudgeEngineEnabled
+        self.smudgeMode = smudgeMode
+        self.smudgeLength = smudgeLength
+        self.colorRate = colorRate
         self.loadPressureSensitivity = loadPressureSensitivity
         self.dualBrushEnabled = dualBrushEnabled
         self.dualTipKind = dualTipKind
@@ -999,6 +1036,11 @@ struct BrushPreset: Identifiable, Equatable {
             opacityPressureSensitivity: 0.12,
             colorMixStrength: 0.08,
             paintLoad: 0.92,
+            smudgeEngineEnabled: true,
+            smudgeMode: .dulling,
+            smudgeLength: 0.34,
+            colorRate: 0.58,
+            smudgeRadius: 0.32,
             loadPressureSensitivity: 0.04,
             dualBrushEnabled: false,
             dualTipKind: .oil,
@@ -1055,6 +1097,11 @@ struct BrushPreset: Identifiable, Equatable {
             opacityPressureSensitivity: 0.10,
             colorMixStrength: 0.08,
             paintLoad: 0.92,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.28,
+            colorRate: 0.42,
+            smudgeRadius: 0.26,
             loadPressureSensitivity: 0.04,
             dualBrushEnabled: false,
             dualTipKind: .oil,
@@ -1097,6 +1144,11 @@ struct BrushPreset: Identifiable, Equatable {
             opacityPressureSensitivity: 0.10,
             colorMixStrength: 0.10,
             paintLoad: 0.92,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.40,
+            colorRate: 0.46,
+            smudgeRadius: 0.36,
             loadPressureSensitivity: 0.06,
             grainScale: 1.08,
             grainContrast: 1.24,
@@ -1108,6 +1160,96 @@ struct BrushPreset: Identifiable, Equatable {
             green: 50,
             blue: 58,
             customTip: BuiltInBrushTipFactory.rake
+        ),
+        studioPreset(
+            name: "Smudge Soft",
+            tipKind: .oil,
+            color: Color(red: 0.18, green: 0.18, blue: 0.19),
+            radius: 10.0,
+            opacity: 0.82,
+            hardness: 0.36,
+            roundness: 0.96,
+            spacing: 0.10,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.10,
+            flow: 0.82,
+            wetness: 0.20,
+            colorMixStrength: 0.24,
+            paintLoad: 0.65,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.56,
+            colorRate: 0.24,
+            loadPressureSensitivity: 0.72,
+            pressureSensitivity: 0.12,
+            red: 46,
+            green: 47,
+            blue: 50,
+            customTip: BuiltInBrushTipFactory.petal
+        ),
+        studioPreset(
+            name: "Smudge Pull",
+            tipKind: .oil,
+            color: Color(red: 0.17, green: 0.18, blue: 0.20),
+            radius: 12.0,
+            opacity: 0.88,
+            hardness: 0.52,
+            roundness: 0.84,
+            spacing: 0.08,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.16,
+            flow: 0.86,
+            wetness: 0.18,
+            colorMixStrength: 0.18,
+            paintLoad: 0.40,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.84,
+            colorRate: 0.12,
+            loadPressureSensitivity: 0.78,
+            pressureSensitivity: 0.18,
+            red: 40,
+            green: 42,
+            blue: 46,
+            customTip: BuiltInBrushTipFactory.ribbon
+        ),
+        studioPreset(
+            name: "Dulling Mixer",
+            tipKind: .oil,
+            color: Color(red: 0.20, green: 0.21, blue: 0.24),
+            radius: 14.0,
+            opacity: 0.76,
+            hardness: 0.28,
+            roundness: 1.0,
+            spacing: 0.12,
+            scatterLateral: 0.0,
+            scatterLinear: 0.0,
+            angleJitter: 0.0,
+            roundnessJitter: 0.0,
+            textureMode: .off,
+            textureStrength: 0.0,
+            flow: 0.74,
+            wetness: 0.10,
+            colorMixStrength: 0.14,
+            paintLoad: 0.72,
+            smudgeEngineEnabled: true,
+            smudgeMode: .dulling,
+            smudgeLength: 0.68,
+            colorRate: 0.46,
+            smudgeRadius: 0.58,
+            loadPressureSensitivity: 0.66,
+            pressureSensitivity: 0.08,
+            red: 52,
+            green: 54,
+            blue: 61
         )
     ]
 
@@ -1152,6 +1294,11 @@ struct BrushPreset: Identifiable, Equatable {
         opacityPressureSensitivity: Double = 0.0,
         colorMixStrength: Double = 0.0,
         paintLoad: Double = 1.0,
+        smudgeEngineEnabled: Bool = false,
+        smudgeMode: BrushSmudgeMode = .smearing,
+        smudgeLength: Double = 0.0,
+        colorRate: Double = 1.0,
+        smudgeRadius: Double = 0.0,
         loadPressureSensitivity: Double = 0.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
@@ -1209,7 +1356,12 @@ struct BrushPreset: Identifiable, Equatable {
             wetnessPressureSensitivity: wetnessPressureSensitivity,
             opacityPressureSensitivity: opacityPressureSensitivity,
             colorMixStrength: colorMixStrength,
+            smudgeRadius: smudgeRadius,
             paintLoad: paintLoad,
+            smudgeEngineEnabled: smudgeEngineEnabled,
+            smudgeMode: smudgeMode,
+            smudgeLength: smudgeLength,
+            colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
