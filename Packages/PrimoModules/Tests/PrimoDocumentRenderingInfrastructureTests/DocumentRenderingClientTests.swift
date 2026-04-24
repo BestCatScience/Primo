@@ -203,7 +203,9 @@ struct DocumentRenderingClientTests {
 
         if client.isAvailable {
             #expect(preview != nil)
-            #expect(preview?.pixelData.count == basePixels.count)
+            #expect(preview?.pixelData == nil)
+            #expect(preview?.gpuBufferHandle != nil)
+            #expect(preview?.incrementalUpdate?.gpuBufferHandle != nil)
         } else {
             #expect(preview == nil)
         }

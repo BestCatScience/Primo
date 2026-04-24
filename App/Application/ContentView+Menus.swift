@@ -551,7 +551,7 @@ extension ContentView {
         }
         return AppFeature.transformationBounds(
             selection: nil,
-            sourceBytes: [UInt8](layer.pixelData),
+            pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height
         )

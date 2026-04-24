@@ -169,18 +169,31 @@ extension AppFeature {
         let expectedCount = canvasWidth * canvasHeight * 4
         guard source.count == expectedCount else { return nil }
 
-        let sourceBytes = [UInt8](source)
-        let mask: [UInt8]
+        let mask: [UInt8]?
+        let bounds: CGRect
         if let selection {
             guard let expanded = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
                 return nil
             }
             mask = expanded
+            bounds = selection.bounds
         } else {
-            mask = Self.alphaMask(from: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
-        }
-        guard let bounds = Self.transformationBounds(selection: selection, sourceBytes: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
-            return nil
+            guard
+                let alphaMask = MetalDocumentProcessingClient.shared.alphaMask(
+                    pixelData: source,
+                    width: canvasWidth,
+                    height: canvasHeight
+                ),
+                let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+                    mask: alphaMask,
+                    width: canvasWidth,
+                    height: canvasHeight
+                )
+            else {
+                return nil
+            }
+            mask = alphaMask
+            bounds = cropped.bounds
         }
         let resolved = effectiveTransformQuad(
             bounds: bounds,
@@ -193,62 +206,20 @@ extension AppFeature {
             quadOffsets: quadOffsets
         )
 
-        var destination = sourceBytes
-        for index in 0..<(canvasWidth * canvasHeight) where mask[index] != 0 {
-            let pixelOffset = index * 4
-            destination[pixelOffset] = 0
-            destination[pixelOffset + 1] = 0
-            destination[pixelOffset + 2] = 0
-            destination[pixelOffset + 3] = 0
-        }
-        let clampedMinX = max(Int(floor(resolved.effective.bounds.minX)) - 1, 0)
-        let clampedMaxX = min(Int(ceil(resolved.effective.bounds.maxX)) + 1, canvasWidth - 1)
-        let clampedMinY = max(Int(floor(resolved.effective.bounds.minY)) - 1, 0)
-        let clampedMaxY = min(Int(ceil(resolved.effective.bounds.maxY)) + 1, canvasHeight - 1)
-        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
-        let cosTheta = cos(rotationRadians)
-        let sinTheta = sin(rotationRadians)
-        let clampedScaleX = min(max(scaleX, 0.2), 6.0)
-        let clampedScaleY = min(max(scaleY, 0.2), 6.0)
-
-        for y in clampedMinY...clampedMaxY {
-            for x in clampedMinX...clampedMaxX {
-                let destinationPoint = CGPoint(x: CGFloat(x), y: CGFloat(y))
-                let sourcePoint: CGPoint?
-                if mode == .standard || quadOffsets.isZero {
-                    let shiftedX = destinationPoint.x - translation.width - resolved.pivot.x
-                    let shiftedY = destinationPoint.y - translation.height - resolved.pivot.y
-                    let unrotatedX = (shiftedX * cosTheta) + (shiftedY * sinTheta)
-                    let unrotatedY = (-shiftedX * sinTheta) + (shiftedY * cosTheta)
-                    sourcePoint = CGPoint(
-                        x: (unrotatedX / clampedScaleX) + resolved.pivot.x,
-                        y: (unrotatedY / clampedScaleY) + resolved.pivot.y
-                    )
-                } else {
-                    sourcePoint = sampleSourcePoint(
-                        destinationPoint: destinationPoint,
-                        sourceQuad: resolved.source,
-                        destinationQuad: resolved.effective
-                    )
-                }
-
-                guard let sourcePoint else { continue }
-                let sourcePixelX = Int(sourcePoint.x.rounded())
-                let sourcePixelY = Int(sourcePoint.y.rounded())
-                guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else { continue }
-                let sourceIndex = (sourcePixelY * canvasWidth) + sourcePixelX
-                guard mask[sourceIndex] != 0 else { continue }
-                let sourceOffset = sourceIndex * 4
-                guard sourceBytes[sourceOffset + 3] != 0 else { continue }
-                let destinationOffset = ((y * canvasWidth) + x) * 4
-                destination[destinationOffset] = sourceBytes[sourceOffset]
-                destination[destinationOffset + 1] = sourceBytes[sourceOffset + 1]
-                destination[destinationOffset + 2] = sourceBytes[sourceOffset + 2]
-                destination[destinationOffset + 3] = sourceBytes[sourceOffset + 3]
-            }
-        }
-
-        return Data(destination)
+        return MetalDocumentProcessingClient.shared.transformedLayerPixelData(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            expandedSelectionMask: mask,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: resolved.pivot,
+            sourceQuad: resolved.source,
+            destinationQuad: resolved.effective,
+            usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+        )
     }
 
     static func transformedSelection(
@@ -279,46 +250,20 @@ extension AppFeature {
             mode: mode,
             quadOffsets: quadOffsets
         )
-        var transformed = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
-        let clampedMinX = max(Int(floor(resolved.effective.bounds.minX)) - 1, 0)
-        let clampedMaxX = min(Int(ceil(resolved.effective.bounds.maxX)) + 1, canvasWidth - 1)
-        let clampedMinY = max(Int(floor(resolved.effective.bounds.minY)) - 1, 0)
-        let clampedMaxY = min(Int(ceil(resolved.effective.bounds.maxY)) + 1, canvasHeight - 1)
-        let rotationRadians = CGFloat(rotationDegrees * .pi / 180.0)
-        let cosTheta = cos(rotationRadians)
-        let sinTheta = sin(rotationRadians)
-        let clampedScaleX = min(max(scaleX, 0.2), 6.0)
-        let clampedScaleY = min(max(scaleY, 0.2), 6.0)
-
-        for y in clampedMinY...clampedMaxY {
-            for x in clampedMinX...clampedMaxX {
-                let destinationPoint = CGPoint(x: CGFloat(x), y: CGFloat(y))
-                let sourcePoint: CGPoint?
-                if mode == .standard || quadOffsets.isZero {
-                    let shiftedX = destinationPoint.x - translation.width - resolved.pivot.x
-                    let shiftedY = destinationPoint.y - translation.height - resolved.pivot.y
-                    let unrotatedX = (shiftedX * cosTheta) + (shiftedY * sinTheta)
-                    let unrotatedY = (-shiftedX * sinTheta) + (shiftedY * cosTheta)
-                    sourcePoint = CGPoint(
-                        x: (unrotatedX / clampedScaleX) + resolved.pivot.x,
-                        y: (unrotatedY / clampedScaleY) + resolved.pivot.y
-                    )
-                } else {
-                    sourcePoint = sampleSourcePoint(
-                        destinationPoint: destinationPoint,
-                        sourceQuad: resolved.source,
-                        destinationQuad: resolved.effective
-                    )
-                }
-
-                guard let sourcePoint else { continue }
-                let sourcePixelX = Int(sourcePoint.x.rounded())
-                let sourcePixelY = Int(sourcePoint.y.rounded())
-                guard sourcePixelX >= 0, sourcePixelX < canvasWidth, sourcePixelY >= 0, sourcePixelY < canvasHeight else { continue }
-                let sourceIndex = (sourcePixelY * canvasWidth) + sourcePixelX
-                guard mask[sourceIndex] != 0 else { continue }
-                transformed[(y * canvasWidth) + x] = 255
-            }
+        guard let transformed = MetalDocumentProcessingClient.shared.transformedSelectionMask(
+            expandedSelectionMask: mask,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: resolved.pivot,
+            sourceQuad: resolved.source,
+            destinationQuad: resolved.effective,
+            usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+        ) else {
+            return nil
         }
 
         return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
@@ -337,41 +282,30 @@ extension AppFeature {
         return Data(mask)
     }
 
-    static func alphaMask(from sourceBytes: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
-        var mask = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
-        for index in 0..<(canvasWidth * canvasHeight) {
-            if sourceBytes[index * 4 + 3] != 0 {
-                mask[index] = 255
-            }
-        }
-        return mask
-    }
-
     static func transformationBounds(
         selection: CanvasSelection?,
-        sourceBytes: [UInt8],
+        pixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int
     ) -> CGRect? {
         if let selection, !selection.isEmpty {
             return selection.bounds
         }
-
-        var minX = canvasWidth
-        var minY = canvasHeight
-        var maxX = -1
-        var maxY = -1
-        for y in 0..<canvasHeight {
-            for x in 0..<canvasWidth {
-                if sourceBytes[((y * canvasWidth) + x) * 4 + 3] == 0 { continue }
-                minX = min(minX, x)
-                minY = min(minY, y)
-                maxX = max(maxX, x)
-                maxY = max(maxY, y)
-            }
+        guard
+            let alphaMask = MetalDocumentProcessingClient.shared.alphaMask(
+                pixelData: pixelData,
+                width: canvasWidth,
+                height: canvasHeight
+            ),
+            let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+                mask: alphaMask,
+                width: canvasWidth,
+                height: canvasHeight
+            )
+        else {
+            return nil
         }
-
-        guard maxX >= minX, maxY >= minY else { return nil }
-        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+        return cropped.bounds
     }
+
 }

@@ -559,8 +559,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     let eyedropperLoupePipeline: MTLComputePipelineState?
     let paperCompositePipeline: MTLComputePipelineState?
     let applyLayerMaskPipeline: MTLComputePipelineState?
+    let alphaMaskPipeline: MTLComputePipelineState?
     let layerProcessingPipeline: MTLComputePipelineState?
     let layerTransformPipeline: MTLComputePipelineState?
+    let quadLayerTransformPipeline: MTLComputePipelineState?
+    let quadMaskTransformPipeline: MTLComputePipelineState?
     let fillEligibilityPipeline: MTLComputePipelineState?
     let fillPropagationPipeline: MTLComputePipelineState?
     let fillExpansionPipeline: MTLComputePipelineState?
@@ -620,8 +623,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
         self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
         self.applyLayerMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "applyLayerMaskKernel")
+        self.alphaMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "alphaMaskKernel")
         self.layerProcessingPipeline = Self.makePipeline(device: device, library: library, functionName: "layerProcessingKernel")
         self.layerTransformPipeline = Self.makePipeline(device: device, library: library, functionName: "layerTransformKernel")
+        self.quadLayerTransformPipeline = Self.makePipeline(device: device, library: library, functionName: "quadLayerTransformKernel")
+        self.quadMaskTransformPipeline = Self.makePipeline(device: device, library: library, functionName: "quadMaskTransformKernel")
         self.fillEligibilityPipeline = Self.makePipeline(device: device, library: library, functionName: "fillEligibilityKernel")
         self.fillPropagationPipeline = Self.makePipeline(device: device, library: library, functionName: "fillPropagationKernel")
         self.fillExpansionPipeline = Self.makePipeline(device: device, library: library, functionName: "fillExpansionKernel")
@@ -674,8 +680,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         eyedropperLoupePipeline != nil &&
         paperCompositePipeline != nil &&
         applyLayerMaskPipeline != nil &&
+        alphaMaskPipeline != nil &&
         layerProcessingPipeline != nil &&
         layerTransformPipeline != nil &&
+        quadLayerTransformPipeline != nil &&
+        quadMaskTransformPipeline != nil &&
         fillEligibilityPipeline != nil &&
         fillPropagationPipeline != nil &&
         fillExpansionPipeline != nil &&
@@ -1342,8 +1351,40 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         adjustedActiveLayerPixels: Data?,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil
     ) -> MetalBufferHandle? {
+        compositedBufferHandle(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+            adjustedActiveLayerBufferHandle: nil,
+            dirtyRect: dirtyRect
+        )
+    }
+
+    public func compositedBufferHandle(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int?,
+        adjustedActiveLayerBufferHandle: MetalBufferHandle?,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil
+    ) -> MetalBufferHandle? {
+        compositedBufferHandle(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: nil,
+            adjustedActiveLayerBufferHandle: adjustedActiveLayerBufferHandle,
+            dirtyRect: dirtyRect
+        )
+    }
+
+    private func compositedBufferHandle(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int?,
+        adjustedActiveLayerPixels: Data?,
+        adjustedActiveLayerBufferHandle: MetalBufferHandle?,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil
+    ) -> MetalBufferHandle? {
         guard snapshot.width > 0, snapshot.height > 0 else { return nil }
         let orderedLayers = snapshot.layers.sorted(by: { $0.index < $1.index })
+        let hasOverride = adjustedActiveLayerPixels != nil || adjustedActiveLayerBufferHandle != nil
         guard
             let commandQueue,
             let pipeline = compositePipeline,
@@ -1359,7 +1400,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     outputHeight: UInt32(dirtyRect?.height ?? snapshot.height),
                     layerCount: UInt32(orderedLayers.count),
                     activeLayerIndex: Int32(activeLayerIndex ?? -1),
-                    hasActiveLayerOverride: adjustedActiveLayerPixels == nil ? 0 : 1,
+                    hasActiveLayerOverride: hasOverride ? 1 : 0,
                     includeActiveLayerWhenHidden: dirtyRect == nil ? 0 : 1
                 )
             )
@@ -1371,12 +1412,25 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let overridePixels = adjustedActiveLayerPixels ?? Data(count: expectedCount)
         let outputWidth = dirtyRect?.width ?? snapshot.width
         let outputHeight = dirtyRect?.height ?? snapshot.height
-        guard
-            overridePixels.count == expectedCount,
-            let overrideBuffer = makeBuffer(overridePixels),
-            let outputBuffer = device?.makeBuffer(length: outputWidth * outputHeight * 4, options: .storageModeShared),
-            let commandBuffer = commandQueue.makeCommandBuffer(),
-            let encoder = commandBuffer.makeComputeCommandEncoder()
+        let overrideBuffer: MTLBuffer?
+        if let adjustedActiveLayerBufferHandle {
+            guard
+                adjustedActiveLayerBufferHandle.width == snapshot.width,
+                adjustedActiveLayerBufferHandle.height == snapshot.height,
+                let resource = cachedBufferResource(for: adjustedActiveLayerBufferHandle)
+            else {
+                return nil
+            }
+            overrideBuffer = resource.buffer
+        } else {
+            guard overridePixels.count == expectedCount else { return nil }
+            overrideBuffer = makeBuffer(overridePixels)
+        }
+
+        guard let overrideBuffer,
+              let outputBuffer = device?.makeBuffer(length: outputWidth * outputHeight * 4, options: .storageModeShared),
+              let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeComputeCommandEncoder()
         else {
             return nil
         }
@@ -1474,6 +1528,31 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         )
     }
 
+    public func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerBufferHandle: MetalBufferHandle,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        guard let handle = compositedBufferHandle(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerBufferHandle: adjustedActiveLayerBufferHandle,
+            dirtyRect: dirtyRect
+        ) else {
+            return nil
+        }
+        return IncrementalLayerUpdate(
+            layerIndex: -1,
+            originX: dirtyRect.originX,
+            originY: dirtyRect.originY,
+            width: dirtyRect.width,
+            height: dirtyRect.height,
+            gpuBufferHandle: handle,
+            pixelData: Data()
+        )
+    }
+
     public func applyLayerMask(
         pixelData: Data,
         maskData: Data,
@@ -1513,6 +1592,43 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
         return bytes(from: outputBuffer, count: pixelData.count)
+    }
+
+    public func alphaMask(
+        pixelData: Data,
+        width: Int,
+        height: Int
+    ) -> [UInt8]? {
+        guard
+            width > 0,
+            height > 0,
+            pixelData.count == width * height * 4,
+            let commandQueue,
+            let pipeline = alphaMaskPipeline,
+            let pixelBuffer = makeBuffer(pixelData),
+            let outputBuffer = device?.makeBuffer(length: width * height, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalLayerMaskApplyDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height)
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(pixelBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return [UInt8](bytes(from: outputBuffer, count: width * height))
     }
 
     public func mergeLayers(

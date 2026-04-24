@@ -281,7 +281,11 @@ extension AppFeature {
         ) -> MetalDocumentSnapshot? {
             guard
                 let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                let committedPixels = state.canvas.activeStrokePreviewLayerPixelData
+                let committedPixels = committedPreviewLayerPixelData(
+                    state: state,
+                    baseSnapshot: baseSnapshot,
+                    activeLayerIndex: activeLayerIndex
+                )
             else {
                 return nil
             }
@@ -293,6 +297,47 @@ extension AppFeature {
                 activeLayerIndex: activeLayerIndex,
                 stagedCompositePixelData: state.canvas.stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot)
             )
+        }
+
+        private static func committedPreviewLayerPixelData(
+            state: State,
+            baseSnapshot: MetalDocumentSnapshot,
+            activeLayerIndex: Int
+        ) -> Data? {
+            if let previewLayerPixelData = state.canvas.activeStrokePreviewLayerPixelData {
+                return previewLayerPixelData
+            }
+            guard
+                let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
+                let rectPixelData = state.canvas.activeStrokePreviewRectPixelData,
+                let baseLayer = baseSnapshot.layers.first(where: { $0.index == activeLayerIndex }),
+                baseLayer.pixelData.count == baseSnapshot.width * baseSnapshot.height * 4,
+                dirtyRect.originX >= 0,
+                dirtyRect.originY >= 0,
+                dirtyRect.originX + dirtyRect.width <= baseSnapshot.width,
+                dirtyRect.originY + dirtyRect.height <= baseSnapshot.height,
+                rectPixelData.count >= dirtyRect.width * dirtyRect.height * 4
+            else {
+                return nil
+            }
+
+            var committedPixels = baseLayer.pixelData
+            committedPixels.withUnsafeMutableBytes { destinationBytes in
+                rectPixelData.withUnsafeBytes { sourceBytes in
+                    guard
+                        let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    else {
+                        return
+                    }
+                    for row in 0..<dirtyRect.height {
+                        let sourceOffset = row * dirtyRect.width * 4
+                        let destinationOffset = ((dirtyRect.originY + row) * baseSnapshot.width + dirtyRect.originX) * 4
+                        memcpy(destinationBase + destinationOffset, sourceBase + sourceOffset, dirtyRect.width * 4)
+                    }
+                }
+            }
+            return committedPixels
         }
     }
 
@@ -675,11 +720,11 @@ extension AppFeature {
                 activeLayerIndex: activeLayerIndex,
                 activeLayerPixelData: plan.adjustedPixels
             )
-        } else {
+        } else if let adjustedPixels = plan.adjustedPixels {
             applyLiveStrokePreview(
                 baseSnapshot: plan.baseSnapshot,
                 activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: plan.adjustedPixels,
+                adjustedActiveLayerPixels: adjustedPixels,
                 state: &state
             )
         }

@@ -12,18 +12,21 @@ public typealias MetalSelectionCombineMode = PrimoMetalSelectionCombineMode
 public typealias MetalCroppedSelectionMask = PrimoMetalCroppedSelectionMask
 
 public struct DocumentInteractiveStrokePreviewResult: Sendable {
-    public let pixelData: Data
+    public let pixelData: Data?
+    public let gpuBufferHandle: MetalBufferHandle?
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
     public let rectPixelData: Data?
     public let incrementalUpdate: IncrementalLayerUpdate?
 
     public init(
-        pixelData: Data,
+        pixelData: Data?,
+        gpuBufferHandle: MetalBufferHandle? = nil,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?,
         rectPixelData: Data?,
         incrementalUpdate: IncrementalLayerUpdate?
     ) {
         self.pixelData = pixelData
+        self.gpuBufferHandle = gpuBufferHandle
         self.dirtyRect = dirtyRect
         self.rectPixelData = rectPixelData
         self.incrementalUpdate = incrementalUpdate
@@ -189,6 +192,20 @@ public struct DocumentRenderingClient: Sendable {
         )
     }
 
+    public func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerBufferHandle: MetalBufferHandle,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        backend.compositedPreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerBufferHandle: adjustedActiveLayerBufferHandle,
+            dirtyRect: dirtyRect
+        )
+    }
+
     public func makeInteractiveStrokePreview(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
@@ -197,6 +214,37 @@ public struct DocumentRenderingClient: Sendable {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> DocumentInteractiveStrokePreviewResult? {
+        if !preserveAlphaLockedPixels,
+           shouldUseIncrementalPreviewUpdate(for: brush),
+           let gpuResult = backend.executeStrokeMutation(
+               MetalStrokeExecutionRequest(
+                   basePixelData: basePixelData,
+                   canvasWidth: snapshot.width,
+                   canvasHeight: snapshot.height,
+                   samples: samples,
+                   brush: brush,
+                   mode: .interactive,
+                   snapshotRevision: snapshot.revision,
+                   activeLayerIndex: activeLayerIndex
+               )
+           ),
+           let bufferHandle = gpuResult.gpuBufferHandle {
+            if let incrementalUpdate = compositedPreviewIncrementalUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerBufferHandle: bufferHandle,
+                dirtyRect: gpuResult.dirtyRect
+            ) {
+                return DocumentInteractiveStrokePreviewResult(
+                    pixelData: nil,
+                    gpuBufferHandle: bufferHandle,
+                    dirtyRect: gpuResult.dirtyRect,
+                    rectPixelData: gpuResult.rectPixelData,
+                    incrementalUpdate: incrementalUpdate
+                )
+            }
+        }
+
         guard let gpuResult = executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
@@ -244,6 +292,7 @@ public struct DocumentRenderingClient: Sendable {
 
         return DocumentInteractiveStrokePreviewResult(
             pixelData: adjustedPixels,
+            gpuBufferHandle: preserveAlphaLockedPixels ? nil : gpuResult.gpuBufferHandle,
             dirtyRect: previewDirtyRect,
             rectPixelData: rasterRectPixelData ?? Self.pixelData(
                 in: previewDirtyRect,
@@ -425,6 +474,72 @@ public struct DocumentRenderingClient: Sendable {
             mask: mask,
             width: width,
             height: height
+        )
+    }
+
+    public func alphaMask(
+        pixelData: Data,
+        width: Int,
+        height: Int
+    ) -> [UInt8]? {
+        backend.alphaMask(pixelData: pixelData, width: width, height: height)
+    }
+
+    public func transformedLayerPixelData(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        expandedSelectionMask: [UInt8]?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> Data? {
+        backend.transformedLayerPixelData(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            expandedSelectionMask: expandedSelectionMask,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            sourceQuad: sourceQuad,
+            destinationQuad: destinationQuad,
+            usesFreeformQuad: usesFreeformQuad
+        )
+    }
+
+    public func transformedSelectionMask(
+        expandedSelectionMask: [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> [UInt8]? {
+        backend.transformedSelectionMask(
+            expandedSelectionMask: expandedSelectionMask,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            sourceQuad: sourceQuad,
+            destinationQuad: destinationQuad,
+            usesFreeformQuad: usesFreeformQuad
         )
     }
 

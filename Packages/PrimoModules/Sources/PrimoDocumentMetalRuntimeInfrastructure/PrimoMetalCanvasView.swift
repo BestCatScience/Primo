@@ -207,6 +207,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         guard showsPaper else { return }
         guard lastAppliedIncrementalUpdateID != update.id else { return }
         guard let currentDevice = device, !update.isEmpty else { return }
+        applyPendingSnapshotIfNeeded(device: currentDevice)
         guard let texture = ensureCompositeTexture(device: currentDevice) else { return }
 
         let maxWidth = max(0, texture.width - update.originX)

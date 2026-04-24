@@ -154,6 +154,91 @@ struct PrimoMetalSelectionAndTextTests {
     }
 
     @Test
+    func directQuadLayerTransformTranslatesOpaquePixels() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let transparent: [UInt8] = [0, 0, 0, 0]
+        let red: [UInt8] = [255, 0, 0, 255]
+        let pixels = Data(red + transparent + transparent)
+        let quad = TransformQuad(
+            topLeft: CGPoint(x: 0, y: 0),
+            topRight: CGPoint(x: 2, y: 0),
+            bottomLeft: CGPoint(x: 0, y: 0),
+            bottomRight: CGPoint(x: 2, y: 0)
+        )
+
+        let output = client.transformedLayerPixelData(
+            source: pixels,
+            canvasWidth: 3,
+            canvasHeight: 1,
+            expandedSelectionMask: nil,
+            translation: CGSize(width: 1, height: 0),
+            scaleX: 1,
+            scaleY: 1,
+            rotationDegrees: 0,
+            pivot: .zero,
+            sourceQuad: quad,
+            destinationQuad: quad,
+            usesFreeformQuad: false
+        )
+
+        if client.isAvailable {
+            let resolved = try #require(output)
+            #expect(resolved == Data(transparent + red + transparent))
+        } else {
+            #expect(output == nil)
+        }
+    }
+
+    @Test
+    func directAlphaMaskExtractsOpaquePixels() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let pixels = Data([
+            255, 0, 0, 255,
+            0, 255, 0, 0,
+            0, 0, 255, 128,
+        ])
+
+        let mask = client.alphaMask(pixelData: pixels, width: 3, height: 1)
+
+        if client.isAvailable {
+            #expect(mask == [255, 0, 255])
+        } else {
+            #expect(mask == nil)
+        }
+    }
+
+    @Test
+    func directQuadMaskTransformTranslatesSelection() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let quad = TransformQuad(
+            topLeft: CGPoint(x: 0, y: 0),
+            topRight: CGPoint(x: 2, y: 0),
+            bottomLeft: CGPoint(x: 0, y: 0),
+            bottomRight: CGPoint(x: 2, y: 0)
+        )
+
+        let output = client.transformedSelectionMask(
+            expandedSelectionMask: [255, 0, 0],
+            canvasWidth: 3,
+            canvasHeight: 1,
+            translation: CGSize(width: 1, height: 0),
+            scaleX: 1,
+            scaleY: 1,
+            rotationDegrees: 0,
+            pivot: .zero,
+            sourceQuad: quad,
+            destinationQuad: quad,
+            usesFreeformQuad: false
+        )
+
+        if client.isAvailable {
+            #expect(output == [0, 255, 0])
+        } else {
+            #expect(output == nil)
+        }
+    }
+
+    @Test
     func directExpandedSelectionMaskPlacesCroppedMaskIntoCanvas() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let maskData = Data([

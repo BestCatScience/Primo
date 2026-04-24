@@ -105,6 +105,37 @@ private struct PrimoMetalTranslateDescriptor {
     let offsetY: Int32
 }
 
+private struct PrimoMetalQuadTransformDescriptor {
+    let width: UInt32
+    let height: UInt32
+    let hasSelection: UInt32
+    let mode: UInt32
+    let translationX: Float
+    let translationY: Float
+    let scaleX: Float
+    let scaleY: Float
+    let rotationCos: Float
+    let rotationSin: Float
+    let pivotX: Float
+    let pivotY: Float
+    let sourceTopLeftX: Float
+    let sourceTopLeftY: Float
+    let sourceTopRightX: Float
+    let sourceTopRightY: Float
+    let sourceBottomLeftX: Float
+    let sourceBottomLeftY: Float
+    let sourceBottomRightX: Float
+    let sourceBottomRightY: Float
+    let destinationTopLeftX: Float
+    let destinationTopLeftY: Float
+    let destinationTopRightX: Float
+    let destinationTopRightY: Float
+    let destinationBottomLeftX: Float
+    let destinationBottomLeftY: Float
+    let destinationBottomRightX: Float
+    let destinationBottomRightY: Float
+}
+
 private enum PrimoMetalLayerProcessingKind {
     static let gradientMap: UInt32 = 0
     static let hueSaturationBrightness: UInt32 = 1
@@ -999,6 +1030,120 @@ extension PrimoMetalDocumentProcessingClient {
         )
     }
 
+    public func transformedLayerPixelData(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        expandedSelectionMask: [UInt8]?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> Data? {
+        guard
+            isAvailable,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            source.count == canvasWidth * canvasHeight * 4,
+            expandedSelectionMask == nil || expandedSelectionMask?.count == canvasWidth * canvasHeight,
+            let commandQueue,
+            let pipeline = quadLayerTransformPipeline,
+            let sourceBuffer = makeBuffer(source),
+            let selectionBuffer = makeBuffer(expandedSelectionMask ?? [UInt8](repeating: 0, count: canvasWidth * canvasHeight)),
+            let outputBuffer = device?.makeBuffer(length: source.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                quadTransformDescriptor(
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
+                    hasSelection: expandedSelectionMask != nil,
+                    translation: translation,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    rotationDegrees: rotationDegrees,
+                    pivot: pivot,
+                    sourceQuad: sourceQuad,
+                    destinationQuad: destinationQuad,
+                    usesFreeformQuad: usesFreeformQuad
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(selectionBuffer, offset: 0, index: 1)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 3)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: canvasWidth, height: canvasHeight)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: source.count)
+    }
+
+    public func transformedSelectionMask(
+        expandedSelectionMask: [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> [UInt8]? {
+        guard
+            isAvailable,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            expandedSelectionMask.count == canvasWidth * canvasHeight,
+            let commandQueue,
+            let pipeline = quadMaskTransformPipeline,
+            let sourceBuffer = makeBuffer(expandedSelectionMask),
+            let outputBuffer = device?.makeBuffer(length: expandedSelectionMask.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                quadTransformDescriptor(
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
+                    hasSelection: true,
+                    translation: translation,
+                    scaleX: scaleX,
+                    scaleY: scaleY,
+                    rotationDegrees: rotationDegrees,
+                    pivot: pivot,
+                    sourceQuad: sourceQuad,
+                    destinationQuad: destinationQuad,
+                    usesFreeformQuad: usesFreeformQuad
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 1)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: canvasWidth, height: canvasHeight)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return [UInt8](bytes(from: outputBuffer, count: expandedSelectionMask.count))
+    }
+
     private func processLayerTransform(
         pixelData: Data,
         canvasWidth: Int,
@@ -1172,6 +1317,52 @@ extension PrimoMetalDocumentProcessingClient {
                 param5: 0, param6: 0, param7: 0, selectionWidth: 0, selectionHeight: 0, hasSelection: 0, padding0: 0
             )
         }
+    }
+
+    private func quadTransformDescriptor(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        hasSelection: Bool,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> PrimoMetalQuadTransformDescriptor {
+        let rotationRadians = rotationDegrees * .pi / 180.0
+        return PrimoMetalQuadTransformDescriptor(
+            width: UInt32(canvasWidth),
+            height: UInt32(canvasHeight),
+            hasSelection: hasSelection ? 1 : 0,
+            mode: usesFreeformQuad ? 1 : 0,
+            translationX: Float(translation.width),
+            translationY: Float(translation.height),
+            scaleX: Float(min(max(scaleX, 0.2), 6.0)),
+            scaleY: Float(min(max(scaleY, 0.2), 6.0)),
+            rotationCos: Float(cos(rotationRadians)),
+            rotationSin: Float(sin(rotationRadians)),
+            pivotX: Float(pivot.x),
+            pivotY: Float(pivot.y),
+            sourceTopLeftX: Float(sourceQuad.topLeft.x),
+            sourceTopLeftY: Float(sourceQuad.topLeft.y),
+            sourceTopRightX: Float(sourceQuad.topRight.x),
+            sourceTopRightY: Float(sourceQuad.topRight.y),
+            sourceBottomLeftX: Float(sourceQuad.bottomLeft.x),
+            sourceBottomLeftY: Float(sourceQuad.bottomLeft.y),
+            sourceBottomRightX: Float(sourceQuad.bottomRight.x),
+            sourceBottomRightY: Float(sourceQuad.bottomRight.y),
+            destinationTopLeftX: Float(destinationQuad.topLeft.x),
+            destinationTopLeftY: Float(destinationQuad.topLeft.y),
+            destinationTopRightX: Float(destinationQuad.topRight.x),
+            destinationTopRightY: Float(destinationQuad.topRight.y),
+            destinationBottomLeftX: Float(destinationQuad.bottomLeft.x),
+            destinationBottomLeftY: Float(destinationQuad.bottomLeft.y),
+            destinationBottomRightX: Float(destinationQuad.bottomRight.x),
+            destinationBottomRightY: Float(destinationQuad.bottomRight.y)
+        )
     }
 
     private func makeGradientStops(for request: LayerProcessingRequest) -> [PrimoMetalGradientStopDescriptor] {

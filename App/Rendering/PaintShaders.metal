@@ -233,6 +233,37 @@ struct MetalLayerProcessingDescriptor {
     uint _padding0;
 };
 
+struct MetalQuadTransformDescriptor {
+    uint width;
+    uint height;
+    uint hasSelection;
+    uint mode;
+    float translationX;
+    float translationY;
+    float scaleX;
+    float scaleY;
+    float rotationCos;
+    float rotationSin;
+    float pivotX;
+    float pivotY;
+    float sourceTopLeftX;
+    float sourceTopLeftY;
+    float sourceTopRightX;
+    float sourceTopRightY;
+    float sourceBottomLeftX;
+    float sourceBottomLeftY;
+    float sourceBottomRightX;
+    float sourceBottomRightY;
+    float destinationTopLeftX;
+    float destinationTopLeftY;
+    float destinationTopRightX;
+    float destinationTopRightY;
+    float destinationBottomLeftX;
+    float destinationBottomLeftY;
+    float destinationBottomRightX;
+    float destinationBottomRightY;
+};
+
 struct MetalGradientStopDescriptor {
     float position;
     float red;
@@ -744,6 +775,87 @@ inline void writePixelRGBA(device uchar *outputPixels, uint width, uint2 gid, fl
     outputPixels[offset + 1u] = uchar(clamp(int(round(color.g * 255.0)), 0, 255));
     outputPixels[offset + 2u] = uchar(clamp(int(round(color.b * 255.0)), 0, 255));
     outputPixels[offset + 3u] = uchar(clamp(int(round(color.a * 255.0)), 0, 255));
+}
+
+inline float quadCross(float2 lhs, float2 rhs) {
+    return (lhs.x * rhs.y) - (lhs.y * rhs.x);
+}
+
+inline bool inverseBilinearUV(float2 point, MetalQuadTransformDescriptor descriptor, thread float2& uv) {
+    float2 topLeft = float2(descriptor.destinationTopLeftX, descriptor.destinationTopLeftY);
+    float2 topRight = float2(descriptor.destinationTopRightX, descriptor.destinationTopRightY);
+    float2 bottomLeft = float2(descriptor.destinationBottomLeftX, descriptor.destinationBottomLeftY);
+    float2 bottomRight = float2(descriptor.destinationBottomRightX, descriptor.destinationBottomRightY);
+    float2 b = topRight - topLeft;
+    float2 c = bottomLeft - topLeft;
+    float2 d = bottomRight - topRight - bottomLeft + topLeft;
+    float2 ap = topLeft - point;
+    float quadratic = quadCross(d, b);
+    float linear = quadCross(c, b) + quadCross(d, ap);
+    float constantTerm = quadCross(c, ap);
+
+    float candidates[2];
+    uint candidateCount = 0u;
+    if (fabs(quadratic) < 1.0e-7) {
+        if (fabs(linear) > 1.0e-7) {
+            candidates[candidateCount++] = -constantTerm / linear;
+        }
+    } else {
+        float discriminant = max((linear * linear) - (4.0 * quadratic * constantTerm), 0.0);
+        float root = sqrt(discriminant);
+        candidates[candidateCount++] = (-linear + root) / (2.0 * quadratic);
+        candidates[candidateCount++] = (-linear - root) / (2.0 * quadratic);
+    }
+
+    for (uint index = 0u; index < candidateCount; ++index) {
+        float u = candidates[index];
+        if (u < -0.001 || u > 1.001) {
+            continue;
+        }
+        float denominatorX = c.x + (d.x * u);
+        float denominatorY = c.y + (d.y * u);
+        float v;
+        if (fabs(denominatorX) > fabs(denominatorY) && fabs(denominatorX) > 1.0e-7) {
+            v = -((ap.x + (b.x * u)) / denominatorX);
+        } else if (fabs(denominatorY) > 1.0e-7) {
+            v = -((ap.y + (b.y * u)) / denominatorY);
+        } else {
+            continue;
+        }
+        if (v >= -0.001 && v <= 1.001) {
+            uv = clamp(float2(u, v), float2(0.0), float2(1.0));
+            return true;
+        }
+    }
+    return false;
+}
+
+inline bool transformSourcePoint(float2 destinationPoint, MetalQuadTransformDescriptor descriptor, thread float2& sourcePoint) {
+    if (descriptor.mode == 0u) {
+        float2 shifted = destinationPoint - float2(
+            descriptor.translationX + descriptor.pivotX,
+            descriptor.translationY + descriptor.pivotY
+        );
+        float2 unrotated = float2(
+            (shifted.x * descriptor.rotationCos) + (shifted.y * descriptor.rotationSin),
+            (-shifted.x * descriptor.rotationSin) + (shifted.y * descriptor.rotationCos)
+        );
+        sourcePoint = float2(
+            (unrotated.x / max(descriptor.scaleX, 0.001)) + descriptor.pivotX,
+            (unrotated.y / max(descriptor.scaleY, 0.001)) + descriptor.pivotY
+        );
+        return true;
+    }
+
+    float2 uv;
+    if (!inverseBilinearUV(destinationPoint, descriptor, uv)) {
+        return false;
+    }
+    float2 topLeft = float2(descriptor.sourceTopLeftX, descriptor.sourceTopLeftY);
+    float2 topRight = float2(descriptor.sourceTopRightX, descriptor.sourceTopRightY);
+    float2 bottomLeft = float2(descriptor.sourceBottomLeftX, descriptor.sourceBottomLeftY);
+    sourcePoint = topLeft + ((topRight - topLeft) * uv.x) + ((bottomLeft - topLeft) * uv.y);
+    return true;
 }
 
 inline float gradientChannel(
@@ -2112,6 +2224,21 @@ kernel void applyLayerMaskKernel(
     outputPixels[rgbaOffset + 3u] = uchar(outputAlpha);
 }
 
+kernel void alphaMaskKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalLayerMaskApplyDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    uint pixelIndex = (gid.y * descriptor.width) + gid.x;
+    uint rgbaOffset = pixelIndex * 4u;
+    outputMask[pixelIndex] = sourcePixels[rgbaOffset + 3u] > 0u ? uchar(255) : uchar(0);
+}
+
 kernel void layerProcessingKernel(
     const device uchar *sourcePixels [[buffer(0)]],
     device uchar *outputPixels [[buffer(1)]],
@@ -2240,6 +2367,79 @@ kernel void layerTransformKernel(
     }
 
     writePixelRGBA(outputPixels, descriptor.width, gid, base);
+}
+
+kernel void quadLayerTransformKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    const device uchar *selectionMask [[buffer(1)]],
+    device uchar *outputPixels [[buffer(2)]],
+    constant MetalQuadTransformDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    uint pixelIndex = (gid.y * descriptor.width) + gid.x;
+    uint pixelOffset = pixelIndex * 4u;
+    bool destinationSelected = descriptor.hasSelection != 0u
+        ? selectionMask[pixelIndex] > 0u
+        : sourcePixels[pixelOffset + 3u] > 0u;
+    float4 output = destinationSelected
+        ? float4(0.0)
+        : sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid);
+
+    float2 sourcePoint;
+    if (!transformSourcePoint(float2(gid), descriptor, sourcePoint)) {
+        writePixelRGBA(outputPixels, descriptor.width, gid, output);
+        return;
+    }
+
+    int sourceX = int(round(sourcePoint.x));
+    int sourceY = int(round(sourcePoint.y));
+    if (sourceX < 0 || sourceY < 0 || sourceX >= int(descriptor.width) || sourceY >= int(descriptor.height)) {
+        writePixelRGBA(outputPixels, descriptor.width, gid, output);
+        return;
+    }
+
+    uint sourceIndex = (uint(sourceY) * descriptor.width) + uint(sourceX);
+    uint sourceOffset = sourceIndex * 4u;
+    bool sourceSelected = descriptor.hasSelection != 0u
+        ? selectionMask[sourceIndex] > 0u
+        : sourcePixels[sourceOffset + 3u] > 0u;
+    if (sourceSelected && sourcePixels[sourceOffset + 3u] > 0u) {
+        output = sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, uint2(uint(sourceX), uint(sourceY)));
+    }
+
+    writePixelRGBA(outputPixels, descriptor.width, gid, output);
+}
+
+kernel void quadMaskTransformKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalQuadTransformDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    uint destinationIndex = (gid.y * descriptor.width) + gid.x;
+    outputMask[destinationIndex] = uchar(0);
+
+    float2 sourcePoint;
+    if (!transformSourcePoint(float2(gid), descriptor, sourcePoint)) {
+        return;
+    }
+
+    int sourceX = int(round(sourcePoint.x));
+    int sourceY = int(round(sourcePoint.y));
+    if (sourceX < 0 || sourceY < 0 || sourceX >= int(descriptor.width) || sourceY >= int(descriptor.height)) {
+        return;
+    }
+
+    uint sourceIndex = (uint(sourceY) * descriptor.width) + uint(sourceX);
+    outputMask[destinationIndex] = sourceMask[sourceIndex] > 0u ? uchar(255) : uchar(0);
 }
 
 kernel void fillEligibilityKernel(

@@ -3,20 +3,23 @@ import PrimoDocumentContracts
 
 public struct DocumentStrokePreviewPlan: Sendable {
     public let baseSnapshot: MetalDocumentSnapshot
-    public let adjustedPixels: Data
+    public let adjustedPixels: Data?
+    public let adjustedBufferHandle: MetalBufferHandle?
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
     public let rectPixelData: Data?
     public let incrementalUpdate: IncrementalLayerUpdate?
 
     public init(
         baseSnapshot: MetalDocumentSnapshot,
-        adjustedPixels: Data,
+        adjustedPixels: Data?,
+        adjustedBufferHandle: MetalBufferHandle? = nil,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?,
         rectPixelData: Data?,
         incrementalUpdate: IncrementalLayerUpdate?
     ) {
         self.baseSnapshot = baseSnapshot
         self.adjustedPixels = adjustedPixels
+        self.adjustedBufferHandle = adjustedBufferHandle
         self.dirtyRect = dirtyRect
         self.rectPixelData = rectPixelData
         self.incrementalUpdate = incrementalUpdate
@@ -56,6 +59,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         return DocumentStrokePreviewPlan(
             baseSnapshot: snapshot,
             adjustedPixels: preview.pixelData,
+            adjustedBufferHandle: preview.gpuBufferHandle,
             dirtyRect: preview.dirtyRect,
             rectPixelData: preview.rectPixelData,
             incrementalUpdate: preview.incrementalUpdate
