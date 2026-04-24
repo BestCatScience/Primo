@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentContracts
 
 extension AppFeature {
     func routeAdjustmentEditingAction(
@@ -15,25 +16,24 @@ extension AppFeature {
             )
 
         case let .editing(.gradientMapPreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.gradientMappedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .gradientMapSettings($0) }
+            )
             return .none
 
         case let .editing(.gradientMapApplied(settings)):
-            let adjusted = adjustedActiveLayerPixels(in: state) {
-                Self.gradientMappedLayerPixels(source: $0, settings: settings)
-            }
-            return handleAdjustmentApplyUsingPixels(
+            return handleAdjustmentApplyRequest(
                 state: &state,
-                adjustedPixels: adjusted,
+                request: .gradientMapSettings(settings),
                 failureFeedback: .gradientMapApplyFailed
             )
 
         case let .editing(.hueSaturationBrightnessPreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.hueSaturationBrightnessAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .hueSaturationBrightness($0) }
+            )
             return .none
 
         case let .editing(.hueSaturationBrightnessApplied(settings)):
@@ -44,9 +44,10 @@ extension AppFeature {
             )
 
         case let .editing(.brightnessContrastPreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.brightnessContrastAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .brightnessContrast($0) }
+            )
             return .none
 
         case let .editing(.brightnessContrastApplied(settings)):
@@ -57,9 +58,10 @@ extension AppFeature {
             )
 
         case let .editing(.levelsPreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.levelsAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .levels($0) }
+            )
             return .none
 
         case let .editing(.levelsApplied(settings)):
@@ -70,9 +72,10 @@ extension AppFeature {
             )
 
         case let .editing(.toneCurvePreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.toneCurveAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .toneCurve($0) }
+            )
             return .none
 
         case let .editing(.toneCurveApplied(settings)):
@@ -83,9 +86,10 @@ extension AppFeature {
             )
 
         case let .editing(.colorBalancePreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.colorBalanceAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .colorBalance($0) }
+            )
             return .none
 
         case let .editing(.colorBalanceApplied(settings)):
@@ -96,9 +100,10 @@ extension AppFeature {
             )
 
         case let .editing(.thresholdPreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.thresholdAdjustedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .threshold($0) }
+            )
             return .none
 
         case let .editing(.thresholdApplied(settings)):
@@ -109,9 +114,10 @@ extension AppFeature {
             )
 
         case let .editing(.posterizePreviewChanged(settings)):
-            previewAdjustedActiveLayer(state: &state) { source in
-                settings.flatMap { Self.posterizedLayerPixels(source: source, settings: $0) }
-            }
+            previewAdjustedActiveLayer(
+                state: &state,
+                request: settings.map { .posterize($0) }
+            )
             return .none
 
         case let .editing(.posterizeApplied(settings)):
@@ -122,12 +128,9 @@ extension AppFeature {
             )
 
         case .editing(.luminanceToAlphaRequested):
-            let adjusted = adjustedActiveLayerPixels(in: state) {
-                Self.luminanceToAlphaLayerPixels(source: $0)
-            }
-            return handleAdjustmentApplyUsingPixels(
+            return handleAdjustmentApplyRequest(
                 state: &state,
-                adjustedPixels: adjusted,
+                request: .luminanceToAlpha,
                 failureFeedback: .colorAdjustmentApplyFailed
             )
 

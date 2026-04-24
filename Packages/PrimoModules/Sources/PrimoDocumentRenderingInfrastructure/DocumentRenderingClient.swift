@@ -9,6 +9,7 @@ public typealias MetalStrokeExecutionMode = PrimoMetalStrokeExecutionMode
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest
 public typealias MetalStrokeExecutionResult = PrimoMetalStrokeExecutionResult
 public typealias MetalSelectionCombineMode = PrimoMetalSelectionCombineMode
+public typealias MetalCroppedSelectionMask = PrimoMetalCroppedSelectionMask
 
 public struct DocumentInteractiveStrokePreviewResult: Sendable {
     public let pixelData: Data
@@ -413,6 +414,32 @@ public struct DocumentRenderingClient: Sendable {
             width: width,
             height: height
         )
+    }
+
+    public func croppedSelectionMask(
+        mask: [UInt8],
+        width: Int,
+        height: Int
+    ) -> MetalCroppedSelectionMask? {
+        backend.croppedSelectionMask(
+            mask: mask,
+            width: width,
+            height: height
+        )
+    }
+
+    public func processedLayerPixelData(
+        pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        request: LayerProcessingRequest
+    ) -> Data? {
+        backend.processLayer(
+            pixelData: pixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            request: request
+        )?.fullPixelData
     }
 
     public func inpaintCrop(

@@ -245,41 +245,19 @@ extension AppFeature {
     }
 
     static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
-        guard let first = source.firstIndex(where: { $0 != 0 }) else { return nil }
-        var minX = first % width
-        var maxX = minX
-        var minY = first / width
-        var maxY = minY
-
-        for index in source.indices where source[index] != 0 {
-            let x = index % width
-            let y = index / width
-            minX = min(minX, x)
-            maxX = max(maxX, x)
-            minY = min(minY, y)
-            maxY = max(maxY, y)
-        }
-
-        let croppedWidth = (maxX - minX) + 1
-        let croppedHeight = (maxY - minY) + 1
-        guard croppedWidth > 0, croppedHeight > 0 else { return nil }
-
-        var cropped = Data(count: croppedWidth * croppedHeight)
-        cropped.withUnsafeMutableBytes { bytes in
-            guard let base = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            for y in 0..<croppedHeight {
-                for x in 0..<croppedWidth {
-                    let sourceIndex = ((minY + y) * width) + (minX + x)
-                    base[(y * croppedWidth) + x] = source[sourceIndex]
-                }
-            }
+        guard let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+            mask: source,
+            width: width,
+            height: height
+        ) else {
+            return nil
         }
 
         return CanvasSelection(
-            bounds: CGRect(x: minX, y: minY, width: croppedWidth, height: croppedHeight),
-            maskWidth: croppedWidth,
-            maskHeight: croppedHeight,
-            maskData: cropped,
+            bounds: cropped.bounds,
+            maskWidth: cropped.maskWidth,
+            maskHeight: cropped.maskHeight,
+            maskData: cropped.maskData,
             mode: mode
         )
     }

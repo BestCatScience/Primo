@@ -237,6 +237,40 @@ struct PrimoMetalSelectionAndTextTests {
     }
 
     @Test
+    func directCroppedSelectionMaskExtractsBoundsAndMaskData() throws {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let mask: [UInt8] = [
+            0, 0, 0, 0, 0,
+            0, 255, 0, 0, 0,
+            0, 0, 128, 255, 0,
+            0, 0, 0, 0, 0,
+        ]
+
+        let cropped = client.croppedSelectionMask(mask: mask, width: 5, height: 4)
+
+        if client.isAvailable {
+            let resolved = try #require(cropped)
+            #expect(resolved.bounds == CGRect(x: 1, y: 1, width: 3, height: 2))
+            #expect(resolved.maskWidth == 3)
+            #expect(resolved.maskHeight == 2)
+            #expect(resolved.maskData == Data([
+                255, 0, 0,
+                0, 128, 255,
+            ]))
+        } else {
+            #expect(cropped == nil)
+        }
+    }
+
+    @Test
+    func directCroppedSelectionMaskReturnsNilForEmptyMask() {
+        let client = PrimoMetalDocumentProcessingClient.shared
+        let cropped = client.croppedSelectionMask(mask: [UInt8](repeating: 0, count: 12), width: 4, height: 3)
+
+        #expect(cropped == nil)
+    }
+
+    @Test
     func directAlphaPreserveRetainsExistingAlphaAndZeroesTransparentPixels() throws {
         let client = PrimoMetalDocumentProcessingClient.shared
         let source = Data([

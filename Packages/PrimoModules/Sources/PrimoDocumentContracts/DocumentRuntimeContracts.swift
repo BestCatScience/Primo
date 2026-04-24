@@ -535,6 +535,7 @@ public struct CanvasSelection: Equatable, Sendable {
 
 public enum LayerProcessingRequest: Equatable, Sendable {
     case gradientMap(GradientMapPreset)
+    case gradientMapSettings(GradientMapSettings)
     case hueSaturationBrightness(HueSaturationBrightnessSettings)
     case brightnessContrast(BrightnessContrastSettings)
     case levels(LevelsAdjustmentSettings)
@@ -542,6 +543,7 @@ public enum LayerProcessingRequest: Equatable, Sendable {
     case colorBalance(ColorBalanceSettings)
     case threshold(ThresholdSettings)
     case posterize(PosterizeSettings)
+    case luminanceToAlpha
     case transform(translation: CGSize, scale: CGFloat, rotationDegrees: Double, selection: CanvasSelection?)
 }
 

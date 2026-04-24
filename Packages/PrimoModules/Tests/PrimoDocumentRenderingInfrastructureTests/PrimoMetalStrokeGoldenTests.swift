@@ -92,6 +92,41 @@ struct PrimoMetalStrokeGoldenTests {
     }
 
     @Test
+    func gpuRasterizesSinglePointAndShortSmudgeStrokes() {
+        let client = DocumentRenderingClient.live
+        let basePixelData = seededCanvas(width: 24, height: 24)
+        let stampOutput = client.rasterizedStrokePixelData(
+            basePixelData: basePixelData,
+            canvasWidth: 24,
+            canvasHeight: 24,
+            samples: [
+                StylusSample(point: CGPoint(x: 12, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0)
+            ],
+            brush: texturedOilBrush()
+        )
+        let smudgeOutput = client.rasterizedStrokePixelData(
+            basePixelData: basePixelData,
+            canvasWidth: 24,
+            canvasHeight: 24,
+            samples: [
+                StylusSample(point: CGPoint(x: 8, y: 11), pressure: 0.5, altitude: .pi / 2, azimuth: 0, timestamp: 0),
+                StylusSample(point: CGPoint(x: 15, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0.016),
+            ],
+            brush: smudgeBrush()
+        )
+
+        if client.isAvailable {
+            #expect(stampOutput != nil)
+            #expect(smudgeOutput != nil)
+            #expect(stampOutput != basePixelData)
+            #expect(smudgeOutput != basePixelData)
+        } else {
+            #expect(stampOutput == nil)
+            #expect(smudgeOutput == nil)
+        }
+    }
+
+    @Test
     func gpuPrimitiveBinningProducesStableSummary() {
         let client = PrimoMetalDocumentProcessingClient.shared
         let summary = client.debugStrokeBinningSummary(

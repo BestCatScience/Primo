@@ -45,11 +45,39 @@ extension AppFeature {
         handleAdjustmentPreview(state: &state, adjustedPixels: adjustedPixels)
     }
 
+    func previewAdjustedActiveLayer(
+        state: inout State,
+        request: LayerProcessingRequest?
+    ) {
+        let adjustedPixels = request.flatMap { request in
+            processedActiveLayerPixels(in: state, request: request)
+        }
+        handleAdjustmentPreview(state: &state, adjustedPixels: adjustedPixels)
+    }
+
     func adjustedActiveLayerPixels(
         in state: State,
         transform: (Data) -> Data?
     ) -> Data? {
         activeLayerPixelContext(in: state).flatMap { transform($0.pixelData) }
+    }
+
+    func processedActiveLayerPixels(
+        in state: State,
+        request: LayerProcessingRequest
+    ) -> Data? {
+        guard
+            let snapshot = state.canvas.renderSnapshot,
+            let layer = snapshot.layers.first(where: { $0.index == state.canvas.activeLayerIndex })
+        else {
+            return nil
+        }
+        return MetalDocumentProcessingClient.shared.processedLayerPixelData(
+            pixelData: layer.pixelData,
+            canvasWidth: snapshot.width,
+            canvasHeight: snapshot.height,
+            request: request
+        )
     }
 
     func handleAdjustmentPreview(

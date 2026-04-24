@@ -107,6 +107,33 @@ struct DocumentRenderingClientTests {
     }
 
     @Test
+    func processedLayerPixelDataRunsAdjustmentsThroughRuntimeBoundary() {
+        let client = DocumentRenderingClient.live
+        let pixels = Data([
+            10, 20, 30, 255,
+            200, 180, 160, 128,
+        ])
+
+        let output = client.processedLayerPixelData(
+            pixelData: pixels,
+            canvasWidth: 2,
+            canvasHeight: 1,
+            request: .luminanceToAlpha
+        )
+
+        if client.isAvailable {
+            #expect(output != nil)
+            #expect(output?.count == pixels.count)
+            #expect(output?[0] == 0)
+            #expect(output?[1] == 0)
+            #expect(output?[2] == 0)
+            #expect((output?[3] ?? 255) < 255)
+        } else {
+            #expect(output == nil)
+        }
+    }
+
+    @Test
     func interactiveStrokePreviewBuildsPreviewThroughRuntimeBoundary() {
         let client = DocumentRenderingClient.live
         let basePixels = Data(count: 32 * 32 * 4)

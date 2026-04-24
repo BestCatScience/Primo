@@ -114,7 +114,8 @@ private enum PrimoMetalLayerProcessingKind {
     static let colorBalance: UInt32 = 5
     static let threshold: UInt32 = 6
     static let posterize: UInt32 = 7
-    static let transform: UInt32 = 8
+    static let luminanceToAlpha: UInt32 = 8
+    static let transform: UInt32 = 9
 }
 
 extension PrimoMetalDocumentProcessingClient {
@@ -1072,7 +1073,7 @@ extension PrimoMetalDocumentProcessingClient {
         canvasHeight: Int
     ) -> PrimoMetalLayerProcessingDescriptor {
         switch request {
-        case .gradientMap:
+        case .gradientMap, .gradientMapSettings:
             return PrimoMetalLayerProcessingDescriptor(
                 width: UInt32(canvasWidth), height: UInt32(canvasHeight),
                 requestKind: PrimoMetalLayerProcessingKind.gradientMap,
@@ -1154,6 +1155,14 @@ extension PrimoMetalDocumentProcessingClient {
                 param1: 0, param2: 0, param3: 0, param4: 0, param5: 0, param6: 0, param7: 0,
                 selectionWidth: 0, selectionHeight: 0, hasSelection: 0, padding0: 0
             )
+        case .luminanceToAlpha:
+            return PrimoMetalLayerProcessingDescriptor(
+                width: UInt32(canvasWidth), height: UInt32(canvasHeight),
+                requestKind: PrimoMetalLayerProcessingKind.luminanceToAlpha,
+                gradientStopCount: 0,
+                param0: 0, param1: 0, param2: 0, param3: 0, param4: 0, param5: 0, param6: 0, param7: 0,
+                selectionWidth: 0, selectionHeight: 0, hasSelection: 0, padding0: 0
+            )
         case .transform:
             return PrimoMetalLayerProcessingDescriptor(
                 width: UInt32(canvasWidth), height: UInt32(canvasHeight),
@@ -1180,6 +1189,29 @@ extension PrimoMetalDocumentProcessingClient {
                 stops = [(0.0, 36, 11, 54), (0.4, 173, 58, 91), (0.72, 244, 142, 68), (1.0, 255, 223, 128)]
             case .toxic:
                 stops = [(0.0, 4, 23, 18), (0.44, 35, 172, 106), (1.0, 227, 255, 111)]
+            }
+        case let .gradientMapSettings(settings):
+            var normalized = settings.stops.sorted { $0.position < $1.position }
+            if normalized.count < 2 {
+                normalized = [
+                    GradientMapStopSettings(position: 0.0, red: 0, green: 0, blue: 0),
+                    GradientMapStopSettings(position: 1.0, red: 255, green: 255, blue: 255)
+                ]
+            }
+            for index in normalized.indices {
+                normalized[index].position = min(max(normalized[index].position, 0.0), 1.0)
+            }
+            normalized[0].position = 0.0
+            normalized[normalized.count - 1].position = 1.0
+            if normalized.count > 2 {
+                for index in 1..<(normalized.count - 1) {
+                    let lowerBound = normalized[index - 1].position + 0.01
+                    let upperBound = normalized[index + 1].position - 0.01
+                    normalized[index].position = min(max(normalized[index].position, lowerBound), upperBound)
+                }
+            }
+            stops = normalized.map { stop in
+                (stop.position, stop.red, stop.green, stop.blue)
             }
         default:
             stops = []

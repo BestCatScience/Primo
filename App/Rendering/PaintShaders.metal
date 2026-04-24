@@ -198,6 +198,17 @@ struct MetalSelectionCombineDescriptor {
     uint padding0;
 };
 
+struct MetalSelectionCropDescriptor {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint originX;
+    uint originY;
+    uint cropWidth;
+    uint cropHeight;
+    uint padding0;
+    uint padding1;
+};
+
 struct MetalAlphaPreserveDescriptor {
     uint width;
     uint height;
@@ -2176,6 +2187,11 @@ kernel void layerProcessingKernel(
             color = round(color * denominator) / denominator;
             break;
         }
+        case 8u: {
+            float luminance = layerLuminance(color);
+            writePixelRGBA(outputPixels, descriptor.width, gid, float4(0.0, 0.0, 0.0, source.a * (1.0 - luminance)));
+            return;
+        }
         default:
             break;
     }
@@ -2854,6 +2870,48 @@ kernel void selectionCombineKernel(
     } else {
         outputMask[index] = incomingValue == 0 ? baseValue : uchar(0);
     }
+}
+
+kernel void selectionBoundsKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device atomic_uint *bounds [[buffer(1)]],
+    constant MetalMaskKernelDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    const uint index = (gid.y * descriptor.width) + gid.x;
+    if (sourceMask[index] == 0) {
+        return;
+    }
+
+    atomic_fetch_min_explicit(&bounds[0], gid.x, memory_order_relaxed);
+    atomic_fetch_min_explicit(&bounds[1], gid.y, memory_order_relaxed);
+    atomic_fetch_max_explicit(&bounds[2], gid.x, memory_order_relaxed);
+    atomic_fetch_max_explicit(&bounds[3], gid.y, memory_order_relaxed);
+}
+
+kernel void selectionCropKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalSelectionCropDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.cropWidth || gid.y >= descriptor.cropHeight) {
+        return;
+    }
+
+    const uint sourceX = descriptor.originX + gid.x;
+    const uint sourceY = descriptor.originY + gid.y;
+    const uint outputIndex = (gid.y * descriptor.cropWidth) + gid.x;
+    if (sourceX >= descriptor.sourceWidth || sourceY >= descriptor.sourceHeight) {
+        outputMask[outputIndex] = 0;
+        return;
+    }
+
+    outputMask[outputIndex] = sourceMask[(sourceY * descriptor.sourceWidth) + sourceX];
 }
 
 kernel void inpaintCompositeKernel(

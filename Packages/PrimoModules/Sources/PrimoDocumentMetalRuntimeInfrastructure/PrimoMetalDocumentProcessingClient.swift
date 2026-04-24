@@ -81,6 +81,17 @@ struct PrimoMetalSelectionCombineDescriptor {
     let padding0: UInt32
 }
 
+struct PrimoMetalSelectionCropDescriptor {
+    let sourceWidth: UInt32
+    let sourceHeight: UInt32
+    let originX: UInt32
+    let originY: UInt32
+    let cropWidth: UInt32
+    let cropHeight: UInt32
+    let padding0: UInt32
+    let padding1: UInt32
+}
+
 struct PrimoMetalAlphaPreserveDescriptor {
     let width: UInt32
     let height: UInt32
@@ -168,6 +179,20 @@ public struct PrimoMetalInpaintCropPayload: Sendable, Equatable {
 public enum PrimoMetalSelectionCombineMode: Sendable {
     case add
     case subtract
+}
+
+public struct PrimoMetalCroppedSelectionMask: Sendable, Equatable {
+    public let bounds: CGRect
+    public let maskData: Data
+    public let maskWidth: Int
+    public let maskHeight: Int
+
+    public init(bounds: CGRect, maskData: Data, maskWidth: Int, maskHeight: Int) {
+        self.bounds = bounds
+        self.maskData = maskData
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+    }
 }
 
 struct PrimoMetalStrokeSampleDescriptor: Equatable {
@@ -528,6 +553,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     let lassoSelectionPipeline: MTLComputePipelineState?
     let selectionPlacementPipeline: MTLComputePipelineState?
     let selectionCombinePipeline: MTLComputePipelineState?
+    let selectionBoundsPipeline: MTLComputePipelineState?
+    let selectionCropPipeline: MTLComputePipelineState?
     let selectionOverlayPipeline: MTLComputePipelineState?
     let eyedropperLoupePipeline: MTLComputePipelineState?
     let paperCompositePipeline: MTLComputePipelineState?
@@ -587,6 +614,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.lassoSelectionPipeline = Self.makePipeline(device: device, library: library, functionName: "lassoSelectionKernel")
         self.selectionPlacementPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionPlacementKernel")
         self.selectionCombinePipeline = Self.makePipeline(device: device, library: library, functionName: "selectionCombineKernel")
+        self.selectionBoundsPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionBoundsKernel")
+        self.selectionCropPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionCropKernel")
         self.selectionOverlayPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionOverlayKernel")
         self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
         self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
@@ -639,6 +668,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         lassoSelectionPipeline != nil &&
         selectionPlacementPipeline != nil &&
         selectionCombinePipeline != nil &&
+        selectionBoundsPipeline != nil &&
+        selectionCropPipeline != nil &&
         selectionOverlayPipeline != nil &&
         eyedropperLoupePipeline != nil &&
         paperCompositePipeline != nil &&
@@ -1112,6 +1143,91 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
         return byteArray(from: outputBuffer, count: expectedCount)
+    }
+
+    public func croppedSelectionMask(
+        mask: [UInt8],
+        width: Int,
+        height: Int
+    ) -> PrimoMetalCroppedSelectionMask? {
+        guard
+            width > 0,
+            height > 0,
+            mask.count == width * height,
+            let device,
+            let commandQueue,
+            let boundsPipeline = selectionBoundsPipeline,
+            let cropPipeline = selectionCropPipeline,
+            let maskBuffer = makeBuffer(mask),
+            let boundsBuffer = makeBuffer([UInt32(width), UInt32(height), 0, 0]),
+            let requestBuffer = makeBuffer(
+                PrimoMetalMaskKernelDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height),
+                    radius: 0
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let boundsEncoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        boundsEncoder.setComputePipelineState(boundsPipeline)
+        boundsEncoder.setBuffer(maskBuffer, offset: 0, index: 0)
+        boundsEncoder.setBuffer(boundsBuffer, offset: 0, index: 1)
+        boundsEncoder.setBuffer(requestBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: boundsEncoder, pipeline: boundsPipeline, width: width, height: height)
+        boundsEncoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+
+        let bounds = Array(UnsafeBufferPointer(start: boundsBuffer.contents().assumingMemoryBound(to: UInt32.self), count: 4))
+        let minX = Int(bounds[0])
+        let minY = Int(bounds[1])
+        let maxX = Int(bounds[2])
+        let maxY = Int(bounds[3])
+        guard minX < width, minY < height, maxX >= minX, maxY >= minY else { return nil }
+
+        let cropWidth = (maxX - minX) + 1
+        let cropHeight = (maxY - minY) + 1
+        guard
+            let cropBuffer = device.makeBuffer(length: cropWidth * cropHeight, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalSelectionCropDescriptor(
+                    sourceWidth: UInt32(width),
+                    sourceHeight: UInt32(height),
+                    originX: UInt32(minX),
+                    originY: UInt32(minY),
+                    cropWidth: UInt32(cropWidth),
+                    cropHeight: UInt32(cropHeight),
+                    padding0: 0,
+                    padding1: 0
+                )
+            ),
+            let cropCommandBuffer = commandQueue.makeCommandBuffer(),
+            let cropEncoder = cropCommandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        cropEncoder.setComputePipelineState(cropPipeline)
+        cropEncoder.setBuffer(maskBuffer, offset: 0, index: 0)
+        cropEncoder.setBuffer(cropBuffer, offset: 0, index: 1)
+        cropEncoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: cropEncoder, pipeline: cropPipeline, width: cropWidth, height: cropHeight)
+        cropEncoder.endEncoding()
+        cropCommandBuffer.commit()
+        cropCommandBuffer.waitUntilCompleted()
+        guard cropCommandBuffer.status == .completed else { return nil }
+
+        return PrimoMetalCroppedSelectionMask(
+            bounds: CGRect(x: minX, y: minY, width: cropWidth, height: cropHeight),
+            maskData: bytes(from: cropBuffer, count: cropWidth * cropHeight),
+            maskWidth: cropWidth,
+            maskHeight: cropHeight
+        )
     }
 
     public func preservingExistingAlpha(
