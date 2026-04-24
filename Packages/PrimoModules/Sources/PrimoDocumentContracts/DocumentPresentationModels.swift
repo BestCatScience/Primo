@@ -107,6 +107,25 @@ public struct StylusSample: Equatable, Sendable {
     }
 }
 
+public struct MetalBufferHandle: Equatable, Hashable, Sendable {
+    public let id: UUID
+    public let width: Int
+    public let height: Int
+    public let bytesPerRow: Int
+
+    public init(
+        id: UUID = UUID(),
+        width: Int,
+        height: Int,
+        bytesPerRow: Int
+    ) {
+        self.id = id
+        self.width = width
+        self.height = height
+        self.bytesPerRow = bytesPerRow
+    }
+}
+
 public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
     public var id: Int { index }
     public let index: Int
@@ -117,6 +136,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
     public let thumbnailSurface: DocumentCompositeSurface?
     /// Legacy thumbnail bytes retained for fallback UI and persisted snapshots.
     public let thumbnailData: Data?
+    public let gpuBufferHandle: MetalBufferHandle?
     public let pixelData: Data
 
     public init(
@@ -127,6 +147,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         blendMode: LayerBlendMode,
         thumbnailSurface: DocumentCompositeSurface? = nil,
         thumbnailData: Data?,
+        gpuBufferHandle: MetalBufferHandle? = nil,
         pixelData: Data
     ) {
         self.index = index
@@ -136,6 +157,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         self.blendMode = blendMode
         self.thumbnailSurface = thumbnailSurface
         self.thumbnailData = thumbnailData
+        self.gpuBufferHandle = gpuBufferHandle
         self.pixelData = pixelData
     }
 }
@@ -150,6 +172,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
     public let height: Int
     public let revision: Int
     public let transferKind: MetalSnapshotTransferKind
+    public let compositeBufferHandle: MetalBufferHandle?
     public let compositePixelData: Data
     public let layers: [MetalLayerSnapshot]
 
@@ -158,6 +181,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         height: Int,
         revision: Int,
         transferKind: MetalSnapshotTransferKind = .fullSnapshot,
+        compositeBufferHandle: MetalBufferHandle? = nil,
         compositePixelData: Data,
         layers: [MetalLayerSnapshot]
     ) {
@@ -165,6 +189,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         self.height = height
         self.revision = revision
         self.transferKind = transferKind
+        self.compositeBufferHandle = compositeBufferHandle
         self.compositePixelData = compositePixelData
         self.layers = layers
     }
@@ -178,6 +203,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
     public let width: Int
     public let height: Int
     public let transferKind: MetalSnapshotTransferKind
+    public let gpuBufferHandle: MetalBufferHandle?
     public let pixelData: Data
 
     public init(
@@ -188,6 +214,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         width: Int,
         height: Int,
         transferKind: MetalSnapshotTransferKind = .dirtyRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
         pixelData: Data
     ) {
         self.id = id
@@ -197,10 +224,11 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         self.width = width
         self.height = height
         self.transferKind = transferKind
+        self.gpuBufferHandle = gpuBufferHandle
         self.pixelData = pixelData
     }
 
-    public var isEmpty: Bool { width <= 0 || height <= 0 || pixelData.isEmpty }
+    public var isEmpty: Bool { width <= 0 || height <= 0 || (pixelData.isEmpty && gpuBufferHandle == nil) }
 }
 
 public struct PaintDocumentPresentation: Equatable, Sendable {
@@ -231,6 +259,7 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
     public let canvasWidth: Int
     public let canvasHeight: Int
     public let dirtyRect: LayerPixelRect
+    public let gpuBufferHandle: MetalBufferHandle?
     public let rectPixelData: Data
     public let fullPixelData: Data?
 
@@ -238,12 +267,14 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,
-        rectPixelData: Data,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        rectPixelData: Data = Data(),
         fullPixelData: Data? = nil
     ) {
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
         self.rectPixelData = rectPixelData
         self.fullPixelData = fullPixelData
     }

@@ -372,6 +372,57 @@ struct MetalColorSmudgeDabDescriptor {
     float radius;
 };
 
+struct MetalRawStrokeSample {
+    float x;
+    float y;
+    float pressure;
+    float altitude;
+    float azimuth;
+    float timestamp;
+};
+
+struct MetalStrokePreprocessDescriptor {
+    uint sampleCount;
+    uint canvasWidth;
+    uint canvasHeight;
+    float radius;
+    float pressureSensitivity;
+    float taperIn;
+    float taperOut;
+    float hardness;
+    float scatterLateral;
+    float scatterLinear;
+    uint scatterEnabled;
+    uint isAirbrush;
+};
+
+struct MetalStrokePreprocessSummary {
+    uint effectiveSampleCount;
+    int dirtyOriginX;
+    int dirtyOriginY;
+    uint dirtyWidth;
+    uint dirtyHeight;
+};
+
+struct MetalSmudgeDabGenerationDescriptor {
+    uint sampleCount;
+    uint canvasWidth;
+    uint canvasHeight;
+    float stampSpacing;
+};
+
+struct MetalSmudgeDabCountSummary {
+    uint dabCount;
+};
+
+struct MetalSmudgeDabGenerationSummary {
+    uint dabCount;
+    int dirtyOriginX;
+    int dirtyOriginY;
+    uint dirtyWidth;
+    uint dirtyHeight;
+};
+
 struct MetalStrokeRasterRequestDescriptor {
     uint canvasWidth;
     uint canvasHeight;
@@ -1140,6 +1191,325 @@ inline bool strokePrimitiveTileBounds(
     tileMaxX = min(request.tileColumns - 1u, uint(max(0.0f, floor((clampedMaxX - dirtyMinX) / tileSize))));
     tileMaxY = min(request.tileRows - 1u, uint(max(0.0f, floor((clampedMaxY - dirtyMinY) / tileSize))));
     return true;
+}
+
+kernel void strokePreprocessKernel(
+    const device MetalRawStrokeSample *rawSamples [[buffer(0)]],
+    device MetalStrokeSampleDescriptor *outputSamples [[buffer(1)]],
+    device MetalStrokePreprocessSummary *summary [[buffer(2)]],
+    constant MetalStrokePreprocessDescriptor& descriptor [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid != 0u) {
+        return;
+    }
+
+    summary->effectiveSampleCount = 0u;
+    summary->dirtyOriginX = 0;
+    summary->dirtyOriginY = 0;
+    summary->dirtyWidth = 0u;
+    summary->dirtyHeight = 0u;
+    if (descriptor.sampleCount == 0u) {
+        return;
+    }
+
+    for (uint index = 0u; index < descriptor.sampleCount; ++index) {
+        MetalRawStrokeSample raw = rawSamples[index];
+        outputSamples[index] = MetalStrokeSampleDescriptor{
+            isfinite(raw.x) ? raw.x : 0.0f,
+            isfinite(raw.y) ? raw.y : 0.0f,
+            isfinite(raw.pressure) ? raw.pressure : 1.0f,
+            0.0f
+        };
+    }
+
+    uint writeCount = descriptor.sampleCount;
+    float jumpThreshold = max(descriptor.radius * 8.0f, 24.0f);
+    while (writeCount > 1u) {
+        MetalStrokeSampleDescriptor last = outputSamples[writeCount - 1u];
+        MetalStrokeSampleDescriptor previous = outputSamples[writeCount - 2u];
+        float dx = last.x - previous.x;
+        float dy = last.y - previous.y;
+        float distance = sqrt((dx * dx) + (dy * dy));
+        float pressureDropThreshold = max(0.08f, previous.pressure * 0.5f);
+        if (!(distance > jumpThreshold && last.pressure < pressureDropThreshold)) {
+            break;
+        }
+        writeCount -= 1u;
+    }
+
+    uint deduplicatedCount = 0u;
+    for (uint index = 0u; index < writeCount; ++index) {
+        MetalStrokeSampleDescriptor sample = outputSamples[index];
+        if (deduplicatedCount > 0u) {
+            MetalStrokeSampleDescriptor previous = outputSamples[deduplicatedCount - 1u];
+            float dx = sample.x - previous.x;
+            float dy = sample.y - previous.y;
+            float distance = sqrt((dx * dx) + (dy * dy));
+            if (distance < 0.001f && fabs(sample.pressure - previous.pressure) < 0.001f) {
+                continue;
+            }
+        }
+        outputSamples[deduplicatedCount] = sample;
+        deduplicatedCount += 1u;
+    }
+
+    if (deduplicatedCount == 0u) {
+        return;
+    }
+
+    float totalLength = 0.0f;
+    for (uint index = 1u; index < deduplicatedCount; ++index) {
+        float dx = outputSamples[index].x - outputSamples[index - 1u].x;
+        float dy = outputSamples[index].y - outputSamples[index - 1u].y;
+        totalLength += sqrt((dx * dx) + (dy * dy));
+        outputSamples[index].progress = totalLength;
+    }
+    if (totalLength > 0.001f) {
+        for (uint index = 1u; index < deduplicatedCount; ++index) {
+            outputSamples[index].progress /= totalLength;
+        }
+    } else {
+        for (uint index = 0u; index < deduplicatedCount; ++index) {
+            outputSamples[index].progress = 0.0f;
+        }
+    }
+
+    float scatterExtent = descriptor.scatterEnabled != 0u ? max(descriptor.scatterLateral, descriptor.scatterLinear) : 0.0f;
+    float softness = max(0.0f, 1.0f - descriptor.hardness);
+    float featherPadding = max(
+        descriptor.isAirbrush != 0u
+            ? descriptor.radius * (0.9f + softness * 0.6f)
+            : descriptor.radius * (0.35f + softness * 0.75f),
+        descriptor.isAirbrush != 0u ? 18.0f : 10.0f
+    );
+    float minX = INFINITY;
+    float minY = INFINITY;
+    float maxX = -INFINITY;
+    float maxY = -INFINITY;
+    for (uint index = 0u; index < deduplicatedCount; ++index) {
+        MetalStrokeSampleDescriptor sample = outputSamples[index];
+        float pressureFactor = max(0.1f, 1.0f + ((sample.pressure - 1.0f) * descriptor.pressureSensitivity));
+        float radiusPadding = max(descriptor.radius * pressureFactor, 1.5f)
+            + (scatterExtent * descriptor.radius)
+            + featherPadding
+            + 6.0f;
+        minX = min(minX, sample.x - radiusPadding);
+        minY = min(minY, sample.y - radiusPadding);
+        maxX = max(maxX, sample.x + radiusPadding);
+        maxY = max(maxY, sample.y + radiusPadding);
+    }
+
+    if (!isfinite(minX) || !isfinite(minY) || !isfinite(maxX) || !isfinite(maxY)) {
+        summary->effectiveSampleCount = deduplicatedCount;
+        return;
+    }
+
+    int originX = max(0, int(floor(minX)));
+    int originY = max(0, int(floor(minY)));
+    int maxRectX = min(int(descriptor.canvasWidth) - 1, int(ceil(maxX)));
+    int maxRectY = min(int(descriptor.canvasHeight) - 1, int(ceil(maxY)));
+    if (maxRectX >= originX && maxRectY >= originY) {
+        summary->dirtyOriginX = originX;
+        summary->dirtyOriginY = originY;
+        summary->dirtyWidth = uint(maxRectX - originX + 1);
+        summary->dirtyHeight = uint(maxRectY - originY + 1);
+    }
+    summary->effectiveSampleCount = deduplicatedCount;
+}
+
+kernel void smudgeDabCountKernel(
+    const device MetalStrokeSampleDescriptor *samples [[buffer(0)]],
+    device MetalSmudgeDabCountSummary *summary [[buffer(1)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(2)]],
+    constant MetalSmudgeDabGenerationDescriptor& descriptor [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid != 0u) {
+        return;
+    }
+
+    uint total = descriptor.sampleCount > 0u ? 1u : 0u;
+    for (uint index = 1u; index < descriptor.sampleCount; ++index) {
+        MetalStrokeSampleDescriptor start = samples[index - 1u];
+        MetalStrokeSampleDescriptor end = samples[index];
+        float startRadius = resolvedStrokeRadius(brush, start.pressure, start.progress);
+        float endRadius = resolvedStrokeRadius(brush, end.pressure, end.progress);
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float distance = sqrt((dx * dx) + (dy * dy));
+        float spacing = max(1.0f, ((startRadius + endRadius) * 0.5f) * max(descriptor.stampSpacing, 0.02f));
+        if (!isfinite(distance) || !isfinite(spacing) || spacing <= 0.0f) {
+            continue;
+        }
+        total += max(1u, uint(ceil(distance / spacing)));
+    }
+    summary->dabCount = total;
+}
+
+inline void emitSmudgeDab(
+    device MetalColorSmudgeDabDescriptor *dabs,
+    device MetalSmudgeDabGenerationSummary *summary,
+    constant MetalSmudgeDabGenerationDescriptor& descriptor,
+    float centerX,
+    float centerY,
+    float pressure,
+    float progress,
+    float radius,
+    thread float &previousCenterX,
+    thread float &previousCenterY,
+    thread bool &hasBounds,
+    thread int &dirtyMinX,
+    thread int &dirtyMinY,
+    thread int &dirtyMaxX,
+    thread int &dirtyMaxY
+) {
+    if (!isfinite(centerX) || !isfinite(centerY) || !isfinite(progress) || !isfinite(radius)) {
+        return;
+    }
+    float margin = max(2.0f, radius + 2.0f);
+    int rawOriginX = int(floor(centerX - margin));
+    int rawOriginY = int(floor(centerY - margin));
+    int rawMaxX = rawOriginX + int(ceil(margin * 2.0f)) - 1;
+    int rawMaxY = rawOriginY + int(ceil(margin * 2.0f)) - 1;
+    int clippedOriginX = max(0, rawOriginX);
+    int clippedOriginY = max(0, rawOriginY);
+    int clippedMaxX = min(int(descriptor.canvasWidth) - 1, rawMaxX);
+    int clippedMaxY = min(int(descriptor.canvasHeight) - 1, rawMaxY);
+    if (clippedMaxX < clippedOriginX || clippedMaxY < clippedOriginY) {
+        previousCenterX = centerX;
+        previousCenterY = centerY;
+        return;
+    }
+
+    uint index = summary->dabCount;
+    dabs[index] = MetalColorSmudgeDabDescriptor{
+        descriptor.canvasWidth,
+        descriptor.canvasHeight,
+        uint(clippedOriginX),
+        uint(clippedOriginY),
+        uint(clippedMaxX - clippedOriginX + 1),
+        uint(clippedMaxY - clippedOriginY + 1),
+        centerX,
+        centerY,
+        previousCenterX,
+        previousCenterY,
+        pressure,
+        progress,
+        radius
+    };
+    summary->dabCount += 1u;
+
+    if (!hasBounds) {
+        dirtyMinX = clippedOriginX;
+        dirtyMinY = clippedOriginY;
+        dirtyMaxX = clippedMaxX;
+        dirtyMaxY = clippedMaxY;
+        hasBounds = true;
+    } else {
+        dirtyMinX = min(dirtyMinX, clippedOriginX);
+        dirtyMinY = min(dirtyMinY, clippedOriginY);
+        dirtyMaxX = max(dirtyMaxX, clippedMaxX);
+        dirtyMaxY = max(dirtyMaxY, clippedMaxY);
+    }
+    previousCenterX = centerX;
+    previousCenterY = centerY;
+}
+
+kernel void smudgeDabGenerationKernel(
+    const device MetalStrokeSampleDescriptor *samples [[buffer(0)]],
+    device MetalColorSmudgeDabDescriptor *dabs [[buffer(1)]],
+    device MetalSmudgeDabGenerationSummary *summary [[buffer(2)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(3)]],
+    constant MetalSmudgeDabGenerationDescriptor& descriptor [[buffer(4)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid != 0u) {
+        return;
+    }
+
+    summary->dabCount = 0u;
+    summary->dirtyOriginX = 0;
+    summary->dirtyOriginY = 0;
+    summary->dirtyWidth = 0u;
+    summary->dirtyHeight = 0u;
+    if (descriptor.sampleCount == 0u) {
+        return;
+    }
+
+    bool hasBounds = false;
+    int dirtyMinX = 0;
+    int dirtyMinY = 0;
+    int dirtyMaxX = 0;
+    int dirtyMaxY = 0;
+    float previousCenterX = samples[0].x;
+    float previousCenterY = samples[0].y;
+
+    MetalStrokeSampleDescriptor first = samples[0];
+    emitSmudgeDab(
+        dabs,
+        summary,
+        descriptor,
+        first.x,
+        first.y,
+        first.pressure,
+        first.progress,
+        resolvedStrokeRadius(brush, first.pressure, first.progress),
+        previousCenterX,
+        previousCenterY,
+        hasBounds,
+        dirtyMinX,
+        dirtyMinY,
+        dirtyMaxX,
+        dirtyMaxY
+    );
+
+    for (uint index = 1u; index < descriptor.sampleCount; ++index) {
+        MetalStrokeSampleDescriptor start = samples[index - 1u];
+        MetalStrokeSampleDescriptor end = samples[index];
+        float startRadius = resolvedStrokeRadius(brush, start.pressure, start.progress);
+        float endRadius = resolvedStrokeRadius(brush, end.pressure, end.progress);
+        float dx = end.x - start.x;
+        float dy = end.y - start.y;
+        float distance = sqrt((dx * dx) + (dy * dy));
+        float spacing = max(1.0f, ((startRadius + endRadius) * 0.5f) * max(descriptor.stampSpacing, 0.02f));
+        if (!isfinite(distance) || !isfinite(spacing) || spacing <= 0.0f) {
+            continue;
+        }
+
+        uint steps = max(1u, uint(ceil(distance / spacing)));
+        for (uint step = 1u; step <= steps; ++step) {
+            float t = float(step) / float(steps);
+            float centerX = start.x + ((end.x - start.x) * t);
+            float centerY = start.y + ((end.y - start.y) * t);
+            float pressure = start.pressure + ((end.pressure - start.pressure) * t);
+            float progress = start.progress + ((end.progress - start.progress) * t);
+            emitSmudgeDab(
+                dabs,
+                summary,
+                descriptor,
+                centerX,
+                centerY,
+                pressure,
+                progress,
+                resolvedStrokeRadius(brush, pressure, progress),
+                previousCenterX,
+                previousCenterY,
+                hasBounds,
+                dirtyMinX,
+                dirtyMinY,
+                dirtyMaxX,
+                dirtyMaxY
+            );
+        }
+    }
+
+    if (hasBounds) {
+        summary->dirtyOriginX = dirtyMinX;
+        summary->dirtyOriginY = dirtyMinY;
+        summary->dirtyWidth = uint(dirtyMaxX - dirtyMinX + 1);
+        summary->dirtyHeight = uint(dirtyMaxY - dirtyMinY + 1);
+    }
 }
 
 kernel void strokePrimitiveGenerationKernel(

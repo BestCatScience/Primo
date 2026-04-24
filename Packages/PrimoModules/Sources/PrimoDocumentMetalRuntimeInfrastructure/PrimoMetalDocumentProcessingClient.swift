@@ -177,6 +177,15 @@ struct PrimoMetalStrokeSampleDescriptor: Equatable {
     let progress: Float
 }
 
+private struct PrimoMetalRawStrokeSample {
+    let x: Float
+    let y: Float
+    let pressure: Float
+    let altitude: Float
+    let azimuth: Float
+    let timestamp: Float
+}
+
 private struct PrimoMetalStrokeBrushDescriptor {
     let radius: Float
     let pressureSensitivity: Float
@@ -242,6 +251,48 @@ private struct PrimoMetalColorSmudgeDabDescriptor {
     let pressure: Float
     let progress: Float
     let radius: Float
+}
+
+private struct PrimoMetalStrokePreprocessDescriptor {
+    let sampleCount: UInt32
+    let canvasWidth: UInt32
+    let canvasHeight: UInt32
+    let radius: Float
+    let pressureSensitivity: Float
+    let taperIn: Float
+    let taperOut: Float
+    let hardness: Float
+    let scatterLateral: Float
+    let scatterLinear: Float
+    let scatterEnabled: UInt32
+    let isAirbrush: UInt32
+}
+
+private struct PrimoMetalStrokePreprocessSummary {
+    let effectiveSampleCount: UInt32
+    let dirtyOriginX: Int32
+    let dirtyOriginY: Int32
+    let dirtyWidth: UInt32
+    let dirtyHeight: UInt32
+}
+
+private struct PrimoMetalSmudgeDabGenerationDescriptor {
+    let sampleCount: UInt32
+    let canvasWidth: UInt32
+    let canvasHeight: UInt32
+    let stampSpacing: Float
+}
+
+private struct PrimoMetalSmudgeDabCountSummary {
+    let dabCount: UInt32
+}
+
+private struct PrimoMetalSmudgeDabGenerationSummary {
+    let dabCount: UInt32
+    let dirtyOriginX: Int32
+    let dirtyOriginY: Int32
+    let dirtyWidth: UInt32
+    let dirtyHeight: UInt32
 }
 
 private struct PrimoMetalColorSmudgeDab {
@@ -343,28 +394,34 @@ public struct PrimoMetalStrokeExecutionRequest: Sendable {
 public struct PrimoMetalStrokeExecutionResult: Sendable {
     public let pixelData: Data
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    public let gpuBufferHandle: MetalBufferHandle?
     public let rectPixelData: Data?
 
     public init(
         pixelData: Data,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
+        gpuBufferHandle: MetalBufferHandle? = nil,
         rectPixelData: Data?
     ) {
         self.pixelData = pixelData
         self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
         self.rectPixelData = rectPixelData
     }
 }
 
 public struct PrimoMetalStrokeMutationResult: Sendable {
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    public let gpuBufferHandle: MetalBufferHandle?
     public let rectPixelData: Data?
 
     public init(
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
+        gpuBufferHandle: MetalBufferHandle? = nil,
         rectPixelData: Data?
     ) {
         self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
         self.rectPixelData = rectPixelData
     }
 }
@@ -398,6 +455,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let visible: Bool
         let isClipped: Bool
         let blendMode: LayerBlendMode
+        let gpuHandleID: UUID?
         let pixelStorageIdentity: UInt
     }
 
@@ -408,6 +466,19 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let transferKind: MetalSnapshotTransferKind
         let compositeStorageIdentity: UInt
         let layers: [SnapshotLayerSignature]
+    }
+
+    private struct CachedBufferResource {
+        let width: Int
+        let height: Int
+        let bytesPerRow: Int
+        let buffer: MTLBuffer
+    }
+
+    private struct BrushTipCacheKey: Hashable {
+        let width: Int
+        let height: Int
+        let digest: Int
     }
 
     private struct StrokeExecutionCache {
@@ -442,6 +513,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     private static let strokeTileSize = 32
     private static let strokePrefixBlockSize = 256
 
+    private let cacheLock = NSRecursiveLock()
     let device: MTLDevice?
     let commandQueue: MTLCommandQueue?
     let library: MTLLibrary?
@@ -478,6 +550,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     let inpaintCropMaskPipeline: MTLComputePipelineState?
     let inpaintCompositePipeline: MTLComputePipelineState?
     let alphaPreservePipeline: MTLComputePipelineState?
+    let strokePreprocessPipeline: MTLComputePipelineState?
+    let smudgeDabCountPipeline: MTLComputePipelineState?
+    let smudgeDabGenerationPipeline: MTLComputePipelineState?
     let strokePrimitiveGenerationPipeline: MTLComputePipelineState?
     let strokeTileCountPipeline: MTLComputePipelineState?
     let strokePrefixScanPipeline: MTLComputePipelineState?
@@ -493,6 +568,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     private var cachedSignature: SnapshotTextureSignature?
     private var cachedLayerTexture: MTLTexture?
     private var cachedStrokeExecution: StrokeExecutionCache?
+    private var cachedBuffers: [UUID: CachedBufferResource] = [:]
+    private var cachedScaledBrushTips: [BrushTipCacheKey: BrushTipRaster] = [:]
 
     public init() {
         let device = MTLCreateSystemDefaultDevice()
@@ -532,6 +609,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.inpaintCropMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "inpaintCropMaskKernel")
         self.inpaintCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "inpaintCompositeKernel")
         self.alphaPreservePipeline = Self.makePipeline(device: device, library: library, functionName: "alphaPreserveKernel")
+        self.strokePreprocessPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePreprocessKernel")
+        self.smudgeDabCountPipeline = Self.makePipeline(device: device, library: library, functionName: "smudgeDabCountKernel")
+        self.smudgeDabGenerationPipeline = Self.makePipeline(device: device, library: library, functionName: "smudgeDabGenerationKernel")
         self.strokePrimitiveGenerationPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrimitiveGenerationKernel")
         self.strokeTileCountPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeTileCountKernel")
         self.strokePrefixScanPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrefixScanKernel")
@@ -581,6 +661,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         inpaintCropMaskPipeline != nil &&
         inpaintCompositePipeline != nil &&
         alphaPreservePipeline != nil &&
+        strokePreprocessPipeline != nil &&
+        smudgeDabCountPipeline != nil &&
+        smudgeDabGenerationPipeline != nil &&
         strokePrimitiveGenerationPipeline != nil &&
         strokeTileCountPipeline != nil &&
         strokePrefixScanPipeline != nil &&
@@ -595,7 +678,69 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     }
 
     public func resetStrokeExecutionSession() {
-        cachedStrokeExecution = nil
+        withCacheLock {
+            cachedStrokeExecution = nil
+        }
+    }
+
+    public func materializedPixelData(for handle: MetalBufferHandle) -> Data? {
+        guard let resource = cachedBufferResource(for: handle) else { return nil }
+        return bytes(from: resource.buffer, count: resource.bytesPerRow * resource.height)
+    }
+
+    public func populateTexture(
+        _ texture: MTLTexture,
+        from handle: MetalBufferHandle,
+        sourceOriginX: Int = 0,
+        sourceOriginY: Int = 0,
+        destinationOriginX: Int = 0,
+        destinationOriginY: Int = 0,
+        width: Int? = nil,
+        height: Int? = nil
+    ) -> Bool {
+        guard let resource = cachedBufferResource(for: handle) else { return false }
+        let copyWidth = min(width ?? resource.width, resource.width - sourceOriginX)
+        let copyHeight = min(height ?? resource.height, resource.height - sourceOriginY)
+        guard copyWidth > 0, copyHeight > 0 else { return false }
+        let byteOffset = (sourceOriginY * resource.bytesPerRow) + (sourceOriginX * 4)
+        let pointer = resource.buffer.contents().advanced(by: byteOffset)
+        texture.replace(
+            region: MTLRegionMake2D(destinationOriginX, destinationOriginY, copyWidth, copyHeight),
+            mipmapLevel: 0,
+            withBytes: pointer,
+            bytesPerRow: resource.bytesPerRow
+        )
+        return true
+    }
+
+    public func makeBufferHandle(
+        width: Int,
+        height: Int,
+        bytesPerRow: Int,
+        buffer: MTLBuffer
+    ) -> MetalBufferHandle {
+        let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: bytesPerRow)
+        withCacheLock {
+            cachedBuffers[handle.id] = CachedBufferResource(
+                width: width,
+                height: height,
+                bytesPerRow: bytesPerRow,
+                buffer: buffer
+            )
+        }
+        return handle
+    }
+
+    private func cachedBufferResource(for handle: MetalBufferHandle) -> CachedBufferResource? {
+        withCacheLock {
+            cachedBuffers[handle.id]
+        }
+    }
+
+    private func withCacheLock<T>(_ work: () throws -> T) rethrows -> T {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return try work()
     }
 
     public func selectionOverlayRGBA(
@@ -1075,8 +1220,76 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return bytes(from: outputBuffer, count: outputWidth * outputHeight * 4)
     }
 
+    public func compositedBufferHandle(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int?,
+        adjustedActiveLayerPixels: Data?,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)? = nil
+    ) -> MetalBufferHandle? {
+        guard snapshot.width > 0, snapshot.height > 0 else { return nil }
+        let orderedLayers = snapshot.layers.sorted(by: { $0.index < $1.index })
+        guard
+            let commandQueue,
+            let pipeline = compositePipeline,
+            let layerTexture = rebuildLayerTextureIfNeeded(snapshot: snapshot, orderedLayers: orderedLayers),
+            let layerBuffer = makeBuffer(orderedLayers.map(Self.makeLayerDescriptor(for:))),
+            let requestBuffer = makeBuffer(
+                PrimoMetalCompositeRequestDescriptor(
+                    canvasWidth: UInt32(snapshot.width),
+                    canvasHeight: UInt32(snapshot.height),
+                    originX: UInt32(dirtyRect?.originX ?? 0),
+                    originY: UInt32(dirtyRect?.originY ?? 0),
+                    outputWidth: UInt32(dirtyRect?.width ?? snapshot.width),
+                    outputHeight: UInt32(dirtyRect?.height ?? snapshot.height),
+                    layerCount: UInt32(orderedLayers.count),
+                    activeLayerIndex: Int32(activeLayerIndex ?? -1),
+                    hasActiveLayerOverride: adjustedActiveLayerPixels == nil ? 0 : 1,
+                    includeActiveLayerWhenHidden: dirtyRect == nil ? 0 : 1
+                )
+            )
+        else {
+            return nil
+        }
+
+        let expectedCount = snapshot.width * snapshot.height * 4
+        let overridePixels = adjustedActiveLayerPixels ?? Data(count: expectedCount)
+        let outputWidth = dirtyRect?.width ?? snapshot.width
+        let outputHeight = dirtyRect?.height ?? snapshot.height
+        guard
+            overridePixels.count == expectedCount,
+            let overrideBuffer = makeBuffer(overridePixels),
+            let outputBuffer = device?.makeBuffer(length: outputWidth * outputHeight * 4, options: .storageModeShared),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setTexture(layerTexture, index: 0)
+        encoder.setBuffer(layerBuffer, offset: 0, index: 0)
+        encoder.setBuffer(overrideBuffer, offset: 0, index: 1)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+        encoder.setBuffer(requestBuffer, offset: 0, index: 3)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: outputWidth, height: outputHeight)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return makeBufferHandle(width: outputWidth, height: outputHeight, bytesPerRow: outputWidth * 4, buffer: outputBuffer)
+    }
+
     public func compositeDocument(snapshot: MetalDocumentSnapshot) -> Data? {
         compositedPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: nil,
+            adjustedActiveLayerPixels: nil,
+            dirtyRect: nil
+        )
+    }
+
+    public func compositeDocumentBufferHandle(snapshot: MetalDocumentSnapshot) -> MetalBufferHandle? {
+        compositedBufferHandle(
             snapshot: snapshot,
             activeLayerIndex: nil,
             adjustedActiveLayerPixels: nil,
@@ -1088,7 +1301,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         snapshot: MetalDocumentSnapshot,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
     ) -> IncrementalLayerUpdate? {
-        guard let pixelData = compositedPixelData(
+        guard let handle = compositedBufferHandle(
             snapshot: snapshot,
             activeLayerIndex: nil,
             adjustedActiveLayerPixels: nil,
@@ -1102,7 +1315,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             originY: dirtyRect.originY,
             width: dirtyRect.width,
             height: dirtyRect.height,
-            pixelData: pixelData
+            gpuBufferHandle: handle,
+            pixelData: Data()
         )
     }
 
@@ -1125,7 +1339,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         adjustedActiveLayerPixels: Data,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
     ) -> IncrementalLayerUpdate? {
-        guard let pixelData = compositedPixelData(
+        guard let handle = compositedBufferHandle(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,
@@ -1139,7 +1353,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             originY: dirtyRect.originY,
             width: dirtyRect.width,
             height: dirtyRect.height,
-            pixelData: pixelData
+            gpuBufferHandle: handle,
+            pixelData: Data()
         )
     }
 
@@ -1254,9 +1469,19 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
         guard let pixelData = result.pixelData else { return nil }
+        let cachedExecution = withCacheLock { cachedStrokeExecution }
+        let gpuBufferHandle = cachedExecution.map {
+            makeBufferHandle(
+                width: request.canvasWidth,
+                height: request.canvasHeight,
+                bytesPerRow: request.canvasWidth * 4,
+                buffer: $0.buffers.current
+            )
+        }
         return PrimoMetalStrokeExecutionResult(
             pixelData: pixelData,
             dirtyRect: result.dirtyRect,
+            gpuBufferHandle: gpuBufferHandle,
             rectPixelData: result.rectPixelData
         )
     }
@@ -1270,8 +1495,18 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         ) else {
             return nil
         }
+        let cachedExecution = withCacheLock { cachedStrokeExecution }
+        let gpuBufferHandle = cachedExecution.map {
+            makeBufferHandle(
+                width: request.canvasWidth,
+                height: request.canvasHeight,
+                bytesPerRow: request.canvasWidth * 4,
+                buffer: $0.buffers.current
+            )
+        }
         return PrimoMetalStrokeMutationResult(
             dirtyRect: result.dirtyRect,
+            gpuBufferHandle: gpuBufferHandle,
             rectPixelData: result.rectPixelData
         )
     }
@@ -1284,9 +1519,15 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return executeColorSmudgeStroke(request, includeFullPixelData: includeFullPixelData)
         }
         guard Self.supportsStrokeRasterization(request.brush) else { return nil }
-        let normalizedSamples = Self.normalizedCommittedStrokeSamples(request.samples, brush: request.brush)
-        let descriptors = Self.strokeSampleDescriptors(samples: normalizedSamples)
-        guard !descriptors.isEmpty else { return nil }
+        guard let preprocess = preprocessStrokeSamples(
+            samples: request.samples,
+            brush: request.brush,
+            canvasWidth: request.canvasWidth,
+            canvasHeight: request.canvasHeight
+        ) else {
+            return nil
+        }
+        let descriptors = preprocess.descriptors
         guard
             request.canvasWidth > 0,
             request.canvasHeight > 0,
@@ -1298,17 +1539,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
 
-        let fullDirtyRect = Self.strokePreviewDirtyRect(
-            samples: normalizedSamples,
-            brush: request.brush,
-            canvasWidth: request.canvasWidth,
-            canvasHeight: request.canvasHeight
-        )
         guard let executionContext = prepareStrokeExecutionContext(request: request, descriptors: descriptors) else {
             return nil
         }
         if executionContext.shouldAdoptCachedOutput {
-            let resolvedDirtyRect = fullDirtyRect
+            let resolvedDirtyRect = preprocess.dirtyRect
                 ?? executionContext.cachedDirtyRect.map { ($0.originX, $0.originY, $0.width, $0.height) }
                 ?? (0, 0, request.canvasWidth, request.canvasHeight)
             return (
@@ -1320,26 +1555,18 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             )
         }
 
-        guard
-            let dirtyRect = Self.strokePreviewDirtyRect(
-                samples: normalizedSamples,
-                brush: request.brush,
-                canvasWidth: request.canvasWidth,
-                canvasHeight: request.canvasHeight
-            )
-        else {
+        guard let dirtyRect = preprocess.dirtyRect else {
             return (
                 pixelData: includeFullPixelData
                     ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
                     : nil,
-                dirtyRect: fullDirtyRect ?? (0, 0, request.canvasWidth, request.canvasHeight),
+                dirtyRect: (0, 0, request.canvasWidth, request.canvasHeight),
                 rectPixelData: nil
             )
         }
 
-        let customTip = Self.makeCustomTipMask(request.brush.customTip)
+        let customTip = resolvedCustomTipMask(request.brush.customTip)
         guard
-            let sampleBuffer = makeBuffer(descriptors),
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(request.brush, customTip: customTip)),
             let customTipBuffer = makeBuffer(customTip.alphaData),
             let copyRequestBuffer = makeBuffer(
@@ -1360,7 +1587,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         guard let binningResources = makeStrokeBinningResources(
             commandBuffer: commandBuffer,
             descriptors: descriptors,
-            sampleBuffer: sampleBuffer,
+            sampleBuffer: preprocess.sampleBuffer,
             brush: request.brush,
             brushBuffer: brushBuffer,
             dirtyRect: dirtyRect,
@@ -1416,19 +1643,21 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             canvasWidth: request.canvasWidth,
             canvasHeight: request.canvasHeight
         )
-        cachedStrokeExecution = StrokeExecutionCache(
-            width: request.canvasWidth,
-            height: request.canvasHeight,
-            baseSnapshotRevision: request.snapshotRevision,
-            activeLayerIndex: request.activeLayerIndex,
-            brush: request.brush,
-            previewSamples: descriptors,
-            committableSamples: descriptors,
-            dirtyRect: cachedDirtyRect,
-            rectPixelData: rectPixelData,
-            buffers: executionContext.buffers,
-            lastOutputValid: true
-        )
+        withCacheLock {
+            cachedStrokeExecution = StrokeExecutionCache(
+                width: request.canvasWidth,
+                height: request.canvasHeight,
+                baseSnapshotRevision: request.snapshotRevision,
+                activeLayerIndex: request.activeLayerIndex,
+                brush: request.brush,
+                previewSamples: descriptors,
+                committableSamples: descriptors,
+                dirtyRect: cachedDirtyRect,
+                rectPixelData: rectPixelData,
+                buffers: executionContext.buffers,
+                lastOutputValid: true
+            )
+        }
         return (
             pixelData: includeFullPixelData
                 ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
@@ -1453,22 +1682,43 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
 
-        let normalizedSamples = Self.normalizedCommittedStrokeSamples(request.samples, brush: request.brush)
-        guard !normalizedSamples.isEmpty else { return nil }
-        let progressTable = Self.strokeProgressTable(normalizedSamples)
-        let dabs = Self.makeColorSmudgeDabs(
-            samples: normalizedSamples,
-            progressTable: progressTable,
+        guard let preprocess = preprocessStrokeSamples(
+            samples: request.samples,
             brush: request.brush,
             canvasWidth: request.canvasWidth,
             canvasHeight: request.canvasHeight
-        )
-        guard !dabs.isEmpty else { return nil }
-        guard let executionContext = prepareStrokeExecutionContext(request: request, descriptors: Self.strokeSampleDescriptors(samples: normalizedSamples)) else {
+        ) else {
             return nil
         }
+        guard
+            let smudgeGeneration = generateColorSmudgeDabDescriptors(
+                descriptors: preprocess.descriptors,
+                sampleBuffer: preprocess.sampleBuffer,
+                brush: request.brush,
+                canvasWidth: request.canvasWidth,
+                canvasHeight: request.canvasHeight
+            ),
+            !smudgeGeneration.descriptors.isEmpty
+        else {
+            return nil
+        }
+        guard let executionContext = prepareStrokeExecutionContext(request: request, descriptors: preprocess.descriptors) else {
+            return nil
+        }
+        if executionContext.shouldAdoptCachedOutput {
+            let resolvedDirtyRect = smudgeGeneration.dirtyRect
+                ?? executionContext.cachedDirtyRect.map { ($0.originX, $0.originY, $0.width, $0.height) }
+                ?? (0, 0, request.canvasWidth, request.canvasHeight)
+            return (
+                pixelData: includeFullPixelData
+                    ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count)
+                    : nil,
+                dirtyRect: resolvedDirtyRect,
+                rectPixelData: executionContext.cachedRectPixelData
+            )
+        }
 
-        let customTip = Self.makeCustomTipMask(request.brush.customTip)
+        let customTip = resolvedCustomTipMask(request.brush.customTip)
         guard
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(request.brush, customTip: customTip)),
             let customTipBuffer = makeBuffer(customTip.alphaData),
@@ -1477,13 +1727,16 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
 
-        var resolvedDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
-        for (index, dab) in dabs.enumerated() {
-            let rect = Self.clippedRect(from: dab.destinationRect)
+        let generatedDabs = smudgeGeneration.descriptors
+        for dab in generatedDabs {
+            let rect = (
+                originX: Int(dab.rectOriginX),
+                originY: Int(dab.rectOriginY),
+                width: Int(dab.rectWidth),
+                height: Int(dab.rectHeight)
+            )
             guard rect.width > 0, rect.height > 0 else { continue }
-            resolvedDirtyRect = resolvedDirtyRect.map { Self.union($0, rect) } ?? rect
 
-            let previousCenter = index > 0 ? dabs[index - 1].center : dab.center
             guard
                 let copyRequestBuffer = makeBuffer(
                     PrimoMetalStrokeRectCopyDescriptor(
@@ -1496,21 +1749,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     )
                 ),
                 let dabBuffer = makeBuffer(
-                    PrimoMetalColorSmudgeDabDescriptor(
-                        canvasWidth: UInt32(request.canvasWidth),
-                        canvasHeight: UInt32(request.canvasHeight),
-                        rectOriginX: UInt32(rect.originX),
-                        rectOriginY: UInt32(rect.originY),
-                        rectWidth: UInt32(rect.width),
-                        rectHeight: UInt32(rect.height),
-                        centerX: Float(dab.center.x),
-                        centerY: Float(dab.center.y),
-                        previousCenterX: Float(previousCenter.x),
-                        previousCenterY: Float(previousCenter.y),
-                        pressure: Float(dab.sample.pressure),
-                        progress: Float(dab.progress),
-                        radius: Float(dab.radius)
-                    )
+                    dab
                 ),
                 let copyEncoder = commandBuffer.makeComputeCommandEncoder()
             else {
@@ -1546,7 +1785,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         commandBuffer.commit()
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
-        guard let resolvedDirtyRect else {
+        guard let resolvedDirtyRect = smudgeGeneration.dirtyRect else {
             return (
                 pixelData: includeFullPixelData ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count) : nil,
                 dirtyRect: (0, 0, request.canvasWidth, request.canvasHeight),
@@ -1566,19 +1805,21 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             canvasWidth: request.canvasWidth,
             canvasHeight: request.canvasHeight
         )
-        cachedStrokeExecution = StrokeExecutionCache(
-            width: request.canvasWidth,
-            height: request.canvasHeight,
-            baseSnapshotRevision: request.snapshotRevision,
-            activeLayerIndex: request.activeLayerIndex,
-            brush: request.brush,
-            previewSamples: Self.strokeSampleDescriptors(samples: normalizedSamples),
-            committableSamples: Self.strokeSampleDescriptors(samples: normalizedSamples),
-            dirtyRect: cachedDirtyRect,
-            rectPixelData: rectPixelData,
-            buffers: executionContext.buffers,
-            lastOutputValid: true
-        )
+        withCacheLock {
+            cachedStrokeExecution = StrokeExecutionCache(
+                width: request.canvasWidth,
+                height: request.canvasHeight,
+                baseSnapshotRevision: request.snapshotRevision,
+                activeLayerIndex: request.activeLayerIndex,
+                brush: request.brush,
+                previewSamples: preprocess.descriptors,
+                committableSamples: preprocess.descriptors,
+                dirtyRect: cachedDirtyRect,
+                rectPixelData: rectPixelData,
+                buffers: executionContext.buffers,
+                lastOutputValid: true
+            )
+        }
         return (
             pixelData: includeFullPixelData ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count) : nil,
             dirtyRect: resolvedDirtyRect,
@@ -1634,7 +1875,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         ) else {
             return nil
         }
-        let customTip = Self.makeCustomTipMask(brush.customTip)
+        let customTip = resolvedCustomTipMask(brush.customTip)
         guard
             let sampleBuffer = makeBuffer(descriptors),
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(brush, customTip: customTip)),
@@ -1696,7 +1937,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         request: PrimoMetalStrokeExecutionRequest,
         descriptors: [PrimoMetalStrokeSampleDescriptor]
     ) -> StrokeExecutionContext? {
-        if let cachedStrokeExecution,
+        let cachedExecution = withCacheLock { cachedStrokeExecution }
+        if let cachedStrokeExecution = cachedExecution,
            cachedStrokeExecution.width == request.canvasWidth,
            cachedStrokeExecution.height == request.canvasHeight,
            cachedStrokeExecution.baseSnapshotRevision == request.snapshotRevision,
@@ -1747,7 +1989,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             width: snapshot.width,
             height: snapshot.height,
             transferKind: snapshot.transferKind,
-            compositeStorageIdentity: Self.dataStorageIdentity(snapshot.compositePixelData),
+            compositeStorageIdentity: snapshot.compositeBufferHandle.map(Self.handleIdentity(_:)) ?? Self.dataStorageIdentity(snapshot.compositePixelData),
             layers: orderedLayers.map {
                 SnapshotLayerSignature(
                     index: $0.index,
@@ -1755,12 +1997,16 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     visible: $0.visible,
                     isClipped: $0.isClipped,
                     blendMode: $0.blendMode,
+                    gpuHandleID: $0.gpuBufferHandle?.id,
                     pixelStorageIdentity: Self.dataStorageIdentity($0.pixelData)
                 )
             }
         )
-        if cachedSignature == signature, let cachedLayerTexture {
-            return cachedLayerTexture
+        let cachedTexture = withCacheLock {
+            cachedSignature == signature ? cachedLayerTexture : nil
+        }
+        if let cachedTexture {
+            return cachedTexture
         }
         guard let device else { return nil }
         let descriptor = MTLTextureDescriptor()
@@ -1775,7 +2021,20 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         descriptor.storageMode = .shared
         guard let texture = device.makeTexture(descriptor: descriptor) else { return nil }
         let expectedCount = snapshot.width * snapshot.height * 4
-        for (slice, layer) in orderedLayers.enumerated() where layer.pixelData.count == expectedCount {
+        for (slice, layer) in orderedLayers.enumerated() {
+            if let handle = layer.gpuBufferHandle,
+               let resource = cachedBufferResource(for: handle) {
+                texture.replace(
+                    region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
+                    mipmapLevel: 0,
+                    slice: slice,
+                    withBytes: resource.buffer.contents(),
+                    bytesPerRow: resource.bytesPerRow,
+                    bytesPerImage: resource.bytesPerRow * resource.height
+                )
+                continue
+            }
+            guard layer.pixelData.count == expectedCount else { continue }
             layer.pixelData.withUnsafeBytes { bytes in
                 guard let baseAddress = bytes.baseAddress else { return }
                 texture.replace(
@@ -1788,8 +2047,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 )
             }
         }
-        cachedSignature = signature
-        cachedLayerTexture = texture
+        withCacheLock {
+            cachedSignature = signature
+            cachedLayerTexture = texture
+        }
         return texture
     }
 
@@ -1798,6 +2059,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             guard let baseAddress = bytes.baseAddress else { return 0 }
             return UInt(bitPattern: baseAddress)
         }
+    }
+
+    private static func handleIdentity(_ handle: MetalBufferHandle) -> UInt {
+        UInt(bitPattern: handle.id.uuidString.hashValue)
     }
 
     func makeBuffer<T>(_ values: [T]) -> MTLBuffer? {
@@ -2508,38 +2773,210 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         )
     }
 
-    private static func makeCustomTipMask(_ raster: BrushTipRaster?) -> BrushTipRaster {
+    private func preprocessStrokeSamples(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> (
+        descriptors: [PrimoMetalStrokeSampleDescriptor],
+        sampleBuffer: MTLBuffer,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
+    )? {
+        guard
+            !samples.isEmpty,
+            let commandQueue,
+            let pipeline = strokePreprocessPipeline,
+            let summaryBuffer = device?.makeBuffer(length: MemoryLayout<PrimoMetalStrokePreprocessSummary>.stride, options: .storageModeShared),
+            let descriptorBuffer = device?.makeBuffer(
+                length: max(samples.count, 1) * MemoryLayout<PrimoMetalStrokeSampleDescriptor>.stride,
+                options: .storageModeShared
+            ),
+            let requestBuffer = makeBuffer(
+                PrimoMetalStrokePreprocessDescriptor(
+                    sampleCount: UInt32(samples.count),
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    radius: Float(brush.radius),
+                    pressureSensitivity: Float(brush.pressureSensitivity),
+                    taperIn: Float(brush.taperIn),
+                    taperOut: Float(brush.taperOut),
+                    hardness: Float(brush.hardness),
+                    scatterLateral: Float(brush.scatterEnabled ? brush.scatterLateral : 0),
+                    scatterLinear: Float(brush.scatterEnabled ? brush.scatterLinear : 0),
+                    scatterEnabled: brush.scatterEnabled ? 1 : 0,
+                    isAirbrush: brush.tipKind == .airbrush ? 1 : 0
+                )
+            ),
+            let rawSampleBuffer = makeBuffer(samples.map {
+                PrimoMetalRawStrokeSample(
+                    x: Float($0.point.x),
+                    y: Float($0.point.y),
+                    pressure: Float($0.pressure),
+                    altitude: Float($0.altitude),
+                    azimuth: Float($0.azimuth),
+                    timestamp: Float($0.timestamp)
+                )
+            }),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        memset(summaryBuffer.contents(), 0, MemoryLayout<PrimoMetalStrokePreprocessSummary>.stride)
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(rawSampleBuffer, offset: 0, index: 0)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 1)
+        encoder.setBuffer(summaryBuffer, offset: 0, index: 2)
+        encoder.setBuffer(requestBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: encoder, pipeline: pipeline, count: 1)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+
+        let summary = summaryBuffer.contents().assumingMemoryBound(to: PrimoMetalStrokePreprocessSummary.self).pointee
+        let effectiveCount = Int(summary.effectiveSampleCount)
+        guard effectiveCount > 0 else { return nil }
+        let base = descriptorBuffer.contents().assumingMemoryBound(to: PrimoMetalStrokeSampleDescriptor.self)
+        let descriptors = Array(UnsafeBufferPointer(start: base, count: effectiveCount))
+        let dirtyRect = summary.dirtyWidth > 0 && summary.dirtyHeight > 0
+            ? (
+                originX: Int(summary.dirtyOriginX),
+                originY: Int(summary.dirtyOriginY),
+                width: Int(summary.dirtyWidth),
+                height: Int(summary.dirtyHeight)
+            )
+            : nil
+        return (descriptors: descriptors, sampleBuffer: descriptorBuffer, dirtyRect: dirtyRect)
+    }
+
+    private func generateColorSmudgeDabDescriptors(
+        descriptors: [PrimoMetalStrokeSampleDescriptor],
+        sampleBuffer: MTLBuffer,
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> (
+        descriptors: [PrimoMetalColorSmudgeDabDescriptor],
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
+    )? {
+        guard
+            !descriptors.isEmpty,
+            let commandQueue,
+            let countPipeline = smudgeDabCountPipeline,
+            let generationPipeline = smudgeDabGenerationPipeline,
+            let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(brush, customTip: BrushTipRaster(width: 1, height: 1, alphaData: Data([255])))),
+            let generationDescriptorBuffer = makeBuffer(
+                PrimoMetalSmudgeDabGenerationDescriptor(
+                    sampleCount: UInt32(descriptors.count),
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    stampSpacing: Float(max(CGFloat(brush.stampSpacing), 0.02))
+                )
+            ),
+            let countSummaryBuffer = device?.makeBuffer(length: MemoryLayout<PrimoMetalSmudgeDabCountSummary>.stride, options: .storageModeShared)
+        else {
+            return nil
+        }
+
+        guard let countCommandBuffer = commandQueue.makeCommandBuffer(),
+              let countEncoder = countCommandBuffer.makeComputeCommandEncoder() else {
+            return nil
+        }
+        memset(countSummaryBuffer.contents(), 0, MemoryLayout<PrimoMetalSmudgeDabCountSummary>.stride)
+        countEncoder.setComputePipelineState(countPipeline)
+        countEncoder.setBuffer(sampleBuffer, offset: 0, index: 0)
+        countEncoder.setBuffer(countSummaryBuffer, offset: 0, index: 1)
+        countEncoder.setBuffer(brushBuffer, offset: 0, index: 2)
+        countEncoder.setBuffer(generationDescriptorBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: countEncoder, pipeline: countPipeline, count: 1)
+        countEncoder.endEncoding()
+        countCommandBuffer.commit()
+        countCommandBuffer.waitUntilCompleted()
+        guard countCommandBuffer.status == .completed else { return nil }
+
+        let dabCount = Int(countSummaryBuffer.contents().assumingMemoryBound(to: PrimoMetalSmudgeDabCountSummary.self).pointee.dabCount)
+        guard dabCount > 0,
+              let dabBuffer = device?.makeBuffer(
+                length: dabCount * MemoryLayout<PrimoMetalColorSmudgeDabDescriptor>.stride,
+                options: .storageModeShared
+              ),
+              let generationSummaryBuffer = device?.makeBuffer(
+                length: MemoryLayout<PrimoMetalSmudgeDabGenerationSummary>.stride,
+                options: .storageModeShared
+              ),
+              let generationCommandBuffer = commandQueue.makeCommandBuffer(),
+              let generationEncoder = generationCommandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        memset(generationSummaryBuffer.contents(), 0, MemoryLayout<PrimoMetalSmudgeDabGenerationSummary>.stride)
+        generationEncoder.setComputePipelineState(generationPipeline)
+        generationEncoder.setBuffer(sampleBuffer, offset: 0, index: 0)
+        generationEncoder.setBuffer(dabBuffer, offset: 0, index: 1)
+        generationEncoder.setBuffer(generationSummaryBuffer, offset: 0, index: 2)
+        generationEncoder.setBuffer(brushBuffer, offset: 0, index: 3)
+        generationEncoder.setBuffer(generationDescriptorBuffer, offset: 0, index: 4)
+        dispatchLinear(encoder: generationEncoder, pipeline: generationPipeline, count: 1)
+        generationEncoder.endEncoding()
+        generationCommandBuffer.commit()
+        generationCommandBuffer.waitUntilCompleted()
+        guard generationCommandBuffer.status == .completed else { return nil }
+
+        let summary = generationSummaryBuffer.contents().assumingMemoryBound(to: PrimoMetalSmudgeDabGenerationSummary.self).pointee
+        let generatedCount = Int(summary.dabCount)
+        let base = dabBuffer.contents().assumingMemoryBound(to: PrimoMetalColorSmudgeDabDescriptor.self)
+        let generatedDescriptors = Array(UnsafeBufferPointer(start: base, count: generatedCount))
+        let dirtyRect = summary.dirtyWidth > 0 && summary.dirtyHeight > 0
+            ? (
+                originX: Int(summary.dirtyOriginX),
+                originY: Int(summary.dirtyOriginY),
+                width: Int(summary.dirtyWidth),
+                height: Int(summary.dirtyHeight)
+            )
+            : nil
+        return (descriptors: generatedDescriptors, dirtyRect: dirtyRect)
+    }
+
+    private func resolvedCustomTipMask(_ raster: BrushTipRaster?) -> BrushTipRaster {
         guard let raster else { return BrushTipRaster(width: 1, height: 1, alphaData: Data([255])) }
         guard raster.width > 0, raster.height > 0, raster.alphaData.count == raster.width * raster.height else {
             return BrushTipRaster(width: 1, height: 1, alphaData: Data([255]))
         }
+        let cacheKey = BrushTipCacheKey(width: raster.width, height: raster.height, digest: raster.alphaData.hashValue)
+        if let cached = withCacheLock({ cachedScaledBrushTips[cacheKey] }) {
+            return cached
+        }
         let maxDimension = 64
-        if max(raster.width, raster.height) <= maxDimension { return raster }
+        if max(raster.width, raster.height) <= maxDimension {
+            withCacheLock {
+                cachedScaledBrushTips[cacheKey] = raster
+            }
+            return raster
+        }
         let scale = min(Double(maxDimension) / Double(raster.width), Double(maxDimension) / Double(raster.height))
         let targetWidth = max(1, Int((Double(raster.width) * scale).rounded(.toNearestOrEven)))
         let targetHeight = max(1, Int((Double(raster.height) * scale).rounded(.toNearestOrEven)))
-        var output = [UInt8](repeating: 0, count: targetWidth * targetHeight)
-        raster.alphaData.withUnsafeBytes { sourceBytes in
-            guard let source = sourceBytes.bindMemory(to: UInt8.self).baseAddress else { return }
-            for y in 0..<targetHeight {
-                let sourceY0 = Int((Double(y) * Double(raster.height) / Double(targetHeight)).rounded(.down))
-                let sourceY1 = max(sourceY0 + 1, Int((Double(y + 1) * Double(raster.height) / Double(targetHeight)).rounded(.up)))
-                for x in 0..<targetWidth {
-                    let sourceX0 = Int((Double(x) * Double(raster.width) / Double(targetWidth)).rounded(.down))
-                    let sourceX1 = max(sourceX0 + 1, Int((Double(x + 1) * Double(raster.width) / Double(targetWidth)).rounded(.up)))
-                    var total = 0
-                    var count = 0
-                    for sampleY in sourceY0..<min(sourceY1, raster.height) {
-                        for sampleX in sourceX0..<min(sourceX1, raster.width) {
-                            total += Int(source[(sampleY * raster.width) + sampleX])
-                            count += 1
-                        }
-                    }
-                    output[(y * targetWidth) + x] = UInt8(max(0, min(255, count > 0 ? total / count : 0)))
-                }
+        if let scaledData = scaledMaskData(
+            raster.alphaData,
+            sourceWidth: raster.width,
+            sourceHeight: raster.height,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        ) {
+            let scaled = BrushTipRaster(width: targetWidth, height: targetHeight, alphaData: scaledData)
+            withCacheLock {
+                cachedScaledBrushTips[cacheKey] = scaled
             }
+            return scaled
         }
-        return BrushTipRaster(width: targetWidth, height: targetHeight, alphaData: Data(output))
+        withCacheLock {
+            cachedScaledBrushTips[cacheKey] = raster
+        }
+        return raster
     }
 
     private static func strokeRasterProfile(for brush: BrushRuntimeSettings) -> (wetness: Float, colorMixStrength: Float, smudgeBleed: Float, smudgeRadius: Float, paintLoad: Float) {

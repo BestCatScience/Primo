@@ -215,6 +215,22 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         let copyHeight = min(update.height, maxHeight)
         guard copyWidth > 0, copyHeight > 0 else { return }
 
+        if let handle = update.gpuBufferHandle,
+           PrimoMetalDocumentProcessingClient.shared.populateTexture(
+               texture,
+               from: handle,
+               sourceOriginX: 0,
+               sourceOriginY: 0,
+               destinationOriginX: update.originX,
+               destinationOriginY: update.originY,
+               width: copyWidth,
+               height: copyHeight
+           ) {
+            lastAppliedIncrementalUpdateID = update.id
+            scheduleRedraw()
+            return
+        }
+
         update.pixelData.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return }
             texture.replace(
@@ -375,14 +391,20 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         let start = clock.now
 
         let texture = ensureCompositeTexture(device: device)
-        snapshot.compositePixelData.withUnsafeBytes { bytes in
-            guard let baseAddress = bytes.baseAddress else { return }
-            texture?.replace(
-                region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
-                mipmapLevel: 0,
-                withBytes: baseAddress,
-                bytesPerRow: snapshot.width * 4
-            )
+        if let handle = snapshot.compositeBufferHandle,
+           let texture,
+           PrimoMetalDocumentProcessingClient.shared.populateTexture(texture, from: handle) {
+            // GPU-backed snapshot upload completed directly from cached buffer.
+        } else {
+            snapshot.compositePixelData.withUnsafeBytes { bytes in
+                guard let baseAddress = bytes.baseAddress else { return }
+                texture?.replace(
+                    region: MTLRegionMake2D(0, 0, snapshot.width, snapshot.height),
+                    mipmapLevel: 0,
+                    withBytes: baseAddress,
+                    bytesPerRow: snapshot.width * 4
+                )
+            }
         }
 
         appliedRevision = snapshot.revision
