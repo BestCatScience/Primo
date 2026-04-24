@@ -1,4 +1,5 @@
 import PrimoBrushDomain
+import PrimoCanvasInputDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
@@ -32,6 +33,8 @@ final class InputHandler {
     var strokeStabilization: Float = 0.0
     var pointMapper: ((CGPoint, UIView) -> SIMD2<Float>)?
 
+    private let inputReducer = CanvasInputReducer()
+    private var inputState = CanvasInputReducer.State()
     private var currentStroke: Stroke?
     private var shapeStartPoint: StrokePoint?
     private var currentSelectionPoints: [CGPoint] = []
@@ -41,99 +44,54 @@ final class InputHandler {
         guard let touch = touches.first,
               (touch.type == .pencil || tool == .text) else { return }
 
-        if tool == .select {
-            handleSelectionTouches(touch, with: event, in: view)
-            return
-        }
+        guard let phase = CanvasInputTouchPhase(touch.phase) else { return }
+        let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
+        let commands = inputReducer.reduce(
+            phase: phase,
+            sample: makeInputSample(touch, in: view),
+            coalescedSamples: coalescedTouches.map { makeInputSample($0, in: view) },
+            state: &inputState,
+            configuration: CanvasInputConfiguration(
+                tool: CanvasInputToolKind(tool),
+                selectionMode: selectionMode,
+                shapeMode: shapeMode,
+                brushTipKind: brushTipKind,
+                brushColor: brushColor,
+                brushSize: brushSize,
+                strokeStabilization: strokeStabilization
+            )
+        )
+        dispatch(commands)
+    }
 
-        if tool == .move {
-            handleTransformTouches(touch, in: view)
-            return
-        }
-
-        if tool == .text {
-            guard touch.phase == .began else { return }
-            delegate?.didRequestTextPlacement(at: makePoint(touch, in: view, predicted: false).cgPoint)
-            currentStroke = nil
-            shapeStartPoint = nil
-            return
-        }
-
-        if tool == .fill {
-            guard touch.phase == .began else { return }
-            delegate?.didRequestFill(at: makePoint(touch, in: view, predicted: false).stylusSample)
-            currentStroke = nil
-            shapeStartPoint = nil
-            return
-        }
-
-        if tool == .eyedropper {
-            switch touch.phase {
-            case .began, .moved, .stationary:
-                delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
-            case .ended, .cancelled:
-                delegate?.didRequestColorSample(at: makePoint(touch, in: view, predicted: false).stylusSample)
-                currentStroke = nil
-                shapeStartPoint = nil
-            default:
-                break
+    private func dispatch(_ commands: [CanvasInputCommand]) {
+        for command in commands {
+            switch command {
+            case let .updateStroke(stroke):
+                delegate?.didUpdateStroke(Stroke(stroke))
+            case let .endStroke(stroke):
+                delegate?.didEndStroke(Stroke(stroke))
+            case .cancelStroke:
+                delegate?.didCancelStroke()
+            case let .requestFill(sample):
+                delegate?.didRequestFill(at: sample)
+            case let .requestColorSample(sample):
+                delegate?.didRequestColorSample(at: sample)
+            case let .updateSelectionPath(points):
+                delegate?.didUpdateSelectionPath(points)
+            case let .endSelectionPath(points):
+                delegate?.didEndSelectionPath(points)
+            case let .requestAutoSelection(sample):
+                delegate?.didRequestAutoSelection(at: sample)
+            case let .requestTextPlacement(point):
+                delegate?.didRequestTextPlacement(at: point)
+            case .beginTransform:
+                delegate?.didBeginTransform()
+            case let .updateTransform(translation):
+                delegate?.didUpdateTransform(translation: translation)
+            case let .endTransform(translation):
+                delegate?.didEndTransform(translation: translation)
             }
-            return
-        }
-
-        switch touch.phase {
-        case .began:
-            let firstPoint = makePoint(touch, in: view, predicted: false)
-            shapeStartPoint = firstPoint
-            currentStroke = Stroke(points: [firstPoint], predictedPoints: [], color: brushColor, brushSize: brushSize)
-            if let stroke = currentStroke {
-                delegate?.didUpdateStroke(stroke)
-            }
-            return
-
-        case .moved:
-            guard var stroke = currentStroke else { return }
-
-            if tool == .shape, let shapeStartPoint {
-                let currentPoint = makePoint(touch, in: view, predicted: false)
-                stroke.points = shapePoints(from: shapeStartPoint, to: currentPoint, predicted: false)
-                stroke.predictedPoints.removeAll()
-            } else {
-                let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
-                appendFilteredPoints(from: coalescedTouches, to: &stroke, in: view, isFinishingStroke: false)
-                stroke.predictedPoints.removeAll()
-            }
-
-            currentStroke = stroke
-            delegate?.didUpdateStroke(stroke)
-
-        case .stationary:
-            return
-
-        case .ended:
-            if var stroke = currentStroke {
-                if tool == .shape, let shapeStartPoint {
-                    let finalPoint = makePoint(touch, in: view, predicted: false)
-                    stroke.points = shapePoints(from: shapeStartPoint, to: finalPoint, predicted: false)
-                } else {
-                    let finishingTouches = event?.coalescedTouches(for: touch) ?? [touch]
-                    appendFilteredPoints(from: finishingTouches, to: &stroke, in: view, isFinishingStroke: true)
-                }
-
-                var finalStroke = stroke
-                finalStroke.predictedPoints.removeAll()
-                delegate?.didEndStroke(finalStroke)
-            }
-            currentStroke = nil
-            shapeStartPoint = nil
-
-        case .cancelled:
-            currentStroke = nil
-            shapeStartPoint = nil
-            delegate?.didCancelStroke()
-
-        default:
-            break
         }
     }
 
@@ -223,6 +181,18 @@ final class InputHandler {
             azimuth: Float(touch.azimuthAngle(in: view)),
             timestamp: touch.timestamp,
             isPredicted: predicted
+        )
+    }
+
+    private func makeInputSample(_ touch: UITouch, in view: UIView) -> CanvasInputSample {
+        let location = touch.preciseLocation(in: view)
+        let mappedPosition = pointMapper?(location, view) ?? SIMD2(Float(location.x), Float(location.y))
+        return CanvasInputSample(
+            point: CGPoint(x: CGFloat(mappedPosition.x), y: CGFloat(mappedPosition.y)),
+            pressure: normalizedPressure(for: touch),
+            altitude: Float(touch.altitudeAngle),
+            azimuth: Float(touch.azimuthAngle(in: view)),
+            timestamp: touch.timestamp
         )
     }
 
@@ -475,6 +445,74 @@ final class InputHandler {
             azimuth: start.azimuth + ((end.azimuth - start.azimuth) * progress),
             timestamp: start.timestamp + Double(Float(end.timestamp - start.timestamp) * progress),
             isPredicted: predicted
+        )
+    }
+}
+
+private extension CanvasInputTouchPhase {
+    init?(_ phase: UITouch.Phase) {
+        switch phase {
+        case .began:
+            self = .began
+        case .moved:
+            self = .moved
+        case .stationary:
+            self = .stationary
+        case .ended:
+            self = .ended
+        case .cancelled:
+            self = .cancelled
+        @unknown default:
+            return nil
+        }
+    }
+}
+
+private extension CanvasInputToolKind {
+    init(_ tool: StudioToolKind) {
+        switch tool {
+        case .brush:
+            self = .brush
+        case .erase:
+            self = .erase
+        case .blur:
+            self = .blur
+        case .fill:
+            self = .fill
+        case .eyedropper:
+            self = .eyedropper
+        case .select:
+            self = .select
+        case .move:
+            self = .move
+        case .shape:
+            self = .shape
+        case .text:
+            self = .text
+        }
+    }
+}
+
+private extension Stroke {
+    init(_ stroke: CanvasInputStroke) {
+        self.init(
+            points: stroke.points.map(StrokePoint.init(_:)),
+            predictedPoints: stroke.predictedPoints.map(StrokePoint.init(_:)),
+            color: stroke.color,
+            brushSize: stroke.brushSize
+        )
+    }
+}
+
+private extension StrokePoint {
+    init(_ point: CanvasStrokePoint) {
+        self.init(
+            position: point.position,
+            pressure: point.pressure,
+            altitude: point.altitude,
+            azimuth: point.azimuth,
+            timestamp: point.timestamp,
+            isPredicted: point.isPredicted
         )
     }
 }

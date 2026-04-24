@@ -272,3 +272,135 @@ public struct DocumentInteractionService: Sendable {
         execute(.redo).map { _ in () }
     }
 }
+
+public struct DocumentCanvasCommandService: Sendable {
+    public var createCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public var resizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public var resizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public var initializeImportedCanvas: @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult
+    public var compositeSurface: @Sendable () -> DocumentCompositeSurface
+
+    public init(
+        createCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        resizeCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        resizeCanvasExtent: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
+        initializeImportedCanvas: @escaping @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult,
+        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface
+    ) {
+        self.createCanvas = createCanvas
+        self.resizeCanvas = resizeCanvas
+        self.resizeCanvasExtent = resizeCanvasExtent
+        self.initializeImportedCanvas = initializeImportedCanvas
+        self.compositeSurface = compositeSurface
+    }
+
+    public init(interactionService: DocumentInteractionService) {
+        self.init(
+            createCanvas: interactionService.createCanvas(width:height:),
+            resizeCanvas: interactionService.resizeCanvas(width:height:),
+            resizeCanvasExtent: interactionService.resizeCanvasExtent(width:height:),
+            initializeImportedCanvas: interactionService.initializeImportedCanvas(_:layerName:),
+            compositeSurface: interactionService.compositeSurface
+        )
+    }
+}
+
+public struct DocumentLayerCommandService: Sendable {
+    public var ensureLayerVisible: @Sendable (Int) -> DocumentMutationResult
+    public var replaceLayerPixels: @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult
+    public var replaceLayerPixelsInRect: @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult
+    public var applyLayerMutation: @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
+    public var applyTextLayerMutation: @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
+    public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+
+    public init(
+        ensureLayerVisible: @escaping @Sendable (Int) -> DocumentMutationResult,
+        replaceLayerPixels: @escaping @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult,
+        replaceLayerPixelsInRect: @escaping @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult,
+        applyLayerMutation: @escaping @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult,
+        applyTextLayerMutation: @escaping @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult,
+        revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult
+    ) {
+        self.ensureLayerVisible = ensureLayerVisible
+        self.replaceLayerPixels = replaceLayerPixels
+        self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
+        self.applyLayerMutation = applyLayerMutation
+        self.applyTextLayerMutation = applyTextLayerMutation
+        self.revealLayerForEditing = revealLayerForEditing
+    }
+
+    public init(interactionService: DocumentInteractionService) {
+        self.init(
+            ensureLayerVisible: interactionService.ensureLayerVisible,
+            replaceLayerPixels: interactionService.replaceLayerPixels(_:pixelData:),
+            replaceLayerPixelsInRect: interactionService.replaceLayerPixels(_:in:pixelData:),
+            applyLayerMutation: interactionService.applyLayerMutation(_:payload:),
+            applyTextLayerMutation: interactionService.applyTextLayerMutation(_:textLayer:payload:),
+            revealLayerForEditing: interactionService.revealLayerForEditing
+        )
+    }
+}
+
+public struct DocumentStrokeCommandService: Sendable {
+    public var beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void
+    public var appendStroke: @Sendable (StylusSample) -> Void
+    public var endStroke: @Sendable () -> Void
+    public var cancelStroke: @Sendable () -> Void
+    public var applySoftwareStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
+    public var blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
+    public var endBlurStroke: @Sendable () -> Void
+    public var fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
+
+    public init(
+        beginStroke: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void,
+        appendStroke: @escaping @Sendable (StylusSample) -> Void,
+        endStroke: @escaping @Sendable () -> Void,
+        cancelStroke: @escaping @Sendable () -> Void,
+        applySoftwareStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
+        blurStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult,
+        endBlurStroke: @escaping @Sendable () -> Void,
+        fill: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
+    ) {
+        self.beginStroke = beginStroke
+        self.appendStroke = appendStroke
+        self.endStroke = endStroke
+        self.cancelStroke = cancelStroke
+        self.applySoftwareStroke = applySoftwareStroke
+        self.blurStroke = blurStroke
+        self.endBlurStroke = endBlurStroke
+        self.fill = fill
+    }
+
+    public init(interactionService: DocumentInteractionService) {
+        self.init(
+            beginStroke: interactionService.beginStroke(_:brush:),
+            appendStroke: interactionService.appendStroke,
+            endStroke: interactionService.endStroke,
+            cancelStroke: interactionService.cancelStroke,
+            applySoftwareStroke: interactionService.applySoftwareStroke(_:brush:layerIndex:),
+            blurStroke: interactionService.blurStroke(_:brush:layerIndex:clearSelectionAfterBlur:),
+            endBlurStroke: interactionService.endBlurStroke,
+            fill: interactionService.fill(_:brush:)
+        )
+    }
+}
+
+public struct DocumentHistoryCommandService: Sendable {
+    public var undo: @Sendable () -> DocumentMutationResult
+    public var redo: @Sendable () -> DocumentMutationResult
+
+    public init(
+        undo: @escaping @Sendable () -> DocumentMutationResult,
+        redo: @escaping @Sendable () -> DocumentMutationResult
+    ) {
+        self.undo = undo
+        self.redo = redo
+    }
+
+    public init(interactionService: DocumentInteractionService) {
+        self.init(
+            undo: interactionService.undo,
+            redo: interactionService.redo
+        )
+    }
+}

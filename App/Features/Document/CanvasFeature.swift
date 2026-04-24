@@ -3,7 +3,6 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentMetalRuntimeInfrastructure
 import simd
 
 @Reducer
@@ -241,12 +240,10 @@ struct CanvasFeature {
         }
 
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
-            releasePendingIncrementalUpdate(replacingWith: update)
             pendingIncrementalUpdate = update
         }
 
         mutating func clearPendingIncrementalUpdate() {
-            releasePendingIncrementalUpdate(replacingWith: nil)
             pendingIncrementalUpdate = nil
         }
 
@@ -317,17 +314,6 @@ struct CanvasFeature {
             pendingStrokeFinalizationSamples = []
             clearPendingIncrementalUpdate()
         }
-
-        private mutating func releasePendingIncrementalUpdate(replacingWith nextUpdate: IncrementalLayerUpdate?) {
-            guard
-                let currentHandle = pendingIncrementalUpdate?.gpuBufferHandle,
-                currentHandle.id != nextUpdate?.gpuBufferHandle?.id
-            else {
-                return
-            }
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(currentHandle)
-        }
-
         mutating func setActiveTextLayer(_ textLayer: TextLayerData?) {
             activeTextLayer = textLayer
         }

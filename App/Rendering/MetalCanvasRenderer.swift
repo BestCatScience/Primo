@@ -1,6 +1,8 @@
 import CoreGraphics
+import PrimoCanvasPresentationInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentRenderingInfrastructure
 import UIKit
@@ -18,6 +20,7 @@ struct CanvasRenderSurfaceUpdate {
 
 final class CanvasRenderSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
+    private let renderSession = CanvasRenderSession()
     private var lastPreviewResetNonce = 0
     private(set) var currentActiveLayerIndex: Int = 0
 
@@ -42,6 +45,18 @@ final class CanvasRenderSurfaceView: UIView {
     }
 
     func render(_ update: CanvasRenderSurfaceUpdate) {
+        renderSession.retainResources(
+            for: RenderFrameUpdate(
+                snapshot: update.snapshot,
+                activeLayerIndex: update.activeLayerIndex,
+                incrementalUpdate: update.incrementalUpdate,
+                documentSize: update.documentSize,
+                viewportOffset: update.viewportOffset,
+                zoomScale: update.zoomScale,
+                paperStyle: update.paperStyle,
+                previewResetNonce: update.previewResetNonce
+            )
+        )
         currentActiveLayerIndex = update.activeLayerIndex
         backend.currentActiveLayerIndex = update.activeLayerIndex
         backend.updateDocumentSize(update.documentSize)

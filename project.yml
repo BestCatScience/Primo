@@ -31,7 +31,15 @@ targets:
       - package: PrimoModules
         product: PrimoWorkspaceApplication
       - package: PrimoModules
+        product: PrimoCanvasInputDomain
+      - package: PrimoModules
         product: PrimoDocumentEngineInfrastructure
+      - package: PrimoModules
+        product: PrimoDocumentStrokeApplication
+      - package: PrimoModules
+        product: PrimoDocumentMetalStrokeInfrastructure
+      - package: PrimoModules
+        product: PrimoCanvasPresentationInfrastructure
       - package: PrimoModules
         product: PrimoDocumentRenderingInfrastructure
       - package: PrimoModules

@@ -11,9 +11,15 @@ let package = Package(
         .library(name: "PrimoCoreTypes", targets: ["PrimoCoreTypes"]),
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
+        .library(name: "PrimoCanvasInputDomain", targets: ["PrimoCanvasInputDomain"]),
+        .library(name: "PrimoDocumentGPUContracts", targets: ["PrimoDocumentGPUContracts"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
+        .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoDocumentMetalRuntimeInfrastructure", targets: ["PrimoDocumentMetalRuntimeInfrastructure"]),
+        .library(name: "PrimoDocumentMetalStrokeInfrastructure", targets: ["PrimoDocumentMetalStrokeInfrastructure"]),
+        .library(name: "PrimoDocumentMetalLayerInfrastructure", targets: ["PrimoDocumentMetalLayerInfrastructure"]),
+        .library(name: "PrimoCanvasPresentationInfrastructure", targets: ["PrimoCanvasPresentationInfrastructure"]),
         .library(name: "PrimoDocumentEngineInfrastructure", targets: ["PrimoDocumentEngineInfrastructure"]),
         .library(name: "PrimoDocumentRenderingInfrastructure", targets: ["PrimoDocumentRenderingInfrastructure"]),
         .library(name: "PrimoDocumentPersistenceInfrastructure", targets: ["PrimoDocumentPersistenceInfrastructure"]),
@@ -42,11 +48,36 @@ let package = Package(
             dependencies: ["PrimoCoreTypes"]
         ),
         .target(
+            name: "PrimoCanvasInputDomain",
+            dependencies: [
+                "PrimoBrushDomain",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+            ]
+        ),
+        .target(
+            name: "PrimoDocumentGPUContracts",
+            dependencies: [
+                "PrimoBrushDomain",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+            ]
+        ),
+        .target(
             name: "PrimoDocumentApplication",
             dependencies: [
                 "PrimoDocumentDomain",
                 "PrimoDocumentContracts",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+            ]
+        ),
+        .target(
+            name: "PrimoDocumentStrokeApplication",
+            dependencies: [
+                "PrimoDocumentApplication",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentGPUContracts",
             ]
         ),
         .target(
@@ -68,11 +99,33 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PrimoDocumentMetalStrokeInfrastructure",
+            dependencies: [
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentRenderingInfrastructure",
+            ]
+        ),
+        .target(
+            name: "PrimoDocumentMetalLayerInfrastructure",
+            dependencies: [
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentRenderingInfrastructure",
+            ]
+        ),
+        .target(
+            name: "PrimoCanvasPresentationInfrastructure",
+            dependencies: [
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+            ]
+        ),
+        .target(
             name: "PrimoDocumentRenderingInfrastructure",
             dependencies: [
                 "PrimoDocumentApplication",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoDocumentGPUContracts",
                 "PrimoDocumentMetalRuntimeInfrastructure",
             ],
             path: "Sources/PrimoDocumentRenderingInfrastructure"
@@ -198,6 +251,24 @@ let package = Package(
         .testTarget(
             name: "PrimoWorkspaceDomainTests",
             dependencies: ["PrimoWorkspaceDomain"]
+        ),
+        .testTarget(
+            name: "PrimoCanvasInputDomainTests",
+            dependencies: ["PrimoCanvasInputDomain"]
+        ),
+        .testTarget(
+            name: "PrimoCanvasPresentationInfrastructureTests",
+            dependencies: [
+                "PrimoCanvasPresentationInfrastructure",
+                "PrimoDocumentGPUContracts",
+            ]
+        ),
+        .testTarget(
+            name: "PrimoDocumentStrokeApplicationTests",
+            dependencies: [
+                "PrimoDocumentStrokeApplication",
+                "PrimoDocumentGPUContracts",
+            ]
         ),
         .testTarget(
             name: "PrimoWorkspaceApplicationTests",

@@ -3,7 +3,10 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+import PrimoDocumentMetalStrokeInfrastructure
 import PrimoDocumentRenderingInfrastructure
+import PrimoDocumentStrokeApplication
 
 extension AppFeature {
     typealias StrokePreviewPlan = DocumentStrokePreviewPlan
@@ -119,101 +122,6 @@ extension AppFeature {
                 resolution.plan,
                 activeLayerIndex,
                 &state
-            )
-        }
-    }
-
-    struct CanvasStrokePreviewResolver {
-        fileprivate func resolveInitial(
-            state: State,
-            sample: StylusSample,
-            context: CanvasStrokeContext,
-            makePreviewPlan: (
-                MetalDocumentSnapshot,
-                Int,
-                Data,
-                MetalBufferHandle?,
-                [StylusSample],
-                BrushRuntimeSettings,
-                Bool,
-                Bool
-            ) -> StrokePreviewPlan?
-        ) -> StrokePreviewResolution? {
-            guard let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                  let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex }),
-                  let previewPlan = makePreviewPlan(
-                    baseSnapshot,
-                    context.activeLayerIndex,
-                    baseLayer.pixelData,
-                    baseLayer.gpuBufferHandle,
-                    [sample],
-                    context.previewBrush,
-                    context.activeLayer.isAlphaLocked,
-                    state.usesResponsiveOilPreview(for: context.previewBrush)
-                  )
-            else {
-                return nil
-            }
-            return StrokePreviewResolution(plan: previewPlan)
-        }
-
-        fileprivate func resolveAppended(
-            state: State,
-            samples: [StylusSample],
-            context: CanvasStrokeContext,
-            makePreviewPlan: (
-                MetalDocumentSnapshot,
-                Int,
-                Data,
-                MetalBufferHandle?,
-                [StylusSample],
-                BrushRuntimeSettings,
-                Bool,
-                Bool
-            ) -> StrokePreviewPlan?
-        ) -> StrokePreviewResolution? {
-            guard !samples.isEmpty else { return nil }
-            if
-                let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex })
-            {
-                let fullSamples = !state.canvas.pendingStrokeFinalizationSamples.isEmpty
-                    ? state.canvas.pendingStrokeFinalizationSamples
-                    : (state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples)
-                guard let previewPlan = makePreviewPlan(
-                    baseSnapshot,
-                    context.activeLayerIndex,
-                    baseLayer.pixelData,
-                    baseLayer.gpuBufferHandle,
-                    fullSamples,
-                    context.previewBrush,
-                    context.activeLayer.isAlphaLocked,
-                    state.usesResponsiveOilPreview(for: context.previewBrush)
-                ) else {
-                    return nil
-                }
-                return StrokePreviewResolution(plan: previewPlan)
-            }
-
-            guard
-                let snapshot = state.canvas.renderSnapshot,
-                let baseLayer = snapshot.layers.first(where: { $0.index == context.activeLayerIndex }),
-                let previewPlan = makePreviewPlan(
-                    snapshot,
-                    context.activeLayerIndex,
-                    baseLayer.pixelData,
-                    baseLayer.gpuBufferHandle,
-                    samples,
-                    context.previewBrush,
-                    context.activeLayer.isAlphaLocked,
-                    state.usesResponsiveOilPreview(for: context.previewBrush)
-                )
-            else {
-                return nil
-            }
-            return StrokePreviewResolution(
-                plan: previewPlan,
-                baseSnapshotToCapture: snapshot
             )
         }
     }
@@ -503,10 +411,6 @@ extension AppFeature {
         CanvasStrokeStateCoordinator(workflowService: documentInteractionService)
     }
 
-    var canvasStrokePreviewResolver: CanvasStrokePreviewResolver {
-        CanvasStrokePreviewResolver()
-    }
-
     var canvasStrokeCommitService: CanvasStrokeCommitService {
         CanvasStrokeCommitService(
             workflowService: documentInteractionService,
@@ -516,6 +420,18 @@ extension AppFeature {
 
     var canvasStrokeProcessingService: DocumentStrokeProcessingService {
         DocumentStrokeProcessingService()
+    }
+
+    var canvasStrokePreviewUseCase: DocumentStrokePreviewUseCase {
+        DocumentStrokePreviewUseCase(
+            planner: MetalStrokeRenderer(processingService: canvasStrokeProcessingService)
+        )
+    }
+
+    var canvasStrokeCommitUseCase: DocumentStrokeCommitUseCase {
+        DocumentStrokeCommitUseCase(
+            renderer: MetalStrokeRenderer(processingService: canvasStrokeProcessingService)
+        )
     }
 
     var canvasStrokeEffectCoordinator: CanvasStrokeEffectCoordinator {
@@ -599,23 +515,12 @@ extension AppFeature {
         sample: StylusSample,
         context: CanvasStrokeContext
     ) -> StrokePreviewResolution? {
-        canvasStrokePreviewResolver.resolveInitial(
-            state: state,
+        canvasStrokePreviewUseCase.resolveInitial(
+            baseSnapshot: state.canvas.activeStrokeBaseSnapshot,
             sample: sample,
-            context: context,
-            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, baseBufferHandle, samples, brush, preserveAlphaLockedPixels, usesResponsiveOilPreview in
-                makeStrokePreviewPlan(
-                    snapshot: snapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    basePixelData: basePixelData,
-                    baseBufferHandle: baseBufferHandle,
-                    samples: samples,
-                    brush: brush,
-                    preserveAlphaLockedPixels: preserveAlphaLockedPixels,
-                    usesResponsiveOilPreview: usesResponsiveOilPreview
-                )
-            }
-        )
+            context: DocumentStrokeContext(context),
+            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
+        ).flatMap(StrokePreviewResolution.init(_:))
     }
 
     func resolveAppendedStrokePreview(
@@ -623,23 +528,17 @@ extension AppFeature {
         samples: [StylusSample],
         context: CanvasStrokeContext
     ) -> StrokePreviewResolution? {
-        canvasStrokePreviewResolver.resolveAppended(
-            state: state,
+        let fullSamples = !state.canvas.pendingStrokeFinalizationSamples.isEmpty
+            ? state.canvas.pendingStrokeFinalizationSamples
+            : (state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples)
+        return canvasStrokePreviewUseCase.resolveAppended(
+            activeStrokeBaseSnapshot: state.canvas.activeStrokeBaseSnapshot,
+            renderSnapshot: state.canvas.renderSnapshot,
             samples: samples,
-            context: context,
-            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, baseBufferHandle, samples, brush, preserveAlphaLockedPixels, usesResponsiveOilPreview in
-                makeStrokePreviewPlan(
-                    snapshot: snapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    basePixelData: basePixelData,
-                    baseBufferHandle: baseBufferHandle,
-                    samples: samples,
-                    brush: brush,
-                    preserveAlphaLockedPixels: preserveAlphaLockedPixels,
-                    usesResponsiveOilPreview: usesResponsiveOilPreview
-                )
-            }
-        )
+            fullSamples: fullSamples,
+            context: DocumentStrokeContext(context),
+            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
+        ).flatMap(StrokePreviewResolution.init(_:))
     }
 
     func applyStrokePreviewResolution(
@@ -714,28 +613,6 @@ extension AppFeature {
         )
     }
 
-    fileprivate func makeStrokePreviewPlan(
-        snapshot: MetalDocumentSnapshot,
-        activeLayerIndex: Int,
-        basePixelData: Data,
-        baseBufferHandle: MetalBufferHandle?,
-        samples: [StylusSample],
-        brush: BrushRuntimeSettings,
-        preserveAlphaLockedPixels: Bool,
-        usesResponsiveOilPreview: Bool
-    ) -> StrokePreviewPlan? {
-        canvasStrokeProcessingService.makePreviewPlan(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            basePixelData: basePixelData,
-            baseBufferHandle: baseBufferHandle,
-            samples: samples,
-            brush: brush,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels,
-            usesResponsiveOilPreview: usesResponsiveOilPreview
-        )
-    }
-
     func applyStrokePreviewPlan(
         _ plan: StrokePreviewPlan,
         activeLayerIndex: Int,
@@ -785,19 +662,22 @@ extension AppFeature {
             : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
         guard
             let snapshot = fallbackSnapshot,
-            let adjustedPixels = canvasStrokeProcessingService.makeCommittedPixels(
+            let committedResult = canvasStrokeCommitUseCase.makeCommittedPixels(
                 snapshot: snapshot,
-                activeLayerIndex: state.canvas.activeLayerIndex,
                 samples: samples,
-                brush: brush,
-                preserveAlphaLockedPixels: activeLayer.isAlphaLocked
+                context: DocumentStrokeContext(
+                    activeLayer: activeLayer,
+                    activeLayerIndex: state.canvas.activeLayerIndex,
+                    brush: brush,
+                    previewBrush: brush
+                )
             )
         else {
             return .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
         }
         return documentInteractionService.replaceLayerPixels(
             state.canvas.activeLayerIndex,
-            pixelData: adjustedPixels
+            pixelData: committedResult.committedPixels
         )
     }
 
@@ -1023,6 +903,42 @@ extension AppFeature {
                     return .failure(failure)
                 }
             }
+        )
+    }
+}
+
+private extension DocumentStrokeContext {
+    init(_ context: AppFeature.CanvasStrokeContext) {
+        self.init(
+            activeLayer: context.activeLayer,
+            activeLayerIndex: context.activeLayerIndex,
+            brush: context.brush,
+            previewBrush: context.previewBrush
+        )
+    }
+}
+
+private extension AppFeature.StrokePreviewResolution {
+    init?(_ resolution: DocumentStrokePreviewResolution) {
+        self.init(
+            plan: DocumentStrokePreviewPlan(resolution.result),
+            baseSnapshotToCapture: resolution.baseSnapshotToCapture
+        )
+    }
+}
+
+private extension DocumentStrokePreviewPlan {
+    init(_ result: StrokePreviewResult) {
+        self.init(
+            baseSnapshot: result.baseSnapshot,
+            adjustedPixels: result.adjustedPixels,
+            adjustedBufferHandle: result.adjustedHandle?.buffer,
+            dirtyRect: result.dirtyRect.map {
+                (originX: $0.originX, originY: $0.originY, width: $0.width, height: $0.height)
+            },
+            rectPixelData: result.rectPixelData,
+            incrementalUpdate: result.incrementalUpdate,
+            isApproximatePreview: result.isApproximatePreview
         )
     }
 }
