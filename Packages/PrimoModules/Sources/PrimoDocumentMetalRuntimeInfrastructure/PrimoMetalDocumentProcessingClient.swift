@@ -6,7 +6,6 @@ import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentStrokeInfrastructure
 
 private struct PrimoMetalCompositeLayerDescriptor {
     let documentIndex: Int32
@@ -207,6 +206,10 @@ private struct PrimoMetalStrokeBrushDescriptor {
     let blue: Float
     let scatterLateral: Float
     let scatterLinear: Float
+    let count: Float
+    let countJitter: Float
+    let countSizeJitter: Float
+    let countOpacityJitter: Float
     let dualScale: Float
     let dualSpacing: Float
     let dualScatter: Float
@@ -241,6 +244,14 @@ private struct PrimoMetalColorSmudgeDabDescriptor {
     let radius: Float
 }
 
+private struct PrimoMetalColorSmudgeDab {
+    let center: CGPoint
+    let radius: CGFloat
+    let progress: CGFloat
+    let sample: StylusSample
+    let destinationRect: CGRect
+}
+
 private struct PrimoMetalStrokeRasterRequestDescriptor {
     let canvasWidth: UInt32
     let canvasHeight: UInt32
@@ -249,8 +260,13 @@ private struct PrimoMetalStrokeRasterRequestDescriptor {
     let rectWidth: UInt32
     let rectHeight: UInt32
     let sampleCount: UInt32
+    let inputSampleCount: UInt32
     let tileSize: UInt32
     let tileColumns: UInt32
+    let tileRows: UInt32
+    let tileCount: UInt32
+    let maxPrimitiveIndexCount: UInt32
+    let prefixBlockSize: UInt32
 }
 
 private struct PrimoMetalStrokePrimitiveDescriptor {
@@ -280,6 +296,11 @@ private struct PrimoMetalStrokeRectCopyDescriptor {
     let originY: UInt32
     let rectWidth: UInt32
     let rectHeight: UInt32
+}
+
+private struct PrimoMetalStrokePrefixDescriptor {
+    let elementCount: UInt32
+    let blockSize: UInt32
 }
 
 public enum PrimoMetalStrokeExecutionMode: Equatable, Sendable {
@@ -348,6 +369,14 @@ public struct PrimoMetalStrokeMutationResult: Sendable {
     }
 }
 
+struct PrimoMetalStrokeBinningDebugSummary: Sendable, Equatable {
+    let primitiveCount: Int
+    let tileCount: Int
+    let totalPrimitiveReferences: Int
+    let monotonicTileOffsets: Bool
+    let primitiveIndexBoundsValid: Bool
+}
+
 private struct PrimoMetalStrokeDirtyRect: Equatable {
     let originX: Int
     let originY: Int
@@ -395,13 +424,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         var lastOutputValid: Bool
     }
 
-    private struct StrokePrimitiveBinning {
-        let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
-        let tileSize: Int
-        let tileColumns: Int
-        let primitives: [PrimoMetalStrokePrimitiveDescriptor]
-        let tileRanges: [PrimoMetalStrokeTileRangeDescriptor]
-        let primitiveIndices: [UInt32]
+    private struct StrokeBinningResources {
+        let primitiveBuffer: MTLBuffer
+        let tileRangeBuffer: MTLBuffer
+        let primitiveIndexBuffer: MTLBuffer
+        let requestDescriptor: PrimoMetalStrokeRasterRequestDescriptor
     }
 
     private struct StrokeExecutionContext {
@@ -412,6 +439,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     }
 
     private static let logger = Logger(subsystem: "com.primo.modules", category: "MetalRuntime")
+    private static let strokeTileSize = 32
+    private static let strokePrefixBlockSize = 256
 
     let device: MTLDevice?
     let commandQueue: MTLCommandQueue?
@@ -449,6 +478,14 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     let inpaintCropMaskPipeline: MTLComputePipelineState?
     let inpaintCompositePipeline: MTLComputePipelineState?
     let alphaPreservePipeline: MTLComputePipelineState?
+    let strokePrimitiveGenerationPipeline: MTLComputePipelineState?
+    let strokeTileCountPipeline: MTLComputePipelineState?
+    let strokePrefixScanPipeline: MTLComputePipelineState?
+    let strokePrefixBlockScanPipeline: MTLComputePipelineState?
+    let strokePrefixAddPipeline: MTLComputePipelineState?
+    let strokeTileRangePipeline: MTLComputePipelineState?
+    let strokeCursorInitPipeline: MTLComputePipelineState?
+    let strokePrimitiveScatterPipeline: MTLComputePipelineState?
     let strokeRasterPipeline: MTLComputePipelineState?
     let strokeColorSmudgePipeline: MTLComputePipelineState?
     let copyStrokeRectPipeline: MTLComputePipelineState?
@@ -495,6 +532,14 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.inpaintCropMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "inpaintCropMaskKernel")
         self.inpaintCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "inpaintCompositeKernel")
         self.alphaPreservePipeline = Self.makePipeline(device: device, library: library, functionName: "alphaPreserveKernel")
+        self.strokePrimitiveGenerationPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrimitiveGenerationKernel")
+        self.strokeTileCountPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeTileCountKernel")
+        self.strokePrefixScanPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrefixScanKernel")
+        self.strokePrefixBlockScanPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrefixBlockScanKernel")
+        self.strokePrefixAddPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrefixAddKernel")
+        self.strokeTileRangePipeline = Self.makePipeline(device: device, library: library, functionName: "strokeTileRangeKernel")
+        self.strokeCursorInitPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeCursorInitKernel")
+        self.strokePrimitiveScatterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrimitiveScatterKernel")
         self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
         self.strokeColorSmudgePipeline = Self.makePipeline(device: device, library: library, functionName: "strokeColorSmudgeKernel")
         self.copyStrokeRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copyStrokeRectKernel")
@@ -536,6 +581,14 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         inpaintCropMaskPipeline != nil &&
         inpaintCompositePipeline != nil &&
         alphaPreservePipeline != nil &&
+        strokePrimitiveGenerationPipeline != nil &&
+        strokeTileCountPipeline != nil &&
+        strokePrefixScanPipeline != nil &&
+        strokePrefixBlockScanPipeline != nil &&
+        strokePrefixAddPipeline != nil &&
+        strokeTileRangePipeline != nil &&
+        strokeCursorInitPipeline != nil &&
+        strokePrimitiveScatterPipeline != nil &&
         strokeRasterPipeline != nil &&
         strokeColorSmudgePipeline != nil &&
         copyStrokeRectPipeline != nil
@@ -1273,13 +1326,6 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 brush: request.brush,
                 canvasWidth: request.canvasWidth,
                 canvasHeight: request.canvasHeight
-            ),
-            let primitiveBinning = Self.makeStrokePrimitiveBinning(
-                descriptors: descriptors,
-                brush: request.brush,
-                canvasWidth: request.canvasWidth,
-                canvasHeight: request.canvasHeight,
-                dirtyRect: dirtyRect
             )
         else {
             return (
@@ -1293,24 +1339,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
         let customTip = Self.makeCustomTipMask(request.brush.customTip)
         guard
-            let primitiveBuffer = makeBuffer(primitiveBinning.primitives),
-            let tileRangeBuffer = makeBuffer(primitiveBinning.tileRanges),
-            let primitiveIndexBuffer = makeBuffer(primitiveBinning.primitiveIndices),
+            let sampleBuffer = makeBuffer(descriptors),
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(request.brush, customTip: customTip)),
             let customTipBuffer = makeBuffer(customTip.alphaData),
-            let requestBuffer = makeBuffer(
-                PrimoMetalStrokeRasterRequestDescriptor(
-                    canvasWidth: UInt32(request.canvasWidth),
-                    canvasHeight: UInt32(request.canvasHeight),
-                    originX: UInt32(dirtyRect.originX),
-                    originY: UInt32(dirtyRect.originY),
-                    rectWidth: UInt32(dirtyRect.width),
-                    rectHeight: UInt32(dirtyRect.height),
-                    sampleCount: UInt32(primitiveBinning.primitives.count),
-                    tileSize: UInt32(primitiveBinning.tileSize),
-                    tileColumns: UInt32(primitiveBinning.tileColumns)
-                )
-            ),
             let copyRequestBuffer = makeBuffer(
                 PrimoMetalStrokeRectCopyDescriptor(
                     canvasWidth: UInt32(request.canvasWidth),
@@ -1321,12 +1352,26 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     rectHeight: UInt32(dirtyRect.height)
                 )
             ),
-            let commandBuffer = commandQueue.makeCommandBuffer(),
-            let copyEncoder = commandBuffer.makeComputeCommandEncoder()
+            let commandBuffer = commandQueue.makeCommandBuffer()
         else {
             return nil
         }
 
+        guard let binningResources = makeStrokeBinningResources(
+            commandBuffer: commandBuffer,
+            descriptors: descriptors,
+            sampleBuffer: sampleBuffer,
+            brush: request.brush,
+            brushBuffer: brushBuffer,
+            dirtyRect: dirtyRect,
+            canvasWidth: request.canvasWidth,
+            canvasHeight: request.canvasHeight
+        ) else {
+            return nil
+        }
+        guard let requestBuffer = makeBuffer(binningResources.requestDescriptor) else { return nil }
+
+        guard let copyEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
         copyEncoder.setComputePipelineState(copyPipeline)
         copyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
         copyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
@@ -1338,12 +1383,12 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         encoder.setComputePipelineState(pipeline)
         encoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
         encoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
-        encoder.setBuffer(primitiveBuffer, offset: 0, index: 2)
+        encoder.setBuffer(binningResources.primitiveBuffer, offset: 0, index: 2)
         encoder.setBuffer(brushBuffer, offset: 0, index: 3)
         encoder.setBuffer(requestBuffer, offset: 0, index: 4)
         encoder.setBuffer(customTipBuffer, offset: 0, index: 5)
-        encoder.setBuffer(tileRangeBuffer, offset: 0, index: 6)
-        encoder.setBuffer(primitiveIndexBuffer, offset: 0, index: 7)
+        encoder.setBuffer(binningResources.tileRangeBuffer, offset: 0, index: 6)
+        encoder.setBuffer(binningResources.primitiveIndexBuffer, offset: 0, index: 7)
         dispatch2D(encoder: encoder, pipeline: pipeline, width: dirtyRect.width, height: dirtyRect.height)
         encoder.endEncoding()
 
@@ -1411,7 +1456,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let normalizedSamples = Self.normalizedCommittedStrokeSamples(request.samples, brush: request.brush)
         guard !normalizedSamples.isEmpty else { return nil }
         let progressTable = Self.strokeProgressTable(normalizedSamples)
-        let dabs = DocumentColorSmudgeEngine().makeDabs(
+        let dabs = Self.makeColorSmudgeDabs(
             samples: normalizedSamples,
             progressTable: progressTable,
             brush: request.brush,
@@ -1563,6 +1608,88 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 activeLayerIndex: activeLayerIndex
             )
         )?.pixelData
+    }
+
+    func debugStrokeBinningSummary(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings
+    ) -> PrimoMetalStrokeBinningDebugSummary? {
+        guard
+            canvasWidth > 0,
+            canvasHeight > 0,
+            let commandQueue
+        else {
+            return nil
+        }
+        let normalizedSamples = Self.normalizedCommittedStrokeSamples(samples, brush: brush)
+        let descriptors = Self.strokeSampleDescriptors(samples: normalizedSamples)
+        guard !descriptors.isEmpty else { return nil }
+        guard let dirtyRect = Self.strokePreviewDirtyRect(
+            samples: normalizedSamples,
+            brush: brush,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        ) else {
+            return nil
+        }
+        let customTip = Self.makeCustomTipMask(brush.customTip)
+        guard
+            let sampleBuffer = makeBuffer(descriptors),
+            let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(brush, customTip: customTip)),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let resources = makeStrokeBinningResources(
+                commandBuffer: commandBuffer,
+                descriptors: descriptors,
+                sampleBuffer: sampleBuffer,
+                brush: brush,
+                brushBuffer: brushBuffer,
+                dirtyRect: dirtyRect,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight
+            )
+        else {
+            return nil
+        }
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+
+        let tileCount = Int(resources.requestDescriptor.tileCount)
+        let tileRanges = Array(
+            UnsafeBufferPointer(
+                start: resources.tileRangeBuffer.contents().assumingMemoryBound(to: PrimoMetalStrokeTileRangeDescriptor.self),
+                count: tileCount
+            )
+        )
+        let primitiveIndices = Array(
+            UnsafeBufferPointer(
+                start: resources.primitiveIndexBuffer.contents().assumingMemoryBound(to: UInt32.self),
+                count: Int(resources.requestDescriptor.maxPrimitiveIndexCount)
+            )
+        )
+        var monotonic = true
+        var previousStart = 0
+        var totalReferences = 0
+        for (index, range) in tileRanges.enumerated() {
+            let start = Int(range.startIndex)
+            let count = Int(range.primitiveCount)
+            if index > 0, start < previousStart {
+                monotonic = false
+            }
+            previousStart = start
+            totalReferences += count
+        }
+        let boundsValid = primitiveIndices.prefix(totalReferences).allSatisfy { Int($0) < Int(resources.requestDescriptor.sampleCount) }
+        return PrimoMetalStrokeBinningDebugSummary(
+            primitiveCount: Int(resources.requestDescriptor.sampleCount),
+            tileCount: tileCount,
+            totalPrimitiveReferences: totalReferences,
+            monotonicTileOffsets: monotonic,
+            primitiveIndexBoundsValid: boundsValid
+        )
     }
 
     private func prepareStrokeExecutionContext(
@@ -1989,88 +2116,189 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return (minX, minY, maxX - minX, maxY - minY)
     }
 
-    private static func makeStrokePrimitiveBinning(
+    private func makeStrokeBinningResources(
+        commandBuffer: MTLCommandBuffer,
         descriptors: [PrimoMetalStrokeSampleDescriptor],
+        sampleBuffer: MTLBuffer,
         brush: BrushRuntimeSettings,
+        brushBuffer: MTLBuffer,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
         canvasWidth: Int,
-        canvasHeight: Int,
-        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
-    ) -> StrokePrimitiveBinning? {
-        guard !descriptors.isEmpty, dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
-        let tileSize = 32
+        canvasHeight: Int
+    ) -> StrokeBinningResources? {
+        guard
+            let device,
+            let primitiveGenerationPipeline = strokePrimitiveGenerationPipeline,
+            let tileCountPipeline = strokeTileCountPipeline,
+            let prefixScanPipeline = strokePrefixScanPipeline,
+            let prefixBlockScanPipeline = strokePrefixBlockScanPipeline,
+            let prefixAddPipeline = strokePrefixAddPipeline,
+            let tileRangePipeline = strokeTileRangePipeline,
+            let cursorInitPipeline = strokeCursorInitPipeline,
+            let primitiveScatterPipeline = strokePrimitiveScatterPipeline
+        else {
+            return nil
+        }
+
+        let primitiveCount = max(1, descriptors.count > 1 ? descriptors.count - 1 : 1)
+        let tileSize = Self.strokeTileSize
         let tileColumns = max(1, (dirtyRect.width + tileSize - 1) / tileSize)
-        var tileBuckets = Array(repeating: [UInt32](), count: tileColumns * max(1, (dirtyRect.height + tileSize - 1) / tileSize))
-        var primitives: [PrimoMetalStrokePrimitiveDescriptor] = []
-        let scatterExtent = brush.scatterEnabled ? max(brush.scatterLateral, brush.scatterLinear) : 0.0
-        let softness = max(0.0, 1.0 - brush.hardness)
-        let primitiveSourceIndices = descriptors.count > 1 ? Array(descriptors.indices.dropLast()) : Array(descriptors.indices)
-        for index in primitiveSourceIndices {
-            let start = descriptors[index]
-            let hasFollowing = index + 1 < descriptors.count
-            let end = hasFollowing ? descriptors[index + 1] : start
-            let startRadius = max(1.5, brush.radius * max(0.1, 1.0 + ((Double(start.pressure) - 1.0) * brush.pressureSensitivity)))
-            let endRadius = max(1.5, brush.radius * max(0.1, 1.0 + ((Double(end.pressure) - 1.0) * brush.pressureSensitivity)))
-            let maxRadius = max(startRadius, endRadius)
-            let featherPadding = brush.tipKind == .airbrush
-                ? max(18.0, maxRadius * (0.9 + softness * 0.6))
-                : max(10.0, maxRadius * (0.35 + softness * 0.75))
-            let oilSpread = brush.tipKind == .oil
-                ? maxRadius * min(0.85, 0.24 + (brush.smudgeRadius * 1.45) + (brush.wetness * 0.35) + 0.18)
-                : 0.0
-            let padding = maxRadius + featherPadding + oilSpread + (scatterExtent * brush.radius) + 6.0
-            let minX = min(Double(start.x), Double(end.x)) - padding
-            let minY = min(Double(start.y), Double(end.y)) - padding
-            let maxX = max(Double(start.x), Double(end.x)) + padding
-            let maxY = max(Double(start.y), Double(end.y)) + padding
-            let clampedMinX = max(Double(dirtyRect.originX), minX)
-            let clampedMinY = max(Double(dirtyRect.originY), minY)
-            let clampedMaxX = min(Double(dirtyRect.originX + dirtyRect.width - 1), maxX)
-            let clampedMaxY = min(Double(dirtyRect.originY + dirtyRect.height - 1), maxY)
-            guard clampedMinX <= clampedMaxX, clampedMinY <= clampedMaxY else { continue }
-            let primitiveIndex = UInt32(primitives.count)
-            primitives.append(
-                PrimoMetalStrokePrimitiveDescriptor(
-                    startX: start.x,
-                    startY: start.y,
-                    endX: end.x,
-                    endY: end.y,
-                    startPressure: start.pressure,
-                    endPressure: end.pressure,
-                    startProgress: start.progress,
-                    endProgress: end.progress,
-                    maxRadius: Float(maxRadius),
-                    isSegment: hasFollowing ? 1 : 0,
-                    padding0: 0,
-                    padding1: 0
+        let tileRows = max(1, (dirtyRect.height + tileSize - 1) / tileSize)
+        let tileCount = tileColumns * tileRows
+        let blockSize = Self.strokePrefixBlockSize
+        let blockCount = max(1, (tileCount + blockSize - 1) / blockSize)
+        let maxPrimitiveIndexCount = max(primitiveCount, primitiveCount * tileCount)
+
+        let requestDescriptor = PrimoMetalStrokeRasterRequestDescriptor(
+            canvasWidth: UInt32(canvasWidth),
+            canvasHeight: UInt32(canvasHeight),
+            originX: UInt32(dirtyRect.originX),
+            originY: UInt32(dirtyRect.originY),
+            rectWidth: UInt32(dirtyRect.width),
+            rectHeight: UInt32(dirtyRect.height),
+            sampleCount: UInt32(primitiveCount),
+            inputSampleCount: UInt32(descriptors.count),
+            tileSize: UInt32(tileSize),
+            tileColumns: UInt32(tileColumns),
+            tileRows: UInt32(tileRows),
+            tileCount: UInt32(tileCount),
+            maxPrimitiveIndexCount: UInt32(maxPrimitiveIndexCount),
+            prefixBlockSize: UInt32(blockSize)
+        )
+
+        guard
+            let requestBuffer = makeBuffer(requestDescriptor),
+            let prefixDescriptorBuffer = makeBuffer(
+                PrimoMetalStrokePrefixDescriptor(
+                    elementCount: UInt32(tileCount),
+                    blockSize: UInt32(blockSize)
                 )
+            ),
+            let blockPrefixDescriptorBuffer = makeBuffer(
+                PrimoMetalStrokePrefixDescriptor(
+                    elementCount: UInt32(blockCount),
+                    blockSize: UInt32(blockSize)
+                )
+            ),
+            let primitiveBuffer = device.makeBuffer(
+                length: primitiveCount * MemoryLayout<PrimoMetalStrokePrimitiveDescriptor>.stride,
+                options: .storageModeShared
+            ),
+            let tileCountBuffer = device.makeBuffer(
+                length: tileCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
+            ),
+            let tileOffsetBuffer = device.makeBuffer(
+                length: tileCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
+            ),
+            let tileRangeBuffer = device.makeBuffer(
+                length: tileCount * MemoryLayout<PrimoMetalStrokeTileRangeDescriptor>.stride,
+                options: .storageModeShared
+            ),
+            let blockSumBuffer = device.makeBuffer(
+                length: blockCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
+            ),
+            let blockOffsetBuffer = device.makeBuffer(
+                length: blockCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
+            ),
+            let primitiveIndexCursorBuffer = device.makeBuffer(
+                length: tileCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
+            ),
+            let primitiveIndexBuffer = device.makeBuffer(
+                length: maxPrimitiveIndexCount * MemoryLayout<UInt32>.stride,
+                options: .storageModeShared
             )
-            let tileMinX = max(0, Int((clampedMinX - Double(dirtyRect.originX)) / Double(tileSize)))
-            let tileMinY = max(0, Int((clampedMinY - Double(dirtyRect.originY)) / Double(tileSize)))
-            let tileMaxX = min(tileColumns - 1, Int((clampedMaxX - Double(dirtyRect.originX)) / Double(tileSize)))
-            let tileMaxY = min(max(1, (dirtyRect.height + tileSize - 1) / tileSize) - 1, Int((clampedMaxY - Double(dirtyRect.originY)) / Double(tileSize)))
-            for tileY in tileMinY...tileMaxY {
-                for tileX in tileMinX...tileMaxX {
-                    tileBuckets[(tileY * tileColumns) + tileX].append(primitiveIndex)
-                }
-            }
+        else {
+            return nil
         }
-        guard !primitives.isEmpty else { return nil }
-        var tileRanges: [PrimoMetalStrokeTileRangeDescriptor] = []
-        var primitiveIndices: [UInt32] = []
-        tileRanges.reserveCapacity(tileBuckets.count)
-        var cursor: UInt32 = 0
-        for bucket in tileBuckets {
-            tileRanges.append(PrimoMetalStrokeTileRangeDescriptor(startIndex: cursor, primitiveCount: UInt32(bucket.count)))
-            primitiveIndices.append(contentsOf: bucket)
-            cursor += UInt32(bucket.count)
-        }
-        return StrokePrimitiveBinning(
-            dirtyRect: dirtyRect,
-            tileSize: tileSize,
-            tileColumns: tileColumns,
-            primitives: primitives,
-            tileRanges: tileRanges,
-            primitiveIndices: primitiveIndices
+
+        memset(tileCountBuffer.contents(), 0, tileCount * MemoryLayout<UInt32>.stride)
+        memset(tileOffsetBuffer.contents(), 0, tileCount * MemoryLayout<UInt32>.stride)
+        memset(tileRangeBuffer.contents(), 0, tileCount * MemoryLayout<PrimoMetalStrokeTileRangeDescriptor>.stride)
+        memset(blockSumBuffer.contents(), 0, blockCount * MemoryLayout<UInt32>.stride)
+        memset(blockOffsetBuffer.contents(), 0, blockCount * MemoryLayout<UInt32>.stride)
+        memset(primitiveIndexCursorBuffer.contents(), 0, tileCount * MemoryLayout<UInt32>.stride)
+        memset(primitiveIndexBuffer.contents(), 0, maxPrimitiveIndexCount * MemoryLayout<UInt32>.stride)
+
+        guard let primitiveEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        primitiveEncoder.setComputePipelineState(primitiveGenerationPipeline)
+        primitiveEncoder.setBuffer(sampleBuffer, offset: 0, index: 0)
+        primitiveEncoder.setBuffer(primitiveBuffer, offset: 0, index: 1)
+        primitiveEncoder.setBuffer(brushBuffer, offset: 0, index: 2)
+        primitiveEncoder.setBuffer(requestBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: primitiveEncoder, pipeline: primitiveGenerationPipeline, count: primitiveCount)
+        primitiveEncoder.endEncoding()
+
+        guard let countEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        countEncoder.setComputePipelineState(tileCountPipeline)
+        countEncoder.setBuffer(primitiveBuffer, offset: 0, index: 0)
+        countEncoder.setBuffer(tileCountBuffer, offset: 0, index: 1)
+        countEncoder.setBuffer(brushBuffer, offset: 0, index: 2)
+        countEncoder.setBuffer(requestBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: countEncoder, pipeline: tileCountPipeline, count: primitiveCount)
+        countEncoder.endEncoding()
+
+        guard let prefixEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        prefixEncoder.setComputePipelineState(prefixScanPipeline)
+        prefixEncoder.setBuffer(tileCountBuffer, offset: 0, index: 0)
+        prefixEncoder.setBuffer(tileOffsetBuffer, offset: 0, index: 1)
+        prefixEncoder.setBuffer(blockSumBuffer, offset: 0, index: 2)
+        prefixEncoder.setBuffer(prefixDescriptorBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: prefixEncoder, pipeline: prefixScanPipeline, count: blockCount)
+        prefixEncoder.endEncoding()
+
+        guard let blockPrefixEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        blockPrefixEncoder.setComputePipelineState(prefixBlockScanPipeline)
+        blockPrefixEncoder.setBuffer(blockSumBuffer, offset: 0, index: 0)
+        blockPrefixEncoder.setBuffer(blockOffsetBuffer, offset: 0, index: 1)
+        blockPrefixEncoder.setBuffer(blockPrefixDescriptorBuffer, offset: 0, index: 2)
+        dispatchLinear(encoder: blockPrefixEncoder, pipeline: prefixBlockScanPipeline, count: 1)
+        blockPrefixEncoder.endEncoding()
+
+        guard let addEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        addEncoder.setComputePipelineState(prefixAddPipeline)
+        addEncoder.setBuffer(tileOffsetBuffer, offset: 0, index: 0)
+        addEncoder.setBuffer(blockOffsetBuffer, offset: 0, index: 1)
+        addEncoder.setBuffer(prefixDescriptorBuffer, offset: 0, index: 2)
+        dispatchLinear(encoder: addEncoder, pipeline: prefixAddPipeline, count: tileCount)
+        addEncoder.endEncoding()
+
+        guard let tileRangeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        tileRangeEncoder.setComputePipelineState(tileRangePipeline)
+        tileRangeEncoder.setBuffer(tileCountBuffer, offset: 0, index: 0)
+        tileRangeEncoder.setBuffer(tileOffsetBuffer, offset: 0, index: 1)
+        tileRangeEncoder.setBuffer(tileRangeBuffer, offset: 0, index: 2)
+        tileRangeEncoder.setBuffer(prefixDescriptorBuffer, offset: 0, index: 3)
+        dispatchLinear(encoder: tileRangeEncoder, pipeline: tileRangePipeline, count: tileCount)
+        tileRangeEncoder.endEncoding()
+
+        guard let cursorEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        cursorEncoder.setComputePipelineState(cursorInitPipeline)
+        cursorEncoder.setBuffer(tileOffsetBuffer, offset: 0, index: 0)
+        cursorEncoder.setBuffer(primitiveIndexCursorBuffer, offset: 0, index: 1)
+        cursorEncoder.setBuffer(prefixDescriptorBuffer, offset: 0, index: 2)
+        dispatchLinear(encoder: cursorEncoder, pipeline: cursorInitPipeline, count: tileCount)
+        cursorEncoder.endEncoding()
+
+        guard let scatterEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        scatterEncoder.setComputePipelineState(primitiveScatterPipeline)
+        scatterEncoder.setBuffer(primitiveBuffer, offset: 0, index: 0)
+        scatterEncoder.setBuffer(primitiveIndexCursorBuffer, offset: 0, index: 1)
+        scatterEncoder.setBuffer(primitiveIndexBuffer, offset: 0, index: 2)
+        scatterEncoder.setBuffer(brushBuffer, offset: 0, index: 3)
+        scatterEncoder.setBuffer(requestBuffer, offset: 0, index: 4)
+        dispatchLinear(encoder: scatterEncoder, pipeline: primitiveScatterPipeline, count: primitiveCount)
+        scatterEncoder.endEncoding()
+
+        return StrokeBinningResources(
+            primitiveBuffer: primitiveBuffer,
+            tileRangeBuffer: tileRangeBuffer,
+            primitiveIndexBuffer: primitiveIndexBuffer,
+            requestDescriptor: requestDescriptor
         )
     }
 
@@ -2105,6 +2333,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             blue: Float(brush.blue) / 255.0,
             scatterLateral: Float(brush.scatterEnabled ? brush.scatterLateral : 0),
             scatterLinear: Float(brush.scatterEnabled ? brush.scatterLinear : 0),
+            count: Float(max(1, brush.count)),
+            countJitter: Float(max(0.0, brush.countJitter)),
+            countSizeJitter: Float(max(0.0, brush.countSizeJitter)),
+            countOpacityJitter: Float(max(0.0, brush.countOpacityJitter)),
             dualScale: Float(brush.dualBrushEnabled ? brush.dualScale : 0),
             dualSpacing: Float(brush.dualBrushEnabled ? brush.dualSpacing : 0),
             dualScatter: Float(brush.dualBrushEnabled ? brush.dualScatter : 0),
@@ -2150,29 +2382,130 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     }
 
     private static func supportsStrokeRasterization(_ brush: BrushRuntimeSettings) -> Bool {
-        guard brush.radius >= 0.5 else { return false }
-        let isOil = brush.tipKind == .oil
-        if brush.dualBrushEnabled,
-           ((isOil ? brush.dualScale > 2.6 : brush.dualScale > 1.8) ||
-            (isOil ? brush.dualScatter > 2.2 : brush.dualScatter > 1.6) ||
-            (!isOil && brush.count > 1) ||
-            (!isOil && brush.countJitter > 0.001)) {
-            return false
+        brush.radius >= 0.5
+    }
+
+    private static func makeColorSmudgeDabs(
+        samples: [StylusSample],
+        progressTable: [CGFloat],
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> [PrimoMetalColorSmudgeDab] {
+        guard let first = samples.first else { return [] }
+        var dabs: [PrimoMetalColorSmudgeDab] = []
+        let firstRadius = resolvedSmudgeStrokeRadius(for: first, progress: progressTable.first ?? 0, brush: brush)
+        if let firstDab = makeColorSmudgeDab(
+            sample: first,
+            progress: progressTable.first ?? 0,
+            radius: firstRadius,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        ) {
+            dabs.append(firstDab)
         }
-        if brush.scatterEnabled,
-           ((!isOil && brush.count > 1) ||
-            (!isOil && brush.countJitter > 0.001) ||
-            brush.scatterLateral > brush.radius * (isOil ? 2.1 : 1.35) ||
-            brush.scatterLinear > brush.radius * (isOil ? 2.1 : 1.35)) {
-            return false
+
+        guard samples.count > 1 else { return dabs }
+
+        for index in samples.indices.dropFirst() {
+            let start = samples[index - 1]
+            let end = samples[index]
+            let startProgress = progressTable[index - 1]
+            let endProgress = progressTable[index]
+            let startRadius = resolvedSmudgeStrokeRadius(for: start, progress: startProgress, brush: brush)
+            let endRadius = resolvedSmudgeStrokeRadius(for: end, progress: endProgress, brush: brush)
+            let dx = end.point.x - start.point.x
+            let dy = end.point.y - start.point.y
+            let distance = sqrt((dx * dx) + (dy * dy))
+            let spacing = max(1.0, ((startRadius + endRadius) * 0.5) * max(CGFloat(brush.stampSpacing), 0.02))
+            guard distance.isFinite, spacing.isFinite, spacing > 0 else { continue }
+            let steps = max(1, Int(ceil(distance / spacing)))
+            for step in 1...steps {
+                let t = CGFloat(step) / CGFloat(steps)
+                let interpolated = interpolatedStylusSample(from: start, to: end, progress: t)
+                let progress = startProgress + ((endProgress - startProgress) * t)
+                let radius = resolvedSmudgeStrokeRadius(for: interpolated, progress: progress, brush: brush)
+                if let dab = makeColorSmudgeDab(
+                    sample: interpolated,
+                    progress: progress,
+                    radius: radius,
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight
+                ) {
+                    dabs.append(dab)
+                }
+            }
         }
-        if brush.tipKind == .airbrush, brush.colorMixingMode == .runningColor || brush.smudgeBleed > 0.001 {
-            return false
+        return dabs
+    }
+
+    private static func makeColorSmudgeDab(
+        sample: StylusSample,
+        progress: CGFloat,
+        radius: CGFloat,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> PrimoMetalColorSmudgeDab? {
+        guard sample.point.x.isFinite, sample.point.y.isFinite, progress.isFinite, radius.isFinite else { return nil }
+        let margin = max(2.0, radius + 2.0)
+        guard margin.isFinite else { return nil }
+        let rawRect = CGRect(
+            x: floor(sample.point.x - margin),
+            y: floor(sample.point.y - margin),
+            width: ceil(margin * 2.0),
+            height: ceil(margin * 2.0)
+        )
+        guard rawRect.origin.x.isFinite, rawRect.origin.y.isFinite, rawRect.width.isFinite, rawRect.height.isFinite else {
+            return nil
         }
-        if brush.textureMode == .moving && brush.tipKind == .oil && brush.textureStrength > 0.98 {
-            return false
+        let clipped = rawRect.intersection(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
+        guard clipped.origin.x.isFinite, clipped.origin.y.isFinite, clipped.width.isFinite, clipped.height.isFinite else {
+            return nil
         }
-        return true
+        return PrimoMetalColorSmudgeDab(
+            center: sample.point,
+            radius: radius,
+            progress: progress,
+            sample: sample,
+            destinationRect: clipped
+        )
+    }
+
+    private static func resolvedSmudgeStrokeRadius(
+        for sample: StylusSample,
+        progress: CGFloat,
+        brush: BrushRuntimeSettings
+    ) -> CGFloat {
+        let clampedPressure = max(0.08, min(sample.pressure, 1.0))
+        let pressureFactor = max(0.1, 1.0 + ((clampedPressure - 1.0) * CGFloat(brush.pressureSensitivity)))
+        let taper = strokeTaperScale(progress: progress, taperIn: CGFloat(brush.taperIn), taperOut: CGFloat(brush.taperOut))
+        return max(CGFloat(brush.radius) * pressureFactor * taper, 1.5)
+    }
+
+    private static func strokeTaperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
+        func easedRamp(_ progress: CGFloat, length: CGFloat) -> CGFloat {
+            guard length > 0.001 else { return 1.0 }
+            let t = max(0.0, min(1.0, progress / length))
+            let eased = t * t * (3.0 - (2.0 * t))
+            return 0.08 + (0.92 * eased)
+        }
+
+        let entry = easedRamp(progress, length: taperIn)
+        let exit = easedRamp(1.0 - progress, length: taperOut)
+        return min(entry, exit)
+    }
+
+    private static func interpolatedStylusSample(from start: StylusSample, to end: StylusSample, progress t: CGFloat) -> StylusSample {
+        StylusSample(
+            point: CGPoint(
+                x: start.point.x + ((end.point.x - start.point.x) * t),
+                y: start.point.y + ((end.point.y - start.point.y) * t)
+            ),
+            pressure: start.pressure + ((end.pressure - start.pressure) * t),
+            altitude: start.altitude + ((end.altitude - start.altitude) * t),
+            azimuth: start.azimuth + ((end.azimuth - start.azimuth) * t),
+            timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
+        )
     }
 
     private static func makeCustomTipMask(_ raster: BrushTipRaster?) -> BrushTipRaster {

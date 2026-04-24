@@ -166,9 +166,9 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
 #endif
         colorPixelFormat = .bgra8Unorm
         clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-        preferredFramesPerSecond = 120
-        enableSetNeedsDisplay = false
-        isPaused = false
+        preferredFramesPerSecond = 60
+        enableSetNeedsDisplay = true
+        isPaused = true
         delegate = self
         let duration = start.duration(to: clock.now)
         Self.logger.debug("PrimoMetalCanvasView initialized in \(String(describing: duration), privacy: .public)")

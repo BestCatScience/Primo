@@ -334,6 +334,10 @@ struct MetalStrokeBrushDescriptor {
     float blue;
     float scatterLateral;
     float scatterLinear;
+    float count;
+    float countJitter;
+    float countSizeJitter;
+    float countOpacityJitter;
     float dualScale;
     float dualSpacing;
     float dualScatter;
@@ -376,8 +380,18 @@ struct MetalStrokeRasterRequestDescriptor {
     uint rectWidth;
     uint rectHeight;
     uint sampleCount;
+    uint inputSampleCount;
     uint tileSize;
     uint tileColumns;
+    uint tileRows;
+    uint tileCount;
+    uint maxPrimitiveIndexCount;
+    uint prefixBlockSize;
+};
+
+struct MetalStrokePrefixDescriptor {
+    uint elementCount;
+    uint blockSize;
 };
 
 struct MetalStrokePrimitiveDescriptor {
@@ -707,6 +721,10 @@ inline float strokeClampUnit(float value) {
 inline float strokeNoise(float x, float y) {
     float value = sin((x * 12.9898f) + (y * 78.233f)) * 43758.5453f;
     return value - floor(value);
+}
+
+inline float strokeSignedNoise(float x, float y) {
+    return (strokeNoise(x, y) * 2.0f) - 1.0f;
 }
 
 inline float strokeTaperScale(float progress, float taperIn, float taperOut) {
@@ -1050,10 +1068,9 @@ inline float strokeSegmentEndpointFalloff(float t) {
     return 1.0f - (0.14f * endpointBlend);
 }
 
-inline float strokePrimitiveSourceAlpha(
+inline float strokePrimitiveCandidate(
     constant MetalStrokePrimitiveDescriptor& primitive,
     constant MetalStrokeBrushDescriptor& brush,
-    const device uchar *customTipPixels,
     float2 pixelCenter,
     thread float2 &candidatePoint,
     thread float &candidatePressure,
@@ -1066,15 +1083,7 @@ inline float strokePrimitiveSourceAlpha(
     candidatePoint = float2(primitive.startX, primitive.startY);
 
     if (primitive.isSegment == 0u) {
-        return rasterizedSourceAlpha(
-            brush,
-            customTipPixels,
-            candidatePoint,
-            candidatePressure,
-            candidateProgress,
-            candidateRadius,
-            pixelCenter
-        );
+        return 1.0f;
     }
 
     float2 start = float2(primitive.startX, primitive.startY);
@@ -1087,16 +1096,213 @@ inline float strokePrimitiveSourceAlpha(
     candidatePressure = primitive.startPressure + ((primitive.endPressure - primitive.startPressure) * t);
     candidateProgress = primitive.startProgress + ((primitive.endProgress - primitive.startProgress) * t);
     candidateRadius = resolvedStrokeRadius(brush, candidatePressure, candidateProgress);
-    float sourceAlpha = rasterizedSourceAlpha(
-        brush,
-        customTipPixels,
-        candidatePoint,
-        candidatePressure,
-        candidateProgress,
-        candidateRadius,
-        pixelCenter
-    );
-    return sourceAlpha * strokeSegmentEndpointFalloff(t);
+    return strokeSegmentEndpointFalloff(t);
+}
+
+inline bool strokePrimitiveTileBounds(
+    MetalStrokePrimitiveDescriptor primitive,
+    constant MetalStrokeBrushDescriptor& brush,
+    constant MetalStrokeRasterRequestDescriptor& request,
+    thread uint &tileMinX,
+    thread uint &tileMinY,
+    thread uint &tileMaxX,
+    thread uint &tileMaxY
+) {
+    float scatterExtent = max(brush.scatterLateral, brush.scatterLinear);
+    float softness = max(0.0f, 1.0f - brush.hardness);
+    float maxRadius = max(primitive.maxRadius, 1.5f);
+    float featherPadding = brush.isAirbrush != 0u
+        ? max(18.0f, maxRadius * (0.9f + softness * 0.6f))
+        : max(10.0f, maxRadius * (0.35f + softness * 0.75f));
+    float oilSpread = brush.isOil != 0u
+        ? maxRadius * min(0.85f, 0.24f + (brush.smudgeRadius * 1.45f) + (brush.wetness * 0.35f) + 0.18f)
+        : 0.0f;
+    float padding = maxRadius + featherPadding + oilSpread + (scatterExtent * brush.radius) + 6.0f;
+    float minX = min(primitive.startX, primitive.endX) - padding;
+    float minY = min(primitive.startY, primitive.endY) - padding;
+    float maxX = max(primitive.startX, primitive.endX) + padding;
+    float maxY = max(primitive.startY, primitive.endY) + padding;
+    float dirtyMinX = float(request.originX);
+    float dirtyMinY = float(request.originY);
+    float dirtyMaxX = float(request.originX + request.rectWidth - 1u);
+    float dirtyMaxY = float(request.originY + request.rectHeight - 1u);
+    float clampedMinX = max(dirtyMinX, minX);
+    float clampedMinY = max(dirtyMinY, minY);
+    float clampedMaxX = min(dirtyMaxX, maxX);
+    float clampedMaxY = min(dirtyMaxY, maxY);
+    if (clampedMinX > clampedMaxX || clampedMinY > clampedMaxY) {
+        return false;
+    }
+
+    float tileSize = max(float(request.tileSize), 1.0f);
+    tileMinX = uint(max(0.0f, floor((clampedMinX - dirtyMinX) / tileSize)));
+    tileMinY = uint(max(0.0f, floor((clampedMinY - dirtyMinY) / tileSize)));
+    tileMaxX = min(request.tileColumns - 1u, uint(max(0.0f, floor((clampedMaxX - dirtyMinX) / tileSize))));
+    tileMaxY = min(request.tileRows - 1u, uint(max(0.0f, floor((clampedMaxY - dirtyMinY) / tileSize))));
+    return true;
+}
+
+kernel void strokePrimitiveGenerationKernel(
+    const device MetalStrokeSampleDescriptor *samples [[buffer(0)]],
+    device MetalStrokePrimitiveDescriptor *primitives [[buffer(1)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(2)]],
+    constant MetalStrokeRasterRequestDescriptor& request [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= request.sampleCount || request.inputSampleCount == 0u) {
+        return;
+    }
+
+    MetalStrokeSampleDescriptor start = samples[min(gid, request.inputSampleCount - 1u)];
+    bool hasFollowing = request.inputSampleCount > 1u && gid + 1u < request.inputSampleCount;
+    MetalStrokeSampleDescriptor end = hasFollowing ? samples[gid + 1u] : start;
+    float startRadius = max(1.5f, brush.radius * max(0.1f, 1.0f + ((start.pressure - 1.0f) * brush.pressureSensitivity)));
+    float endRadius = max(1.5f, brush.radius * max(0.1f, 1.0f + ((end.pressure - 1.0f) * brush.pressureSensitivity)));
+    primitives[gid] = MetalStrokePrimitiveDescriptor{
+        start.x,
+        start.y,
+        end.x,
+        end.y,
+        start.pressure,
+        end.pressure,
+        start.progress,
+        end.progress,
+        max(startRadius, endRadius),
+        hasFollowing ? 1u : 0u,
+        0u,
+        0u
+    };
+}
+
+kernel void strokeTileCountKernel(
+    const device MetalStrokePrimitiveDescriptor *primitives [[buffer(0)]],
+    device atomic_uint *tileCounts [[buffer(1)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(2)]],
+    constant MetalStrokeRasterRequestDescriptor& request [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= request.sampleCount) {
+        return;
+    }
+    uint tileMinX;
+    uint tileMinY;
+    uint tileMaxX;
+    uint tileMaxY;
+    if (!strokePrimitiveTileBounds(primitives[gid], brush, request, tileMinX, tileMinY, tileMaxX, tileMaxY)) {
+        return;
+    }
+    for (uint tileY = tileMinY; tileY <= tileMaxY; ++tileY) {
+        for (uint tileX = tileMinX; tileX <= tileMaxX; ++tileX) {
+            uint tileIndex = (tileY * request.tileColumns) + tileX;
+            atomic_fetch_add_explicit(&tileCounts[tileIndex], 1u, memory_order_relaxed);
+        }
+    }
+}
+
+kernel void strokePrefixScanKernel(
+    const device uint *counts [[buffer(0)]],
+    device uint *offsets [[buffer(1)]],
+    device uint *blockSums [[buffer(2)]],
+    constant MetalStrokePrefixDescriptor& descriptor [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    uint blockIndex = gid;
+    uint blockSize = max(descriptor.blockSize, 1u);
+    uint start = blockIndex * blockSize;
+    if (start >= descriptor.elementCount) {
+        return;
+    }
+    uint running = 0u;
+    uint end = min(start + blockSize, descriptor.elementCount);
+    for (uint index = start; index < end; ++index) {
+        offsets[index] = running;
+        running += counts[index];
+    }
+    blockSums[blockIndex] = running;
+}
+
+kernel void strokePrefixBlockScanKernel(
+    const device uint *blockSums [[buffer(0)]],
+    device uint *blockOffsets [[buffer(1)]],
+    constant MetalStrokePrefixDescriptor& descriptor [[buffer(2)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid != 0u) {
+        return;
+    }
+    uint running = 0u;
+    for (uint index = 0u; index < descriptor.elementCount; ++index) {
+        blockOffsets[index] = running;
+        running += blockSums[index];
+    }
+}
+
+kernel void strokePrefixAddKernel(
+    device uint *offsets [[buffer(0)]],
+    const device uint *blockOffsets [[buffer(1)]],
+    constant MetalStrokePrefixDescriptor& descriptor [[buffer(2)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= descriptor.elementCount) {
+        return;
+    }
+    uint blockSize = max(descriptor.blockSize, 1u);
+    uint blockIndex = gid / blockSize;
+    offsets[gid] += blockOffsets[blockIndex];
+}
+
+kernel void strokeTileRangeKernel(
+    const device uint *counts [[buffer(0)]],
+    const device uint *offsets [[buffer(1)]],
+    device MetalStrokeTileRangeDescriptor *tileRanges [[buffer(2)]],
+    constant MetalStrokePrefixDescriptor& descriptor [[buffer(3)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= descriptor.elementCount) {
+        return;
+    }
+    tileRanges[gid] = MetalStrokeTileRangeDescriptor{ offsets[gid], counts[gid] };
+}
+
+kernel void strokeCursorInitKernel(
+    const device uint *offsets [[buffer(0)]],
+    device atomic_uint *cursors [[buffer(1)]],
+    constant MetalStrokePrefixDescriptor& descriptor [[buffer(2)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= descriptor.elementCount) {
+        return;
+    }
+    atomic_store_explicit(&cursors[gid], offsets[gid], memory_order_relaxed);
+}
+
+kernel void strokePrimitiveScatterKernel(
+    const device MetalStrokePrimitiveDescriptor *primitives [[buffer(0)]],
+    device atomic_uint *tileCursors [[buffer(1)]],
+    device uint *primitiveIndices [[buffer(2)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(3)]],
+    constant MetalStrokeRasterRequestDescriptor& request [[buffer(4)]],
+    uint gid [[thread_position_in_grid]]
+) {
+    if (gid >= request.sampleCount) {
+        return;
+    }
+    uint tileMinX;
+    uint tileMinY;
+    uint tileMaxX;
+    uint tileMaxY;
+    if (!strokePrimitiveTileBounds(primitives[gid], brush, request, tileMinX, tileMinY, tileMaxX, tileMaxY)) {
+        return;
+    }
+    for (uint tileY = tileMinY; tileY <= tileMaxY; ++tileY) {
+        for (uint tileX = tileMinX; tileX <= tileMaxX; ++tileX) {
+            uint tileIndex = (tileY * request.tileColumns) + tileX;
+            uint writeIndex = atomic_fetch_add_explicit(&tileCursors[tileIndex], 1u, memory_order_relaxed);
+            if (writeIndex < request.maxPrimitiveIndexCount) {
+                primitiveIndices[writeIndex] = gid;
+            }
+        }
+    }
 }
 
 kernel void copyStrokeRectKernel(
@@ -1170,33 +1376,82 @@ kernel void strokeRasterKernel(
         float candidatePressure;
         float candidateProgress;
         float candidateRadius;
-        float sourceAlpha = strokePrimitiveSourceAlpha(
+        float endpointFalloff = strokePrimitiveCandidate(
             primitive,
             brush,
-            customTipPixels,
             pixelCenter,
             candidatePoint,
             candidatePressure,
             candidateProgress,
             candidateRadius
         );
-        if (sourceAlpha > 0.0f) {
-            float appliedMask = dualBrushMask(
-                brush,
-                candidatePoint,
-                candidateProgress,
-                candidateRadius,
-                pixelCenter
-            );
-            sourceAlpha *= appliedMask;
+        float countNoise = strokeSignedNoise(
+            float(primitiveIndex) * 1.913f + candidateProgress * 31.0f,
+            candidatePressure * 23.0f + brush.radius * 0.17f
+        );
+        uint stampCount = max(1u, uint(round(max(1.0f, brush.count + (countNoise * brush.countJitter * max(brush.count, 1.0f))))));
+        float2 segmentDirection = primitive.isSegment != 0u
+            ? normalize(float2(primitive.endX - primitive.startX, primitive.endY - primitive.startY))
+            : float2(1.0f, 0.0f);
+        if (!isfinite(segmentDirection.x) || !isfinite(segmentDirection.y) || dot(segmentDirection, segmentDirection) <= 0.0001f) {
+            segmentDirection = float2(1.0f, 0.0f);
         }
-        accumulatedSourceAlpha += sourceAlpha * (1.0f - accumulatedSourceAlpha);
-        accumulatedSourceAlpha = strokeClampUnit(accumulatedSourceAlpha);
-        if (sourceAlpha > strongestSourceAlpha) {
-            strongestSourceAlpha = sourceAlpha;
-            bestPressure = candidatePressure;
-            bestProgress = candidateProgress;
-            bestRadius = candidateRadius;
+        float2 segmentNormal = float2(-segmentDirection.y, segmentDirection.x);
+        float baseScatterRadius = max(
+            max(brush.scatterLateral, brush.scatterLinear),
+            candidateRadius * (0.18f + brush.countJitter * 0.22f)
+        );
+
+        for (uint stampIndex = 0u; stampIndex < stampCount; ++stampIndex) {
+            float stampSeed = float((primitiveIndex + 1u) * 31u + (stampIndex + 1u) * 17u);
+            float lateralNoise = strokeSignedNoise(
+                stampSeed * 0.173f + candidateProgress * 11.0f,
+                candidatePressure * 7.0f + brush.dualSpacing * 3.0f
+            );
+            float linearNoise = strokeSignedNoise(
+                stampSeed * 0.271f + candidateProgress * 19.0f,
+                candidatePressure * 5.0f + brush.scatterLinear * 0.11f
+            );
+            float radialNoise = strokeSignedNoise(
+                stampSeed * 0.347f + candidateProgress * 7.0f,
+                candidatePressure * 13.0f + brush.scatterLateral * 0.09f
+            );
+            float opacityJitter = strokeClampUnit(1.0f + (linearNoise * brush.countOpacityJitter));
+            float sizeJitter = max(0.2f, 1.0f + (radialNoise * brush.countSizeJitter));
+            float2 jitteredPoint = candidatePoint;
+            if (stampCount > 1u || brush.countJitter > 0.001f) {
+                float lateralOffset = lateralNoise * baseScatterRadius;
+                float linearOffset = linearNoise * baseScatterRadius * 0.65f;
+                jitteredPoint += (segmentNormal * lateralOffset) + (segmentDirection * linearOffset);
+            }
+            float jitteredRadius = max(1.0f, candidateRadius * sizeJitter);
+            float sourceAlpha = rasterizedSourceAlpha(
+                brush,
+                customTipPixels,
+                jitteredPoint,
+                candidatePressure,
+                candidateProgress,
+                jitteredRadius,
+                pixelCenter
+            ) * endpointFalloff * opacityJitter;
+            if (sourceAlpha > 0.0f) {
+                float appliedMask = dualBrushMask(
+                    brush,
+                    jitteredPoint,
+                    candidateProgress,
+                    jitteredRadius,
+                    pixelCenter
+                );
+                sourceAlpha *= appliedMask;
+            }
+            accumulatedSourceAlpha += sourceAlpha * (1.0f - accumulatedSourceAlpha);
+            accumulatedSourceAlpha = strokeClampUnit(accumulatedSourceAlpha);
+            if (sourceAlpha > strongestSourceAlpha) {
+                strongestSourceAlpha = sourceAlpha;
+                bestPressure = candidatePressure;
+                bestProgress = candidateProgress;
+                bestRadius = jitteredRadius;
+            }
         }
     }
 

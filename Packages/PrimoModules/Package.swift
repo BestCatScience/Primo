@@ -63,7 +63,6 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
-                "PrimoDocumentStrokeInfrastructure",
                 "PrimoBrushDomain",
                 "PrimoBrushFileFormats",
             ]
@@ -75,7 +74,6 @@ let package = Package(
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMetalRuntimeInfrastructure",
-                "PrimoDocumentStrokeInfrastructure",
             ],
             path: "Sources/PrimoDocumentRenderingInfrastructure"
         ),
@@ -237,7 +235,7 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
-                "PrimoDocumentStrokeInfrastructure",
+                "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
             ]
         ),
