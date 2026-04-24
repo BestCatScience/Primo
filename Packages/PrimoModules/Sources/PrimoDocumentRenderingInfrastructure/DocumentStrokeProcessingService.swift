@@ -8,6 +8,7 @@ public struct DocumentStrokePreviewPlan: Sendable {
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
     public let rectPixelData: Data?
     public let incrementalUpdate: IncrementalLayerUpdate?
+    public let isApproximatePreview: Bool
 
     public init(
         baseSnapshot: MetalDocumentSnapshot,
@@ -15,7 +16,8 @@ public struct DocumentStrokePreviewPlan: Sendable {
         adjustedBufferHandle: MetalBufferHandle? = nil,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?,
         rectPixelData: Data?,
-        incrementalUpdate: IncrementalLayerUpdate?
+        incrementalUpdate: IncrementalLayerUpdate?,
+        isApproximatePreview: Bool = false
     ) {
         self.baseSnapshot = baseSnapshot
         self.adjustedPixels = adjustedPixels
@@ -23,6 +25,7 @@ public struct DocumentStrokePreviewPlan: Sendable {
         self.dirtyRect = dirtyRect
         self.rectPixelData = rectPixelData
         self.incrementalUpdate = incrementalUpdate
+        self.isApproximatePreview = isApproximatePreview
     }
 }
 
@@ -41,17 +44,21 @@ public struct DocumentStrokeProcessingService: Sendable {
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
-        preserveAlphaLockedPixels: Bool
+        preserveAlphaLockedPixels: Bool,
+        usesResponsiveOilPreview: Bool = false
     ) -> DocumentStrokePreviewPlan? {
         guard let preview = renderingClient.makeInteractiveStrokePreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             basePixelData: basePixelData,
+            baseBufferHandle: baseBufferHandle,
             samples: samples,
             brush: brush,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels
+            preserveAlphaLockedPixels: preserveAlphaLockedPixels,
+            usesResponsiveOilPreview: usesResponsiveOilPreview
         ) else {
             return nil
         }
@@ -62,7 +69,8 @@ public struct DocumentStrokeProcessingService: Sendable {
             adjustedBufferHandle: preview.gpuBufferHandle,
             dirtyRect: preview.dirtyRect,
             rectPixelData: preview.rectPixelData,
-            incrementalUpdate: preview.incrementalUpdate
+            incrementalUpdate: preview.incrementalUpdate,
+            isApproximatePreview: preview.isApproximatePreview
         )
     }
 
@@ -79,6 +87,7 @@ public struct DocumentStrokeProcessingService: Sendable {
 
         if let gpuOutput = renderingClient.rasterizedStrokePixelData(
             basePixelData: baseLayer.pixelData,
+            baseBufferHandle: baseLayer.gpuBufferHandle,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,
             samples: samples,

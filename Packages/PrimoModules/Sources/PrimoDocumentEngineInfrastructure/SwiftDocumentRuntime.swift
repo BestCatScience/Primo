@@ -85,7 +85,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func pixelDataForLayer(index: Int) -> Data {
         guard store.snapshot.layers.indices.contains(index) else { return Data() }
-        return store.snapshot.layers[index].pixelData
+        return currentPixelData(for: index)
     }
 
     func canUndo() -> Bool {
@@ -103,7 +103,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         redoStack.append(store.snapshot)
         store.restore(previous)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         store.snapshot.timelapseEvents.append(.undo)
         store.snapshot.revision += 1
         captureDirtyUpdate()
@@ -117,7 +117,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         undoStack.append(store.snapshot)
         store.restore(next)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         store.snapshot.timelapseEvents.append(.redo)
         store.snapshot.revision += 1
         captureDirtyUpdate()
@@ -182,7 +182,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.canvasHeight = targetSize.height
         store.snapshot.thumbnailCache.removeAll()
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: nil)
         return .success(())
     }
@@ -248,7 +248,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.canvasHeight = targetSize.height
         store.snapshot.thumbnailCache.removeAll()
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: nil)
         return .success(())
     }
@@ -272,7 +272,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.layers.append(layer)
         let index = store.snapshot.layers.count - 1
         store.snapshot.activeLayerIndex = index
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .addLayer(name: name))
         return .success(index)
     }
@@ -454,7 +454,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.layers.insert(layer, at: duplicatedIndex)
         remapFoldersAfterInsertion(at: duplicatedIndex)
         store.snapshot.activeLayerIndex = duplicatedIndex
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
         return .success(duplicatedIndex)
     }
@@ -467,7 +467,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         remapFoldersAfterDeletion(of: index)
         store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
         invalidateAllThumbnails()
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
         return .success(())
     }
@@ -484,7 +484,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             store.snapshot.activeLayerIndex = destinationIndex
         }
         invalidateAllThumbnails()
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .moveLayer(index: .unchecked(index), destinationIndex: .unchecked(destinationIndex)))
         return .success(())
     }
@@ -688,6 +688,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
         guard let payload = PrimoMetalDocumentProcessingClient.shared.blurPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
+            sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
             canvasHeight: store.snapshot.canvasHeight,
             samples: samples,
@@ -696,14 +697,27 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.bridgeMutationFailed("blurStroke"))
         }
         let current = store.snapshot.layers[layerIndex].pixelData
+        let nextPixelData: Data
+        let nextHandle: MetalBufferHandle?
+        if store.snapshot.layers[layerIndex].alphaLocked {
+            nextPixelData = preserveExistingAlphaIfNeeded(
+                materializedPixelData(from: payload, existing: current),
+                existing: current,
+                isAlphaLocked: true
+            )
+            nextHandle = nil
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(payload.gpuBufferHandle)
+        } else if let handle = payload.gpuBufferHandle {
+            nextPixelData = current
+            nextHandle = handle
+        } else {
+            nextPixelData = materializedPixelData(from: payload, existing: current)
+            nextHandle = nil
+        }
         setLayerPixelState(
             index: layerIndex,
-            pixelData: preserveExistingAlphaIfNeeded(
-            materializedPixelData(from: payload, existing: current),
-            existing: current,
-            isAlphaLocked: store.snapshot.layers[layerIndex].alphaLocked
-            ),
-            gpuBufferHandle: payload.gpuBufferHandle
+            pixelData: nextPixelData,
+            gpuBufferHandle: nextHandle
         )
         store.snapshot.layers[layerIndex].textLayer = nil
         invalidateThumbnail(for: layerIndex)
@@ -737,6 +751,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
         guard let payload = PrimoMetalDocumentProcessingClient.shared.fillPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
+            sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
             canvasHeight: store.snapshot.canvasHeight,
             sample: sample,
@@ -757,6 +772,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let gpuResult = PrimoMetalDocumentProcessingClient.shared.executeStrokeMutation(
             PrimoMetalStrokeExecutionRequest(
                 basePixelData: store.snapshot.layers[layerIndex].pixelData,
+                baseBufferHandle: gpuLayerHandles[layerIndex],
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
                 samples: samples,
@@ -776,19 +792,36 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             height: gpuResult.dirtyRect.height
         )
         let before = store.snapshot
-        let committedOutput = gpuResult.gpuBufferHandle.flatMap {
-            PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: $0)
-        } ?? gpuResult.rectPixelData ?? Data()
-        guard committedOutput.count == rgbaByteCount else {
-            return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+        let existing = store.snapshot.layers[layerIndex].pixelData
+        let adjustedOutput: Data
+        let nextHandle: MetalBufferHandle?
+        if store.snapshot.layers[layerIndex].alphaLocked {
+            let committedOutput = gpuResult.gpuBufferHandle.flatMap {
+                PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: $0)
+            } ?? gpuResult.rectPixelData ?? Data()
+            guard committedOutput.count == rgbaByteCount else {
+                return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+            }
+            adjustedOutput = preserveExistingAlphaIfNeeded(
+                committedOutput,
+                existing: existing,
+                isAlphaLocked: true
+            )
+            nextHandle = nil
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(gpuResult.gpuBufferHandle)
+        } else if let handle = gpuResult.gpuBufferHandle {
+            adjustedOutput = existing
+            nextHandle = handle
+        } else {
+            let committedOutput = gpuResult.rectPixelData ?? Data()
+            guard committedOutput.count == rgbaByteCount else {
+                return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+            }
+            adjustedOutput = committedOutput
+            nextHandle = nil
         }
-        let adjustedOutput = preserveExistingAlphaIfNeeded(
-            committedOutput,
-            existing: store.snapshot.layers[layerIndex].pixelData,
-            isAlphaLocked: store.snapshot.layers[layerIndex].alphaLocked
-        )
         store.snapshot.layers[layerIndex].textLayer = nil
-        setLayerPixelState(index: layerIndex, pixelData: adjustedOutput, gpuBufferHandle: gpuResult.gpuBufferHandle)
+        setLayerPixelState(index: layerIndex, pixelData: adjustedOutput, gpuBufferHandle: nextHandle)
         invalidateThumbnail(for: layerIndex)
         recordMutation(
             before: before,
@@ -809,7 +842,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         for index in store.snapshot.layers.indices {
             let filename = String(format: "layer-%04d.rgba", index)
             try persistenceService.writeAtomic(
-                store.snapshot.layers[index].pixelData,
+                currentPixelData(for: index),
                 to: directories.layersDirectory.appendingPathComponent(filename, isDirectory: false)
             )
             if let maskData = store.snapshot.layers[index].maskData {
@@ -1169,16 +1202,35 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         let before = store.snapshot
         let existing = store.snapshot.layers[index].pixelData
-        let materialized = materializedPixelData(from: payload, existing: existing)
-        let adjusted = preserveExistingAlphaIfNeeded(
-            materialized,
-            existing: existing,
-            isAlphaLocked: store.snapshot.layers[index].alphaLocked
-        )
-        setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: payload.gpuBufferHandle)
+        let shouldMaterialize = store.snapshot.layers[index].alphaLocked || timelapseEvent?.requiresLayerPixelData == true
+        let adjusted: Data
+        let nextHandle: MetalBufferHandle?
+        if shouldMaterialize {
+            let materialized = materializedPixelData(from: payload, existing: existing)
+            adjusted = preserveExistingAlphaIfNeeded(
+                materialized,
+                existing: existing,
+                isAlphaLocked: store.snapshot.layers[index].alphaLocked
+            )
+            nextHandle = nil
+        } else if let handle = payload.gpuBufferHandle {
+            adjusted = existing
+            nextHandle = handle
+        } else {
+            adjusted = materializedPixelData(from: payload, existing: existing)
+            nextHandle = nil
+        }
+        setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
+        if nextHandle != payload.gpuBufferHandle {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(payload.gpuBufferHandle)
+        }
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
-        recordMutation(before: before, timelapseEvent: timelapseEvent, dirtyRect: payload.dirtyRect)
+        recordMutation(
+            before: before,
+            timelapseEvent: timelapseEvent?.replacingLayerPixelData(with: adjusted),
+            dirtyRect: payload.dirtyRect
+        )
         return .success(())
     }
 
@@ -1237,12 +1289,33 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func setLayerPixelState(index: Int, pixelData: Data, gpuBufferHandle: MetalBufferHandle?) {
+        let previousHandle = gpuLayerHandles[index]
         store.snapshot.layers[index].pixelData = pixelData
         if let gpuBufferHandle {
             gpuLayerHandles[index] = gpuBufferHandle
         } else {
             gpuLayerHandles.removeValue(forKey: index)
         }
+        if previousHandle != gpuBufferHandle {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(previousHandle)
+        }
+    }
+
+    private func releaseLayerBufferHandles() {
+        for handle in gpuLayerHandles.values {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(handle)
+        }
+        gpuLayerHandles.removeAll(keepingCapacity: true)
+    }
+
+    private func currentPixelData(for index: Int) -> Data {
+        guard store.snapshot.layers.indices.contains(index) else { return Data() }
+        if let handle = gpuLayerHandles[index],
+           let pixelData = PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: handle),
+           pixelData.count == rgbaByteCount {
+            return pixelData
+        }
+        return store.snapshot.layers[index].pixelData
     }
 
     private func recordMutation(
@@ -1267,19 +1340,27 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             snapshot: snapshot,
             dirtyRect: (rect.originX, rect.originY, rect.width, rect.height)
         ) {
-            pendingDirtyUpdate = dirtyUpdate
+            setPendingDirtyUpdate(dirtyUpdate)
             return
         }
         let composite = compositePixelDataForSnapshot(store.snapshot)
         let pixelData = crop(pixelData: composite, width: store.snapshot.canvasWidth, rect: rect)
-        pendingDirtyUpdate = IncrementalLayerUpdate(
+        setPendingDirtyUpdate(IncrementalLayerUpdate(
             layerIndex: -1,
             originX: rect.originX,
             originY: rect.originY,
             width: rect.width,
             height: rect.height,
             pixelData: pixelData
-        )
+        ))
+    }
+
+    private func setPendingDirtyUpdate(_ update: IncrementalLayerUpdate) {
+        if let previous = pendingDirtyUpdate?.gpuBufferHandle,
+           previous != update.gpuBufferHandle {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(previous)
+        }
+        pendingDirtyUpdate = update
     }
 
     private func compositeSurfaceForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> DocumentCompositeSurface {
@@ -1576,5 +1657,23 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
         }
         return Data(output)
+    }
+}
+
+private extension TimelapseOperation {
+    var requiresLayerPixelData: Bool {
+        if case .replaceLayerPixels = self {
+            return true
+        }
+        return false
+    }
+
+    func replacingLayerPixelData(with data: Data) -> TimelapseOperation {
+        switch self {
+        case let .replaceLayerPixels(index, _):
+            return .replaceLayerPixels(index: index, data: data)
+        default:
+            return self
+        }
     }
 }

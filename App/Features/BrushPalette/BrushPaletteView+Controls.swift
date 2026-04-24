@@ -603,6 +603,17 @@ extension BrushPaletteView {
             }
             sliderRow(title: language.localized("先端テクスチャ"), value: "\(Int(store.brush.textureStrength * 100))%", slider: Slider(value: $store.brush.textureStrength, in: 0.0...1.0))
             segmentedModeRow(
+                title: language.localized("油彩ライブプレビュー"),
+                selectedTitle: store.ui.oilLivePreviewQuality.localizedTitle(language)
+            ) {
+                Picker(language.localized("油彩ライブプレビュー"), selection: $store.ui.oilLivePreviewQuality) {
+                    ForEach(OilLivePreviewQuality.allCases) { quality in
+                        Text(quality.localizedTitle(language)).tag(quality)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            segmentedModeRow(
                 title: language.localized("Color Smudge"),
                 selectedTitle: store.brush.smudgeEngineEnabled ? store.brush.smudgeMode.localizedTitle(language) : language.localized("オフ")
             ) {

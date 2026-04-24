@@ -3,6 +3,40 @@ import XCTest
 @testable import Primo
 
 final class CanvasStrokeWorkflowTests: XCTestCase {
+    private static func oilSmudgeBrush() -> BrushRuntimeSettings {
+        BrushRuntimeSettings(
+            tipKind: .oil,
+            radius: 8,
+            opacity: 1,
+            hardness: 0.8,
+            roundness: 0.8,
+            angle: 0,
+            angleMode: .strokeDirection,
+            stampSpacing: 0.1,
+            spacingJitter: 0,
+            scatterLateral: 0,
+            scatterLinear: 0,
+            count: 1,
+            countJitter: 0,
+            angleJitter: 0,
+            roundnessJitter: 0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.2,
+            wetness: 0.12,
+            colorMixStrength: 0.1,
+            smudgeRadius: 0.36,
+            paintLoad: 0.92,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.4,
+            colorRate: 0.46,
+            pressureSensitivity: 0.16,
+            red: 46,
+            green: 50,
+            blue: 58
+        )
+    }
+
     func testPrepareCanvasStrokeEditingReturnsTypedFailure() {
         let result = withDependencies {
             $0.documentInteractionService = .stub(
@@ -42,6 +76,181 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             result,
             .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
         )
+    }
+
+    func testResponsiveOilApproximatePreviewCommitsRectPixels() {
+        let replaceCalls = TestRecorder<DocumentInteractionRequest>()
+        let fallbackCalls = TestRecorder<[StylusSample]>()
+
+        let result = withDependencies {
+            $0.documentInteractionService = .stub(
+                execute: { request in
+                    switch request {
+                    case .replaceLayerPixels, .replaceLayerPixelsInRect:
+                        replaceCalls.record(request)
+                    default:
+                        break
+                    }
+                    return .success(.none)
+                }
+            )
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.brushPalette.ui.oilLivePreviewQuality = .responsive
+            state.canvas.activeStrokePreviewIsApproximate = true
+            state.canvas.setStrokePreviewRectPixelData(
+                Data(repeating: 0x22, count: 16),
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+            )
+
+            let service = AppFeature.CanvasStrokeCommitService(
+                workflowService: feature.documentInteractionService,
+                strokeProcessingService: feature.canvasStrokeProcessingService
+            )
+            let samples = [StylusSample.testValue()]
+            return service.resolve(
+                state: &state,
+                samples: samples,
+                context: AppFeature.CanvasStrokeContext(
+                    activeLayer: .testValue(),
+                    activeLayerIndex: 0,
+                    brush: Self.oilSmudgeBrush(),
+                    previewBrush: Self.oilSmudgeBrush()
+                ),
+                keepsSelectionCleared: false,
+                refreshViaDirtyPresentation: true,
+                clearSelectionWithoutRefresh: { _ in },
+                commitFallbackPixels: { _, fallbackSamples, _, _, _ in
+                    fallbackCalls.record(fallbackSamples)
+                    return .success(())
+                }
+            )
+        }
+
+        XCTAssertEqual(fallbackCalls.values.count, 0)
+        XCTAssertEqual(replaceCalls.values.count, 1)
+        if case let .replaceLayerPixelsInRect(layerIndex, rect, pixelData) = replaceCalls.values.first {
+            XCTAssertEqual(layerIndex, 0)
+            XCTAssertEqual(rect, LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2))
+            XCTAssertEqual(pixelData, Data(repeating: 0x22, count: 16))
+        } else {
+            XCTFail("Expected rect pixel commit")
+        }
+        XCTAssertEqual(result, .committed(DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false)))
+    }
+
+    func testResponsiveOilApproximatePreviewCommitsFullPixels() {
+        let replaceCalls = TestRecorder<DocumentInteractionRequest>()
+        let fallbackCalls = TestRecorder<[StylusSample]>()
+
+        let result = withDependencies {
+            $0.documentInteractionService = .stub(
+                execute: { request in
+                    switch request {
+                    case .replaceLayerPixels, .replaceLayerPixelsInRect:
+                        replaceCalls.record(request)
+                    default:
+                        break
+                    }
+                    return .success(.none)
+                }
+            )
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.brushPalette.ui.oilLivePreviewQuality = .responsive
+            state.canvas.activeStrokePreviewIsApproximate = true
+            state.canvas.setStrokePreviewLayerPixelData(Data(repeating: 0x33, count: 16))
+
+            let service = AppFeature.CanvasStrokeCommitService(
+                workflowService: feature.documentInteractionService,
+                strokeProcessingService: feature.canvasStrokeProcessingService
+            )
+            return service.resolve(
+                state: &state,
+                samples: [.testValue()],
+                context: AppFeature.CanvasStrokeContext(
+                    activeLayer: .testValue(),
+                    activeLayerIndex: 0,
+                    brush: Self.oilSmudgeBrush(),
+                    previewBrush: Self.oilSmudgeBrush()
+                ),
+                keepsSelectionCleared: false,
+                refreshViaDirtyPresentation: true,
+                clearSelectionWithoutRefresh: { _ in },
+                commitFallbackPixels: { _, fallbackSamples, _, _, _ in
+                    fallbackCalls.record(fallbackSamples)
+                    return .success(())
+                }
+            )
+        }
+
+        XCTAssertEqual(fallbackCalls.values.count, 0)
+        XCTAssertEqual(replaceCalls.values.count, 1)
+        if case let .replaceLayerPixels(layerIndex, pixelData) = replaceCalls.values.first {
+            XCTAssertEqual(layerIndex, 0)
+            XCTAssertEqual(pixelData, Data(repeating: 0x33, count: 16))
+        } else {
+            XCTFail("Expected full pixel commit")
+        }
+        XCTAssertEqual(result, .committed(DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false)))
+    }
+
+    func testHighFidelityOilApproximatePreviewFallsBackToCommittedPixels() {
+        let replaceCalls = TestRecorder<DocumentInteractionRequest>()
+        let fallbackCalls = TestRecorder<[StylusSample]>()
+
+        let result = withDependencies {
+            $0.documentInteractionService = .stub(
+                execute: { request in
+                    switch request {
+                    case .replaceLayerPixels, .replaceLayerPixelsInRect:
+                        replaceCalls.record(request)
+                    default:
+                        break
+                    }
+                    return .success(.none)
+                }
+            )
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.brushPalette.ui.oilLivePreviewQuality = .highFidelity
+            state.canvas.activeStrokePreviewIsApproximate = true
+            state.canvas.setStrokePreviewLayerPixelData(Data(repeating: 0x11, count: 16))
+            state.canvas.setStrokePreviewRectPixelData(
+                Data(repeating: 0x22, count: 16),
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+            )
+
+            let service = AppFeature.CanvasStrokeCommitService(
+                workflowService: feature.documentInteractionService,
+                strokeProcessingService: feature.canvasStrokeProcessingService
+            )
+            let samples = [StylusSample.testValue()]
+            return service.resolve(
+                state: &state,
+                samples: samples,
+                context: AppFeature.CanvasStrokeContext(
+                    activeLayer: .testValue(),
+                    activeLayerIndex: 0,
+                    brush: Self.oilSmudgeBrush(),
+                    previewBrush: Self.oilSmudgeBrush()
+                ),
+                keepsSelectionCleared: false,
+                refreshViaDirtyPresentation: true,
+                clearSelectionWithoutRefresh: { _ in },
+                commitFallbackPixels: { _, fallbackSamples, _, _, _ in
+                    fallbackCalls.record(fallbackSamples)
+                    return .success(())
+                }
+            )
+        }
+
+        XCTAssertEqual(replaceCalls.values, [])
+        XCTAssertEqual(fallbackCalls.values.count, 1)
+        XCTAssertEqual(result, .committed(DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false)))
     }
 
     func testFillFailureRemainsTyped() {

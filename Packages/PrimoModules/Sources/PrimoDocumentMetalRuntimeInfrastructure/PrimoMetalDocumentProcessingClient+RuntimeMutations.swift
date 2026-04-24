@@ -234,8 +234,8 @@ extension PrimoMetalDocumentProcessingClient {
         memset(secondFillBuffer.contents(), 0, canvasWidth * canvasHeight)
         firstFillBuffer.contents().assumingMemoryBound(to: UInt8.self)[seedY * canvasWidth + seedX] = 255
 
-        guard let commandBuffer = commandQueue.makeCommandBuffer(),
-              let eligibilityEncoder = commandBuffer.makeComputeCommandEncoder()
+        guard let eligibilityCommandBuffer = commandQueue.makeCommandBuffer(),
+              let eligibilityEncoder = eligibilityCommandBuffer.makeComputeCommandEncoder()
         else {
             return nil
         }
@@ -245,12 +245,16 @@ extension PrimoMetalDocumentProcessingClient {
         eligibilityEncoder.setBuffer(eligibilityDescriptorBuffer, offset: 0, index: 2)
         dispatch2D(encoder: eligibilityEncoder, pipeline: eligibilityPipeline, width: canvasWidth, height: canvasHeight)
         eligibilityEncoder.endEncoding()
+        eligibilityCommandBuffer.commit()
+        eligibilityCommandBuffer.waitUntilCompleted()
+        guard eligibilityCommandBuffer.status == .completed else { return nil }
 
         var currentFill = firstFillBuffer
         var nextFill = secondFillBuffer
         let maxPropagationIterations = max(1, canvasWidth + canvasHeight)
         for _ in 0..<maxPropagationIterations {
             changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee = 0
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
             guard let propagationEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
             propagationEncoder.setComputePipelineState(propagationPipeline)
             propagationEncoder.setBuffer(eligibleBuffer, offset: 0, index: 0)
@@ -260,11 +264,18 @@ extension PrimoMetalDocumentProcessingClient {
             propagationEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 4)
             dispatch2D(encoder: propagationEncoder, pipeline: propagationPipeline, width: canvasWidth, height: canvasHeight)
             propagationEncoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            guard commandBuffer.status == .completed else { return nil }
             swap(&currentFill, &nextFill)
+            if changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee == 0 {
+                break
+            }
         }
 
         if expansion > 0 {
             for _ in 0..<expansion {
+                guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
                 guard let expansionEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
                 expansionEncoder.setComputePipelineState(expansionPipeline)
                 expansionEncoder.setBuffer(currentFill, offset: 0, index: 0)
@@ -272,13 +283,12 @@ extension PrimoMetalDocumentProcessingClient {
                 expansionEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 2)
                 dispatch2D(encoder: expansionEncoder, pipeline: expansionPipeline, width: canvasWidth, height: canvasHeight)
                 expansionEncoder.endEncoding()
+                commandBuffer.commit()
+                commandBuffer.waitUntilCompleted()
+                guard commandBuffer.status == .completed else { return nil }
                 swap(&currentFill, &nextFill)
             }
         }
-
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        guard commandBuffer.status == .completed else { return nil }
         return byteArray(from: currentFill, count: canvasWidth * canvasHeight)
     }
 
@@ -601,6 +611,7 @@ extension PrimoMetalDocumentProcessingClient {
 
     public func blurPixels(
         pixelData: Data,
+        sourceBufferHandle: MetalBufferHandle? = nil,
         canvasWidth: Int,
         canvasHeight: Int,
         samples: [StylusSample],
@@ -614,7 +625,11 @@ extension PrimoMetalDocumentProcessingClient {
             let horizontalPipeline = blurHorizontalPipeline,
             let verticalPipeline = blurVerticalPipeline,
             let blendPipeline = blurBlendPipeline,
-            let sourceBuffer = makeBuffer(pixelData),
+            let sourceBuffer = makeLayerSourceBuffer(
+                pixelData: pixelData,
+                bufferHandle: sourceBufferHandle,
+                expectedCount: canvasWidth * canvasHeight * 4
+            ),
             let tempBuffer = device?.makeBuffer(
                 length: canvasWidth * canvasHeight * MemoryLayout<SIMD4<Float>>.stride,
                 options: .storageModeShared
@@ -673,21 +688,20 @@ extension PrimoMetalDocumentProcessingClient {
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
 
-        let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
         let dirtyRect = blurDirtyRect(samples: samples, brush: brush, width: canvasWidth, height: canvasHeight)
-        let rectPixelData = crop(pixelData: fullPixelData, canvasWidth: canvasWidth, rect: dirtyRect)
         return DocumentLayerMutationPayload(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: dirtyRect,
             gpuBufferHandle: makeBufferHandle(width: canvasWidth, height: canvasHeight, bytesPerRow: canvasWidth * 4, buffer: outputBuffer),
-            rectPixelData: rectPixelData,
-            fullPixelData: fullPixelData
+            rectPixelData: Data(),
+            fullPixelData: nil
         )
     }
 
     public func fillPixels(
         pixelData: Data,
+        sourceBufferHandle: MetalBufferHandle? = nil,
         canvasWidth: Int,
         canvasHeight: Int,
         sample: StylusSample,
@@ -713,32 +727,50 @@ extension PrimoMetalDocumentProcessingClient {
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 dirtyRect: fullRect,
-                rectPixelData: pixelData,
-                fullPixelData: pixelData
+                gpuBufferHandle: sourceBufferHandle,
+                rectPixelData: sourceBufferHandle == nil ? pixelData : Data(),
+                fullPixelData: sourceBufferHandle == nil ? pixelData : nil
             )
         }
 
         let offset = ((y * canvasWidth) + x) * 4
-        let seedRed = Float(pixelData[offset]) / 255.0
-        let seedGreen = Float(pixelData[offset + 1]) / 255.0
-        let seedBlue = Float(pixelData[offset + 2]) / 255.0
-        let seedAlpha = Float(pixelData[offset + 3]) / 255.0
+        let seedBytes: (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)
+        if let sourceBufferHandle,
+           let rgba = rgbaBytes(from: sourceBufferHandle, offset: offset, expectedCount: pixelData.count) {
+            seedBytes = rgba
+        } else {
+            seedBytes = (
+                pixelData[offset],
+                pixelData[offset + 1],
+                pixelData[offset + 2],
+                pixelData[offset + 3]
+            )
+        }
+        let seedRed = Float(seedBytes.red) / 255.0
+        let seedGreen = Float(seedBytes.green) / 255.0
+        let seedBlue = Float(seedBytes.blue) / 255.0
+        let seedAlpha = Float(seedBytes.alpha) / 255.0
         let targetAlpha = Float(max(0.0, min(1.0, brush.opacity)))
-        if pixelData[offset] == brush.red,
-           pixelData[offset + 1] == brush.green,
-           pixelData[offset + 2] == brush.blue,
+        if seedBytes.red == brush.red,
+           seedBytes.green == brush.green,
+           seedBytes.blue == brush.blue,
            abs(seedAlpha - targetAlpha) < 0.0001 {
             return DocumentLayerMutationPayload(
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 dirtyRect: fullRect,
-                rectPixelData: pixelData,
-                fullPixelData: pixelData
+                gpuBufferHandle: sourceBufferHandle,
+                rectPixelData: sourceBufferHandle == nil ? pixelData : Data(),
+                fullPixelData: sourceBufferHandle == nil ? pixelData : nil
             )
         }
 
         guard
-            let sourceBuffer = makeBuffer(pixelData),
+            let sourceBuffer = makeLayerSourceBuffer(
+                pixelData: pixelData,
+                bufferHandle: sourceBufferHandle,
+                expectedCount: canvasWidth * canvasHeight * 4
+            ),
             let eligibleBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
             let firstFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
             let secondFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
@@ -775,8 +807,8 @@ extension PrimoMetalDocumentProcessingClient {
         memset(secondFillBuffer.contents(), 0, canvasWidth * canvasHeight)
         firstFillBuffer.contents().assumingMemoryBound(to: UInt8.self)[y * canvasWidth + x] = 255
 
-        guard let commandBuffer = commandQueue.makeCommandBuffer(),
-              let eligibilityEncoder = commandBuffer.makeComputeCommandEncoder()
+        guard let eligibilityCommandBuffer = commandQueue.makeCommandBuffer(),
+              let eligibilityEncoder = eligibilityCommandBuffer.makeComputeCommandEncoder()
         else {
             return nil
         }
@@ -786,12 +818,16 @@ extension PrimoMetalDocumentProcessingClient {
         eligibilityEncoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
         dispatch2D(encoder: eligibilityEncoder, pipeline: eligibilityPipeline, width: canvasWidth, height: canvasHeight)
         eligibilityEncoder.endEncoding()
+        eligibilityCommandBuffer.commit()
+        eligibilityCommandBuffer.waitUntilCompleted()
+        guard eligibilityCommandBuffer.status == .completed else { return nil }
 
         var currentFill = firstFillBuffer
         var nextFill = secondFillBuffer
         let maxPropagationIterations = max(1, canvasWidth + canvasHeight)
         for _ in 0..<maxPropagationIterations {
             changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee = 0
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
             guard let propagationEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
             propagationEncoder.setComputePipelineState(propagationPipeline)
             propagationEncoder.setBuffer(eligibleBuffer, offset: 0, index: 0)
@@ -801,11 +837,18 @@ extension PrimoMetalDocumentProcessingClient {
             propagationEncoder.setBuffer(descriptorBuffer, offset: 0, index: 4)
             dispatch2D(encoder: propagationEncoder, pipeline: propagationPipeline, width: canvasWidth, height: canvasHeight)
             propagationEncoder.endEncoding()
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            guard commandBuffer.status == .completed else { return nil }
             swap(&currentFill, &nextFill)
+            if changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee == 0 {
+                break
+            }
         }
 
         if brush.fillExpansion > 0 {
             for _ in 0..<brush.fillExpansion {
+                guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
                 guard let expansionEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
                 expansionEncoder.setComputePipelineState(expansionPipeline)
                 expansionEncoder.setBuffer(currentFill, offset: 0, index: 0)
@@ -813,10 +856,14 @@ extension PrimoMetalDocumentProcessingClient {
                 expansionEncoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
                 dispatch2D(encoder: expansionEncoder, pipeline: expansionPipeline, width: canvasWidth, height: canvasHeight)
                 expansionEncoder.endEncoding()
+                commandBuffer.commit()
+                commandBuffer.waitUntilCompleted()
+                guard commandBuffer.status == .completed else { return nil }
                 swap(&currentFill, &nextFill)
             }
         }
 
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
         guard let composeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
         composeEncoder.setComputePipelineState(composePipeline)
         composeEncoder.setBuffer(sourceBuffer, offset: 0, index: 0)
@@ -829,14 +876,13 @@ extension PrimoMetalDocumentProcessingClient {
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
 
-        let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
         return DocumentLayerMutationPayload(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: fullRect,
             gpuBufferHandle: makeBufferHandle(width: canvasWidth, height: canvasHeight, bytesPerRow: canvasWidth * 4, buffer: outputBuffer),
-            rectPixelData: fullPixelData,
-            fullPixelData: fullPixelData
+            rectPixelData: Data(),
+            fullPixelData: nil
         )
     }
 

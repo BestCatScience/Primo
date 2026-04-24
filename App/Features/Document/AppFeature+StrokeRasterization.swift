@@ -22,6 +22,7 @@ extension AppFeature {
         guard layer.pixelData.count == expectedCount else { return nil }
         guard let output = MetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
             basePixelData: layer.pixelData,
+            baseBufferHandle: layer.gpuBufferHandle,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,
             samples: samples,

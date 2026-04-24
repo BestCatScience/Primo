@@ -132,8 +132,10 @@ extension AppFeature {
                 MetalDocumentSnapshot,
                 Int,
                 Data,
+                MetalBufferHandle?,
                 [StylusSample],
                 BrushRuntimeSettings,
+                Bool,
                 Bool
             ) -> StrokePreviewPlan?
         ) -> StrokePreviewResolution? {
@@ -143,9 +145,11 @@ extension AppFeature {
                     baseSnapshot,
                     context.activeLayerIndex,
                     baseLayer.pixelData,
+                    baseLayer.gpuBufferHandle,
                     [sample],
                     context.previewBrush,
-                    context.activeLayer.isAlphaLocked
+                    context.activeLayer.isAlphaLocked,
+                    state.usesResponsiveOilPreview(for: context.previewBrush)
                   )
             else {
                 return nil
@@ -161,8 +165,10 @@ extension AppFeature {
                 MetalDocumentSnapshot,
                 Int,
                 Data,
+                MetalBufferHandle?,
                 [StylusSample],
                 BrushRuntimeSettings,
+                Bool,
                 Bool
             ) -> StrokePreviewPlan?
         ) -> StrokePreviewResolution? {
@@ -178,9 +184,11 @@ extension AppFeature {
                     baseSnapshot,
                     context.activeLayerIndex,
                     baseLayer.pixelData,
+                    baseLayer.gpuBufferHandle,
                     fullSamples,
                     context.previewBrush,
-                    context.activeLayer.isAlphaLocked
+                    context.activeLayer.isAlphaLocked,
+                    state.usesResponsiveOilPreview(for: context.previewBrush)
                 ) else {
                     return nil
                 }
@@ -194,9 +202,11 @@ extension AppFeature {
                     snapshot,
                     context.activeLayerIndex,
                     baseLayer.pixelData,
+                    baseLayer.gpuBufferHandle,
                     samples,
                     context.previewBrush,
-                    context.activeLayer.isAlphaLocked
+                    context.activeLayer.isAlphaLocked,
+                    state.usesResponsiveOilPreview(for: context.previewBrush)
                 )
             else {
                 return nil
@@ -231,14 +241,20 @@ extension AppFeature {
                 clearSelectionWithoutRefresh(&state)
             }
             let commitResult: DocumentMutationResult
-            if let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
+            let canCommitPreviewPixels = Self.shouldCommitPreviewPixels(
+                state: state,
+                context: context
+            )
+            if canCommitPreviewPixels,
+               let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
                let rectPixelData = state.canvas.activeStrokePreviewRectPixelData {
                 commitResult = workflowService.replaceLayerPixels(
                     context.activeLayerIndex,
                     in: dirtyRect,
                     pixelData: rectPixelData
                 )
-            } else if let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
+            } else if canCommitPreviewPixels,
+                      let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
                 commitResult = workflowService.replaceLayerPixels(
                     context.activeLayerIndex,
                     pixelData: previewPixels
@@ -257,6 +273,7 @@ extension AppFeature {
                 if let stagedSnapshot = Self.stagedCommittedSnapshot(
                     state: state,
                     activeLayerIndex: context.activeLayerIndex,
+                    canCommitPreviewPixels: canCommitPreviewPixels,
                     strokeProcessingService: strokeProcessingService
                 ) {
                     state.canvas.stagePendingCommittedSnapshot(stagedSnapshot)
@@ -277,6 +294,7 @@ extension AppFeature {
         private static func stagedCommittedSnapshot(
             state: State,
             activeLayerIndex: Int,
+            canCommitPreviewPixels: Bool,
             strokeProcessingService: DocumentStrokeProcessingService
         ) -> MetalDocumentSnapshot? {
             guard
@@ -284,7 +302,8 @@ extension AppFeature {
                 let committedPixels = committedPreviewLayerPixelData(
                     state: state,
                     baseSnapshot: baseSnapshot,
-                    activeLayerIndex: activeLayerIndex
+                    activeLayerIndex: activeLayerIndex,
+                    canCommitPreviewPixels: canCommitPreviewPixels
                 )
             else {
                 return nil
@@ -302,8 +321,10 @@ extension AppFeature {
         private static func committedPreviewLayerPixelData(
             state: State,
             baseSnapshot: MetalDocumentSnapshot,
-            activeLayerIndex: Int
+            activeLayerIndex: Int,
+            canCommitPreviewPixels: Bool
         ) -> Data? {
+            guard canCommitPreviewPixels else { return nil }
             if let previewLayerPixelData = state.canvas.activeStrokePreviewLayerPixelData {
                 return previewLayerPixelData
             }
@@ -338,6 +359,16 @@ extension AppFeature {
                 }
             }
             return committedPixels
+        }
+
+        private static func shouldCommitPreviewPixels(
+            state: State,
+            context: CanvasStrokeContext
+        ) -> Bool {
+            if !state.canvas.activeStrokePreviewIsApproximate {
+                return true
+            }
+            return state.usesResponsiveOilPreview(for: context.previewBrush)
         }
     }
 
@@ -572,14 +603,16 @@ extension AppFeature {
             state: state,
             sample: sample,
             context: context,
-            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, samples, brush, preserveAlphaLockedPixels in
+            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, baseBufferHandle, samples, brush, preserveAlphaLockedPixels, usesResponsiveOilPreview in
                 makeStrokePreviewPlan(
                     snapshot: snapshot,
                     activeLayerIndex: activeLayerIndex,
                     basePixelData: basePixelData,
+                    baseBufferHandle: baseBufferHandle,
                     samples: samples,
                     brush: brush,
-                    preserveAlphaLockedPixels: preserveAlphaLockedPixels
+                    preserveAlphaLockedPixels: preserveAlphaLockedPixels,
+                    usesResponsiveOilPreview: usesResponsiveOilPreview
                 )
             }
         )
@@ -594,14 +627,16 @@ extension AppFeature {
             state: state,
             samples: samples,
             context: context,
-            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, samples, brush, preserveAlphaLockedPixels in
+            makePreviewPlan: { snapshot, activeLayerIndex, basePixelData, baseBufferHandle, samples, brush, preserveAlphaLockedPixels, usesResponsiveOilPreview in
                 makeStrokePreviewPlan(
                     snapshot: snapshot,
                     activeLayerIndex: activeLayerIndex,
                     basePixelData: basePixelData,
+                    baseBufferHandle: baseBufferHandle,
                     samples: samples,
                     brush: brush,
-                    preserveAlphaLockedPixels: preserveAlphaLockedPixels
+                    preserveAlphaLockedPixels: preserveAlphaLockedPixels,
+                    usesResponsiveOilPreview: usesResponsiveOilPreview
                 )
             }
         )
@@ -683,17 +718,21 @@ extension AppFeature {
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle?,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
-        preserveAlphaLockedPixels: Bool
+        preserveAlphaLockedPixels: Bool,
+        usesResponsiveOilPreview: Bool
     ) -> StrokePreviewPlan? {
         canvasStrokeProcessingService.makePreviewPlan(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             basePixelData: basePixelData,
+            baseBufferHandle: baseBufferHandle,
             samples: samples,
             brush: brush,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels
+            preserveAlphaLockedPixels: preserveAlphaLockedPixels,
+            usesResponsiveOilPreview: usesResponsiveOilPreview
         )
     }
 
@@ -703,6 +742,7 @@ extension AppFeature {
         state: inout State
     ) {
         state.canvas.setStrokePreviewLayerPixelData(plan.adjustedPixels)
+        state.canvas.setStrokePreviewIsApproximate(plan.isApproximatePreview)
         state.canvas.setStrokePreviewRectPixelData(
             plan.rectPixelData,
             dirtyRect: plan.dirtyRect.map {
@@ -984,5 +1024,13 @@ extension AppFeature {
                 }
             }
         )
+    }
+}
+
+private extension AppFeature.State {
+    func usesResponsiveOilPreview(for brush: BrushRuntimeSettings) -> Bool {
+        brushPalette.ui.oilLivePreviewQuality == .responsive &&
+        brush.tipKind == .oil &&
+        brush.smudgeEngineEnabled
     }
 }

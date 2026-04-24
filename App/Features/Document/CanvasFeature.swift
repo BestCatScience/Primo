@@ -3,6 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentMetalRuntimeInfrastructure
 import simd
 
 @Reducer
@@ -45,6 +46,7 @@ struct CanvasFeature {
         var activeStrokePreviewRectPixelData: Data?
         var activeStrokePreviewDirtyRect: LayerPixelRect?
         var activeStrokePreviewCompositePixelData: Data?
+        var activeStrokePreviewIsApproximate = false
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
@@ -234,11 +236,17 @@ struct CanvasFeature {
             activeStrokePreviewCompositePixelData = pixelData
         }
 
+        mutating func setStrokePreviewIsApproximate(_ isApproximate: Bool) {
+            activeStrokePreviewIsApproximate = isApproximate
+        }
+
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
+            releasePendingIncrementalUpdate(replacingWith: update)
             pendingIncrementalUpdate = update
         }
 
         mutating func clearPendingIncrementalUpdate() {
+            releasePendingIncrementalUpdate(replacingWith: nil)
             pendingIncrementalUpdate = nil
         }
 
@@ -251,7 +259,7 @@ struct CanvasFeature {
                 setStrokePreviewLayerPixelData(activeLayerPixelData)
             }
             setStrokePreviewCompositePixelData(nil)
-            pendingIncrementalUpdate = update
+            setPendingIncrementalUpdate(update)
         }
 
         func stagedPreviewCompositePixelData(baseSnapshot: MetalDocumentSnapshot) -> Data? {
@@ -305,8 +313,19 @@ struct CanvasFeature {
             activeStrokePreviewRectPixelData = nil
             activeStrokePreviewDirtyRect = nil
             activeStrokePreviewCompositePixelData = nil
+            activeStrokePreviewIsApproximate = false
             pendingStrokeFinalizationSamples = []
-            pendingIncrementalUpdate = nil
+            clearPendingIncrementalUpdate()
+        }
+
+        private mutating func releasePendingIncrementalUpdate(replacingWith nextUpdate: IncrementalLayerUpdate?) {
+            guard
+                let currentHandle = pendingIncrementalUpdate?.gpuBufferHandle,
+                currentHandle.id != nextUpdate?.gpuBufferHandle?.id
+            else {
+                return
+            }
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(currentHandle)
         }
 
         mutating func setActiveTextLayer(_ textLayer: TextLayerData?) {

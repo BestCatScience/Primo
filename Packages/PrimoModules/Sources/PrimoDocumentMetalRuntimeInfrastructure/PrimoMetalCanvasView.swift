@@ -227,6 +227,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
                width: copyWidth,
                height: copyHeight
            ) {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(handle)
             lastAppliedIncrementalUpdateID = update.id
             scheduleRedraw()
             return

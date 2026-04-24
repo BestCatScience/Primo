@@ -387,6 +387,7 @@ public enum PrimoMetalStrokeExecutionMode: Equatable, Sendable {
 
 public struct PrimoMetalStrokeExecutionRequest: Sendable {
     public let basePixelData: Data
+    public let baseBufferHandle: MetalBufferHandle?
     public let canvasWidth: Int
     public let canvasHeight: Int
     public let samples: [StylusSample]
@@ -397,6 +398,7 @@ public struct PrimoMetalStrokeExecutionRequest: Sendable {
 
     public init(
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
         canvasWidth: Int,
         canvasHeight: Int,
         samples: [StylusSample],
@@ -406,6 +408,7 @@ public struct PrimoMetalStrokeExecutionRequest: Sendable {
         activeLayerIndex: Int?
     ) {
         self.basePixelData = basePixelData
+        self.baseBufferHandle = baseBufferHandle
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.samples = samples
@@ -723,6 +726,13 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
+    public func releaseBufferHandle(_ handle: MetalBufferHandle?) {
+        guard let handle else { return }
+        _ = withCacheLock {
+            cachedBuffers.removeValue(forKey: handle.id)
+        }
+    }
+
     public func materializedPixelData(for handle: MetalBufferHandle) -> Data? {
         guard let resource = cachedBufferResource(for: handle) else { return nil }
         return bytes(from: resource.buffer, count: resource.bytesPerRow * resource.height)
@@ -775,6 +785,19 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         withCacheLock {
             cachedBuffers[handle.id]
         }
+    }
+
+    func rgbaBytes(from handle: MetalBufferHandle, offset: Int, expectedCount: Int) -> (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8)? {
+        guard
+            offset >= 0,
+            offset + 3 < expectedCount,
+            handle.bytesPerRow * handle.height == expectedCount,
+            let resource = cachedBufferResource(for: handle)
+        else {
+            return nil
+        }
+        let bytes = resource.buffer.contents().assumingMemoryBound(to: UInt8.self)
+        return (bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3])
     }
 
     private func withCacheLock<T>(_ work: () throws -> T) rethrows -> T {
@@ -2061,6 +2084,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
     public func rasterizedStrokePixelData(
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
         canvasWidth: Int,
         canvasHeight: Int,
         samples: [StylusSample],
@@ -2069,9 +2093,10 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         snapshotRevision: Int? = nil,
         activeLayerIndex: Int? = nil
     ) -> Data? {
-        executeStroke(
+        guard let result = executeStroke(
             PrimoMetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
+                baseBufferHandle: baseBufferHandle,
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 samples: samples,
@@ -2080,7 +2105,11 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 snapshotRevision: snapshotRevision,
                 activeLayerIndex: activeLayerIndex
             )
-        )?.pixelData
+        ) else {
+            return nil
+        }
+        releaseBufferHandle(result.gpuBufferHandle)
+        return result.pixelData
     }
 
     func debugStrokeBinningSummary(
@@ -2202,9 +2231,15 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
 
         guard
-            let current = makeBuffer(request.basePixelData),
-            let scratch = makeBuffer(request.basePixelData)
+            let current = makeLayerSourceBuffer(
+                pixelData: request.basePixelData,
+                bufferHandle: request.baseBufferHandle,
+                expectedCount: request.canvasWidth * request.canvasHeight * 4
+            )
         else {
+            return nil
+        }
+        guard let scratch = makeBuffer(from: current, count: request.canvasWidth * request.canvasHeight * 4) else {
             return nil
         }
         return StrokeExecutionContext(
@@ -2327,6 +2362,21 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             guard let baseAddress = bytes.baseAddress else { return nil }
             return device?.makeBuffer(bytes: baseAddress, length: values.count, options: .storageModeShared)
         }
+    }
+
+    func makeBuffer(from source: MTLBuffer, count: Int) -> MTLBuffer? {
+        guard count > 0 else { return device?.makeBuffer(length: 1, options: .storageModeShared) }
+        return device?.makeBuffer(bytes: source.contents(), length: count, options: .storageModeShared)
+    }
+
+    func makeLayerSourceBuffer(pixelData: Data, bufferHandle: MetalBufferHandle?, expectedCount: Int) -> MTLBuffer? {
+        if let bufferHandle,
+           bufferHandle.bytesPerRow * bufferHandle.height == expectedCount,
+           let resource = cachedBufferResource(for: bufferHandle) {
+            return resource.buffer
+        }
+        guard pixelData.count == expectedCount else { return nil }
+        return makeBuffer(pixelData)
     }
 
     func bytes(from buffer: MTLBuffer, count: Int) -> Data {

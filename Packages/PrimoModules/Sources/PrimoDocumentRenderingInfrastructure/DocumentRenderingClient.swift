@@ -17,19 +17,22 @@ public struct DocumentInteractiveStrokePreviewResult: Sendable {
     public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
     public let rectPixelData: Data?
     public let incrementalUpdate: IncrementalLayerUpdate?
+    public let isApproximatePreview: Bool
 
     public init(
         pixelData: Data?,
         gpuBufferHandle: MetalBufferHandle? = nil,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?,
         rectPixelData: Data?,
-        incrementalUpdate: IncrementalLayerUpdate?
+        incrementalUpdate: IncrementalLayerUpdate?,
+        isApproximatePreview: Bool = false
     ) {
         self.pixelData = pixelData
         self.gpuBufferHandle = gpuBufferHandle
         self.dirtyRect = dirtyRect
         self.rectPixelData = rectPixelData
         self.incrementalUpdate = incrementalUpdate
+        self.isApproximatePreview = isApproximatePreview
     }
 }
 
@@ -118,6 +121,7 @@ public struct DocumentRenderingClient: Sendable {
 
     public func rasterizedStrokePixelData(
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
         canvasWidth: Int,
         canvasHeight: Int,
         samples: [StylusSample],
@@ -128,6 +132,7 @@ public struct DocumentRenderingClient: Sendable {
     ) -> Data? {
         backend.rasterizedStrokePixelData(
             basePixelData: basePixelData,
+            baseBufferHandle: baseBufferHandle,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             samples: samples,
@@ -210,19 +215,30 @@ public struct DocumentRenderingClient: Sendable {
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
-        preserveAlphaLockedPixels: Bool
+        preserveAlphaLockedPixels: Bool,
+        usesResponsiveOilPreview: Bool = false
     ) -> DocumentInteractiveStrokePreviewResult? {
+        let usesApproximateOilPreview =
+            usesResponsiveOilPreview &&
+            brush.tipKind == .oil &&
+            brush.smudgeEngineEnabled
+        let previewBrush = usesApproximateOilPreview
+            ? Self.responsiveOilPreviewBrush(from: brush)
+            : brush
+
         if !preserveAlphaLockedPixels,
-           shouldUseIncrementalPreviewUpdate(for: brush),
+           shouldUseIncrementalPreviewUpdate(for: previewBrush),
            let gpuResult = backend.executeStrokeMutation(
                MetalStrokeExecutionRequest(
                    basePixelData: basePixelData,
+                   baseBufferHandle: baseBufferHandle,
                    canvasWidth: snapshot.width,
                    canvasHeight: snapshot.height,
                    samples: samples,
-                   brush: brush,
+                   brush: previewBrush,
                    mode: .interactive,
                    snapshotRevision: snapshot.revision,
                    activeLayerIndex: activeLayerIndex
@@ -235,23 +251,27 @@ public struct DocumentRenderingClient: Sendable {
                 adjustedActiveLayerBufferHandle: bufferHandle,
                 dirtyRect: gpuResult.dirtyRect
             ) {
+                backend.releaseBufferHandle(bufferHandle)
                 return DocumentInteractiveStrokePreviewResult(
                     pixelData: nil,
-                    gpuBufferHandle: bufferHandle,
+                    gpuBufferHandle: nil,
                     dirtyRect: gpuResult.dirtyRect,
-                    rectPixelData: gpuResult.rectPixelData,
-                    incrementalUpdate: incrementalUpdate
+                    rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
+                    incrementalUpdate: incrementalUpdate,
+                    isApproximatePreview: usesApproximateOilPreview
                 )
             }
+            backend.releaseBufferHandle(bufferHandle)
         }
 
         guard let gpuResult = executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
+                baseBufferHandle: baseBufferHandle,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,
                 samples: samples,
-                brush: brush,
+                brush: previewBrush,
                 mode: .interactive,
                 snapshotRevision: snapshot.revision,
                 activeLayerIndex: activeLayerIndex
@@ -279,7 +299,7 @@ public struct DocumentRenderingClient: Sendable {
         let previewDirtyRect = rasterDirtyRect
 
         let incrementalUpdate: IncrementalLayerUpdate?
-        if shouldUseIncrementalPreviewUpdate(for: brush) {
+        if shouldUseIncrementalPreviewUpdate(for: previewBrush) {
             incrementalUpdate = compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
@@ -300,7 +320,8 @@ public struct DocumentRenderingClient: Sendable {
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height
             ),
-            incrementalUpdate: incrementalUpdate
+            incrementalUpdate: incrementalUpdate,
+            isApproximatePreview: usesApproximateOilPreview
         )
     }
 
@@ -316,6 +337,21 @@ public struct DocumentRenderingClient: Sendable {
             width: width,
             height: height
         )
+    }
+
+    static func responsiveOilPreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
+        var copy = brush
+        copy.smudgeEngineEnabled = false
+        copy.customTip = nil
+        copy.textureStrength = min(copy.textureStrength, 0.08)
+        copy.pressureSensitivity = min(copy.pressureSensitivity, 0.04)
+        copy.opacityPressureSensitivity = min(copy.opacityPressureSensitivity, 0.04)
+        copy.flowPressureSensitivity = min(copy.flowPressureSensitivity, 0.04)
+        copy.radius *= 1.10
+        copy.hardness = max(copy.hardness, 0.86)
+        copy.flow = max(copy.flow, 0.96)
+        copy.opacity = max(copy.opacity, 0.92)
+        return copy
     }
 
     private static func strokePreviewDirtyRect(

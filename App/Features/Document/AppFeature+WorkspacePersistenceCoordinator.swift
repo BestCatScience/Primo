@@ -3,6 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 
@@ -704,24 +705,10 @@ extension AppFeature {
             ),
             state: &state
         )
-        let canApplyIncrementalUpdate =
-            canApplyDirtyUpdateIncrementally(
-                presentation: presentation,
-                state: state
-            )
-        if canApplyIncrementalUpdate,
-           let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
-            let activeLayerPixels = documentPresentationQueryService.pixelDataForLayer(
-                presentation.activeLayerIndex
-            )
-            state.canvas.applyIncrementalRenderUpdate(
-                dirtyUpdate,
-                activeLayerIndex: presentation.activeLayerIndex,
-                activeLayerPixelData: activeLayerPixels
-            )
-        } else {
-            applyPresentation(documentPresentationQueryService.presentation(), state: &state)
+        if let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
+            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(dirtyUpdate.gpuBufferHandle)
         }
+        applyPresentation(documentPresentationQueryService.presentation(), state: &state)
         guard updatesWorkspaceArtifacts else {
             return .none
         }
@@ -738,30 +725,6 @@ extension AppFeature {
             return .none
         }
         return .send(.workspacePersistenceRequested(request))
-    }
-
-    private func canApplyDirtyUpdateIncrementally(
-        presentation: PaintDocumentPresentation,
-        state: State
-    ) -> Bool {
-        guard let currentSnapshot = state.canvas.renderSnapshot else {
-            return false
-        }
-        let nextWidth = max(Int(presentation.canvasSize.width.rounded()), 1)
-        let nextHeight = max(Int(presentation.canvasSize.height.rounded()), 1)
-        guard currentSnapshot.width == nextWidth,
-              currentSnapshot.height == nextHeight,
-              currentSnapshot.layers.count == presentation.layerRows.count else {
-            return false
-        }
-
-        let currentLayerIndices = currentSnapshot.layers.map(\.index)
-        let nextLayerIndices = presentation.layerRows.map(\.index).sorted()
-        guard currentLayerIndices == nextLayerIndices else {
-            return false
-        }
-
-        return presentation.layerRows.contains(where: { $0.index == presentation.activeLayerIndex })
     }
 
     func applyLoadedWorkspaceSuccessEffects(
