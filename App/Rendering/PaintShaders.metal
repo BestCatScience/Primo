@@ -107,6 +107,27 @@ struct MetalColorRangeSelectionDescriptor {
     float minimumAlpha;
 };
 
+struct MetalAutoSelectionDescriptor {
+    uint width;
+    uint height;
+    uint seedX;
+    uint seedY;
+    uint thresholdMode;
+    uint expansion;
+    float tolerance;
+    float seedRed;
+    float seedGreen;
+    float seedBlue;
+    float seedAlpha;
+};
+
+struct MetalLassoSelectionDescriptor {
+    uint width;
+    uint height;
+    uint pointCount;
+    uint padding0;
+};
+
 struct MetalSelectionOverlayDescriptor {
     uint width;
     uint height;
@@ -139,6 +160,45 @@ struct MetalPaperCompositeDescriptor {
 };
 
 struct MetalLayerMaskApplyDescriptor {
+    uint width;
+    uint height;
+};
+
+struct MetalInpaintCompositeDescriptor {
+    uint canvasWidth;
+    uint canvasHeight;
+    uint cropWidth;
+    uint cropHeight;
+    int originX;
+    int originY;
+};
+
+struct MetalInpaintCropDescriptor {
+    uint canvasWidth;
+    uint canvasHeight;
+    uint cropWidth;
+    uint cropHeight;
+    int originX;
+    int originY;
+};
+
+struct MetalSelectionPlacementDescriptor {
+    uint canvasWidth;
+    uint canvasHeight;
+    uint maskWidth;
+    uint maskHeight;
+    int originX;
+    int originY;
+};
+
+struct MetalSelectionCombineDescriptor {
+    uint width;
+    uint height;
+    uint mode;
+    uint padding0;
+};
+
+struct MetalAlphaPreserveDescriptor {
     uint width;
     uint height;
 };
@@ -201,10 +261,25 @@ struct MetalBlurDescriptor {
 struct MetalTextComposeDescriptor {
     uint width;
     uint height;
+    uint glyphCount;
+    uint padding0;
     float red;
     float green;
     float blue;
     float alpha;
+    float rotationRadians;
+    float layoutCenterX;
+    float layoutCenterY;
+    float padding1;
+};
+
+struct MetalTextGlyphDescriptor {
+    float originX;
+    float originY;
+    float width;
+    float height;
+    uint atlasBitsLow;
+    uint atlasBitsHigh;
 };
 
 struct MetalScaleDescriptor {
@@ -1694,7 +1769,7 @@ kernel void blurBlendKernel(
 }
 
 kernel void textMaskComposeKernel(
-    const device uchar *maskPixels [[buffer(0)]],
+    const device MetalTextGlyphDescriptor *glyphs [[buffer(0)]],
     device uchar *outputPixels [[buffer(1)]],
     constant MetalTextComposeDescriptor& descriptor [[buffer(2)]],
     uint2 gid [[thread_position_in_grid]]
@@ -1702,8 +1777,43 @@ kernel void textMaskComposeKernel(
     if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
         return;
     }
-    uint index = (gid.y * descriptor.width) + gid.x;
-    float alpha = (float(maskPixels[index]) / 255.0) * descriptor.alpha;
+
+    float2 center = float2(descriptor.layoutCenterX, descriptor.layoutCenterY);
+    float2 samplePoint = float2(float(gid.x) + 0.5, float(gid.y) + 0.5);
+    float cosine = cos(-descriptor.rotationRadians);
+    float sine = sin(-descriptor.rotationRadians);
+    float2 translated = samplePoint - center;
+    float2 layoutPoint = float2(
+        (translated.x * cosine) - (translated.y * sine),
+        (translated.x * sine) + (translated.y * cosine)
+    ) + center;
+
+    float glyphAlpha = 0.0;
+    for (uint glyphIndex = 0u; glyphIndex < descriptor.glyphCount; ++glyphIndex) {
+        MetalTextGlyphDescriptor glyph = glyphs[glyphIndex];
+        if (layoutPoint.x < glyph.originX || layoutPoint.y < glyph.originY ||
+            layoutPoint.x >= glyph.originX + glyph.width || layoutPoint.y >= glyph.originY + glyph.height) {
+            continue;
+        }
+
+        float localX = (layoutPoint.x - glyph.originX) / max(glyph.width, 0.001);
+        float localY = (layoutPoint.y - glyph.originY) / max(glyph.height, 0.001);
+        uint column = min(uint(floor(localX * 5.0)), 4u);
+        uint row = min(uint(floor(localY * 7.0)), 6u);
+        uint bitIndex = (row * 5u) + column;
+        uint bit = 0u;
+        if (bitIndex < 32u) {
+            bit = (glyph.atlasBitsLow >> bitIndex) & 1u;
+        } else {
+            bit = (glyph.atlasBitsHigh >> (bitIndex - 32u)) & 1u;
+        }
+        if (bit != 0u) {
+            glyphAlpha = 1.0;
+            break;
+        }
+    }
+
+    float alpha = glyphAlpha * descriptor.alpha;
     writePixelRGBA(
         outputPixels,
         descriptor.width,
@@ -2016,4 +2126,224 @@ kernel void colorRangeSelectionKernel(
     const float db = (float(pixel.b) - float(request.blue)) / 255.0;
     const float distance = sqrt((dr * dr) + (dg * dg) + (db * db)) / sqrt(3.0);
     outputMask[index] = distance <= request.tolerance ? uchar(255) : uchar(0);
+}
+
+kernel void autoSelectionEligibilityKernel(
+    const device uchar4 *sourcePixels [[buffer(0)]],
+    device uchar *eligiblePixels [[buffer(1)]],
+    constant MetalAutoSelectionDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    const uint index = (gid.y * descriptor.width) + gid.x;
+    const uchar4 pixel = sourcePixels[index];
+    bool matches = false;
+    if (descriptor.thresholdMode == 0u) {
+        const bool sameColor =
+            pixel.r == uchar(clamp(round(descriptor.seedRed * 255.0), 0.0, 255.0)) &&
+            pixel.g == uchar(clamp(round(descriptor.seedGreen * 255.0), 0.0, 255.0)) &&
+            pixel.b == uchar(clamp(round(descriptor.seedBlue * 255.0), 0.0, 255.0));
+        const float alphaDistance = fabs((float(pixel.a) / 255.0) - descriptor.seedAlpha);
+        matches = sameColor && alphaDistance <= descriptor.tolerance;
+    } else {
+        const float dr = (float(pixel.r) / 255.0) - descriptor.seedRed;
+        const float dg = (float(pixel.g) / 255.0) - descriptor.seedGreen;
+        const float db = (float(pixel.b) / 255.0) - descriptor.seedBlue;
+        const float distance = sqrt((dr * dr) + (dg * dg) + (db * db)) / sqrt(3.0);
+        matches = distance <= descriptor.tolerance;
+    }
+    eligiblePixels[index] = matches ? uchar(255) : uchar(0);
+}
+
+kernel void lassoSelectionKernel(
+    const device float2 *points [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalLassoSelectionDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    const uint index = (gid.y * descriptor.width) + gid.x;
+    if (descriptor.pointCount < 3u) {
+        outputMask[index] = 0;
+        return;
+    }
+
+    const float2 samplePoint = float2(float(gid.x) + 0.5, float(gid.y) + 0.5);
+    bool inside = false;
+    for (uint i = 0u, j = descriptor.pointCount - 1u; i < descriptor.pointCount; j = i++) {
+        const float2 a = points[i];
+        const float2 b = points[j];
+        const bool intersects = ((a.y > samplePoint.y) != (b.y > samplePoint.y)) &&
+            (samplePoint.x < ((b.x - a.x) * (samplePoint.y - a.y) / max(b.y - a.y, 0.00001)) + a.x);
+        if (intersects) {
+            inside = !inside;
+        }
+    }
+    outputMask[index] = inside ? uchar(255) : uchar(0);
+}
+
+kernel void selectionPlacementKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalSelectionPlacementDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.canvasWidth || gid.y >= descriptor.canvasHeight) {
+        return;
+    }
+
+    const uint outputIndex = (gid.y * descriptor.canvasWidth) + gid.x;
+    const int sourceX = int(gid.x) - descriptor.originX;
+    const int sourceY = int(gid.y) - descriptor.originY;
+    if (sourceX < 0 || sourceY < 0 || sourceX >= int(descriptor.maskWidth) || sourceY >= int(descriptor.maskHeight)) {
+        outputMask[outputIndex] = 0;
+        return;
+    }
+
+    const uint sourceIndex = (uint(sourceY) * descriptor.maskWidth) + uint(sourceX);
+    outputMask[outputIndex] = sourceMask[sourceIndex];
+}
+
+kernel void selectionCombineKernel(
+    const device uchar *baseMask [[buffer(0)]],
+    const device uchar *incomingMask [[buffer(1)]],
+    device uchar *outputMask [[buffer(2)]],
+    constant MetalSelectionCombineDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    const uint index = (gid.y * descriptor.width) + gid.x;
+    const uchar baseValue = baseMask[index];
+    const uchar incomingValue = incomingMask[index];
+    if (descriptor.mode == 0u) {
+        outputMask[index] = max(baseValue, incomingValue);
+    } else {
+        outputMask[index] = incomingValue == 0 ? baseValue : uchar(0);
+    }
+}
+
+kernel void inpaintCompositeKernel(
+    const device uchar4 *basePixels [[buffer(0)]],
+    const device uchar4 *editedCropPixels [[buffer(1)]],
+    const device uchar *blendMask [[buffer(2)]],
+    device uchar4 *outputPixels [[buffer(3)]],
+    constant MetalInpaintCompositeDescriptor& descriptor [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.canvasWidth || gid.y >= descriptor.canvasHeight) {
+        return;
+    }
+
+    const uint canvasIndex = (gid.y * descriptor.canvasWidth) + gid.x;
+    const uchar4 basePixel = basePixels[canvasIndex];
+
+    const int cropX = int(gid.x) - descriptor.originX;
+    const int cropY = int(gid.y) - descriptor.originY;
+    if (cropX < 0 || cropY < 0 || cropX >= int(descriptor.cropWidth) || cropY >= int(descriptor.cropHeight)) {
+        outputPixels[canvasIndex] = basePixel;
+        return;
+    }
+
+    const uint cropIndex = (uint(cropY) * descriptor.cropWidth) + uint(cropX);
+    const float alpha = float(blendMask[cropIndex]) / 255.0;
+    if (alpha <= 0.0) {
+        outputPixels[canvasIndex] = basePixel;
+        return;
+    }
+
+    const uchar4 editedPixel = editedCropPixels[cropIndex];
+    if (alpha >= 0.999) {
+        outputPixels[canvasIndex] = editedPixel;
+        return;
+    }
+
+    const float4 baseFloat = float4(basePixel) / 255.0;
+    const float4 editedFloat = float4(editedPixel) / 255.0;
+    const float4 blended = mix(baseFloat, editedFloat, alpha);
+    outputPixels[canvasIndex] = uchar4(
+        uchar(clamp(round(blended.r * 255.0), 0.0, 255.0)),
+        uchar(clamp(round(blended.g * 255.0), 0.0, 255.0)),
+        uchar(clamp(round(blended.b * 255.0), 0.0, 255.0)),
+        uchar(clamp(round(blended.a * 255.0), 0.0, 255.0))
+    );
+}
+
+kernel void inpaintCropRGBAKernel(
+    const device uchar4 *sourcePixels [[buffer(0)]],
+    device uchar4 *outputPixels [[buffer(1)]],
+    constant MetalInpaintCropDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.cropWidth || gid.y >= descriptor.cropHeight) {
+        return;
+    }
+
+    const int canvasX = descriptor.originX + int(gid.x);
+    const int canvasY = descriptor.originY + int(gid.y);
+    const uint cropIndex = (gid.y * descriptor.cropWidth) + gid.x;
+    if (canvasX < 0 || canvasY < 0 || canvasX >= int(descriptor.canvasWidth) || canvasY >= int(descriptor.canvasHeight)) {
+        outputPixels[cropIndex] = uchar4(0);
+        return;
+    }
+
+    const uint canvasIndex = (uint(canvasY) * descriptor.canvasWidth) + uint(canvasX);
+    outputPixels[cropIndex] = sourcePixels[canvasIndex];
+}
+
+kernel void inpaintCropMaskKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalInpaintCropDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.cropWidth || gid.y >= descriptor.cropHeight) {
+        return;
+    }
+
+    const int canvasX = descriptor.originX + int(gid.x);
+    const int canvasY = descriptor.originY + int(gid.y);
+    const uint cropIndex = (gid.y * descriptor.cropWidth) + gid.x;
+    if (canvasX < 0 || canvasY < 0 || canvasX >= int(descriptor.canvasWidth) || canvasY >= int(descriptor.canvasHeight)) {
+        outputMask[cropIndex] = 0;
+        return;
+    }
+
+    const uint canvasIndex = (uint(canvasY) * descriptor.canvasWidth) + uint(canvasX);
+    outputMask[cropIndex] = sourceMask[canvasIndex];
+}
+
+kernel void alphaPreserveKernel(
+    const device uchar4 *sourcePixels [[buffer(0)]],
+    const device uchar4 *existingPixels [[buffer(1)]],
+    device uchar4 *outputPixels [[buffer(2)]],
+    constant MetalAlphaPreserveDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    const uint index = (gid.y * descriptor.width) + gid.x;
+    const uchar4 sourcePixel = sourcePixels[index];
+    const uchar4 existingPixel = existingPixels[index];
+    if (existingPixel.a == 0) {
+        outputPixels[index] = uchar4(0);
+        return;
+    }
+
+    outputPixels[index] = uchar4(
+        sourcePixel.r,
+        sourcePixel.g,
+        sourcePixel.b,
+        existingPixel.a
+    );
 }

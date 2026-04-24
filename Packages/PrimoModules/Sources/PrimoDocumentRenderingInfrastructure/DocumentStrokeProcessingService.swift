@@ -83,9 +83,15 @@ public struct DocumentStrokeProcessingService: Sendable {
             snapshotRevision: snapshot.revision,
             activeLayerIndex: activeLayerIndex
         ) {
-            return preserveAlphaLockedPixels
-                ? Self.pixelDataByPreservingExistingAlpha(source: gpuOutput, existing: baseLayer.pixelData)
-                : gpuOutput
+            if preserveAlphaLockedPixels {
+                return renderingClient.preservingExistingAlpha(
+                    source: gpuOutput,
+                    existing: baseLayer.pixelData,
+                    width: snapshot.width,
+                    height: snapshot.height
+                )
+            }
+            return gpuOutput
         }
         return nil
     }
@@ -131,29 +137,5 @@ public struct DocumentStrokeProcessingService: Sendable {
             compositePixelData: compositePixelData,
             layers: layers
         )
-    }
-
-    private static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
-        guard source.count == existing.count else { return source }
-        var output = source
-        output.withUnsafeMutableBytes { outputBytes in
-            existing.withUnsafeBytes { existingBytes in
-                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
-                else { return }
-                for offset in stride(from: 0, to: source.count, by: 4) {
-                    let alpha = src[offset + 3]
-                    if alpha == 0 {
-                        dst[offset] = 0
-                        dst[offset + 1] = 0
-                        dst[offset + 2] = 0
-                        dst[offset + 3] = 0
-                    } else {
-                        dst[offset + 3] = alpha
-                    }
-                }
-            }
-        }
-        return output
     }
 }

@@ -4,16 +4,6 @@ import Metal
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-#if canImport(UIKit)
-import UIKit
-private typealias PlatformColor = UIColor
-private typealias PlatformFont = UIFont
-#elseif canImport(AppKit)
-import AppKit
-private typealias PlatformColor = NSColor
-private typealias PlatformFont = NSFont
-#endif
-
 private struct PrimoMetalLayerProcessingDescriptor {
     let width: UInt32
     let height: UInt32
@@ -72,10 +62,31 @@ private struct PrimoMetalBlurDescriptor {
 private struct PrimoMetalTextComposeDescriptor {
     let width: UInt32
     let height: UInt32
+    let glyphCount: UInt32
+    let padding0: UInt32
     let red: Float
     let green: Float
     let blue: Float
     let alpha: Float
+    let rotationRadians: Float
+    let layoutCenterX: Float
+    let layoutCenterY: Float
+    let padding1: Float
+}
+
+private struct PrimoMetalTextGlyphDescriptor {
+    let originX: Float
+    let originY: Float
+    let width: Float
+    let height: Float
+    let atlasBitsLow: UInt32
+    let atlasBitsHigh: UInt32
+}
+
+private struct PrimoMetalTextLayoutResult {
+    let glyphs: [PrimoMetalTextGlyphDescriptor]
+    let unrotatedBounds: CGRect
+    let rotatedBounds: CGRect
 }
 
 private struct PrimoMetalScaleDescriptor {
@@ -107,6 +118,155 @@ private enum PrimoMetalLayerProcessingKind {
 }
 
 extension PrimoMetalDocumentProcessingClient {
+    public func autoSelection(
+        pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        seedX: Int,
+        seedY: Int,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> [UInt8]? {
+        guard
+            isAvailable,
+            pixelData.count == canvasWidth * canvasHeight * 4,
+            seedX >= 0,
+            seedX < canvasWidth,
+            seedY >= 0,
+            seedY < canvasHeight,
+            let commandQueue,
+            let eligibilityPipeline = autoSelectionEligibilityPipeline,
+            let propagationPipeline = fillPropagationPipeline,
+            let expansionPipeline = fillExpansionPipeline
+        else {
+            return nil
+        }
+
+        let seedOffset = ((seedY * canvasWidth) + seedX) * 4
+        let seedRed = Float(pixelData[seedOffset]) / 255.0
+        let seedGreen = Float(pixelData[seedOffset + 1]) / 255.0
+        let seedBlue = Float(pixelData[seedOffset + 2]) / 255.0
+        let seedAlpha = Float(pixelData[seedOffset + 3]) / 255.0
+
+        guard
+            let sourceBuffer = makeBuffer(pixelData),
+            let eligibleBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
+            let firstFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
+            let secondFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
+            let changeFlagBuffer = device?.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared),
+            let eligibilityDescriptorBuffer = makeBuffer(
+                PrimoMetalAutoSelectionDescriptor(
+                    width: UInt32(canvasWidth),
+                    height: UInt32(canvasHeight),
+                    seedX: UInt32(seedX),
+                    seedY: UInt32(seedY),
+                    thresholdMode: thresholdMode == .opacity ? 0 : 1,
+                    expansion: UInt32(max(0, expansion)),
+                    tolerance: Float(
+                        thresholdMode == .opacity
+                            ? max(0.0, min(1.0, opacityTolerance))
+                            : max(0.0, min(1.0, colorTolerance))
+                    ),
+                    seedRed: seedRed,
+                    seedGreen: seedGreen,
+                    seedBlue: seedBlue,
+                    seedAlpha: seedAlpha
+                )
+            ),
+            let propagationDescriptorBuffer = makeBuffer(
+                PrimoMetalFillDescriptor(
+                    width: UInt32(canvasWidth),
+                    height: UInt32(canvasHeight),
+                    seedX: UInt32(seedX),
+                    seedY: UInt32(seedY),
+                    thresholdMode: thresholdMode == .opacity ? 0 : 1,
+                    expansion: UInt32(max(0, expansion)),
+                    tolerance: 0,
+                    seedRed: seedRed,
+                    seedGreen: seedGreen,
+                    seedBlue: seedBlue,
+                    seedAlpha: seedAlpha,
+                    targetRed: 0,
+                    targetGreen: 0,
+                    targetBlue: 0,
+                    targetAlpha: 0
+                )
+            )
+        else {
+            return nil
+        }
+
+        memset(firstFillBuffer.contents(), 0, canvasWidth * canvasHeight)
+        memset(secondFillBuffer.contents(), 0, canvasWidth * canvasHeight)
+        firstFillBuffer.contents().assumingMemoryBound(to: UInt8.self)[seedY * canvasWidth + seedX] = 255
+
+        guard let eligibilityCommandBuffer = commandQueue.makeCommandBuffer(),
+              let eligibilityEncoder = eligibilityCommandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+        eligibilityEncoder.setComputePipelineState(eligibilityPipeline)
+        eligibilityEncoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        eligibilityEncoder.setBuffer(eligibleBuffer, offset: 0, index: 1)
+        eligibilityEncoder.setBuffer(eligibilityDescriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: eligibilityEncoder, pipeline: eligibilityPipeline, width: canvasWidth, height: canvasHeight)
+        eligibilityEncoder.endEncoding()
+        eligibilityCommandBuffer.commit()
+        eligibilityCommandBuffer.waitUntilCompleted()
+        guard eligibilityCommandBuffer.status == .completed else { return nil }
+
+        var currentFill = firstFillBuffer
+        var nextFill = secondFillBuffer
+        for _ in 0..<(canvasWidth * canvasHeight) {
+            changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee = 0
+            guard let propagationCommandBuffer = commandQueue.makeCommandBuffer(),
+                  let propagationEncoder = propagationCommandBuffer.makeComputeCommandEncoder()
+            else {
+                return nil
+            }
+            propagationEncoder.setComputePipelineState(propagationPipeline)
+            propagationEncoder.setBuffer(eligibleBuffer, offset: 0, index: 0)
+            propagationEncoder.setBuffer(currentFill, offset: 0, index: 1)
+            propagationEncoder.setBuffer(nextFill, offset: 0, index: 2)
+            propagationEncoder.setBuffer(changeFlagBuffer, offset: 0, index: 3)
+            propagationEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 4)
+            dispatch2D(encoder: propagationEncoder, pipeline: propagationPipeline, width: canvasWidth, height: canvasHeight)
+            propagationEncoder.endEncoding()
+            propagationCommandBuffer.commit()
+            propagationCommandBuffer.waitUntilCompleted()
+            guard propagationCommandBuffer.status == .completed else { return nil }
+
+            swap(&currentFill, &nextFill)
+            if changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee == 0 {
+                break
+            }
+        }
+
+        if expansion > 0 {
+            for _ in 0..<expansion {
+                guard let expansionCommandBuffer = commandQueue.makeCommandBuffer(),
+                      let expansionEncoder = expansionCommandBuffer.makeComputeCommandEncoder()
+                else {
+                    return nil
+                }
+                expansionEncoder.setComputePipelineState(expansionPipeline)
+                expansionEncoder.setBuffer(currentFill, offset: 0, index: 0)
+                expansionEncoder.setBuffer(nextFill, offset: 0, index: 1)
+                expansionEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 2)
+                dispatch2D(encoder: expansionEncoder, pipeline: expansionPipeline, width: canvasWidth, height: canvasHeight)
+                expansionEncoder.endEncoding()
+                expansionCommandBuffer.commit()
+                expansionCommandBuffer.waitUntilCompleted()
+                guard expansionCommandBuffer.status == .completed else { return nil }
+                swap(&currentFill, &nextFill)
+            }
+        }
+
+        return byteArray(from: currentFill, count: canvasWidth * canvasHeight)
+    }
+
     public func scaledPixelData(
         _ source: Data,
         sourceWidth: Int,
@@ -362,17 +522,23 @@ extension PrimoMetalDocumentProcessingClient {
             isAvailable,
             let commandQueue,
             let pipeline = textMaskComposePipeline,
-            let textMask = renderTextMask(textLayer, canvasSize: canvasSize),
-            let maskBuffer = makeBuffer(textMask),
+            let layout = layoutTextLayer(textLayer, canvasSize: canvasSize),
+            let glyphBuffer = makeBuffer(layout.glyphs),
             let outputBuffer = device?.makeBuffer(length: width * height * 4, options: .storageModeShared),
             let descriptorBuffer = makeBuffer(
                 PrimoMetalTextComposeDescriptor(
                     width: UInt32(width),
                     height: UInt32(height),
+                    glyphCount: UInt32(layout.glyphs.count),
+                    padding0: 0,
                     red: Float(textLayer.red),
                     green: Float(textLayer.green),
                     blue: Float(textLayer.blue),
-                    alpha: Float(textLayer.alpha)
+                    alpha: Float(textLayer.alpha),
+                    rotationRadians: Float(textLayer.rotationDegrees * .pi / 180.0),
+                    layoutCenterX: Float(layout.unrotatedBounds.midX),
+                    layoutCenterY: Float(layout.unrotatedBounds.midY),
+                    padding1: 0
                 )
             ),
             let commandBuffer = commandQueue.makeCommandBuffer(),
@@ -382,7 +548,7 @@ extension PrimoMetalDocumentProcessingClient {
         }
 
         encoder.setComputePipelineState(pipeline)
-        encoder.setBuffer(maskBuffer, offset: 0, index: 0)
+        encoder.setBuffer(glyphBuffer, offset: 0, index: 0)
         encoder.setBuffer(outputBuffer, offset: 0, index: 1)
         encoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
         dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
@@ -392,12 +558,19 @@ extension PrimoMetalDocumentProcessingClient {
         guard commandBuffer.status == .completed else { return nil }
 
         let fullPixelData = bytes(from: outputBuffer, count: width * height * 4)
-        let dirtyRect = LayerPixelRect(originX: 0, originY: 0, width: width, height: height)
+        let dirtyRect = clippedTextDirtyRect(
+            bounds: layout.rotatedBounds,
+            canvasWidth: width,
+            canvasHeight: height
+        ) ?? LayerPixelRect(originX: 0, originY: 0, width: width, height: height)
+        let rectPixelData = dirtyRect.width == width && dirtyRect.height == height
+            ? fullPixelData
+            : crop(pixelData: fullPixelData, canvasWidth: width, rect: dirtyRect)
         return DocumentLayerMutationPayload(
             canvasWidth: width,
             canvasHeight: height,
             dirtyRect: dirtyRect,
-            rectPixelData: fullPixelData,
+            rectPixelData: rectPixelData,
             fullPixelData: fullPixelData
         )
     }
@@ -406,7 +579,7 @@ extension PrimoMetalDocumentProcessingClient {
         for textLayer: TextLayerData,
         canvasSize: CGSize
     ) -> CGRect? {
-        resolvedTextDrawRect(for: textLayer, canvasSize: canvasSize)
+        layoutTextLayer(textLayer, canvasSize: canvasSize)?.rotatedBounds.integral
     }
 
     public func blurPixels(
@@ -672,6 +845,196 @@ extension PrimoMetalDocumentProcessingClient {
         )
     }
 
+    public func applyInpaintCrop(
+        editedCropPixelData: Data,
+        to baseLayerPixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        cropWidth: Int,
+        cropHeight: Int,
+        originX: Int,
+        originY: Int,
+        selectionMask: [UInt8],
+        featherRadius: Int
+    ) -> Data? {
+        guard
+            isAvailable,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            cropWidth > 0,
+            cropHeight > 0,
+            baseLayerPixelData.count == canvasWidth * canvasHeight * 4,
+            editedCropPixelData.count == cropWidth * cropHeight * 4,
+            selectionMask.count == cropWidth * cropHeight,
+            let commandQueue,
+            let composePipeline = inpaintCompositePipeline,
+            let baseBuffer = makeBuffer(baseLayerPixelData),
+            let editedBuffer = makeBuffer(editedCropPixelData),
+            let outputBuffer = device?.makeBuffer(length: baseLayerPixelData.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalInpaintCompositeDescriptor(
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    cropWidth: UInt32(cropWidth),
+                    cropHeight: UInt32(cropHeight),
+                    originX: Int32(originX),
+                    originY: Int32(originY)
+                )
+            )
+        else {
+            return nil
+        }
+
+        let maskBuffer: MTLBuffer
+        if featherRadius > 0 {
+            guard
+                let horizontalPipeline = featherHorizontalPipeline,
+                let verticalPipeline = featherVerticalPipeline,
+                let sourceMaskBuffer = makeBuffer(selectionMask),
+                let temporary = device?.makeBuffer(length: selectionMask.count * MemoryLayout<Float>.stride, options: .storageModeShared),
+                let outputMaskBuffer = device?.makeBuffer(length: selectionMask.count, options: .storageModeShared),
+                let maskDescriptorBuffer = makeBuffer(
+                    PrimoMetalMaskKernelDescriptor(
+                        width: UInt32(cropWidth),
+                        height: UInt32(cropHeight),
+                        radius: UInt32(featherRadius)
+                    )
+                ),
+                let featherCommandBuffer = commandQueue.makeCommandBuffer(),
+                let horizontalEncoder = featherCommandBuffer.makeComputeCommandEncoder()
+            else {
+                return nil
+            }
+
+            horizontalEncoder.setComputePipelineState(horizontalPipeline)
+            horizontalEncoder.setBuffer(sourceMaskBuffer, offset: 0, index: 0)
+            horizontalEncoder.setBuffer(temporary, offset: 0, index: 1)
+            horizontalEncoder.setBuffer(maskDescriptorBuffer, offset: 0, index: 2)
+            dispatch2D(encoder: horizontalEncoder, pipeline: horizontalPipeline, width: cropWidth, height: cropHeight)
+            horizontalEncoder.endEncoding()
+
+            guard let verticalEncoder = featherCommandBuffer.makeComputeCommandEncoder() else { return nil }
+            verticalEncoder.setComputePipelineState(verticalPipeline)
+            verticalEncoder.setBuffer(temporary, offset: 0, index: 0)
+            verticalEncoder.setBuffer(outputMaskBuffer, offset: 0, index: 1)
+            verticalEncoder.setBuffer(maskDescriptorBuffer, offset: 0, index: 2)
+            dispatch2D(encoder: verticalEncoder, pipeline: verticalPipeline, width: cropWidth, height: cropHeight)
+            verticalEncoder.endEncoding()
+
+            featherCommandBuffer.commit()
+            featherCommandBuffer.waitUntilCompleted()
+            guard featherCommandBuffer.status == .completed else { return nil }
+            maskBuffer = outputMaskBuffer
+        } else {
+            guard let sourceMaskBuffer = makeBuffer(selectionMask) else { return nil }
+            maskBuffer = sourceMaskBuffer
+        }
+
+        guard let composeCommandBuffer = commandQueue.makeCommandBuffer(),
+              let composeEncoder = composeCommandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+        composeEncoder.setComputePipelineState(composePipeline)
+        composeEncoder.setBuffer(baseBuffer, offset: 0, index: 0)
+        composeEncoder.setBuffer(editedBuffer, offset: 0, index: 1)
+        composeEncoder.setBuffer(maskBuffer, offset: 0, index: 2)
+        composeEncoder.setBuffer(outputBuffer, offset: 0, index: 3)
+        composeEncoder.setBuffer(descriptorBuffer, offset: 0, index: 4)
+        dispatch2D(encoder: composeEncoder, pipeline: composePipeline, width: canvasWidth, height: canvasHeight)
+        composeEncoder.endEncoding()
+        composeCommandBuffer.commit()
+        composeCommandBuffer.waitUntilCompleted()
+        guard composeCommandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: baseLayerPixelData.count)
+    }
+
+    public func inpaintCropPayload(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selectionBounds: CGRect,
+        expandedMask: [UInt8],
+        padding: Int = 64
+    ) -> PrimoMetalInpaintCropPayload? {
+        guard
+            isAvailable,
+            canvasWidth > 0,
+            canvasHeight > 0,
+            source.count == canvasWidth * canvasHeight * 4,
+            expandedMask.count == canvasWidth * canvasHeight
+        else {
+            return nil
+        }
+
+        let minX = max(Int(selectionBounds.minX.rounded(.down)) - padding, 0)
+        let minY = max(Int(selectionBounds.minY.rounded(.down)) - padding, 0)
+        let maxX = min(Int(selectionBounds.maxX.rounded(.up)) + padding, canvasWidth)
+        let maxY = min(Int(selectionBounds.maxY.rounded(.up)) + padding, canvasHeight)
+        let cropWidth = maxX - minX
+        let cropHeight = maxY - minY
+        guard
+            cropWidth > 0,
+            cropHeight > 0,
+            let commandQueue,
+            let rgbaPipeline = inpaintCropRGBAPipeline,
+            let maskPipeline = inpaintCropMaskPipeline,
+            let sourceBuffer = makeBuffer(source),
+            let maskSourceBuffer = makeBuffer(expandedMask),
+            let cropPixelBuffer = device?.makeBuffer(length: cropWidth * cropHeight * 4, options: .storageModeShared),
+            let cropMaskBuffer = device?.makeBuffer(length: cropWidth * cropHeight, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalInpaintCropDescriptor(
+                    canvasWidth: UInt32(canvasWidth),
+                    canvasHeight: UInt32(canvasHeight),
+                    cropWidth: UInt32(cropWidth),
+                    cropHeight: UInt32(cropHeight),
+                    originX: Int32(minX),
+                    originY: Int32(minY)
+                )
+            )
+        else {
+            return nil
+        }
+
+        guard let commandBuffer = commandQueue.makeCommandBuffer(),
+              let rgbaEncoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        rgbaEncoder.setComputePipelineState(rgbaPipeline)
+        rgbaEncoder.setBuffer(sourceBuffer, offset: 0, index: 0)
+        rgbaEncoder.setBuffer(cropPixelBuffer, offset: 0, index: 1)
+        rgbaEncoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: rgbaEncoder, pipeline: rgbaPipeline, width: cropWidth, height: cropHeight)
+        rgbaEncoder.endEncoding()
+
+        guard let maskEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        maskEncoder.setComputePipelineState(maskPipeline)
+        maskEncoder.setBuffer(maskSourceBuffer, offset: 0, index: 0)
+        maskEncoder.setBuffer(cropMaskBuffer, offset: 0, index: 1)
+        maskEncoder.setBuffer(descriptorBuffer, offset: 0, index: 2)
+        dispatch2D(encoder: maskEncoder, pipeline: maskPipeline, width: cropWidth, height: cropHeight)
+        maskEncoder.endEncoding()
+
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+
+        let cropPixelData = bytes(from: cropPixelBuffer, count: cropWidth * cropHeight * 4)
+        let selectionMask = bytes(from: cropMaskBuffer, count: cropWidth * cropHeight)
+
+        return PrimoMetalInpaintCropPayload(
+            pixelData: cropPixelData,
+            width: cropWidth,
+            height: cropHeight,
+            originX: minX,
+            originY: minY,
+            selectionMask: [UInt8](selectionMask)
+        )
+    }
+
     private func processLayerTransform(
         pixelData: Data,
         canvasWidth: Int,
@@ -905,123 +1268,344 @@ extension PrimoMetalDocumentProcessingClient {
         return output
     }
 
-    #if canImport(UIKit) || canImport(AppKit)
-    private func resolvedTextDrawRect(
-        for textLayer: TextLayerData,
+    private func layoutTextLayer(
+        _ textLayer: TextLayerData,
         canvasSize: CGSize
-    ) -> CGRect? {
-        guard
-            !textLayer.text.isEmpty,
-            canvasSize.width > 0,
-            canvasSize.height > 0
-        else {
-            return nil
-        }
-        let font = PlatformFont(name: textLayer.fontPostScriptName, size: textLayer.fontSize) ?? systemFont(ofSize: textLayer.fontSize)
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .left
-        paragraphStyle.lineBreakMode = .byWordWrapping
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: PlatformColor(white: 1.0, alpha: 1.0),
-            .paragraphStyle: paragraphStyle
-        ]
-        let constraintRect = CGSize(
-            width: max(canvasSize.width - textLayer.position.x - 12, textLayer.fontSize),
-            height: max(canvasSize.height - textLayer.position.y - 12, textLayer.fontSize * 2.0)
-        )
-        let measuredBounds = (textLayer.text as NSString).boundingRect(
-            with: constraintRect,
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: attributes,
-            context: nil
-        ).integral
-        return CGRect(
-            origin: textLayer.position,
-            size: CGSize(
-                width: max(measuredBounds.width, textLayer.fontSize * 0.5),
-                height: max(measuredBounds.height, textLayer.fontSize * 1.2)
-            )
-        )
-    }
+    ) -> PrimoMetalTextLayoutResult? {
+        let normalizedText = textLayer.text.replacingOccurrences(of: "\r\n", with: "\n")
+        guard !normalizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard canvasSize.width > 0, canvasSize.height > 0 else { return nil }
 
-    private func renderTextMask(_ textLayer: TextLayerData, canvasSize: CGSize) -> Data? {
-        guard let drawRect = resolvedTextDrawRect(for: textLayer, canvasSize: canvasSize) else { return nil }
-        let width = max(Int(canvasSize.width.rounded()), 1)
-        let height = max(Int(canvasSize.height.rounded()), 1)
-        let font = PlatformFont(name: textLayer.fontPostScriptName, size: textLayer.fontSize) ?? systemFont(ofSize: textLayer.fontSize)
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .left
-        paragraphStyle.lineBreakMode = .byWordWrapping
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .foregroundColor: PlatformColor(white: 1.0, alpha: 1.0),
-            .paragraphStyle: paragraphStyle
-        ]
-        var data = Data(count: width * height)
-        let colorSpace = CGColorSpaceCreateDeviceGray()
-        let rendered = data.withUnsafeMutableBytes { buffer -> Bool in
-            guard let baseAddress = buffer.baseAddress else { return false }
-            guard let context = CGContext(
-                data: baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: width,
-                space: colorSpace,
-                bitmapInfo: CGImageAlphaInfo.none.rawValue
-            ) else {
-                return false
+        let effectiveScale = CGFloat(min(max(textLayer.scale, 0.2), 6.0))
+        let effectiveFontSize = max(CGFloat(textLayer.fontSize) * effectiveScale, 6.0)
+        let pixelScale = max(effectiveFontSize / 7.0, 1.0)
+        let glyphWidth = pixelScale * 5.0
+        let glyphHeight = pixelScale * 7.0
+        let advanceX = pixelScale * 6.0
+        let lineHeight = pixelScale * 8.0
+        let origin = CGPoint(x: textLayer.positionX, y: textLayer.positionY)
+        let maxLineWidth = max(canvasSize.width - origin.x - 12.0, glyphWidth)
+
+        var cursorX = origin.x
+        var cursorY = origin.y
+        var maxX = origin.x
+        var maxY = origin.y
+        var glyphs: [PrimoMetalTextGlyphDescriptor] = []
+
+        for paragraph in normalizedText.split(separator: "\n", omittingEmptySubsequences: false) {
+            let tokens = tokenizeTextParagraph(String(paragraph))
+            if tokens.isEmpty {
+                cursorX = origin.x
+                cursorY += lineHeight
+                maxY = max(maxY, cursorY)
+                continue
             }
-            context.setFillColor(gray: 0, alpha: 1)
-            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-            let anchor = CGPoint(x: drawRect.midX, y: drawRect.midY)
-            let scale = CGFloat(min(max(textLayer.scale, 0.2), 6.0))
-            context.saveGState()
-            context.translateBy(x: anchor.x, y: anchor.y)
-            context.rotate(by: CGFloat(textLayer.rotationDegrees * .pi / 180.0))
-            context.scaleBy(x: scale, y: scale)
-            let localRect = CGRect(
-                x: -(drawRect.width / 2),
-                y: -(drawRect.height / 2),
-                width: drawRect.width,
-                height: drawRect.height
-            )
-            pushGraphicsContext(context)
-            (textLayer.text as NSString).draw(in: localRect, withAttributes: attributes)
-            popGraphicsContext()
-            context.restoreGState()
-            return true
+
+            for token in tokens {
+                switch token {
+                case .spaces(let count):
+                    if cursorX > origin.x {
+                        cursorX += advanceX * CGFloat(count)
+                        maxX = max(maxX, cursorX)
+                    }
+
+                case .word(let word):
+                    let wordWidth = advanceX * CGFloat(word.count)
+                    if cursorX > origin.x, cursorX + wordWidth > origin.x + maxLineWidth {
+                        cursorX = origin.x
+                        cursorY += lineHeight
+                    }
+
+                    for scalar in word.unicodeScalars {
+                        if cursorX > origin.x, cursorX + advanceX > origin.x + maxLineWidth {
+                            cursorX = origin.x
+                            cursorY += lineHeight
+                        }
+
+                        let bits = glyphBits(for: scalar)
+                        if bits != 0 {
+                            glyphs.append(
+                                PrimoMetalTextGlyphDescriptor(
+                                    originX: Float(cursorX),
+                                    originY: Float(cursorY),
+                                    width: Float(glyphWidth),
+                                    height: Float(glyphHeight),
+                                    atlasBitsLow: UInt32(bits & 0xFFFF_FFFF),
+                                    atlasBitsHigh: UInt32((bits >> 32) & 0xFFFF_FFFF)
+                                )
+                            )
+                        }
+                        cursorX += advanceX
+                        maxX = max(maxX, cursorX)
+                        maxY = max(maxY, cursorY + glyphHeight)
+                    }
+                }
+            }
+
+            cursorX = origin.x
+            cursorY += lineHeight
+            maxY = max(maxY, cursorY)
         }
-        return rendered ? data : nil
+
+        guard !glyphs.isEmpty else { return nil }
+        let unrotatedBounds = CGRect(
+            x: origin.x,
+            y: origin.y,
+            width: max(maxX - origin.x, glyphWidth),
+            height: max(maxY - origin.y - (lineHeight - glyphHeight), glyphHeight)
+        )
+        let rotatedBounds = rotatedBoundingRect(unrotatedBounds, angleRadians: CGFloat(textLayer.rotationDegrees * .pi / 180.0))
+        return PrimoMetalTextLayoutResult(
+            glyphs: glyphs,
+            unrotatedBounds: unrotatedBounds,
+            rotatedBounds: rotatedBounds
+        )
     }
 
-    private func systemFont(ofSize size: Double) -> PlatformFont {
-        #if canImport(UIKit)
-        PlatformFont.systemFont(ofSize: size, weight: .regular)
-        #else
-        PlatformFont.systemFont(ofSize: size)
-        #endif
+    private enum TextToken {
+        case word(String)
+        case spaces(Int)
     }
 
-    private func pushGraphicsContext(_ context: CGContext) {
-        #if canImport(UIKit)
-        UIGraphicsPushContext(context)
-        #elseif canImport(AppKit)
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        #endif
+    private func tokenizeTextParagraph(_ paragraph: String) -> [TextToken] {
+        guard !paragraph.isEmpty else { return [] }
+        var tokens: [TextToken] = []
+        var current = ""
+        var collectingSpaces = false
+
+        for character in paragraph {
+            if character == " " {
+                if !collectingSpaces, !current.isEmpty {
+                    tokens.append(.word(current))
+                    current.removeAll(keepingCapacity: true)
+                }
+                collectingSpaces = true
+                current.append(character)
+            } else {
+                if collectingSpaces, !current.isEmpty {
+                    tokens.append(.spaces(current.count))
+                    current.removeAll(keepingCapacity: true)
+                }
+                collectingSpaces = false
+                current.append(character)
+            }
+        }
+
+        if !current.isEmpty {
+            tokens.append(collectingSpaces ? .spaces(current.count) : .word(current))
+        }
+        return tokens
     }
 
-    private func popGraphicsContext() {
-        #if canImport(UIKit)
-        UIGraphicsPopContext()
-        #elseif canImport(AppKit)
-        NSGraphicsContext.restoreGraphicsState()
-        #endif
+    private func rotatedBoundingRect(_ rect: CGRect, angleRadians: CGFloat) -> CGRect {
+        guard rect.width > 0, rect.height > 0 else { return rect }
+        guard abs(angleRadians) > 0.0001 else { return rect.integral }
+
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let corners = [
+            CGPoint(x: rect.minX, y: rect.minY),
+            CGPoint(x: rect.maxX, y: rect.minY),
+            CGPoint(x: rect.minX, y: rect.maxY),
+            CGPoint(x: rect.maxX, y: rect.maxY),
+        ].map { point -> CGPoint in
+            let translatedX = point.x - center.x
+            let translatedY = point.y - center.y
+            let rotatedX = (translatedX * cos(angleRadians)) - (translatedY * sin(angleRadians))
+            let rotatedY = (translatedX * sin(angleRadians)) + (translatedY * cos(angleRadians))
+            return CGPoint(x: center.x + rotatedX, y: center.y + rotatedY)
+        }
+
+        let xs = corners.map(\.x)
+        let ys = corners.map(\.y)
+        return CGRect(
+            x: xs.min() ?? rect.minX,
+            y: ys.min() ?? rect.minY,
+            width: (xs.max() ?? rect.maxX) - (xs.min() ?? rect.minX),
+            height: (ys.max() ?? rect.maxY) - (ys.min() ?? rect.minY)
+        ).integral
     }
-    #else
-    private func resolvedTextDrawRect(for textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? { nil }
-    private func renderTextMask(_ textLayer: TextLayerData, canvasSize: CGSize) -> Data? { nil }
-    #endif
+
+    private func clippedTextDirtyRect(
+        bounds: CGRect,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> LayerPixelRect? {
+        guard canvasWidth > 0, canvasHeight > 0 else { return nil }
+        let minX = max(Int(floor(bounds.minX)), 0)
+        let minY = max(Int(floor(bounds.minY)), 0)
+        let maxX = min(Int(ceil(bounds.maxX)), canvasWidth)
+        let maxY = min(Int(ceil(bounds.maxY)), canvasHeight)
+        guard maxX > minX, maxY > minY else { return nil }
+        return LayerPixelRect(
+            originX: minX,
+            originY: minY,
+            width: maxX - minX,
+            height: maxY - minY
+        )
+    }
+
+    private func glyphBits(for scalar: UnicodeScalar) -> UInt64 {
+        let value = scalar.properties.isLowercase
+            ? (String(scalar).uppercased().unicodeScalars.first ?? scalar)
+            : scalar
+        return Self.bitmapFont[value.value] ?? Self.bitmapFont[63] ?? 0
+    }
+
+    private static let bitmapFont: [UInt32: UInt64] = [
+        32: glyphBits([
+            "00000","00000","00000","00000","00000","00000","00000"
+        ]),
+        33: glyphBits([
+            "00100","00100","00100","00100","00100","00000","00100"
+        ]),
+        39: glyphBits([
+            "00100","00100","00000","00000","00000","00000","00000"
+        ]),
+        44: glyphBits([
+            "00000","00000","00000","00000","00110","00100","01000"
+        ]),
+        45: glyphBits([
+            "00000","00000","00000","11111","00000","00000","00000"
+        ]),
+        46: glyphBits([
+            "00000","00000","00000","00000","00000","00110","00110"
+        ]),
+        47: glyphBits([
+            "00001","00010","00100","01000","10000","00000","00000"
+        ]),
+        48: glyphBits([
+            "01110","10001","10011","10101","11001","10001","01110"
+        ]),
+        49: glyphBits([
+            "00100","01100","00100","00100","00100","00100","01110"
+        ]),
+        50: glyphBits([
+            "01110","10001","00001","00010","00100","01000","11111"
+        ]),
+        51: glyphBits([
+            "11110","00001","00001","01110","00001","00001","11110"
+        ]),
+        52: glyphBits([
+            "00010","00110","01010","10010","11111","00010","00010"
+        ]),
+        53: glyphBits([
+            "11111","10000","10000","11110","00001","00001","11110"
+        ]),
+        54: glyphBits([
+            "01110","10000","10000","11110","10001","10001","01110"
+        ]),
+        55: glyphBits([
+            "11111","00001","00010","00100","01000","01000","01000"
+        ]),
+        56: glyphBits([
+            "01110","10001","10001","01110","10001","10001","01110"
+        ]),
+        57: glyphBits([
+            "01110","10001","10001","01111","00001","00001","01110"
+        ]),
+        58: glyphBits([
+            "00000","00110","00110","00000","00110","00110","00000"
+        ]),
+        63: glyphBits([
+            "01110","10001","00001","00010","00100","00000","00100"
+        ]),
+        65: glyphBits([
+            "01110","10001","10001","11111","10001","10001","10001"
+        ]),
+        66: glyphBits([
+            "11110","10001","10001","11110","10001","10001","11110"
+        ]),
+        67: glyphBits([
+            "01110","10001","10000","10000","10000","10001","01110"
+        ]),
+        68: glyphBits([
+            "11110","10001","10001","10001","10001","10001","11110"
+        ]),
+        69: glyphBits([
+            "11111","10000","10000","11110","10000","10000","11111"
+        ]),
+        70: glyphBits([
+            "11111","10000","10000","11110","10000","10000","10000"
+        ]),
+        71: glyphBits([
+            "01110","10001","10000","10111","10001","10001","01110"
+        ]),
+        72: glyphBits([
+            "10001","10001","10001","11111","10001","10001","10001"
+        ]),
+        73: glyphBits([
+            "01110","00100","00100","00100","00100","00100","01110"
+        ]),
+        74: glyphBits([
+            "00001","00001","00001","00001","10001","10001","01110"
+        ]),
+        75: glyphBits([
+            "10001","10010","10100","11000","10100","10010","10001"
+        ]),
+        76: glyphBits([
+            "10000","10000","10000","10000","10000","10000","11111"
+        ]),
+        77: glyphBits([
+            "10001","11011","10101","10101","10001","10001","10001"
+        ]),
+        78: glyphBits([
+            "10001","11001","10101","10011","10001","10001","10001"
+        ]),
+        79: glyphBits([
+            "01110","10001","10001","10001","10001","10001","01110"
+        ]),
+        80: glyphBits([
+            "11110","10001","10001","11110","10000","10000","10000"
+        ]),
+        81: glyphBits([
+            "01110","10001","10001","10001","10101","10010","01101"
+        ]),
+        82: glyphBits([
+            "11110","10001","10001","11110","10100","10010","10001"
+        ]),
+        83: glyphBits([
+            "01111","10000","10000","01110","00001","00001","11110"
+        ]),
+        84: glyphBits([
+            "11111","00100","00100","00100","00100","00100","00100"
+        ]),
+        85: glyphBits([
+            "10001","10001","10001","10001","10001","10001","01110"
+        ]),
+        86: glyphBits([
+            "10001","10001","10001","10001","10001","01010","00100"
+        ]),
+        87: glyphBits([
+            "10001","10001","10001","10101","10101","10101","01010"
+        ]),
+        88: glyphBits([
+            "10001","10001","01010","00100","01010","10001","10001"
+        ]),
+        89: glyphBits([
+            "10001","10001","01010","00100","00100","00100","00100"
+        ]),
+        90: glyphBits([
+            "11111","00001","00010","00100","01000","10000","11111"
+        ]),
+        91: glyphBits([
+            "01110","01000","01000","01000","01000","01000","01110"
+        ]),
+        93: glyphBits([
+            "01110","00010","00010","00010","00010","00010","01110"
+        ]),
+        95: glyphBits([
+            "00000","00000","00000","00000","00000","00000","11111"
+        ]),
+    ]
+
+    private static func glyphBits(_ rows: [String]) -> UInt64 {
+        var bits: UInt64 = 0
+        for (rowIndex, row) in rows.enumerated() {
+            for (columnIndex, character) in row.enumerated() where character == "1" {
+                let bitIndex = (rowIndex * 5) + columnIndex
+                bits |= UInt64(1) << UInt64(bitIndex)
+            }
+        }
+        return bits
+    }
 }

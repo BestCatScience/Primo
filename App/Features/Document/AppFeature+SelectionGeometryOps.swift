@@ -170,8 +170,15 @@ extension AppFeature {
         guard source.count == expectedCount else { return nil }
 
         let sourceBytes = [UInt8](source)
-        let mask = selection.map { expandedMask(from: $0, canvasWidth: canvasWidth, canvasHeight: canvasHeight) }
-            ?? Self.alphaMask(from: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        let mask: [UInt8]
+        if let selection {
+            guard let expanded = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+                return nil
+            }
+            mask = expanded
+        } else {
+            mask = Self.alphaMask(from: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        }
         guard let bounds = Self.transformationBounds(selection: selection, sourceBytes: sourceBytes, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
@@ -258,7 +265,9 @@ extension AppFeature {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            return nil
+        }
         let bounds = selection.bounds
         let resolved = effectiveTransformQuad(
             bounds: bounds,
@@ -322,7 +331,10 @@ extension AppFeature {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        return Data(expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight))
+        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            return nil
+        }
+        return Data(mask)
     }
 
     static func alphaMask(from sourceBytes: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {

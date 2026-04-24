@@ -28,16 +28,20 @@ extension AppFeature {
         selection: CanvasSelection,
         padding: Int = 64
     ) -> InpaintCrop? {
-        DocumentRasterImageService.inpaintCrop(
+        guard let expandedMask = expandedMask(
+            from: selection,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        ) else {
+            return nil
+        }
+
+        return DocumentRasterImageService.inpaintCrop(
             source: source,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             selectionBounds: selection.bounds,
-            expandedMask: expandedMask(
-                from: selection,
-                canvasWidth: canvasWidth,
-                canvasHeight: canvasHeight
-            ),
+            expandedMask: expandedMask,
             padding: padding
         )
     }

@@ -50,15 +50,21 @@ extension AppFeature {
                 height: snapshot.height,
                 pixelData: layer.pixelData
             )
-            let selectionRegion = adjustedSelection.map {
-                NanoBananaSelectionRegion(
-                    selectionBounds: $0.bounds,
-                    expandedMask: AppFeature.expandedMask(
-                        from: $0,
-                        canvasWidth: snapshot.width,
-                        canvasHeight: snapshot.height
-                    )
+            let selectionRegion: NanoBananaSelectionRegion?
+            if let adjustedSelection {
+                guard let expandedMask = AppFeature.expandedMask(
+                    from: adjustedSelection,
+                    canvasWidth: snapshot.width,
+                    canvasHeight: snapshot.height
+                ) else {
+                    return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
+                }
+                selectionRegion = NanoBananaSelectionRegion(
+                    selectionBounds: adjustedSelection.bounds,
+                    expandedMask: expandedMask
                 )
+            } else {
+                selectionRegion = nil
             }
 
             return .success(

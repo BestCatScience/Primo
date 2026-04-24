@@ -58,9 +58,15 @@ extension AppFeature {
         }
 
         guard didRasterize else { return nil }
-        return preserveAlphaLockedPixels
-            ? pixelDataByPreservingExistingAlpha(source: output, existing: layer.pixelData)
-            : output
+        if preserveAlphaLockedPixels {
+            return pixelDataByPreservingExistingAlpha(
+                source: output,
+                existing: layer.pixelData,
+                width: snapshot.width,
+                height: snapshot.height
+            )
+        }
+        return output
     }
 
     static func layerPixelDataByApplyingCommittedStroke(
@@ -84,9 +90,15 @@ extension AppFeature {
             snapshotRevision: snapshotRevision,
             activeLayerIndex: activeLayerIndex
         ) {
-            return preserveAlphaLockedPixels
-                ? pixelDataByPreservingExistingAlpha(source: gpuOutput, existing: basePixelData)
-                : gpuOutput
+            if preserveAlphaLockedPixels {
+                return pixelDataByPreservingExistingAlpha(
+                    source: gpuOutput,
+                    existing: basePixelData,
+                    width: canvasWidth,
+                    height: canvasHeight
+                )
+            }
+            return gpuOutput
         }
 
         let expectedCount = canvasWidth * canvasHeight * 4
@@ -128,33 +140,29 @@ extension AppFeature {
         }
 
         guard didRasterize else { return nil }
-        return preserveAlphaLockedPixels
-            ? pixelDataByPreservingExistingAlpha(source: output, existing: basePixelData)
-            : output
-    }
-
-    static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
-        guard source.count == existing.count else { return source }
-        var output = source
-        output.withUnsafeMutableBytes { outputBytes in
-            existing.withUnsafeBytes { existingBytes in
-                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
-                else { return }
-                for offset in stride(from: 0, to: source.count, by: 4) {
-                    let alpha = src[offset + 3]
-                    if alpha == 0 {
-                        dst[offset] = 0
-                        dst[offset + 1] = 0
-                        dst[offset + 2] = 0
-                        dst[offset + 3] = 0
-                    } else {
-                        dst[offset + 3] = alpha
-                    }
-                }
-            }
+        if preserveAlphaLockedPixels {
+            return pixelDataByPreservingExistingAlpha(
+                source: output,
+                existing: basePixelData,
+                width: canvasWidth,
+                height: canvasHeight
+            )
         }
         return output
+    }
+
+    static func pixelDataByPreservingExistingAlpha(
+        source: Data,
+        existing: Data,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        MetalDocumentProcessingClient.shared.preservingExistingAlpha(
+            source: source,
+            existing: existing,
+            width: width,
+            height: height
+        )
     }
 
     static func shouldRasterizeCommittedShortStroke(

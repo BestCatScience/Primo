@@ -43,7 +43,11 @@ let package = Package(
         ),
         .target(
             name: "PrimoDocumentApplication",
-            dependencies: ["PrimoDocumentDomain", "PrimoDocumentContracts"]
+            dependencies: [
+                "PrimoDocumentDomain",
+                "PrimoDocumentContracts",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+            ]
         ),
         .target(
             name: "PrimoDocumentInfrastructure",

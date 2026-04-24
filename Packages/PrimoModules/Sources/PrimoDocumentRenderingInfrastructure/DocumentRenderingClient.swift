@@ -1,4 +1,6 @@
+import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
@@ -6,6 +8,7 @@ import PrimoDocumentMetalRuntimeInfrastructure
 public typealias MetalStrokeExecutionMode = PrimoMetalStrokeExecutionMode
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest
 public typealias MetalStrokeExecutionResult = PrimoMetalStrokeExecutionResult
+public typealias MetalSelectionCombineMode = PrimoMetalSelectionCombineMode
 
 public struct DocumentInteractiveStrokePreviewResult: Sendable {
     public let pixelData: Data
@@ -207,9 +210,20 @@ public struct DocumentRenderingClient: Sendable {
         ) else {
             return nil
         }
-        let adjustedPixels = preserveAlphaLockedPixels
-            ? Self.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
-            : gpuResult.pixelData
+        let adjustedPixels: Data
+        if preserveAlphaLockedPixels {
+            guard let preserved = preservingExistingAlpha(
+                source: gpuResult.pixelData,
+                existing: basePixelData,
+                width: snapshot.width,
+                height: snapshot.height
+            ) else {
+                return nil
+            }
+            adjustedPixels = preserved
+        } else {
+            adjustedPixels = gpuResult.pixelData
+        }
         let rasterDirtyRect = gpuResult.dirtyRect
         let rasterRectPixelData = gpuResult.rectPixelData
 
@@ -240,28 +254,18 @@ public struct DocumentRenderingClient: Sendable {
         )
     }
 
-    private static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
-        guard source.count == existing.count else { return source }
-        var output = source
-        output.withUnsafeMutableBytes { outputBytes in
-            existing.withUnsafeBytes { existingBytes in
-                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
-                else { return }
-                for offset in stride(from: 0, to: source.count, by: 4) {
-                    let alpha = src[offset + 3]
-                    if alpha == 0 {
-                        dst[offset] = 0
-                        dst[offset + 1] = 0
-                        dst[offset + 2] = 0
-                        dst[offset + 3] = 0
-                    } else {
-                        dst[offset + 3] = alpha
-                    }
-                }
-            }
-        }
-        return output
+    public func preservingExistingAlpha(
+        source: Data,
+        existing: Data,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        backend.preservingExistingAlpha(
+            source: source,
+            existing: existing,
+            width: width,
+            height: height
+        )
     }
 
     private static func strokePreviewDirtyRect(
@@ -336,6 +340,129 @@ public struct DocumentRenderingClient: Sendable {
             width: width,
             height: height,
             request: request
+        )
+    }
+
+    public func autoSelection(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        seedX: Int,
+        seedY: Int,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double,
+        expansion: Int
+    ) -> [UInt8]? {
+        backend.autoSelection(
+            pixelData: pixelData,
+            canvasWidth: width,
+            canvasHeight: height,
+            seedX: seedX,
+            seedY: seedY,
+            thresholdMode: thresholdMode,
+            opacityTolerance: opacityTolerance,
+            colorTolerance: colorTolerance,
+            expansion: expansion
+        )
+    }
+
+    public func lassoSelection(
+        points: [CGPoint],
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> [UInt8]? {
+        backend.lassoSelection(
+            points: points,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+
+    public func expandedSelectionMask(
+        maskData: Data,
+        maskWidth: Int,
+        maskHeight: Int,
+        originX: Int,
+        originY: Int,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> [UInt8]? {
+        backend.expandedSelectionMask(
+            maskData: maskData,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight,
+            originX: originX,
+            originY: originY,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+
+    public func combinedSelectionMask(
+        base: [UInt8],
+        incoming: [UInt8],
+        mode: MetalSelectionCombineMode,
+        width: Int,
+        height: Int
+    ) -> [UInt8]? {
+        backend.combinedSelectionMask(
+            base: base,
+            incoming: incoming,
+            mode: mode,
+            width: width,
+            height: height
+        )
+    }
+
+    public func inpaintCrop(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selectionBounds: CGRect,
+        expandedMask: [UInt8],
+        padding: Int = 64
+    ) -> InpaintCrop? {
+        guard let payload = backend.inpaintCropPayload(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            selectionBounds: selectionBounds,
+            expandedMask: expandedMask,
+            padding: padding
+        ) else {
+            return nil
+        }
+
+        return InpaintCrop(
+            pixelData: payload.pixelData,
+            width: payload.width,
+            height: payload.height,
+            originX: payload.originX,
+            originY: payload.originY,
+            selectionMask: payload.selectionMask
+        )
+    }
+
+    public func applyInpaintCrop(
+        editedCropPixelData: Data,
+        to baseLayerPixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        crop: InpaintCrop,
+        featherRadius: Int = 10
+    ) -> Data? {
+        backend.applyInpaintCrop(
+            editedCropPixelData: editedCropPixelData,
+            to: baseLayerPixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            cropWidth: crop.width,
+            cropHeight: crop.height,
+            originX: crop.originX,
+            originY: crop.originY,
+            selectionMask: crop.selectionMask,
+            featherRadius: featherRadius
         )
     }
 
