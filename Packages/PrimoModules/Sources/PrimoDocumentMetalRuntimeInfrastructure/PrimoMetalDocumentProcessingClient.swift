@@ -76,7 +76,12 @@ private struct PrimoMetalPaperCompositeDescriptor {
     let checkerboard: UInt32
 }
 
-private struct PrimoMetalStrokeSampleDescriptor: Equatable {
+private struct PrimoMetalLayerMaskApplyDescriptor {
+    let width: UInt32
+    let height: UInt32
+}
+
+struct PrimoMetalStrokeSampleDescriptor: Equatable {
     let x: Float
     let y: Float
     let pressure: Float
@@ -318,22 +323,37 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
     private static let logger = Logger(subsystem: "com.primo.modules", category: "MetalRuntime")
 
-    private let device: MTLDevice?
-    private let commandQueue: MTLCommandQueue?
-    private let library: MTLLibrary?
-    private let compositePipeline: MTLComputePipelineState?
-    private let invertMaskPipeline: MTLComputePipelineState?
-    private let dilateMaskPipeline: MTLComputePipelineState?
-    private let erodeMaskPipeline: MTLComputePipelineState?
-    private let featherHorizontalPipeline: MTLComputePipelineState?
-    private let featherVerticalPipeline: MTLComputePipelineState?
-    private let colorRangePipeline: MTLComputePipelineState?
-    private let selectionOverlayPipeline: MTLComputePipelineState?
-    private let eyedropperLoupePipeline: MTLComputePipelineState?
-    private let paperCompositePipeline: MTLComputePipelineState?
-    private let strokeRasterPipeline: MTLComputePipelineState?
-    private let strokeColorSmudgePipeline: MTLComputePipelineState?
-    private let copyStrokeRectPipeline: MTLComputePipelineState?
+    let device: MTLDevice?
+    let commandQueue: MTLCommandQueue?
+    let library: MTLLibrary?
+    let compositePipeline: MTLComputePipelineState?
+    let invertMaskPipeline: MTLComputePipelineState?
+    let dilateMaskPipeline: MTLComputePipelineState?
+    let erodeMaskPipeline: MTLComputePipelineState?
+    let featherHorizontalPipeline: MTLComputePipelineState?
+    let featherVerticalPipeline: MTLComputePipelineState?
+    let colorRangePipeline: MTLComputePipelineState?
+    let selectionOverlayPipeline: MTLComputePipelineState?
+    let eyedropperLoupePipeline: MTLComputePipelineState?
+    let paperCompositePipeline: MTLComputePipelineState?
+    let applyLayerMaskPipeline: MTLComputePipelineState?
+    let layerProcessingPipeline: MTLComputePipelineState?
+    let layerTransformPipeline: MTLComputePipelineState?
+    let fillEligibilityPipeline: MTLComputePipelineState?
+    let fillPropagationPipeline: MTLComputePipelineState?
+    let fillExpansionPipeline: MTLComputePipelineState?
+    let fillComposePipeline: MTLComputePipelineState?
+    let blurHorizontalPipeline: MTLComputePipelineState?
+    let blurVerticalPipeline: MTLComputePipelineState?
+    let blurBlendPipeline: MTLComputePipelineState?
+    let textMaskComposePipeline: MTLComputePipelineState?
+    let scaleRGBAPipeline: MTLComputePipelineState?
+    let scaleMaskPipeline: MTLComputePipelineState?
+    let translateRGBAPipeline: MTLComputePipelineState?
+    let translateMaskPipeline: MTLComputePipelineState?
+    let strokeRasterPipeline: MTLComputePipelineState?
+    let strokeColorSmudgePipeline: MTLComputePipelineState?
+    let copyStrokeRectPipeline: MTLComputePipelineState?
 
     private var cachedSignature: SnapshotTextureSignature?
     private var cachedLayerTexture: MTLTexture?
@@ -354,6 +374,21 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.selectionOverlayPipeline = Self.makePipeline(device: device, library: library, functionName: "selectionOverlayKernel")
         self.eyedropperLoupePipeline = Self.makePipeline(device: device, library: library, functionName: "eyedropperLoupeKernel")
         self.paperCompositePipeline = Self.makePipeline(device: device, library: library, functionName: "paperCompositeKernel")
+        self.applyLayerMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "applyLayerMaskKernel")
+        self.layerProcessingPipeline = Self.makePipeline(device: device, library: library, functionName: "layerProcessingKernel")
+        self.layerTransformPipeline = Self.makePipeline(device: device, library: library, functionName: "layerTransformKernel")
+        self.fillEligibilityPipeline = Self.makePipeline(device: device, library: library, functionName: "fillEligibilityKernel")
+        self.fillPropagationPipeline = Self.makePipeline(device: device, library: library, functionName: "fillPropagationKernel")
+        self.fillExpansionPipeline = Self.makePipeline(device: device, library: library, functionName: "fillExpansionKernel")
+        self.fillComposePipeline = Self.makePipeline(device: device, library: library, functionName: "fillComposeKernel")
+        self.blurHorizontalPipeline = Self.makePipeline(device: device, library: library, functionName: "blurHorizontalKernel")
+        self.blurVerticalPipeline = Self.makePipeline(device: device, library: library, functionName: "blurVerticalKernel")
+        self.blurBlendPipeline = Self.makePipeline(device: device, library: library, functionName: "blurBlendKernel")
+        self.textMaskComposePipeline = Self.makePipeline(device: device, library: library, functionName: "textMaskComposeKernel")
+        self.scaleRGBAPipeline = Self.makePipeline(device: device, library: library, functionName: "scaleRGBAKernel")
+        self.scaleMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "scaleMaskKernel")
+        self.translateRGBAPipeline = Self.makePipeline(device: device, library: library, functionName: "translateRGBAKernel")
+        self.translateMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "translateMaskKernel")
         self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
         self.strokeColorSmudgePipeline = Self.makePipeline(device: device, library: library, functionName: "strokeColorSmudgeKernel")
         self.copyStrokeRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copyStrokeRectKernel")
@@ -372,6 +407,21 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         selectionOverlayPipeline != nil &&
         eyedropperLoupePipeline != nil &&
         paperCompositePipeline != nil &&
+        applyLayerMaskPipeline != nil &&
+        layerProcessingPipeline != nil &&
+        layerTransformPipeline != nil &&
+        fillEligibilityPipeline != nil &&
+        fillPropagationPipeline != nil &&
+        fillExpansionPipeline != nil &&
+        fillComposePipeline != nil &&
+        blurHorizontalPipeline != nil &&
+        blurVerticalPipeline != nil &&
+        blurBlendPipeline != nil &&
+        textMaskComposePipeline != nil &&
+        scaleRGBAPipeline != nil &&
+        scaleMaskPipeline != nil &&
+        translateRGBAPipeline != nil &&
+        translateMaskPipeline != nil &&
         strokeRasterPipeline != nil &&
         strokeColorSmudgePipeline != nil &&
         copyStrokeRectPipeline != nil
@@ -679,6 +729,15 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return bytes(from: outputBuffer, count: outputWidth * outputHeight * 4)
     }
 
+    public func compositeDocument(snapshot: MetalDocumentSnapshot) -> Data? {
+        compositedPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: nil,
+            adjustedActiveLayerPixels: nil,
+            dirtyRect: nil
+        )
+    }
+
     public func compositedIncrementalUpdate(
         snapshot: MetalDocumentSnapshot,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
@@ -736,6 +795,107 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             height: dirtyRect.height,
             pixelData: pixelData
         )
+    }
+
+    public func applyLayerMask(
+        pixelData: Data,
+        maskData: Data,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        guard
+            width > 0,
+            height > 0,
+            pixelData.count == width * height * 4,
+            maskData.count == width * height,
+            let commandQueue,
+            let pipeline = applyLayerMaskPipeline,
+            let pixelBuffer = makeBuffer(pixelData),
+            let maskBuffer = makeBuffer(maskData),
+            let outputBuffer = device?.makeBuffer(length: pixelData.count, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalLayerMaskApplyDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height)
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(pixelBuffer, offset: 0, index: 0)
+        encoder.setBuffer(maskBuffer, offset: 0, index: 1)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 3)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return bytes(from: outputBuffer, count: pixelData.count)
+    }
+
+    public func mergeLayers(
+        lowerPixelData: Data,
+        upperPixelData: Data,
+        upperMaskData: Data?,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        upperOpacity: Float,
+        upperBlendMode: LayerBlendMode
+    ) -> Data? {
+        let expectedCount = canvasWidth * canvasHeight * 4
+        guard lowerPixelData.count == expectedCount, upperPixelData.count == expectedCount else {
+            return nil
+        }
+
+        let resolvedUpper: Data
+        if let upperMaskData {
+            guard let maskedUpper = applyLayerMask(
+                pixelData: upperPixelData,
+                maskData: upperMaskData,
+                width: canvasWidth,
+                height: canvasHeight
+            ) else {
+                return nil
+            }
+            resolvedUpper = maskedUpper
+        } else {
+            resolvedUpper = upperPixelData
+        }
+
+        let snapshot = MetalDocumentSnapshot(
+            width: canvasWidth,
+            height: canvasHeight,
+            revision: 0,
+            compositePixelData: Data(count: expectedCount),
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1.0,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailSurface: nil,
+                    thumbnailData: nil,
+                    pixelData: lowerPixelData
+                ),
+                MetalLayerSnapshot(
+                    index: 1,
+                    opacity: upperOpacity,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: upperBlendMode,
+                    thumbnailSurface: nil,
+                    thumbnailData: nil,
+                    pixelData: resolvedUpper
+                )
+            ]
+        )
+        return compositeDocument(snapshot: snapshot)
     }
 
     public func executeStroke(
@@ -1220,7 +1380,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
-    private func makeBuffer<T>(_ values: [T]) -> MTLBuffer? {
+    func makeBuffer<T>(_ values: [T]) -> MTLBuffer? {
         guard !values.isEmpty else {
             return device?.makeBuffer(length: MemoryLayout<T>.stride, options: .storageModeShared)
         }
@@ -1230,7 +1390,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
-    private func makeBuffer<T>(_ value: T) -> MTLBuffer? {
+    func makeBuffer<T>(_ value: T) -> MTLBuffer? {
         var mutableValue = value
         return withUnsafeBytes(of: &mutableValue) { bytes in
             guard let baseAddress = bytes.baseAddress else { return nil }
@@ -1238,25 +1398,25 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
-    private func makeBuffer(_ data: Data) -> MTLBuffer? {
+    func makeBuffer(_ data: Data) -> MTLBuffer? {
         data.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return nil }
             return device?.makeBuffer(bytes: baseAddress, length: data.count, options: .storageModeShared)
         }
     }
 
-    private func makeBuffer(_ values: [UInt8]) -> MTLBuffer? {
+    func makeBuffer(_ values: [UInt8]) -> MTLBuffer? {
         values.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return nil }
             return device?.makeBuffer(bytes: baseAddress, length: values.count, options: .storageModeShared)
         }
     }
 
-    private func bytes(from buffer: MTLBuffer, count: Int) -> Data {
+    func bytes(from buffer: MTLBuffer, count: Int) -> Data {
         Data(bytes: buffer.contents(), count: count)
     }
 
-    private func byteArray(from buffer: MTLBuffer, count: Int) -> [UInt8] {
+    func byteArray(from buffer: MTLBuffer, count: Int) -> [UInt8] {
         Array(UnsafeBufferPointer(start: buffer.contents().assumingMemoryBound(to: UInt8.self), count: count))
     }
 
@@ -1361,7 +1521,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return data
     }
 
-    private func dispatch2D(
+    func dispatch2D(
         encoder: MTLComputeCommandEncoder,
         pipeline: MTLComputePipelineState,
         width: Int,
@@ -1387,7 +1547,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         )
     }
 
-    private static func makePipeline(device: MTLDevice?, library: MTLLibrary?, functionName: String) -> MTLComputePipelineState? {
+    static func makePipeline(device: MTLDevice?, library: MTLLibrary?, functionName: String) -> MTLComputePipelineState? {
         guard let device, let function = library?.makeFunction(name: functionName) else { return nil }
         return try? device.makeComputePipelineState(function: function)
     }
@@ -1402,7 +1562,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         )
     }
 
-    private static func strokeSampleDescriptors(samples: [StylusSample]) -> [PrimoMetalStrokeSampleDescriptor] {
+    static func strokeSampleDescriptors(samples: [StylusSample]) -> [PrimoMetalStrokeSampleDescriptor] {
         let progressTable = strokeProgressTable(samples)
         return zip(samples, progressTable).map { sample, progress in
             PrimoMetalStrokeSampleDescriptor(
@@ -1787,7 +1947,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
-    private static func blendModeIdentifier(_ mode: LayerBlendMode) -> Int {
+    static func blendModeIdentifier(_ mode: LayerBlendMode) -> Int {
         switch mode {
         case .normal: return 0
         case .darken: return 1

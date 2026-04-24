@@ -1,9 +1,7 @@
 import Foundation
-import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
-import PrimoDocumentStrokeInfrastructure
 
 public typealias MetalStrokeExecutionMode = PrimoMetalStrokeExecutionMode
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest
@@ -121,7 +119,7 @@ public struct DocumentRenderingClient: Sendable {
         snapshotRevision: Int? = nil,
         activeLayerIndex: Int? = nil
     ) -> Data? {
-        if let gpuPixels = backend.rasterizedStrokePixelData(
+        backend.rasterizedStrokePixelData(
             basePixelData: basePixelData,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -130,15 +128,6 @@ public struct DocumentRenderingClient: Sendable {
             mode: mode,
             snapshotRevision: snapshotRevision,
             activeLayerIndex: activeLayerIndex
-        ) {
-            return gpuPixels
-        }
-        return DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
-            basePixelData: basePixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            samples: samples,
-            brush: brush
         )
     }
 
@@ -151,10 +140,6 @@ public struct DocumentRenderingClient: Sendable {
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels
-        ) ?? DocumentPreviewComposite.compositedPreviewPixelData(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: adjustedActiveLayerPixels
         )
     }
 
@@ -164,7 +149,7 @@ public struct DocumentRenderingClient: Sendable {
         canvasWidth: Int,
         canvasHeight: Int
     ) -> (originX: Int, originY: Int, width: Int, height: Int)? {
-        DocumentPreviewComposite.strokePreviewDirtyRect(
+        Self.strokePreviewDirtyRect(
             samples: samples,
             brush: brush,
             canvasWidth: canvasWidth,
@@ -173,7 +158,17 @@ public struct DocumentRenderingClient: Sendable {
     }
 
     public func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
-        DocumentPreviewComposite.shouldUseIncrementalPreviewUpdate(for: brush)
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
+        let softness = 1.0 - CGFloat(brush.hardness)
+
+        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
+            return false
+        }
+        if softness >= 0.34 && effectiveDiameter >= 56 {
+            return false
+        }
+        return true
     }
 
     public func compositedPreviewIncrementalUpdate(
@@ -187,29 +182,6 @@ public struct DocumentRenderingClient: Sendable {
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,
             dirtyRect: dirtyRect
-        ) ?? DocumentPreviewComposite.compositedPreviewIncrementalUpdate(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: adjustedActiveLayerPixels,
-            dirtyRect: dirtyRect
-        )
-    }
-
-    public func renderedCompositePNGData(
-        snapshot: MetalDocumentSnapshot,
-        paperStyle: CanvasPaperStyle
-    ) -> Data? {
-        let pixelData = compositedPaperPreviewRGBA(
-            pixelData: snapshot.compositePixelData,
-            width: snapshot.width,
-            height: snapshot.height,
-            paperStyle: paperStyle
-        ) ?? snapshot.compositePixelData
-
-        return DocumentRasterImageService.pngData(
-            fromLayerPixelData: pixelData,
-            width: snapshot.width,
-            height: snapshot.height
         )
     }
 
@@ -221,71 +193,7 @@ public struct DocumentRenderingClient: Sendable {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool
     ) -> DocumentInteractiveStrokePreviewResult? {
-        if brush.smudgeEngineEnabled,
-           let gpuResult = executeStroke(
-                MetalStrokeExecutionRequest(
-                    basePixelData: basePixelData,
-                    canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height,
-                    samples: samples,
-                    brush: brush,
-                    mode: .interactive,
-                    snapshotRevision: snapshot.revision,
-                    activeLayerIndex: activeLayerIndex
-                )
-           ) {
-            let incrementalUpdate: IncrementalLayerUpdate?
-            if shouldUseIncrementalPreviewUpdate(for: brush),
-               let dirtyRect = Optional(gpuResult.dirtyRect) {
-                incrementalUpdate = compositedPreviewIncrementalUpdate(
-                    snapshot: snapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    adjustedActiveLayerPixels: gpuResult.pixelData,
-                    dirtyRect: dirtyRect
-                )
-            } else {
-                incrementalUpdate = nil
-            }
-            return DocumentInteractiveStrokePreviewResult(
-                pixelData: gpuResult.pixelData,
-                dirtyRect: gpuResult.dirtyRect,
-                rectPixelData: gpuResult.rectPixelData,
-                incrementalUpdate: incrementalUpdate
-            )
-        } else if brush.smudgeEngineEnabled,
-                  let smudgeResult = DocumentStrokeRasterizer.colorSmudgeResult(
-                    basePixelData: basePixelData,
-                    canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height,
-                    samples: samples,
-                    brush: brush,
-                    preserveAlphaLockedPixels: preserveAlphaLockedPixels
-                  ) {
-            let incrementalUpdate: IncrementalLayerUpdate?
-            if shouldUseIncrementalPreviewUpdate(for: brush),
-               let dirtyRect = smudgeResult.dirtyRect {
-                incrementalUpdate = compositedPreviewIncrementalUpdate(
-                    snapshot: snapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    adjustedActiveLayerPixels: smudgeResult.pixelData,
-                    dirtyRect: dirtyRect
-                )
-            } else {
-                incrementalUpdate = nil
-            }
-            return DocumentInteractiveStrokePreviewResult(
-                pixelData: smudgeResult.pixelData,
-                dirtyRect: smudgeResult.dirtyRect,
-                rectPixelData: smudgeResult.rectPixelData,
-                incrementalUpdate: incrementalUpdate
-            )
-        }
-
-        let adjustedPixels: Data
-        let rasterDirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
-        let rasterRectPixelData: Data?
-
-        if let gpuResult = executeStroke(
+        guard let gpuResult = executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
                 canvasWidth: snapshot.width,
@@ -296,42 +204,24 @@ public struct DocumentRenderingClient: Sendable {
                 snapshotRevision: snapshot.revision,
                 activeLayerIndex: activeLayerIndex
             )
-        ) {
-            adjustedPixels = preserveAlphaLockedPixels
-                ? DocumentStrokeRasterizer.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
-                : gpuResult.pixelData
-            rasterDirtyRect = gpuResult.dirtyRect
-            rasterRectPixelData = gpuResult.rectPixelData
-        } else if let fallbackPixels = DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
-            basePixelData: basePixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            samples: samples,
-            brush: brush,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels
-        ) {
-            adjustedPixels = fallbackPixels
-            rasterDirtyRect = nil
-            rasterRectPixelData = nil
-        } else {
+        ) else {
             return nil
         }
+        let adjustedPixels = preserveAlphaLockedPixels
+            ? Self.pixelDataByPreservingExistingAlpha(source: gpuResult.pixelData, existing: basePixelData)
+            : gpuResult.pixelData
+        let rasterDirtyRect = gpuResult.dirtyRect
+        let rasterRectPixelData = gpuResult.rectPixelData
 
-        let previewDirtyRect = rasterDirtyRect ?? strokePreviewDirtyRect(
-            samples: samples,
-            brush: brush,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height
-        )
+        let previewDirtyRect = rasterDirtyRect
 
         let incrementalUpdate: IncrementalLayerUpdate?
-        if shouldUseIncrementalPreviewUpdate(for: brush),
-           let dirtyRect = previewDirtyRect {
+        if shouldUseIncrementalPreviewUpdate(for: brush) {
             incrementalUpdate = compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerPixels: adjustedPixels,
-                dirtyRect: dirtyRect
+                dirtyRect: previewDirtyRect
             )
         } else {
             incrementalUpdate = nil
@@ -340,15 +230,82 @@ public struct DocumentRenderingClient: Sendable {
         return DocumentInteractiveStrokePreviewResult(
             pixelData: adjustedPixels,
             dirtyRect: previewDirtyRect,
-            rectPixelData: rasterRectPixelData ?? previewDirtyRect.flatMap {
-                Self.pixelData(
-                    in: $0,
-                    from: adjustedPixels,
-                    canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height
-                )
-            },
+            rectPixelData: rasterRectPixelData ?? Self.pixelData(
+                in: previewDirtyRect,
+                from: adjustedPixels,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height
+            ),
             incrementalUpdate: incrementalUpdate
+        )
+    }
+
+    private static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
+        guard source.count == existing.count else { return source }
+        var output = source
+        output.withUnsafeMutableBytes { outputBytes in
+            existing.withUnsafeBytes { existingBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: source.count, by: 4) {
+                    let alpha = src[offset + 3]
+                    if alpha == 0 {
+                        dst[offset] = 0
+                        dst[offset + 1] = 0
+                        dst[offset + 2] = 0
+                        dst[offset + 3] = 0
+                    } else {
+                        dst[offset + 3] = alpha
+                    }
+                }
+            }
+        }
+        return output
+    }
+
+    private static func strokePreviewDirtyRect(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> (originX: Int, originY: Int, width: Int, height: Int)? {
+        guard !samples.isEmpty, canvasWidth > 0, canvasHeight > 0 else { return nil }
+
+        var minX = CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude
+        var maxX = -CGFloat.greatestFiniteMagnitude
+        var maxY = -CGFloat.greatestFiniteMagnitude
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let softness = max(0, 1.0 - CGFloat(brush.hardness))
+        let featherPadding = max(
+            brush.tipKind == .airbrush ? CGFloat(brush.radius) * (0.9 + softness * 0.6) : CGFloat(brush.radius) * (0.35 + softness * 0.75),
+            brush.tipKind == .airbrush ? 18.0 : 10.0
+        )
+
+        for sample in samples {
+            let pressureFactor = max(0.1, 1.0 + ((sample.pressure - 1.0) * CGFloat(brush.pressureSensitivity)))
+            let radiusPadding = max(CGFloat(brush.radius) * pressureFactor, 1.5)
+                + (scatterExtent * CGFloat(brush.radius))
+                + featherPadding
+                + 6.0
+            minX = min(minX, sample.point.x - radiusPadding)
+            minY = min(minY, sample.point.y - radiusPadding)
+            maxX = max(maxX, sample.point.x + radiusPadding)
+            maxY = max(maxY, sample.point.y + radiusPadding)
+        }
+
+        guard minX.isFinite, minY.isFinite, maxX.isFinite, maxY.isFinite else { return nil }
+        let originX = max(0, Int(floor(minX)))
+        let originY = max(0, Int(floor(minY)))
+        let maxRectX = min(canvasWidth - 1, Int(ceil(maxX)))
+        let maxRectY = min(canvasHeight - 1, Int(ceil(maxY)))
+        guard maxRectX >= originX, maxRectY >= originY else { return nil }
+        return (
+            originX: originX,
+            originY: originY,
+            width: maxRectX - originX + 1,
+            height: maxRectY - originY + 1
         )
     }
 

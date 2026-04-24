@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentContracts
 import PrimoNanoBananaDomain
 
 public enum NanoBananaCommandBuilderFailure: Error, Equatable, Sendable {
@@ -93,24 +94,18 @@ public struct NanoBananaPreviewPreparationRequest: Equatable, Sendable {
     public let command: SubmitNanoBananaEditCommand
     public let selectionRegion: NanoBananaSelectionRegion?
     public let outputLayerIndex: Int
-    public let canvasWidth: Int
-    public let canvasHeight: Int
-    public let sourceLayerPixelData: Data
+    public let sourceSurface: DocumentCompositeSurface
 
     public init(
         command: SubmitNanoBananaEditCommand,
         selectionRegion: NanoBananaSelectionRegion?,
         outputLayerIndex: Int,
-        canvasWidth: Int,
-        canvasHeight: Int,
-        sourceLayerPixelData: Data
+        sourceSurface: DocumentCompositeSurface
     ) {
         self.command = command
         self.selectionRegion = selectionRegion
         self.outputLayerIndex = outputLayerIndex
-        self.canvasWidth = canvasWidth
-        self.canvasHeight = canvasHeight
-        self.sourceLayerPixelData = sourceLayerPixelData
+        self.sourceSurface = sourceSurface
     }
 }
 
@@ -247,23 +242,21 @@ public struct NanoBananaPreviewPreparationService: Sendable {
     public func preparePreview(
         _ request: NanoBananaPreviewPreparationRequest
     ) async -> Result<NanoBananaPreviewState, NanoBananaPreviewPreparationFailure> {
-        let beforePreviewImageData = DocumentRasterImageService.pngData(
-            fromLayerPixelData: request.command.descriptor.outputMode == .replaceCurrentLayer
-                ? request.sourceLayerPixelData
-                : Data(repeating: 0, count: request.canvasWidth * request.canvasHeight * 4),
-            width: request.canvasWidth,
-            height: request.canvasHeight
+        let blankSurface = DocumentCompositeSurface(
+            width: request.sourceSurface.width,
+            height: request.sourceSurface.height,
+            pixelData: Data(repeating: 0, count: request.sourceSurface.width * request.sourceSurface.height * 4)
         )
+        let beforeSurface = request.command.descriptor.outputMode == .replaceCurrentLayer
+            ? request.sourceSurface
+            : blankSurface
+        let beforePreviewImageData = DocumentRasterImageService.pngData(from: beforeSurface)
 
-        let finalPixelData: Data?
+        let finalSurface: DocumentCompositeSurface?
         switch request.command.descriptor.editScope {
         case .wholeLayer:
-            guard let inputPNGData = DocumentRasterImageService.pngData(
-                fromLayerPixelData: request.sourceLayerPixelData,
-                width: request.canvasWidth,
-                height: request.canvasHeight
-            ) else {
-                finalPixelData = nil
+            guard let inputPNGData = DocumentRasterImageService.pngData(from: request.sourceSurface) else {
+                finalSurface = nil
                 break
             }
 
@@ -273,10 +266,9 @@ public struct NanoBananaPreviewPreparationService: Sendable {
                 cropScoped: false
             ) {
             case let .success(imageData):
-                finalPixelData = DocumentRasterImageService.rawLayerPixelData(
-                    fromPNGData: imageData,
-                    width: request.canvasWidth,
-                    height: request.canvasHeight
+                finalSurface = decodedSurface(
+                    from: imageData,
+                    fallbackSize: (request.sourceSurface.width, request.sourceSurface.height)
                 )
             case let .failure(failure):
                 return .failure(.editFailed(failure))
@@ -286,19 +278,17 @@ public struct NanoBananaPreviewPreparationService: Sendable {
             guard
                 let selectionRegion = request.selectionRegion,
                 let crop = DocumentRasterImageService.inpaintCrop(
-                    source: request.sourceLayerPixelData,
-                    canvasWidth: request.canvasWidth,
-                    canvasHeight: request.canvasHeight,
+                    source: request.sourceSurface.pixelData,
+                    canvasWidth: request.sourceSurface.width,
+                    canvasHeight: request.sourceSurface.height,
                     selectionBounds: selectionRegion.selectionBounds,
                     expandedMask: selectionRegion.expandedMask
                 ),
                 let cropPNGData = DocumentRasterImageService.pngData(
-                    fromLayerPixelData: crop.pixelData,
-                    width: crop.width,
-                    height: crop.height
+                    from: DocumentCompositeSurface(width: crop.width, height: crop.height, pixelData: crop.pixelData)
                 )
             else {
-                finalPixelData = nil
+                finalSurface = nil
                 break
             }
 
@@ -308,31 +298,38 @@ public struct NanoBananaPreviewPreparationService: Sendable {
                 cropScoped: true
             ) {
             case let .success(imageData):
-                guard let editedCropPixelData = DocumentRasterImageService.rawLayerPixelData(
-                    fromPNGData: imageData,
-                    width: crop.width,
-                    height: crop.height
+                guard let editedCropSurface = decodedSurface(
+                    from: imageData,
+                    fallbackSize: (crop.width, crop.height)
                 ) else {
-                    finalPixelData = nil
+                    finalSurface = nil
                     break
                 }
 
-                let baseLayerPixelData = request.command.descriptor.outputMode == .replaceCurrentLayer
-                    ? request.sourceLayerPixelData
-                    : Data(repeating: 0, count: request.canvasWidth * request.canvasHeight * 4)
-                finalPixelData = DocumentRasterImageService.applyingInpaintCrop(
-                    editedCropPixelData,
-                    to: baseLayerPixelData,
-                    canvasWidth: request.canvasWidth,
-                    canvasHeight: request.canvasHeight,
+                let baseLayerSurface = request.command.descriptor.outputMode == .replaceCurrentLayer
+                    ? request.sourceSurface
+                    : blankSurface
+                guard let applied = DocumentRasterImageService.applyingInpaintCrop(
+                    editedCropSurface.pixelData,
+                    to: baseLayerSurface.pixelData,
+                    canvasWidth: request.sourceSurface.width,
+                    canvasHeight: request.sourceSurface.height,
                     crop: crop
+                ) else {
+                    finalSurface = nil
+                    break
+                }
+                finalSurface = DocumentCompositeSurface(
+                    width: request.sourceSurface.width,
+                    height: request.sourceSurface.height,
+                    pixelData: applied
                 )
             case let .failure(failure):
                 return .failure(.editFailed(failure))
             }
         }
 
-        guard let finalPixelData else {
+        guard let finalSurface else {
             return .failure(.unsupportedImage)
         }
 
@@ -340,14 +337,27 @@ public struct NanoBananaPreviewPreparationService: Sendable {
             NanoBananaPreviewState(
                 descriptor: request.command.descriptor,
                 outputLayerIndex: request.outputLayerIndex,
-                pixelData: finalPixelData,
+                outputSurface: finalSurface,
                 beforePreviewImageData: beforePreviewImageData,
-                afterPreviewImageData: DocumentRasterImageService.pngData(
-                    fromLayerPixelData: finalPixelData,
-                    width: request.canvasWidth,
-                    height: request.canvasHeight
-                )
+                afterPreviewImageData: DocumentRasterImageService.pngData(from: finalSurface)
             )
+        )
+    }
+
+    private func decodedSurface(
+        from encodedData: Data,
+        fallbackSize: (width: Int, height: Int)
+    ) -> DocumentCompositeSurface? {
+        guard let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: encodedData) else {
+            return nil
+        }
+        guard decoded.width == fallbackSize.width, decoded.height == fallbackSize.height else {
+            return nil
+        }
+        return DocumentCompositeSurface(
+            width: decoded.width,
+            height: decoded.height,
+            pixelData: decoded.pixelData
         )
     }
 

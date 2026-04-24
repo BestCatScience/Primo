@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentContracts
+import PrimoDocumentDomain
 
 public struct ImportedCanvasRequest: Equatable, Sendable {
     public let width: Int
@@ -14,7 +15,7 @@ public struct ImportedCanvasRequest: Equatable, Sendable {
 }
 
 public enum DocumentInteractionRequest: Equatable, Sendable {
-    case compositePixelData
+    case compositeSurface
     case newCanvas(width: Int, height: Int)
     case resizeCanvas(width: Int, height: Int)
     case resizeCanvasExtent(width: Int, height: Int)
@@ -26,6 +27,8 @@ public enum DocumentInteractionRequest: Equatable, Sendable {
     case ensureLayerVisible(Int)
     case replaceLayerPixels(layerIndex: Int, pixelData: Data)
     case replaceLayerPixelsInRect(layerIndex: Int, rect: LayerPixelRect, pixelData: Data)
+    case applyLayerMutation(layerIndex: Int, payload: DocumentLayerMutationPayload)
+    case applyTextLayerMutation(layerIndex: Int, textLayer: TextLayerData, payload: DocumentLayerMutationPayload)
     case applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int)
     case revealLayerForEditing(Int)
     case blurStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, clearSelectionAfterBlur: Bool)
@@ -37,7 +40,7 @@ public enum DocumentInteractionRequest: Equatable, Sendable {
 
 public enum DocumentInteractionResult: Equatable, Sendable {
     case none
-    case compositePixelData(Data)
+    case compositeSurface(DocumentCompositeSurface)
 }
 
 public struct DocumentInteractionService: Sendable {
@@ -58,8 +61,8 @@ public struct DocumentInteractionService: Sendable {
     ) {
         self.execute = { request in
             switch request {
-            case .compositePixelData:
-                return .success(.compositePixelData(queryGateway.compositePixelData()))
+            case .compositeSurface:
+                return .success(.compositeSurface(queryGateway.compositeSurface()))
 
             case let .newCanvas(width, height):
                 persistenceGateway.newCanvas(width, height)
@@ -114,6 +117,12 @@ public struct DocumentInteractionService: Sendable {
             case let .replaceLayerPixelsInRect(layerIndex, rect, pixelData):
                 return mutationGateway.replaceLayerPixelsInRect(layerIndex, rect, pixelData).map { .none }
 
+            case let .applyLayerMutation(layerIndex, payload):
+                return mutationGateway.applyLayerMutation(layerIndex, payload).map { .none }
+
+            case let .applyTextLayerMutation(layerIndex, textLayer, payload):
+                return mutationGateway.applyTextLayerMutation(layerIndex, textLayer, payload).map { .none }
+
             case let .applySoftwareStroke(samples, brush, layerIndex):
                 return strokeGateway.applySoftwareStroke(samples, brush, layerIndex).map { .none }
 
@@ -139,12 +148,18 @@ public struct DocumentInteractionService: Sendable {
         }
     }
 
+    @available(*, deprecated, message: "Prefer compositeSurface() for live rendering queries.")
     public func compositePixelData() -> Data {
-        switch execute(.compositePixelData) {
-        case let .success(.compositePixelData(data)):
-            return data
+        // Legacy convenience retained for callers that still expect readback bytes.
+        compositeSurface().pixelData
+    }
+
+    public func compositeSurface() -> DocumentCompositeSurface {
+        switch execute(.compositeSurface) {
+        case let .success(.compositeSurface(surface)):
+            return surface
         case .success(.none), .failure:
-            return Data()
+            return DocumentCompositeSurface(width: 0, height: 0, pixelData: Data())
         }
     }
 
@@ -200,6 +215,21 @@ public struct DocumentInteractionService: Sendable {
         pixelData: Data
     ) -> DocumentMutationResult {
         execute(.replaceLayerPixelsInRect(layerIndex: layerIndex, rect: dirtyRect, pixelData: pixelData)).map { _ in () }
+    }
+
+    public func applyLayerMutation(
+        _ layerIndex: Int,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        execute(.applyLayerMutation(layerIndex: layerIndex, payload: payload)).map { _ in () }
+    }
+
+    public func applyTextLayerMutation(
+        _ layerIndex: Int,
+        textLayer: TextLayerData,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        execute(.applyTextLayerMutation(layerIndex: layerIndex, textLayer: textLayer, payload: payload)).map { _ in () }
     }
 
     public func applySoftwareStroke(

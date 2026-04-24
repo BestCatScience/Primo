@@ -21,19 +21,14 @@ struct LayerThumbnailView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color.black.opacity(0.1), lineWidth: 1)
 
-            if let thumbnail = thumbnailImage {
-                Image(uiImage: thumbnail)
-                    .resizable()
-                    .interpolation(.medium)
-                    .scaledToFit()
+            if let thumbnailSurface = snapshot?.thumbnailSurface {
+                SurfacePreviewView(surface: thumbnailSurface)
+                    .padding(3)
+            } else if let fallbackSurface = StoredSurfaceAdapter.surface(from: snapshot?.thumbnailData) {
+                SurfacePreviewView(surface: fallbackSurface)
                     .padding(3)
             }
         }
-    }
-
-    private var thumbnailImage: UIImage? {
-        guard let data = snapshot?.thumbnailData else { return nil }
-        return UIImage(data: data)
     }
 }
 

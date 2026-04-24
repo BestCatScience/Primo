@@ -4,16 +4,17 @@ import PrimoDocumentContracts
 extension AppFeature {
     struct AppFeatureCanvasPreviewStateCoordinator {
         @discardableResult
-        func applyLiveCompositePixelData(
-            _ compositePixelData: Data,
+        func applyLiveCompositeSurface(
+            _ compositeSurface: DocumentCompositeSurface,
             to state: inout AppFeature.State
         ) -> Bool {
-            let width = state.canvas.renderSnapshot?.width ?? max(Int(state.canvas.canvasSize.width.rounded()), 1)
-            let height = state.canvas.renderSnapshot?.height ?? max(Int(state.canvas.canvasSize.height.rounded()), 1)
-            guard compositePixelData.count == width * height * 4 else {
+            guard compositeSurface.width > 0, compositeSurface.height > 0 else {
                 return false
             }
-            state.canvas.setStrokePreviewCompositePixelData(compositePixelData)
+            guard compositeSurface.pixelData.count == compositeSurface.width * compositeSurface.height * 4 else {
+                return false
+            }
+            state.canvas.setStrokePreviewCompositePixelData(compositeSurface.pixelData)
             state.canvas.clearPendingIncrementalUpdate()
             return true
         }
@@ -41,6 +42,7 @@ extension AppFeature {
                     visible: layer.visible,
                     isClipped: layer.isClipped,
                     blendMode: layer.blendMode,
+                    thumbnailSurface: layer.thumbnailSurface,
                     thumbnailData: layer.thumbnailData,
                     pixelData: adjustedActiveLayerPixels
                 )

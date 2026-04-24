@@ -1,6 +1,5 @@
 import Foundation
 import PrimoDocumentContracts
-import PrimoDocumentStrokeInfrastructure
 
 public struct DocumentStrokePreviewPlan: Sendable {
     public let baseSnapshot: MetalDocumentSnapshot
@@ -63,7 +62,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         )
     }
 
-    public func makeFallbackCommittedPixels(
+    public func makeCommittedPixels(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         samples: [StylusSample],
@@ -85,21 +84,10 @@ public struct DocumentStrokeProcessingService: Sendable {
             activeLayerIndex: activeLayerIndex
         ) {
             return preserveAlphaLockedPixels
-                ? DocumentStrokeRasterizer.pixelDataByPreservingExistingAlpha(
-                    source: gpuOutput,
-                    existing: baseLayer.pixelData
-                )
+                ? Self.pixelDataByPreservingExistingAlpha(source: gpuOutput, existing: baseLayer.pixelData)
                 : gpuOutput
         }
-
-        return DocumentStrokeRasterizer.layerPixelDataByApplyingCommittedStroke(
-            basePixelData: baseLayer.pixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            samples: samples,
-            brush: brush,
-            preserveAlphaLockedPixels: preserveAlphaLockedPixels
-        )
+        return nil
     }
 
     public func stageCommittedSnapshot(
@@ -130,6 +118,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 visible: layer.visible,
                 isClipped: layer.isClipped,
                 blendMode: layer.blendMode,
+                thumbnailSurface: layer.thumbnailSurface,
                 thumbnailData: layer.thumbnailData,
                 pixelData: committedPixels
             )
@@ -142,5 +131,29 @@ public struct DocumentStrokeProcessingService: Sendable {
             compositePixelData: compositePixelData,
             layers: layers
         )
+    }
+
+    private static func pixelDataByPreservingExistingAlpha(source: Data, existing: Data) -> Data {
+        guard source.count == existing.count else { return source }
+        var output = source
+        output.withUnsafeMutableBytes { outputBytes in
+            existing.withUnsafeBytes { existingBytes in
+                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
+                      let src = existingBytes.bindMemory(to: UInt8.self).baseAddress
+                else { return }
+                for offset in stride(from: 0, to: source.count, by: 4) {
+                    let alpha = src[offset + 3]
+                    if alpha == 0 {
+                        dst[offset] = 0
+                        dst[offset + 1] = 0
+                        dst[offset + 2] = 0
+                        dst[offset + 3] = 0
+                    } else {
+                        dst[offset + 3] = alpha
+                    }
+                }
+            }
+        }
+        return output
     }
 }

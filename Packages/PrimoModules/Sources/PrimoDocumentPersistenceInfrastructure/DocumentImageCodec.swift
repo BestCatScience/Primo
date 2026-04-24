@@ -4,6 +4,9 @@ import ImageIO
 import PrimoDocumentDomain
 import UniformTypeIdentifiers
 
+/// Legacy external-format codec helpers.
+/// Live document rendering and mutation paths should prefer `DocumentCompositeSurface`
+/// plus `DocumentRasterImageService` or Metal surface APIs instead of bridging through `CGImage`.
 public enum DocumentImageCodec {
     public static func pngData(from image: CGImage) -> Data? {
         encodedData(from: image, typeIdentifier: UTType.png.identifier as CFString)

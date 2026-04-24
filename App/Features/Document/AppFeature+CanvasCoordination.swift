@@ -23,6 +23,10 @@ extension AppFeature {
         func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
             documentExportGateway.compositePNGData(paperStyle)
         }
+
+        func compositeSurface(paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+            documentExportGateway.compositeSurface(paperStyle)
+        }
     }
 
     struct DocumentPaperStyleSyncClient {
@@ -64,11 +68,11 @@ extension AppFeature {
         AppFeature.canvasPresentationStateCoordinator.syncTextEditorWithActiveLayer(state: &state)
     }
 
-    func applyLiveCompositePixelData(
-        _ compositePixelData: Data,
+    func applyLiveCompositeSurface(
+        _ compositeSurface: DocumentCompositeSurface,
         state: inout State
     ) {
-        if AppFeature.canvasPreviewStateCoordinator.applyLiveCompositePixelData(compositePixelData, to: &state) {
+        if AppFeature.canvasPreviewStateCoordinator.applyLiveCompositeSurface(compositeSurface, to: &state) {
             state.application.finishHydration()
         }
     }

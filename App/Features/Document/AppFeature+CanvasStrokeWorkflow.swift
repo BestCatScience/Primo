@@ -598,7 +598,7 @@ extension AppFeature {
                 clearCanvasSelectionWithoutRefresh(state: &state)
             },
             commitFallbackPixels: { state, samples, brush, activeLayer, refreshViaDirtyPresentation in
-                commitStrokeUsingFallbackPixels(
+                commitStrokeUsingCommittedPixels(
                     state: &state,
                     samples: samples,
                     brush: brush,
@@ -685,7 +685,7 @@ extension AppFeature {
         }
     }
 
-    func commitStrokeUsingFallbackPixels(
+    func commitStrokeUsingCommittedPixels(
         state: inout State,
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
@@ -700,7 +700,7 @@ extension AppFeature {
             : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
         guard
             let snapshot = fallbackSnapshot,
-            let adjustedPixels = canvasStrokeProcessingService.makeFallbackCommittedPixels(
+            let adjustedPixels = canvasStrokeProcessingService.makeCommittedPixels(
                 snapshot: snapshot,
                 activeLayerIndex: state.canvas.activeLayerIndex,
                 samples: samples,
@@ -708,7 +708,7 @@ extension AppFeature {
                 preserveAlphaLockedPixels: activeLayer.isAlphaLocked
             )
         else {
-            return .failure(.bridgeMutationFailed("Missing fallback stroke snapshot"))
+            return .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
         }
         return documentInteractionService.replaceLayerPixels(
             state.canvas.activeLayerIndex,
@@ -817,7 +817,7 @@ extension AppFeature {
         for sample in samples.dropFirst() {
             documentInteractionService.appendStroke(sample)
         }
-        applyLiveCompositePixelData(documentInteractionService.compositePixelData(), state: &state)
+        applyLiveCompositeSurface(documentInteractionService.compositeSurface(), state: &state)
         return cancelStartupPresentationEffects()
     }
 

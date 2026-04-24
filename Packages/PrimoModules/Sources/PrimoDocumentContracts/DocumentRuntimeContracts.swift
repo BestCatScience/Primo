@@ -607,6 +607,8 @@ public enum TimelapseCaptureSource: Equatable, Sendable {
 public struct TimelapseCapture: Equatable, Sendable {
     public let canvasSize: CGSize
     public let paperStyle: CanvasPaperStyle
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for HUD/persistence fallback.
     public let previewImageData: Data?
     public let source: TimelapseCaptureSource
     public let framesPerSecond: Int
@@ -614,12 +616,14 @@ public struct TimelapseCapture: Equatable, Sendable {
     public init(
         canvasSize: CGSize,
         paperStyle: CanvasPaperStyle,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?,
         source: TimelapseCaptureSource,
         framesPerSecond: Int
     ) {
         self.canvasSize = canvasSize
         self.paperStyle = paperStyle
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
         self.source = source
         self.framesPerSecond = framesPerSecond
@@ -629,7 +633,10 @@ public struct TimelapseCapture: Equatable, Sendable {
 public struct DocumentQueryGateway: Sendable {
     public var lightweightPresentation: @Sendable () -> PaintDocumentPresentation
     public var presentation: @Sendable () -> PaintDocumentPresentation
+    /// Legacy convenience retained for callers that still expect raw bytes.
+    /// Live query paths should prefer `compositeSurface`.
     public var compositePixelData: @Sendable () -> Data
+    public var compositeSurface: @Sendable () -> DocumentCompositeSurface
     public var pixelDataForLayer: @Sendable (Int) -> Data
     public var consumeDirtyUpdate: @Sendable () -> IncrementalLayerUpdate?
 
@@ -637,12 +644,14 @@ public struct DocumentQueryGateway: Sendable {
         lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
         presentation: @escaping @Sendable () -> PaintDocumentPresentation,
         compositePixelData: @escaping @Sendable () -> Data,
+        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface,
         pixelDataForLayer: @escaping @Sendable (Int) -> Data,
         consumeDirtyUpdate: @escaping @Sendable () -> IncrementalLayerUpdate?
     ) {
         self.lightweightPresentation = lightweightPresentation
         self.presentation = presentation
         self.compositePixelData = compositePixelData
+        self.compositeSurface = compositeSurface
         self.pixelDataForLayer = pixelDataForLayer
         self.consumeDirtyUpdate = consumeDirtyUpdate
     }
@@ -659,6 +668,8 @@ public struct DocumentMutationGateway: Sendable {
     public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
     public var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
     public var replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
+    public var applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
+    public var applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
     public var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
     public var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
     public var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
@@ -676,6 +687,8 @@ public struct DocumentMutationGateway: Sendable {
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult,
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
         replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult,
+        applyLayerMutation: @escaping @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult,
+        applyTextLayerMutation: @escaping @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult,
         replaceLayerMask: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
         clearLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult,
         applyLayerMask: @escaping @Sendable (Int) -> DocumentMutationResult,
@@ -692,6 +705,8 @@ public struct DocumentMutationGateway: Sendable {
         self.revealLayerForEditing = revealLayerForEditing
         self.replaceLayerPixels = replaceLayerPixels
         self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
+        self.applyLayerMutation = applyLayerMutation
+        self.applyTextLayerMutation = applyTextLayerMutation
         self.replaceLayerMask = replaceLayerMask
         self.clearLayerMask = clearLayerMask
         self.applyLayerMask = applyLayerMask
@@ -773,13 +788,16 @@ public struct DocumentPersistenceGateway: Sendable {
 }
 
 public struct DocumentExportGateway: Sendable {
+    public var compositeSurface: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
     public var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
     public var timelapseCapture: @Sendable () -> TimelapseCapture?
 
     public init(
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface? = { _ in nil },
         compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data?,
         timelapseCapture: @escaping @Sendable () -> TimelapseCapture?
     ) {
+        self.compositeSurface = compositeSurface
         self.compositePNGData = compositePNGData
         self.timelapseCapture = timelapseCapture
     }

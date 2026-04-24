@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentContracts
 import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 import Testing
@@ -81,12 +82,16 @@ struct NanoBananaApplicationTests {
             ),
             executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
         )
-        let pixelData = Data([
+        let surface = DocumentCompositeSurface(
+            width: 2,
+            height: 2,
+            pixelData: Data([
             255, 0, 0, 255,
             0, 255, 0, 255,
             0, 0, 255, 255,
             255, 255, 255, 255,
-        ])
+            ])
+        )
         let useCase = NanoBananaEditUseCase { request in
             .success(request.inputPNGData)
         }
@@ -96,15 +101,61 @@ struct NanoBananaApplicationTests {
                 command: command,
                 selectionRegion: nil,
                 outputLayerIndex: 0,
-                canvasWidth: 2,
-                canvasHeight: 2,
-                sourceLayerPixelData: pixelData
+                sourceSurface: surface
             )
         )
 
         let preview = try #require(try result.get())
         #expect(preview.outputLayerIndex == 0)
-        #expect(preview.pixelData.count == pixelData.count)
+        #expect(preview.outputSurface.width == 2)
+        #expect(preview.outputSurface.height == 2)
+        #expect(preview.pixelData.count == surface.pixelData.count)
+        #expect(preview.beforePreviewImageData != nil)
+        #expect(preview.afterPreviewImageData != nil)
+    }
+
+    @Test
+    func previewPreparationServiceBuildsSelectedAreaPreviewFromSurface() async throws {
+        let command = SubmitNanoBananaEditCommand(
+            descriptor: NanoBananaEditDescriptor(
+                prompt: NonEmptyPrompt("Retouch selection")!,
+                accessMode: .userAPIKey,
+                model: .flashImage25,
+                inputLayerIndex: 0,
+                editScope: .selectedArea,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
+        )
+        let surface = DocumentCompositeSurface(
+            width: 4,
+            height: 4,
+            pixelData: Data(repeating: 0xFF, count: 4 * 4 * 4)
+        )
+        let useCase = NanoBananaEditUseCase { request in
+            .success(request.inputPNGData)
+        }
+
+        let result = await NanoBananaPreviewPreparationService(editUseCase: useCase).preparePreview(
+            NanoBananaPreviewPreparationRequest(
+                command: command,
+                selectionRegion: NanoBananaSelectionRegion(
+                    selectionBounds: CGRect(x: 1, y: 1, width: 2, height: 2),
+                    expandedMask: [
+                        0, 0, 0, 0,
+                        0, 255, 255, 0,
+                        0, 255, 255, 0,
+                        0, 0, 0, 0,
+                    ]
+                ),
+                outputLayerIndex: 0,
+                sourceSurface: surface
+            )
+        )
+
+        let preview = try #require(try result.get())
+        #expect(preview.outputSurface.width == 4)
+        #expect(preview.outputSurface.height == 4)
         #expect(preview.beforePreviewImageData != nil)
         #expect(preview.afterPreviewImageData != nil)
     }

@@ -1,6 +1,18 @@
 import CoreGraphics
 import Foundation
 
+public struct DocumentCompositeSurface: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+    public let pixelData: Data
+
+    public init(width: Int, height: Int, pixelData: Data) {
+        self.width = width
+        self.height = height
+        self.pixelData = pixelData
+    }
+}
+
 public struct CanvasPaperStyle: Equatable, Sendable {
     public var red: Float
     public var green: Float
@@ -151,6 +163,8 @@ public struct SavedProjectSummary: Equatable, Sendable, Identifiable {
     public let modifiedAt: Date
     public let canvasSize: CGSize
     public let layerCount: Int
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public let previewImageData: Data?
 
     public init(
@@ -160,6 +174,7 @@ public struct SavedProjectSummary: Equatable, Sendable, Identifiable {
         modifiedAt: Date,
         canvasSize: CGSize,
         layerCount: Int,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?
     ) {
         self.url = url
@@ -168,6 +183,7 @@ public struct SavedProjectSummary: Equatable, Sendable, Identifiable {
         self.modifiedAt = modifiedAt
         self.canvasSize = canvasSize
         self.layerCount = layerCount
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 
@@ -187,6 +203,8 @@ public struct OpenDocumentTab: Equatable, Sendable, Identifiable {
     public var canvasSize: CGSize
     public var isDirty: Bool
     public var pane: WorkspacePane
+    public var previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public var previewImageData: Data?
 
     public init(
@@ -197,6 +215,7 @@ public struct OpenDocumentTab: Equatable, Sendable, Identifiable {
         canvasSize: CGSize,
         isDirty: Bool,
         pane: WorkspacePane,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?
     ) {
         self.id = id
@@ -206,6 +225,7 @@ public struct OpenDocumentTab: Equatable, Sendable, Identifiable {
         self.canvasSize = canvasSize
         self.isDirty = isDirty
         self.pane = pane
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 }
@@ -216,6 +236,8 @@ public struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
     public let sourceProjectURL: DocumentProjectPath?
     public let autosaveProjectURL: DocumentProjectPath
     public let updatedAt: Date
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public let previewImageData: Data?
 
     public init(
@@ -224,6 +246,7 @@ public struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
         sourceProjectURL: DocumentProjectPath?,
         autosaveProjectURL: DocumentProjectPath,
         updatedAt: Date,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?
     ) {
         self.id = id
@@ -231,6 +254,7 @@ public struct AutosaveRecoveryItem: Equatable, Sendable, Identifiable {
         self.sourceProjectURL = sourceProjectURL
         self.autosaveProjectURL = autosaveProjectURL
         self.updatedAt = updatedAt
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 }
@@ -247,6 +271,8 @@ public struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
     public let projectURL: DocumentProjectPath
     public let createdAt: Date
     public let trigger: SaveHistoryTrigger
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public let previewImageData: Data?
 
     public init(
@@ -255,6 +281,7 @@ public struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
         projectURL: DocumentProjectPath,
         createdAt: Date,
         trigger: SaveHistoryTrigger,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?
     ) {
         self.id = id
@@ -262,6 +289,7 @@ public struct SaveHistoryEntry: Equatable, Sendable, Identifiable {
         self.projectURL = projectURL
         self.createdAt = createdAt
         self.trigger = trigger
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 }

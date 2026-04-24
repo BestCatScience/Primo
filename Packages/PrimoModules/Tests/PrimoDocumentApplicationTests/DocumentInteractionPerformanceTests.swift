@@ -21,6 +21,7 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
                 lightweightPresentation: { PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil) },
                 presentation: { PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil) },
                 compositePixelData: { Data() },
+                compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
                 pixelDataForLayer: { _ in Data() },
                 consumeDirtyUpdate: { nil }
             ),
@@ -35,6 +36,8 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
                 revealLayerForEditing: { _ in .success(()) },
                 replaceLayerPixels: { _, _ in .success(()) },
                 replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerMutation: { _, _ in .success(()) },
+                applyTextLayerMutation: { _, _, _ in .success(()) },
                 replaceLayerMask: { _, _ in .success(()) },
                 clearLayerMask: { _ in .success(()) },
                 applyLayerMask: { _ in .success(()) },
@@ -102,4 +105,3 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
         }
     }
 }
-

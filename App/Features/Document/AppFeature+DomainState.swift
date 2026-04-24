@@ -433,6 +433,7 @@ extension AppFeature.ExportState {
     mutating func startTimelapsePreview(from capture: TimelapseCapture) {
         timelapsePreview = TimelapseExportPreview(
             progress: 0,
+            previewSurface: capture.previewSurface,
             previewImageData: capture.previewImageData
         )
     }
@@ -440,6 +441,7 @@ extension AppFeature.ExportState {
     mutating func updateTimelapsePreview(_ progress: TimelapseExportProgress) {
         timelapsePreview = TimelapseExportPreview(
             progress: progress.progress,
+            previewSurface: progress.previewSurface ?? timelapsePreview?.previewSurface,
             previewImageData: progress.previewImageData ?? timelapsePreview?.previewImageData
         )
     }

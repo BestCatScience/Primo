@@ -34,7 +34,11 @@ struct DocumentRenderingClientTests {
             adjustedActiveLayerPixels: adjustedPixels
         )
 
-        #expect(composited == adjustedPixels)
+        if client.isAvailable {
+            #expect(composited == adjustedPixels)
+        } else {
+            #expect(composited == nil)
+        }
     }
 
     @Test
@@ -84,24 +88,22 @@ struct DocumentRenderingClientTests {
     }
 
     @Test
-    func renderedCompositePNGDataUsesRuntimeFacade() {
+    func compositedPaperPreviewRGBAProducesExportReadyPixels() {
         let client = DocumentRenderingClient.live
         let compositePixels = Data([255, 255, 255, 255, 0, 0, 0, 255])
-        let snapshot = MetalDocumentSnapshot(
+        let output = client.compositedPaperPreviewRGBA(
+            pixelData: compositePixels,
             width: 2,
             height: 1,
-            revision: 7,
-            compositePixelData: compositePixels,
-            layers: []
-        )
-
-        let pngData = client.renderedCompositePNGData(
-            snapshot: snapshot,
             paperStyle: .default
         )
 
-        #expect(pngData != nil)
-        #expect((pngData?.isEmpty ?? true) == false)
+        if client.isAvailable {
+            #expect(output != nil)
+            #expect(output?.count == compositePixels.count)
+        } else {
+            #expect(output == nil)
+        }
     }
 
     @Test
@@ -172,8 +174,12 @@ struct DocumentRenderingClientTests {
             preserveAlphaLockedPixels: false
         )
 
-        #expect(preview != nil)
-        #expect(preview?.pixelData.count == basePixels.count)
+        if client.isAvailable {
+            #expect(preview != nil)
+            #expect(preview?.pixelData.count == basePixels.count)
+        } else {
+            #expect(preview == nil)
+        }
     }
 
     @Test
@@ -247,7 +253,12 @@ struct DocumentRenderingClientTests {
             adjustedActiveLayerPixels: transparentActivePixels
         )
 
-        #expect(firstComposite == redBackground)
-        #expect(secondComposite == blueBackground)
+        if client.isAvailable {
+            #expect(firstComposite == redBackground)
+            #expect(secondComposite == blueBackground)
+        } else {
+            #expect(firstComposite == nil)
+            #expect(secondComposite == nil)
+        }
     }
 }

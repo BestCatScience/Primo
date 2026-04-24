@@ -1,6 +1,6 @@
-import Accelerate
 import CoreGraphics
 import Foundation
+import os
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
@@ -22,6 +22,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private var pendingDirtyUpdate: IncrementalLayerUpdate?
     private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
     private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
+    private var thumbnailSurfaceCache: [Int: DocumentCompositeSurface] = [:]
 
     init(
         width: Int = 1152,
@@ -64,11 +65,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func prewarmDrawingResources() {
-        _ = compositePixelData()
+        _ = compositeSurface()
+    }
+
+    func compositeSurface() -> DocumentCompositeSurface {
+        compositeSurfaceForSnapshot(store.snapshot)
     }
 
     func compositePixelData() -> Data {
-        compositePixelDataForSnapshot(store.snapshot)
+        // Legacy convenience retained for callers that still expect raw bytes.
+        compositeSurface().pixelData
     }
 
     func consumeDirtyUpdate() -> IncrementalLayerUpdate? {
@@ -95,6 +101,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         redoStack.append(store.snapshot)
         store.restore(previous)
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         store.snapshot.timelapseEvents.append(.undo)
         store.snapshot.revision += 1
         captureDirtyUpdate()
@@ -107,6 +114,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         undoStack.append(store.snapshot)
         store.restore(next)
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         store.snapshot.timelapseEvents.append(.redo)
         store.snapshot.revision += 1
         captureDirtyUpdate()
@@ -117,6 +125,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
+        let metalClient = PrimoMetalDocumentProcessingClient.shared
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         guard sourceSize != targetSize else { return .success(()) }
@@ -126,11 +135,26 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let textScale = min(widthScale, heightScale)
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            if let scaled = services.stroke.geometry.scaledLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize) {
-                layer.pixelData = scaled
+            guard let scaled = metalClient.scaledPixelData(
+                layer.pixelData,
+                sourceWidth: sourceSize.width,
+                sourceHeight: sourceSize.height,
+                targetWidth: targetSize.width,
+                targetHeight: targetSize.height
+            ) else {
+                return .failure(.bridgeMutationFailed("resizeCanvas"))
             }
-            if let mask = layer.maskData,
-               let scaledMask = services.stroke.geometry.scaledLayerMaskData(mask, from: sourceSize, to: targetSize) {
+            layer.pixelData = scaled
+            if let mask = layer.maskData {
+                guard let scaledMask = metalClient.scaledMaskData(
+                    mask,
+                    sourceWidth: sourceSize.width,
+                    sourceHeight: sourceSize.height,
+                    targetWidth: targetSize.width,
+                    targetHeight: targetSize.height
+                ) else {
+                    return .failure(.bridgeMutationFailed("resizeCanvas"))
+                }
                 layer.maskData = scaledMask
             }
             if let textLayer = layer.textLayer {
@@ -154,6 +178,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.canvasWidth = targetSize.width
         store.snapshot.canvasHeight = targetSize.height
         store.snapshot.thumbnailCache.removeAll()
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         recordMutation(before: before, timelapseEvent: nil)
         return .success(())
     }
@@ -162,6 +187,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
+        let metalClient = PrimoMetalDocumentProcessingClient.shared
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         guard sourceSize != targetSize else { return .success(()) }
@@ -170,11 +196,30 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let offsetY = (targetSize.height - sourceSize.height) / 2
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            if let translated = services.stroke.geometry.translatedLayerPixelData(layer.pixelData, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
-                layer.pixelData = translated
+            guard let translated = metalClient.translatedPixelData(
+                layer.pixelData,
+                sourceWidth: sourceSize.width,
+                sourceHeight: sourceSize.height,
+                targetWidth: targetSize.width,
+                targetHeight: targetSize.height,
+                offsetX: offsetX,
+                offsetY: offsetY
+            ) else {
+                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
             }
-            if let mask = layer.maskData,
-               let translatedMask = services.stroke.geometry.translatedLayerMaskData(mask, from: sourceSize, to: targetSize, offsetX: offsetX, offsetY: offsetY) {
+            layer.pixelData = translated
+            if let mask = layer.maskData {
+                guard let translatedMask = metalClient.translatedMaskData(
+                    mask,
+                    sourceWidth: sourceSize.width,
+                    sourceHeight: sourceSize.height,
+                    targetWidth: targetSize.width,
+                    targetHeight: targetSize.height,
+                    offsetX: offsetX,
+                    offsetY: offsetY
+                ) else {
+                    return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+                }
                 layer.maskData = translatedMask
             }
             if let textLayer = layer.textLayer {
@@ -198,6 +243,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.canvasWidth = targetSize.width
         store.snapshot.canvasHeight = targetSize.height
         store.snapshot.thumbnailCache.removeAll()
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         recordMutation(before: before, timelapseEvent: nil)
         return .success(())
     }
@@ -302,6 +348,22 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .failure(failure)
     }
 
+    func applyLayerMutation(index: Int, payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
+        guard let failure = validateEditableLayer(index) else {
+            return applyLayerMutationPayload(
+                index: index,
+                payload: payload,
+                timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData)
+            )
+        }
+        return .failure(failure)
+    }
+
+    func applyTextLayerMutation(index: Int, textLayer: TextLayerData, payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
+        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
+    }
+
     func replaceLayerMask(index: Int, data: Data) -> DocumentMutationResult {
         guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
         guard !data.isEmpty else { return .failure(.emptyInput) }
@@ -328,22 +390,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func applyLayerMask(index: Int) -> DocumentMutationResult {
         guard let failure = validateLayer(index) else {
             guard let mask = store.snapshot.layers[index].maskData else { return .success(()) }
-            let before = store.snapshot
-            var output = store.snapshot.layers[index].pixelData
-            output.withUnsafeMutableBytes { outputBytes in
-                mask.withUnsafeBytes { maskBytes in
-                    guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                          let maskBase = maskBytes.bindMemory(to: UInt8.self).baseAddress
-                    else { return }
-                    for pixelIndex in 0..<mask.count {
-                        let alphaOffset = pixelIndex * 4 + 3
-                        let sourceAlpha = Int(dst[alphaOffset])
-                        let maskAlpha = Int(maskBase[pixelIndex])
-                        dst[alphaOffset] = UInt8((sourceAlpha * maskAlpha) / 255)
-                    }
-                }
+            guard let maskedPixels = PrimoMetalDocumentProcessingClient.shared.applyLayerMask(
+                pixelData: store.snapshot.layers[index].pixelData,
+                maskData: mask,
+                width: store.snapshot.canvasWidth,
+                height: store.snapshot.canvasHeight
+            ) else {
+                return .failure(.bridgeMutationFailed("applyLayerMask"))
             }
-            store.snapshot.layers[index].pixelData = output
+            let before = store.snapshot
+            store.snapshot.layers[index].pixelData = maskedPixels
             store.snapshot.layers[index].maskData = nil
             invalidateThumbnail(for: index)
             recordMutation(
@@ -368,23 +424,19 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let processed = SwiftDocumentLayerProcessing.apply(
-            request,
-            to: store.snapshot.layers[index].pixelData,
+        guard let payload = PrimoMetalDocumentProcessingClient.shared.processLayer(
+            pixelData: store.snapshot.layers[index].pixelData,
             canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight
+            canvasHeight: store.snapshot.canvasHeight,
+            request: request
         ) else {
             return .failure(.bridgeMutationFailed("applyLayerProcessing"))
         }
-        let before = store.snapshot
-        store.snapshot.layers[index].pixelData = preserveExistingAlphaIfNeeded(
-            processed,
-            existing: store.snapshot.layers[index].pixelData,
-            isAlphaLocked: store.snapshot.layers[index].alphaLocked
+        return applyLayerMutationPayload(
+            index: index,
+            payload: payload,
+            timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData)
         )
-        invalidateThumbnail(for: index)
-        recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: store.snapshot.layers[index].pixelData))
-        return .success(())
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
@@ -546,11 +598,25 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard index > 0 else { return .failure(.invalidLayerIndex(index)) }
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
         guard validateEditableLayer(index - 1) == nil else { return .failure(validateEditableLayer(index - 1)!) }
-        guard let merged = mergedLayerDownPixelData(upperIndex: index, lowerIndex: index - 1) else {
+        let upper = store.snapshot.layers[index]
+        let lower = store.snapshot.layers[index - 1]
+        guard let merged = PrimoMetalDocumentProcessingClient.shared.mergeLayers(
+            lowerPixelData: lower.pixelData,
+            upperPixelData: upper.pixelData,
+            upperMaskData: upper.maskData,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            upperOpacity: Float(upper.opacity),
+            upperBlendMode: upper.blendMode
+        ) else {
             return .failure(.bridgeMutationFailed("mergeLayerDown"))
         }
         let before = store.snapshot
-        store.snapshot.layers[index - 1].pixelData = merged
+        store.snapshot.layers[index - 1].pixelData = preserveExistingAlphaIfNeeded(
+            merged,
+            existing: lower.pixelData,
+            isAlphaLocked: lower.alphaLocked
+        )
         store.snapshot.layers[index - 1].textLayer = nil
         _ = deleteLayer(index: index)
         invalidateThumbnail(for: index - 1)
@@ -568,15 +634,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.emptyInput)
         }
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let rasterized = DocumentTextRasterizer.rasterizedPixelData(for: textLayer, canvasSize: canvasSize) else {
+        guard let payload = PrimoMetalDocumentProcessingClient.shared.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
             return .failure(.bridgeMutationFailed("setTextLayer"))
         }
-        let before = store.snapshot
-        store.snapshot.layers[index].textLayer = textLayer
-        store.snapshot.layers[index].pixelData = rasterized
-        invalidateThumbnail(for: index)
-        recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: rasterized))
-        return .success(())
+        return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
     }
 
     func clearTextLayerData(index: Int) {
@@ -612,12 +673,24 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             brush: brush,
             samples: (currentBlurStroke?.samples ?? []) + samples
         )
-        guard let blurred = blurPixelData(layerIndex: layerIndex, samples: samples, brush: brush) else {
+        guard let payload = PrimoMetalDocumentProcessingClient.shared.blurPixels(
+            pixelData: store.snapshot.layers[layerIndex].pixelData,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            samples: samples,
+            brush: brush
+        ) else {
             return .failure(.bridgeMutationFailed("blurStroke"))
         }
-        store.snapshot.layers[layerIndex].pixelData = blurred
+        let current = store.snapshot.layers[layerIndex].pixelData
+        store.snapshot.layers[layerIndex].pixelData = preserveExistingAlphaIfNeeded(
+            materializedPixelData(from: payload, existing: current),
+            existing: current,
+            isAlphaLocked: store.snapshot.layers[layerIndex].alphaLocked
+        )
+        store.snapshot.layers[layerIndex].textLayer = nil
         invalidateThumbnail(for: layerIndex)
-        captureDirtyUpdate()
+        captureDirtyUpdate(rect: payload.dirtyRect)
         if captureTimelapse {
             captureTimelapseFrame()
         }
@@ -645,17 +718,20 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
         let layerIndex = store.snapshot.activeLayerIndex
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
-        guard let filled = fillPixelData(layerIndex: layerIndex, sample: sample, brush: brush) else {
+        guard let payload = PrimoMetalDocumentProcessingClient.shared.fillPixels(
+            pixelData: store.snapshot.layers[layerIndex].pixelData,
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            sample: sample,
+            brush: brush
+        ) else {
             return .failure(.bridgeMutationFailed("fill"))
         }
-        let before = store.snapshot
-        store.snapshot.layers[layerIndex].pixelData = filled
-        invalidateThumbnail(for: layerIndex)
-        recordMutation(
-            before: before,
+        return applyLayerMutationPayload(
+            index: layerIndex,
+            payload: payload,
             timelapseEvent: .fill(layerIndex: .unchecked(layerIndex), brush: brush, sample: sample)
         )
-        return .success(())
     }
 
     func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
@@ -909,6 +985,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 timelapseUsesOperationPersistence: !timelapseEvents.isEmpty
             )
         )
+        runtime.thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         return runtime
     }
 
@@ -927,6 +1004,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             uuidClient: services.ids
         )
         store.restore(newRuntime.store.snapshot)
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         undoStack.removeAll(keepingCapacity: true)
         redoStack.removeAll(keepingCapacity: true)
         currentStroke = nil
@@ -935,16 +1013,30 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func compositePNGData(paperStyle: CanvasPaperStyle) -> Data? {
-        guard let image = renderedCompositeImage(paperStyle: paperStyle) else { return nil }
-        return DocumentImageCodec.pngData(from: image)
+        compositeExportSurface(paperStyle: paperStyle).flatMap(DocumentRasterImageService.pngData(from:))
+    }
+
+    func compositeExportSurface(paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+        let surface = compositeSurface()
+        guard let pixelData = PrimoMetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+            pixelData: surface.pixelData,
+            width: surface.width,
+            height: surface.height,
+            paperStyle: paperStyle
+        ) else {
+            return nil
+        }
+        return DocumentCompositeSurface(width: surface.width, height: surface.height, pixelData: pixelData)
     }
 
     func timelapseCapture() -> TimelapseCapture? {
-        let preview = makeTimelapseThumbnail().flatMap { DocumentImageCodec.jpegData(from: $0) }
+        let previewSurface = makeTimelapseThumbnailSurface()
+        let preview = previewSurface.flatMap { DocumentRasterImageService.jpegData(from: $0) }
         if store.snapshot.timelapseUsesOperationPersistence, !store.snapshot.timelapseEvents.isEmpty {
             return TimelapseCapture(
                 canvasSize: canvasSize,
                 paperStyle: store.snapshot.paperStyle,
+                previewSurface: previewSurface,
                 previewImageData: preview,
                 source: .operations(store.snapshot.timelapseEvents),
                 framesPerSecond: 24
@@ -954,14 +1046,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return TimelapseCapture(
             canvasSize: canvasSize,
             paperStyle: store.snapshot.paperStyle,
+            previewSurface: previewSurface,
             previewImageData: preview,
             source: .frames(store.snapshot.timelapseFrames),
             framesPerSecond: 24
         )
     }
 
-    func timelapseCompositeImage() -> CGImage? {
-        renderedCompositeImage(paperStyle: store.snapshot.paperStyle)
+    func timelapseCompositeSurface() -> DocumentCompositeSurface? {
+        compositeExportSurface(paperStyle: store.snapshot.paperStyle)
     }
 
     func replayTimelapseOperation(_ operation: TimelapseOperation, folderIDMap: inout [DocumentFolderID: Int]) {
@@ -1058,6 +1151,78 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
+    private func applyLayerMutationPayload(
+        index: Int,
+        payload: DocumentLayerMutationPayload,
+        timelapseEvent: TimelapseOperation?
+    ) -> DocumentMutationResult {
+        guard payload.canvasWidth == store.snapshot.canvasWidth,
+              payload.canvasHeight == store.snapshot.canvasHeight else {
+            return .failure(.bridgeMutationFailed("applyLayerMutation"))
+        }
+        let before = store.snapshot
+        let existing = store.snapshot.layers[index].pixelData
+        let materialized = materializedPixelData(from: payload, existing: existing)
+        let adjusted = preserveExistingAlphaIfNeeded(
+            materialized,
+            existing: existing,
+            isAlphaLocked: store.snapshot.layers[index].alphaLocked
+        )
+        store.snapshot.layers[index].pixelData = adjusted
+        store.snapshot.layers[index].textLayer = nil
+        invalidateThumbnail(for: index)
+        recordMutation(before: before, timelapseEvent: timelapseEvent, dirtyRect: payload.dirtyRect)
+        return .success(())
+    }
+
+    private func applyTextLayerMutationPayload(
+        index: Int,
+        textLayer: TextLayerData,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        guard payload.canvasWidth == store.snapshot.canvasWidth,
+              payload.canvasHeight == store.snapshot.canvasHeight else {
+            return .failure(.bridgeMutationFailed("applyTextLayerMutation"))
+        }
+        let before = store.snapshot
+        store.snapshot.layers[index].pixelData = materializedPixelData(
+            from: payload,
+            existing: store.snapshot.layers[index].pixelData
+        )
+        store.snapshot.layers[index].textLayer = textLayer
+        invalidateThumbnail(for: index)
+        recordMutation(
+            before: before,
+            timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData),
+            dirtyRect: payload.dirtyRect
+        )
+        return .success(())
+    }
+
+    private func materializedPixelData(from payload: DocumentLayerMutationPayload, existing: Data) -> Data {
+        if let fullPixelData = payload.fullPixelData, fullPixelData.count == rgbaByteCount {
+            return fullPixelData
+        }
+        guard payload.rectPixelData.count == payload.dirtyRect.width * payload.dirtyRect.height * 4,
+              existing.count == rgbaByteCount else {
+            return existing
+        }
+        var output = existing
+        output.withUnsafeMutableBytes { destinationBytes in
+            payload.rectPixelData.withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<payload.dirtyRect.height {
+                    let destOffset = (((payload.dirtyRect.originY + row) * store.snapshot.canvasWidth) + payload.dirtyRect.originX) * 4
+                    let srcOffset = row * payload.dirtyRect.width * 4
+                    memcpy(destination + destOffset, source + srcOffset, payload.dirtyRect.width * 4)
+                }
+            }
+        }
+        return output
+    }
+
     private func recordMutation(
         before: SwiftDocumentStoreSnapshot,
         timelapseEvent: TimelapseOperation?,
@@ -1095,45 +1260,21 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
     }
 
-    private func compositePixelDataForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> Data {
+    private func compositeSurfaceForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> DocumentCompositeSurface {
         let metalSnapshot = makeMetalSnapshot(for: snapshot, includeCompositePixelData: false)
-        if let gpuComposite = PrimoMetalDocumentProcessingClient.shared.compositedPixelData(
-            snapshot: metalSnapshot,
-            activeLayerIndex: nil,
-            adjustedActiveLayerPixels: nil,
-            dirtyRect: nil
-        ) {
+        if let gpuComposite = PrimoMetalDocumentProcessingClient.shared.compositeDocumentSurface(snapshot: metalSnapshot) {
             return gpuComposite
         }
-        var composite = Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
-        var clipMask = [CGFloat](repeating: 0, count: snapshot.canvasWidth * snapshot.canvasHeight)
-        let folderVisibility = Dictionary(uniqueKeysWithValues: snapshot.folders.map { ($0.id, $0.visible) })
-        composite.withUnsafeMutableBytes { destinationBytes in
-            guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            for layer in snapshot.layers.enumerated().map({ (index: $0.offset, layer: $0.element) })
-                .filter({ $0.layer.visible && ($0.layer.folderID == nil || (folderVisibility[$0.layer.folderID!] ?? true)) }) {
-                layer.layer.pixelData.withUnsafeBytes { sourceBytes in
-                    guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                    for pixelIndex in 0..<(snapshot.canvasWidth * snapshot.canvasHeight) {
-                        let offset = pixelIndex * 4
-                        let baseAlpha = (CGFloat(source[offset + 3]) / 255.0) * CGFloat(layer.layer.opacity)
-                        let effectiveOpacity = layer.layer.clipped
-                            ? CGFloat(layer.layer.opacity) * clipMask[pixelIndex]
-                            : CGFloat(layer.layer.opacity)
-                        if !layer.layer.clipped {
-                            clipMask[pixelIndex] = baseAlpha
-                        }
-                        DocumentPreviewComposite.blendPreviewPixel(
-                            destination: destination + offset,
-                            source: source + offset,
-                            opacity: effectiveOpacity,
-                            blendMode: layer.layer.blendMode
-                        )
-                    }
-                }
-            }
-        }
-        return composite
+        Self.logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
+        return DocumentCompositeSurface(
+            width: snapshot.canvasWidth,
+            height: snapshot.canvasHeight,
+            pixelData: Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
+        )
+    }
+
+    private func compositePixelDataForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> Data {
+        compositeSurfaceForSnapshot(snapshot).pixelData
     }
 
     private func crop(pixelData: Data, width: Int, rect: LayerPixelRect) -> Data {
@@ -1155,13 +1296,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func makeRenderSnapshot() -> MetalDocumentSnapshot? {
-        let composite = compositePixelData()
+        let composite = compositeSurface()
         let baseSnapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
         return MetalDocumentSnapshot(
             width: baseSnapshot.width,
             height: baseSnapshot.height,
             revision: baseSnapshot.revision,
-            compositePixelData: composite,
+            compositePixelData: composite.pixelData,
             layers: baseSnapshot.layers.enumerated().map { index, layer in
                 MetalLayerSnapshot(
                     index: layer.index,
@@ -1169,7 +1310,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                     visible: layer.visible,
                     isClipped: layer.isClipped,
                     blendMode: layer.blendMode,
-                    thumbnailData: cachedLayerThumbnailData(index: index),
+                    thumbnailSurface: cachedLayerThumbnailSurface(index: index),
+                    thumbnailData: nil,
                     pixelData: layer.pixelData
                 )
             }
@@ -1192,6 +1334,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                     visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
                     isClipped: layer.clipped,
                     blendMode: layer.blendMode,
+                    thumbnailSurface: nil,
                     thumbnailData: nil,
                     pixelData: layer.pixelData
                 )
@@ -1261,28 +1404,40 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return rows
     }
 
-    private func cachedLayerThumbnailData(index: Int) -> Data? {
-        if let cached = store.snapshot.thumbnailCache[index] {
+    private func cachedLayerThumbnailSurface(index: Int) -> DocumentCompositeSurface? {
+        if let cached = thumbnailSurfaceCache[index] {
             return cached
         }
-        guard let image = cgImage(from: store.snapshot.layers[index].pixelData, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight) else {
-            return nil
-        }
+        guard store.snapshot.layers.indices.contains(index) else { return nil }
         let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 96)
-        guard let thumbnail = DocumentImageCodec.scaledImage(image, to: targetSize),
-              let data = DocumentImageCodec.pngData(from: thumbnail) else {
+        let targetWidth = max(Int(targetSize.width.rounded()), 1)
+        let targetHeight = max(Int(targetSize.height.rounded()), 1)
+        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+            store.snapshot.layers[index].pixelData,
+            sourceWidth: store.snapshot.canvasWidth,
+            sourceHeight: store.snapshot.canvasHeight,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        ) else {
             return nil
         }
-        store.snapshot.thumbnailCache[index] = data
-        return data
+        let surface = DocumentCompositeSurface(
+            width: targetWidth,
+            height: targetHeight,
+            pixelData: scaled
+        )
+        thumbnailSurfaceCache[index] = surface
+        return surface
     }
 
     private func invalidateThumbnail(for index: Int) {
         store.snapshot.thumbnailCache[index] = nil
+        thumbnailSurfaceCache[index] = nil
     }
 
     private func invalidateAllThumbnails() {
         store.snapshot.thumbnailCache.removeAll(keepingCapacity: true)
+        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
     }
 
     private func timelapseFrameSize(for canvasSize: CGSize, maxDimension: CGFloat) -> CGSize {
@@ -1293,21 +1448,28 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return CGSize(width: max(2, Int((canvasSize.width * scale).rounded())), height: max(2, Int((canvasSize.height * scale).rounded())))
     }
 
-    private func renderedCompositeImage(paperStyle: CanvasPaperStyle) -> CGImage? {
-        guard let base = cgImage(from: compositePixelData(), width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight) else {
+    private func makeTimelapseThumbnailSurface() -> DocumentCompositeSurface? {
+        guard let source = timelapseCompositeSurface() else { return nil }
+        let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 512)
+        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+            source.pixelData,
+            sourceWidth: source.width,
+            sourceHeight: source.height,
+            targetWidth: max(Int(targetSize.width.rounded()), 1),
+            targetHeight: max(Int(targetSize.height.rounded()), 1)
+        ) else {
             return nil
         }
-        return DocumentImageCodec.compositedImage(base: base, canvasSize: canvasSize, paperStyle: paperStyle)
-    }
-
-    private func makeTimelapseThumbnail() -> CGImage? {
-        guard let source = renderedCompositeImage(paperStyle: store.snapshot.paperStyle) else { return nil }
-        let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 512)
-        return DocumentImageCodec.scaledImage(source, to: targetSize)
+        return DocumentCompositeSurface(
+            width: max(Int(targetSize.width.rounded()), 1),
+            height: max(Int(targetSize.height.rounded()), 1),
+            pixelData: scaled
+        )
     }
 
     private func captureTimelapseFrame() {
-        guard let source = makeTimelapseThumbnail(), let jpegData = DocumentImageCodec.jpegData(from: source) else { return }
+        guard let source = makeTimelapseThumbnailSurface(),
+              let jpegData = DocumentRasterImageService.jpegData(from: source) else { return }
         let frameURL = services.timelapse.frameStore.makeFrameURL(
             in: services.timelapse.frameStore.makeDirectoryURL(),
             frameID: store.snapshot.timelapseFrames.count
@@ -1321,7 +1483,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
     }
 
-    private func cgImage(from pixelData: Data, width: Int, height: Int) -> CGImage? {
+    // Legacy helper retained for deprecated replay/export conveniences.
+    func cgImage(from pixelData: Data, width: Int, height: Int) -> CGImage? {
         guard pixelData.count == width * height * 4 else { return nil }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
@@ -1337,154 +1500,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             decode: nil,
             shouldInterpolate: false,
             intent: .defaultIntent
-        )
-    }
-
-    private func blurPixelData(layerIndex: Int, samples: [StylusSample], brush: BrushRuntimeSettings) -> Data? {
-        let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
-        let original = [UInt8](store.snapshot.layers[layerIndex].pixelData)
-        guard let blurred = services.stroke.blur.boxBlurredPixels(from: original, size: size, radius: max(brush.radius * 0.75, 3.0)) else {
-            return nil
-        }
-        let blended = services.stroke.blur.blendBlurredPixels(
-            original: original,
-            blurred: blurred,
-            size: size,
-            samples: samples,
-            brush: brush
-        )
-        return Data(blended)
-    }
-
-    private func fillPixelData(layerIndex: Int, sample: StylusSample, brush: BrushRuntimeSettings) -> Data? {
-        let width = store.snapshot.canvasWidth
-        let height = store.snapshot.canvasHeight
-        let x = Int(sample.point.x.rounded())
-        let y = Int(sample.point.y.rounded())
-        guard x >= 0, x < width, y >= 0, y < height else { return store.snapshot.layers[layerIndex].pixelData }
-        var output = [UInt8](store.snapshot.layers[layerIndex].pixelData)
-        let original = output
-        let startOffset = ((y * width) + x) * 4
-        let seed = (r: original[startOffset], g: original[startOffset + 1], b: original[startOffset + 2], a: original[startOffset + 3])
-        let target = (r: brush.red, g: brush.green, b: brush.blue, a: UInt8(max(0, min(255, Int((brush.opacity * 255).rounded())))))
-        if seed == target { return Data(output) }
-
-        var visited = [UInt8](repeating: 0, count: width * height)
-        var queue: [(Int, Int)] = [(x, y)]
-        var cursor = 0
-        visited[y * width + x] = 1
-
-        while cursor < queue.count {
-            let (currentX, currentY) = queue[cursor]
-            cursor += 1
-            let offset = ((currentY * width) + currentX) * 4
-            if !matchesFillSeed(seed: seed, pixelOffset: offset, pixels: original, brush: brush) {
-                continue
-            }
-            output[offset] = target.r
-            output[offset + 1] = target.g
-            output[offset + 2] = target.b
-            output[offset + 3] = target.a
-
-            let neighbors = [(currentX - 1, currentY), (currentX + 1, currentY), (currentX, currentY - 1), (currentX, currentY + 1)]
-            for (neighborX, neighborY) in neighbors where neighborX >= 0 && neighborX < width && neighborY >= 0 && neighborY < height {
-                let neighborIndex = neighborY * width + neighborX
-                guard visited[neighborIndex] == 0 else { continue }
-                visited[neighborIndex] = 1
-                queue.append((neighborX, neighborY))
-            }
-        }
-
-        if brush.fillExpansion > 0 {
-            for _ in 0..<brush.fillExpansion {
-                let snapshot = output
-                for pixelY in 1..<(height - 1) {
-                    for pixelX in 1..<(width - 1) {
-                        let offset = ((pixelY * width) + pixelX) * 4
-                        if snapshot[offset] == target.r && snapshot[offset + 1] == target.g && snapshot[offset + 2] == target.b && snapshot[offset + 3] == target.a {
-                            continue
-                        }
-                        let neighbors = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-                        if neighbors.contains(where: { delta in
-                            let neighborOffset = (((pixelY + delta.1) * width) + (pixelX + delta.0)) * 4
-                            return snapshot[neighborOffset] == target.r &&
-                                snapshot[neighborOffset + 1] == target.g &&
-                                snapshot[neighborOffset + 2] == target.b &&
-                                snapshot[neighborOffset + 3] == target.a
-                        }) {
-                            output[offset] = target.r
-                            output[offset + 1] = target.g
-                            output[offset + 2] = target.b
-                            output[offset + 3] = target.a
-                        }
-                    }
-                }
-            }
-        }
-
-        let result = Data(output)
-        return preserveExistingAlphaIfNeeded(
-            result,
-            existing: store.snapshot.layers[layerIndex].pixelData,
-            isAlphaLocked: store.snapshot.layers[layerIndex].alphaLocked
-        )
-    }
-
-    private func matchesFillSeed(seed: (r: UInt8, g: UInt8, b: UInt8, a: UInt8), pixelOffset: Int, pixels: [UInt8], brush: BrushRuntimeSettings) -> Bool {
-        switch brush.fillThresholdMode {
-        case .opacity:
-            let alphaDistance = abs(Int(seed.a) - Int(pixels[pixelOffset + 3]))
-            let tolerance = Int((max(0, min(1, brush.fillOpacityTolerance)) * 255.0).rounded())
-            return alphaDistance <= tolerance
-        case .color:
-            let dr = Double(Int(seed.r) - Int(pixels[pixelOffset]))
-            let dg = Double(Int(seed.g) - Int(pixels[pixelOffset + 1]))
-            let db = Double(Int(seed.b) - Int(pixels[pixelOffset + 2]))
-            let distance = sqrt((dr * dr) + (dg * dg) + (db * db)) / 441.67295593
-            return distance <= max(0, min(1, brush.fillColorTolerance))
-        }
-    }
-
-    private func mergedLayerDownPixelData(upperIndex: Int, lowerIndex: Int) -> Data? {
-        let upper = store.snapshot.layers[upperIndex]
-        let lower = store.snapshot.layers[lowerIndex]
-        var maskedUpper = upper.pixelData
-        if let mask = upper.maskData, mask.count * 4 == upper.pixelData.count {
-            maskedUpper.withUnsafeMutableBytes { upperBytes in
-                mask.withUnsafeBytes { maskBytes in
-                    guard let upperBase = upperBytes.bindMemory(to: UInt8.self).baseAddress,
-                          let maskBase = maskBytes.bindMemory(to: UInt8.self).baseAddress
-                    else { return }
-                    for pixelIndex in 0..<mask.count {
-                        let alphaOffset = pixelIndex * 4 + 3
-                        upperBase[alphaOffset] = UInt8((Int(upperBase[alphaOffset]) * Int(maskBase[pixelIndex])) / 255)
-                    }
-                }
-            }
-        }
-
-        var output = lower.pixelData
-        let outputCount = output.count
-        output.withUnsafeMutableBytes { outputBytes in
-            maskedUpper.withUnsafeBytes { upperBytes in
-                guard let dst = outputBytes.bindMemory(to: UInt8.self).baseAddress,
-                      let src = upperBytes.bindMemory(to: UInt8.self).baseAddress
-                else { return }
-                for offset in stride(from: 0, to: outputCount, by: 4) {
-                    DocumentPreviewComposite.blendPreviewPixel(
-                        destination: dst + offset,
-                        source: src + offset,
-                        opacity: CGFloat(upper.opacity),
-                        blendMode: upper.blendMode
-                    )
-                }
-            }
-        }
-
-        return preserveExistingAlphaIfNeeded(
-            output,
-            existing: lower.pixelData,
-            isAlphaLocked: lower.alphaLocked
         )
     }
 

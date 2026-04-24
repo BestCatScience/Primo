@@ -28,15 +28,19 @@ public enum DocumentWorkspaceCatalogError: LocalizedError, Equatable, OperationF
 public struct DocumentWorkspacePreview: Equatable, Sendable {
     public let canvasSize: CGSize
     public let layerCount: Int
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public let previewImageData: Data?
 
     public init(
         canvasSize: CGSize,
         layerCount: Int,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?
     ) {
         self.canvasSize = canvasSize
         self.layerCount = layerCount
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 }
@@ -199,6 +203,7 @@ private struct DocumentWorkspaceStorage: Sendable {
                     modifiedAt: try contentModificationDate(for: projectURL),
                     canvasSize: preview.canvasSize,
                     layerCount: preview.layerCount,
+                    previewSurface: preview.previewSurface,
                     previewImageData: preview.previewImageData
                 )
             )
@@ -268,6 +273,7 @@ private struct DocumentWorkspaceStorage: Sendable {
                 sourceProjectURL: metadata.sourceProjectPath.map { DocumentProjectPath(URL(fileURLWithPath: $0)) },
                 autosaveProjectURL: DocumentProjectPath(projectURL),
                 updatedAt: metadata.updatedAt,
+                previewSurface: preview.previewSurface,
                 previewImageData: preview.previewImageData
             )
         }
@@ -350,6 +356,7 @@ private struct DocumentWorkspaceStorage: Sendable {
                 projectURL: DocumentProjectPath(projectURL),
                 createdAt: metadata.createdAt,
                 trigger: metadata.trigger,
+                previewSurface: preview.previewSurface,
                 previewImageData: preview.previewImageData
             )
         }

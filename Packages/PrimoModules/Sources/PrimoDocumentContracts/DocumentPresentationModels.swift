@@ -114,6 +114,8 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
     public let visible: Bool
     public let isClipped: Bool
     public let blendMode: LayerBlendMode
+    public let thumbnailSurface: DocumentCompositeSurface?
+    /// Legacy thumbnail bytes retained for fallback UI and persisted snapshots.
     public let thumbnailData: Data?
     public let pixelData: Data
 
@@ -123,6 +125,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         visible: Bool,
         isClipped: Bool,
         blendMode: LayerBlendMode,
+        thumbnailSurface: DocumentCompositeSurface? = nil,
         thumbnailData: Data?,
         pixelData: Data
     ) {
@@ -131,6 +134,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         self.visible = visible
         self.isClipped = isClipped
         self.blendMode = blendMode
+        self.thumbnailSurface = thumbnailSurface
         self.thumbnailData = thumbnailData
         self.pixelData = pixelData
     }
@@ -218,6 +222,30 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
         self.layerRows = layerRows
         self.layerSidebarRows = layerSidebarRows
         self.renderSnapshot = renderSnapshot
+    }
+}
+
+public typealias DocumentCompositeSurface = PrimoDocumentDomain.DocumentCompositeSurface
+
+public struct DocumentLayerMutationPayload: Equatable, Sendable {
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let dirtyRect: LayerPixelRect
+    public let rectPixelData: Data
+    public let fullPixelData: Data?
+
+    public init(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        rectPixelData: Data,
+        fullPixelData: Data? = nil
+    ) {
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.dirtyRect = dirtyRect
+        self.rectPixelData = rectPixelData
+        self.fullPixelData = fullPixelData
     }
 }
 

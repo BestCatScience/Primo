@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceApplication
@@ -15,6 +16,7 @@ struct ShareExport: Equatable, Identifiable {
 
 struct TimelapseExportPreview: Equatable {
     var progress: Double
+    var previewSurface: DocumentCompositeSurface?
     var previewImageData: Data?
 }
 

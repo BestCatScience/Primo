@@ -1,5 +1,7 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
+import PrimoDocumentContracts
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest
@@ -11,8 +13,16 @@ final class AppFeatureReducerTests: XCTestCase {
         .deletingLastPathComponent()
         .deletingLastPathComponent()
 
+    private func previewSurface() -> DocumentCompositeSurface {
+        DocumentCompositeSurface(
+            width: 1,
+            height: 1,
+            pixelData: Data([0x01, 0x02, 0x03, 0xFF])
+        )
+    }
+
     func testHomeReturnRequestedEmitsWorkspacePersistenceRequest() async {
-        let previewData = Data([0x01, 0x02, 0x03])
+        let previewData = DocumentRasterImageService.pngData(from: previewSurface())
         let activeTab = OpenDocumentTab.testValue()
         let refreshedTab = OpenDocumentTab.testValue(previewImageData: previewData)
         let store = TestStore(
@@ -29,7 +39,7 @@ final class AppFeatureReducerTests: XCTestCase {
         } withDependencies: {
             $0.documentRuntimeComposition = .stub(
                 exportGateway: .stub(
-                    compositePNGData: { _ in previewData }
+                    compositeSurface: { _ in self.previewSurface() }
                 )
             )
             $0.documentWorkspaceClient = .stub()
@@ -53,7 +63,7 @@ final class AppFeatureReducerTests: XCTestCase {
     }
 
     func testPendingCloseSaveConfirmedEmitsClosePersistenceRequest() async {
-        let previewData = Data([0x0A])
+        let previewData = DocumentRasterImageService.pngData(from: previewSurface())
         let activeTab = OpenDocumentTab.testValue()
         let refreshedTab = OpenDocumentTab.testValue(previewImageData: previewData)
         let store = TestStore(
@@ -75,7 +85,7 @@ final class AppFeatureReducerTests: XCTestCase {
         } withDependencies: {
             $0.documentRuntimeComposition = .stub(
                 exportGateway: .stub(
-                    compositePNGData: { _ in previewData }
+                    compositeSurface: { _ in self.previewSurface() }
                 )
             )
             $0.documentWorkspaceClient = .stub()

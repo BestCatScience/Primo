@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentContracts
 import Testing
 
 struct DocumentRasterImageServiceTests {
@@ -28,6 +29,27 @@ struct DocumentRasterImageServiceTests {
         )
 
         #expect(roundTripped.count == pixelData.count)
+    }
+
+    @Test
+    func decodedImageFromEncodedDataMatchesOriginalDimensions() throws {
+        let surface = DocumentCompositeSurface(
+            width: 2,
+            height: 1,
+            pixelData: Data([
+                255, 0, 0, 255,
+                0, 255, 0, 255,
+            ])
+        )
+
+        let pngData = try #require(DocumentRasterImageService.pngData(from: surface))
+        let decoded = try #require(
+            DocumentRasterImageService.decodedImage(fromEncodedData: pngData)
+        )
+
+        #expect(decoded.width == 2)
+        #expect(decoded.height == 1)
+        #expect(decoded.pixelData.count == surface.pixelData.count)
     }
 
     @Test

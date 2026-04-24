@@ -34,6 +34,8 @@ struct DocumentContentServiceTests {
                     return .failure(.emptyInput)
                 },
                 replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerMutation: { _, _ in .success(()) },
+                applyTextLayerMutation: { _, _, _ in .success(()) },
                 replaceLayerMask: { _, _ in .success(()) },
                 clearLayerMask: { _ in .success(()) },
                 applyLayerMask: { _ in .success(()) },
@@ -78,6 +80,8 @@ struct DocumentContentServiceTests {
                 revealLayerForEditing: { _ in .success(()) },
                 replaceLayerPixels: { _, _ in .success(()) },
                 replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerMutation: { _, _ in .success(()) },
+                applyTextLayerMutation: { _, _, _ in .success(()) },
                 replaceLayerMask: { _, _ in .success(()) },
                 clearLayerMask: { _ in .success(()) },
                 applyLayerMask: { _ in .success(()) },
@@ -141,6 +145,7 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
         lightweightPresentation: { presentation },
         presentation: { presentation },
         compositePixelData: { Data() },
+        compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
         pixelDataForLayer: { _ in Data() },
         consumeDirtyUpdate: { nil }
     )

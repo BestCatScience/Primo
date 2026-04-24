@@ -1,19 +1,58 @@
+import PrimoDocumentContracts
+import PrimoDocumentApplication
 import PrimoDocumentDomain
+import PrimoDocumentMetalRuntimeInfrastructure
 import SwiftUI
 import UIKit
 
+struct SurfacePreviewView: UIViewRepresentable {
+    let surface: DocumentCompositeSurface?
+    var opacity: CGFloat = 1.0
+    var filtering: PrimoMetalSurfaceFiltering = .linear
+
+    func makeUIView(context: Context) -> CanvasPixelSurfaceView {
+        CanvasPixelSurfaceView()
+    }
+
+    func updateUIView(_ uiView: CanvasPixelSurfaceView, context: Context) {
+        uiView.update(surface: surface, opacity: opacity, filtering: filtering)
+    }
+}
+
+enum StoredSurfaceAdapter {
+    static func surface(from encodedImageData: Data?) -> DocumentCompositeSurface? {
+        guard
+            let encodedImageData,
+            let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: encodedImageData)
+        else {
+            return nil
+        }
+        return DocumentCompositeSurface(
+            width: decoded.width,
+            height: decoded.height,
+            pixelData: decoded.pixelData
+        )
+    }
+}
+
 struct TimelapseExportHUD: View {
+    let previewSurface: DocumentCompositeSurface?
     let previewImageData: Data?
     let progress: Double
     let language: AppLanguage
 
     var body: some View {
         VStack(spacing: 12) {
-            if let image = previewImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.medium)
-                    .scaledToFit()
+            if let previewSurface {
+                SurfacePreviewView(surface: previewSurface)
+                    .frame(width: 220, height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            } else if let fallbackSurface = StoredSurfaceAdapter.surface(from: previewImageData) {
+                SurfacePreviewView(surface: fallbackSurface)
                     .frame(width: 220, height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
@@ -48,14 +87,10 @@ struct TimelapseExportHUD: View {
         .shadow(color: .black.opacity(0.3), radius: 24, y: 16)
         .allowsHitTesting(false)
     }
-
-    private var previewImage: UIImage? {
-        guard let previewImageData else { return nil }
-        return UIImage(data: previewImageData)
-    }
 }
 
 struct NanoBananaProgressHUD: View {
+    let previewSurface: DocumentCompositeSurface?
     let previewImageData: Data?
     let progress: Double
     let language: AppLanguage
@@ -63,11 +98,16 @@ struct NanoBananaProgressHUD: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            if let image = previewImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.medium)
-                    .scaledToFit()
+            if let previewSurface {
+                SurfacePreviewView(surface: previewSurface)
+                    .frame(width: 220, height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            } else if let fallbackSurface = StoredSurfaceAdapter.surface(from: previewImageData) {
+                SurfacePreviewView(surface: fallbackSurface)
                     .frame(width: 220, height: 220)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay(
@@ -117,11 +157,6 @@ struct NanoBananaProgressHUD: View {
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.3), radius: 24, y: 16)
-    }
-
-    private var previewImage: UIImage? {
-        guard let previewImageData else { return nil }
-        return UIImage(data: previewImageData)
     }
 }
 
@@ -278,7 +313,7 @@ struct AutosaveRecoverySheet: View {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 12) {
-                            preview(item.previewImageData, symbol: "clock.arrow.circlepath")
+                            preview(item.previewSurface, item.previewImageData, symbol: "clock.arrow.circlepath")
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)
                                     .font(.headline)
@@ -315,12 +350,12 @@ struct AutosaveRecoverySheet: View {
         }
     }
 
-    private func preview(_ data: Data?, symbol: String) -> some View {
+    private func preview(_ surface: DocumentCompositeSurface?, _ data: Data?, symbol: String) -> some View {
         Group {
-            if let data, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
+            if let surface {
+                SurfacePreviewView(surface: surface)
+            } else if let surface = StoredSurfaceAdapter.surface(from: data) {
+                SurfacePreviewView(surface: surface)
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.black.opacity(0.08))
@@ -361,7 +396,7 @@ struct SaveHistorySheet: View {
                     ForEach(entries) { entry in
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(spacing: 12) {
-                                preview(entry.previewImageData, symbol: "clock.arrow.circlepath")
+                                preview(entry.previewSurface, entry.previewImageData, symbol: "clock.arrow.circlepath")
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.trigger.title(language))
                                         .font(.headline)
@@ -399,12 +434,12 @@ struct SaveHistorySheet: View {
         }
     }
 
-    private func preview(_ data: Data?, symbol: String) -> some View {
+    private func preview(_ surface: DocumentCompositeSurface?, _ data: Data?, symbol: String) -> some View {
         Group {
-            if let data, let image = UIImage(data: data) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
+            if let surface {
+                SurfacePreviewView(surface: surface)
+            } else if let surface = StoredSurfaceAdapter.surface(from: data) {
+                SurfacePreviewView(surface: surface)
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.black.opacity(0.08))
@@ -954,11 +989,8 @@ extension ContentView {
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 Group {
-                    if let data = project.previewImageData, let image = UIImage(data: data) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .interpolation(.medium)
-                            .scaledToFit()
+                    if let surface = project.previewSurface ?? StoredSurfaceAdapter.surface(from: project.previewImageData) {
+                        SurfacePreviewView(surface: surface)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color.white)
                     } else {

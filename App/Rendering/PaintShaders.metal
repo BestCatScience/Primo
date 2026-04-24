@@ -60,6 +60,16 @@ fragment float4 layerFragment(VertexOut in [[stage_in]],
     color.rgb *= color.a;
     return color;
 }
+
+fragment float4 nearestLayerFragment(VertexOut in [[stage_in]],
+                                     texture2d<float> layerTexture [[texture(0)]],
+                                     constant MetalQuadUniforms& uniforms [[buffer(0)]]) {
+    constexpr sampler textureSampler(address::clamp_to_edge, filter::nearest);
+    float4 color = layerTexture.sample(textureSampler, in.uv);
+    color.a *= uniforms.opacity;
+    color.rgb *= color.a;
+    return color;
+}
 struct MetalCompositeLayerDescriptor {
     int documentIndex;
     float opacity;
@@ -126,6 +136,91 @@ struct MetalPaperCompositeDescriptor {
     float paperBlue;
     float paperAlpha;
     uint checkerboard;
+};
+
+struct MetalLayerMaskApplyDescriptor {
+    uint width;
+    uint height;
+};
+
+struct MetalLayerProcessingDescriptor {
+    uint width;
+    uint height;
+    uint requestKind;
+    uint gradientStopCount;
+    float param0;
+    float param1;
+    float param2;
+    float param3;
+    float param4;
+    float param5;
+    float param6;
+    float param7;
+    uint selectionWidth;
+    uint selectionHeight;
+    uint hasSelection;
+    uint _padding0;
+};
+
+struct MetalGradientStopDescriptor {
+    float position;
+    float red;
+    float green;
+    float blue;
+};
+
+struct MetalFillDescriptor {
+    uint width;
+    uint height;
+    uint seedX;
+    uint seedY;
+    uint thresholdMode;
+    uint expansion;
+    float tolerance;
+    float seedRed;
+    float seedGreen;
+    float seedBlue;
+    float seedAlpha;
+    float targetRed;
+    float targetGreen;
+    float targetBlue;
+    float targetAlpha;
+};
+
+struct MetalBlurDescriptor {
+    uint width;
+    uint height;
+    uint radius;
+    uint sampleCount;
+    float flow;
+    float hardness;
+    float influenceRadius;
+    float _padding0;
+};
+
+struct MetalTextComposeDescriptor {
+    uint width;
+    uint height;
+    float red;
+    float green;
+    float blue;
+    float alpha;
+};
+
+struct MetalScaleDescriptor {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint targetWidth;
+    uint targetHeight;
+};
+
+struct MetalTranslateDescriptor {
+    uint sourceWidth;
+    uint sourceHeight;
+    uint targetWidth;
+    uint targetHeight;
+    int offsetX;
+    int offsetY;
 };
 
 struct MetalStrokeSampleDescriptor {
@@ -429,6 +524,105 @@ inline float3 blendedPreviewColor(float3 backdrop, float3 source, int blendMode)
         previewBlendChannel(backdrop.g, source.g, blendMode),
         previewBlendChannel(backdrop.b, source.b, blendMode)
     ), float3(0.0), float3(1.0));
+}
+
+inline float3 rgbToHSV(float3 color) {
+    float cMax = max(color.r, max(color.g, color.b));
+    float cMin = min(color.r, min(color.g, color.b));
+    float delta = cMax - cMin;
+    float hue = 0.0;
+    if (delta > 0.0001) {
+        if (cMax == color.r) {
+            hue = fmod(((color.g - color.b) / delta), 6.0);
+        } else if (cMax == color.g) {
+            hue = ((color.b - color.r) / delta) + 2.0;
+        } else {
+            hue = ((color.r - color.g) / delta) + 4.0;
+        }
+        hue /= 6.0;
+        if (hue < 0.0) {
+            hue += 1.0;
+        }
+    }
+    float saturation = cMax <= 0.0001 ? 0.0 : delta / cMax;
+    return float3(hue, saturation, cMax);
+}
+
+inline float3 hsvToRGB(float3 hsv) {
+    float hue = hsv.x * 6.0;
+    float saturation = hsv.y;
+    float value = hsv.z;
+    float c = value * saturation;
+    float x = c * (1.0 - fabs(fmod(hue, 2.0) - 1.0));
+    float m = value - c;
+    float3 rgb;
+    if (hue < 1.0) rgb = float3(c, x, 0.0);
+    else if (hue < 2.0) rgb = float3(x, c, 0.0);
+    else if (hue < 3.0) rgb = float3(0.0, c, x);
+    else if (hue < 4.0) rgb = float3(0.0, x, c);
+    else if (hue < 5.0) rgb = float3(x, 0.0, c);
+    else rgb = float3(c, 0.0, x);
+    return previewClamped(rgb + float3(m));
+}
+
+inline float layerLuminance(float3 color) {
+    return (0.2126 * color.r) + (0.7152 * color.g) + (0.0722 * color.b);
+}
+
+inline float4 sourcePixelRGBA(
+    const device uchar *pixels,
+    uint width,
+    uint height,
+    uint2 gid
+) {
+    if (gid.x >= width || gid.y >= height) {
+        return float4(0.0);
+    }
+    uint offset = ((gid.y * width) + gid.x) * 4u;
+    return float4(
+        float(pixels[offset]) / 255.0,
+        float(pixels[offset + 1u]) / 255.0,
+        float(pixels[offset + 2u]) / 255.0,
+        float(pixels[offset + 3u]) / 255.0
+    );
+}
+
+inline void writePixelRGBA(device uchar *outputPixels, uint width, uint2 gid, float4 color) {
+    uint offset = ((gid.y * width) + gid.x) * 4u;
+    outputPixels[offset] = uchar(clamp(int(round(color.r * 255.0)), 0, 255));
+    outputPixels[offset + 1u] = uchar(clamp(int(round(color.g * 255.0)), 0, 255));
+    outputPixels[offset + 2u] = uchar(clamp(int(round(color.b * 255.0)), 0, 255));
+    outputPixels[offset + 3u] = uchar(clamp(int(round(color.a * 255.0)), 0, 255));
+}
+
+inline float gradientChannel(
+    const device MetalGradientStopDescriptor *stops,
+    uint stopCount,
+    float value,
+    uint channel
+) {
+    if (stopCount == 0u) { return value; }
+    if (stopCount == 1u) {
+        return channel == 0u ? stops[0].red : (channel == 1u ? stops[0].green : stops[0].blue);
+    }
+    float clampedValue = clamp(value, 0.0, 1.0);
+    uint upperIndex = stopCount - 1u;
+    for (uint index = 0u; index < stopCount; ++index) {
+        if (clampedValue <= stops[index].position) {
+            upperIndex = index;
+            break;
+        }
+    }
+    if (upperIndex == 0u) {
+        return channel == 0u ? stops[0].red : (channel == 1u ? stops[0].green : stops[0].blue);
+    }
+    MetalGradientStopDescriptor lower = stops[upperIndex - 1u];
+    MetalGradientStopDescriptor upper = stops[upperIndex];
+    float span = max(upper.position - lower.position, 0.0001);
+    float t = clamp((clampedValue - lower.position) / span, 0.0, 1.0);
+    float lowerValue = channel == 0u ? lower.red : (channel == 1u ? lower.green : lower.blue);
+    float upperValue = channel == 0u ? upper.red : (channel == 1u ? upper.green : upper.blue);
+    return mix(lowerValue, upperValue, t);
 }
 
 inline float strokeClampUnit(float value) {
@@ -1182,6 +1376,433 @@ kernel void paperCompositeKernel(
     outputPixels[offset + 1u] = uchar(clamp(int(round(outGreen * 255.0f)), 0, 255));
     outputPixels[offset + 2u] = uchar(clamp(int(round(outBlue * 255.0f)), 0, 255));
     outputPixels[offset + 3u] = uchar(clamp(int(round(outAlpha * 255.0f)), 0, 255));
+}
+
+kernel void applyLayerMaskKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    const device uchar *maskPixels [[buffer(1)]],
+    device uchar *outputPixels [[buffer(2)]],
+    constant MetalLayerMaskApplyDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    uint pixelIndex = (gid.y * descriptor.width) + gid.x;
+    uint rgbaOffset = pixelIndex * 4u;
+    uint sourceAlpha = uint(sourcePixels[rgbaOffset + 3u]);
+    uint maskAlpha = uint(maskPixels[pixelIndex]);
+    uint outputAlpha = (sourceAlpha * maskAlpha) / 255u;
+
+    outputPixels[rgbaOffset] = sourcePixels[rgbaOffset];
+    outputPixels[rgbaOffset + 1u] = sourcePixels[rgbaOffset + 1u];
+    outputPixels[rgbaOffset + 2u] = sourcePixels[rgbaOffset + 2u];
+    outputPixels[rgbaOffset + 3u] = uchar(outputAlpha);
+}
+
+kernel void layerProcessingKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalLayerProcessingDescriptor& descriptor [[buffer(2)]],
+    const device MetalGradientStopDescriptor *gradientStops [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    float4 source = sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid);
+    if (source.a <= 0.0001) {
+        writePixelRGBA(outputPixels, descriptor.width, gid, source);
+        return;
+    }
+
+    float3 color = source.rgb;
+    switch (descriptor.requestKind) {
+        case 0u: {
+            float luminance = layerLuminance(color);
+            color = float3(
+                gradientChannel(gradientStops, descriptor.gradientStopCount, luminance, 0u),
+                gradientChannel(gradientStops, descriptor.gradientStopCount, luminance, 1u),
+                gradientChannel(gradientStops, descriptor.gradientStopCount, luminance, 2u)
+            );
+            break;
+        }
+        case 1u: {
+            float3 hsv = rgbToHSV(color);
+            hsv.x = fmod(hsv.x + descriptor.param0 + 1.0, 1.0);
+            hsv.y = clamp(hsv.y * descriptor.param1, 0.0, 1.0);
+            hsv.z = clamp(hsv.z + descriptor.param2, 0.0, 1.0);
+            color = hsvToRGB(hsv);
+            break;
+        }
+        case 2u:
+            color = previewClamped((((color - 0.5) * descriptor.param1) + 0.5) + descriptor.param0);
+            break;
+        case 3u: {
+            float inputBlack = descriptor.param0;
+            float inputWhite = max(descriptor.param1, inputBlack + 0.001);
+            float gamma = max(descriptor.param2, 0.01);
+            float outputBlack = descriptor.param3;
+            float outputWhite = max(descriptor.param4, outputBlack);
+            float3 normalized = clamp((color - inputBlack) / max(inputWhite - inputBlack, 0.001), 0.0, 1.0);
+            float3 gammaCorrected = pow(normalized, float3(1.0 / gamma));
+            color = previewClamped(outputBlack + ((outputWhite - outputBlack) * gammaCorrected));
+            break;
+        }
+        case 4u: {
+            float shadows = descriptor.param0;
+            float midtones = descriptor.param1;
+            float highlights = descriptor.param2;
+            float3 shadowWeight = pow(1.0 - color, 2.0);
+            float3 highlightWeight = pow(color, 2.0);
+            float3 midtoneWeight = max(float3(0.0), 1.0 - abs((color * 2.0) - 1.0));
+            float3 offset = (shadows * shadowWeight) + (midtones * midtoneWeight) + (highlights * highlightWeight);
+            color = previewClamped(color + (offset * 0.35));
+            break;
+        }
+        case 5u:
+            color = previewClamped(color + float3(descriptor.param0, descriptor.param1, descriptor.param2));
+            break;
+        case 6u: {
+            float mapped = layerLuminance(color) >= descriptor.param0 ? 1.0 : 0.0;
+            color = float3(mapped);
+            break;
+        }
+        case 7u: {
+            float levels = max(round(descriptor.param0), 2.0);
+            float denominator = max(levels - 1.0, 1.0);
+            color = round(color * denominator) / denominator;
+            break;
+        }
+        default:
+            break;
+    }
+
+    writePixelRGBA(outputPixels, descriptor.width, gid, float4(previewClamped(color), source.a));
+}
+
+kernel void layerTransformKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    const device uchar *selectionMask [[buffer(1)]],
+    device uchar *outputPixels [[buffer(2)]],
+    constant MetalLayerProcessingDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+
+    float2 pivot = float2(descriptor.param3, descriptor.param4);
+    float2 translation = float2(descriptor.param0, descriptor.param1);
+    float scale = max(descriptor.param2, 0.001);
+    float rotationRadians = descriptor.param5;
+
+    float4 base = descriptor.hasSelection != 0u
+        ? sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid)
+        : float4(0.0);
+    if (descriptor.hasSelection != 0u && selectionMask[(gid.y * descriptor.selectionWidth) + gid.x] > 0u) {
+        base = float4(0.0);
+    }
+
+    float2 position = float2(gid) - (pivot + translation);
+    float inverseCos = cos(-rotationRadians);
+    float inverseSin = sin(-rotationRadians);
+    float2 rotated = float2(
+        (position.x * inverseCos) - (position.y * inverseSin),
+        (position.x * inverseSin) + (position.y * inverseCos)
+    ) / scale;
+    float2 sourcePoint = rotated + pivot;
+
+    if (sourcePoint.x >= 0.0 && sourcePoint.y >= 0.0 &&
+        sourcePoint.x < float(descriptor.width) && sourcePoint.y < float(descriptor.height)) {
+        uint2 sample = uint2(uint(sourcePoint.x), uint(sourcePoint.y));
+        if (descriptor.hasSelection == 0u || selectionMask[(sample.y * descriptor.selectionWidth) + sample.x] > 0u) {
+            base = sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, sample);
+        }
+    }
+
+    writePixelRGBA(outputPixels, descriptor.width, gid, base);
+}
+
+kernel void fillEligibilityKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *eligiblePixels [[buffer(1)]],
+    constant MetalFillDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    float4 source = sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid);
+    float matches = 0.0;
+    if (descriptor.thresholdMode == 0u) {
+        matches = fabs(source.a - descriptor.seedAlpha) <= descriptor.tolerance ? 1.0 : 0.0;
+    } else {
+        float distance = length(source.rgb - float3(descriptor.seedRed, descriptor.seedGreen, descriptor.seedBlue)) / 1.7320508;
+        matches = distance <= descriptor.tolerance ? 1.0 : 0.0;
+    }
+    eligiblePixels[(gid.y * descriptor.width) + gid.x] = matches > 0.5 ? uchar(255) : uchar(0);
+}
+
+kernel void fillPropagationKernel(
+    const device uchar *eligiblePixels [[buffer(0)]],
+    const device uchar *filledPixels [[buffer(1)]],
+    device uchar *nextFilledPixels [[buffer(2)]],
+    device atomic_uint *didChange [[buffer(3)]],
+    constant MetalFillDescriptor& descriptor [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    uint index = (gid.y * descriptor.width) + gid.x;
+    uchar current = filledPixels[index];
+    if (current > 0u) {
+        nextFilledPixels[index] = current;
+        return;
+    }
+    if (eligiblePixels[index] == 0u) {
+        nextFilledPixels[index] = 0u;
+        return;
+    }
+
+    bool propagate = false;
+    if (gid.x > 0 && filledPixels[index - 1u] > 0u) propagate = true;
+    if (!propagate && gid.x + 1u < descriptor.width && filledPixels[index + 1u] > 0u) propagate = true;
+    if (!propagate && gid.y > 0 && filledPixels[index - descriptor.width] > 0u) propagate = true;
+    if (!propagate && gid.y + 1u < descriptor.height && filledPixels[index + descriptor.width] > 0u) propagate = true;
+
+    nextFilledPixels[index] = propagate ? uchar(255) : uchar(0);
+    if (propagate) {
+        atomic_store_explicit(didChange, 1u, memory_order_relaxed);
+    }
+}
+
+kernel void fillExpansionKernel(
+    const device uchar *filledPixels [[buffer(0)]],
+    device uchar *expandedPixels [[buffer(1)]],
+    constant MetalFillDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    uint index = (gid.y * descriptor.width) + gid.x;
+    if (filledPixels[index] > 0u) {
+        expandedPixels[index] = uchar(255);
+        return;
+    }
+    bool hasNeighbor = false;
+    if (gid.x > 0 && filledPixels[index - 1u] > 0u) hasNeighbor = true;
+    if (!hasNeighbor && gid.x + 1u < descriptor.width && filledPixels[index + 1u] > 0u) hasNeighbor = true;
+    if (!hasNeighbor && gid.y > 0 && filledPixels[index - descriptor.width] > 0u) hasNeighbor = true;
+    if (!hasNeighbor && gid.y + 1u < descriptor.height && filledPixels[index + descriptor.width] > 0u) hasNeighbor = true;
+    expandedPixels[index] = hasNeighbor ? uchar(255) : uchar(0);
+}
+
+kernel void fillComposeKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    const device uchar *filledPixels [[buffer(1)]],
+    device uchar *outputPixels [[buffer(2)]],
+    constant MetalFillDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    uint index = (gid.y * descriptor.width) + gid.x;
+    if (filledPixels[index] > 0u) {
+        writePixelRGBA(
+            outputPixels,
+            descriptor.width,
+            gid,
+            float4(descriptor.targetRed, descriptor.targetGreen, descriptor.targetBlue, descriptor.targetAlpha)
+        );
+        return;
+    }
+    writePixelRGBA(outputPixels, descriptor.width, gid, sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid));
+}
+
+kernel void blurHorizontalKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device float4 *temporaryPixels [[buffer(1)]],
+    constant MetalBlurDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    float4 sum = float4(0.0);
+    float total = 0.0;
+    for (int dx = -int(descriptor.radius); dx <= int(descriptor.radius); ++dx) {
+        int sampleX = clamp(int(gid.x) + dx, 0, int(descriptor.width) - 1);
+        sum += sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, uint2(uint(sampleX), gid.y));
+        total += 1.0;
+    }
+    temporaryPixels[(gid.y * descriptor.width) + gid.x] = sum / max(total, 1.0);
+}
+
+kernel void blurVerticalKernel(
+    const device float4 *temporaryPixels [[buffer(0)]],
+    device uchar *blurredPixels [[buffer(1)]],
+    constant MetalBlurDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    float4 sum = float4(0.0);
+    float total = 0.0;
+    for (int dy = -int(descriptor.radius); dy <= int(descriptor.radius); ++dy) {
+        int sampleY = clamp(int(gid.y) + dy, 0, int(descriptor.height) - 1);
+        sum += temporaryPixels[(uint(sampleY) * descriptor.width) + gid.x];
+        total += 1.0;
+    }
+    writePixelRGBA(blurredPixels, descriptor.width, gid, sum / max(total, 1.0));
+}
+
+kernel void blurBlendKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    const device uchar *blurredPixels [[buffer(1)]],
+    const device MetalStrokeSampleDescriptor *samples [[buffer(2)]],
+    device uchar *outputPixels [[buffer(3)]],
+    constant MetalBlurDescriptor& descriptor [[buffer(4)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    float2 pixelCenter = float2(gid) + 0.5;
+    float softness = max(0.12, 1.0 - descriptor.hardness);
+    float influence = 0.0;
+    for (uint sampleIndex = 0u; sampleIndex < descriptor.sampleCount; ++sampleIndex) {
+        float2 samplePoint = float2(samples[sampleIndex].x, samples[sampleIndex].y);
+        float sampleRadius = descriptor.influenceRadius * max(0.35, float(samples[sampleIndex].pressure));
+        float distance = length(pixelCenter - samplePoint);
+        if (distance > sampleRadius) {
+            continue;
+        }
+        float normalized = max(0.0, 1.0 - (distance / max(sampleRadius, 0.001)));
+        float feathered = pow(normalized, max(0.75, 2.4 - (softness * 1.6)));
+        influence = max(influence, feathered * descriptor.flow);
+    }
+    float4 source = sourcePixelRGBA(sourcePixels, descriptor.width, descriptor.height, gid);
+    float4 blurred = sourcePixelRGBA(blurredPixels, descriptor.width, descriptor.height, gid);
+    writePixelRGBA(outputPixels, descriptor.width, gid, mix(source, blurred, clamp(influence, 0.0, 1.0)));
+}
+
+kernel void textMaskComposeKernel(
+    const device uchar *maskPixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalTextComposeDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.width || gid.y >= descriptor.height) {
+        return;
+    }
+    uint index = (gid.y * descriptor.width) + gid.x;
+    float alpha = (float(maskPixels[index]) / 255.0) * descriptor.alpha;
+    writePixelRGBA(
+        outputPixels,
+        descriptor.width,
+        gid,
+        float4(descriptor.red, descriptor.green, descriptor.blue, alpha)
+    );
+}
+
+kernel void scaleRGBAKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalScaleDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.targetWidth || gid.y >= descriptor.targetHeight) {
+        return;
+    }
+    float sourceX = ((float(gid.x) + 0.5) / max(float(descriptor.targetWidth), 1.0)) * float(descriptor.sourceWidth) - 0.5;
+    float sourceY = ((float(gid.y) + 0.5) / max(float(descriptor.targetHeight), 1.0)) * float(descriptor.sourceHeight) - 0.5;
+    int x0 = clamp(int(floor(sourceX)), 0, int(descriptor.sourceWidth) - 1);
+    int y0 = clamp(int(floor(sourceY)), 0, int(descriptor.sourceHeight) - 1);
+    int x1 = clamp(x0 + 1, 0, int(descriptor.sourceWidth) - 1);
+    int y1 = clamp(y0 + 1, 0, int(descriptor.sourceHeight) - 1);
+    float tx = clamp(sourceX - float(x0), 0.0, 1.0);
+    float ty = clamp(sourceY - float(y0), 0.0, 1.0);
+    float4 c00 = sourcePixelRGBA(sourcePixels, descriptor.sourceWidth, descriptor.sourceHeight, uint2(uint(x0), uint(y0)));
+    float4 c10 = sourcePixelRGBA(sourcePixels, descriptor.sourceWidth, descriptor.sourceHeight, uint2(uint(x1), uint(y0)));
+    float4 c01 = sourcePixelRGBA(sourcePixels, descriptor.sourceWidth, descriptor.sourceHeight, uint2(uint(x0), uint(y1)));
+    float4 c11 = sourcePixelRGBA(sourcePixels, descriptor.sourceWidth, descriptor.sourceHeight, uint2(uint(x1), uint(y1)));
+    float4 top = mix(c00, c10, tx);
+    float4 bottom = mix(c01, c11, tx);
+    writePixelRGBA(outputPixels, descriptor.targetWidth, gid, mix(top, bottom, ty));
+}
+
+kernel void scaleMaskKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalScaleDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.targetWidth || gid.y >= descriptor.targetHeight) {
+        return;
+    }
+    float sourceX = ((float(gid.x) + 0.5) / max(float(descriptor.targetWidth), 1.0)) * float(descriptor.sourceWidth) - 0.5;
+    float sourceY = ((float(gid.y) + 0.5) / max(float(descriptor.targetHeight), 1.0)) * float(descriptor.sourceHeight) - 0.5;
+    int x0 = clamp(int(floor(sourceX)), 0, int(descriptor.sourceWidth) - 1);
+    int y0 = clamp(int(floor(sourceY)), 0, int(descriptor.sourceHeight) - 1);
+    int x1 = clamp(x0 + 1, 0, int(descriptor.sourceWidth) - 1);
+    int y1 = clamp(y0 + 1, 0, int(descriptor.sourceHeight) - 1);
+    float tx = clamp(sourceX - float(x0), 0.0, 1.0);
+    float ty = clamp(sourceY - float(y0), 0.0, 1.0);
+    float c00 = float(sourceMask[(uint(y0) * descriptor.sourceWidth) + uint(x0)]);
+    float c10 = float(sourceMask[(uint(y0) * descriptor.sourceWidth) + uint(x1)]);
+    float c01 = float(sourceMask[(uint(y1) * descriptor.sourceWidth) + uint(x0)]);
+    float c11 = float(sourceMask[(uint(y1) * descriptor.sourceWidth) + uint(x1)]);
+    float top = mix(c00, c10, tx);
+    float bottom = mix(c01, c11, tx);
+    outputMask[(gid.y * descriptor.targetWidth) + gid.x] = uchar(clamp(round(mix(top, bottom, ty)), 0.0, 255.0));
+}
+
+kernel void translateRGBAKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    constant MetalTranslateDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.targetWidth || gid.y >= descriptor.targetHeight) {
+        return;
+    }
+    int sourceX = int(gid.x) - descriptor.offsetX;
+    int sourceY = int(gid.y) - descriptor.offsetY;
+    if (sourceX < 0 || sourceY < 0 || sourceX >= int(descriptor.sourceWidth) || sourceY >= int(descriptor.sourceHeight)) {
+        writePixelRGBA(outputPixels, descriptor.targetWidth, gid, float4(0.0));
+        return;
+    }
+    writePixelRGBA(
+        outputPixels,
+        descriptor.targetWidth,
+        gid,
+        sourcePixelRGBA(sourcePixels, descriptor.sourceWidth, descriptor.sourceHeight, uint2(uint(sourceX), uint(sourceY)))
+    );
+}
+
+kernel void translateMaskKernel(
+    const device uchar *sourceMask [[buffer(0)]],
+    device uchar *outputMask [[buffer(1)]],
+    constant MetalTranslateDescriptor& descriptor [[buffer(2)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= descriptor.targetWidth || gid.y >= descriptor.targetHeight) {
+        return;
+    }
+    int sourceX = int(gid.x) - descriptor.offsetX;
+    int sourceY = int(gid.y) - descriptor.offsetY;
+    uchar value = 0;
+    if (sourceX >= 0 && sourceY >= 0 && sourceX < int(descriptor.sourceWidth) && sourceY < int(descriptor.sourceHeight)) {
+        value = sourceMask[(uint(sourceY) * descriptor.sourceWidth) + uint(sourceX)];
+    }
+    outputMask[(gid.y * descriptor.targetWidth) + gid.x] = value;
 }
 
 inline float4 readLayerColor(

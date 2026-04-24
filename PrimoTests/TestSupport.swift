@@ -255,10 +255,12 @@ extension DocumentPersistenceGateway {
 
 extension DocumentExportGateway {
     static func stub(
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface? = { _ in nil },
         compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data? = { _ in nil },
         timelapseCapture: @escaping @Sendable () -> TimelapseCapture? = { nil }
     ) -> Self {
         Self(
+            compositeSurface: compositeSurface,
             compositePNGData: compositePNGData,
             timelapseCapture: timelapseCapture
         )

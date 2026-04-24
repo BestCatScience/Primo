@@ -1,7 +1,6 @@
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentPersistenceInfrastructure
-import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentTimelapseInfrastructure
 
 struct DocumentEngineServices {
@@ -10,7 +9,6 @@ struct DocumentEngineServices {
     let ids: UUIDClient
     let persistence: DocumentPersistenceServices
     let timelapse: DocumentTimelapseServices
-    let stroke: DocumentStrokeServices
 
     init(
         fileClient: FileClient,
@@ -22,7 +20,6 @@ struct DocumentEngineServices {
         self.ids = uuidClient
         self.persistence = DocumentPersistenceServices(fileClient: fileClient)
         self.timelapse = DocumentTimelapseServices(fileClient: fileClient, uuidClient: uuidClient)
-        self.stroke = DocumentStrokeServices()
     }
 }
 
@@ -39,15 +36,5 @@ struct DocumentTimelapseServices {
 
     init(fileClient: FileClient, uuidClient: UUIDClient) {
         self.frameStore = PaintDocumentTimelapseService(fileClient: fileClient, uuidClient: uuidClient)
-    }
-}
-
-struct DocumentStrokeServices {
-    let geometry: PaintDocumentGeometryService
-    let blur: PaintDocumentBlurService
-
-    init() {
-        self.geometry = PaintDocumentGeometryService()
-        self.blur = PaintDocumentBlurService()
     }
 }

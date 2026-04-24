@@ -1,3 +1,4 @@
+import PrimoDocumentContracts
 import PrimoDocumentDomain
 import SwiftUI
 import UIKit
@@ -125,14 +126,34 @@ extension ContentView {
 
     @ViewBuilder
     func workspacePanePreview(pane: WorkspacePane, selectedTab: OpenDocumentTab?) -> some View {
-        if let selectedTab, let previewImageData = selectedTab.previewImageData, let image = UIImage(data: previewImageData) {
+        if let selectedTab, let previewSurface = liveWorkspacePreviewSurface(for: selectedTab) {
             VStack(spacing: 18) {
                 Spacer(minLength: 0)
 
-                Image(uiImage: image)
-                    .resizable()
-                    .interpolation(.medium)
-                    .scaledToFit()
+                SurfacePreviewView(surface: previewSurface)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+
+                VStack(spacing: 6) {
+                    Text(selectedTab.title)
+                        .font(StudioTheme.Typography.title(15))
+                        .foregroundStyle(.white.opacity(0.92))
+                    Text(language.localized("タップしてこのペインを編集"))
+                        .font(StudioTheme.Typography.label(12))
+                        .foregroundStyle(.white.opacity(0.52))
+                }
+                .padding(.bottom, 10)
+            }
+            .padding(22)
+        } else if let selectedTab, let previewSurface = selectedTab.previewSurface ?? StoredSurfaceAdapter.surface(from: selectedTab.previewImageData) {
+            VStack(spacing: 18) {
+                Spacer(minLength: 0)
+
+                SurfacePreviewView(surface: previewSurface)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .overlay(
@@ -165,6 +186,16 @@ extension ContentView {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func liveWorkspacePreviewSurface(for selectedTab: OpenDocumentTab) -> DocumentCompositeSurface? {
+        guard
+            selectedTab.id == workspaceState.activeTabID,
+            let snapshot = store.canvas.renderSnapshot
+        else {
+            return nil
+        }
+        return AppFeature.renderedCompositeSurface(snapshot: snapshot, paperStyle: store.canvas.paperStyle)
     }
 
     var toolDockColumn: some View {

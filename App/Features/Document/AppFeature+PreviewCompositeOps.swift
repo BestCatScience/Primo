@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentApplication
 import PrimoDocumentRenderingInfrastructure
 
 enum MetalDocumentProcessingClient {
@@ -9,13 +10,30 @@ enum MetalDocumentProcessingClient {
 }
 
 extension AppFeature {
+    static func renderedCompositeSurface(
+        snapshot: MetalDocumentSnapshot,
+        paperStyle: CanvasPaperStyle
+    ) -> DocumentCompositeSurface {
+        let pixelData = MetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+            pixelData: snapshot.compositePixelData,
+            width: snapshot.width,
+            height: snapshot.height,
+            paperStyle: paperStyle
+        ) ?? snapshot.compositePixelData
+
+        return DocumentCompositeSurface(
+            width: snapshot.width,
+            height: snapshot.height,
+            pixelData: pixelData
+        )
+    }
+
     static func renderedCompositePNGData(
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle
     ) -> Data? {
-        MetalDocumentProcessingClient.shared.renderedCompositePNGData(
-            snapshot: snapshot,
-            paperStyle: paperStyle
+        DocumentRasterImageService.pngData(
+            from: renderedCompositeSurface(snapshot: snapshot, paperStyle: paperStyle)
         )
     }
 

@@ -124,7 +124,8 @@ let package = Package(
             name: "PrimoBrushDomain"
         ),
         .target(
-            name: "PrimoNanoBananaDomain"
+            name: "PrimoNanoBananaDomain",
+            dependencies: ["PrimoDocumentContracts"]
         ),
         .target(
             name: "PrimoNanoBananaApplication",
@@ -224,6 +225,7 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentContracts",
                 "PrimoDocumentEngineInfrastructure",
+                "PrimoDocumentMetalRuntimeInfrastructure",
             ]
         ),
         .testTarget(
@@ -241,7 +243,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoNanoBananaApplicationTests",
-            dependencies: ["PrimoNanoBananaApplication"]
+            dependencies: ["PrimoNanoBananaApplication", "PrimoDocumentContracts"]
         ),
         .testTarget(
             name: "PrimoNanoBananaInfrastructureTests",

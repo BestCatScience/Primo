@@ -47,7 +47,8 @@ public enum DocumentEngineFactory {
         let queryGateway = DocumentQueryGateway(
             lightweightPresentation: { runtimeBox.withRuntime { $0.lightweightPresentation() } },
             presentation: { runtimeBox.withRuntime { $0.presentation() } },
-            compositePixelData: { runtimeBox.withRuntime { $0.compositePixelData() } },
+            compositePixelData: { runtimeBox.withRuntime { $0.compositeSurface().pixelData } },
+            compositeSurface: { runtimeBox.withRuntime { $0.compositeSurface() } },
             pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } },
             consumeDirtyUpdate: { runtimeBox.withRuntime { $0.consumeDirtyUpdate() } }
         )
@@ -68,6 +69,12 @@ public enum DocumentEngineFactory {
             replaceLayerPixels: { index, data in runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, data: data) } },
             replaceLayerPixelsInRect: { index, rect, data in
                 runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, in: rect, data: data) }
+            },
+            applyLayerMutation: { index, payload in
+                runtimeBox.withRuntime { $0.applyLayerMutation(index: index, payload: payload) }
+            },
+            applyTextLayerMutation: { index, textLayer, payload in
+                runtimeBox.withRuntime { $0.applyTextLayerMutation(index: index, textLayer: textLayer, payload: payload) }
             },
             replaceLayerMask: { index, data in runtimeBox.withRuntime { $0.replaceLayerMask(index: index, data: data) } },
             clearLayerMask: { index in runtimeBox.withRuntime { $0.clearLayerMask(index: index) } },
@@ -138,6 +145,7 @@ public enum DocumentEngineFactory {
         )
 
         let exportGateway = DocumentExportGateway(
+            compositeSurface: { style in runtimeBox.withRuntime { $0.compositeExportSurface(paperStyle: style) } },
             compositePNGData: { style in runtimeBox.withRuntime { $0.compositePNGData(paperStyle: style) } },
             timelapseCapture: { runtimeBox.withRuntime { $0.timelapseCapture() } }
         )
@@ -211,8 +219,16 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
         )
     }
 
-    public func replay(_ operation: TimelapseOperation) -> CGImage? {
+    public func replaySurface(_ operation: TimelapseOperation) -> DocumentCompositeSurface? {
         runtime.replayTimelapseOperation(operation, folderIDMap: &folderIDMap)
-        return runtime.timelapseCompositeImage()
+        return runtime.timelapseCompositeSurface()
+    }
+
+    // Legacy convenience retained for callers that still expect CGImage.
+    // Replay/export code should prefer `replaySurface(_:)`.
+    @available(*, deprecated, message: "Prefer replaySurface(_:) for live replay paths.")
+    public func replay(_ operation: TimelapseOperation) -> CGImage? {
+        guard let surface = replaySurface(operation) else { return nil }
+        return runtime.cgImage(from: surface.pixelData, width: surface.width, height: surface.height)
     }
 }

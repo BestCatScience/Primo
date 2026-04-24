@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 
@@ -65,11 +66,12 @@ extension AppFeature {
 
     func handleExportDocumentRequest(state: inout State) {
         let paperStyle = resolvedPaperStyle(for: state)
-        guard let pngData = state.canvas.renderSnapshot.flatMap({
-            AppFeature.renderedCompositePNGData(snapshot: $0, paperStyle: paperStyle)
-        }) ?? documentPresentationQueryService.compositePNGData(
+        let surface = state.canvas.renderSnapshot.map {
+            AppFeature.renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
+        } ?? documentPresentationQueryService.compositeSurface(
             paperStyle: paperStyle
-        ) else {
+        )
+        guard let pngData = surface.flatMap(DocumentRasterImageService.pngData(from:)) else {
             state.application.presentFeedback(.exportFailed)
             return
         }

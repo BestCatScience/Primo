@@ -2,8 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentInfrastructure
-import UIKit
+import PrimoDocumentMetalRuntimeInfrastructure
 
 extension AppFeature {
     typealias InpaintCrop = PrimoDocumentApplication.InpaintCrop
@@ -69,11 +68,22 @@ extension AppFeature {
         )
     }
 
+    static func decodedImageSurface(from imageData: Data) -> DocumentCompositeSurface? {
+        guard let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: imageData) else {
+            return nil
+        }
+        return DocumentCompositeSurface(
+            width: decoded.width,
+            height: decoded.height,
+            pixelData: decoded.pixelData
+        )
+    }
+
     static func fittedLayerPixelData(fromImageData imageData: Data, canvasSize: CGSize) -> Data? {
         guard
             canvasSize.width > 0,
             canvasSize.height > 0,
-            let sourceImage = UIImage(data: imageData)
+            let sourceSurface = decodedImageSurface(from: imageData)
         else {
             return nil
         }
@@ -81,62 +91,62 @@ extension AppFeature {
         let width = Int(canvasSize.width.rounded())
         let height = Int(canvasSize.height.rounded())
         guard width > 0, height > 0 else { return nil }
-
         let canvasRect = CGRect(x: 0, y: 0, width: width, height: height)
-        let imageSize = resolvedPixelSize(for: sourceImage)
+        let imageSize = CGSize(width: sourceSurface.width, height: sourceSurface.height)
         let scale = min(canvasRect.width / imageSize.width, canvasRect.height / imageSize.height)
         let fittedSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        let drawRect = CGRect(
-            x: (canvasRect.width - fittedSize.width) * 0.5,
-            y: (canvasRect.height - fittedSize.height) * 0.5,
-            width: fittedSize.width,
-            height: fittedSize.height
-        )
 
-        let renderer = UIGraphicsImageRenderer(size: canvasRect.size)
-        let renderedImage = renderer.image { _ in
-            UIColor.clear.setFill()
-            UIRectFill(canvasRect)
-            sourceImage.draw(in: drawRect)
-        }
-        guard let renderedCGImage = renderedImage.cgImage else {
+        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+            sourceSurface.pixelData,
+            sourceWidth: sourceSurface.width,
+            sourceHeight: sourceSurface.height,
+            targetWidth: max(Int(fittedSize.width.rounded()), 1),
+            targetHeight: max(Int(fittedSize.height.rounded()), 1)
+        ) else {
             return nil
         }
-        return DocumentTextRasterizer.pixelData(from: renderedCGImage, size: canvasRect.size)
+
+        let fittedSurface = DocumentCompositeSurface(
+            width: max(Int(fittedSize.width.rounded()), 1),
+            height: max(Int(fittedSize.height.rounded()), 1),
+            pixelData: scaled
+        )
+        return composedSurface(
+            fittedSurface,
+            in: CGSize(width: width, height: height)
+        )?.pixelData
     }
 
     static func importedCanvasImage(from imageData: Data) -> ImportedCanvasImage? {
-        guard let sourceImage = UIImage(data: imageData) else {
+        guard let sourceSurface = decodedImageSurface(from: imageData) else {
             return nil
         }
-
-        let imageSize = resolvedPixelSize(for: sourceImage)
-        let width = Int(imageSize.width.rounded())
-        let height = Int(imageSize.height.rounded())
+        let width = sourceSurface.width
+        let height = sourceSurface.height
         guard width > 0, height > 0 else {
             return nil
         }
-
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
-        let renderedImage = renderer.image { _ in
-            UIColor.clear.setFill()
-            UIRectFill(CGRect(x: 0, y: 0, width: width, height: height))
-            sourceImage.draw(in: CGRect(x: 0, y: 0, width: width, height: height))
-        }
-        guard let renderedCGImage = renderedImage.cgImage,
-              let pixelData = DocumentTextRasterizer.pixelData(
-                from: renderedCGImage,
-                size: CGSize(width: width, height: height)
-              ) else {
-            return nil
-        }
-
-        return ImportedCanvasImage(width: width, height: height, pixelData: pixelData)
+        return ImportedCanvasImage(width: width, height: height, pixelData: sourceSurface.pixelData)
     }
 
-    private static func resolvedPixelSize(for image: UIImage) -> CGSize {
-        let pixelWidth = max((image.size.width * image.scale).rounded(), 1)
-        let pixelHeight = max((image.size.height * image.scale).rounded(), 1)
-        return CGSize(width: pixelWidth, height: pixelHeight)
+    private static func composedSurface(
+        _ source: DocumentCompositeSurface,
+        in canvasSize: CGSize
+    ) -> DocumentCompositeSurface? {
+        let width = max(Int(canvasSize.width.rounded()), 1)
+        let height = max(Int(canvasSize.height.rounded()), 1)
+        let offsetX = max((width - source.width) / 2, 0)
+        let offsetY = max((height - source.height) / 2, 0)
+        let translated = PrimoMetalDocumentProcessingClient.shared.translatedPixelData(
+            source.pixelData,
+            sourceWidth: source.width,
+            sourceHeight: source.height,
+            targetWidth: width,
+            targetHeight: height,
+            offsetX: offsetX,
+            offsetY: offsetY
+        )
+        guard let translated else { return nil }
+        return DocumentCompositeSurface(width: width, height: height, pixelData: translated)
     }
 }

@@ -75,6 +75,8 @@ public struct WorkspaceDocumentSaveResult: Equatable, Sendable {
     public let activeTabID: OpenDocumentTab.ID
     public let savedURL: DocumentProjectPath
     public let purpose: WorkspaceDocumentSavePurpose
+    public let previewSurface: DocumentCompositeSurface?
+    /// Legacy preview bytes retained for migration and fallback UI.
     public let previewImageData: Data?
     public let canvasSize: CGSize
     public var issues: [WorkspacePersistenceIssue]
@@ -83,6 +85,7 @@ public struct WorkspaceDocumentSaveResult: Equatable, Sendable {
         activeTabID: OpenDocumentTab.ID,
         savedURL: DocumentProjectPath,
         purpose: WorkspaceDocumentSavePurpose,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data?,
         canvasSize: CGSize,
         issues: [WorkspacePersistenceIssue] = []
@@ -90,6 +93,7 @@ public struct WorkspaceDocumentSaveResult: Equatable, Sendable {
         self.activeTabID = activeTabID
         self.savedURL = savedURL
         self.purpose = purpose
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
         self.canvasSize = canvasSize
         self.issues = issues
@@ -494,6 +498,7 @@ public struct WorkspacePersistenceUseCase: Sendable {
                         activeTabID: requestPayload.activeTab.id,
                         savedURL: savedURL,
                         purpose: requestPayload.purpose,
+                        previewSurface: savedTab.previewSurface,
                         previewImageData: savedTab.previewImageData,
                         canvasSize: savedTab.canvasSize,
                         issues: issues

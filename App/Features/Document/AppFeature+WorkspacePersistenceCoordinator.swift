@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
@@ -110,14 +111,24 @@ extension AppFeature {
         .saveFailed(Self.optionalErrorMessage(error))
     }
 
+    private func currentWorkspacePreviewSurface(
+        state: State,
+        paperStyle: CanvasPaperStyle
+    ) -> DocumentCompositeSurface? {
+        state.canvas.renderSnapshot.map {
+            AppFeature.renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
+        } ?? documentPresentationQueryService.compositeSurface(
+            paperStyle: paperStyle
+        )
+    }
+
     func refreshActiveTabMetadataForPersistence(
         state: inout State
     ) -> OpenDocumentTab? {
         let paperStyle = resolvedPaperStyle(for: state)
         state.workspace.updateActiveTabMetadata(
-            previewImageData: state.canvas.renderSnapshot.flatMap {
-                AppFeature.renderedCompositePNGData(snapshot: $0, paperStyle: paperStyle)
-            } ?? documentPresentationQueryService.compositePNGData(
+            previewSurface: currentWorkspacePreviewSurface(
+                state: state,
                 paperStyle: paperStyle
             ),
             canvasSize: state.canvas.canvasSize
@@ -169,14 +180,11 @@ extension AppFeature {
             canvasSize: state.canvas.canvasSize,
             isDirty: false,
             pane: preparedTab.pane,
-            previewImageData: state.canvas.renderSnapshot.flatMap {
-                AppFeature.renderedCompositePNGData(
-                    snapshot: $0,
-                    paperStyle: resolvedPaperStyle(for: state)
-                )
-            } ?? documentPresentationQueryService.compositePNGData(
+            previewSurface: currentWorkspacePreviewSurface(
+                state: state,
                 paperStyle: resolvedPaperStyle(for: state)
-            )
+            ),
+            previewImageData: nil
         )
         state.workspace.appendTab(tab)
         state.workspace.activateTab(preparedTab.id, pane: preparedTab.pane)
@@ -256,11 +264,13 @@ extension AppFeature {
             activationResult = activatePreparedTab(preparedTab, state: &state)
 
         case let .activeTab(title, sourceProjectURL):
+            let existingPreviewSurface = state.workspace.activeTab?.previewSurface
             let existingPreviewImageData = state.workspace.activeTab?.previewImageData
             applyLoadedProject(loaded, state: &state)
             state.workspace.updateActiveTabMetadata(
                 title: title,
                 sourceProjectURL: sourceProjectURL,
+                previewSurface: existingPreviewSurface,
                 previewImageData: existingPreviewImageData,
                 canvasSize: state.canvas.canvasSize
             )
@@ -509,6 +519,7 @@ extension AppFeature {
                 id: saved.activeTabID,
                 title: saved.savedURL.displayName,
                 sourceProjectURL: saved.savedURL,
+                previewSurface: saved.previewSurface,
                 previewImageData: saved.previewImageData,
                 canvasSize: saved.canvasSize,
                 isDirty: false
@@ -715,14 +726,11 @@ extension AppFeature {
             return .none
         }
         state.workspace.setActiveTabDirty(true)
+        let paperStyle = resolvedPaperStyle(for: state)
         state.workspace.updateActiveTabMetadata(
-            previewImageData: state.canvas.renderSnapshot.flatMap {
-                AppFeature.renderedCompositePNGData(
-                    snapshot: $0,
-                    paperStyle: resolvedPaperStyle(for: state)
-                )
-            } ?? documentPresentationQueryService.compositePNGData(
-                paperStyle: resolvedPaperStyle(for: state)
+            previewSurface: currentWorkspacePreviewSurface(
+                state: state,
+                paperStyle: paperStyle
             ),
             canvasSize: state.canvas.canvasSize
         )

@@ -1,10 +1,23 @@
 import ComposableArchitecture
+import PrimoDocumentApplication
+import PrimoDocumentContracts
 import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
 
 final class WorkspacePersistenceCoordinatorTests: XCTestCase {
+    private func previewSurface(bytes: [UInt8]) -> DocumentCompositeSurface {
+        DocumentCompositeSurface(
+            width: 1,
+            height: 1,
+            pixelData: Data(bytes)
+        )
+    }
+
     func testLoadedWorkspaceFollowUpRequestMarksDirtyAndBuildsPersistenceRequest() {
+        let expectedPreviewData = DocumentRasterImageService.pngData(
+            from: previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF])
+        )
         let tab = OpenDocumentTab.testValue(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
             previewImageData: nil
@@ -20,7 +33,9 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
         )
 
         let result = withDependencies {
-            $0.documentExportGateway = .stub(compositePNGData: { _ in Data([0xAB, 0xCD]) })
+            $0.documentExportGateway = .stub(
+                compositeSurface: { _ in self.previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF]) }
+            )
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
@@ -40,7 +55,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
         }
 
         XCTAssertTrue(updatedTab.isDirty)
-        XCTAssertEqual(updatedTab.previewImageData, Data([0xAB, 0xCD]))
+        XCTAssertEqual(updatedTab.previewImageData, expectedPreviewData)
 
         XCTAssertEqual(
             request,
@@ -57,6 +72,9 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpRequestCanSkipPersistenceWhileStillMarkingDirty() {
+        let expectedPreviewData = DocumentRasterImageService.pngData(
+            from: previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF])
+        )
         let tab = OpenDocumentTab.testValue(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
             previewImageData: Data([0x01])
@@ -71,7 +89,9 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
         )
 
         let result = withDependencies {
-            $0.documentExportGateway = .stub(compositePNGData: { _ in Data([0x01]) })
+            $0.documentExportGateway = .stub(
+                compositeSurface: { _ in self.previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF]) }
+            )
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
@@ -91,6 +111,6 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
         }
 
         XCTAssertTrue(updatedTab.isDirty)
-        XCTAssertEqual(updatedTab.previewImageData, Data([0x01]))
+        XCTAssertEqual(updatedTab.previewImageData, expectedPreviewData)
     }
 }

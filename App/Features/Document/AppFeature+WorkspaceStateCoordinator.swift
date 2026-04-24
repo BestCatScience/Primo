@@ -110,6 +110,7 @@ extension AppFeature.WorkspaceState {
         id tabID: OpenDocumentTab.ID,
         title: String? = nil,
         sourceProjectURL: DocumentProjectPath? = nil,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data? = nil,
         canvasSize: CGSize? = nil,
         isDirty: Bool? = nil
@@ -120,6 +121,9 @@ extension AppFeature.WorkspaceState {
         }
         if let sourceProjectURL {
             openTabs[tabIndex].sourceProjectURL = sourceProjectURL
+        }
+        if let previewSurface {
+            openTabs[tabIndex].previewSurface = previewSurface
         }
         if let previewImageData {
             openTabs[tabIndex].previewImageData = previewImageData
@@ -136,6 +140,7 @@ extension AppFeature.WorkspaceState {
     mutating func updateActiveTabMetadata(
         title: String? = nil,
         sourceProjectURL: DocumentProjectPath? = nil,
+        previewSurface: DocumentCompositeSurface? = nil,
         previewImageData: Data? = nil,
         canvasSize: CGSize
     ) {
@@ -144,6 +149,7 @@ extension AppFeature.WorkspaceState {
             id: activeTabID,
             title: title,
             sourceProjectURL: sourceProjectURL,
+            previewSurface: previewSurface,
             previewImageData: previewImageData,
             canvasSize: canvasSize
         )

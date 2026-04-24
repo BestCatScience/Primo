@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentContracts
 
 public enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
     case wholeLayer
@@ -168,20 +169,24 @@ public struct SubmitNanoBananaEditCommand: Equatable, Sendable {
 public struct NanoBananaPreviewState: Equatable, Sendable {
     public var descriptor: NanoBananaEditDescriptor
     public var outputLayerIndex: Int
-    public var pixelData: Data
+    public var outputSurface: DocumentCompositeSurface
     public var beforePreviewImageData: Data?
     public var afterPreviewImageData: Data?
+
+    public var pixelData: Data {
+        outputSurface.pixelData
+    }
 
     public init(
         descriptor: NanoBananaEditDescriptor,
         outputLayerIndex: Int,
-        pixelData: Data,
+        outputSurface: DocumentCompositeSurface,
         beforePreviewImageData: Data?,
         afterPreviewImageData: Data?
     ) {
         self.descriptor = descriptor
         self.outputLayerIndex = outputLayerIndex
-        self.pixelData = pixelData
+        self.outputSurface = outputSurface
         self.beforePreviewImageData = beforePreviewImageData
         self.afterPreviewImageData = afterPreviewImageData
     }

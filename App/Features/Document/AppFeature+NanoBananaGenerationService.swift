@@ -11,9 +11,7 @@ extension AppFeature {
         let command: SubmitNanoBananaEditCommand
         let selectionRegion: NanoBananaSelectionRegion?
         let outputLayerIndex: Int
-        let canvasWidth: Int
-        let canvasHeight: Int
-        let sourceLayerPixelData: Data
+        let sourceSurface: DocumentCompositeSurface
     }
 
     private struct NanoBananaValidationFailure: Error, Equatable {
@@ -47,16 +45,18 @@ extension AppFeature {
             let outputLayerIndex = command.descriptor.outputMode == .replaceCurrentLayer
                 ? command.descriptor.inputLayerIndex
                 : state.canvas.activeLayerIndex
-            let canvasWidth = snapshot.width
-            let canvasHeight = snapshot.height
-            let sourceLayerPixelData = layer.pixelData
+            let sourceSurface = DocumentCompositeSurface(
+                width: snapshot.width,
+                height: snapshot.height,
+                pixelData: layer.pixelData
+            )
             let selectionRegion = adjustedSelection.map {
                 NanoBananaSelectionRegion(
                     selectionBounds: $0.bounds,
                     expandedMask: AppFeature.expandedMask(
                         from: $0,
-                        canvasWidth: canvasWidth,
-                        canvasHeight: canvasHeight
+                        canvasWidth: snapshot.width,
+                        canvasHeight: snapshot.height
                     )
                 )
             }
@@ -66,9 +66,7 @@ extension AppFeature {
                     command: command,
                     selectionRegion: selectionRegion,
                     outputLayerIndex: outputLayerIndex,
-                    canvasWidth: canvasWidth,
-                    canvasHeight: canvasHeight,
-                    sourceLayerPixelData: sourceLayerPixelData
+                    sourceSurface: sourceSurface
                 )
             )
         }
@@ -119,7 +117,7 @@ extension AppFeature {
             _ plan: NanoBananaPreviewApplicationPlan
         ) -> Result<AppliedPreview, DocumentMutationFailure> {
             contentService.applyPixels(
-                plan.preview.pixelData,
+                plan.preview.outputSurface.pixelData,
                 to: plan.target
             )
             .map { AppliedPreview(targetLayerIndex: $0.targetLayerIndex) }
@@ -151,9 +149,7 @@ extension AppFeature {
                         command: prepared.command,
                         selectionRegion: prepared.selectionRegion,
                         outputLayerIndex: prepared.outputLayerIndex,
-                        canvasWidth: prepared.canvasWidth,
-                        canvasHeight: prepared.canvasHeight,
-                        sourceLayerPixelData: prepared.sourceLayerPixelData
+                        sourceSurface: prepared.sourceSurface
                     )
                 ) {
                 case let .success(preview):

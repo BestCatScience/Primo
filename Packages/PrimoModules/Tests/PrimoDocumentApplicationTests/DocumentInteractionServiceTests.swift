@@ -7,13 +7,37 @@ import Testing
 
 struct DocumentInteractionServiceTests {
     @Test
-    func compositePixelDataReturnsQueryGatewayPayload() {
+    func compositeSurfaceReturnsQueryGatewayPayload() {
         let expected = Data([0x10, 0x20, 0x30])
+        let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
         let service = DocumentInteractionService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
                 presentation: { queryGateway().presentation() },
                 compositePixelData: { expected },
+                compositeSurface: { expectedSurface },
+                pixelDataForLayer: { _ in Data() },
+                consumeDirtyUpdate: { nil }
+            ),
+            mutationGateway: mutationGateway(recorder: CallRecorder()),
+            strokeGateway: strokeGateway(),
+            historyGateway: historyGateway(recorder: CallRecorder()),
+            persistenceGateway: persistenceGateway(recorder: CallRecorder())
+        )
+
+        #expect(service.compositeSurface() == expectedSurface)
+    }
+
+    @Test
+    func compositePixelDataDelegatesToCompositeSurface() {
+        let expected = Data([0x10, 0x20, 0x30])
+        let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
+        let service = DocumentInteractionService(
+            queryGateway: DocumentQueryGateway(
+                lightweightPresentation: { queryGateway().lightweightPresentation() },
+                presentation: { queryGateway().presentation() },
+                compositePixelData: { Data() },
+                compositeSurface: { expectedSurface },
                 pixelDataForLayer: { _ in Data() },
                 consumeDirtyUpdate: { nil }
             ),
@@ -97,6 +121,7 @@ private func queryGateway() -> DocumentQueryGateway {
         lightweightPresentation: { presentation },
         presentation: { presentation },
         compositePixelData: { Data() },
+        compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
         pixelDataForLayer: { _ in Data() },
         consumeDirtyUpdate: { nil }
     )
@@ -123,6 +148,8 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
             return .success(())
         },
         replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+        applyLayerMutation: { _, _ in .success(()) },
+        applyTextLayerMutation: { _, _, _ in .success(()) },
         replaceLayerMask: { _, _ in .success(()) },
         clearLayerMask: { _ in .success(()) },
         applyLayerMask: { _ in .success(()) },

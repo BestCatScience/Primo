@@ -378,6 +378,7 @@ struct ContentView: View {
         .overlay {
             if let preview = exportState.timelapsePreview {
                 TimelapseExportHUD(
+                    previewSurface: preview.previewSurface,
                     previewImageData: preview.previewImageData,
                     progress: preview.progress,
                     language: language
@@ -388,6 +389,7 @@ struct ContentView: View {
                         .ignoresSafeArea()
 
                     NanoBananaProgressHUD(
+                        previewSurface: nanoBananaInputPreviewSurface,
                         previewImageData: nanoBananaInputPreviewImageData,
                         progress: progress,
                         language: language,
@@ -400,17 +402,28 @@ struct ContentView: View {
         }
     }
 
-    private var nanoBananaInputPreviewImageData: Data? {
+    private var nanoBananaInputPreviewSurface: DocumentCompositeSurface? {
         guard
             let snapshot = store.canvas.renderSnapshot,
             let layer = snapshot.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })
         else {
             return nil
         }
-        return AppFeature.pngData(
-            fromLayerPixelData: layer.pixelData,
+        return DocumentCompositeSurface(
             width: snapshot.width,
-            height: snapshot.height
+            height: snapshot.height,
+            pixelData: layer.pixelData
+        )
+    }
+
+    private var nanoBananaInputPreviewImageData: Data? {
+        guard let surface = nanoBananaInputPreviewSurface else {
+            return nil
+        }
+        return AppFeature.pngData(
+            fromLayerPixelData: surface.pixelData,
+            width: surface.width,
+            height: surface.height
         )
     }
 

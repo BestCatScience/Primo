@@ -1,17 +1,21 @@
 import AVFoundation
-import CoreGraphics
 import Foundation
-import ImageIO
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoDocumentContracts
-import UniformTypeIdentifiers
 
 public struct TimelapseExportProgress: Equatable, Sendable {
     public var progress: Double
+    public var previewSurface: DocumentCompositeSurface?
     public var previewImageData: Data?
 
-    public init(progress: Double, previewImageData: Data?) {
+    public init(
+        progress: Double,
+        previewSurface: DocumentCompositeSurface? = nil,
+        previewImageData: Data?
+    ) {
         self.progress = progress
+        self.previewSurface = previewSurface
         self.previewImageData = previewImageData
     }
 }
@@ -58,14 +62,14 @@ public enum TimelapseExportService {
             guard exportFrames.count >= 2 else {
                 throw TimelapseExportError.insufficientFrames
             }
-            targetSize = videoDimensions(for: capture, exportFrames: exportFrames)
+            targetSize = videoDimensions(for: capture, exportFrames: exportFrames, fileClient: fileClient)
             totalFrameCount = exportFrames.count + holdFrameCount
         case let .operations(operations):
             let exportOperations = sampledOperations(from: operations)
             guard exportOperations.count >= 2 else {
                 throw TimelapseExportError.insufficientFrames
             }
-            targetSize = videoDimensions(for: capture, exportFrames: [])
+            targetSize = videoDimensions(for: capture, exportFrames: [], fileClient: fileClient)
             totalFrameCount = exportOperations.count + holdFrameCount
         }
 
@@ -114,6 +118,7 @@ public enum TimelapseExportService {
             try appendFrameImages(
                 exportFrames.map(\.imageURL),
                 targetSize: targetSize,
+                fileClient: fileClient,
                 input: input,
                 adaptor: adaptor,
                 pixelBufferPool: pixelBufferPool,
@@ -161,6 +166,7 @@ public enum TimelapseExportService {
     private static func appendFrameImages(
         _ frameURLs: [URL],
         targetSize: CGSize,
+        fileClient: FileClient,
         input: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         pixelBufferPool: CVPixelBufferPool,
@@ -170,11 +176,11 @@ public enum TimelapseExportService {
         progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
         for (index, frameURL) in frameURLs.enumerated() {
-            guard let image = decodedImage(from: frameURL) else {
+            guard let surface = decodedSurface(from: frameURL, fileClient: fileClient) else {
                 throw TimelapseExportError.invalidFrameData
             }
-            try appendRenderedImage(
-                image,
+            try appendRenderedSurface(
+                surface,
                 at: index,
                 targetSize: targetSize,
                 input: input,
@@ -185,19 +191,20 @@ public enum TimelapseExportService {
             progress?(
                 TimelapseExportProgress(
                     progress: Double(index + 1) / Double(totalFrameCount),
-                    previewImageData: makePreviewData(image: image)
+                    previewSurface: surface,
+                    previewImageData: makePreviewData(surface: surface)
                 )
             )
         }
 
         guard let finalFrameURL = frameURLs.last,
-              let finalImage = decodedImage(from: finalFrameURL) else {
+              let finalSurface = decodedSurface(from: finalFrameURL, fileClient: fileClient) else {
             throw TimelapseExportError.invalidFrameData
         }
 
         for holdIndex in 1...holdFrameCount {
-            try appendRenderedImage(
-                finalImage,
+            try appendRenderedSurface(
+                finalSurface,
                 at: frameURLs.count - 1 + holdIndex,
                 targetSize: targetSize,
                 input: input,
@@ -208,7 +215,8 @@ public enum TimelapseExportService {
             progress?(
                 TimelapseExportProgress(
                     progress: Double(frameURLs.count + holdIndex) / Double(totalFrameCount),
-                    previewImageData: makePreviewData(image: finalImage)
+                    previewSurface: finalSurface,
+                    previewImageData: makePreviewData(surface: finalSurface)
                 )
             )
         }
@@ -231,15 +239,15 @@ public enum TimelapseExportService {
             canvasSize: capture.canvasSize,
             fileClient: fileClient
         )
-        var finalImage: CGImage?
+        var finalSurface: DocumentCompositeSurface?
 
         for (index, operation) in operations.enumerated() {
-            guard let image = replayService.replay(operation) else {
+            guard let surface = replayService.replaySurface(operation) else {
                 throw TimelapseExportError.exportFailed
             }
-            finalImage = image
-            try appendRenderedImage(
-                image,
+            finalSurface = surface
+            try appendRenderedSurface(
+                surface,
                 at: index,
                 targetSize: targetSize,
                 input: input,
@@ -250,18 +258,19 @@ public enum TimelapseExportService {
             progress?(
                 TimelapseExportProgress(
                     progress: Double(index + 1) / Double(totalFrameCount),
-                    previewImageData: makePreviewData(image: image)
+                    previewSurface: surface,
+                    previewImageData: makePreviewData(surface: surface)
                 )
             )
         }
 
-        guard let finalImage else {
+        guard let finalSurface else {
             throw TimelapseExportError.insufficientFrames
         }
 
         for holdIndex in 1...holdFrameCount {
-            try appendRenderedImage(
-                finalImage,
+            try appendRenderedSurface(
+                finalSurface,
                 at: operations.count - 1 + holdIndex,
                 targetSize: targetSize,
                 input: input,
@@ -272,14 +281,15 @@ public enum TimelapseExportService {
             progress?(
                 TimelapseExportProgress(
                     progress: Double(operations.count + holdIndex) / Double(totalFrameCount),
-                    previewImageData: makePreviewData(image: finalImage)
+                    previewSurface: finalSurface,
+                    previewImageData: makePreviewData(surface: finalSurface)
                 )
             )
         }
     }
 
-    private static func appendRenderedImage(
-        _ image: CGImage,
+    private static func appendRenderedSurface(
+        _ surface: DocumentCompositeSurface,
         at index: Int,
         targetSize: CGSize,
         input: AVAssetWriterInput,
@@ -300,21 +310,9 @@ public enum TimelapseExportService {
         CVPixelBufferLockBaseAddress(pixelBuffer, [])
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
 
-        guard let context = CGContext(
-            data: CVPixelBufferGetBaseAddress(pixelBuffer),
-            width: Int(targetSize.width),
-            height: Int(targetSize.height),
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-        ) else {
+        guard writeSurface(surface, into: pixelBuffer, targetSize: targetSize) else {
             throw TimelapseExportError.exportFailed
         }
-
-        context.clear(CGRect(origin: .zero, size: targetSize))
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(origin: .zero, size: targetSize))
 
         let presentationTime = CMTimeMultiply(frameDuration, multiplier: Int32(index))
         guard adaptor.append(pixelBuffer, withPresentationTime: presentationTime) else {
@@ -322,41 +320,30 @@ public enum TimelapseExportService {
         }
     }
 
-    private static func decodedImage(from url: URL) -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+    private static func decodedSurface(from url: URL, fileClient: FileClient) -> DocumentCompositeSurface? {
+        guard let data = try? fileClient.readData(url),
+              let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: data) else {
             return nil
         }
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+        return DocumentCompositeSurface(
+            width: decoded.width,
+            height: decoded.height,
+            pixelData: decoded.pixelData
+        )
     }
 
-    private static func makePreviewData(image: CGImage) -> Data? {
-        let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            data,
-            UTType.jpeg.identifier as CFString,
-            1,
-            nil
-        ) else {
-            return nil
-        }
-        CGImageDestinationAddImage(
-            destination,
-            image,
-            [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary
-        )
-        guard CGImageDestinationFinalize(destination) else {
-            return nil
-        }
-        return data as Data
+    private static func makePreviewData(surface: DocumentCompositeSurface) -> Data? {
+        DocumentRasterImageService.jpegData(from: surface, compressionQuality: 0.7)
     }
 
     private static func videoDimensions(
         for capture: TimelapseCapture,
-        exportFrames: [TimelapseFrame]
+        exportFrames: [TimelapseFrame],
+        fileClient: FileClient = .live
     ) -> CGSize {
         if let firstFrame = exportFrames.first,
-           let image = decodedImage(from: firstFrame.imageURL) {
-            return CGSize(width: image.width, height: image.height)
+           let surface = decodedSurface(from: firstFrame.imageURL, fileClient: fileClient) {
+            return CGSize(width: surface.width, height: surface.height)
         }
         return capture.canvasSize
     }
@@ -384,5 +371,47 @@ public enum TimelapseExportService {
         let raw = formatter.string(from: date)
             .replacingOccurrences(of: ":", with: "-")
         return "timelapse-\(raw).mp4"
+    }
+
+    static func writeSurface(
+        _ surface: DocumentCompositeSurface,
+        into pixelBuffer: CVPixelBuffer,
+        targetSize: CGSize
+    ) -> Bool {
+        guard surface.pixelData.count == surface.width * surface.height * 4 else { return false }
+        guard
+            let destinationBaseAddress = CVPixelBufferGetBaseAddress(pixelBuffer)
+        else {
+            return false
+        }
+
+        let targetWidth = max(Int(targetSize.width.rounded()), 1)
+        let targetHeight = max(Int(targetSize.height.rounded()), 1)
+        guard surface.width == targetWidth, surface.height == targetHeight else {
+            return false
+        }
+
+        let sourceBytesPerRow = surface.width * 4
+        let destinationBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let totalByteCount = destinationBytesPerRow * targetHeight
+        memset(destinationBaseAddress, 0, totalByteCount)
+
+        surface.pixelData.withUnsafeBytes { sourceBytes in
+            guard let sourceBaseAddress = sourceBytes.baseAddress else { return }
+            if destinationBytesPerRow == sourceBytesPerRow {
+                memcpy(destinationBaseAddress, sourceBaseAddress, sourceBytesPerRow * surface.height)
+                return
+            }
+            for row in 0..<surface.height {
+                let sourceOffset = row * sourceBytesPerRow
+                let destinationOffset = row * destinationBytesPerRow
+                memcpy(
+                    destinationBaseAddress.advanced(by: destinationOffset),
+                    sourceBaseAddress.advanced(by: sourceOffset),
+                    sourceBytesPerRow
+                )
+            }
+        }
+        return true
     }
 }

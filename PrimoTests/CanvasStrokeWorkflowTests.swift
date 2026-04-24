@@ -24,12 +24,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(result, .failure(.layerLocked(0)))
     }
 
-    func testFallbackStrokeCommitReturnsBridgeFailureWhenSnapshotIsMissing() {
+    func testCommittedStrokeCommitReturnsBridgeFailureWhenSnapshotIsMissing() {
         let result = withDependencies {
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
-            return feature.commitStrokeUsingFallbackPixels(
+            return feature.commitStrokeUsingCommittedPixels(
                 state: &state,
                 samples: [.testValue()],
                 brush: feature.resolvedBrushSettings(for: state),
@@ -40,7 +40,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         XCTAssertEqual(
             result,
-            .failure(.bridgeMutationFailed("Missing fallback stroke snapshot"))
+            .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
         )
     }
 

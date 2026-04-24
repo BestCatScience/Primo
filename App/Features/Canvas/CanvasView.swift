@@ -3,7 +3,7 @@ import ComposableArchitecture
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentInfrastructure
+import PrimoDocumentMetalRuntimeInfrastructure
 import QuartzCore
 import SwiftUI
 import UIKit
@@ -57,9 +57,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
     private let canvasImageRenderer = CanvasImageRenderer.live
-    private let selectionOverlayView = UIImageView()
-    private let compositePreviewImageView = UIImageView()
-    private let shapePreviewImageView = UIImageView()
+    private let selectionOverlayView = CanvasPixelSurfaceView()
+    private let compositePreviewSurfaceView = CanvasPixelSurfaceView()
+    private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
     private let textTransformBoxView = TransformOutlineView()
     private let textTransformRotationStemView = UIView()
     private let textTransformTopLeftHandleView = UIView()
@@ -75,7 +75,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
     private let touchEyedropperLoupeView = UIView()
-    private let touchEyedropperImageView = UIImageView()
+    private let touchEyedropperSurfaceView = CanvasPixelSurfaceView()
     private let touchEyedropperRingView = UIView()
     private let touchEyedropperFocusView = UIView()
     private let touchEyedropperLongPressRecognizer: UILongPressGestureRecognizer
@@ -115,7 +115,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     private let touchEyedropperLoupeSize = CGSize(width: 102, height: 102)
     private let touchEyedropperPreviewInset: CGFloat = 9
     private let touchEyedropperPreviewGridSize = 17
-    private let touchEyedropperPreviewScale: CGFloat = 6
     private let touchEyedropperVerticalOffset: CGFloat = 86
 
     override init(frame: CGRect) {
@@ -135,19 +134,18 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         addSubview(canvasRenderSurfaceView)
 
         selectionOverlayView.isUserInteractionEnabled = false
-        selectionOverlayView.contentMode = .scaleToFill
         selectionOverlayView.alpha = 0.55
         addSubview(selectionOverlayView)
 
-        compositePreviewImageView.isUserInteractionEnabled = false
-        compositePreviewImageView.contentMode = .scaleToFill
-        compositePreviewImageView.alpha = 1.0
-        addSubview(compositePreviewImageView)
+        compositePreviewSurfaceView.isUserInteractionEnabled = false
+        compositePreviewSurfaceView.alpha = 1.0
+        compositePreviewSurfaceView.isHidden = true
+        addSubview(compositePreviewSurfaceView)
 
-        shapePreviewImageView.isUserInteractionEnabled = false
-        shapePreviewImageView.contentMode = .scaleToFill
-        shapePreviewImageView.alpha = 1.0
-        addSubview(shapePreviewImageView)
+        shapePreviewSurfaceView.isUserInteractionEnabled = false
+        shapePreviewSurfaceView.alpha = 1.0
+        shapePreviewSurfaceView.isHidden = true
+        addSubview(shapePreviewSurfaceView)
 
         textTransformBoxView.isHidden = true
         let textBoxPanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextBoxPan(_:)))
@@ -245,15 +243,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         touchEyedropperLoupeView.addSubview(touchEyedropperRingView)
 
         let previewFrame = touchEyedropperLoupeView.bounds.insetBy(dx: touchEyedropperPreviewInset, dy: touchEyedropperPreviewInset)
-        touchEyedropperImageView.frame = previewFrame
-        touchEyedropperImageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        touchEyedropperImageView.layer.cornerRadius = previewFrame.width / 2
-        touchEyedropperImageView.layer.masksToBounds = true
-        touchEyedropperImageView.contentMode = .scaleAspectFill
-        touchEyedropperImageView.backgroundColor = .white
-        touchEyedropperImageView.layer.borderWidth = 1
-        touchEyedropperImageView.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
-        touchEyedropperLoupeView.addSubview(touchEyedropperImageView)
+        touchEyedropperSurfaceView.frame = previewFrame
+        touchEyedropperSurfaceView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        touchEyedropperSurfaceView.layer.cornerRadius = previewFrame.width / 2
+        touchEyedropperSurfaceView.layer.masksToBounds = true
+        touchEyedropperSurfaceView.backgroundColor = .white
+        touchEyedropperSurfaceView.layer.borderWidth = 1
+        touchEyedropperSurfaceView.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        touchEyedropperLoupeView.addSubview(touchEyedropperSurfaceView)
 
         touchEyedropperFocusView.bounds = CGRect(x: 0, y: 0, width: 18, height: 18)
         touchEyedropperFocusView.center = CGPoint(x: previewFrame.midX, y: previewFrame.midY)
@@ -268,7 +265,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         touchEyedropperFocusView.layer.shadowOpacity = 0.16
         touchEyedropperFocusView.layer.shadowRadius = 2
         touchEyedropperFocusView.layer.shadowOffset = .zero
-        touchEyedropperImageView.addSubview(touchEyedropperFocusView)
+        touchEyedropperSurfaceView.addSubview(touchEyedropperFocusView)
 
         let horizontalCrosshair = UIView(frame: CGRect(x: 0, y: 8.5, width: 18, height: 1))
         horizontalCrosshair.autoresizingMask = [.flexibleWidth]
@@ -330,9 +327,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     override func layoutSubviews() {
         super.layoutSubviews()
         canvasRenderSurfaceView.frame = bounds
-        shapePreviewImageView.frame = bounds
         selectionOutlineLayer.frame = bounds
         selectionPreviewLayer.frame = bounds
+        if !shapePreviewSurfaceView.isHidden {
+            shapePreviewSurfaceView.frame = contentRect()
+        }
+        if !compositePreviewSurfaceView.isHidden {
+            compositePreviewSurfaceView.frame = contentRect()
+        }
     }
 
     func update(
@@ -562,9 +564,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             currentTool == .select || currentTool == .move,
             let selection,
             !selection.isEmpty,
-            let image = makeSelectionOverlayImage(selection)
+            let surface = makeSelectionOverlaySurface(selection)
         else {
-            selectionOverlayView.image = nil
+            selectionOverlayView.update(surface: nil)
             selectionOverlayView.frame = .zero
             selectionOutlineLayer.path = nil
             return
@@ -583,7 +585,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                 false
             )
 
-        selectionOverlayView.image = shouldHideOverlayImage ? nil : image
+        selectionOverlayView.update(surface: shouldHideOverlayImage ? nil : surface)
         selectionOverlayView.frame = shouldHideOverlayImage ? .zero : rect
         if currentTool == .move, shouldHideOverlayImage {
             let corners = effectiveTransformQuad(for: selection.bounds).points.map(viewPoint(fromDocumentPoint:))
@@ -740,15 +742,15 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             if
                 let snapshot,
                 let strokePreviewCompositePixelData,
-                let image = makeLayerImage(
+                let surface = canvasImageRenderer.paperCompositeSurface(
                     pixelData: strokePreviewCompositePixelData,
                     width: snapshot.width,
                     height: snapshot.height,
                     paperStyle: paperStyle
                 )
             {
-                compositePreviewImageView.image = image
-                compositePreviewImageView.frame = contentRect()
+                compositePreviewSurfaceView.update(surface: surface)
+                compositePreviewSurfaceView.frame = contentRect()
                 canvasRenderSurfaceView.isHidden = true
                 return
             }
@@ -756,26 +758,26 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             if
                 let snapshot,
                 let adjustmentPreviewPixelData,
-                let image = makeLayerImage(
+                let surface = canvasImageRenderer.paperCompositeSurface(
                     pixelData: adjustmentPreviewPixelData,
                     width: snapshot.width,
                     height: snapshot.height,
                     paperStyle: paperStyle
                 )
             {
-                compositePreviewImageView.image = image
-                compositePreviewImageView.frame = contentRect()
+                compositePreviewSurfaceView.update(surface: surface)
+                compositePreviewSurfaceView.frame = contentRect()
                 canvasRenderSurfaceView.isHidden = true
                 return
             }
 
-            compositePreviewImageView.image = nil
-            compositePreviewImageView.frame = .zero
+            compositePreviewSurfaceView.update(surface: nil)
+            compositePreviewSurfaceView.frame = .zero
             canvasRenderSurfaceView.isHidden = false
             return
         }
 
-        guard let image = makeCompositePreviewImage(
+        guard let surface = makeCompositePreviewSurface(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             selection: selection,
@@ -785,14 +787,14 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             transformPreviewRotationDegrees: transformPreviewRotationDegrees,
             activeTextLayer: activeTextLayer
         ) else {
-            compositePreviewImageView.image = nil
-            compositePreviewImageView.frame = .zero
+            compositePreviewSurfaceView.update(surface: nil)
+            compositePreviewSurfaceView.frame = .zero
             canvasRenderSurfaceView.isHidden = false
             return
         }
 
-        compositePreviewImageView.image = image
-        compositePreviewImageView.frame = contentRect()
+        compositePreviewSurfaceView.update(surface: surface)
+        compositePreviewSurfaceView.frame = contentRect()
         canvasRenderSurfaceView.isHidden = true
     }
 
@@ -816,198 +818,29 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     private func updateStrokePreview(_ stroke: Stroke?, style: PreviewStrokeStyle) {
         guard let stroke else {
-            shapePreviewImageView.image = nil
-            shapePreviewImageView.isHidden = true
+            shapePreviewSurfaceView.update(surface: nil)
             return
         }
         guard currentTool == .shape else {
-            shapePreviewImageView.image = nil
-            shapePreviewImageView.isHidden = true
+            shapePreviewSurfaceView.update(surface: nil)
             return
         }
         guard stroke.points.count >= 2 else {
-            shapePreviewImageView.image = nil
-            shapePreviewImageView.isHidden = true
+            shapePreviewSurfaceView.update(surface: nil)
             return
         }
-
-        let renderer = UIGraphicsImageRenderer(size: bounds.size)
-        let image = renderer.image { context in
-            let cgContext = context.cgContext
-            cgContext.setAllowsAntialiasing(true)
-            cgContext.setShouldAntialias(true)
-            drawStrokePreview(stroke: stroke, style: style, in: cgContext)
-        }
-
-        shapePreviewImageView.image = image
-        shapePreviewImageView.isHidden = false
-    }
-
-    private func drawStrokePreview(stroke: Stroke, style: PreviewStrokeStyle, in context: CGContext) {
-        let points = stroke.points.map { point in
-            (viewPoint(fromDocumentPoint: point.cgPoint), CGFloat(point.pressure))
-        }
-
-        guard !points.isEmpty else { return }
-        if points.count == 1 {
-            let point = points[0].0
-            let pressure = points[0].1
-            let baseDiameter = max(style.radius * 2.0, 1.0)
-            let pressureScale = max(0.35, 1.0 - style.pressureSensitivity + (style.pressureSensitivity * pressure))
-            let diameter = max(baseDiameter * pressureScale, 1.0)
-            drawPreviewStamp(
-                in: context,
-                center: point,
-                diameter: diameter,
-                angle: style.angle,
-                alpha: previewStampAlpha(style: style),
-                style: style
-            )
+        guard let snapshot = currentSnapshot,
+              let surface = canvasImageRenderer.shapePreviewSurface(
+                stroke: stroke,
+                style: style,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height
+              ) else {
+            shapePreviewSurfaceView.update(surface: nil)
             return
         }
-        let sampled = denselySampledPreviewPoints(from: points, style: style)
-        for index in sampled.indices {
-            let point = sampled[index].0
-            let pressure = sampled[index].1
-            let baseDiameter = max(style.radius * 2.0, 1.0)
-            let pressureScale = max(0.35, 1.0 - style.pressureSensitivity + (style.pressureSensitivity * pressure))
-            let diameter = max(baseDiameter * pressureScale, 1.0)
-            let angle = previewStampAngle(for: sampled, at: index, style: style)
-            drawPreviewStamp(
-                in: context,
-                center: point,
-                diameter: diameter,
-                angle: angle,
-                alpha: previewStampAlpha(style: style),
-                style: style
-            )
-        }
-    }
-
-    private func denselySampledPreviewPoints(from points: [(CGPoint, CGFloat)], style: PreviewStrokeStyle) -> [(CGPoint, CGFloat)] {
-        guard points.count >= 2 else { return points }
-
-        let baseDiameter = max(style.radius * 2.0, 1.0)
-        let spacing = max(baseDiameter * 0.16, 0.75)
-        var sampled: [(CGPoint, CGFloat)] = [points[0]]
-
-        for index in 1..<points.count {
-            let previous = points[index - 1]
-            let current = points[index]
-            let deltaX = current.0.x - previous.0.x
-            let deltaY = current.0.y - previous.0.y
-            let distance = hypot(deltaX, deltaY)
-            let steps = max(1, Int(ceil(distance / spacing)))
-
-            for step in 1...steps {
-                let t = CGFloat(step) / CGFloat(steps)
-                sampled.append((
-                    CGPoint(
-                        x: previous.0.x + deltaX * t,
-                        y: previous.0.y + deltaY * t
-                    ),
-                    previous.1 + ((current.1 - previous.1) * t)
-                ))
-            }
-        }
-
-        return sampled
-    }
-
-    private func previewStampAngle(for points: [(CGPoint, CGFloat)], at index: Int, style: PreviewStrokeStyle) -> CGFloat {
-        guard style.followsStrokeAngle, points.count >= 2 else { return style.angle }
-
-        let previous = points[max(index - 1, 0)].0
-        let next = points[min(index + 1, points.count - 1)].0
-        let deltaX = next.x - previous.x
-        let deltaY = next.y - previous.y
-        guard abs(deltaX) > 0.001 || abs(deltaY) > 0.001 else { return style.angle }
-        return atan2(deltaY, deltaX) + style.angle
-    }
-
-    private func drawPreviewStamp(
-        in context: CGContext,
-        center: CGPoint,
-        diameter: CGFloat,
-        angle: CGFloat,
-        alpha: CGFloat,
-        style: PreviewStrokeStyle
-    ) {
-        context.saveGState()
-        context.translateBy(x: center.x, y: center.y)
-        context.rotate(by: angle)
-
-        let size: CGSize = {
-            if let customTip = style.customTip, customTip.width > 0, customTip.height > 0 {
-                let aspectRatio = CGFloat(customTip.height) / CGFloat(customTip.width)
-                return CGSize(width: diameter, height: max(diameter * aspectRatio, 1.0))
-            }
-            return CGSize(width: diameter, height: max(diameter * style.roundness, diameter * 0.2))
-        }()
-        let rect = CGRect(
-            x: -size.width * 0.5,
-            y: -size.height * 0.5,
-            width: size.width,
-            height: size.height
-        )
-
-        if let customTip = style.customTip, let mask = tipMaskImage(for: customTip) {
-            context.saveGState()
-            context.clip(to: rect, mask: mask)
-            context.setFillColor(UIColor(cgColor: style.color).withAlphaComponent(alpha).cgColor)
-            context.fill(rect)
-            context.restoreGState()
-        } else {
-            context.setFillColor(UIColor(cgColor: style.color).withAlphaComponent(alpha).cgColor)
-
-            switch style.tipKind {
-            case .airbrush:
-                context.setShadow(offset: .zero, blur: diameter * (1.0 - style.hardness) * 0.8, color: UIColor(cgColor: style.color).withAlphaComponent(alpha * 0.8).cgColor)
-                context.fillEllipse(in: rect)
-            case .oil:
-                let path = UIBezierPath(roundedRect: rect, cornerRadius: rect.height * 0.22)
-                context.addPath(path.cgPath)
-                context.fillPath()
-            case .ink, .pencil:
-                context.fillEllipse(in: rect)
-            }
-        }
-
-        context.restoreGState()
-    }
-
-    private func previewStampAlpha(style: PreviewStrokeStyle) -> CGFloat {
-        let base = min(max(style.opacity, 0.04), 1.0)
-        let flow = min(max(style.flow, 0.04), 1.0)
-        let hardnessBias = 0.55 + (style.hardness * 0.45)
-        return min(max(base * flow * hardnessBias * 0.55, 0.03), 1.0)
-    }
-
-    private func tipMaskImage(for raster: BrushTipRaster) -> CGImage? {
-        let colorSpace = CGColorSpaceCreateDeviceGray()
-        guard let provider = CGDataProvider(data: raster.alphaData as CFData) else { return nil }
-        return CGImage(
-            maskWidth: raster.width,
-            height: raster.height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 8,
-            bytesPerRow: raster.width,
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: true
-        ) ?? CGImage(
-            width: raster.width,
-            height: raster.height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 8,
-            bytesPerRow: raster.width,
-            space: colorSpace,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: true,
-            intent: .defaultIntent
-        )
+        shapePreviewSurfaceView.update(surface: surface)
+        shapePreviewSurfaceView.frame = contentRect()
     }
 
     private func sampledColor(at point: CGPoint, source: EyedropperSamplingSource) -> SampledColor? {
@@ -1094,9 +927,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
         sendAction?(.colorSampled(sampledColor))
         touchEyedropperRingView.layer.borderColor = uiColor(from: sampledColor).cgColor
-        touchEyedropperImageView.image = makeEyedropperLoupeImage(
+        touchEyedropperSurfaceView.update(
+            surface: makeEyedropperLoupeSurface(
             around: documentPoint,
             source: inputHandler.eyedropperSamplingSource
+            ),
+            filtering: .nearest
         )
         positionTouchEyedropperLoupe(above: viewPoint)
         if touchEyedropperLoupeView.isHidden {
@@ -1119,7 +955,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         } completion: { _ in
             self.touchEyedropperLoupeView.isHidden = true
             self.touchEyedropperLoupeView.transform = .identity
-            self.touchEyedropperImageView.image = nil
+            self.touchEyedropperSurfaceView.update(surface: nil, filtering: .nearest)
         }
     }
 
@@ -1148,7 +984,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         touchEyedropperLoupeView.center = clampedCenter
     }
 
-    private func makeEyedropperLoupeImage(around point: CGPoint, source: EyedropperSamplingSource) -> UIImage? {
+    private func makeEyedropperLoupeSurface(around point: CGPoint, source: EyedropperSamplingSource) -> DocumentCompositeSurface? {
         guard
             touchEyedropperPreviewGridSize > 0,
             let snapshot = currentSnapshot
@@ -1169,7 +1005,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
 
         if let sourcePixelData,
-           let image = canvasImageRenderer.eyedropperLoupeImage(
+           let surface = canvasImageRenderer.eyedropperLoupeSurface(
                 sourcePixelData: sourcePixelData,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,
@@ -1177,65 +1013,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                 centerY: centerY,
                 gridSize: grid,
                 paperStyle: paperStyle,
-                blendWithPaper: blendWithPaper,
-                imageBuilder: { rgba, grid in
-                    upscaledGridImage(from: rgba, grid: grid)
-                }
+                blendWithPaper: blendWithPaper
            ) {
-            return image
+            return surface
         }
 
-        var rgba = [UInt8](repeating: 255, count: grid * grid * 4)
-        for row in 0..<grid {
-            for column in 0..<grid {
-                let sampleX = centerX + column - (grid / 2)
-                let sampleY = centerY + row - (grid / 2)
-                let samplePoint = CGPoint(x: sampleX, y: sampleY)
-                let sampled = sampledColor(at: samplePoint, source: source) ?? SampledColor(red: 255, green: 255, blue: 255, alpha: 255)
-                let offset = ((row * grid) + column) * 4
-                rgba[offset] = sampled.red
-                rgba[offset + 1] = sampled.green
-                rgba[offset + 2] = sampled.blue
-                rgba[offset + 3] = 255
-            }
-        }
-
-        let data = Data(rgba)
-        return upscaledGridImage(from: data, grid: grid)
-    }
-
-    private func upscaledGridImage(from data: Data, grid: Int) -> UIImage? {
-        guard let provider = CGDataProvider(data: data as CFData) else { return nil }
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let cgImage = CGImage(
-            width: grid,
-            height: grid,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: grid * 4,
-            space: colorSpace,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-        ) else {
-            return nil
-        }
-
-        let outputSize = CGSize(
-            width: CGFloat(grid) * touchEyedropperPreviewScale,
-            height: CGFloat(grid) * touchEyedropperPreviewScale
-        )
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = true
-        let renderer = UIGraphicsImageRenderer(size: outputSize, format: format)
-        return renderer.image { context in
-            context.cgContext.interpolationQuality = .none
-            context.cgContext.setFillColor(UIColor.white.cgColor)
-            context.cgContext.fill(CGRect(origin: .zero, size: outputSize))
-            context.cgContext.draw(cgImage, in: CGRect(origin: .zero, size: outputSize))
-        }
+        return nil
     }
 
     private func uiColor(from sampledColor: SampledColor) -> UIColor {
@@ -1315,22 +1098,19 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         )
     }
 
-    private func makeSelectionOverlayImage(_ selection: CanvasSelection) -> UIImage? {
+    private func makeSelectionOverlaySurface(_ selection: CanvasSelection) -> DocumentCompositeSurface? {
         let width = selection.maskWidth
         let height = selection.maskHeight
         guard width > 0, height > 0 else { return nil }
         let expectedCount = width * height
         guard selection.maskData.count == expectedCount else { return nil }
 
-        if let image = canvasImageRenderer.selectionOverlayImage(
+        if let surface = canvasImageRenderer.selectionOverlaySurface(
             maskData: selection.maskData,
             width: width,
-            height: height,
-            imageBuilder: { rgba, width, height in
-                rgbaImage(from: rgba, width: width, height: height)
-            }
+            height: height
         ) {
-            return image
+            return surface
         }
 
         var rgba = Data(count: expectedCount * 4)
@@ -1352,31 +1132,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             }
         }
 
-        return rgbaImage(from: rgba, width: width, height: height)
+        return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
     }
 
-    private func rgbaImage(from rgba: Data, width: Int, height: Int) -> UIImage? {
-        guard let provider = CGDataProvider(data: rgba as CFData) else { return nil }
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let image = CGImage(
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-        ) else {
-            return nil
-        }
-        return UIImage(cgImage: image)
-    }
-
-    private func makeCompositePreviewImage(
+    private func makeCompositePreviewSurface(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         selection: CanvasSelection?,
@@ -1385,7 +1144,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         transformPreviewScaleY: CGFloat,
         transformPreviewRotationDegrees: Double,
         activeTextLayer: TextLayerData?
-    ) -> UIImage? {
+    ) -> DocumentCompositeSurface? {
         guard let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
             return nil
         }
@@ -1447,42 +1206,12 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return composite
         }()
 
-        return makeLayerImage(pixelData: composite, width: snapshot.width, height: snapshot.height, paperStyle: paperStyle)
-    }
-
-    private func makeLayerImage(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle? = nil) -> UIImage? {
-        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
-        if let paperStyle {
-            if let composited = canvasImageRenderer.paperCompositeImage(
-                pixelData: pixelData,
-                width: width,
-                height: height,
-                paperStyle: paperStyle,
-                imageBuilder: { rgba, width, height in
-                    rgbaImage(from: rgba, width: width, height: height)
-                }
-            ) {
-                return composited
-            }
-        }
-        guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let image = CGImage(
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bitsPerPixel: 32,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
-            provider: provider,
-            decode: nil,
-            shouldInterpolate: false,
-            intent: .defaultIntent
-        ) else {
-            return nil
-        }
-        return UIImage(cgImage: image)
+        return canvasImageRenderer.paperCompositeSurface(
+            pixelData: composite,
+            width: snapshot.width,
+            height: snapshot.height,
+            paperStyle: paperStyle
+        )
     }
 
     private func makeTransformedLayerPreview(
@@ -1517,7 +1246,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         scaleY: CGFloat,
         rotationDegrees: Double
     ) -> Data? {
-        let canvasSize = CGSize(width: canvasWidth, height: canvasHeight)
         var transformed = textLayer
         transformed.position = CGPoint(
             x: transformed.position.x + transformPreviewOffset.width,
@@ -1525,18 +1253,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         )
         transformed.scale = min(max(transformed.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += rotationDegrees
-        guard let resolved = DocumentTextRasterizer.resolvedTextLayout(for: transformed, canvasSize: canvasSize) else {
-            return nil
-        }
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = false
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
-        let image = renderer.image { context in
-            DocumentTextRasterizer.drawTextLayer(transformed, resolved: resolved, in: context.cgContext)
-        }
-        guard let cgImage = image.cgImage else { return nil }
-        return DocumentTextRasterizer.pixelData(from: cgImage, size: canvasSize)
+        return canvasImageRenderer.transformedTextPreviewSurface(
+            textLayer: transformed,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )?.pixelData
     }
 
     private func configureTextHandle(_ handle: UIView, symbol: String) {
@@ -1595,17 +1316,20 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         transformed.scale = min(max(transformed.scale * Double((transformPreviewScaleX + transformPreviewScaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += transformPreviewRotationDegrees
 
-        guard let resolved = DocumentTextRasterizer.resolvedTextLayout(for: transformed, canvasSize: documentSize) else {
+        guard let drawRect = canvasImageRenderer.transformedTextLayoutRect(
+            textLayer: transformed,
+            canvasSize: documentSize
+        ) else {
             return nil
         }
         let quad = TransformQuad(
-            topLeft: CGPoint(x: resolved.drawRect.minX, y: resolved.drawRect.minY),
-            topRight: CGPoint(x: resolved.drawRect.maxX, y: resolved.drawRect.minY),
-            bottomLeft: CGPoint(x: resolved.drawRect.minX, y: resolved.drawRect.maxY),
-            bottomRight: CGPoint(x: resolved.drawRect.maxX, y: resolved.drawRect.maxY)
+            topLeft: CGPoint(x: drawRect.minX, y: drawRect.minY),
+            topRight: CGPoint(x: drawRect.maxX, y: drawRect.minY),
+            bottomLeft: CGPoint(x: drawRect.minX, y: drawRect.maxY),
+            bottomRight: CGPoint(x: drawRect.maxX, y: drawRect.maxY)
         )
         return geometry(
-            sourceRect: resolved.drawRect,
+            sourceRect: drawRect,
             quad: quad,
             pivot: transformed.position
         )
