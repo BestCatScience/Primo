@@ -3,6 +3,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentStrokeApplication
 
 public struct DocumentRuntimeComposition: Sendable {
     public var queryGateway: DocumentQueryGateway
@@ -14,6 +15,7 @@ public struct DocumentRuntimeComposition: Sendable {
     public var textLayerGateway: TextLayerGateway
     public var layerEffectsGateway: DocumentLayerEffectsGateway
     public var editingGateway: DocumentEditingGateway
+    public var strokeSessionUseCase: DocumentStrokeSessionUseCase
 
     public init(
         queryGateway: DocumentQueryGateway,
@@ -24,7 +26,8 @@ public struct DocumentRuntimeComposition: Sendable {
         exportGateway: DocumentExportGateway,
         textLayerGateway: TextLayerGateway,
         layerEffectsGateway: DocumentLayerEffectsGateway,
-        editingGateway: DocumentEditingGateway
+        editingGateway: DocumentEditingGateway,
+        strokeSessionUseCase: DocumentStrokeSessionUseCase
     ) {
         self.queryGateway = queryGateway
         self.mutationGateway = mutationGateway
@@ -35,6 +38,7 @@ public struct DocumentRuntimeComposition: Sendable {
         self.textLayerGateway = textLayerGateway
         self.layerEffectsGateway = layerEffectsGateway
         self.editingGateway = editingGateway
+        self.strokeSessionUseCase = strokeSessionUseCase
     }
 }
 
@@ -49,6 +53,7 @@ public enum DocumentRuntimeCompositionFactory {
             dateClient: dateClient,
             uuidClient: uuidClient
         )
+        let strokeUseCases = DocumentStrokeUseCasesLive.live()
 
         return DocumentRuntimeComposition(
             queryGateway: runtime.queryGateway,
@@ -61,7 +66,8 @@ public enum DocumentRuntimeCompositionFactory {
             layerEffectsGateway: DocumentLayerEffectsGateway(
                 mergeLayerDown: runtime.mergeLayerDown
             ),
-            editingGateway: runtime.makeEditingGateway()
+            editingGateway: runtime.makeEditingGateway(),
+            strokeSessionUseCase: strokeUseCases.session
         )
     }
 }

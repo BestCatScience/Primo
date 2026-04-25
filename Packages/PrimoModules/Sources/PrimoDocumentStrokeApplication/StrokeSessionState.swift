@@ -29,20 +29,17 @@ public struct StrokeSessionState: Equatable, Sendable {
     public var baseSnapshot: MetalDocumentSnapshot?
     public var renderState: StrokeSessionRenderState?
     public var pendingIncrementalUpdate: IncrementalLayerUpdate?
-    public var pendingFinalizationSamples: [StylusSample]
     public var committedPointCount: Int
 
     public init(
         baseSnapshot: MetalDocumentSnapshot? = nil,
         renderState: StrokeSessionRenderState? = nil,
         pendingIncrementalUpdate: IncrementalLayerUpdate? = nil,
-        pendingFinalizationSamples: [StylusSample] = [],
         committedPointCount: Int = 0
     ) {
         self.baseSnapshot = baseSnapshot
         self.renderState = renderState
         self.pendingIncrementalUpdate = pendingIncrementalUpdate
-        self.pendingFinalizationSamples = pendingFinalizationSamples
         self.committedPointCount = committedPointCount
     }
 
@@ -74,10 +71,6 @@ public struct StrokeSessionState: Equatable, Sendable {
         }
     }
 
-    public mutating func setPendingFinalizationSamples(_ samples: [StylusSample]) {
-        pendingFinalizationSamples = Self.trimmingDuplicateTrailingSamples(samples)
-    }
-
     public mutating func markCommittedPointCount(_ pointCount: Int) {
         committedPointCount = max(committedPointCount, pointCount)
     }
@@ -85,7 +78,6 @@ public struct StrokeSessionState: Equatable, Sendable {
     public mutating func resetPreview() {
         baseSnapshot = nil
         renderState = nil
-        pendingFinalizationSamples = []
         pendingIncrementalUpdate = nil
     }
 

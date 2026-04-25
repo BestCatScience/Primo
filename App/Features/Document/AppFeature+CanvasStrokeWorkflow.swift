@@ -5,22 +5,14 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
-import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
 extension AppFeature {
-    typealias StrokePreviewPlan = DocumentStrokePreviewPlan
-
     struct CanvasStrokeContext {
         let activeLayer: LayerRowModel
         let activeLayerIndex: Int
         let brush: BrushRuntimeSettings
         let previewBrush: BrushRuntimeSettings
-    }
-
-    struct StrokePreviewResolution {
-        let plan: StrokePreviewPlan
-        var baseSnapshotToCapture: MetalDocumentSnapshot? = nil
     }
 
     enum StrokeCommitResolution {
@@ -110,93 +102,21 @@ extension AppFeature {
             return .success(())
         }
 
-        func applyPreviewResolution(
-            _ resolution: StrokePreviewResolution,
+        func applyPreviewMutation(
+            _ mutation: GpuPreviewMutation,
             activeLayerIndex: Int,
-            state: inout State,
-            applyPreviewPlan: (StrokePreviewPlan, Int, inout State) -> Void
+            state: inout State
         ) {
-            if let baseSnapshotToCapture = resolution.baseSnapshotToCapture {
+            if let baseSnapshotToCapture = mutation.baseSnapshotToCapture {
                 state.canvas.captureStrokeBaseSnapshot(baseSnapshotToCapture)
             }
-            applyPreviewPlan(
-                resolution.plan,
-                activeLayerIndex,
-                &state
+            state.canvas.strokeSession.applyPreview(
+                baseSnapshot: mutation.baseSnapshot,
+                surface: mutation.surface,
+                dirtyRegion: mutation.dirtyRegion,
+                isApproximatePreview: mutation.isApproximatePreview,
+                incrementalUpdate: mutation.incrementalUpdate
             )
-        }
-    }
-
-    struct CanvasStrokeCommitService {
-        let layerCommands: DocumentLayerCommandService
-
-        fileprivate func resolve(
-            state: inout State,
-            samples: [StylusSample],
-            context: CanvasStrokeContext,
-            keepsSelectionCleared: Bool,
-            refreshViaDirtyPresentation: Bool,
-            clearSelectionWithoutRefresh: (inout State) -> Void,
-            commitFallbackPixels: (inout State, [StylusSample], BrushRuntimeSettings, LayerRowModel, Bool) -> DocumentMutationResult
-        ) -> StrokeCommitResolution {
-            if keepsSelectionCleared {
-                switch layerCommands.ensureLayerVisible(context.activeLayerIndex) {
-                case .success:
-                    break
-                case let .failure(failure):
-                    return .failed(failure)
-                }
-                clearSelectionWithoutRefresh(&state)
-            }
-            let commitResult: DocumentMutationResult
-            let canCommitPreviewSurface = Self.shouldCommitPreviewSurface(
-                state: state,
-                context: context
-            )
-            if canCommitPreviewSurface,
-               let renderState = state.canvas.strokeSession.renderState {
-                commitResult = layerCommands.applyLayerSurfaceMutation(
-                    context.activeLayerIndex,
-                    GpuLayerMutationPayload(
-                        canvasWidth: renderState.surfaceHandle.width,
-                        canvasHeight: renderState.surfaceHandle.height,
-                        dirtyRect: renderState.dirtyRect,
-                        gpuBufferHandle: renderState.surfaceHandle
-                    )
-                )
-            } else {
-                commitResult = commitFallbackPixels(
-                    &state,
-                    samples,
-                    context.previewBrush,
-                    context.activeLayer,
-                    refreshViaDirtyPresentation
-                )
-            }
-            switch commitResult {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failed(failure)
-            }
-            return .committed(
-                DocumentMutationContract(
-                    canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
-                    refresh: refreshViaDirtyPresentation ? .dirty : .current,
-                    updatesWorkspaceArtifacts: false
-                )
-            )
-        }
-
-        private static func shouldCommitPreviewSurface(
-            state: State,
-            context: CanvasStrokeContext
-        ) -> Bool {
-            guard let renderState = state.canvas.strokeSession.renderState else { return false }
-            if !renderState.isApproximatePreview {
-                return true
-            }
-            return state.usesResponsiveOilPreview(for: context.previewBrush)
         }
     }
 
@@ -231,8 +151,8 @@ extension AppFeature {
             prepareEditing: (inout State) -> DocumentMutationResult,
             applyFailureFeedback: (DocumentMutationFailure, inout State) -> Void,
             captureBaseSnapshot: (inout State) -> Void,
-            resolveInitialPreview: (State, StylusSample, CanvasStrokeContext) -> StrokePreviewResolution?,
-            applyPreview: (StrokePreviewResolution, Int, inout State) -> Void,
+            resolveInitialPreview: (State, StylusSample, CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout State) -> Void,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
@@ -246,17 +166,16 @@ extension AppFeature {
                 return .none
             }
             captureBaseSnapshot(&state)
-            if let previewResolution = resolveInitialPreview(
+            let previewOutcome = resolveInitialPreview(
                 state,
                 sample,
                 context
-            ) {
-                applyPreview(
-                    previewResolution,
-                    context.activeLayerIndex,
-                    &state
-                )
-            }
+            )
+            applyPreview(
+                previewOutcome,
+                context.activeLayerIndex,
+                &state
+            )
             return cancelEffects()
         }
 
@@ -264,21 +183,19 @@ extension AppFeature {
             state: inout State,
             samples: [StylusSample],
             resolveContext: (State) -> CanvasStrokeContext?,
-            resolvePreview: (State, [StylusSample], CanvasStrokeContext) -> StrokePreviewResolution?,
-            applyPreview: (StrokePreviewResolution, Int, inout State) -> Void
+            resolvePreview: (State, [StylusSample], CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout State) -> Void
         ) {
             guard let context = resolveContext(state) else {
                 return
             }
-            guard let previewResolution = resolvePreview(
+            let previewOutcome = resolvePreview(
                 state,
                 samples,
                 context
-            ) else {
-                return
-            }
+            )
             applyPreview(
-                previewResolution,
+                previewOutcome,
                 context.activeLayerIndex,
                 &state
             )
@@ -334,24 +251,6 @@ extension AppFeature {
         )
     }
 
-    var canvasStrokeCommitService: CanvasStrokeCommitService {
-        CanvasStrokeCommitService(
-            layerCommands: documentLayerCommandService
-        )
-    }
-
-    var canvasStrokeUseCases: DocumentStrokeUseCasesLive {
-        DocumentStrokeUseCasesLive.live()
-    }
-
-    var canvasStrokePreviewUseCase: DocumentStrokePreviewUseCase {
-        canvasStrokeUseCases.preview
-    }
-
-    var canvasStrokeCommitUseCase: DocumentStrokeCommitUseCase {
-        canvasStrokeUseCases.commit
-    }
-
     var canvasStrokeEffectCoordinator: CanvasStrokeEffectCoordinator {
         CanvasStrokeEffectCoordinator()
     }
@@ -361,7 +260,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
-        canvasStrokeUseCases.resetInteractiveStrokeState()
+        _ = documentStrokeSessionUseCase.execute(.cancel)
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -384,7 +283,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
-        canvasStrokeUseCases.resetInteractiveStrokeState()
+        _ = documentStrokeSessionUseCase.execute(.cancel)
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -432,50 +331,51 @@ extension AppFeature {
         state: State,
         sample: StylusSample,
         context: CanvasStrokeContext
-    ) -> StrokePreviewResolution? {
-        canvasStrokePreviewUseCase.resolveInitial(
-            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
-            sample: sample,
-            context: DocumentStrokeContext(context),
-            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
-        ).flatMap(StrokePreviewResolution.init(_:))
+    ) -> GpuStrokeSessionOutcome {
+        documentStrokeSessionUseCase.execute(
+            .begin(
+                sample: sample,
+                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+                context: DocumentStrokeContext(context),
+                usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
+            )
+        )
     }
 
     func resolveAppendedStrokePreview(
         state: State,
         samples: [StylusSample],
         context: CanvasStrokeContext
-    ) -> StrokePreviewResolution? {
-        let fullSamples = !state.canvas.strokeSession.pendingFinalizationSamples.isEmpty
-            ? state.canvas.strokeSession.pendingFinalizationSamples
-            : (state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples)
-        return canvasStrokePreviewUseCase.resolveAppended(
-            activeStrokeBaseSnapshot: state.canvas.strokeSession.baseSnapshot,
-            renderSnapshot: state.canvas.renderSnapshot,
-            samples: samples,
-            fullSamples: fullSamples,
-            context: DocumentStrokeContext(context),
-            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
-        ).flatMap(StrokePreviewResolution.init(_:))
+    ) -> GpuStrokeSessionOutcome {
+        documentStrokeSessionUseCase.execute(
+            .append(
+                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+                renderSnapshot: state.canvas.renderSnapshot,
+                samples: samples,
+                fullSamples: state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples,
+                context: DocumentStrokeContext(context),
+                usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
+            )
+        )
     }
 
-    func applyStrokePreviewResolution(
-        _ resolution: StrokePreviewResolution,
+    func applyStrokePreviewOutcome(
+        _ outcome: GpuStrokeSessionOutcome,
         activeLayerIndex: Int,
         state: inout State
     ) {
-        canvasStrokeStateCoordinator.applyPreviewResolution(
-            resolution,
-            activeLayerIndex: activeLayerIndex,
-            state: &state,
-            applyPreviewPlan: { plan, activeLayerIndex, state in
-                applyStrokePreviewPlan(
-                    plan,
-                    activeLayerIndex: activeLayerIndex,
-                    state: &state
-                )
-            }
-        )
+        switch outcome {
+        case let .preview(mutation):
+            canvasStrokeStateCoordinator.applyPreviewMutation(
+                mutation,
+                activeLayerIndex: activeLayerIndex,
+                state: &state
+            )
+        case let .failure(failure):
+            applyCanvasStrokeFailure(failure, state: &state)
+        case .commit, .reset:
+            break
+        }
     }
 
     func resolveStrokeCommit(
@@ -485,25 +385,55 @@ extension AppFeature {
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> StrokeCommitResolution {
-        canvasStrokeCommitService.resolve(
-            state: &state,
-            samples: samples,
-            context: context,
-            keepsSelectionCleared: keepsSelectionCleared,
-            refreshViaDirtyPresentation: refreshViaDirtyPresentation,
-            clearSelectionWithoutRefresh: { state in
+        if keepsSelectionCleared {
+            switch documentLayerCommandService.ensureLayerVisible(context.activeLayerIndex) {
+            case .success:
                 clearCanvasSelectionWithoutRefresh(state: &state)
-            },
-            commitFallbackPixels: { state, samples, brush, activeLayer, refreshViaDirtyPresentation in
-                commitStrokeUsingCommittedPixels(
-                    state: &state,
-                    samples: samples,
-                    brush: brush,
-                    activeLayer: activeLayer,
-                    refreshViaDirtyPresentation: refreshViaDirtyPresentation
-                )
+            case let .failure(failure):
+                return .failed(failure)
             }
+        }
+
+        let outcome = documentStrokeSessionUseCase.execute(
+            .finish(
+                renderState: state.canvas.strokeSession.renderState,
+                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+                renderSnapshot: state.canvas.renderSnapshot,
+                samples: samples,
+                context: DocumentStrokeContext(context),
+                allowsApproximatePreviewCommit: state.usesResponsiveOilPreview(for: context.previewBrush),
+                refreshViaDirtyPresentation: refreshViaDirtyPresentation
+            )
         )
+
+        switch outcome {
+        case let .commit(mutation):
+            let result = documentLayerCommandService.applyLayerSurfaceMutation(
+                mutation.surface.layerIndex,
+                GpuLayerMutationPayload(
+                    canvasWidth: mutation.surface.width,
+                    canvasHeight: mutation.surface.height,
+                    dirtyRect: mutation.dirtyRegion.layerPixelRect,
+                    gpuBufferHandle: mutation.surface.handle.buffer
+                )
+            )
+            switch result {
+            case .success:
+                return .committed(
+                    DocumentMutationContract(
+                        canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
+                        refresh: mutation.refreshViaDirtyPresentation ? .dirty : .current,
+                        updatesWorkspaceArtifacts: false
+                    )
+                )
+            case let .failure(failure):
+                return .failed(failure)
+            }
+        case let .failure(failure):
+            return .failed(failure)
+        case .preview, .reset:
+            return .failed(.bridgeMutationFailed("GPU stroke commit failed: unexpected session outcome"))
+        }
     }
 
     func completeResolvedStrokeCommit(
@@ -528,70 +458,6 @@ extension AppFeature {
             cancelEffects: {
                 cancelStartupPresentationEffects()
             }
-        )
-    }
-
-    func applyStrokePreviewPlan(
-        _ plan: StrokePreviewPlan,
-        activeLayerIndex: Int,
-        state: inout State
-    ) {
-        let dirtyRect = LayerPixelRect(
-            originX: plan.dirtyRect.originX,
-            originY: plan.dirtyRect.originY,
-            width: plan.dirtyRect.width,
-            height: plan.dirtyRect.height
-        )
-        state.canvas.setActiveStrokeRenderState(
-            StrokeSessionRenderState(
-                baseRevision: plan.baseSnapshot.revision,
-                layerIndex: activeLayerIndex,
-                surfaceHandle: plan.adjustedBufferHandle,
-                dirtyRect: dirtyRect,
-                isApproximatePreview: plan.isApproximatePreview
-            )
-        )
-        if let incrementalUpdate = plan.incrementalUpdate {
-            state.canvas.applyIncrementalRenderUpdate(incrementalUpdate)
-        }
-    }
-
-    func commitStrokeUsingCommittedPixels(
-        state: inout State,
-        samples: [StylusSample],
-        brush: BrushRuntimeSettings,
-        activeLayer: LayerRowModel,
-        refreshViaDirtyPresentation: Bool
-    ) -> DocumentMutationResult {
-        if !refreshViaDirtyPresentation {
-            ensureCurrentCanvasPresentationLoaded(state: &state)
-        }
-        let fallbackSnapshot = refreshViaDirtyPresentation
-            ? state.canvas.strokeSession.baseSnapshot
-            : (state.canvas.strokeSession.baseSnapshot ?? state.canvas.renderSnapshot)
-        guard
-            let snapshot = fallbackSnapshot,
-            let committedResult = canvasStrokeCommitUseCase.makeCommittedPixels(
-                snapshot: snapshot,
-                samples: samples,
-                context: DocumentStrokeContext(
-                    activeLayer: activeLayer,
-                    activeLayerIndex: state.canvas.activeLayerIndex,
-                    brush: brush,
-                    previewBrush: brush
-                )
-            )
-        else {
-            return .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
-        }
-        return documentLayerCommandService.applyLayerSurfaceMutation(
-            state.canvas.activeLayerIndex,
-            GpuLayerMutationPayload(
-                canvasWidth: committedResult.surface.width,
-                canvasHeight: committedResult.surface.height,
-                dirtyRect: committedResult.dirtyRegion.layerPixelRect,
-                gpuBufferHandle: committedResult.surface.handle.buffer
-            )
         )
     }
 
@@ -640,9 +506,9 @@ extension AppFeature {
                     context: context
                 )
             },
-            applyPreview: { resolution, activeLayerIndex, state in
-                applyStrokePreviewResolution(
-                    resolution,
+            applyPreview: { outcome, activeLayerIndex, state in
+                applyStrokePreviewOutcome(
+                    outcome,
                     activeLayerIndex: activeLayerIndex,
                     state: &state
                 )
@@ -670,9 +536,9 @@ extension AppFeature {
                     context: context
                 )
             },
-            applyPreview: { resolution, activeLayerIndex, state in
-                applyStrokePreviewResolution(
-                    resolution,
+            applyPreview: { outcome, activeLayerIndex, state in
+                applyStrokePreviewOutcome(
+                    outcome,
                     activeLayerIndex: activeLayerIndex,
                     state: &state
                 )
@@ -828,39 +694,6 @@ private extension DocumentStrokeContext {
             activeLayerIndex: context.activeLayerIndex,
             brush: context.brush,
             previewBrush: context.previewBrush
-        )
-    }
-}
-
-private extension AppFeature.StrokePreviewResolution {
-    init?(_ resolution: DocumentStrokePreviewResolution) {
-        guard let plan = DocumentStrokePreviewPlan(resolution.result) else {
-            return nil
-        }
-        self.init(
-            plan: plan,
-            baseSnapshotToCapture: resolution.baseSnapshotToCapture
-        )
-    }
-}
-
-private extension DocumentStrokePreviewPlan {
-    init?(_ result: StrokePreviewResult) {
-        guard let surface = result.surface,
-              let dirtyRegion = result.dirtyRegion else {
-            return nil
-        }
-        self.init(
-            baseSnapshot: result.baseSnapshot,
-            adjustedBufferHandle: surface.handle.buffer,
-            dirtyRect: (
-                originX: dirtyRegion.originX,
-                originY: dirtyRegion.originY,
-                width: dirtyRegion.width,
-                height: dirtyRegion.height
-            ),
-            incrementalUpdate: result.incrementalUpdate,
-            isApproximatePreview: result.isApproximatePreview
         )
     }
 }

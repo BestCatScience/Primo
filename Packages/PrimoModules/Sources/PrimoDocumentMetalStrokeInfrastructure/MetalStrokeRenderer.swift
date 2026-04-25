@@ -11,7 +11,7 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
     }
 
     public func makePreview(_ request: StrokePreviewRequest) -> StrokePreviewResult? {
-        guard let plan = processingService.makePreviewPlan(
+        processingService.makePreviewSurface(
             snapshot: request.snapshot,
             activeLayerIndex: request.activeLayerIndex,
             basePixelData: request.baseLayer.pixelData,
@@ -20,26 +20,6 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
             brush: request.brush,
             preserveAlphaLockedPixels: request.preserveAlphaLockedPixels,
             usesResponsiveOilPreview: request.usesResponsiveOilPreview
-        ) else {
-            return nil
-        }
-        let region = GpuSurfaceRegion(
-            originX: plan.dirtyRect.originX,
-            originY: plan.dirtyRect.originY,
-            width: plan.dirtyRect.width,
-            height: plan.dirtyRect.height
-        )
-        return StrokePreviewResult(
-            baseSnapshot: plan.baseSnapshot,
-            surface: GpuLayerSurface(
-                layerIndex: request.activeLayerIndex,
-                width: request.snapshot.width,
-                height: request.snapshot.height,
-                handle: GpuSurfaceHandle(buffer: plan.adjustedBufferHandle)
-            ),
-            dirtyRegion: region,
-            incrementalUpdate: plan.incrementalUpdate,
-            isApproximatePreview: plan.isApproximatePreview
         )
     }
 

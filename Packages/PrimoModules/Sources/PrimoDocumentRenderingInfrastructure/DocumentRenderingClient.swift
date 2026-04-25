@@ -176,6 +176,22 @@ public struct SurfaceMaterializationGateway: Sendable {
     ) -> Data? {
         layerMutationExecutor.preservingExistingAlpha(source: source, existing: existing, width: width, height: height)
     }
+
+    public func preservingExistingAlphaBufferHandle(
+        sourceHandle: MetalBufferHandle,
+        existingHandle: MetalBufferHandle?,
+        existingPixelData: Data,
+        width: Int,
+        height: Int
+    ) -> MetalBufferHandle? {
+        layerMutationExecutor.preservingExistingAlphaBufferHandle(
+            sourceHandle: sourceHandle,
+            existingHandle: existingHandle,
+            existingPixelData: existingPixelData,
+            width: width,
+            height: height
+        )
+    }
 }
 
 public struct OverlayRenderingGateway: Sendable {

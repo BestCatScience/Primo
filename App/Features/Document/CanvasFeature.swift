@@ -569,7 +569,6 @@ struct CanvasFeature {
             case let .strokeUpdated(stroke):
                 state.isStrokeActive = true
                 state.isAwaitingCommittedRender = false
-                state.strokeSession.setPendingFinalizationSamples(stroke.points.map(\.stylusSample))
                 if state.currentTool == .shape {
                     state.activeStroke = nil
                     guard stroke.points.count >= 2 else { return .none }
@@ -634,7 +633,6 @@ struct CanvasFeature {
                 let finalSamples = Self.trimmingDuplicateTrailingSamples(
                     stroke.points.map(\.stylusSample)
                 )
-                state.strokeSession.pendingFinalizationSamples = finalSamples
                 state.activeStroke = nil
                 let didCommitStroke = state.strokeSession.hasCommittedPoints
                 state.strokeSession.committedPointCount = 0
@@ -655,7 +653,6 @@ struct CanvasFeature {
                 let cancelledStroke = state.activeStroke
                 state.isStrokeActive = false
                 state.isAwaitingCommittedRender = false
-                state.strokeSession.pendingFinalizationSamples = []
                 state.activeStroke = nil
                 let didCommitStroke = state.strokeSession.hasCommittedPoints
                 state.strokeSession.committedPointCount = 0

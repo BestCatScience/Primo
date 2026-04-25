@@ -144,3 +144,148 @@ public struct DocumentStrokeCommitUseCase: Sendable {
         )
     }
 }
+
+public enum GpuStrokeSessionCommand: Sendable {
+    case begin(
+        sample: StylusSample,
+        baseSnapshot: MetalDocumentSnapshot?,
+        context: DocumentStrokeContext,
+        usesResponsiveOilPreview: Bool
+    )
+    case append(
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext,
+        usesResponsiveOilPreview: Bool
+    )
+    case finish(
+        renderState: StrokeSessionRenderState?,
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        allowsApproximatePreviewCommit: Bool,
+        refreshViaDirtyPresentation: Bool
+    )
+    case cancel
+}
+
+public enum GpuStrokeSessionOutcome: Sendable {
+    case preview(GpuPreviewMutation)
+    case commit(GpuCommitMutation)
+    case reset
+    case failure(DocumentMutationFailure)
+}
+
+public struct DocumentStrokeSessionUseCase: Sendable {
+    public var preview: DocumentStrokePreviewUseCase
+    public var commit: DocumentStrokeCommitUseCase
+    public var resetInteractiveStrokeState: @Sendable () -> Void
+    private var executeOverride: (@Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome)?
+
+    public init(
+        preview: DocumentStrokePreviewUseCase,
+        commit: DocumentStrokeCommitUseCase,
+        resetInteractiveStrokeState: @escaping @Sendable () -> Void,
+        executeOverride: (@Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome)? = nil
+    ) {
+        self.preview = preview
+        self.commit = commit
+        self.resetInteractiveStrokeState = resetInteractiveStrokeState
+        self.executeOverride = executeOverride
+    }
+
+    public func execute(_ command: GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome {
+        if let executeOverride {
+            return executeOverride(command)
+        }
+        switch command {
+        case let .begin(sample, baseSnapshot, context, usesResponsiveOilPreview):
+            guard let resolution = preview.resolveInitial(
+                baseSnapshot: baseSnapshot,
+                sample: sample,
+                context: context,
+                usesResponsiveOilPreview: usesResponsiveOilPreview
+            ) else {
+                return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing base snapshot or surface"))
+            }
+            return previewOutcome(from: resolution)
+
+        case let .append(baseSnapshot, renderSnapshot, samples, fullSamples, context, usesResponsiveOilPreview):
+            guard let resolution = preview.resolveAppended(
+                activeStrokeBaseSnapshot: baseSnapshot,
+                renderSnapshot: renderSnapshot,
+                samples: samples,
+                fullSamples: fullSamples,
+                context: context,
+                usesResponsiveOilPreview: usesResponsiveOilPreview
+            ) else {
+                return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing render snapshot or surface"))
+            }
+            return previewOutcome(from: resolution)
+
+        case let .finish(renderState, baseSnapshot, renderSnapshot, samples, context, allowsApproximatePreviewCommit, refreshViaDirtyPresentation):
+            if
+                let renderState,
+                (!renderState.isApproximatePreview || allowsApproximatePreviewCommit)
+            {
+                return .commit(
+                    GpuCommitMutation(
+                        surface: GpuLayerSurface(
+                            layerIndex: renderState.layerIndex,
+                            width: renderState.surfaceHandle.width,
+                            height: renderState.surfaceHandle.height,
+                            handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+                        ),
+                        dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
+                        refreshViaDirtyPresentation: refreshViaDirtyPresentation
+                    )
+                )
+            }
+
+            let snapshot = baseSnapshot ?? renderSnapshot
+            guard let snapshot else {
+                return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
+            }
+            guard let result = commit.makeCommittedPixels(
+                snapshot: snapshot,
+                samples: samples,
+                context: context
+            ) else {
+                return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing committed surface"))
+            }
+            return .commit(
+                GpuCommitMutation(
+                    surface: result.surface,
+                    dirtyRegion: result.dirtyRegion,
+                    refreshViaDirtyPresentation: refreshViaDirtyPresentation
+                )
+            )
+
+        case .cancel:
+            resetInteractiveStrokeState()
+            return .reset
+        }
+    }
+
+    private func previewOutcome(from resolution: DocumentStrokePreviewResolution) -> GpuStrokeSessionOutcome {
+        guard
+            let surface = resolution.result.surface,
+            let dirtyRegion = resolution.result.dirtyRegion
+        else {
+            return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing surface handle"))
+        }
+        return .preview(
+            GpuPreviewMutation(
+                baseSnapshot: resolution.result.baseSnapshot,
+                surface: surface,
+                dirtyRegion: dirtyRegion,
+                incrementalUpdate: resolution.result.incrementalUpdate,
+                isApproximatePreview: resolution.result.isApproximatePreview,
+                baseSnapshotToCapture: resolution.baseSnapshotToCapture
+            )
+        )
+    }
+}

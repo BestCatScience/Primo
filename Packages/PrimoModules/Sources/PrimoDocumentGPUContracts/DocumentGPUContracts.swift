@@ -213,6 +213,47 @@ public struct StrokeCommitResult: Sendable {
     }
 }
 
+public struct GpuPreviewMutation: Sendable {
+    public let baseSnapshot: MetalDocumentSnapshot
+    public let surface: GpuLayerSurface
+    public let dirtyRegion: GpuSurfaceRegion
+    public let incrementalUpdate: IncrementalLayerUpdate?
+    public let isApproximatePreview: Bool
+    public let baseSnapshotToCapture: MetalDocumentSnapshot?
+
+    public init(
+        baseSnapshot: MetalDocumentSnapshot,
+        surface: GpuLayerSurface,
+        dirtyRegion: GpuSurfaceRegion,
+        incrementalUpdate: IncrementalLayerUpdate?,
+        isApproximatePreview: Bool,
+        baseSnapshotToCapture: MetalDocumentSnapshot? = nil
+    ) {
+        self.baseSnapshot = baseSnapshot
+        self.surface = surface
+        self.dirtyRegion = dirtyRegion
+        self.incrementalUpdate = incrementalUpdate
+        self.isApproximatePreview = isApproximatePreview
+        self.baseSnapshotToCapture = baseSnapshotToCapture
+    }
+}
+
+public struct GpuCommitMutation: Sendable {
+    public let surface: GpuLayerSurface
+    public let dirtyRegion: GpuSurfaceRegion
+    public let refreshViaDirtyPresentation: Bool
+
+    public init(
+        surface: GpuLayerSurface,
+        dirtyRegion: GpuSurfaceRegion,
+        refreshViaDirtyPresentation: Bool
+    ) {
+        self.surface = surface
+        self.dirtyRegion = dirtyRegion
+        self.refreshViaDirtyPresentation = refreshViaDirtyPresentation
+    }
+}
+
 public struct RenderFrameUpdate: Sendable {
     public let snapshot: MetalDocumentSnapshot?
     public let activeLayerIndex: Int

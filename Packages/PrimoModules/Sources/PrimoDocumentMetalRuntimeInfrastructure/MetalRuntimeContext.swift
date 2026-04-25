@@ -229,6 +229,22 @@ public struct MetalLayerMutationExecutor: Sendable {
     public func preservingExistingAlpha(source: Data, existing: Data, width: Int, height: Int) -> Data? {
         service.preservingExistingAlpha(source: source, existing: existing, width: width, height: height)
     }
+
+    public func preservingExistingAlphaBufferHandle(
+        sourceHandle: MetalBufferHandle,
+        existingHandle: MetalBufferHandle?,
+        existingPixelData: Data,
+        width: Int,
+        height: Int
+    ) -> MetalBufferHandle? {
+        service.preservingExistingAlphaBufferHandle(
+            sourceHandle: sourceHandle,
+            existingHandle: existingHandle,
+            existingPixelData: existingPixelData,
+            width: width,
+            height: height
+        )
+    }
 }
 
 public struct MetalOverlayExecutor: Sendable {

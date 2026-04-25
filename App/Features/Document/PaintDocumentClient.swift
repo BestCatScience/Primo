@@ -4,6 +4,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
+import PrimoDocumentStrokeApplication
 
 private enum DocumentRuntimeCompositionKey: DependencyKey {
     static var liveValue: DocumentRuntimeComposition {
@@ -156,6 +157,15 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.editingGateway = newValue
+            documentRuntimeComposition = composition
+        }
+    }
+
+    var documentStrokeSessionUseCase: DocumentStrokeSessionUseCase {
+        get { documentRuntimeComposition.strokeSessionUseCase }
+        set {
+            var composition = documentRuntimeComposition
+            composition.strokeSessionUseCase = newValue
             documentRuntimeComposition = composition
         }
     }

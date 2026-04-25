@@ -1,28 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
-
-public struct DocumentStrokePreviewPlan: Sendable {
-    public let baseSnapshot: MetalDocumentSnapshot
-    public let adjustedBufferHandle: MetalBufferHandle
-    public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
-    public let incrementalUpdate: IncrementalLayerUpdate?
-    public let isApproximatePreview: Bool
-
-    public init(
-        baseSnapshot: MetalDocumentSnapshot,
-        adjustedBufferHandle: MetalBufferHandle,
-        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
-        incrementalUpdate: IncrementalLayerUpdate?,
-        isApproximatePreview: Bool = false
-    ) {
-        self.baseSnapshot = baseSnapshot
-        self.adjustedBufferHandle = adjustedBufferHandle
-        self.dirtyRect = dirtyRect
-        self.incrementalUpdate = incrementalUpdate
-        self.isApproximatePreview = isApproximatePreview
-    }
-}
+import PrimoDocumentGPUContracts
 
 public struct DocumentStrokeProcessingService: Sendable {
     public let strokeGateway: StrokeRenderingGateway
@@ -43,7 +22,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         strokeGateway.resetExecutionSession()
     }
 
-    public func makePreviewPlan(
+    public func makePreviewSurface(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         basePixelData: Data,
@@ -52,7 +31,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool,
         usesResponsiveOilPreview: Bool = false
-    ) -> DocumentStrokePreviewPlan? {
+    ) -> StrokePreviewResult? {
         guard let preview = makeInteractiveStrokePreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
@@ -71,10 +50,20 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        return DocumentStrokePreviewPlan(
+        return StrokePreviewResult(
             baseSnapshot: snapshot,
-            adjustedBufferHandle: gpuBufferHandle,
-            dirtyRect: dirtyRect,
+            surface: GpuLayerSurface(
+                layerIndex: activeLayerIndex,
+                width: snapshot.width,
+                height: snapshot.height,
+                handle: GpuSurfaceHandle(buffer: gpuBufferHandle)
+            ),
+            dirtyRegion: GpuSurfaceRegion(
+                originX: dirtyRect.originX,
+                originY: dirtyRect.originY,
+                width: dirtyRect.width,
+                height: dirtyRect.height
+            ),
             incrementalUpdate: preview.incrementalUpdate,
             isApproximatePreview: preview.isApproximatePreview
         )
@@ -106,9 +95,22 @@ public struct DocumentStrokeProcessingService: Sendable {
         ) else {
             return nil
         }
-        guard !preserveAlphaLockedPixels else { return nil }
         guard let handle = gpuOutput.gpuBufferHandle else {
             return nil
+        }
+        if preserveAlphaLockedPixels {
+            guard let alphaPreservedHandle = materializationGateway.preservingExistingAlphaBufferHandle(
+                sourceHandle: handle,
+                existingHandle: baseLayer.gpuBufferHandle,
+                existingPixelData: baseLayer.pixelData,
+                width: snapshot.width,
+                height: snapshot.height
+            ) else {
+                strokeGateway.release(handle)
+                return nil
+            }
+            strokeGateway.release(handle)
+            return (alphaPreservedHandle, gpuOutput.dirtyRect, nil)
         }
         return (handle, gpuOutput.dirtyRect, gpuOutput.pixelData)
     }
@@ -259,20 +261,42 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        let adjustedPixels: Data
         if preserveAlphaLockedPixels {
-            guard let preserved = materializationGateway.preservingExistingAlpha(
-                source: gpuResult.pixelData,
-                existing: basePixelData,
-                width: snapshot.width,
-                height: snapshot.height
-            ) else {
+            guard
+                let sourceHandle = gpuResult.gpuBufferHandle,
+                let alphaPreservedHandle = materializationGateway.preservingExistingAlphaBufferHandle(
+                    sourceHandle: sourceHandle,
+                    existingHandle: baseBufferHandle,
+                    existingPixelData: basePixelData,
+                    width: snapshot.width,
+                    height: snapshot.height
+                )
+            else {
+                strokeGateway.release(gpuResult.gpuBufferHandle)
                 return nil
             }
-            adjustedPixels = preserved
-        } else {
-            adjustedPixels = gpuResult.pixelData
+            strokeGateway.release(sourceHandle)
+            guard let incrementalUpdate = compositingGateway.compositedPreviewIncrementalUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerBufferHandle: alphaPreservedHandle,
+                dirtyRect: gpuResult.dirtyRect
+            ) else {
+                strokeGateway.release(alphaPreservedHandle)
+                return nil
+            }
+            return DocumentInteractiveStrokePreviewResult(
+                pixelData: nil,
+                gpuBufferHandle: alphaPreservedHandle,
+                dirtyRect: gpuResult.dirtyRect,
+                rectPixelData: nil,
+                incrementalUpdate: incrementalUpdate,
+                isApproximatePreview: usesApproximateOilPreview
+            )
         }
+
+        let adjustedPixels: Data
+        adjustedPixels = gpuResult.pixelData
 
         let incrementalUpdate = Self.shouldUseIncrementalPreviewUpdate(for: previewBrush)
             ? compositingGateway.compositedPreviewIncrementalUpdate(
@@ -285,7 +309,7 @@ public struct DocumentStrokeProcessingService: Sendable {
 
         return DocumentInteractiveStrokePreviewResult(
             pixelData: adjustedPixels,
-            gpuBufferHandle: preserveAlphaLockedPixels ? nil : gpuResult.gpuBufferHandle,
+            gpuBufferHandle: gpuResult.gpuBufferHandle,
             dirtyRect: gpuResult.dirtyRect,
             rectPixelData: gpuResult.rectPixelData ?? Self.pixelData(
                 in: gpuResult.dirtyRect,

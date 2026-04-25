@@ -3,6 +3,8 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentEngineInfrastructure
+import PrimoDocumentGPUContracts
+import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 @testable import Primo
@@ -150,6 +152,9 @@ extension DocumentMutationGateway {
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult = { _, _ in .success(()) },
         replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult = { _, _, _ in .success(()) },
+        applyLayerSurfaceMutation: @escaping @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult = { _, _ in .success(()) },
+        applyLayerMutation: @escaping @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult = { _, _ in .success(()) },
+        applyTextLayerMutation: @escaping @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult = { _, _, _ in .success(()) },
         applyLayerProcessing: @escaping @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult = { _, _ in .success(()) }
     ) -> Self {
         Self(
@@ -163,6 +168,9 @@ extension DocumentMutationGateway {
             revealLayerForEditing: revealLayerForEditing,
             replaceLayerPixels: replaceLayerPixels,
             replaceLayerPixelsInRect: replaceLayerPixelsInRect,
+            applyLayerSurfaceMutation: applyLayerSurfaceMutation,
+            applyLayerMutation: applyLayerMutation,
+            applyTextLayerMutation: applyTextLayerMutation,
             replaceLayerMask: { _, _ in .success(()) },
             clearLayerMask: { _ in .success(()) },
             applyLayerMask: { _ in .success(()) },
@@ -277,7 +285,8 @@ extension DocumentRuntimeComposition {
         exportGateway: DocumentExportGateway = .stub(),
         textLayerGateway: TextLayerGateway = .stub(),
         layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
-        editingGateway: DocumentEditingGateway? = nil
+        editingGateway: DocumentEditingGateway? = nil,
+        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil
     ) -> Self {
         let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
         return Self(
@@ -289,8 +298,78 @@ extension DocumentRuntimeComposition {
             exportGateway: exportGateway,
             textLayerGateway: textLayerGateway,
             layerEffectsGateway: layerEffectsGateway,
-            editingGateway: resolvedEditingGateway
+            editingGateway: resolvedEditingGateway,
+            strokeSessionUseCase: strokeSessionUseCase ?? .stub()
         )
+    }
+}
+
+extension DocumentStrokeSessionUseCase {
+    static func stub(
+        execute: @escaping @Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome = { _ in .reset }
+    ) -> Self {
+        let adapter = StubStrokeSessionAdapter(execute: execute)
+        return Self(
+            preview: DocumentStrokePreviewUseCase(planner: adapter),
+            commit: DocumentStrokeCommitUseCase(renderer: adapter),
+            resetInteractiveStrokeState: {},
+            executeOverride: execute
+        )
+    }
+}
+
+private final class StubStrokeSessionAdapter: StrokePreviewPlanning, StrokeCommitRendering, @unchecked Sendable {
+    let execute: @Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome
+
+    init(execute: @escaping @Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome) {
+        self.execute = execute
+    }
+
+    func makePreview(_ request: StrokePreviewRequest) -> StrokePreviewResult? {
+        guard case let .preview(mutation) = execute(
+            .begin(
+                sample: request.samples.first ?? StylusSample(point: .zero, pressure: 1, altitude: 0, azimuth: 0, timestamp: 0),
+                baseSnapshot: request.snapshot,
+                context: DocumentStrokeContext(
+                    activeLayer: .testValue(index: request.activeLayerIndex),
+                    activeLayerIndex: request.activeLayerIndex,
+                    brush: request.brush,
+                    previewBrush: request.brush
+                ),
+                usesResponsiveOilPreview: request.usesResponsiveOilPreview
+            )
+        ) else {
+            return nil
+        }
+        return StrokePreviewResult(
+            baseSnapshot: mutation.baseSnapshot,
+            surface: mutation.surface,
+            dirtyRegion: mutation.dirtyRegion,
+            incrementalUpdate: mutation.incrementalUpdate,
+            isApproximatePreview: mutation.isApproximatePreview
+        )
+    }
+
+    func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
+        guard case let .commit(mutation) = execute(
+            .finish(
+                renderState: nil,
+                baseSnapshot: request.snapshot,
+                renderSnapshot: nil,
+                samples: request.samples,
+                context: DocumentStrokeContext(
+                    activeLayer: .testValue(index: request.activeLayerIndex),
+                    activeLayerIndex: request.activeLayerIndex,
+                    brush: request.brush,
+                    previewBrush: request.brush
+                ),
+                allowsApproximatePreviewCommit: true,
+                refreshViaDirtyPresentation: true
+            )
+        ) else {
+            return nil
+        }
+        return StrokeCommitResult(surface: mutation.surface, dirtyRegion: mutation.dirtyRegion)
     }
 }
 

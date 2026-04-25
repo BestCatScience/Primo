@@ -472,6 +472,22 @@ public struct MetalLayerMutationService: Sendable {
         )
     }
 
+    public func preservingExistingAlphaBufferHandle(
+        sourceHandle: MetalBufferHandle,
+        existingHandle: MetalBufferHandle?,
+        existingPixelData: Data,
+        width: Int,
+        height: Int
+    ) -> MetalBufferHandle? {
+        client.preservingExistingAlphaBufferHandle(
+            sourceHandle: sourceHandle,
+            existingHandle: existingHandle,
+            existingPixelData: existingPixelData,
+            width: width,
+            height: height
+        )
+    }
+
     public func applyLayerMask(
         pixelData: Data,
         maskData: Data,

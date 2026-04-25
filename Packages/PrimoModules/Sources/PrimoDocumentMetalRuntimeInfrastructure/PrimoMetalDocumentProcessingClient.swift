@@ -1304,6 +1304,60 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return bytes(from: outputBuffer, count: expectedCount)
     }
 
+    public func preservingExistingAlphaBufferHandle(
+        sourceHandle: MetalBufferHandle,
+        existingHandle: MetalBufferHandle?,
+        existingPixelData: Data,
+        width: Int,
+        height: Int
+    ) -> MetalBufferHandle? {
+        let expectedCount = width * height * 4
+        guard
+            width > 0,
+            height > 0,
+            existingPixelData.count == expectedCount,
+            let commandQueue,
+            let pipeline = alphaPreservePipeline,
+            let sourceResource = cachedBufferResource(for: sourceHandle)
+        else {
+            return nil
+        }
+
+        let existingBuffer: MTLBuffer?
+        if let existingHandle, let existingResource = cachedBufferResource(for: existingHandle) {
+            existingBuffer = existingResource.buffer
+        } else {
+            existingBuffer = makeBuffer(existingPixelData)
+        }
+
+        guard
+            let existingBuffer,
+            let outputBuffer = device?.makeBuffer(length: expectedCount, options: .storageModeShared),
+            let descriptorBuffer = makeBuffer(
+                PrimoMetalAlphaPreserveDescriptor(
+                    width: UInt32(width),
+                    height: UInt32(height)
+                )
+            ),
+            let commandBuffer = commandQueue.makeCommandBuffer(),
+            let encoder = commandBuffer.makeComputeCommandEncoder()
+        else {
+            return nil
+        }
+
+        encoder.setComputePipelineState(pipeline)
+        encoder.setBuffer(sourceResource.buffer, offset: 0, index: 0)
+        encoder.setBuffer(existingBuffer, offset: 0, index: 1)
+        encoder.setBuffer(outputBuffer, offset: 0, index: 2)
+        encoder.setBuffer(descriptorBuffer, offset: 0, index: 3)
+        dispatch2D(encoder: encoder, pipeline: pipeline, width: width, height: height)
+        encoder.endEncoding()
+        commandBuffer.commit()
+        commandBuffer.waitUntilCompleted()
+        guard commandBuffer.status == .completed else { return nil }
+        return makeBufferHandle(width: width, height: height, bytesPerRow: width * 4, buffer: outputBuffer)
+    }
+
     public func compositedPixelData(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int?,

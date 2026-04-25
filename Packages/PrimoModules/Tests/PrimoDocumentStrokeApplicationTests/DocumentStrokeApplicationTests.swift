@@ -103,9 +103,7 @@ struct DocumentStrokeApplicationTests {
         let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
         let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
         var session = StrokeSessionState()
-        let sample = stylusSample(x: 1, y: 1)
 
-        session.setPendingFinalizationSamples([sample, sample])
         session.applyPreview(
             baseSnapshot: snapshot,
             surface: GpuLayerSurface(
@@ -120,7 +118,6 @@ struct DocumentStrokeApplicationTests {
         )
         session.markCommittedPointCount(2)
 
-        #expect(session.pendingFinalizationSamples == [sample])
         #expect(session.baseSnapshot?.revision == 11)
         #expect(session.renderState?.surfaceHandle == handle)
         #expect(session.renderState?.dirtyRect == LayerPixelRect(originX: 0, originY: 1, width: 2, height: 1))
@@ -132,17 +129,57 @@ struct DocumentStrokeApplicationTests {
     func strokeSessionResetKeepsCommittedCountSeparateFromPreviewReset() {
         var session = StrokeSessionState(
             baseSnapshot: makeSnapshot(layerIndex: 0),
-            pendingFinalizationSamples: [stylusSample(x: 1, y: 1)],
             committedPointCount: 4
         )
 
         session.resetPreview()
         #expect(session.baseSnapshot == nil)
-        #expect(session.pendingFinalizationSamples.isEmpty)
         #expect(session.committedPointCount == 4)
 
         session.resetInteraction()
         #expect(session.committedPointCount == 0)
+    }
+
+    @Test
+    func strokeSessionUseCaseReusesPreviewSurfaceOnCommit() throws {
+        let planner = RecordingPreviewPlanner()
+        let renderer = RecordingCommitRenderer()
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: planner),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let preview = try #require(useCase.execute(
+            .begin(
+                sample: stylusSample(x: 1, y: 1),
+                baseSnapshot: snapshot,
+                context: makeContext(layerIndex: 0),
+                usesResponsiveOilPreview: false
+            )
+        ).previewMutation)
+
+        let renderState = StrokeSessionRenderState(
+            baseRevision: preview.baseSnapshot.revision,
+            layerIndex: preview.surface.layerIndex,
+            surfaceHandle: preview.surface.handle.buffer,
+            dirtyRect: preview.dirtyRegion.layerPixelRect,
+            isApproximatePreview: false
+        )
+        let commit = try #require(useCase.execute(
+            .finish(
+                renderState: renderState,
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: [stylusSample(x: 1, y: 1)],
+                context: makeContext(layerIndex: 0),
+                allowsApproximatePreviewCommit: false,
+                refreshViaDirtyPresentation: true
+            )
+        ).commitMutation)
+
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(renderer.requests.isEmpty)
     }
 
     private func makeSnapshot(layerIndex: Int, revision: Int = 7) -> MetalDocumentSnapshot {
@@ -267,5 +304,17 @@ private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked S
             ),
             dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: request.snapshot.width, height: request.snapshot.height)
         )
+    }
+}
+
+private extension GpuStrokeSessionOutcome {
+    var previewMutation: GpuPreviewMutation? {
+        guard case let .preview(mutation) = self else { return nil }
+        return mutation
+    }
+
+    var commitMutation: GpuCommitMutation? {
+        guard case let .commit(mutation) = self else { return nil }
+        return mutation
     }
 }
