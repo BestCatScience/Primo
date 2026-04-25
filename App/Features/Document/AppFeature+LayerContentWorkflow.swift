@@ -23,7 +23,11 @@ extension AppFeature {
         name: String?,
         data: Data
     ) -> Effect<Action> {
-        guard let importedPixelData = Self.fittedLayerPixelData(fromImageData: data, canvasSize: state.canvas.canvasSize) else {
+        guard let importedPixelData = Self.fittedLayerPixelData(
+            fromImageData: data,
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
+        ) else {
             state.application.presentFeedback(.couldNotImportPhoto(nil))
             return .none
         }

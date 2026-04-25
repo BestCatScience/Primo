@@ -705,7 +705,7 @@ extension AppFeature {
             state: &state
         )
         if let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
-            MetalResourceStore().release(dirtyUpdate.gpuBufferHandle)
+            documentGpuOperationGateway.releaseSurfaceHandle(dirtyUpdate.gpuBufferHandle)
         }
         applyPresentation(documentPresentationQueryService.presentation(), state: &state)
         guard updatesWorkspaceArtifacts else {

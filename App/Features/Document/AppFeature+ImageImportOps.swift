@@ -84,7 +84,11 @@ extension AppFeature {
         )
     }
 
-    static func fittedLayerPixelData(fromImageData imageData: Data, canvasSize: CGSize) -> Data? {
+    static func fittedLayerPixelData(
+        fromImageData imageData: Data,
+        canvasSize: CGSize,
+        gpuOperations: DocumentGpuOperationGateway
+    ) -> Data? {
         guard
             canvasSize.width > 0,
             canvasSize.height > 0,
@@ -101,13 +105,12 @@ extension AppFeature {
         let scale = min(canvasRect.width / imageSize.width, canvasRect.height / imageSize.height)
         let fittedSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
 
-        let layerService = MetalLayerMutationService()
-        guard let scaled = layerService.scaledPixelData(
+        guard let scaled = gpuOperations.scaledPixelData(
             sourceSurface.pixelData,
-            sourceWidth: sourceSurface.width,
-            sourceHeight: sourceSurface.height,
-            targetWidth: max(Int(fittedSize.width.rounded()), 1),
-            targetHeight: max(Int(fittedSize.height.rounded()), 1)
+            sourceSurface.width,
+            sourceSurface.height,
+            max(Int(fittedSize.width.rounded()), 1),
+            max(Int(fittedSize.height.rounded()), 1)
         ) else {
             return nil
         }
@@ -119,7 +122,8 @@ extension AppFeature {
         )
         return composedSurface(
             fittedSurface,
-            in: CGSize(width: width, height: height)
+            in: CGSize(width: width, height: height),
+            gpuOperations: gpuOperations
         )?.pixelData
     }
 
@@ -137,20 +141,21 @@ extension AppFeature {
 
     private static func composedSurface(
         _ source: DocumentCompositeSurface,
-        in canvasSize: CGSize
+        in canvasSize: CGSize,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> DocumentCompositeSurface? {
         let width = max(Int(canvasSize.width.rounded()), 1)
         let height = max(Int(canvasSize.height.rounded()), 1)
         let offsetX = max((width - source.width) / 2, 0)
         let offsetY = max((height - source.height) / 2, 0)
-        let translated = MetalLayerMutationService().translatedPixelData(
+        let translated = gpuOperations.translatedPixelData(
             source.pixelData,
-            sourceWidth: source.width,
-            sourceHeight: source.height,
-            targetWidth: width,
-            targetHeight: height,
-            offsetX: offsetX,
-            offsetY: offsetY
+            source.width,
+            source.height,
+            width,
+            height,
+            offsetX,
+            offsetY
         )
         guard let translated else { return nil }
         return DocumentCompositeSurface(width: width, height: height, pixelData: translated)

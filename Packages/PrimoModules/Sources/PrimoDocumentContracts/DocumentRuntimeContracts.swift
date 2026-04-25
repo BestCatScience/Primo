@@ -788,6 +788,9 @@ public struct DocumentGpuOperationGateway: Sendable {
     public var invertMask: @Sendable ([UInt8]) -> [UInt8]?
     public var transformedSelectionMask: @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?
     public var transformedLayerPixelData: @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?
+    public var scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
+    public var translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
+    public var releaseSurfaceHandle: @Sendable (MetalBufferHandle?) -> Void
 
     public init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?,
@@ -806,7 +809,10 @@ public struct DocumentGpuOperationGateway: Sendable {
         featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
         invertMask: @escaping @Sendable ([UInt8]) -> [UInt8]?,
         transformedSelectionMask: @escaping @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?,
-        transformedLayerPixelData: @escaping @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?
+        transformedLayerPixelData: @escaping @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?,
+        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data?,
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?,
+        releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void
     ) {
         self.compositedPaperPreviewRGBA = compositedPaperPreviewRGBA
         self.compositedPreviewPixelData = compositedPreviewPixelData
@@ -825,6 +831,9 @@ public struct DocumentGpuOperationGateway: Sendable {
         self.invertMask = invertMask
         self.transformedSelectionMask = transformedSelectionMask
         self.transformedLayerPixelData = transformedLayerPixelData
+        self.scaledPixelData = scaledPixelData
+        self.translatedPixelData = translatedPixelData
+        self.releaseSurfaceHandle = releaseSurfaceHandle
     }
 }
 

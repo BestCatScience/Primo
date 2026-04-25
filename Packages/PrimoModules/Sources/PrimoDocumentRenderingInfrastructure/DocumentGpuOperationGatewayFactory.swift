@@ -8,7 +8,10 @@ public enum DocumentGpuOperationGatewayFactory {
     public static func live(
         renderingClient: DocumentRenderingClient = .live
     ) -> DocumentGpuOperationGateway {
-        DocumentGpuOperationGateway(
+        let layerMutationService = MetalLayerMutationService()
+        let resourceStore = MetalResourceStore()
+
+        return DocumentGpuOperationGateway(
             compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
                 renderingClient.compositedPaperPreviewRGBA(
                     pixelData: pixelData,
@@ -140,6 +143,29 @@ public enum DocumentGpuOperationGatewayFactory {
                     destinationQuad: destinationQuad,
                     usesFreeformQuad: usesFreeformQuad
                 )
+            },
+            scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in
+                layerMutationService.scaledPixelData(
+                    source,
+                    sourceWidth: sourceWidth,
+                    sourceHeight: sourceHeight,
+                    targetWidth: targetWidth,
+                    targetHeight: targetHeight
+                )
+            },
+            translatedPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
+                layerMutationService.translatedPixelData(
+                    source,
+                    sourceWidth: sourceWidth,
+                    sourceHeight: sourceHeight,
+                    targetWidth: targetWidth,
+                    targetHeight: targetHeight,
+                    offsetX: offsetX,
+                    offsetY: offsetY
+                )
+            },
+            releaseSurfaceHandle: { handle in
+                resourceStore.release(handle)
             }
         )
     }
