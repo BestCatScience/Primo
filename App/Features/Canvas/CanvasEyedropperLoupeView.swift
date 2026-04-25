@@ -12,6 +12,7 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
 
     private var context: Context?
     private(set) var isActive = false
+    var documentGpuOperationGateway: DocumentGpuOperationGateway?
     var onSampledColor: ((SampledColor) -> Void)?
     var onBeganSampling: (() -> Void)?
 
@@ -231,8 +232,9 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
             blendWithPaper = !context.paperStyle.isTransparent
         }
 
-        if let sourcePixelData {
+        if let sourcePixelData, let documentGpuOperationGateway {
             return canvasImageRenderer.eyedropperLoupeSurface(
+                gpuOperations: documentGpuOperationGateway,
                 sourcePixelData: sourcePixelData,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,

@@ -10,6 +10,9 @@ public enum DocumentGpuOperationGatewayFactory {
     ) -> DocumentGpuOperationGateway {
         let layerMutationService = MetalLayerMutationService()
         let resourceStore = MetalResourceStore()
+        let strokeGateway = StrokeRenderingGateway()
+        let overlayGateway = OverlayRenderingGateway()
+        let textService = MetalTextService()
 
         return DocumentGpuOperationGateway(
             compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
@@ -39,6 +42,49 @@ public enum DocumentGpuOperationGatewayFactory {
                         height: dirtyRect.height
                     )
                 )
+            },
+            selectionOverlayRGBA: { maskData, width, height in
+                overlayGateway.selectionOverlayRGBA(maskData: maskData, width: width, height: height)
+            },
+            eyedropperLoupeRGBA: { sourcePixelData, canvasWidth, canvasHeight, centerX, centerY, gridSize, paperStyle, blendWithPaper in
+                overlayGateway.eyedropperLoupeRGBA(
+                    sourcePixelData: sourcePixelData,
+                    canvasWidth: canvasWidth,
+                    canvasHeight: canvasHeight,
+                    centerX: centerX,
+                    centerY: centerY,
+                    gridSize: gridSize,
+                    paperStyle: paperStyle,
+                    blendWithPaper: blendWithPaper
+                )
+            },
+            shapePreviewSurface: { samples, brush, canvasWidth, canvasHeight in
+                guard !samples.isEmpty,
+                      let pixelData = strokeGateway.rasterizedStrokePixelData(
+                        basePixelData: Data(count: canvasWidth * canvasHeight * 4),
+                        canvasWidth: canvasWidth,
+                        canvasHeight: canvasHeight,
+                        samples: samples,
+                        brush: brush,
+                        mode: .interactive
+                      )
+                else {
+                    return nil
+                }
+                return DocumentCompositeSurface(width: canvasWidth, height: canvasHeight, pixelData: pixelData)
+            },
+            textLayerSurface: { textLayer, canvasSize in
+                textService.rasterizeTextLayer(textLayer, canvasSize: canvasSize).flatMap { payload in
+                    let pixelData = payload.fullPixelData ?? payload.rectPixelData
+                    return DocumentCompositeSurface(
+                        width: max(Int(canvasSize.width.rounded()), 1),
+                        height: max(Int(canvasSize.height.rounded()), 1),
+                        pixelData: pixelData
+                    )
+                }
+            },
+            textLayoutRect: { textLayer, canvasSize in
+                textService.textLayoutRect(for: textLayer, canvasSize: canvasSize)
             },
             processedLayerPixelData: { pixelData, canvasWidth, canvasHeight, request in
                 renderingClient.processedLayerPixelData(

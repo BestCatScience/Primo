@@ -4,7 +4,6 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
-import PrimoDocumentRenderingInfrastructure
 import UIKit
 
 final class CanvasRenderSurfaceView: UIView {
@@ -82,19 +81,10 @@ final class CanvasPixelSurfaceView: UIView {
 }
 
 struct CanvasImageRenderer {
-    let strokeGateway: StrokeRenderingGateway
-    let compositingGateway: LayerCompositingGateway
-    let overlayGateway: OverlayRenderingGateway
-    let textService: MetalTextService
-
-    static let live = CanvasImageRenderer(
-        strokeGateway: StrokeRenderingGateway(),
-        compositingGateway: LayerCompositingGateway(),
-        overlayGateway: OverlayRenderingGateway(),
-        textService: MetalTextService()
-    )
+    static let live = CanvasImageRenderer()
 
     func eyedropperLoupeSurface(
+        gpuOperations: DocumentGpuOperationGateway,
         sourcePixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int,
@@ -104,15 +94,15 @@ struct CanvasImageRenderer {
         paperStyle: CanvasPaperStyle,
         blendWithPaper: Bool
     ) -> DocumentCompositeSurface? {
-        guard let rgba = overlayGateway.eyedropperLoupeRGBA(
-            sourcePixelData: sourcePixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            centerX: centerX,
-            centerY: centerY,
-            gridSize: gridSize,
-            paperStyle: paperStyle,
-            blendWithPaper: blendWithPaper
+        guard let rgba = gpuOperations.eyedropperLoupeRGBA(
+            sourcePixelData,
+            canvasWidth,
+            canvasHeight,
+            centerX,
+            centerY,
+            gridSize,
+            paperStyle,
+            blendWithPaper
         ) else {
             return nil
         }
@@ -120,50 +110,41 @@ struct CanvasImageRenderer {
     }
 
     func selectionOverlaySurface(
+        gpuOperations: DocumentGpuOperationGateway,
         maskData: Data,
         width: Int,
         height: Int
     ) -> DocumentCompositeSurface? {
-        guard let rgba = overlayGateway.selectionOverlayRGBA(
-            maskData: maskData,
-            width: width,
-            height: height
-        ) else {
+        guard let rgba = gpuOperations.selectionOverlayRGBA(maskData, width, height) else {
             return nil
         }
         return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
     }
 
     func compositePreviewImageData(
+        gpuOperations: DocumentGpuOperationGateway,
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        compositingGateway.compositedPreviewPixelData(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: adjustedActiveLayerPixels
-        )
+        gpuOperations.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
     }
 
     func paperCompositeSurface(
+        gpuOperations: DocumentGpuOperationGateway,
         pixelData: Data,
         width: Int,
         height: Int,
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface? {
-        guard let rgba = compositingGateway.compositedPaperPreviewRGBA(
-            pixelData: pixelData,
-            width: width,
-            height: height,
-            paperStyle: paperStyle
-        ) else {
+        guard let rgba = gpuOperations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle) else {
             return nil
         }
         return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
     }
 
     func shapePreviewSurface(
+        gpuOperations: DocumentGpuOperationGateway,
         stroke: Stroke,
         style: PreviewStrokeStyle,
         canvasWidth: Int,
@@ -172,41 +153,27 @@ struct CanvasImageRenderer {
         let samples = stroke.points.map(\.stylusSample)
         guard !samples.isEmpty else { return nil }
         let brush = brushSettings(for: style)
-        guard let pixelData = strokeGateway.rasterizedStrokePixelData(
-            basePixelData: Data(count: canvasWidth * canvasHeight * 4),
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            samples: samples,
-            brush: brush,
-            mode: .interactive
-        ) else {
-            return nil
-        }
-        return DocumentCompositeSurface(width: canvasWidth, height: canvasHeight, pixelData: pixelData)
+        return gpuOperations.shapePreviewSurface(samples, brush, canvasWidth, canvasHeight)
     }
 
     func transformedTextPreviewSurface(
+        gpuOperations: DocumentGpuOperationGateway,
         textLayer: TextLayerData,
         canvasWidth: Int,
         canvasHeight: Int
     ) -> DocumentCompositeSurface? {
-        textService.rasterizeTextLayer(
+        gpuOperations.textLayerSurface(
             textLayer,
-            canvasSize: CGSize(width: canvasWidth, height: canvasHeight)
-        ).flatMap { payload in
-            let pixelData = payload.fullPixelData ?? payload.rectPixelData
-            return DocumentCompositeSurface(width: canvasWidth, height: canvasHeight, pixelData: pixelData)
-        }
+            CGSize(width: canvasWidth, height: canvasHeight)
+        )
     }
 
     func transformedTextLayoutRect(
+        gpuOperations: DocumentGpuOperationGateway,
         textLayer: TextLayerData,
         canvasSize: CGSize
     ) -> CGRect? {
-        textService.textLayoutRect(
-            for: textLayer,
-            canvasSize: canvasSize
-        )
+        gpuOperations.textLayoutRect(textLayer, canvasSize)
     }
 
     private func brushSettings(for style: PreviewStrokeStyle) -> BrushRuntimeSettings {

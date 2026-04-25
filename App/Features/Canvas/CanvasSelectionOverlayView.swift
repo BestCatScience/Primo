@@ -7,6 +7,7 @@ final class CanvasSelectionOverlayView: UIView {
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
     private let canvasImageRenderer: CanvasImageRenderer
+    var documentGpuOperationGateway: DocumentGpuOperationGateway?
 
     init(canvasImageRenderer: CanvasImageRenderer) {
         self.canvasImageRenderer = canvasImageRenderer
@@ -141,35 +142,12 @@ final class CanvasSelectionOverlayView: UIView {
         let height = selection.maskHeight
         guard width > 0, height > 0 else { return nil }
         let expectedCount = width * height
-        guard selection.maskData.count == expectedCount else { return nil }
-
-        if let surface = canvasImageRenderer.selectionOverlaySurface(
+        guard selection.maskData.count == expectedCount, let documentGpuOperationGateway else { return nil }
+        return canvasImageRenderer.selectionOverlaySurface(
+            gpuOperations: documentGpuOperationGateway,
             maskData: selection.maskData,
             width: width,
             height: height
-        ) {
-            return surface
-        }
-
-        var rgba = Data(count: expectedCount * 4)
-        rgba.withUnsafeMutableBytes { destinationBytes in
-            selection.maskData.withUnsafeBytes { sourceBytes in
-                guard
-                    let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                else { return }
-
-                for index in 0..<expectedCount {
-                    let alpha = sourceBase[index]
-                    let destinationIndex = index * 4
-                    destinationBase[destinationIndex] = 91
-                    destinationBase[destinationIndex + 1] = 181
-                    destinationBase[destinationIndex + 2] = 255
-                    destinationBase[destinationIndex + 3] = UInt8((Float(alpha) / 255.0) * 96.0)
-                }
-            }
-        }
-
-        return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
+        )
     }
 }

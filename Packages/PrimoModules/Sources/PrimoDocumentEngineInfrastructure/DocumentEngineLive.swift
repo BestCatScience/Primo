@@ -40,7 +40,8 @@ public enum DocumentEngineFactory {
             runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,
                 dateClient: dateClient,
-                uuidClient: uuidClient
+                uuidClient: uuidClient,
+                gpuServices: DocumentRuntimeGpuServicesFactory.live()
             )
         )
 
@@ -140,7 +141,8 @@ public enum DocumentEngineFactory {
                         height: height,
                         fileClient: fileClient,
                         dateClient: dateClient,
-                        uuidClient: uuidClient
+                        uuidClient: uuidClient,
+                        gpuServices: DocumentRuntimeGpuServicesFactory.live()
                     )
                 )
             },
@@ -218,7 +220,8 @@ public final class DocumentTimelapseReplayService: @unchecked Sendable {
             height: max(Int(canvasSize.height.rounded()), 1),
             fileClient: fileClient,
             dateClient: dateClient,
-            uuidClient: uuidClient
+            uuidClient: uuidClient,
+            gpuServices: DocumentRuntimeGpuServicesFactory.live()
         )
     }
 

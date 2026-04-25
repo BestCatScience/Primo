@@ -16,6 +16,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
     private let services: DocumentEngineServices
+    private let gpuServices: DocumentRuntimeGpuServices
     private let resources: MetalResourceStore
     private let strokes: MetalStrokeExecutionService
     private let composites: MetalCompositingService
@@ -36,22 +37,19 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live,
-        resources: MetalResourceStore = MetalResourceStore(),
-        strokes: MetalStrokeExecutionService = MetalStrokeExecutionService(),
-        composites: MetalCompositingService = MetalCompositingService(),
-        layers: MetalLayerMutationService = MetalLayerMutationService(),
-        text: MetalTextService = MetalTextService()
+        gpuServices: DocumentRuntimeGpuServices
     ) {
         self.services = DocumentEngineServices(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
         )
-        self.resources = resources
-        self.strokes = strokes
-        self.composites = composites
-        self.layers = layers
-        self.text = text
+        self.gpuServices = gpuServices
+        self.resources = gpuServices.resources
+        self.strokes = gpuServices.strokes
+        self.composites = gpuServices.composites
+        self.layers = gpuServices.layers
+        self.text = gpuServices.text
         self.store = SwiftDocumentStore(width: width, height: height)
         captureDirtyUpdate()
     }
@@ -991,7 +989,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             height: 1,
             fileClient: fileClient,
             dateClient: dateClient,
-            uuidClient: uuidClient
+            uuidClient: uuidClient,
+            gpuServices: DocumentRuntimeGpuServicesFactory.live()
         )
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
         let manifestData = try fileClient.readData(manifestURL)
@@ -1095,11 +1094,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             fileClient: services.fileIO,
             dateClient: services.clock,
             uuidClient: services.ids,
-            resources: resources,
-            strokes: strokes,
-            composites: composites,
-            layers: layers,
-            text: text
+            gpuServices: gpuServices
         )
         store.restore(newRuntime.store.snapshot)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)

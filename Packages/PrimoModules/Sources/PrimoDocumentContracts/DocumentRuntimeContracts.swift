@@ -774,6 +774,11 @@ public struct DocumentGpuOperationGateway: Sendable {
     public var compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
     public var compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?
     public var compositedPreviewIncrementalUpdate: @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate?
+    public var selectionOverlayRGBA: @Sendable (Data, Int, Int) -> Data?
+    public var eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> Data?
+    public var shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentCompositeSurface?
+    public var textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentCompositeSurface?
+    public var textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
     public var processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data?
     public var alphaMask: @Sendable (Data, Int, Int) -> [UInt8]?
     public var croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
@@ -796,6 +801,11 @@ public struct DocumentGpuOperationGateway: Sendable {
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?,
         compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?,
         compositedPreviewIncrementalUpdate: @escaping @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate?,
+        selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> Data?,
+        eyedropperLoupeRGBA: @escaping @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> Data?,
+        shapePreviewSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentCompositeSurface?,
+        textLayerSurface: @escaping @Sendable (TextLayerData, CGSize) -> DocumentCompositeSurface?,
+        textLayoutRect: @escaping @Sendable (TextLayerData, CGSize) -> CGRect?,
         processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data?,
         alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]?,
         croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
@@ -817,6 +827,11 @@ public struct DocumentGpuOperationGateway: Sendable {
         self.compositedPaperPreviewRGBA = compositedPaperPreviewRGBA
         self.compositedPreviewPixelData = compositedPreviewPixelData
         self.compositedPreviewIncrementalUpdate = compositedPreviewIncrementalUpdate
+        self.selectionOverlayRGBA = selectionOverlayRGBA
+        self.eyedropperLoupeRGBA = eyedropperLoupeRGBA
+        self.shapePreviewSurface = shapePreviewSurface
+        self.textLayerSurface = textLayerSurface
+        self.textLayoutRect = textLayoutRect
         self.processedLayerPixelData = processedLayerPixelData
         self.alphaMask = alphaMask
         self.croppedSelectionMask = croppedSelectionMask

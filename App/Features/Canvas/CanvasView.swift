@@ -55,7 +55,10 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
     var documentSize: CGSize = .zero
     var documentGpuOperationGateway: DocumentGpuOperationGateway? {
         didSet {
+            selectionOverlayView.documentGpuOperationGateway = documentGpuOperationGateway
             transformPreviewView.documentGpuOperationGateway = documentGpuOperationGateway
+            textTransformOverlayView.documentGpuOperationGateway = documentGpuOperationGateway
+            eyedropperLoupeView.documentGpuOperationGateway = documentGpuOperationGateway
         }
     }
     var sendAction: ((CanvasFeature.Action) -> Void)? {

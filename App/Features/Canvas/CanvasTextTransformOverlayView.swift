@@ -23,6 +23,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     private var pivotTouchOffset: CGPoint = .zero
     private var activeTransformHandle: TransformOverlayHandle = .bottomRight
 
+    var documentGpuOperationGateway: DocumentGpuOperationGateway?
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
     init(canvasImageRenderer: CanvasImageRenderer) {
@@ -308,7 +309,9 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         transformed.scale = min(max(transformed.scale * Double((context.transformPreviewScaleX + context.transformPreviewScaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += context.transformPreviewRotationDegrees
 
-        guard let drawRect = canvasImageRenderer.transformedTextLayoutRect(
+        guard let documentGpuOperationGateway,
+              let drawRect = canvasImageRenderer.transformedTextLayoutRect(
+            gpuOperations: documentGpuOperationGateway,
             textLayer: transformed,
             canvasSize: context.geometry.documentSize
         ) else {
