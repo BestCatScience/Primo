@@ -670,6 +670,7 @@ public struct DocumentMutationGateway: Sendable {
     public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
     public var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
     public var replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
+    public var applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
     public var applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
     public var applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
     public var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
@@ -689,6 +690,7 @@ public struct DocumentMutationGateway: Sendable {
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult,
         replaceLayerPixels: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
         replaceLayerPixelsInRect: @escaping @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult,
+        applyLayerSurfaceMutation: @escaping @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult,
         applyLayerMutation: @escaping @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult,
         applyTextLayerMutation: @escaping @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult,
         replaceLayerMask: @escaping @Sendable (Int, Data) -> DocumentMutationResult,
@@ -707,6 +709,7 @@ public struct DocumentMutationGateway: Sendable {
         self.revealLayerForEditing = revealLayerForEditing
         self.replaceLayerPixels = replaceLayerPixels
         self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
+        self.applyLayerSurfaceMutation = applyLayerSurfaceMutation
         self.applyLayerMutation = applyLayerMutation
         self.applyTextLayerMutation = applyTextLayerMutation
         self.replaceLayerMask = replaceLayerMask

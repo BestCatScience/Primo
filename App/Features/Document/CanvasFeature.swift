@@ -9,6 +9,14 @@ import simd
 struct CanvasFeature {
     static let defaultCanvasSize = CGSize(width: 1152, height: 1536)
 
+    struct ActiveStrokeRenderState: Equatable {
+        let baseRevision: Int
+        let layerIndex: Int
+        let surfaceHandle: MetalBufferHandle
+        let dirtyRect: LayerPixelRect
+        let isApproximatePreview: Bool
+    }
+
     static func trimmingDuplicateLeadingSamples(
         _ samples: [StylusSample],
         after previousSample: StylusSample?
@@ -41,11 +49,7 @@ struct CanvasFeature {
         var pendingCommittedSnapshot: MetalDocumentSnapshot?
         var activeLayerIndex = 0
         var activeStrokeBaseSnapshot: MetalDocumentSnapshot?
-        var activeStrokePreviewLayerPixelData: Data?
-        var activeStrokePreviewRectPixelData: Data?
-        var activeStrokePreviewDirtyRect: LayerPixelRect?
-        var activeStrokePreviewCompositePixelData: Data?
-        var activeStrokePreviewIsApproximate = false
+        var activeStrokeRenderState: ActiveStrokeRenderState?
         var layerBuffers: [LayerCanvasBuffer] = [
             LayerCanvasBuffer(index: 0, name: "Layer 1", visible: true, opacity: 1.0)
         ]
@@ -222,21 +226,8 @@ struct CanvasFeature {
             pendingCommittedSnapshot = snapshot
         }
 
-        mutating func setStrokePreviewLayerPixelData(_ pixelData: Data?) {
-            activeStrokePreviewLayerPixelData = pixelData
-        }
-
-        mutating func setStrokePreviewRectPixelData(_ pixelData: Data?, dirtyRect: LayerPixelRect?) {
-            activeStrokePreviewRectPixelData = pixelData
-            activeStrokePreviewDirtyRect = dirtyRect
-        }
-
-        mutating func setStrokePreviewCompositePixelData(_ pixelData: Data?) {
-            activeStrokePreviewCompositePixelData = pixelData
-        }
-
-        mutating func setStrokePreviewIsApproximate(_ isApproximate: Bool) {
-            activeStrokePreviewIsApproximate = isApproximate
+        mutating func setActiveStrokeRenderState(_ renderState: ActiveStrokeRenderState?) {
+            activeStrokeRenderState = renderState
         }
 
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
@@ -247,22 +238,11 @@ struct CanvasFeature {
             pendingIncrementalUpdate = nil
         }
 
-        mutating func applyIncrementalRenderUpdate(
-            _ update: IncrementalLayerUpdate,
-            activeLayerIndex _: Int? = nil,
-            activeLayerPixelData: Data? = nil
-        ) {
-            if let activeLayerPixelData {
-                setStrokePreviewLayerPixelData(activeLayerPixelData)
-            }
-            setStrokePreviewCompositePixelData(nil)
+        mutating func applyIncrementalRenderUpdate(_ update: IncrementalLayerUpdate) {
             setPendingIncrementalUpdate(update)
         }
 
         func stagedPreviewCompositePixelData(baseSnapshot: MetalDocumentSnapshot) -> Data? {
-            if let activeStrokePreviewCompositePixelData {
-                return activeStrokePreviewCompositePixelData
-            }
             guard let pendingIncrementalUpdate else { return nil }
             return Self.replacingCompositeRegion(
                 in: baseSnapshot.compositePixelData,
@@ -294,11 +274,16 @@ struct CanvasFeature {
             _ renderSnapshot: MetalDocumentSnapshot,
             previewLayerPixelData: Data? = nil
         ) {
-            if let previewLayerPixelData {
-                setStrokePreviewLayerPixelData(previewLayerPixelData)
-            }
-            setStrokePreviewCompositePixelData(renderSnapshot.compositePixelData)
-            clearPendingIncrementalUpdate()
+            applyIncrementalRenderUpdate(
+                IncrementalLayerUpdate(
+                    layerIndex: -1,
+                    originX: 0,
+                    originY: 0,
+                    width: renderSnapshot.width,
+                    height: renderSnapshot.height,
+                    pixelData: renderSnapshot.compositePixelData
+                )
+            )
         }
 
         mutating func resetStrokePreview() {
@@ -306,11 +291,7 @@ struct CanvasFeature {
                 previewResetNonce += 1
             }
             activeStrokeBaseSnapshot = nil
-            activeStrokePreviewLayerPixelData = nil
-            activeStrokePreviewRectPixelData = nil
-            activeStrokePreviewDirtyRect = nil
-            activeStrokePreviewCompositePixelData = nil
-            activeStrokePreviewIsApproximate = false
+            activeStrokeRenderState = nil
             pendingStrokeFinalizationSamples = []
             clearPendingIncrementalUpdate()
         }

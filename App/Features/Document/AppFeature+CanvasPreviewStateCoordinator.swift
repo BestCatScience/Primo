@@ -14,8 +14,16 @@ extension AppFeature {
             guard compositeSurface.pixelData.count == compositeSurface.width * compositeSurface.height * 4 else {
                 return false
             }
-            state.canvas.setStrokePreviewCompositePixelData(compositeSurface.pixelData)
-            state.canvas.clearPendingIncrementalUpdate()
+            state.canvas.applyIncrementalRenderUpdate(
+                IncrementalLayerUpdate(
+                    layerIndex: -1,
+                    originX: 0,
+                    originY: 0,
+                    width: compositeSurface.width,
+                    height: compositeSurface.height,
+                    pixelData: compositeSurface.pixelData
+                )
+            )
             return true
         }
 

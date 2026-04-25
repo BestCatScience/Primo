@@ -70,6 +70,7 @@ public struct DocumentLayerCommandService: Sendable {
     public var ensureLayerVisible: @Sendable (Int) -> DocumentMutationResult
     public var replaceLayerPixels: @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult
     public var replaceLayerPixelsInRect: @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult
+    public var applyLayerSurfaceMutation: @Sendable (_ layerIndex: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
     public var applyLayerMutation: @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
     public var applyTextLayerMutation: @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
     public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
@@ -78,6 +79,7 @@ public struct DocumentLayerCommandService: Sendable {
         ensureLayerVisible: @escaping @Sendable (Int) -> DocumentMutationResult,
         replaceLayerPixels: @escaping @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult,
         replaceLayerPixelsInRect: @escaping @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult,
+        applyLayerSurfaceMutation: @escaping @Sendable (_ layerIndex: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult,
         applyLayerMutation: @escaping @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult,
         applyTextLayerMutation: @escaping @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult,
         revealLayerForEditing: @escaping @Sendable (Int) -> DocumentMutationResult
@@ -85,6 +87,7 @@ public struct DocumentLayerCommandService: Sendable {
         self.ensureLayerVisible = ensureLayerVisible
         self.replaceLayerPixels = replaceLayerPixels
         self.replaceLayerPixelsInRect = replaceLayerPixelsInRect
+        self.applyLayerSurfaceMutation = applyLayerSurfaceMutation
         self.applyLayerMutation = applyLayerMutation
         self.applyTextLayerMutation = applyTextLayerMutation
         self.revealLayerForEditing = revealLayerForEditing
@@ -95,6 +98,7 @@ public struct DocumentLayerCommandService: Sendable {
             ensureLayerVisible: { mutationGateway.setLayerVisibility($0, true) },
             replaceLayerPixels: mutationGateway.replaceLayerPixels,
             replaceLayerPixelsInRect: mutationGateway.replaceLayerPixelsInRect,
+            applyLayerSurfaceMutation: mutationGateway.applyLayerSurfaceMutation,
             applyLayerMutation: mutationGateway.applyLayerMutation,
             applyTextLayerMutation: mutationGateway.applyTextLayerMutation,
             revealLayerForEditing: mutationGateway.revealLayerForEditing

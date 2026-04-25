@@ -37,8 +37,6 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
-        product: PrimoDocumentMetalStrokeInfrastructure
-      - package: PrimoModules
         product: PrimoCanvasPresentationInfrastructure
       - package: PrimoModules
         product: PrimoDocumentRenderingInfrastructure

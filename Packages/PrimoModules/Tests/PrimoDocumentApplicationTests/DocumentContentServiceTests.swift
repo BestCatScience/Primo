@@ -34,6 +34,7 @@ struct DocumentContentServiceTests {
                     return .failure(.emptyInput)
                 },
                 replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerSurfaceMutation: { _, _ in .success(()) },
                 applyLayerMutation: { _, _ in .success(()) },
                 applyTextLayerMutation: { _, _, _ in .success(()) },
                 replaceLayerMask: { _, _ in .success(()) },
@@ -80,6 +81,7 @@ struct DocumentContentServiceTests {
                 revealLayerForEditing: { _ in .success(()) },
                 replaceLayerPixels: { _, _ in .success(()) },
                 replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerSurfaceMutation: { _, _ in .success(()) },
                 applyLayerMutation: { _, _ in .success(()) },
                 applyTextLayerMutation: { _, _, _ in .success(()) },
                 replaceLayerMask: { _, _ in .success(()) },

@@ -70,6 +70,9 @@ public enum DocumentEngineFactory {
             replaceLayerPixelsInRect: { index, rect, data in
                 runtimeBox.withRuntime { $0.replaceLayerPixels(index: index, in: rect, data: data) }
             },
+            applyLayerSurfaceMutation: { index, payload in
+                runtimeBox.withRuntime { $0.applyLayerSurfaceMutation(index: index, payload: payload) }
+            },
             applyLayerMutation: { index, payload in
                 runtimeBox.withRuntime { $0.applyLayerMutation(index: index, payload: payload) }
             },

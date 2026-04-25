@@ -280,6 +280,28 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
     }
 }
 
+public struct GpuLayerMutationPayload: Equatable, Sendable {
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let dirtyRect: LayerPixelRect
+    public let gpuBufferHandle: MetalBufferHandle
+    public let fallbackPixelData: Data?
+
+    public init(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferHandle: MetalBufferHandle,
+        fallbackPixelData: Data? = nil
+    ) {
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
+        self.fallbackPixelData = fallbackPixelData
+    }
+}
+
 public struct LoadedPaintProject: Equatable, Sendable {
     public var presentation: PaintDocumentPresentation
     public var paperStyle: CanvasPaperStyle

@@ -2,7 +2,6 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentMetalRuntimeInfrastructure
 import Testing
 
 struct DocumentRasterImageServiceTests {
@@ -56,7 +55,6 @@ struct DocumentRasterImageServiceTests {
 
     @Test
     func applyingInpaintCropReplacesSelectedPixels() throws {
-        let client = PrimoMetalDocumentProcessingClient.shared
         let base = Data([
             10, 20, 30, 255,
             40, 50, 60, 255,
@@ -86,21 +84,16 @@ struct DocumentRasterImageServiceTests {
             featherRadius: 0
         )
 
-        if client.isAvailable {
-            #expect(output == Data([
-                10, 20, 30, 255,
-                200, 210, 220, 255,
-                70, 80, 90, 255,
-                100, 110, 120, 255,
-            ]))
-        } else {
-            #expect(output == nil)
-        }
+        #expect(output == Data([
+            10, 20, 30, 255,
+            200, 210, 220, 255,
+            70, 80, 90, 255,
+            100, 110, 120, 255,
+        ]))
     }
 
     @Test
     func inpaintCropExtractsExpectedBoundsPixelsAndMask() throws {
-        let client = PrimoMetalDocumentProcessingClient.shared
         let source = Data([
             1, 2, 3, 255, 11, 12, 13, 255, 21, 22, 23, 255,
             31, 32, 33, 255, 41, 42, 43, 255, 51, 52, 53, 255,
@@ -120,21 +113,17 @@ struct DocumentRasterImageServiceTests {
             padding: 1
         )
 
-        if client.isAvailable {
-            let resolved = try #require(crop)
-            #expect(resolved.width == 3)
-            #expect(resolved.height == 3)
-            #expect(resolved.originX == 0)
-            #expect(resolved.originY == 0)
-            #expect(resolved.pixelData == source)
-            #expect(resolved.selectionMask == [
-                0, 0, 0,
-                0, 255, 0,
-                0, 0, 0,
-            ])
-        } else {
-            #expect(crop == nil)
-        }
+        let resolved = try #require(crop)
+        #expect(resolved.width == 3)
+        #expect(resolved.height == 3)
+        #expect(resolved.originX == 0)
+        #expect(resolved.originY == 0)
+        #expect(resolved.pixelData == source)
+        #expect(resolved.selectionMask == [
+            0, 0, 0,
+            0, 255, 0,
+            0, 0, 0,
+        ])
     }
 
     @Test

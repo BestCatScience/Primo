@@ -140,6 +140,7 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
             return .success(())
         },
         replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+                applyLayerSurfaceMutation: { _, _ in .success(()) },
         applyLayerMutation: { _, _ in .success(()) },
         applyTextLayerMutation: { _, _, _ in .success(()) },
         replaceLayerMask: { _, _ in .success(()) },
