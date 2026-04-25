@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
