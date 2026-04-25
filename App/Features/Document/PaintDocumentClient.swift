@@ -19,34 +19,56 @@ private enum DocumentRuntimeCompositionKey: DependencyKey {
     }
 }
 
-private enum DocumentInteractionServiceKey: DependencyKey {
-    static var liveValue: DocumentInteractionService {
+private enum DocumentCanvasCommandServiceKey: DependencyKey {
+    static var liveValue: DocumentCanvasCommandService {
         @Dependency(\.documentRuntimeComposition) var composition
-        return Self.makeService(from: composition)
-    }
-
-    private static func makeService(from composition: DocumentRuntimeComposition) -> DocumentInteractionService {
-        DocumentInteractionService(
+        return DocumentCanvasCommandService(
             queryGateway: composition.queryGateway,
             mutationGateway: composition.mutationGateway,
-            strokeGateway: composition.strokeGateway,
-            historyGateway: composition.historyGateway,
             persistenceGateway: composition.persistenceGateway
         )
     }
 }
 
+private enum DocumentLayerCommandServiceKey: DependencyKey {
+    static var liveValue: DocumentLayerCommandService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
+    }
+}
+
+private enum DocumentStrokeCommandServiceKey: DependencyKey {
+    static var liveValue: DocumentStrokeCommandService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
+    }
+}
+
+private enum DocumentHistoryCommandServiceKey: DependencyKey {
+    static var liveValue: DocumentHistoryCommandService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+    }
+}
+
 private extension DependencyValues {
-    mutating func setDocumentRuntimeCompositionAndRefreshInteractionService(
+    mutating func setDocumentRuntimeCompositionAndRefreshCommandServices(
         _ composition: DocumentRuntimeComposition
     ) {
         self[DocumentRuntimeCompositionKey.self] = composition
-        self[DocumentInteractionServiceKey.self] = DocumentInteractionService(
+        self[DocumentCanvasCommandServiceKey.self] = DocumentCanvasCommandService(
             queryGateway: composition.queryGateway,
             mutationGateway: composition.mutationGateway,
-            strokeGateway: composition.strokeGateway,
-            historyGateway: composition.historyGateway,
             persistenceGateway: composition.persistenceGateway
+        )
+        self[DocumentLayerCommandServiceKey.self] = DocumentLayerCommandService(
+            mutationGateway: composition.mutationGateway
+        )
+        self[DocumentStrokeCommandServiceKey.self] = DocumentStrokeCommandService(
+            strokeGateway: composition.strokeGateway
+        )
+        self[DocumentHistoryCommandServiceKey.self] = DocumentHistoryCommandService(
+            historyGateway: composition.historyGateway
         )
     }
 }
@@ -54,7 +76,7 @@ private extension DependencyValues {
 extension DependencyValues {
     var documentRuntimeComposition: DocumentRuntimeComposition {
         get { self[DocumentRuntimeCompositionKey.self] }
-        set { setDocumentRuntimeCompositionAndRefreshInteractionService(newValue) }
+        set { setDocumentRuntimeCompositionAndRefreshCommandServices(newValue) }
     }
 
     var documentQueryGateway: DocumentQueryGateway {
@@ -62,7 +84,7 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.queryGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshInteractionService(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
         }
     }
 
@@ -71,7 +93,7 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.mutationGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshInteractionService(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
         }
     }
 
@@ -80,7 +102,7 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.strokeGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshInteractionService(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
         }
     }
 
@@ -89,7 +111,7 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.historyGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshInteractionService(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
         }
     }
 
@@ -98,7 +120,7 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.persistenceGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshInteractionService(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
         }
     }
 
@@ -138,8 +160,23 @@ extension DependencyValues {
         }
     }
 
-    var documentInteractionService: DocumentInteractionService {
-        get { self[DocumentInteractionServiceKey.self] }
-        set { self[DocumentInteractionServiceKey.self] = newValue }
+    var documentCanvasCommandService: DocumentCanvasCommandService {
+        get { self[DocumentCanvasCommandServiceKey.self] }
+        set { self[DocumentCanvasCommandServiceKey.self] = newValue }
+    }
+
+    var documentLayerCommandService: DocumentLayerCommandService {
+        get { self[DocumentLayerCommandServiceKey.self] }
+        set { self[DocumentLayerCommandServiceKey.self] = newValue }
+    }
+
+    var documentStrokeCommandService: DocumentStrokeCommandService {
+        get { self[DocumentStrokeCommandServiceKey.self] }
+        set { self[DocumentStrokeCommandServiceKey.self] = newValue }
+    }
+
+    var documentHistoryCommandService: DocumentHistoryCommandService {
+        get { self[DocumentHistoryCommandServiceKey.self] }
+        set { self[DocumentHistoryCommandServiceKey.self] = newValue }
     }
 }

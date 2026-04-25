@@ -23,6 +23,12 @@
 		A00000000000000000000023 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AppFeature.swift */; };
 		A00000000000000000000024 /* PaintModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* PaintModels.swift */; };
 		A00000000000000000000025 /* CanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* CanvasView.swift */; };
+		D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000001 /* CanvasViewportGeometry.swift */; };
+		D50000000000000000000002 /* CanvasSelectionOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000002 /* CanvasSelectionOverlayView.swift */; };
+		D50000000000000000000003 /* CanvasTransformPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000003 /* CanvasTransformPreviewView.swift */; };
+		D50000000000000000000004 /* CanvasTextTransformOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */; };
+		D50000000000000000000005 /* CanvasEyedropperLoupeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */; };
+		D50000000000000000000006 /* CanvasNavigationGestureAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */; };
 		A00000000000000000000026 /* BrushPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* BrushPaletteView.swift */; };
 		A00000000000000000000027 /* LayerSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* LayerSidebarView.swift */; };
 		A0000000000000000000002A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* UIKit.framework */; };
@@ -188,6 +194,12 @@
 		A00000000000000000000003 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A00000000000000000000004 /* PaintModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintModels.swift; sourceTree = "<group>"; };
 		A00000000000000000000005 /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
+		D60000000000000000000001 /* CanvasViewportGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasViewportGeometry.swift; sourceTree = "<group>"; };
+		D60000000000000000000002 /* CanvasSelectionOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSelectionOverlayView.swift; sourceTree = "<group>"; };
+		D60000000000000000000003 /* CanvasTransformPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformPreviewView.swift; sourceTree = "<group>"; };
+		D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTextTransformOverlayView.swift; sourceTree = "<group>"; };
+		D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasEyedropperLoupeView.swift; sourceTree = "<group>"; };
+		D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNavigationGestureAdapter.swift; sourceTree = "<group>"; };
 		A00000000000000000000006 /* BrushPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteView.swift; sourceTree = "<group>"; };
 		A00000000000000000000007 /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -477,6 +489,12 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000005 /* CanvasView.swift */,
+				D60000000000000000000001 /* CanvasViewportGeometry.swift */,
+				D60000000000000000000002 /* CanvasSelectionOverlayView.swift */,
+				D60000000000000000000003 /* CanvasTransformPreviewView.swift */,
+				D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */,
+				D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */,
+				D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */,
 				A00000000000000000000045 /* InputHandler.swift */,
 			);
 			path = Canvas;
@@ -779,6 +797,12 @@
 				A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */,
 				A00000000000000000000043 /* CanvasFeature.swift in Sources */,
 				A00000000000000000000025 /* CanvasView.swift in Sources */,
+				D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */,
+				D50000000000000000000002 /* CanvasSelectionOverlayView.swift in Sources */,
+				D50000000000000000000003 /* CanvasTransformPreviewView.swift in Sources */,
+				D50000000000000000000004 /* CanvasTextTransformOverlayView.swift in Sources */,
+				D50000000000000000000005 /* CanvasEyedropperLoupeView.swift in Sources */,
+				D50000000000000000000006 /* CanvasNavigationGestureAdapter.swift in Sources */,
 				A00000000000000000000022 /* ContentView.swift in Sources */,
 				A00000000000000000000096 /* ContentView+Support.swift in Sources */,
 				A00000000000000000000044 /* InputHandler.swift in Sources */,

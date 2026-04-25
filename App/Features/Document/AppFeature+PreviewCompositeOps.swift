@@ -5,8 +5,8 @@ import PrimoDocumentDomain
 import PrimoDocumentApplication
 import PrimoDocumentRenderingInfrastructure
 
-enum MetalDocumentProcessingClient {
-    static let shared = DocumentRenderingClient.live
+enum CanvasDocumentRenderingServices {
+    static let live = DocumentRenderingClient.live
 }
 
 extension AppFeature {
@@ -14,7 +14,7 @@ extension AppFeature {
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface {
-        let pixelData = MetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+        let pixelData = CanvasDocumentRenderingServices.live.compositedPaperPreviewRGBA(
             pixelData: snapshot.compositePixelData,
             width: snapshot.width,
             height: snapshot.height,
@@ -42,7 +42,7 @@ extension AppFeature {
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        MetalDocumentProcessingClient.shared.compositedPreviewPixelData(
+        CanvasDocumentRenderingServices.live.compositedPreviewPixelData(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels
@@ -55,7 +55,7 @@ extension AppFeature {
         canvasWidth: Int,
         canvasHeight: Int
     ) -> (originX: Int, originY: Int, width: Int, height: Int)? {
-        MetalDocumentProcessingClient.shared.strokePreviewDirtyRect(
+        CanvasDocumentRenderingServices.live.strokePreviewDirtyRect(
             samples: samples,
             brush: brush,
             canvasWidth: canvasWidth,
@@ -69,7 +69,7 @@ extension AppFeature {
         adjustedActiveLayerPixels: Data,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
     ) -> IncrementalLayerUpdate? {
-        MetalDocumentProcessingClient.shared.compositedPreviewIncrementalUpdate(
+        CanvasDocumentRenderingServices.live.compositedPreviewIncrementalUpdate(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,

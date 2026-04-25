@@ -217,7 +217,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         guard copyWidth > 0, copyHeight > 0 else { return }
 
         if let handle = update.gpuBufferHandle,
-           PrimoMetalDocumentProcessingClient.shared.populateTexture(
+           MetalResourceStore().populateTexture(
                texture,
                from: handle,
                sourceOriginX: 0,
@@ -227,7 +227,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
                width: copyWidth,
                height: copyHeight
            ) {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(handle)
+            MetalResourceStore().release(handle)
             lastAppliedIncrementalUpdateID = update.id
             scheduleRedraw()
             return
@@ -395,7 +395,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         let texture = ensureCompositeTexture(device: device)
         if let handle = snapshot.compositeBufferHandle,
            let texture,
-           PrimoMetalDocumentProcessingClient.shared.populateTexture(texture, from: handle) {
+           MetalResourceStore().populateTexture(texture, from: handle) {
             // GPU-backed snapshot upload completed directly from cached buffer.
         } else {
             snapshot.compositePixelData.withUnsafeBytes { bytes in

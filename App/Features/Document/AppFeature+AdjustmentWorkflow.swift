@@ -72,7 +72,7 @@ extension AppFeature {
         else {
             return nil
         }
-        return MetalDocumentProcessingClient.shared.processedLayerPixelData(
+        return CanvasDocumentRenderingServices.live.processedLayerPixelData(
             pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,

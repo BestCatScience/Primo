@@ -5,12 +5,12 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import Testing
 
-struct DocumentInteractionServiceTests {
+struct DocumentCommandServiceTests {
     @Test
     func compositeSurfaceReturnsQueryGatewayPayload() {
         let expected = Data([0x10, 0x20, 0x30])
         let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
-        let service = DocumentInteractionService(
+        let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
                 presentation: { queryGateway().presentation() },
@@ -20,8 +20,6 @@ struct DocumentInteractionServiceTests {
                 consumeDirtyUpdate: { nil }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
-            strokeGateway: strokeGateway(),
-            historyGateway: historyGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
         )
 
@@ -29,10 +27,10 @@ struct DocumentInteractionServiceTests {
     }
 
     @Test
-    func compositePixelDataDelegatesToCompositeSurface() {
+    func compositeSurfaceReplacesLegacyPixelDataReadback() {
         let expected = Data([0x10, 0x20, 0x30])
         let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
-        let service = DocumentInteractionService(
+        let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
                 presentation: { queryGateway().presentation() },
@@ -42,37 +40,33 @@ struct DocumentInteractionServiceTests {
                 consumeDirtyUpdate: { nil }
             ),
             mutationGateway: mutationGateway(recorder: CallRecorder()),
-            strokeGateway: strokeGateway(),
-            historyGateway: historyGateway(recorder: CallRecorder()),
             persistenceGateway: persistenceGateway(recorder: CallRecorder())
         )
 
-        #expect(service.compositePixelData() == expected)
+        #expect(service.compositeSurface().pixelData == expected)
     }
 
     @Test
     func initializeImportedCanvasCreatesCanvasAndActivatesImportedLayer() {
         let recorder = CallRecorder()
-        let service = DocumentInteractionService(
+        let service = DocumentCanvasCommandService(
             queryGateway: queryGateway(),
             mutationGateway: mutationGateway(recorder: recorder),
-            strokeGateway: strokeGateway(),
-            historyGateway: historyGateway(recorder: recorder),
             persistenceGateway: persistenceGateway(recorder: recorder)
         )
 
-        let result = service.execute(
-            .initializeImportedCanvas(
-                ImportedCanvasRequest(
-                    width: 48,
-                    height: 32,
-                    pixelData: Data([0xAA, 0xBB])
-                ),
-                layerName: "Imported"
-            )
+        let result = service.initializeImportedCanvas(
+            ImportedCanvasRequest(
+                width: 48,
+                height: 32,
+                pixelData: Data([0xAA, 0xBB])
+            ),
+            "Imported"
         )
 
-        #expect(result == .success(.none))
+        if case .failure = result {
+            Issue.record("Expected imported canvas initialization to succeed")
+        }
         #expect(
             recorder.values == [
                 "newCanvas:48x32",
@@ -87,16 +81,14 @@ struct DocumentInteractionServiceTests {
     @Test
     func undoAndRedoRouteThroughHistoryGateway() {
         let recorder = CallRecorder()
-        let service = DocumentInteractionService(
-            queryGateway: queryGateway(),
-            mutationGateway: mutationGateway(recorder: recorder),
-            strokeGateway: strokeGateway(),
-            historyGateway: historyGateway(recorder: recorder),
-            persistenceGateway: persistenceGateway(recorder: recorder)
-        )
+        let service = DocumentHistoryCommandService(historyGateway: historyGateway(recorder: recorder))
 
-        #expect(service.execute(.undo) == .success(.none))
-        #expect(service.execute(.redo) == .success(.none))
+        if case .failure = service.undo() {
+            Issue.record("Expected undo to succeed")
+        }
+        if case .failure = service.redo() {
+            Issue.record("Expected redo to succeed")
+        }
         #expect(recorder.values == ["undo", "redo"])
     }
 }

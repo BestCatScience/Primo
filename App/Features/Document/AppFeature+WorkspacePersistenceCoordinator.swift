@@ -706,7 +706,7 @@ extension AppFeature {
             state: &state
         )
         if let dirtyUpdate = documentQueryGateway.consumeDirtyUpdate() {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(dirtyUpdate.gpuBufferHandle)
+            MetalResourceStore().release(dirtyUpdate.gpuBufferHandle)
         }
         applyPresentation(documentPresentationQueryService.presentation(), state: &state)
         guard updatesWorkspaceArtifacts else {

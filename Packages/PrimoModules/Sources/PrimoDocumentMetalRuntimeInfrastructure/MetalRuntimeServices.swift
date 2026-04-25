@@ -176,6 +176,20 @@ public struct MetalCompositingService: Sendable {
     public func compositedPreviewIncrementalUpdate(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        client.compositedPreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+            dirtyRect: dirtyRect
+        )
+    }
+
+    public func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
         adjustedActiveLayerBufferHandle: MetalBufferHandle,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
     ) -> IncrementalLayerUpdate? {
@@ -185,6 +199,36 @@ public struct MetalCompositingService: Sendable {
             adjustedActiveLayerBufferHandle: adjustedActiveLayerBufferHandle,
             dirtyRect: dirtyRect
         )
+    }
+
+    public func compositedPreviewPixelData(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data
+    ) -> Data? {
+        client.compositedPreviewPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels
+        )
+    }
+
+    public func compositedPaperPreviewRGBA(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        paperStyle: CanvasPaperStyle
+    ) -> Data? {
+        client.compositedPaperPreviewRGBA(
+            pixelData: pixelData,
+            width: width,
+            height: height,
+            paperStyle: paperStyle
+        )
+    }
+
+    public func compositeDocumentSurface(snapshot: MetalDocumentSnapshot) -> DocumentCompositeSurface? {
+        client.compositeDocumentSurface(snapshot: snapshot)
     }
 }
 
@@ -232,6 +276,15 @@ public struct MetalSelectionService: Sendable {
         client.expandedMask(source, width: width, height: height, expansion: expansion)
     }
 
+    public func contractedMask(
+        _ source: [UInt8],
+        width: Int,
+        height: Int,
+        contraction: Int
+    ) -> [UInt8]? {
+        client.contractedMask(source, width: width, height: height, contraction: contraction)
+    }
+
     public func featheredMask(
         _ source: [UInt8],
         width: Int,
@@ -239,6 +292,112 @@ public struct MetalSelectionService: Sendable {
         radius: Int
     ) -> [UInt8]? {
         client.featheredMask(source, width: width, height: height, radius: radius)
+    }
+
+    public func colorRangeSelection(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        request: ColorRangeSelectionRequest
+    ) -> [UInt8]? {
+        client.colorRangeSelection(
+            pixelData: pixelData,
+            width: width,
+            height: height,
+            request: request
+        )
+    }
+
+    public func lassoSelection(
+        points: [CGPoint],
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> [UInt8]? {
+        client.lassoSelection(
+            points: points,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+
+    public func expandedSelectionMask(
+        maskData: Data,
+        maskWidth: Int,
+        maskHeight: Int,
+        originX: Int,
+        originY: Int,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> [UInt8]? {
+        client.expandedSelectionMask(
+            maskData: maskData,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight,
+            originX: originX,
+            originY: originY,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+
+    public func combinedSelectionMask(
+        base: [UInt8],
+        incoming: [UInt8],
+        mode: PrimoMetalSelectionCombineMode,
+        width: Int,
+        height: Int
+    ) -> [UInt8]? {
+        client.combinedSelectionMask(
+            base: base,
+            incoming: incoming,
+            mode: mode,
+            width: width,
+            height: height
+        )
+    }
+
+    public func croppedSelectionMask(
+        mask: [UInt8],
+        width: Int,
+        height: Int
+    ) -> PrimoMetalCroppedSelectionMask? {
+        client.croppedSelectionMask(mask: mask, width: width, height: height)
+    }
+
+    public func alphaMask(
+        pixelData: Data,
+        width: Int,
+        height: Int
+    ) -> [UInt8]? {
+        client.alphaMask(pixelData: pixelData, width: width, height: height)
+    }
+
+    public func transformedSelectionMask(
+        expandedSelectionMask: [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> [UInt8]? {
+        client.transformedSelectionMask(
+            expandedSelectionMask: expandedSelectionMask,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            sourceQuad: sourceQuad,
+            destinationQuad: destinationQuad,
+            usesFreeformQuad: usesFreeformQuad
+        )
     }
 }
 
@@ -310,6 +469,186 @@ public struct MetalLayerMutationService: Sendable {
             existing: existing,
             width: width,
             height: height
+        )
+    }
+
+    public func applyLayerMask(
+        pixelData: Data,
+        maskData: Data,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        client.applyLayerMask(
+            pixelData: pixelData,
+            maskData: maskData,
+            width: width,
+            height: height
+        )
+    }
+
+    public func mergeLayers(
+        lowerPixelData: Data,
+        upperPixelData: Data,
+        upperMaskData: Data?,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        upperOpacity: Float,
+        upperBlendMode: LayerBlendMode
+    ) -> Data? {
+        client.mergeLayers(
+            lowerPixelData: lowerPixelData,
+            upperPixelData: upperPixelData,
+            upperMaskData: upperMaskData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            upperOpacity: upperOpacity,
+            upperBlendMode: upperBlendMode
+        )
+    }
+
+    public func scaledPixelData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data? {
+        client.scaledPixelData(
+            source,
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+    }
+
+    public func scaledMaskData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int
+    ) -> Data? {
+        client.scaledMaskData(
+            source,
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight
+        )
+    }
+
+    public func translatedMaskData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+        offsetX: Int,
+        offsetY: Int
+    ) -> Data? {
+        client.translatedMaskData(
+            source,
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight,
+            offsetX: offsetX,
+            offsetY: offsetY
+        )
+    }
+
+    public func translatedPixelData(
+        _ source: Data,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        targetWidth: Int,
+        targetHeight: Int,
+        offsetX: Int,
+        offsetY: Int
+    ) -> Data? {
+        client.translatedPixelData(
+            source,
+            sourceWidth: sourceWidth,
+            sourceHeight: sourceHeight,
+            targetWidth: targetWidth,
+            targetHeight: targetHeight,
+            offsetX: offsetX,
+            offsetY: offsetY
+        )
+    }
+
+    public func transformedLayerPixelData(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        expandedSelectionMask: [UInt8]?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) -> Data? {
+        client.transformedLayerPixelData(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            expandedSelectionMask: expandedSelectionMask,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            sourceQuad: sourceQuad,
+            destinationQuad: destinationQuad,
+            usesFreeformQuad: usesFreeformQuad
+        )
+    }
+
+    public func inpaintCropPayload(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selectionBounds: CGRect,
+        expandedMask: [UInt8],
+        padding: Int
+    ) -> PrimoMetalInpaintCropPayload? {
+        client.inpaintCropPayload(
+            source: source,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            selectionBounds: selectionBounds,
+            expandedMask: expandedMask,
+            padding: padding
+        )
+    }
+
+    public func applyInpaintCrop(
+        editedCropPixelData: Data,
+        to baseLayerPixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        cropWidth: Int,
+        cropHeight: Int,
+        originX: Int,
+        originY: Int,
+        selectionMask: [UInt8],
+        featherRadius: Int
+    ) -> Data? {
+        client.applyInpaintCrop(
+            editedCropPixelData: editedCropPixelData,
+            to: baseLayerPixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            cropWidth: cropWidth,
+            cropHeight: cropHeight,
+            originX: originX,
+            originY: originY,
+            selectionMask: selectionMask,
+            featherRadius: featherRadius
         )
     }
 }

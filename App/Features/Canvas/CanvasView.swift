@@ -1,10 +1,8 @@
-import AVFoundation
 import ComposableArchitecture
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
-import QuartzCore
 import SwiftUI
 import UIKit
 import simd
@@ -51,74 +49,34 @@ struct CanvasView: UIViewRepresentable {
     }
 }
 
-final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRecognizerDelegate, UIPencilInteractionDelegate {
+final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInteractionDelegate {
     var documentSize: CGSize = .zero
-    var sendAction: ((CanvasFeature.Action) -> Void)?
+    var sendAction: ((CanvasFeature.Action) -> Void)? {
+        didSet {
+            navigationGestureAdapter.sendAction = sendAction
+            textTransformOverlayView.sendAction = sendAction
+            eyedropperLoupeView.onSampledColor = { [weak self] sampledColor in
+                self?.sendAction?(.colorSampled(sampledColor))
+            }
+        }
+    }
 
     private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
     private let canvasImageRenderer = CanvasImageRenderer.live
-    private let selectionOverlayView = CanvasPixelSurfaceView()
-    private let compositePreviewSurfaceView = CanvasPixelSurfaceView()
-    private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
-    private let textTransformBoxView = TransformOutlineView()
-    private let textTransformRotationStemView = UIView()
-    private let textTransformTopLeftHandleView = UIView()
-    private let textTransformTopRightHandleView = UIView()
-    private let textTransformBottomLeftHandleView = UIView()
-    private let textTransformScaleHandleView = UIView()
-    private let textTransformLeftMidHandleView = UIView()
-    private let textTransformRightMidHandleView = UIView()
-    private let textTransformBottomMidHandleView = UIView()
-    private let textTransformRotationHandleView = UIView()
-    private let textTransformPivotHandleView = UIView()
     private let inputHandler = InputHandler()
-    private let selectionOutlineLayer = CAShapeLayer()
-    private let selectionPreviewLayer = CAShapeLayer()
-    private let touchEyedropperLoupeView = UIView()
-    private let touchEyedropperSurfaceView = CanvasPixelSurfaceView()
-    private let touchEyedropperRingView = UIView()
-    private let touchEyedropperFocusView = UIView()
-    private let touchEyedropperLongPressRecognizer: UILongPressGestureRecognizer
+    private lazy var selectionOverlayView = CanvasSelectionOverlayView(canvasImageRenderer: canvasImageRenderer)
+    private lazy var transformPreviewView = CanvasTransformPreviewView(canvasImageRenderer: canvasImageRenderer)
+    private lazy var textTransformOverlayView = CanvasTextTransformOverlayView(canvasImageRenderer: canvasImageRenderer)
+    private lazy var eyedropperLoupeView = CanvasEyedropperLoupeView(canvasImageRenderer: canvasImageRenderer)
+    private let navigationGestureAdapter = CanvasNavigationGestureAdapter()
+    private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
 
     private var viewportOffset: CGSize = .zero
     private var zoomScale: CGFloat = 1.0
     private var currentTool: StudioToolKind = .brush
-    private var paperStyle: CanvasPaperStyle = .default
-    private var transformPreviewOffset: CGSize = .zero
-    private var transformPreviewScaleX: CGFloat = 1.0
-    private var transformPreviewScaleY: CGFloat = 1.0
-    private var transformPreviewRotationDegrees: Double = 0
-    private var transformPivot: CGPoint?
-    private var transformMode: CanvasTransformMode = .standard
-    private var transformLocksAspectRatio = true
-    private var transformQuadOffsets: TransformQuadOffsets = .zero
-    private var activeTextLayer: TextLayerData?
-    private var panStartLocation: CGPoint?
-    private var panStartOffset: CGSize = .zero
-    private var panDidMove = false
-    private var isCanvasPanGestureActive = false
-    private var pinchStartScale: CGFloat = 1.0
-    private var pinchAnchorDocumentPoint: CGPoint?
-    private var isPinchGestureActive = false
-    private var lastNavigationGestureEndedAt: CFTimeInterval = 0
-    private var currentTransformGeometry: TextTransformGeometry?
-    private var textHandleStartScale = CGSize(width: 1, height: 1)
-    private var textRotationHandleStartAngle: CGFloat = 0
-    private var transformPivotTouchOffset: CGPoint = .zero
-    private var activeTransformHandle: TransformOverlayHandle = .bottomRight
-    private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
-    private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
-    private var currentSnapshot: MetalDocumentSnapshot?
-    private var lastPreviewResetNonce: Int = 0
-    private var isTouchEyedropperActive = false
-
-    private let touchEyedropperLoupeSize = CGSize(width: 102, height: 102)
-    private let touchEyedropperPreviewInset: CGFloat = 9
-    private let touchEyedropperPreviewGridSize = 17
-    private let touchEyedropperVerticalOffset: CGFloat = 86
 
     override init(frame: CGRect) {
-        touchEyedropperLongPressRecognizer = UILongPressGestureRecognizer()
         super.init(frame: frame)
         backgroundColor = .clear
         isMultipleTouchEnabled = true
@@ -132,185 +90,37 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         }
 
         addSubview(canvasRenderSurfaceView)
-
-        selectionOverlayView.isUserInteractionEnabled = false
-        selectionOverlayView.alpha = 0.55
         addSubview(selectionOverlayView)
+        addSubview(transformPreviewView)
+        addSubview(textTransformOverlayView)
 
-        compositePreviewSurfaceView.isUserInteractionEnabled = false
-        compositePreviewSurfaceView.alpha = 1.0
-        compositePreviewSurfaceView.isHidden = true
-        addSubview(compositePreviewSurfaceView)
+        navigationGestureAdapter.sendAction = sendAction
+        navigationGestureAdapter.shouldAllowSimultaneousRecognition = { [weak self] gesture, otherGesture in
+            guard let self else { return true }
+            if self.eyedropperLoupeView.ownsGesture(gesture) || self.eyedropperLoupeView.ownsGesture(otherGesture) {
+                return false
+            }
+            if self.textTransformOverlayView.ownsGesture(gesture) || self.textTransformOverlayView.ownsGesture(otherGesture) {
+                return false
+            }
+            return true
+        }
+        navigationGestureAdapter.shouldReceiveTouch = { [weak self] gesture, touch in
+            guard let self else { return true }
+            if self.textTransformOverlayView.ownsGesture(gesture) {
+                return !self.textTransformOverlayView.containsInteractivePoint(touch.location(in: self))
+            }
+            return true
+        }
+        navigationGestureAdapter.install(on: self)
 
-        shapePreviewSurfaceView.isUserInteractionEnabled = false
-        shapePreviewSurfaceView.alpha = 1.0
-        shapePreviewSurfaceView.isHidden = true
-        addSubview(shapePreviewSurfaceView)
-
-        textTransformBoxView.isHidden = true
-        let textBoxPanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextBoxPan(_:)))
-        textBoxPanRecognizer.delegate = self
-        textTransformBoxView.addGestureRecognizer(textBoxPanRecognizer)
-        addSubview(textTransformBoxView)
-
-        textTransformRotationStemView.isHidden = true
-        textTransformRotationStemView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.92)
-        textTransformRotationStemView.layer.cornerRadius = 1
-        addSubview(textTransformRotationStemView)
-
-        configureTextHandle(textTransformScaleHandleView, symbol: "arrow.up.left.and.arrow.down.right")
-        let scaleHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        scaleHandlePanRecognizer.delegate = self
-        textTransformScaleHandleView.addGestureRecognizer(scaleHandlePanRecognizer)
-        addSubview(textTransformScaleHandleView)
-
-        configurePassiveTransformHandle(textTransformTopLeftHandleView)
-        let topLeftHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        topLeftHandlePanRecognizer.delegate = self
-        textTransformTopLeftHandleView.addGestureRecognizer(topLeftHandlePanRecognizer)
-        addSubview(textTransformTopLeftHandleView)
-
-        configurePassiveTransformHandle(textTransformTopRightHandleView)
-        let topRightHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        topRightHandlePanRecognizer.delegate = self
-        textTransformTopRightHandleView.addGestureRecognizer(topRightHandlePanRecognizer)
-        addSubview(textTransformTopRightHandleView)
-
-        configurePassiveTransformHandle(textTransformBottomLeftHandleView)
-        let bottomLeftHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        bottomLeftHandlePanRecognizer.delegate = self
-        textTransformBottomLeftHandleView.addGestureRecognizer(bottomLeftHandlePanRecognizer)
-        addSubview(textTransformBottomLeftHandleView)
-
-        configurePassiveTransformHandle(textTransformLeftMidHandleView)
-        let leftMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        leftMidHandlePanRecognizer.delegate = self
-        textTransformLeftMidHandleView.addGestureRecognizer(leftMidHandlePanRecognizer)
-        addSubview(textTransformLeftMidHandleView)
-
-        configurePassiveTransformHandle(textTransformRightMidHandleView)
-        let rightMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        rightMidHandlePanRecognizer.delegate = self
-        textTransformRightMidHandleView.addGestureRecognizer(rightMidHandlePanRecognizer)
-        addSubview(textTransformRightMidHandleView)
-
-        configurePassiveTransformHandle(textTransformBottomMidHandleView)
-        let bottomMidHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextScalePan(_:)))
-        bottomMidHandlePanRecognizer.delegate = self
-        textTransformBottomMidHandleView.addGestureRecognizer(bottomMidHandlePanRecognizer)
-        addSubview(textTransformBottomMidHandleView)
-
-        configureTextHandle(textTransformRotationHandleView, symbol: "rotate.right.fill")
-        let rotationHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTextRotationPan(_:)))
-        rotationHandlePanRecognizer.delegate = self
-        textTransformRotationHandleView.addGestureRecognizer(rotationHandlePanRecognizer)
-        addSubview(textTransformRotationHandleView)
-
-        configureTextHandle(textTransformPivotHandleView, symbol: "scope")
-        let pivotHandlePanRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handleTransformPivotPan(_:)))
-        pivotHandlePanRecognizer.delegate = self
-        textTransformPivotHandleView.addGestureRecognizer(pivotHandlePanRecognizer)
-        addSubview(textTransformPivotHandleView)
-
-        selectionOutlineLayer.strokeColor = UIColor.white.withAlphaComponent(0.92).cgColor
-        selectionOutlineLayer.fillColor = UIColor.clear.cgColor
-        selectionOutlineLayer.lineWidth = 1.5
-        selectionOutlineLayer.lineDashPattern = [6, 4]
-        layer.addSublayer(selectionOutlineLayer)
-
-        selectionPreviewLayer.strokeColor = UIColor.white.withAlphaComponent(0.8).cgColor
-        selectionPreviewLayer.fillColor = UIColor.clear.cgColor
-        selectionPreviewLayer.lineWidth = 1.25
-        selectionPreviewLayer.lineDashPattern = [4, 4]
-        layer.addSublayer(selectionPreviewLayer)
-
-        touchEyedropperLoupeView.isHidden = true
-        touchEyedropperLoupeView.isUserInteractionEnabled = false
-        touchEyedropperLoupeView.bounds = CGRect(origin: .zero, size: touchEyedropperLoupeSize)
-        touchEyedropperLoupeView.backgroundColor = UIColor.black.withAlphaComponent(0.9)
-        touchEyedropperLoupeView.layer.cornerRadius = touchEyedropperLoupeSize.width / 2
-        touchEyedropperLoupeView.layer.shadowColor = UIColor.black.cgColor
-        touchEyedropperLoupeView.layer.shadowOpacity = 0.28
-        touchEyedropperLoupeView.layer.shadowRadius = 18
-        touchEyedropperLoupeView.layer.shadowOffset = CGSize(width: 0, height: 8)
-
-        touchEyedropperRingView.frame = touchEyedropperLoupeView.bounds
-        touchEyedropperRingView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        touchEyedropperRingView.backgroundColor = .clear
-        touchEyedropperRingView.layer.cornerRadius = touchEyedropperLoupeSize.width / 2
-        touchEyedropperRingView.layer.borderWidth = 6
-        touchEyedropperRingView.layer.borderColor = UIColor.white.cgColor
-        touchEyedropperLoupeView.addSubview(touchEyedropperRingView)
-
-        let previewFrame = touchEyedropperLoupeView.bounds.insetBy(dx: touchEyedropperPreviewInset, dy: touchEyedropperPreviewInset)
-        touchEyedropperSurfaceView.frame = previewFrame
-        touchEyedropperSurfaceView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        touchEyedropperSurfaceView.layer.cornerRadius = previewFrame.width / 2
-        touchEyedropperSurfaceView.layer.masksToBounds = true
-        touchEyedropperSurfaceView.backgroundColor = .white
-        touchEyedropperSurfaceView.layer.borderWidth = 1
-        touchEyedropperSurfaceView.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
-        touchEyedropperLoupeView.addSubview(touchEyedropperSurfaceView)
-
-        touchEyedropperFocusView.bounds = CGRect(x: 0, y: 0, width: 18, height: 18)
-        touchEyedropperFocusView.center = CGPoint(x: previewFrame.midX, y: previewFrame.midY)
-        touchEyedropperFocusView.autoresizingMask = [
-            .flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin
-        ]
-        touchEyedropperFocusView.backgroundColor = .clear
-        touchEyedropperFocusView.layer.cornerRadius = 9
-        touchEyedropperFocusView.layer.borderWidth = 1.5
-        touchEyedropperFocusView.layer.borderColor = UIColor.white.withAlphaComponent(0.95).cgColor
-        touchEyedropperFocusView.layer.shadowColor = UIColor.black.cgColor
-        touchEyedropperFocusView.layer.shadowOpacity = 0.16
-        touchEyedropperFocusView.layer.shadowRadius = 2
-        touchEyedropperFocusView.layer.shadowOffset = .zero
-        touchEyedropperSurfaceView.addSubview(touchEyedropperFocusView)
-
-        let horizontalCrosshair = UIView(frame: CGRect(x: 0, y: 8.5, width: 18, height: 1))
-        horizontalCrosshair.autoresizingMask = [.flexibleWidth]
-        horizontalCrosshair.backgroundColor = UIColor.white.withAlphaComponent(0.95)
-        touchEyedropperFocusView.addSubview(horizontalCrosshair)
-
-        let verticalCrosshair = UIView(frame: CGRect(x: 8.5, y: 0, width: 1, height: 18))
-        verticalCrosshair.autoresizingMask = [.flexibleHeight]
-        verticalCrosshair.backgroundColor = UIColor.white.withAlphaComponent(0.95)
-        touchEyedropperFocusView.addSubview(verticalCrosshair)
-
-        addSubview(touchEyedropperLoupeView)
-
-        let pinchRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
-        pinchRecognizer.delegate = self
-        pinchRecognizer.cancelsTouchesInView = false
-        addGestureRecognizer(pinchRecognizer)
-
-        let rotationRecognizer = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
-        rotationRecognizer.delegate = self
-        rotationRecognizer.cancelsTouchesInView = false
-        addGestureRecognizer(rotationRecognizer)
-
-        let undoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleTwoFingerUndoTap(_:)))
-        undoTapRecognizer.numberOfTouchesRequired = 2
-        undoTapRecognizer.numberOfTapsRequired = 1
-        undoTapRecognizer.cancelsTouchesInView = false
-        undoTapRecognizer.delegate = self
-        undoTapRecognizer.require(toFail: pinchRecognizer)
-        addGestureRecognizer(undoTapRecognizer)
-
-        let redoTapRecognizer = UITapGestureRecognizer(target: self, action: #selector(handleThreeFingerRedoTap(_:)))
-        redoTapRecognizer.numberOfTouchesRequired = 3
-        redoTapRecognizer.numberOfTapsRequired = 1
-        redoTapRecognizer.cancelsTouchesInView = false
-        redoTapRecognizer.delegate = self
-        redoTapRecognizer.require(toFail: pinchRecognizer)
-        addGestureRecognizer(redoTapRecognizer)
-
-        touchEyedropperLongPressRecognizer.addTarget(self, action: #selector(handleTouchEyedropperLongPress(_:)))
-        touchEyedropperLongPressRecognizer.minimumPressDuration = 0.34
-        touchEyedropperLongPressRecognizer.allowableMovement = 18
-        touchEyedropperLongPressRecognizer.cancelsTouchesInView = false
-        touchEyedropperLongPressRecognizer.delegate = self
-        addGestureRecognizer(touchEyedropperLongPressRecognizer)
+        eyedropperLoupeView.onSampledColor = { [weak self] sampledColor in
+            self?.sendAction?(.colorSampled(sampledColor))
+        }
+        eyedropperLoupeView.onBeganSampling = { [weak self] in
+            self?.navigationGestureAdapter.cancelPan()
+        }
+        eyedropperLoupeView.install(on: self)
 
         let pencilInteraction = UIPencilInteraction()
         pencilInteraction.delegate = self
@@ -327,14 +137,9 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
     override func layoutSubviews() {
         super.layoutSubviews()
         canvasRenderSurfaceView.frame = bounds
-        selectionOutlineLayer.frame = bounds
-        selectionPreviewLayer.frame = bounds
-        if !shapePreviewSurfaceView.isHidden {
-            shapePreviewSurfaceView.frame = contentRect()
-        }
-        if !compositePreviewSurfaceView.isHidden {
-            compositePreviewSurfaceView.frame = contentRect()
-        }
+        selectionOverlayView.frame = bounds
+        transformPreviewView.frame = bounds
+        textTransformOverlayView.frame = bounds
     }
 
     func update(
@@ -365,20 +170,11 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         zoomScale: CGFloat,
         previewResetNonce: Int
     ) {
-        currentSnapshot = snapshot
         self.currentTool = currentTool
-        self.paperStyle = paperStyle
-        self.transformPreviewOffset = transformPreviewOffset
-        self.transformPreviewScaleX = transformPreviewScaleX
-        self.transformPreviewScaleY = transformPreviewScaleY
-        self.transformPreviewRotationDegrees = transformPreviewRotationDegrees
-        self.transformPivot = transformPivot
-        self.transformMode = transformMode
-        self.transformLocksAspectRatio = transformLocksAspectRatio
-        self.transformQuadOffsets = transformQuadOffsets
-        self.activeTextLayer = activeTextLayer
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
+
+        let geometry = viewportGeometry
         canvasRenderSurfaceView.render(
             CanvasRenderSurfaceUpdate(
                 snapshot: snapshot,
@@ -391,7 +187,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
                 previewResetNonce: previewResetNonce
             )
         )
-        lastPreviewResetNonce = previewResetNonce
+
         inputHandler.tool = currentTool
         inputHandler.selectionMode = selectionMode
         inputHandler.shapeMode = shapeMode
@@ -400,58 +196,122 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         inputHandler.brushSize = Float(previewStyle.radius * 2.0)
         inputHandler.brushColor = previewStyle.simdColor
         inputHandler.strokeStabilization = Float(previewStyle.stabilization)
-        updateSelectionOverlay(
-            selection,
-            transformPreviewScaleX: transformPreviewScaleX,
-            transformPreviewScaleY: transformPreviewScaleY
+
+        let shouldHideMoveOverlay = currentTool == .move && (
+            abs(transformPreviewRotationDegrees) > 0.001 ||
+            abs(transformPreviewScaleX - 1.0) > 0.001 ||
+            abs(transformPreviewScaleY - 1.0) > 0.001
         )
-        updateSelectionPreview(selectionPreviewPoints)
-        updateStrokePreview(activeStroke, style: previewStyle)
-        updateTransformPreview(
+        selectionOverlayView.update(
+            selection: selection,
+            previewPoints: selectionPreviewPoints,
+            currentTool: currentTool,
+            geometry: geometry,
+            transformQuad: currentTool == .move
+                ? { rect in
+                    AppFeature.effectiveTransformQuad(
+                        bounds: rect,
+                        translation: transformPreviewOffset,
+                        scaleX: transformPreviewScaleX,
+                        scaleY: transformPreviewScaleY,
+                        rotationDegrees: transformPreviewRotationDegrees,
+                        pivot: transformPivot,
+                        mode: transformMode,
+                        quadOffsets: transformQuadOffsets
+                    ).effective
+                }
+                : nil,
+            hidesTransformedOverlayImage: shouldHideMoveOverlay
+        )
+
+        transformPreviewView.update(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
+            activeStroke: activeStroke,
             strokePreviewCompositePixelData: strokePreviewCompositePixelData,
             adjustmentPreviewPixelData: adjustmentPreviewPixelData,
             selection: selection,
             paperStyle: paperStyle,
+            previewStyle: previewStyle,
+            currentTool: currentTool,
+            transformPreviewOffset: transformPreviewOffset,
             transformPreviewScaleX: transformPreviewScaleX,
             transformPreviewScaleY: transformPreviewScaleY,
             transformPreviewRotationDegrees: transformPreviewRotationDegrees,
-            activeTextLayer: activeTextLayer
-        )
-        updateTextTransformOverlay(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
+            transformPivot: transformPivot,
+            transformMode: transformMode,
+            transformQuadOffsets: transformQuadOffsets,
             activeTextLayer: activeTextLayer,
-            selection: selection
+            geometry: geometry,
+            renderSurfaceView: canvasRenderSurfaceView
+        )
+
+        textTransformOverlayView.update(
+            context: CanvasTextTransformOverlayView.Context(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                currentTool: currentTool,
+                selection: selection,
+                transformPreviewOffset: transformPreviewOffset,
+                transformPreviewScaleX: transformPreviewScaleX,
+                transformPreviewScaleY: transformPreviewScaleY,
+                transformPreviewRotationDegrees: transformPreviewRotationDegrees,
+                transformPivot: transformPivot,
+                transformMode: transformMode,
+                transformLocksAspectRatio: transformLocksAspectRatio,
+                transformQuadOffsets: transformQuadOffsets,
+                activeTextLayer: activeTextLayer,
+                geometry: geometry
+            )
+        )
+
+        eyedropperLoupeView.update(
+            context: CanvasEyedropperLoupeView.Context(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                paperStyle: paperStyle,
+                source: eyedropperSamplingSource,
+                geometry: geometry,
+                shouldBlockSampling: { [weak self] point in
+                    self?.textTransformOverlayView.containsInteractivePoint(point) ?? false
+                }
+            )
+        )
+
+        navigationGestureAdapter.update(
+            context: CanvasNavigationGestureAdapter.Context(
+                currentTool: currentTool,
+                transformMode: transformMode,
+                geometry: geometry
+            )
         )
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
-        if isTouchEyedropperActive { return }
-        if handlePanTouchesIfNeeded(touches, with: event, phase: .began) { return }
+        if eyedropperLoupeView.isActive { return }
+        if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .began) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
-        if isTouchEyedropperActive { return }
-        if handlePanTouchesIfNeeded(touches, with: event, phase: .moved) { return }
+        if eyedropperLoupeView.isActive { return }
+        if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .moved) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
-        if isTouchEyedropperActive { return }
-        if handlePanTouchesIfNeeded(touches, with: event, phase: .ended) { return }
+        if eyedropperLoupeView.isActive { return }
+        if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .ended) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         if shouldRouteTouchesToTransformOverlay(touches) { return }
-        if isTouchEyedropperActive { return }
-        if handlePanTouchesIfNeeded(touches, with: event, phase: .cancelled) { return }
+        if eyedropperLoupeView.isActive { return }
+        if navigationGestureAdapter.handlePanTouchesIfNeeded(touches, with: event, phase: .cancelled) { return }
         inputHandler.handleTouches(touches, with: event, in: self)
     }
 
@@ -473,7 +333,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
 
     func didRequestColorSample(at sample: StylusSample) {
         guard
-            let sampledColor = sampledColor(
+            let sampledColor = eyedropperLoupeView.sampledColor(
                 at: sample.point,
                 source: inputHandler.eyedropperSamplingSource
             )
@@ -481,27 +341,6 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
             return
         }
         sendAction?(.colorSampled(sampledColor))
-    }
-
-    @objc
-    private func handleTouchEyedropperLongPress(_ recognizer: UILongPressGestureRecognizer) {
-        guard recognizer.numberOfTouches == 1 else {
-            hideTouchEyedropperLoupe()
-            return
-        }
-
-        let location = recognizer.location(in: self)
-        switch recognizer.state {
-        case .began, .changed:
-            updateTouchEyedropper(at: location)
-        case .ended:
-            updateTouchEyedropper(at: location)
-            hideTouchEyedropperLoupe()
-        case .cancelled, .failed:
-            hideTouchEyedropperLoupe()
-        default:
-            break
-        }
     }
 
     func didUpdateSelectionPath(_ points: [CGPoint]) {
@@ -540,1765 +379,27 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIGestureRe
         sendAction?(.pencilInteractionToggleRequested)
     }
 
-    private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
-        let fitted = contentRect()
-        guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
-
-        let local = convert(location, from: view)
-        let x = ((local.x - fitted.minX) / fitted.width) * documentSize.width
-        let y = ((local.y - fitted.minY) / fitted.height) * documentSize.height
-        return CGPoint(x: x, y: y)
-    }
-
-    private func contentRect() -> CGRect {
-        canvasRenderSurfaceView.contentRect(
-            for: bounds.size,
+    private var viewportGeometry: CanvasViewportGeometry {
+        CanvasViewportGeometry(
+            bounds: bounds,
             documentSize: documentSize,
             viewportOffset: viewportOffset,
             zoomScale: zoomScale
         )
     }
 
-    private func updateSelectionOverlay(_ selection: CanvasSelection?, transformPreviewScaleX: CGFloat, transformPreviewScaleY: CGFloat) {
-        guard
-            currentTool == .select || currentTool == .move,
-            let selection,
-            !selection.isEmpty,
-            let surface = makeSelectionOverlaySurface(selection)
-        else {
-            selectionOverlayView.update(surface: nil)
-            selectionOverlayView.frame = .zero
-            selectionOutlineLayer.path = nil
-            return
-        }
-
-        var rect = viewRect(forDocumentRect: selection.bounds)
-        if currentTool == .move {
-            rect = transformedRect(for: effectiveTransformQuad(for: selection.bounds))
-        }
-        let shouldHideOverlayImage =
-            currentTool == .move &&
-            (
-                abs(transformPreviewRotationDegrees) > 0.001 ||
-                abs(transformPreviewScaleX - 1.0) > 0.001 ||
-                abs(transformPreviewScaleY - 1.0) > 0.001 ||
-                false
-            )
-
-        selectionOverlayView.update(surface: shouldHideOverlayImage ? nil : surface)
-        selectionOverlayView.frame = shouldHideOverlayImage ? .zero : rect
-        if currentTool == .move, shouldHideOverlayImage {
-            let corners = effectiveTransformQuad(for: selection.bounds).points.map(viewPoint(fromDocumentPoint:))
-            let path = UIBezierPath()
-            if let first = corners.first {
-                path.move(to: first)
-                for corner in corners.dropFirst() {
-                    path.addLine(to: corner)
-                }
-                path.close()
-            }
-            selectionOutlineLayer.path = path.cgPath
-        } else {
-            selectionOutlineLayer.path = UIBezierPath(rect: rect).cgPath
-        }
-    }
-
-    private func updateTextTransformOverlay(
-        snapshot: MetalDocumentSnapshot?,
-        activeLayerIndex: Int,
-        activeTextLayer: TextLayerData?,
-        selection: CanvasSelection?
-    ) {
-        let geometry: TextTransformGeometry?
-        if let selection {
-            geometry = transformGeometry(for: selection.bounds)
-        } else if let activeTextLayer {
-            geometry = textTransformGeometry(for: activeTextLayer)
-        } else if
-            let snapshot,
-            let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex })
-        {
-            geometry = layerTransformGeometry(
-                layerData: activeLayer.pixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height
-            )
-        } else {
-            geometry = nil
-        }
-
-        guard
-            currentTool == .move,
-            let geometry
-        else {
-            currentTransformGeometry = nil
-            textTransformBoxView.isHidden = true
-            textTransformBoxView.updatePath(nil)
-            textTransformRotationStemView.isHidden = true
-            textTransformTopLeftHandleView.isHidden = true
-            textTransformTopRightHandleView.isHidden = true
-            textTransformBottomLeftHandleView.isHidden = true
-            textTransformScaleHandleView.isHidden = true
-            textTransformLeftMidHandleView.isHidden = true
-            textTransformRightMidHandleView.isHidden = true
-            textTransformBottomMidHandleView.isHidden = true
-            textTransformRotationHandleView.isHidden = true
-            textTransformPivotHandleView.isHidden = true
-            return
-        }
-
-        currentTransformGeometry = geometry
-        textTransformBoxView.isHidden = false
-        textTransformRotationStemView.isHidden = transformMode != .standard
-        textTransformTopLeftHandleView.isHidden = false
-        textTransformTopRightHandleView.isHidden = false
-        textTransformBottomLeftHandleView.isHidden = false
-        textTransformScaleHandleView.isHidden = false
-        textTransformLeftMidHandleView.isHidden = false
-        textTransformRightMidHandleView.isHidden = false
-        textTransformBottomMidHandleView.isHidden = false
-        textTransformRotationHandleView.isHidden = transformMode != .standard
-        textTransformPivotHandleView.isHidden = transformMode != .standard
-
-        let polygonPath = UIBezierPath()
-        polygonPath.move(to: geometry.topLeft)
-        polygonPath.addLine(to: geometry.topRight)
-        polygonPath.addLine(to: geometry.bottomRight)
-        polygonPath.addLine(to: geometry.bottomLeft)
-        polygonPath.close()
-        textTransformBoxView.frame = bounds
-        textTransformBoxView.updatePath(polygonPath)
-
-        textTransformRotationStemView.bounds = CGRect(x: 0, y: 0, width: 2, height: geometry.rotationStemLength)
-        textTransformRotationStemView.center = CGPoint(
-            x: (geometry.topMidpoint.x + geometry.rotationHandleCenter.x) / 2,
-            y: (geometry.topMidpoint.y + geometry.rotationHandleCenter.y) / 2
-        )
-        textTransformRotationStemView.transform = .identity
-
-        let cornerHandleSize = CGSize(width: 18, height: 18)
-        textTransformTopLeftHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
-        textTransformTopLeftHandleView.center = geometry.topLeft
-        textTransformTopLeftHandleView.transform = .identity
-
-        textTransformTopRightHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
-        textTransformTopRightHandleView.center = geometry.topRight
-        textTransformTopRightHandleView.transform = .identity
-
-        textTransformBottomLeftHandleView.bounds = CGRect(origin: .zero, size: cornerHandleSize)
-        textTransformBottomLeftHandleView.center = geometry.bottomLeft
-        textTransformBottomLeftHandleView.transform = .identity
-
-        let scaleHandleSize = CGSize(width: 22, height: 22)
-        textTransformScaleHandleView.bounds = CGRect(origin: .zero, size: scaleHandleSize)
-        textTransformScaleHandleView.center = geometry.bottomRight
-        textTransformScaleHandleView.transform = .identity
-
-        let edgeHandleSize = CGSize(width: 16, height: 16)
-        textTransformLeftMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
-        textTransformLeftMidHandleView.center = geometry.leftMidpoint
-        textTransformLeftMidHandleView.transform = .identity
-
-        textTransformRightMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
-        textTransformRightMidHandleView.center = geometry.rightMidpoint
-        textTransformRightMidHandleView.transform = .identity
-
-        textTransformBottomMidHandleView.bounds = CGRect(origin: .zero, size: edgeHandleSize)
-        textTransformBottomMidHandleView.center = geometry.bottomMidpoint
-        textTransformBottomMidHandleView.transform = .identity
-
-        let rotationHandleSize = CGSize(width: 26, height: 26)
-        textTransformRotationHandleView.bounds = CGRect(origin: .zero, size: rotationHandleSize)
-        textTransformRotationHandleView.center = geometry.rotationHandleCenter
-        textTransformRotationHandleView.transform = .identity
-
-        let pivotHandleSize = CGSize(width: 24, height: 24)
-        textTransformPivotHandleView.bounds = CGRect(origin: .zero, size: pivotHandleSize)
-        textTransformPivotHandleView.center = geometry.pivotCenter
-        textTransformPivotHandleView.transform = .identity
-    }
-
-    private func updateTransformPreview(
-        snapshot: MetalDocumentSnapshot?,
-        activeLayerIndex: Int,
-        strokePreviewCompositePixelData: Data?,
-        adjustmentPreviewPixelData: Data?,
-        selection: CanvasSelection?,
-        paperStyle: CanvasPaperStyle,
-        transformPreviewScaleX: CGFloat,
-        transformPreviewScaleY: CGFloat,
-        transformPreviewRotationDegrees: Double,
-        activeTextLayer: TextLayerData?
-    ) {
-        guard
-            currentTool == .move,
-            transformPreviewOffset != .zero ||
-            abs(transformPreviewScaleX - 1.0) > 0.001 ||
-            abs(transformPreviewScaleY - 1.0) > 0.001 ||
-            abs(transformPreviewRotationDegrees) > 0.001 ||
-            !transformQuadOffsets.isZero,
-            let snapshot
-        else {
-            if
-                let snapshot,
-                let strokePreviewCompositePixelData,
-                let surface = canvasImageRenderer.paperCompositeSurface(
-                    pixelData: strokePreviewCompositePixelData,
-                    width: snapshot.width,
-                    height: snapshot.height,
-                    paperStyle: paperStyle
-                )
-            {
-                compositePreviewSurfaceView.update(surface: surface)
-                compositePreviewSurfaceView.frame = contentRect()
-                canvasRenderSurfaceView.isHidden = true
-                return
-            }
-
-            if
-                let snapshot,
-                let adjustmentPreviewPixelData,
-                let surface = canvasImageRenderer.paperCompositeSurface(
-                    pixelData: adjustmentPreviewPixelData,
-                    width: snapshot.width,
-                    height: snapshot.height,
-                    paperStyle: paperStyle
-                )
-            {
-                compositePreviewSurfaceView.update(surface: surface)
-                compositePreviewSurfaceView.frame = contentRect()
-                canvasRenderSurfaceView.isHidden = true
-                return
-            }
-
-            compositePreviewSurfaceView.update(surface: nil)
-            compositePreviewSurfaceView.frame = .zero
-            canvasRenderSurfaceView.isHidden = false
-            return
-        }
-
-        guard let surface = makeCompositePreviewSurface(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            selection: selection,
-            paperStyle: paperStyle,
-            transformPreviewScaleX: transformPreviewScaleX,
-            transformPreviewScaleY: transformPreviewScaleY,
-            transformPreviewRotationDegrees: transformPreviewRotationDegrees,
-            activeTextLayer: activeTextLayer
-        ) else {
-            compositePreviewSurfaceView.update(surface: nil)
-            compositePreviewSurfaceView.frame = .zero
-            canvasRenderSurfaceView.isHidden = false
-            return
-        }
-
-        compositePreviewSurfaceView.update(surface: surface)
-        compositePreviewSurfaceView.frame = contentRect()
-        canvasRenderSurfaceView.isHidden = true
-    }
-
-    private func updateSelectionPreview(_ points: [CGPoint]) {
-        guard currentTool == .select, points.count >= 2 else {
-            selectionPreviewLayer.path = nil
-            return
-        }
-
-        let path = UIBezierPath()
-        for (index, point) in points.enumerated() {
-            let mapped = viewPoint(fromDocumentPoint: point)
-            if index == 0 {
-                path.move(to: mapped)
-            } else {
-                path.addLine(to: mapped)
-            }
-        }
-        selectionPreviewLayer.path = path.cgPath
-    }
-
-    private func updateStrokePreview(_ stroke: Stroke?, style: PreviewStrokeStyle) {
-        guard let stroke else {
-            shapePreviewSurfaceView.update(surface: nil)
-            return
-        }
-        guard currentTool == .shape else {
-            shapePreviewSurfaceView.update(surface: nil)
-            return
-        }
-        guard stroke.points.count >= 2 else {
-            shapePreviewSurfaceView.update(surface: nil)
-            return
-        }
-        guard let snapshot = currentSnapshot,
-              let surface = canvasImageRenderer.shapePreviewSurface(
-                stroke: stroke,
-                style: style,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height
-              ) else {
-            shapePreviewSurfaceView.update(surface: nil)
-            return
-        }
-        shapePreviewSurfaceView.update(surface: surface)
-        shapePreviewSurfaceView.frame = contentRect()
-    }
-
-    private func sampledColor(at point: CGPoint, source: EyedropperSamplingSource) -> SampledColor? {
-        guard
-            let snapshot = currentSnapshot,
-            snapshot.width > 0,
-            snapshot.height > 0
-        else {
-            return nil
-        }
-
-        let x = min(max(Int(point.x.rounded()), 0), snapshot.width - 1)
-        let y = min(max(Int(point.y.rounded()), 0), snapshot.height - 1)
-
-        switch source {
-        case .activeLayer:
-            guard let layer = snapshot.layers.first(where: { $0.index == canvasRenderSurfaceView.currentActiveLayerIndex }) else {
-                return nil
-            }
-            return samplePixel(in: layer.pixelData, width: snapshot.width, height: snapshot.height, x: x, y: y)
-
-        case .canvas:
-            return sampleCanvasPixel(
-                in: snapshot.compositePixelData,
-                width: snapshot.width,
-                height: snapshot.height,
-                x: x,
-                y: y
-            )
-        }
-    }
-
-    private func samplePixel(in pixelData: Data, width: Int, height: Int, x: Int, y: Int) -> SampledColor? {
-        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
-        let offset = ((y * width) + x) * 4
-        return pixelData.withUnsafeBytes { bytes in
-            guard let source = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
-            return SampledColor(
-                red: source[offset],
-                green: source[offset + 1],
-                blue: source[offset + 2],
-                alpha: source[offset + 3]
-            )
-        }
-    }
-
-    private func sampleCanvasPixel(in pixelData: Data, width: Int, height: Int, x: Int, y: Int) -> SampledColor? {
-        guard let foreground = samplePixel(in: pixelData, width: width, height: height, x: x, y: y) else {
-            return nil
-        }
-
-        guard !paperStyle.isTransparent else { return foreground }
-
-        let alpha = CGFloat(foreground.alpha) / 255.0
-        let background = SampledColor(
-            red: UInt8(max(0, min(255, Int((CGFloat(paperStyle.red) * 255.0).rounded())))),
-            green: UInt8(max(0, min(255, Int((CGFloat(paperStyle.green) * 255.0).rounded())))),
-            blue: UInt8(max(0, min(255, Int((CGFloat(paperStyle.blue) * 255.0).rounded())))),
-            alpha: 255
-        )
-
-        return SampledColor(
-            red: blendedChannel(source: foreground.red, background: background.red, alpha: alpha),
-            green: blendedChannel(source: foreground.green, background: background.green, alpha: alpha),
-            blue: blendedChannel(source: foreground.blue, background: background.blue, alpha: alpha),
-            alpha: 255
-        )
-    }
-
-    private func updateTouchEyedropper(at viewPoint: CGPoint) {
-        guard let documentPoint = documentPointForEyedropper(at: viewPoint) else {
-            hideTouchEyedropperLoupe()
-            return
-        }
-        guard let sampledColor = sampledColor(at: documentPoint, source: inputHandler.eyedropperSamplingSource) else {
-            hideTouchEyedropperLoupe()
-            return
-        }
-
-        isTouchEyedropperActive = true
-        panStartLocation = nil
-        panDidMove = false
-        isCanvasPanGestureActive = false
-
-        sendAction?(.colorSampled(sampledColor))
-        touchEyedropperRingView.layer.borderColor = uiColor(from: sampledColor).cgColor
-        touchEyedropperSurfaceView.update(
-            surface: makeEyedropperLoupeSurface(
-            around: documentPoint,
-            source: inputHandler.eyedropperSamplingSource
-            ),
-            filtering: .nearest
-        )
-        positionTouchEyedropperLoupe(above: viewPoint)
-        if touchEyedropperLoupeView.isHidden {
-            touchEyedropperLoupeView.alpha = 0
-            touchEyedropperLoupeView.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
-            touchEyedropperLoupeView.isHidden = false
-            UIView.animate(withDuration: 0.14, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
-                self.touchEyedropperLoupeView.alpha = 1
-                self.touchEyedropperLoupeView.transform = .identity
-            }
-        }
-    }
-
-    private func hideTouchEyedropperLoupe() {
-        guard isTouchEyedropperActive || !touchEyedropperLoupeView.isHidden else { return }
-        isTouchEyedropperActive = false
-        UIView.animate(withDuration: 0.12, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
-            self.touchEyedropperLoupeView.alpha = 0
-            self.touchEyedropperLoupeView.transform = CGAffineTransform(scaleX: 0.94, y: 0.94)
-        } completion: { _ in
-            self.touchEyedropperLoupeView.isHidden = true
-            self.touchEyedropperLoupeView.transform = .identity
-            self.touchEyedropperSurfaceView.update(surface: nil, filtering: .nearest)
-        }
-    }
-
-    private func documentPointForEyedropper(at viewPoint: CGPoint) -> CGPoint? {
-        let rect = contentRect()
-        guard rect.width > 0, rect.height > 0 else { return nil }
-        guard rect.insetBy(dx: -18, dy: -18).contains(viewPoint) else { return nil }
-        let point = documentPoint(at: viewPoint, in: rect)
-        return CGPoint(
-            x: min(max(point.x, 0), max(documentSize.width - 1, 0)),
-            y: min(max(point.y, 0), max(documentSize.height - 1, 0))
-        )
-    }
-
-    private func positionTouchEyedropperLoupe(above fingerPoint: CGPoint) {
-        let halfWidth = touchEyedropperLoupeSize.width / 2
-        let halfHeight = touchEyedropperLoupeSize.height / 2
-        let minX = halfWidth + 10
-        let maxX = bounds.width - halfWidth - 10
-        let minY = halfHeight + 10
-        let preferredY = fingerPoint.y - touchEyedropperVerticalOffset
-        let clampedCenter = CGPoint(
-            x: min(max(fingerPoint.x, minX), max(maxX, minX)),
-            y: max(minY, preferredY)
-        )
-        touchEyedropperLoupeView.center = clampedCenter
-    }
-
-    private func makeEyedropperLoupeSurface(around point: CGPoint, source: EyedropperSamplingSource) -> DocumentCompositeSurface? {
-        guard
-            touchEyedropperPreviewGridSize > 0,
-            let snapshot = currentSnapshot
-        else { return nil }
-        let grid = touchEyedropperPreviewGridSize
-        let centerX = Int(point.x.rounded())
-        let centerY = Int(point.y.rounded())
-
-        let sourcePixelData: Data?
-        let blendWithPaper: Bool
-        switch source {
-        case .activeLayer:
-            sourcePixelData = snapshot.layers.first(where: { $0.index == canvasRenderSurfaceView.currentActiveLayerIndex })?.pixelData
-            blendWithPaper = false
-        case .canvas:
-            sourcePixelData = snapshot.compositePixelData
-            blendWithPaper = !paperStyle.isTransparent
-        }
-
-        if let sourcePixelData,
-           let surface = canvasImageRenderer.eyedropperLoupeSurface(
-                sourcePixelData: sourcePixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                centerX: centerX,
-                centerY: centerY,
-                gridSize: grid,
-                paperStyle: paperStyle,
-                blendWithPaper: blendWithPaper
-           ) {
-            return surface
-        }
-
-        return nil
-    }
-
-    private func uiColor(from sampledColor: SampledColor) -> UIColor {
-        UIColor(
-            red: CGFloat(sampledColor.red) / 255.0,
-            green: CGFloat(sampledColor.green) / 255.0,
-            blue: CGFloat(sampledColor.blue) / 255.0,
-            alpha: 1.0
-        )
-    }
-
-    private func blendedChannel(source: UInt8, background: UInt8, alpha: CGFloat) -> UInt8 {
-        UInt8(max(0, min(255, Int((CGFloat(source) * alpha + CGFloat(background) * (1 - alpha)).rounded()))))
-    }
-
-    private func viewRect(forDocumentRect rect: CGRect) -> CGRect {
-        let fitted = contentRect()
-        guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        let minPoint = viewPoint(fromDocumentPoint: rect.origin)
-        let maxPoint = viewPoint(fromDocumentPoint: CGPoint(x: rect.maxX, y: rect.maxY))
-        return CGRect(
-            x: minPoint.x,
-            y: minPoint.y,
-            width: max(1, maxPoint.x - minPoint.x),
-            height: max(1, maxPoint.y - minPoint.y)
-        )
-    }
-
-    private func transformedRect(for quad: TransformQuad) -> CGRect {
-        let corners = quad.points.map(viewPoint(fromDocumentPoint:))
-        let minX = corners.map(\.x).min() ?? 0
-        let maxX = corners.map(\.x).max() ?? 0
-        let minY = corners.map(\.y).min() ?? 0
-        let maxY = corners.map(\.y).max() ?? 0
-        return CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY))
-    }
-
-    private func effectiveTransformQuad(for rect: CGRect, mode overrideMode: CanvasTransformMode? = nil) -> TransformQuad {
-        AppFeature.effectiveTransformQuad(
-            bounds: rect,
-            translation: transformPreviewOffset,
-            scaleX: transformPreviewScaleX,
-            scaleY: transformPreviewScaleY,
-            rotationDegrees: transformPreviewRotationDegrees,
-            pivot: transformPivot,
-            mode: overrideMode ?? transformMode,
-            quadOffsets: transformQuadOffsets
-        ).effective
-    }
-
-    private func affineTransformQuad(for rect: CGRect) -> TransformQuad {
-        AppFeature.affineTransformQuad(
-            bounds: rect,
-            translation: transformPreviewOffset,
-            scaleX: transformPreviewScaleX,
-            scaleY: transformPreviewScaleY,
-            rotationDegrees: transformPreviewRotationDegrees,
-            pivot: transformPivot
-        ).quad
-    }
-
-    private func visualTransformPivot(for rect: CGRect) -> CGPoint {
-        let fallbackPivot = CGPoint(x: rect.midX, y: rect.midY)
-        let sourcePivot = transformPivot ?? fallbackPivot
-        return CGPoint(
-            x: sourcePivot.x + transformPreviewOffset.width,
-            y: sourcePivot.y + transformPreviewOffset.height
-        )
-    }
-
-    private func viewPoint(fromDocumentPoint point: CGPoint) -> CGPoint {
-        let fitted = contentRect()
-        guard fitted.width > 0, fitted.height > 0, documentSize.width > 0, documentSize.height > 0 else { return .zero }
-        return CGPoint(
-            x: fitted.minX + ((point.x / documentSize.width) * fitted.width),
-            y: fitted.minY + ((point.y / documentSize.height) * fitted.height)
-        )
-    }
-
-    private func makeSelectionOverlaySurface(_ selection: CanvasSelection) -> DocumentCompositeSurface? {
-        let width = selection.maskWidth
-        let height = selection.maskHeight
-        guard width > 0, height > 0 else { return nil }
-        let expectedCount = width * height
-        guard selection.maskData.count == expectedCount else { return nil }
-
-        if let surface = canvasImageRenderer.selectionOverlaySurface(
-            maskData: selection.maskData,
-            width: width,
-            height: height
-        ) {
-            return surface
-        }
-
-        var rgba = Data(count: expectedCount * 4)
-        rgba.withUnsafeMutableBytes { destinationBytes in
-            selection.maskData.withUnsafeBytes { sourceBytes in
-                guard
-                    let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                else { return }
-
-                for index in 0..<expectedCount {
-                    let alpha = sourceBase[index]
-                    let destinationIndex = index * 4
-                    destinationBase[destinationIndex] = 91
-                    destinationBase[destinationIndex + 1] = 181
-                    destinationBase[destinationIndex + 2] = 255
-                    destinationBase[destinationIndex + 3] = UInt8((Float(alpha) / 255.0) * 96.0)
-                }
-            }
-        }
-
-        return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
-    }
-
-    private func makeCompositePreviewSurface(
-        snapshot: MetalDocumentSnapshot,
-        activeLayerIndex: Int,
-        selection: CanvasSelection?,
-        paperStyle: CanvasPaperStyle,
-        transformPreviewScaleX: CGFloat,
-        transformPreviewScaleY: CGFloat,
-        transformPreviewRotationDegrees: Double,
-        activeTextLayer: TextLayerData?
-    ) -> DocumentCompositeSurface? {
-        guard let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
-            return nil
-        }
-
-        let transformedLayerData: Data?
-        if let activeTextLayer, selection == nil {
-            transformedLayerData = makeTransformedTextLayerPreview(
-                textLayer: activeTextLayer,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                scaleX: transformPreviewScaleX,
-                scaleY: transformPreviewScaleY,
-                rotationDegrees: transformPreviewRotationDegrees
-            )
-        } else {
-            transformedLayerData = makeTransformedLayerPreview(
-                layerData: activeLayer.pixelData,
-                canvasWidth: snapshot.width,
-                canvasHeight: snapshot.height,
-                selection: selection,
-                scaleX: transformPreviewScaleX,
-                scaleY: transformPreviewScaleY,
-                rotationDegrees: transformPreviewRotationDegrees
-            )
-        }
-        guard let transformedLayerData else { return nil }
-
-        let composite = canvasImageRenderer.compositePreviewImageData(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            adjustedActiveLayerPixels: transformedLayerData
-        ) ?? {
-            var composite = Data(count: snapshot.width * snapshot.height * 4)
-            var clipMask = [CGFloat](repeating: 0, count: snapshot.width * snapshot.height)
-            composite.withUnsafeMutableBytes { destinationBytes in
-                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                for layer in snapshot.layers.sorted(by: { $0.index < $1.index }) where layer.visible {
-                    let sourceData = layer.index == activeLayerIndex ? transformedLayerData : layer.pixelData
-                    sourceData.withUnsafeBytes { sourceBytes in
-                        guard let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                        for pixelIndex in 0..<(snapshot.width * snapshot.height) {
-                            let offset = pixelIndex * 4
-                            let alphaOffset = offset + 3
-                            let baseAlpha = (CGFloat(source[alphaOffset]) / 255.0) * CGFloat(layer.opacity)
-                            let effectiveAlpha = layer.isClipped ? (baseAlpha * clipMask[pixelIndex]) : baseAlpha
-                            if !layer.isClipped {
-                                clipMask[pixelIndex] = baseAlpha
-                            }
-                            blendPixel(
-                                destination: destination + offset,
-                                source: source + offset,
-                                opacity: effectiveAlpha,
-                                blendMode: layer.blendMode
-                            )
-                        }
-                    }
-                }
-            }
-            return composite
-        }()
-
-        return canvasImageRenderer.paperCompositeSurface(
-            pixelData: composite,
-            width: snapshot.width,
-            height: snapshot.height,
-            paperStyle: paperStyle
-        )
-    }
-
-    private func makeTransformedLayerPreview(
-        layerData: Data,
-        canvasWidth: Int,
-        canvasHeight: Int,
-        selection: CanvasSelection?,
-        scaleX: CGFloat,
-        scaleY: CGFloat,
-        rotationDegrees: Double
-    ) -> Data? {
-        AppFeature.transformedLayerPixels(
-            source: layerData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            selection: selection,
-            translation: transformPreviewOffset,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: transformPivot,
-            mode: .freeform,
-            quadOffsets: activeTextLayer == nil ? transformQuadOffsets : .zero
-        ) ?? layerData
-    }
-
-    private func makeTransformedTextLayerPreview(
-        textLayer: TextLayerData,
-        canvasWidth: Int,
-        canvasHeight: Int,
-        scaleX: CGFloat,
-        scaleY: CGFloat,
-        rotationDegrees: Double
-    ) -> Data? {
-        var transformed = textLayer
-        transformed.position = CGPoint(
-            x: transformed.position.x + transformPreviewOffset.width,
-            y: transformed.position.y + transformPreviewOffset.height
-        )
-        transformed.scale = min(max(transformed.scale * Double((scaleX + scaleY) * 0.5), 0.2), 6.0)
-        transformed.rotationDegrees += rotationDegrees
-        return canvasImageRenderer.transformedTextPreviewSurface(
-            textLayer: transformed,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
-        )?.pixelData
-    }
-
-    private func configureTextHandle(_ handle: UIView, symbol: String) {
-        handle.isHidden = true
-        let isRotationHandle = symbol.contains("rotate")
-        handle.backgroundColor = isRotationHandle
-            ? UIColor.systemBlue.withAlphaComponent(0.98)
-            : UIColor.white.withAlphaComponent(0.98)
-        handle.layer.cornerRadius = isRotationHandle ? 15 : 5
-        handle.layer.borderColor = isRotationHandle
-            ? UIColor.white.withAlphaComponent(0.92).cgColor
-            : UIColor.systemBlue.withAlphaComponent(0.96).cgColor
-        handle.layer.borderWidth = isRotationHandle ? 1.1 : 1.6
-        handle.layer.shadowColor = UIColor.black.cgColor
-        handle.layer.shadowOpacity = 0.16
-        handle.layer.shadowRadius = 5
-        handle.layer.shadowOffset = CGSize(width: 0, height: 2)
-        handle.isUserInteractionEnabled = true
-
-        let imageView = UIImageView(image: UIImage(systemName: symbol))
-        imageView.tintColor = isRotationHandle
-            ? UIColor.white.withAlphaComponent(0.96)
-            : UIColor.systemBlue.withAlphaComponent(0.96)
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        handle.addSubview(imageView)
-
-        NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: handle.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: handle.centerYAnchor),
-            imageView.widthAnchor.constraint(equalToConstant: 14),
-            imageView.heightAnchor.constraint(equalToConstant: 14)
-        ])
-    }
-
-    private func configurePassiveTransformHandle(_ handle: UIView) {
-        handle.isHidden = true
-        handle.backgroundColor = UIColor.white.withAlphaComponent(0.98)
-        handle.layer.cornerRadius = 4
-        handle.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.96).cgColor
-        handle.layer.borderWidth = 1.4
-        handle.layer.shadowColor = UIColor.black.cgColor
-        handle.layer.shadowOpacity = 0.12
-        handle.layer.shadowRadius = 4
-        handle.layer.shadowOffset = CGSize(width: 0, height: 1)
-        handle.isUserInteractionEnabled = true
-    }
-
-    private func textTransformGeometry(for textLayer: TextLayerData) -> TextTransformGeometry? {
-        guard documentSize.width > 0, documentSize.height > 0 else { return nil }
-        var transformed = textLayer
-        transformed.position = CGPoint(
-            x: transformed.position.x + transformPreviewOffset.width,
-            y: transformed.position.y + transformPreviewOffset.height
-        )
-        transformed.scale = min(max(transformed.scale * Double((transformPreviewScaleX + transformPreviewScaleY) * 0.5), 0.2), 6.0)
-        transformed.rotationDegrees += transformPreviewRotationDegrees
-
-        guard let drawRect = canvasImageRenderer.transformedTextLayoutRect(
-            textLayer: transformed,
-            canvasSize: documentSize
-        ) else {
-            return nil
-        }
-        let quad = TransformQuad(
-            topLeft: CGPoint(x: drawRect.minX, y: drawRect.minY),
-            topRight: CGPoint(x: drawRect.maxX, y: drawRect.minY),
-            bottomLeft: CGPoint(x: drawRect.minX, y: drawRect.maxY),
-            bottomRight: CGPoint(x: drawRect.maxX, y: drawRect.maxY)
-        )
-        return geometry(
-            sourceRect: drawRect,
-            quad: quad,
-            pivot: transformed.position
-        )
-    }
-
-    private func layerTransformGeometry(layerData: Data, canvasWidth: Int, canvasHeight: Int) -> TextTransformGeometry? {
-        let source = [UInt8](layerData)
-        guard let bounds = transformationBounds(selection: nil, source: source, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
-            return nil
-        }
-        return transformGeometry(
-            for: bounds
-        )
-    }
-
-    private func transformGeometry(
-        for rect: CGRect,
-        mode: CanvasTransformMode? = nil
-    ) -> TextTransformGeometry {
-        let resolvedQuad = effectiveTransformQuad(for: rect, mode: mode)
-        return geometry(
-            sourceRect: rect,
-            quad: resolvedQuad,
-            pivot: visualTransformPivot(for: rect)
-        )
-    }
-
-    private func geometry(
-        sourceRect: CGRect,
-        quad: TransformQuad,
-        pivot: CGPoint
-    ) -> TextTransformGeometry {
-        let resolvedQuad = quad
-        let corners = resolvedQuad.points.map(viewPoint(fromDocumentPoint:))
-        let topMidpoint = viewPoint(fromDocumentPoint: resolvedQuad.topMidpoint)
-        let leftMidpoint = viewPoint(fromDocumentPoint: resolvedQuad.leftMidpoint)
-        let rightMidpoint = viewPoint(fromDocumentPoint: resolvedQuad.rightMidpoint)
-        let bottomMidpoint = viewPoint(fromDocumentPoint: resolvedQuad.bottomMidpoint)
-        let centerView = viewPoint(fromDocumentPoint: resolvedQuad.center)
-        let topEdgeVector = CGPoint(x: corners[1].x - corners[0].x, y: corners[1].y - corners[0].y)
-        let topEdgeLength = max(hypot(topEdgeVector.x, topEdgeVector.y), 1)
-        let outwardNormal = CGPoint(x: -(topEdgeVector.y / topEdgeLength), y: topEdgeVector.x / topEdgeLength)
-        let rotationHandleCenter = CGPoint(
-            x: topMidpoint.x + (outwardNormal.x * -30),
-            y: topMidpoint.y + (outwardNormal.y * -30)
-        )
-        let bounds = transformedRect(for: resolvedQuad)
-        return TextTransformGeometry(
-            sourceRect: sourceRect,
-            quad: resolvedQuad,
-            bounds: bounds,
-            center: centerView,
-            topLeft: corners[0],
-            topRight: corners[1],
-            bottomLeft: corners[2],
-            bottomRight: corners[3],
-            topMidpoint: topMidpoint,
-            leftMidpoint: leftMidpoint,
-            rightMidpoint: rightMidpoint,
-            bottomMidpoint: bottomMidpoint,
-            rotationHandleCenter: rotationHandleCenter,
-            pivotCenter: viewPoint(fromDocumentPoint: pivot),
-            rotationStemLength: max(hypot(rotationHandleCenter.x - topMidpoint.x, rotationHandleCenter.y - topMidpoint.y), 18)
-        )
-    }
-
-    private func documentTranslation(from viewTranslation: CGPoint) -> CGSize {
-        let rect = contentRect()
-        guard rect.width > 0, rect.height > 0 else { return .zero }
-        return CGSize(
-            width: (viewTranslation.x / rect.width) * documentSize.width,
-            height: (viewTranslation.y / rect.height) * documentSize.height
-        )
+    private func canvasPoint(from location: CGPoint, in view: UIView) -> CGPoint {
+        guard documentSize.width > 0, documentSize.height > 0 else { return .zero }
+        let local = convert(location, from: view)
+        return viewportGeometry.documentPoint(fromViewPoint: local)
     }
 
     private func shouldRouteTouchesToTransformOverlay(_ touches: Set<UITouch>) -> Bool {
         guard currentTool == .move else { return false }
         return touches.contains { touch in
             let location = touch.location(in: self)
-            return isPointInsideTransformOverlay(location)
+            return textTransformOverlayView.containsInteractivePoint(location)
         }
-    }
-
-    private func expandedMask(for selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
-        var result = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
-        let originX = max(Int(selection.bounds.minX.rounded(.down)), 0)
-        let originY = max(Int(selection.bounds.minY.rounded(.down)), 0)
-        let width = min(selection.maskWidth, canvasWidth - originX)
-        let height = min(selection.maskHeight, canvasHeight - originY)
-        guard width > 0, height > 0 else { return result }
-
-        selection.maskData.withUnsafeBytes { bytes in
-            guard let source = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-            for y in 0..<height {
-                for x in 0..<width {
-                    let sourceIndex = (y * selection.maskWidth) + x
-                    let destinationIndex = ((originY + y) * canvasWidth) + (originX + x)
-                    result[destinationIndex] = source[sourceIndex]
-                }
-            }
-        }
-        return result
-    }
-
-    private func alphaMask(from source: [UInt8], canvasWidth: Int, canvasHeight: Int) -> [UInt8] {
-        var mask = [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
-        for index in 0..<(canvasWidth * canvasHeight) where source[index * 4 + 3] != 0 {
-            mask[index] = 255
-        }
-        return mask
-    }
-
-    private func transformationBounds(selection: CanvasSelection?, source: [UInt8], canvasWidth: Int, canvasHeight: Int) -> CGRect? {
-        if let selection, !selection.isEmpty {
-            return selection.bounds
-        }
-
-        var minX = canvasWidth
-        var minY = canvasHeight
-        var maxX = -1
-        var maxY = -1
-        for y in 0..<canvasHeight {
-            for x in 0..<canvasWidth {
-                if source[((y * canvasWidth) + x) * 4 + 3] == 0 { continue }
-                minX = min(minX, x)
-                minY = min(minY, y)
-                maxX = max(maxX, x)
-                maxY = max(maxY, y)
-            }
-        }
-
-        guard maxX >= minX, maxY >= minY else { return nil }
-        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
-    }
-
-    private func blendPixel(
-        destination: UnsafeMutablePointer<UInt8>,
-        source: UnsafePointer<UInt8>,
-        opacity: CGFloat,
-        blendMode: LayerBlendMode
-    ) {
-        let srcAlpha = (CGFloat(source[3]) / 255.0) * opacity
-        guard srcAlpha > 0.001 else { return }
-        let dstAlpha = CGFloat(destination[3]) / 255.0
-        let outAlpha = srcAlpha + (dstAlpha * (1 - srcAlpha))
-        guard outAlpha > 0.001 else { return }
-
-        let srcR = CGFloat(source[0]) / 255.0
-        let srcG = CGFloat(source[1]) / 255.0
-        let srcB = CGFloat(source[2]) / 255.0
-        let dstR = CGFloat(destination[0]) / 255.0
-        let dstG = CGFloat(destination[1]) / 255.0
-        let dstB = CGFloat(destination[2]) / 255.0
-        let blended = blendColor(backdrop: (dstR, dstG, dstB), source: (srcR, srcG, srcB), blendMode: blendMode)
-
-        let outR = (
-            srcAlpha * ((1 - dstAlpha) * srcR + (dstAlpha * blended.r)) +
-            (dstAlpha * (1 - srcAlpha) * dstR)
-        ) / outAlpha
-        let outG = (
-            srcAlpha * ((1 - dstAlpha) * srcG + (dstAlpha * blended.g)) +
-            (dstAlpha * (1 - srcAlpha) * dstG)
-        ) / outAlpha
-        let outB = (
-            srcAlpha * ((1 - dstAlpha) * srcB + (dstAlpha * blended.b)) +
-            (dstAlpha * (1 - srcAlpha) * dstB)
-        ) / outAlpha
-
-        destination[0] = UInt8(max(0, min(255, Int((outR * 255.0).rounded()))))
-        destination[1] = UInt8(max(0, min(255, Int((outG * 255.0).rounded()))))
-        destination[2] = UInt8(max(0, min(255, Int((outB * 255.0).rounded()))))
-        destination[3] = UInt8(max(0, min(255, Int((outAlpha * 255.0).rounded()))))
-    }
-
-    private func blendColor(
-        backdrop: (r: CGFloat, g: CGFloat, b: CGFloat),
-        source: (r: CGFloat, g: CGFloat, b: CGFloat),
-        blendMode: LayerBlendMode
-    ) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
-        if blendMode == .darkerColor {
-            return luminosity(source) < luminosity(backdrop) ? source : backdrop
-        }
-
-        if blendMode == .lighterColor {
-            return luminosity(source) > luminosity(backdrop) ? source : backdrop
-        }
-
-        if blendMode == .hue {
-            var output = source
-            output = setSaturation(output, saturation(backdrop))
-            output = setLuminosity(output, luminosity(backdrop))
-            return (
-                r: max(0, min(1, output.r)),
-                g: max(0, min(1, output.g)),
-                b: max(0, min(1, output.b))
-            )
-        }
-
-        if blendMode == .saturation {
-            var output = backdrop
-            output = setSaturation(output, saturation(source))
-            output = setLuminosity(output, luminosity(backdrop))
-            return (
-                r: max(0, min(1, output.r)),
-                g: max(0, min(1, output.g)),
-                b: max(0, min(1, output.b))
-            )
-        }
-
-        if blendMode == .color {
-            var output = source
-            output = setSaturation(output, saturation(source))
-            output = setLuminosity(output, luminosity(backdrop))
-            return (
-                r: max(0, min(1, output.r)),
-                g: max(0, min(1, output.g)),
-                b: max(0, min(1, output.b))
-            )
-        }
-
-        if blendMode == .luminosity {
-            var output = backdrop
-            output = setLuminosity(output, luminosity(source))
-            return (
-                r: max(0, min(1, output.r)),
-                g: max(0, min(1, output.g)),
-                b: max(0, min(1, output.b))
-            )
-        }
-
-        return (
-            r: max(0, min(1, blendChannel(backdrop: backdrop.r, source: source.r, blendMode: blendMode))),
-            g: max(0, min(1, blendChannel(backdrop: backdrop.g, source: source.g, blendMode: blendMode))),
-            b: max(0, min(1, blendChannel(backdrop: backdrop.b, source: source.b, blendMode: blendMode)))
-        )
-    }
-
-    private func blendChannel(backdrop: CGFloat, source: CGFloat, blendMode: LayerBlendMode) -> CGFloat {
-        switch blendMode {
-        case .normal:
-            return source
-        case .darken:
-            return min(backdrop, source)
-        case .multiply:
-            return backdrop * source
-        case .colorBurn:
-            return source <= 0 ? 0 : max(0, 1 - ((1 - backdrop) / max(0.001, source)))
-        case .linearBurn:
-            return max(0, backdrop + source - 1)
-        case .subtract:
-            return max(0, backdrop - source)
-        case .lighten:
-            return max(backdrop, source)
-        case .screen:
-            return 1 - ((1 - backdrop) * (1 - source))
-        case .add:
-            return min(1, backdrop + source)
-        case .colorDodge:
-            return source >= 1 ? 1 : min(1, backdrop / max(0.001, 1 - source))
-        case .glowDodge:
-            return source >= 1 ? 1 : min(1, backdrop / max(0.0005, 1 - (source * 0.92)))
-        case .overlay:
-            return backdrop <= 0.5 ? (2 * backdrop * source) : (1 - 2 * (1 - backdrop) * (1 - source))
-        case .softLight:
-            return source <= 0.5
-                ? (backdrop - ((1 - 2 * source) * backdrop * (1 - backdrop)))
-                : (backdrop + ((2 * source - 1) * ((backdrop <= 0.25)
-                    ? ((((16 * backdrop - 12) * backdrop) + 4) * backdrop)
-                    : sqrt(backdrop)) - backdrop))
-        case .hardLight:
-            return source <= 0.5 ? (2 * backdrop * source) : (1 - 2 * (1 - backdrop) * (1 - source))
-        case .difference:
-            return abs(backdrop - source)
-        case .vividLight:
-            return source <= 0.5
-                ? blendChannel(backdrop: backdrop, source: 2 * source, blendMode: .colorBurn)
-                : blendChannel(backdrop: backdrop, source: 2 * (source - 0.5), blendMode: .colorDodge)
-        case .linearLight:
-            return max(0, min(1, backdrop + 2 * source - 1))
-        case .pinLight:
-            return source <= 0.5 ? min(backdrop, 2 * source) : max(backdrop, 2 * (source - 0.5))
-        case .hardMix:
-            return blendChannel(backdrop: backdrop, source: source, blendMode: .vividLight) < 0.5 ? 0 : 1
-        case .exclusion:
-            return backdrop + source - (2 * backdrop * source)
-        case .darkerColor, .lighterColor, .hue, .saturation, .color, .luminosity:
-            return source
-        case .divide:
-            return min(1, backdrop / max(0.001, source))
-        case .addGlow:
-            return min(1, backdrop + source * 1.35)
-        }
-    }
-
-    private func luminosity(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> CGFloat {
-        (0.3 * color.r) + (0.59 * color.g) + (0.11 * color.b)
-    }
-
-    private func saturation(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> CGFloat {
-        max(color.r, color.g, color.b) - min(color.r, color.g, color.b)
-    }
-
-    private func clipColor(_ color: (r: CGFloat, g: CGFloat, b: CGFloat)) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
-        let lum = luminosity(color)
-        let minimum = min(color.r, color.g, color.b)
-        let maximum = max(color.r, color.g, color.b)
-        var output = color
-
-        if minimum < 0 {
-            let scale = lum / max(0.001, lum - minimum)
-            output = (
-                r: lum + ((output.r - lum) * scale),
-                g: lum + ((output.g - lum) * scale),
-                b: lum + ((output.b - lum) * scale)
-            )
-        }
-
-        if maximum > 1 {
-            let adjustedMaximum = max(output.r, output.g, output.b)
-            let scale = (1 - lum) / max(0.001, adjustedMaximum - lum)
-            output = (
-                r: lum + ((output.r - lum) * scale),
-                g: lum + ((output.g - lum) * scale),
-                b: lum + ((output.b - lum) * scale)
-            )
-        }
-
-        return output
-    }
-
-    private func setLuminosity(_ color: (r: CGFloat, g: CGFloat, b: CGFloat), _ lum: CGFloat) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
-        let delta = lum - luminosity(color)
-        return clipColor(
-            (
-                r: color.r + delta,
-                g: color.g + delta,
-                b: color.b + delta
-            )
-        )
-    }
-
-    private func setSaturation(_ color: (r: CGFloat, g: CGFloat, b: CGFloat), _ sat: CGFloat) -> (r: CGFloat, g: CGFloat, b: CGFloat) {
-        let original = [color.r, color.g, color.b]
-        var components = original
-        var minIndex = 0
-        var midIndex = 1
-        var maxIndex = 2
-
-        if original[minIndex] > original[midIndex] { swap(&minIndex, &midIndex) }
-        if original[midIndex] > original[maxIndex] { swap(&midIndex, &maxIndex) }
-        if original[minIndex] > original[midIndex] { swap(&minIndex, &midIndex) }
-
-        if original[maxIndex] > original[minIndex] {
-            components[midIndex] = ((original[midIndex] - original[minIndex]) * sat) / (original[maxIndex] - original[minIndex])
-            components[maxIndex] = sat
-        } else {
-            components[midIndex] = 0
-            components[maxIndex] = 0
-        }
-        components[minIndex] = 0
-
-        return (r: components[0], g: components[1], b: components[2])
-    }
-
-    private enum PanPhase {
-        case began
-        case moved
-        case ended
-        case cancelled
-    }
-
-    private enum TransformOverlayHandle {
-        case topLeft
-        case topRight
-        case bottomLeft
-        case bottomRight
-        case leftEdge
-        case rightEdge
-        case bottomEdge
-    }
-
-    private func handlePanTouchesIfNeeded(_ touches: Set<UITouch>, with event: UIEvent?, phase: PanPhase) -> Bool {
-        guard currentTool == .move, let touch = touches.first, touch.type != .pencil else {
-            if phase == .ended || phase == .cancelled {
-                panStartLocation = nil
-                panDidMove = false
-                isCanvasPanGestureActive = false
-            }
-            return false
-        }
-
-        let nonPencilTouchCount = event?.allTouches?.filter { $0.type != .pencil }.count ?? 1
-        if isPinchGestureActive || nonPencilTouchCount > 1 {
-            if phase == .ended || phase == .cancelled {
-                panStartLocation = nil
-                panDidMove = false
-                isCanvasPanGestureActive = false
-            }
-            return false
-        }
-
-        let location = touch.preciseLocation(in: self)
-        switch phase {
-        case .began:
-            panStartLocation = location
-            panStartOffset = viewportOffset
-            panDidMove = false
-            isCanvasPanGestureActive = true
-        case .moved:
-            guard let panStartLocation else { return true }
-            let deltaX = location.x - panStartLocation.x
-            let deltaY = location.y - panStartLocation.y
-            if hypot(deltaX, deltaY) > 3.0 {
-                panDidMove = true
-            }
-            let nextOffset = CGSize(
-                width: panStartOffset.width + deltaX,
-                height: panStartOffset.height + deltaY
-            )
-            let clampedOffset = clampedViewportOffset(nextOffset)
-            sendAction?(.viewportOffsetChanged(clampedOffset))
-        case .ended, .cancelled:
-            if panDidMove {
-                lastNavigationGestureEndedAt = CACurrentMediaTime()
-            }
-            panStartLocation = nil
-            panDidMove = false
-            isCanvasPanGestureActive = false
-        }
-        return true
-    }
-
-    private func shouldSuppressHistoryTap() -> Bool {
-        if isPinchGestureActive || isCanvasPanGestureActive || pinchAnchorDocumentPoint != nil {
-            return true
-        }
-        return (CACurrentMediaTime() - lastNavigationGestureEndedAt) < 0.22
-    }
-
-    private func clampedViewportOffset(_ proposedOffset: CGSize) -> CGSize {
-        let paperRect = bounds.insetBy(dx: 6, dy: 6)
-        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
-        let fitted = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledWidth = fitted.width * zoomScale
-        let scaledHeight = fitted.height * zoomScale
-        let horizontalLimit = max(0, (scaledWidth - drawableRect.width) / 2 + 120)
-        let verticalLimit = max(0, (scaledHeight - drawableRect.height) / 2 + 120)
-        return CGSize(
-            width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
-            height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
-        )
-    }
-
-    @objc
-    private func handleTwoFingerUndoTap(_ recognizer: UITapGestureRecognizer) {
-        guard recognizer.state == .ended else { return }
-        guard !shouldSuppressHistoryTap() else { return }
-        sendAction?(.requestLocalUndo)
-    }
-
-    @objc
-    private func handleThreeFingerRedoTap(_ recognizer: UITapGestureRecognizer) {
-        guard recognizer.state == .ended else { return }
-        guard !shouldSuppressHistoryTap() else { return }
-        sendAction?(.requestLocalRedo)
-    }
-
-    @objc
-    private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
-        guard documentSize.width > 0, documentSize.height > 0 else { return }
-
-        if currentTool == .move {
-            switch recognizer.state {
-            case .began:
-                guard transformMode == .standard else {
-                    isPinchGestureActive = false
-                    return
-                }
-                isPinchGestureActive = true
-                sendAction?(.transformScaleGestureBegan)
-
-            case .changed:
-                sendAction?(.transformScaleChanged(recognizer.scale))
-
-            case .ended, .cancelled, .failed:
-                sendAction?(.transformScaleEnded(recognizer.scale))
-                if isPinchGestureActive {
-                    lastNavigationGestureEndedAt = CACurrentMediaTime()
-                }
-                isPinchGestureActive = false
-
-            default:
-                break
-            }
-            return
-        }
-
-        let location = recognizer.location(in: self)
-        switch recognizer.state {
-        case .began:
-            isPinchGestureActive = true
-            pinchStartScale = zoomScale
-            pinchAnchorDocumentPoint = documentPoint(at: location, in: contentRect())
-
-        case .changed:
-            guard let pinchAnchorDocumentPoint else { return }
-            let newScale = min(max(pinchStartScale * recognizer.scale, 0.6), 4.0)
-            let newOffset = offsetKeepingDocumentPointStable(
-                pinchAnchorDocumentPoint,
-                at: location,
-                zoomScale: newScale
-            )
-            sendAction?(.zoomScaleChanged(newScale))
-            sendAction?(.viewportOffsetChanged(newOffset))
-
-        case .ended, .cancelled, .failed:
-            if isPinchGestureActive {
-                lastNavigationGestureEndedAt = CACurrentMediaTime()
-            }
-            isPinchGestureActive = false
-            pinchAnchorDocumentPoint = nil
-
-        default:
-            break
-        }
-    }
-
-    @objc
-    private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
-        guard currentTool == .move else { return }
-        guard transformMode == .standard else { return }
-        switch recognizer.state {
-        case .began:
-            sendAction?(.transformRotationGestureBegan)
-        case .changed:
-            sendAction?(.transformRotationChanged(recognizer.rotation))
-        case .ended, .cancelled, .failed:
-            sendAction?(.transformRotationEnded(recognizer.rotation))
-        default:
-            break
-        }
-    }
-
-    @objc
-    private func handleTextBoxPan(_ recognizer: UIPanGestureRecognizer) {
-        guard currentTool == .move, currentTransformGeometry != nil else { return }
-        let translation = recognizer.translation(in: self)
-        let documentOffset = documentTranslation(from: translation)
-        switch recognizer.state {
-        case .began:
-            sendAction?(.transformGestureBegan)
-            sendAction?(.transformPreviewChanged(.zero))
-        case .changed:
-            sendAction?(.transformPreviewChanged(documentOffset))
-        case .ended, .cancelled, .failed:
-            sendAction?(.transformEnded(documentOffset))
-        default:
-            break
-        }
-    }
-
-    @objc
-    private func handleTextScalePan(_ recognizer: UIPanGestureRecognizer) {
-        guard currentTool == .move, let geometry = currentTransformGeometry else { return }
-        let handle = transformHandle(for: recognizer.view)
-        let location = recognizer.location(in: self)
-
-        switch recognizer.state {
-        case .began:
-            activeTransformHandle = handle
-            textHandleStartScale = CGSize(width: transformPreviewScaleX, height: transformPreviewScaleY)
-        case .changed:
-            if transformMode == .standard {
-                let translation = recognizer.translation(in: self)
-                let nextScale = freeformScale(
-                    from: textHandleStartScale,
-                    translation: translation,
-                    handle: handle
-                )
-                sendAction?(.transformScaleSet(x: nextScale.width, y: nextScale.height))
-            } else {
-                sendAction?(.transformQuadOffsetsSet(
-                    quadOffsetsForDraggedHandle(
-                        handle,
-                        location: location,
-                        geometry: geometry
-                    )
-                ))
-            }
-        case .ended, .cancelled, .failed:
-            if transformMode == .standard {
-                let translation = recognizer.translation(in: self)
-                let nextScale = freeformScale(
-                    from: textHandleStartScale,
-                    translation: translation,
-                    handle: handle
-                )
-                sendAction?(.transformScaleSet(x: nextScale.width, y: nextScale.height))
-            } else {
-                sendAction?(.transformQuadOffsetsSet(
-                    quadOffsetsForDraggedHandle(
-                        handle,
-                        location: location,
-                        geometry: geometry
-                    )
-                ))
-            }
-        default:
-            break
-        }
-    }
-
-    @objc
-    private func handleTextRotationPan(_ recognizer: UIPanGestureRecognizer) {
-        guard transformMode == .standard else { return }
-        guard currentTool == .move, let geometry = currentTransformGeometry else { return }
-        let location = recognizer.location(in: self)
-        let angle = atan2(location.y - geometry.pivotCenter.y, location.x - geometry.pivotCenter.x)
-
-        switch recognizer.state {
-        case .began:
-            textRotationHandleStartAngle = angle
-            sendAction?(.transformRotationGestureBegan)
-        case .changed:
-            sendAction?(.transformRotationChanged(angle - textRotationHandleStartAngle))
-        case .ended, .cancelled, .failed:
-            sendAction?(.transformRotationEnded(angle - textRotationHandleStartAngle))
-        default:
-            break
-        }
-    }
-
-    @objc
-    private func handleTransformPivotPan(_ recognizer: UIPanGestureRecognizer) {
-        guard transformMode == .standard else { return }
-        guard currentTool == .move, let geometry = currentTransformGeometry else { return }
-        let location = recognizer.location(in: self)
-
-        switch recognizer.state {
-        case .began:
-            transformPivotTouchOffset = CGPoint(
-                x: geometry.pivotCenter.x - location.x,
-                y: geometry.pivotCenter.y - location.y
-            )
-        case .changed, .ended:
-            let targetViewPoint = CGPoint(
-                x: location.x + transformPivotTouchOffset.x,
-                y: location.y + transformPivotTouchOffset.y
-            )
-            let documentPoint = self.documentPoint(at: targetViewPoint, in: contentRect())
-            sendAction?(.transformPivotSet(CGPoint(
-                x: documentPoint.x - transformPreviewOffset.width,
-                y: documentPoint.y - transformPreviewOffset.height
-            )))
-        default:
-            break
-        }
-    }
-
-    private func transformHandle(for view: UIView?) -> TransformOverlayHandle {
-        switch view {
-        case textTransformTopLeftHandleView:
-            return .topLeft
-        case textTransformTopRightHandleView:
-            return .topRight
-        case textTransformBottomLeftHandleView:
-            return .bottomLeft
-        case textTransformLeftMidHandleView:
-            return .leftEdge
-        case textTransformRightMidHandleView:
-            return .rightEdge
-        case textTransformBottomMidHandleView:
-            return .bottomEdge
-        default:
-            return .bottomRight
-        }
-    }
-
-    private func freeformScale(
-        from startScale: CGSize,
-        translation: CGPoint,
-        handle: TransformOverlayHandle
-    ) -> CGSize {
-        let xDelta = translation.x / 160.0
-        let yDelta = translation.y / 160.0
-        var scaleX = startScale.width
-        var scaleY = startScale.height
-
-        switch handle {
-        case .topLeft:
-            scaleX -= xDelta
-            scaleY -= yDelta
-        case .topRight:
-            scaleX += xDelta
-            scaleY -= yDelta
-        case .bottomLeft:
-            scaleX -= xDelta
-            scaleY += yDelta
-        case .bottomRight:
-            scaleX += xDelta
-            scaleY += yDelta
-        case .leftEdge:
-            scaleX -= xDelta
-        case .rightEdge:
-            scaleX += xDelta
-        case .bottomEdge:
-            scaleY += yDelta
-        }
-
-        if transformMode == .standard && transformLocksAspectRatio {
-            let startWidth = max(startScale.width, 0.0001)
-            let startHeight = max(startScale.height, 0.0001)
-            let ratioX = scaleX / startWidth
-            let ratioY = scaleY / startHeight
-            let uniformRatio: CGFloat
-
-            switch handle {
-            case .leftEdge, .rightEdge:
-                uniformRatio = ratioX
-            case .bottomEdge:
-                uniformRatio = ratioY
-            case .topLeft, .topRight, .bottomLeft, .bottomRight:
-                uniformRatio = abs(ratioX - 1.0) >= abs(ratioY - 1.0) ? ratioX : ratioY
-            }
-
-            scaleX = startScale.width * uniformRatio
-            scaleY = startScale.height * uniformRatio
-        }
-
-        return CGSize(
-            width: min(max(scaleX, 0.2), 6.0),
-            height: min(max(scaleY, 0.2), 6.0)
-        )
-    }
-
-    private func quadOffsetsForDraggedHandle(
-        _ handle: TransformOverlayHandle,
-        location: CGPoint,
-        geometry: TextTransformGeometry
-    ) -> TransformQuadOffsets {
-        let documentPoint = self.documentPoint(at: location, in: contentRect())
-        let affineQuad = affineTransformQuad(for: geometry.sourceRect)
-        var adjustedQuad = geometry.quad
-
-        switch handle {
-        case .topLeft:
-            adjustedQuad.topLeft = documentPoint
-        case .topRight:
-            adjustedQuad.topRight = documentPoint
-        case .bottomLeft:
-            adjustedQuad.bottomLeft = documentPoint
-        case .bottomRight:
-            adjustedQuad.bottomRight = documentPoint
-        case .leftEdge:
-            let existing = geometry.quad.leftMidpoint
-            let documentDelta = CGSize(
-                width: documentPoint.x - existing.x,
-                height: documentPoint.y - existing.y
-            )
-            adjustedQuad.topLeft.x += documentDelta.width
-            adjustedQuad.topLeft.y += documentDelta.height
-            adjustedQuad.bottomLeft.x += documentDelta.width
-            adjustedQuad.bottomLeft.y += documentDelta.height
-        case .rightEdge:
-            let existing = geometry.quad.rightMidpoint
-            let documentDelta = CGSize(
-                width: documentPoint.x - existing.x,
-                height: documentPoint.y - existing.y
-            )
-            adjustedQuad.topRight.x += documentDelta.width
-            adjustedQuad.topRight.y += documentDelta.height
-            adjustedQuad.bottomRight.x += documentDelta.width
-            adjustedQuad.bottomRight.y += documentDelta.height
-        case .bottomEdge:
-            let existing = geometry.quad.bottomMidpoint
-            let documentDelta = CGSize(
-                width: documentPoint.x - existing.x,
-                height: documentPoint.y - existing.y
-            )
-            adjustedQuad.bottomLeft.x += documentDelta.width
-            adjustedQuad.bottomLeft.y += documentDelta.height
-            adjustedQuad.bottomRight.x += documentDelta.width
-            adjustedQuad.bottomRight.y += documentDelta.height
-        }
-
-        return TransformQuadOffsets(
-            topLeft: CGSize(
-                width: adjustedQuad.topLeft.x - affineQuad.topLeft.x,
-                height: adjustedQuad.topLeft.y - affineQuad.topLeft.y
-            ),
-            topRight: CGSize(
-                width: adjustedQuad.topRight.x - affineQuad.topRight.x,
-                height: adjustedQuad.topRight.y - affineQuad.topRight.y
-            ),
-            bottomLeft: CGSize(
-                width: adjustedQuad.bottomLeft.x - affineQuad.bottomLeft.x,
-                height: adjustedQuad.bottomLeft.y - affineQuad.bottomLeft.y
-            ),
-            bottomRight: CGSize(
-                width: adjustedQuad.bottomRight.x - affineQuad.bottomRight.x,
-                height: adjustedQuad.bottomRight.y - affineQuad.bottomRight.y
-            )
-        )
-    }
-
-    private func documentPoint(at viewPoint: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(
-            x: ((viewPoint.x - rect.minX) / max(rect.width, 1)) * documentSize.width,
-            y: ((viewPoint.y - rect.minY) / max(rect.height, 1)) * documentSize.height
-        )
-    }
-
-    private func offsetKeepingDocumentPointStable(_ documentPoint: CGPoint, at viewPoint: CGPoint, zoomScale: CGFloat) -> CGSize {
-        let paperRect = bounds.insetBy(dx: 6, dy: 6)
-        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
-        let fittedRect = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledSize = CGSize(width: fittedRect.width * zoomScale, height: fittedRect.height * zoomScale)
-        let normalizedX = documentPoint.x / max(documentSize.width, 1)
-        let normalizedY = documentPoint.y / max(documentSize.height, 1)
-        let desiredOrigin = CGPoint(
-            x: viewPoint.x - (normalizedX * scaledSize.width),
-            y: viewPoint.y - (normalizedY * scaledSize.height)
-        )
-        let baseOrigin = CGPoint(
-            x: fittedRect.midX - (scaledSize.width / 2),
-            y: fittedRect.midY - (scaledSize.height / 2)
-        )
-        return clampedViewportOffset(
-            CGSize(width: desiredOrigin.x - baseOrigin.x, height: desiredOrigin.y - baseOrigin.y),
-            zoomScale: zoomScale
-        )
-    }
-
-    private func clampedViewportOffset(_ proposedOffset: CGSize, zoomScale: CGFloat) -> CGSize {
-        let paperRect = bounds.insetBy(dx: 6, dy: 6)
-        let drawableRect = paperRect.insetBy(dx: 8, dy: 8)
-        let fitted = AVMakeRect(aspectRatio: documentSize, insideRect: drawableRect)
-        let scaledWidth = fitted.width * zoomScale
-        let scaledHeight = fitted.height * zoomScale
-        let horizontalLimit = max(0, (scaledWidth - drawableRect.width) / 2 + 120)
-        let verticalLimit = max(0, (scaledHeight - drawableRect.height) / 2 + 120)
-        return CGSize(
-            width: min(max(proposedOffset.width, -horizontalLimit), horizontalLimit),
-            height: min(max(proposedOffset.height, -verticalLimit), verticalLimit)
-        )
-    }
-
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        if gestureRecognizer === touchEyedropperLongPressRecognizer || otherGestureRecognizer === touchEyedropperLongPressRecognizer {
-            return false
-        }
-        if isTransformOverlayGesture(gestureRecognizer) || isTransformOverlayGesture(otherGestureRecognizer) {
-            return false
-        }
-        return true
-    }
-
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        if gestureRecognizer === touchEyedropperLongPressRecognizer {
-            guard touch.type != .pencil else { return false }
-            let location = touch.location(in: self)
-            guard contentRect().insetBy(dx: -18, dy: -18).contains(location) else { return false }
-            if shouldRouteTouchesToTransformOverlay(Set([touch])) { return false }
-            return true
-        }
-        guard gestureRecognizer.view === textTransformBoxView else { return true }
-        let location = touch.location(in: self)
-        if textTransformTopLeftHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformTopRightHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformBottomLeftHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformScaleHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformLeftMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformRightMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformBottomMidHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformRotationHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        if textTransformPivotHandleView.frame.insetBy(dx: -8, dy: -8).contains(location) { return false }
-        return true
-    }
-
-    private func isTransformOverlayGesture(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        switch gestureRecognizer.view {
-        case textTransformBoxView,
-             textTransformTopLeftHandleView,
-             textTransformTopRightHandleView,
-             textTransformBottomLeftHandleView,
-             textTransformScaleHandleView,
-             textTransformLeftMidHandleView,
-             textTransformRightMidHandleView,
-             textTransformBottomMidHandleView,
-             textTransformRotationHandleView,
-             textTransformPivotHandleView:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func isPointInsideTransformOverlay(_ point: CGPoint) -> Bool {
-        let expandedFrames = [
-            textTransformTopLeftHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformTopRightHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformBottomLeftHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformScaleHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformLeftMidHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformRightMidHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformBottomMidHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformRotationHandleView.frame.insetBy(dx: -10, dy: -10),
-            textTransformPivotHandleView.frame.insetBy(dx: -10, dy: -10)
-        ]
-        if expandedFrames.contains(where: { !$0.isEmpty && $0.contains(point) }) {
-            return true
-        }
-        return !textTransformBoxView.isHidden && textTransformBoxView.point(inside: point, with: nil)
-    }
-}
-
-private final class TransformOutlineView: UIView {
-    private let fillLayer = CAShapeLayer()
-    private let strokeLayer = CAShapeLayer()
-    private let shadowLayer = CAShapeLayer()
-    private var currentPath: UIBezierPath?
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = .clear
-        isOpaque = false
-
-        shadowLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.045).cgColor
-        shadowLayer.strokeColor = UIColor.clear.cgColor
-        shadowLayer.shadowColor = UIColor.black.cgColor
-        shadowLayer.shadowOpacity = 0.12
-        shadowLayer.shadowRadius = 5
-        shadowLayer.shadowOffset = CGSize(width: 0, height: 2)
-        layer.addSublayer(shadowLayer)
-
-        fillLayer.fillColor = UIColor.systemBlue.withAlphaComponent(0.045).cgColor
-        fillLayer.strokeColor = UIColor.clear.cgColor
-        layer.addSublayer(fillLayer)
-
-        strokeLayer.fillColor = UIColor.clear.cgColor
-        strokeLayer.strokeColor = UIColor.systemBlue.withAlphaComponent(0.96).cgColor
-        strokeLayer.lineWidth = 1.1
-        strokeLayer.lineJoin = .round
-        layer.addSublayer(strokeLayer)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        fillLayer.frame = bounds
-        strokeLayer.frame = bounds
-        shadowLayer.frame = bounds
-    }
-
-    func updatePath(_ path: UIBezierPath?) {
-        currentPath = path
-        let cgPath = path?.cgPath
-        fillLayer.path = cgPath
-        strokeLayer.path = cgPath
-        shadowLayer.path = cgPath
-    }
-
-    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-        guard let currentPath else { return false }
-        return currentPath.contains(point)
     }
 }
 
@@ -2317,22 +418,4 @@ private extension PreviewStrokeStyle {
             return SIMD4(0, 0, 0, 1)
         }
     }
-}
-
-private struct TextTransformGeometry {
-    let sourceRect: CGRect
-    let quad: TransformQuad
-    let bounds: CGRect
-    let center: CGPoint
-    let topLeft: CGPoint
-    let topRight: CGPoint
-    let bottomLeft: CGPoint
-    let bottomRight: CGPoint
-    let topMidpoint: CGPoint
-    let leftMidpoint: CGPoint
-    let rightMidpoint: CGPoint
-    let bottomMidpoint: CGPoint
-    let rotationHandleCenter: CGPoint
-    let pivotCenter: CGPoint
-    let rotationStemLength: CGFloat
 }

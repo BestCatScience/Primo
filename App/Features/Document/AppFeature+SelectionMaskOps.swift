@@ -24,7 +24,7 @@ extension AppFeature {
             guard
                 let baseMask = expandedMask(from: existing, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
                 let incomingMask = expandedMask(from: incoming, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
-                let combined = MetalDocumentProcessingClient.shared.combinedSelectionMask(
+                let combined = CanvasDocumentRenderingServices.live.combinedSelectionMask(
                     base: baseMask,
                     incoming: incomingMask,
                     mode: mode == .add ? .add : .subtract,
@@ -48,7 +48,7 @@ extension AppFeature {
             return [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
         }
 
-        return MetalDocumentProcessingClient.shared.expandedSelectionMask(
+        return CanvasDocumentRenderingServices.live.expandedSelectionMask(
             maskData: selection.maskData,
             maskWidth: selection.maskWidth,
             maskHeight: selection.maskHeight,
@@ -129,7 +129,7 @@ extension AppFeature {
 
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = MetalDocumentProcessingClient.shared.lassoSelection(
+        guard let mask = CanvasDocumentRenderingServices.live.lassoSelection(
             points: polygon,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight
@@ -164,7 +164,7 @@ extension AppFeature {
         let expectedCount = width * height * 4
         guard layer.pixelData.count == expectedCount else { return nil }
 
-        guard let selected = MetalDocumentProcessingClient.shared.autoSelection(
+        guard let selected = CanvasDocumentRenderingServices.live.autoSelection(
             pixelData: layer.pixelData,
             width: width,
             height: height,
@@ -206,7 +206,7 @@ extension AppFeature {
         }
 
         guard pixelData.count == width * height * 4 else { return nil }
-        guard let selected = MetalDocumentProcessingClient.shared.colorRangeSelection(
+        guard let selected = CanvasDocumentRenderingServices.live.colorRangeSelection(
             pixelData: pixelData,
             width: width,
             height: height,
@@ -223,29 +223,29 @@ extension AppFeature {
 
     static func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
-        return MetalDocumentProcessingClient.shared.expandedMask(source, width: width, height: height, expansion: expansion)
+        return CanvasDocumentRenderingServices.live.expandedMask(source, width: width, height: height, expansion: expansion)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
     static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
-        return MetalDocumentProcessingClient.shared.contractedMask(source, width: width, height: height, contraction: contraction)
+        return CanvasDocumentRenderingServices.live.contractedMask(source, width: width, height: height, contraction: contraction)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
     static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0 else { return source }
-        return MetalDocumentProcessingClient.shared.featheredMask(source, width: width, height: height, radius: radius)
+        return CanvasDocumentRenderingServices.live.featheredMask(source, width: width, height: height, radius: radius)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
     static func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
-        MetalDocumentProcessingClient.shared.invertMask(source)
+        CanvasDocumentRenderingServices.live.invertMask(source)
             ?? [UInt8](repeating: 0, count: source.count)
     }
 
     static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
-        guard let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+        guard let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
             mask: source,
             width: width,
             height: height

@@ -25,7 +25,10 @@ struct AppFeature {
     @Dependency(\.textLayerGateway) var textLayerGateway
     @Dependency(\.documentLayerEffectsGateway) var documentLayerEffectsGateway
     @Dependency(\.documentEditingGateway) var documentEditingGateway
-    @Dependency(\.documentInteractionService) var documentInteractionService
+    @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
+    @Dependency(\.documentLayerCommandService) var documentLayerCommandService
+    @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
+    @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
     @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.documentImportClient) var documentImportClient

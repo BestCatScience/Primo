@@ -94,7 +94,7 @@ public enum DocumentRasterImageService {
         expandedMask: [UInt8],
         padding: Int = 64
     ) -> InpaintCrop? {
-        guard let gpuCrop = PrimoMetalDocumentProcessingClient.shared.inpaintCropPayload(
+        guard let gpuCrop = MetalLayerMutationService().inpaintCropPayload(
             source: source,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -125,7 +125,7 @@ public enum DocumentRasterImageService {
     ) -> Data? {
         guard baseLayerPixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
         guard editedCropPixelData.count == crop.width * crop.height * 4 else { return nil }
-        return PrimoMetalDocumentProcessingClient.shared.applyInpaintCrop(
+        return MetalLayerMutationService().applyInpaintCrop(
             editedCropPixelData: editedCropPixelData,
             to: baseLayerPixelData,
             canvasWidth: canvasWidth,

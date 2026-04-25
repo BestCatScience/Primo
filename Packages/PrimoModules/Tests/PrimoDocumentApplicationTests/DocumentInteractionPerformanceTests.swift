@@ -5,7 +5,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import XCTest
 
-final class DocumentInteractionPerformanceTests: XCTestCase {
+final class DocumentCommandPerformanceTests: XCTestCase {
     func testApplySoftwareStrokeRequestDispatchPerformance() {
         let samples = (0..<512).map { index in
             StylusSample(
@@ -16,34 +16,7 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
                 timestamp: Double(index) * 0.01
             )
         }
-        let service = DocumentInteractionService(
-            queryGateway: DocumentQueryGateway(
-                lightweightPresentation: { PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil) },
-                presentation: { PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil) },
-                compositePixelData: { Data() },
-                compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
-                pixelDataForLayer: { _ in Data() },
-                consumeDirtyUpdate: { nil }
-            ),
-            mutationGateway: DocumentMutationGateway(
-                resizeCanvas: { _, _ in .success(()) },
-                resizeCanvasExtent: { _, _ in .success(()) },
-                addLayer: { _ in .success(0) },
-                deleteLayer: { _ in .success(()) },
-                setActiveLayer: { _ in .success(()) },
-                setLayerName: { _, _ in .success(()) },
-                setLayerVisibility: { _, _ in .success(()) },
-                revealLayerForEditing: { _ in .success(()) },
-                replaceLayerPixels: { _, _ in .success(()) },
-                replaceLayerPixelsInRect: { _, _, _ in .success(()) },
-                applyLayerMutation: { _, _ in .success(()) },
-                applyTextLayerMutation: { _, _, _ in .success(()) },
-                replaceLayerMask: { _, _ in .success(()) },
-                clearLayerMask: { _ in .success(()) },
-                applyLayerMask: { _ in .success(()) },
-                clearLayer: { _ in .success(()) },
-                applyLayerProcessing: { _, _ in .success(()) }
-            ),
+        let service = DocumentStrokeCommandService(
             strokeGateway: StrokeInputGateway(
                 beginStroke: { _, _ in },
                 appendStroke: { _ in },
@@ -53,24 +26,6 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
                 endBlurStroke: {},
                 fill: { _, _ in .success(()) },
                 applySoftwareStroke: { _, _, _ in .success(()) }
-            ),
-            historyGateway: DocumentHistoryGateway(
-                canUndo: { true },
-                canRedo: { true },
-                undo: { .success(()) },
-                redo: { .success(()) }
-            ),
-            persistenceGateway: DocumentPersistenceGateway(
-                saveProject: { _, _ in },
-                loadProject: { _ in
-                    LoadedPaintProject(
-                        presentation: PaintDocumentPresentation(canvasSize: .zero, activeLayerIndex: 0, layerRows: [], layerSidebarRows: [], renderSnapshot: nil),
-                        paperStyle: .default
-                    )
-                },
-                setPaperStyle: { _ in },
-                newCanvas: { _, _ in },
-                prewarmDrawingResources: {}
             )
         )
         let brush = BrushRuntimeSettings(
@@ -98,10 +53,10 @@ final class DocumentInteractionPerformanceTests: XCTestCase {
         )
 
         measure {
-            XCTAssertEqual(
-                service.execute(.applySoftwareStroke(samples: samples, brush: brush, layerIndex: 0)),
-                .success(.none)
-            )
+            guard case .success = service.applySoftwareStroke(samples, brush, 0) else {
+                XCTFail("Expected applySoftwareStroke command dispatch to succeed")
+                return
+            }
         }
     }
 }

@@ -100,7 +100,8 @@ extension AppFeature {
         let scale = min(canvasRect.width / imageSize.width, canvasRect.height / imageSize.height)
         let fittedSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
 
-        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+        let layerService = MetalLayerMutationService()
+        guard let scaled = layerService.scaledPixelData(
             sourceSurface.pixelData,
             sourceWidth: sourceSurface.width,
             sourceHeight: sourceSurface.height,
@@ -141,7 +142,7 @@ extension AppFeature {
         let height = max(Int(canvasSize.height.rounded()), 1)
         let offsetX = max((width - source.width) / 2, 0)
         let offsetY = max((height - source.height) / 2, 0)
-        let translated = PrimoMetalDocumentProcessingClient.shared.translatedPixelData(
+        let translated = MetalLayerMutationService().translatedPixelData(
             source.pixelData,
             sourceWidth: source.width,
             sourceHeight: source.height,

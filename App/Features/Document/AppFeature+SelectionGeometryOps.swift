@@ -179,12 +179,12 @@ extension AppFeature {
             bounds = selection.bounds
         } else {
             guard
-                let alphaMask = MetalDocumentProcessingClient.shared.alphaMask(
+                let alphaMask = CanvasDocumentRenderingServices.live.alphaMask(
                     pixelData: source,
                     width: canvasWidth,
                     height: canvasHeight
                 ),
-                let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+                let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
                     mask: alphaMask,
                     width: canvasWidth,
                     height: canvasHeight
@@ -206,7 +206,7 @@ extension AppFeature {
             quadOffsets: quadOffsets
         )
 
-        return MetalDocumentProcessingClient.shared.transformedLayerPixelData(
+        return CanvasDocumentRenderingServices.live.transformedLayerPixelData(
             source: source,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -250,7 +250,7 @@ extension AppFeature {
             mode: mode,
             quadOffsets: quadOffsets
         )
-        guard let transformed = MetalDocumentProcessingClient.shared.transformedSelectionMask(
+        guard let transformed = CanvasDocumentRenderingServices.live.transformedSelectionMask(
             expandedSelectionMask: mask,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -292,12 +292,12 @@ extension AppFeature {
             return selection.bounds
         }
         guard
-            let alphaMask = MetalDocumentProcessingClient.shared.alphaMask(
+            let alphaMask = CanvasDocumentRenderingServices.live.alphaMask(
                 pixelData: pixelData,
                 width: canvasWidth,
                 height: canvasHeight
             ),
-            let cropped = MetalDocumentProcessingClient.shared.croppedSelectionMask(
+            let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
                 mask: alphaMask,
                 width: canvasWidth,
                 height: canvasHeight

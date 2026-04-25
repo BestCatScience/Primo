@@ -198,23 +198,23 @@ extension AppFeature {
     }
 
     func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentInteractionService.createCanvas(
-            width: dimensions.width,
-            height: dimensions.height
+        documentCanvasCommandService.createCanvas(
+            dimensions.width,
+            dimensions.height
         )
     }
 
     func resizeCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentInteractionService.resizeCanvas(
-            width: dimensions.width,
-            height: dimensions.height
+        documentCanvasCommandService.resizeCanvas(
+            dimensions.width,
+            dimensions.height
         )
     }
 
     func resizeCanvasExtent(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
-        documentInteractionService.resizeCanvasExtent(
-            width: dimensions.width,
-            height: dimensions.height
+        documentCanvasCommandService.resizeCanvasExtent(
+            dimensions.width,
+            dimensions.height
         )
     }
 
@@ -222,18 +222,18 @@ extension AppFeature {
         _ request: ImportedCanvasRequest,
         layerName: String
     ) -> DocumentMutationResult {
-        documentInteractionService.initializeImportedCanvas(
+        documentCanvasCommandService.initializeImportedCanvas(
             request,
-            layerName: layerName
+            layerName
         )
     }
 
     func undoCanvasMutation() -> DocumentMutationResult {
-        documentInteractionService.undo()
+        documentHistoryCommandService.undo()
     }
 
     func redoCanvasMutation() -> DocumentMutationResult {
-        documentInteractionService.redo()
+        documentHistoryCommandService.redo()
     }
 
     var freshDocumentActivationCoordinator: FreshDocumentActivationCoordinator {

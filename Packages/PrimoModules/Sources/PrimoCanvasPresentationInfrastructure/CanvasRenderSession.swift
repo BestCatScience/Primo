@@ -9,7 +9,7 @@ public final class CanvasRenderSession {
 
     public init(
         lifetime: GpuResourceLifetime = GpuResourceLifetime { handle in
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(handle.buffer)
+            MetalResourceStore().release(handle.buffer)
         }
     ) {
         self.lifetime = lifetime

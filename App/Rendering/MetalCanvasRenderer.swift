@@ -121,8 +121,12 @@ final class CanvasPixelSurfaceView: UIView {
 
 struct CanvasImageRenderer {
     let renderingClient: DocumentRenderingClient
+    let textService: MetalTextService
 
-    static let live = CanvasImageRenderer(renderingClient: .live)
+    static let live = CanvasImageRenderer(
+        renderingClient: .live,
+        textService: MetalTextService()
+    )
 
     func eyedropperLoupeSurface(
         sourcePixelData: Data,
@@ -220,7 +224,7 @@ struct CanvasImageRenderer {
         canvasWidth: Int,
         canvasHeight: Int
     ) -> DocumentCompositeSurface? {
-        PrimoMetalDocumentProcessingClient.shared.rasterizeTextLayer(
+        textService.rasterizeTextLayer(
             textLayer,
             canvasSize: CGSize(width: canvasWidth, height: canvasHeight)
         ).flatMap { payload in
@@ -233,7 +237,7 @@ struct CanvasImageRenderer {
         textLayer: TextLayerData,
         canvasSize: CGSize
     ) -> CGRect? {
-        PrimoMetalDocumentProcessingClient.shared.textLayoutRect(
+        textService.textLayoutRect(
             for: textLayer,
             canvasSize: canvasSize
         )

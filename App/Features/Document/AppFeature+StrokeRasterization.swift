@@ -20,7 +20,7 @@ extension AppFeature {
 
         let expectedCount = snapshot.width * snapshot.height * 4
         guard layer.pixelData.count == expectedCount else { return nil }
-        guard let output = MetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
+        guard let output = CanvasDocumentRenderingServices.live.rasterizedStrokePixelData(
             basePixelData: layer.pixelData,
             baseBufferHandle: layer.gpuBufferHandle,
             canvasWidth: snapshot.width,
@@ -55,7 +55,7 @@ extension AppFeature {
         activeLayerIndex: Int? = nil,
         preserveAlphaLockedPixels: Bool = false
     ) -> Data? {
-        if let gpuOutput = MetalDocumentProcessingClient.shared.rasterizedStrokePixelData(
+        if let gpuOutput = CanvasDocumentRenderingServices.live.rasterizedStrokePixelData(
             basePixelData: basePixelData,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -84,7 +84,7 @@ extension AppFeature {
         width: Int,
         height: Int
     ) -> Data? {
-        MetalDocumentProcessingClient.shared.preservingExistingAlpha(
+        CanvasDocumentRenderingServices.live.preservingExistingAlpha(
             source: source,
             existing: existing,
             width: width,

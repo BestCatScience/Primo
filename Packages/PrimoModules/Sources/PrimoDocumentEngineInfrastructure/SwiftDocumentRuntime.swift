@@ -16,6 +16,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
     private let services: DocumentEngineServices
+    private let resources: MetalResourceStore
+    private let strokes: MetalStrokeExecutionService
+    private let composites: MetalCompositingService
+    private let layers: MetalLayerMutationService
+    private let text: MetalTextService
     private let store: SwiftDocumentStore
     private var undoStack: [SwiftDocumentStoreSnapshot] = []
     private var redoStack: [SwiftDocumentStoreSnapshot] = []
@@ -30,13 +35,23 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         height: Int = 1536,
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
+        uuidClient: UUIDClient = .live,
+        resources: MetalResourceStore = MetalResourceStore(),
+        strokes: MetalStrokeExecutionService = MetalStrokeExecutionService(),
+        composites: MetalCompositingService = MetalCompositingService(),
+        layers: MetalLayerMutationService = MetalLayerMutationService(),
+        text: MetalTextService = MetalTextService()
     ) {
         self.services = DocumentEngineServices(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
         )
+        self.resources = resources
+        self.strokes = strokes
+        self.composites = composites
+        self.layers = layers
+        self.text = text
         self.store = SwiftDocumentStore(width: width, height: height)
         captureDirtyUpdate()
     }
@@ -128,7 +143,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
-        let metalClient = PrimoMetalDocumentProcessingClient.shared
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         guard sourceSize != targetSize else { return .success(()) }
@@ -138,7 +152,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let textScale = min(widthScale, heightScale)
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            guard let scaled = metalClient.scaledPixelData(
+            guard let scaled = layers.scaledPixelData(
                 layer.pixelData,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
@@ -149,7 +163,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             layer.pixelData = scaled
             if let mask = layer.maskData {
-                guard let scaledMask = metalClient.scaledMaskData(
+                guard let scaledMask = layers.scaledMaskData(
                     mask,
                     sourceWidth: sourceSize.width,
                     sourceHeight: sourceSize.height,
@@ -191,7 +205,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
-        let metalClient = PrimoMetalDocumentProcessingClient.shared
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         guard sourceSize != targetSize else { return .success(()) }
@@ -200,7 +213,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let offsetY = (targetSize.height - sourceSize.height) / 2
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            guard let translated = metalClient.translatedPixelData(
+            guard let translated = layers.translatedPixelData(
                 layer.pixelData,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
@@ -213,7 +226,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             layer.pixelData = translated
             if let mask = layer.maskData {
-                guard let translatedMask = metalClient.translatedMaskData(
+                guard let translatedMask = layers.translatedMaskData(
                     mask,
                     sourceWidth: sourceSize.width,
                     sourceHeight: sourceSize.height,
@@ -396,7 +409,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func applyLayerMask(index: Int) -> DocumentMutationResult {
         guard let failure = validateLayer(index) else {
             guard let mask = store.snapshot.layers[index].maskData else { return .success(()) }
-            guard let maskedPixels = PrimoMetalDocumentProcessingClient.shared.applyLayerMask(
+            guard let maskedPixels = layers.applyLayerMask(
                 pixelData: store.snapshot.layers[index].pixelData,
                 maskData: mask,
                 width: store.snapshot.canvasWidth,
@@ -430,7 +443,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let payload = PrimoMetalDocumentProcessingClient.shared.processLayer(
+        guard let payload = layers.processLayer(
             pixelData: store.snapshot.layers[index].pixelData,
             canvasWidth: store.snapshot.canvasWidth,
             canvasHeight: store.snapshot.canvasHeight,
@@ -609,7 +622,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard validateEditableLayer(index - 1) == nil else { return .failure(validateEditableLayer(index - 1)!) }
         let upper = store.snapshot.layers[index]
         let lower = store.snapshot.layers[index - 1]
-        guard let merged = PrimoMetalDocumentProcessingClient.shared.mergeLayers(
+        guard let merged = layers.mergeLayers(
             lowerPixelData: lower.pixelData,
             upperPixelData: upper.pixelData,
             upperMaskData: upper.maskData,
@@ -647,7 +660,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.emptyInput)
         }
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let payload = PrimoMetalDocumentProcessingClient.shared.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
+        guard let payload = text.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
             return .failure(.bridgeMutationFailed("setTextLayer"))
         }
         return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
@@ -686,7 +699,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             brush: brush,
             samples: (currentBlurStroke?.samples ?? []) + samples
         )
-        guard let payload = PrimoMetalDocumentProcessingClient.shared.blurPixels(
+        guard let payload = layers.blurPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
             sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
@@ -706,7 +719,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 isAlphaLocked: true
             )
             nextHandle = nil
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(payload.gpuBufferHandle)
+            resources.release(payload.gpuBufferHandle)
         } else if let handle = payload.gpuBufferHandle {
             nextPixelData = current
             nextHandle = handle
@@ -749,7 +762,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
         let layerIndex = store.snapshot.activeLayerIndex
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
-        guard let payload = PrimoMetalDocumentProcessingClient.shared.fillPixels(
+        guard let payload = layers.fillPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
             sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
@@ -769,7 +782,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
-        let gpuResult = PrimoMetalDocumentProcessingClient.shared.executeStrokeMutation(
+        let gpuResult = strokes.executeStrokeMutation(
             PrimoMetalStrokeExecutionRequest(
                 basePixelData: store.snapshot.layers[layerIndex].pixelData,
                 baseBufferHandle: gpuLayerHandles[layerIndex],
@@ -797,7 +810,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[layerIndex].alphaLocked {
             let committedOutput = gpuResult.gpuBufferHandle.flatMap {
-                PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: $0)
+                resources.materializedPixelData(for: $0)
             } ?? gpuResult.rectPixelData ?? Data()
             guard committedOutput.count == rgbaByteCount else {
                 return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
@@ -808,7 +821,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 isAlphaLocked: true
             )
             nextHandle = nil
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(gpuResult.gpuBufferHandle)
+            resources.release(gpuResult.gpuBufferHandle)
         } else if let handle = gpuResult.gpuBufferHandle {
             adjustedOutput = existing
             nextHandle = handle
@@ -1041,7 +1054,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             height: height,
             fileClient: services.fileIO,
             dateClient: services.clock,
-            uuidClient: services.ids
+            uuidClient: services.ids,
+            resources: resources,
+            strokes: strokes,
+            composites: composites,
+            layers: layers,
+            text: text
         )
         store.restore(newRuntime.store.snapshot)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
@@ -1058,7 +1076,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func compositeExportSurface(paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
         let surface = compositeSurface()
-        guard let pixelData = PrimoMetalDocumentProcessingClient.shared.compositedPaperPreviewRGBA(
+        guard let pixelData = composites.compositedPaperPreviewRGBA(
             pixelData: surface.pixelData,
             width: surface.width,
             height: surface.height,
@@ -1222,7 +1240,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
         if nextHandle != payload.gpuBufferHandle {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(payload.gpuBufferHandle)
+            resources.release(payload.gpuBufferHandle)
         }
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
@@ -1261,7 +1279,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private func materializedPixelData(from payload: DocumentLayerMutationPayload, existing: Data) -> Data {
         if let handle = payload.gpuBufferHandle,
-           let gpuPixelData = PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: handle),
+           let gpuPixelData = resources.materializedPixelData(for: handle),
            gpuPixelData.count == rgbaByteCount {
             return gpuPixelData
         }
@@ -1297,13 +1315,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             gpuLayerHandles.removeValue(forKey: index)
         }
         if previousHandle != gpuBufferHandle {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(previousHandle)
+            resources.release(previousHandle)
         }
     }
 
     private func releaseLayerBufferHandles() {
         for handle in gpuLayerHandles.values {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(handle)
+            resources.release(handle)
         }
         gpuLayerHandles.removeAll(keepingCapacity: true)
     }
@@ -1311,7 +1329,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func currentPixelData(for index: Int) -> Data {
         guard store.snapshot.layers.indices.contains(index) else { return Data() }
         if let handle = gpuLayerHandles[index],
-           let pixelData = PrimoMetalDocumentProcessingClient.shared.materializedPixelData(for: handle),
+           let pixelData = resources.materializedPixelData(for: handle),
            pixelData.count == rgbaByteCount {
             return pixelData
         }
@@ -1336,7 +1354,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {
         let rect = rect ?? LayerPixelRect(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let snapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
-        if let dirtyUpdate = PrimoMetalDocumentProcessingClient.shared.compositedIncrementalUpdate(
+        if let dirtyUpdate = composites.compositedIncrementalUpdate(
             snapshot: snapshot,
             dirtyRect: (rect.originX, rect.originY, rect.width, rect.height)
         ) {
@@ -1358,14 +1376,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func setPendingDirtyUpdate(_ update: IncrementalLayerUpdate) {
         if let previous = pendingDirtyUpdate?.gpuBufferHandle,
            previous != update.gpuBufferHandle {
-            PrimoMetalDocumentProcessingClient.shared.releaseBufferHandle(previous)
+            resources.release(previous)
         }
         pendingDirtyUpdate = update
     }
 
     private func compositeSurfaceForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> DocumentCompositeSurface {
         let metalSnapshot = makeMetalSnapshot(for: snapshot, includeCompositePixelData: false)
-        if let gpuComposite = PrimoMetalDocumentProcessingClient.shared.compositeDocumentSurface(snapshot: metalSnapshot) {
+        if let gpuComposite = composites.compositeDocumentSurface(snapshot: metalSnapshot) {
             return gpuComposite
         }
         Self.logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
@@ -1400,7 +1418,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private func makeRenderSnapshot() -> MetalDocumentSnapshot? {
         let baseSnapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
-        let compositeHandle = PrimoMetalDocumentProcessingClient.shared.compositeDocumentBufferHandle(snapshot: baseSnapshot)
+        let compositeHandle = composites.compositeDocumentBufferHandle(snapshot: baseSnapshot)
         let composite = compositeHandle == nil ? compositeSurface() : nil
         return MetalDocumentSnapshot(
             width: baseSnapshot.width,
@@ -1519,7 +1537,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 96)
         let targetWidth = max(Int(targetSize.width.rounded()), 1)
         let targetHeight = max(Int(targetSize.height.rounded()), 1)
-        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+        guard let scaled = layers.scaledPixelData(
             store.snapshot.layers[index].pixelData,
             sourceWidth: store.snapshot.canvasWidth,
             sourceHeight: store.snapshot.canvasHeight,
@@ -1558,7 +1576,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func makeTimelapseThumbnailSurface() -> DocumentCompositeSurface? {
         guard let source = timelapseCompositeSurface() else { return nil }
         let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 512)
-        guard let scaled = PrimoMetalDocumentProcessingClient.shared.scaledPixelData(
+        guard let scaled = layers.scaledPixelData(
             source.pixelData,
             sourceWidth: source.width,
             sourceHeight: source.height,
