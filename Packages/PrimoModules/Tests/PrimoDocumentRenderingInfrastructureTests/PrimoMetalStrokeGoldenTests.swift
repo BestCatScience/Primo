@@ -1,20 +1,19 @@
 import Foundation
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
-import PrimoDocumentRenderingInfrastructure
 @testable import PrimoDocumentMetalRuntimeInfrastructure
 import Testing
 
 struct PrimoMetalStrokeGoldenTests {
     @Test
     func gpuExecutesBrushesThatUsedToBeRejectedByRasterizationGate() {
-        let client = DocumentRenderingClient.live
+        let client = PrimoMetalDocumentProcessingClient.shared
         let basePixelData = seededCanvas(width: 48, height: 48)
         let brush = stressBrush()
         let samples = strokeSamples()
 
         let result = client.executeStroke(
-            MetalStrokeExecutionRequest(
+            PrimoMetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
                 canvasWidth: 48,
                 canvasHeight: 48,
@@ -28,7 +27,11 @@ struct PrimoMetalStrokeGoldenTests {
 
         if client.isAvailable {
             #expect(result != nil)
-            #expect(((result?.dirtyRect.originX ?? -1), (result?.dirtyRect.originY ?? -1), (result?.dirtyRect.width ?? -1), (result?.dirtyRect.height ?? -1)) == (0, 0, 48, 48))
+            let dirtyRect = result?.dirtyRect
+            #expect(dirtyRect?.originX == 0)
+            #expect(dirtyRect?.originY == 0)
+            #expect(dirtyRect?.width == 48)
+            #expect(dirtyRect?.height == 48)
             #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 18, y: 14) == (153, 113, 61, 248))
             #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 31, y: 24) == (214, 159, 104, 255))
         } else {
@@ -38,18 +41,23 @@ struct PrimoMetalStrokeGoldenTests {
 
     @Test
     func gpuRasterStrokeMatchesGoldenOutput() {
-        let client = DocumentRenderingClient.live
+        let client = PrimoMetalDocumentProcessingClient.shared
         let basePixelData = seededCanvas(width: 40, height: 40)
         let brush = texturedOilBrush()
         let samples = strokeSamples()
 
-        let output = client.rasterizedStrokePixelData(
-            basePixelData: basePixelData,
-            canvasWidth: 40,
-            canvasHeight: 40,
-            samples: samples,
-            brush: brush
-        )
+        let output = client.executeStroke(
+            PrimoMetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: 40,
+                canvasHeight: 40,
+                samples: samples,
+                brush: brush,
+                mode: .commit,
+                snapshotRevision: nil,
+                activeLayerIndex: nil
+            )
+        )?.pixelData
 
         if client.isAvailable {
             #expect(output != nil)
@@ -64,7 +72,7 @@ struct PrimoMetalStrokeGoldenTests {
 
     @Test
     func gpuColorSmudgeMatchesGoldenOutput() {
-        let client = DocumentRenderingClient.live
+        let client = PrimoMetalDocumentProcessingClient.shared
         let basePixelData = seededCanvas(width: 36, height: 24)
         let brush = smudgeBrush()
         let samples = [
@@ -72,13 +80,18 @@ struct PrimoMetalStrokeGoldenTests {
             StylusSample(point: CGPoint(x: 30, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 1)
         ]
 
-        let output = client.rasterizedStrokePixelData(
-            basePixelData: basePixelData,
-            canvasWidth: 36,
-            canvasHeight: 24,
-            samples: samples,
-            brush: brush
-        )
+        let output = client.executeStroke(
+            PrimoMetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: 36,
+                canvasHeight: 24,
+                samples: samples,
+                brush: brush,
+                mode: .commit,
+                snapshotRevision: nil,
+                activeLayerIndex: nil
+            )
+        )?.pixelData
 
         if client.isAvailable {
             #expect(output != nil)
@@ -93,27 +106,37 @@ struct PrimoMetalStrokeGoldenTests {
 
     @Test
     func gpuRasterizesSinglePointAndShortSmudgeStrokes() {
-        let client = DocumentRenderingClient.live
+        let client = PrimoMetalDocumentProcessingClient.shared
         let basePixelData = seededCanvas(width: 24, height: 24)
-        let stampOutput = client.rasterizedStrokePixelData(
-            basePixelData: basePixelData,
-            canvasWidth: 24,
-            canvasHeight: 24,
-            samples: [
-                StylusSample(point: CGPoint(x: 12, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0)
-            ],
-            brush: texturedOilBrush()
-        )
-        let smudgeOutput = client.rasterizedStrokePixelData(
-            basePixelData: basePixelData,
-            canvasWidth: 24,
-            canvasHeight: 24,
-            samples: [
-                StylusSample(point: CGPoint(x: 8, y: 11), pressure: 0.5, altitude: .pi / 2, azimuth: 0, timestamp: 0),
-                StylusSample(point: CGPoint(x: 15, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0.016),
-            ],
-            brush: smudgeBrush()
-        )
+        let stampOutput = client.executeStroke(
+            PrimoMetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: 24,
+                canvasHeight: 24,
+                samples: [
+                    StylusSample(point: CGPoint(x: 12, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0)
+                ],
+                brush: texturedOilBrush(),
+                mode: .commit,
+                snapshotRevision: nil,
+                activeLayerIndex: nil
+            )
+        )?.pixelData
+        let smudgeOutput = client.executeStroke(
+            PrimoMetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                canvasWidth: 24,
+                canvasHeight: 24,
+                samples: [
+                    StylusSample(point: CGPoint(x: 8, y: 11), pressure: 0.5, altitude: .pi / 2, azimuth: 0, timestamp: 0),
+                    StylusSample(point: CGPoint(x: 15, y: 12), pressure: 1.0, altitude: .pi / 2, azimuth: 0, timestamp: 0.016),
+                ],
+                brush: smudgeBrush(),
+                mode: .commit,
+                snapshotRevision: nil,
+                activeLayerIndex: nil
+            )
+        )?.pixelData
 
         if client.isAvailable {
             #expect(stampOutput != nil)

@@ -1,7 +1,6 @@
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentGPUContracts
-import PrimoDocumentRenderingInfrastructure
 
 public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering {
     private let processingService: DocumentStrokeProcessingService

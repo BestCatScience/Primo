@@ -120,11 +120,13 @@ public enum DocumentEngineFactory {
                 }
             },
             loadProject: { url in
+                let gpuServices = DocumentRuntimeGpuServicesFactory.live()
                 let runtime = try SwiftDocumentRuntime.loadProject(
                     from: url,
                     fileClient: fileClient,
                     dateClient: dateClient,
-                    uuidClient: uuidClient
+                    uuidClient: uuidClient,
+                    gpuServices: gpuServices
                 )
                 let loadedProject = LoadedPaintProject(
                     presentation: runtime.lightweightPresentation(),

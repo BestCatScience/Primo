@@ -2,24 +2,25 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentGPUContracts
+import PrimoDocumentMetalRuntimeInfrastructure
 
 public struct DocumentStrokeProcessingService: Sendable {
-    public let strokeGateway: StrokeRenderingGateway
-    public let compositingGateway: LayerCompositingGateway
-    public let materializationGateway: SurfaceMaterializationGateway
+    public let strokeService: GpuStrokeRenderingService
+    public let compositingService: GpuLayerCompositingService
+    public let materializationService: GpuSurfaceMaterializationService
 
     public init(
-        strokeGateway: StrokeRenderingGateway = StrokeRenderingGateway(),
-        compositingGateway: LayerCompositingGateway = LayerCompositingGateway(),
-        materializationGateway: SurfaceMaterializationGateway = SurfaceMaterializationGateway()
+        strokeService: GpuStrokeRenderingService = GpuStrokeRenderingService(),
+        compositingService: GpuLayerCompositingService = GpuLayerCompositingService(),
+        materializationService: GpuSurfaceMaterializationService = GpuSurfaceMaterializationService()
     ) {
-        self.strokeGateway = strokeGateway
-        self.compositingGateway = compositingGateway
-        self.materializationGateway = materializationGateway
+        self.strokeService = strokeService
+        self.compositingService = compositingService
+        self.materializationService = materializationService
     }
 
     public func resetInteractiveStrokeState() {
-        strokeGateway.resetExecutionSession()
+        strokeService.resetExecutionSession()
     }
 
     public func makePreviewSurface(
@@ -80,7 +81,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        guard let gpuOutput = strokeGateway.executeStroke(
+        guard let gpuOutput = strokeService.executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: baseLayer.pixelData,
                 baseBufferHandle: baseLayer.gpuBufferHandle,
@@ -99,17 +100,17 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
         if preserveAlphaLockedPixels {
-            guard let alphaPreservedHandle = materializationGateway.preservingExistingAlphaBufferHandle(
+            guard let alphaPreservedHandle = materializationService.preservingExistingAlphaBufferHandle(
                 sourceHandle: handle,
                 existingHandle: baseLayer.gpuBufferHandle,
                 existingPixelData: baseLayer.pixelData,
                 width: snapshot.width,
                 height: snapshot.height
             ) else {
-                strokeGateway.release(handle)
+                strokeService.release(handle)
                 return nil
             }
-            strokeGateway.release(handle)
+            strokeService.release(handle)
             return (alphaPreservedHandle, gpuOutput.dirtyRect, nil)
         }
         return (handle, gpuOutput.dirtyRect, gpuOutput.pixelData)
@@ -126,26 +127,28 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        if let gpuOutput = strokeGateway.rasterizedStrokePixelData(
-            basePixelData: baseLayer.pixelData,
-            baseBufferHandle: baseLayer.gpuBufferHandle,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            samples: samples,
-            brush: brush,
-            mode: .interactive,
-            snapshotRevision: snapshot.revision,
-            activeLayerIndex: activeLayerIndex
+        if let gpuOutput = strokeService.executeStroke(
+            MetalStrokeExecutionRequest(
+                basePixelData: baseLayer.pixelData,
+                baseBufferHandle: baseLayer.gpuBufferHandle,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                samples: samples,
+                brush: brush,
+                mode: .interactive,
+                snapshotRevision: snapshot.revision,
+                activeLayerIndex: activeLayerIndex
+            )
         ) {
             if preserveAlphaLockedPixels {
-                return materializationGateway.preservingExistingAlpha(
-                    source: gpuOutput,
+                return materializationService.preservingExistingAlpha(
+                    source: gpuOutput.pixelData,
                     existing: baseLayer.pixelData,
                     width: snapshot.width,
                     height: snapshot.height
                 )
             }
-            return gpuOutput
+            return gpuOutput.pixelData
         }
         return nil
     }
@@ -160,7 +163,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         let compositePixelData: Data
         if let stagedCompositePixelData {
             compositePixelData = stagedCompositePixelData
-        } else if let composited = compositingGateway.compositedPreviewPixelData(
+        } else if let composited = compositingService.compositedPreviewPixelData(
             snapshot: baseSnapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: committedPixels
@@ -208,12 +211,12 @@ public struct DocumentStrokeProcessingService: Sendable {
             brush.tipKind == .oil &&
             brush.smudgeEngineEnabled
         let previewBrush = usesApproximateOilPreview
-            ? DocumentRenderingClient.responsiveOilPreviewBrush(from: brush)
+            ? GpuRenderingSupport.responsiveOilPreviewBrush(from: brush)
             : brush
 
         if !preserveAlphaLockedPixels,
            Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
-           let gpuResult = strokeGateway.executeStrokeMutation(
+           let gpuResult = strokeService.executeStrokeMutation(
                MetalStrokeExecutionRequest(
                    basePixelData: basePixelData,
                    baseBufferHandle: baseBufferHandle,
@@ -227,7 +230,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                )
            ),
            let bufferHandle = gpuResult.gpuBufferHandle {
-            if let incrementalUpdate = compositingGateway.compositedPreviewIncrementalUpdate(
+            if let incrementalUpdate = compositingService.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerBufferHandle: bufferHandle,
@@ -242,10 +245,10 @@ public struct DocumentStrokeProcessingService: Sendable {
                     isApproximatePreview: usesApproximateOilPreview
                 )
             }
-            strokeGateway.release(bufferHandle)
+            strokeService.release(bufferHandle)
         }
 
-        guard let gpuResult = strokeGateway.executeStroke(
+        guard let gpuResult = strokeService.executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: basePixelData,
                 baseBufferHandle: baseBufferHandle,
@@ -264,7 +267,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         if preserveAlphaLockedPixels {
             guard
                 let sourceHandle = gpuResult.gpuBufferHandle,
-                let alphaPreservedHandle = materializationGateway.preservingExistingAlphaBufferHandle(
+                let alphaPreservedHandle = materializationService.preservingExistingAlphaBufferHandle(
                     sourceHandle: sourceHandle,
                     existingHandle: baseBufferHandle,
                     existingPixelData: basePixelData,
@@ -272,17 +275,17 @@ public struct DocumentStrokeProcessingService: Sendable {
                     height: snapshot.height
                 )
             else {
-                strokeGateway.release(gpuResult.gpuBufferHandle)
+                strokeService.release(gpuResult.gpuBufferHandle)
                 return nil
             }
-            strokeGateway.release(sourceHandle)
-            guard let incrementalUpdate = compositingGateway.compositedPreviewIncrementalUpdate(
+            strokeService.release(sourceHandle)
+            guard let incrementalUpdate = compositingService.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerBufferHandle: alphaPreservedHandle,
                 dirtyRect: gpuResult.dirtyRect
             ) else {
-                strokeGateway.release(alphaPreservedHandle)
+                strokeService.release(alphaPreservedHandle)
                 return nil
             }
             return DocumentInteractiveStrokePreviewResult(
@@ -299,7 +302,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         adjustedPixels = gpuResult.pixelData
 
         let incrementalUpdate = Self.shouldUseIncrementalPreviewUpdate(for: previewBrush)
-            ? compositingGateway.compositedPreviewIncrementalUpdate(
+            ? compositingService.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerPixels: adjustedPixels,

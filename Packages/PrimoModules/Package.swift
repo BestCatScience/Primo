@@ -111,7 +111,7 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentGPUContracts",
                 "PrimoDocumentMetalSurfaceInfrastructure",
-                "PrimoDocumentRenderingInfrastructure",
+                "PrimoDocumentMetalRuntimeInfrastructure",
             ]
         ),
         .target(
@@ -119,7 +119,6 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentGPUContracts",
                 "PrimoDocumentMetalRuntimeInfrastructure",
-                "PrimoDocumentRenderingInfrastructure",
             ]
         ),
         .target(
@@ -318,6 +317,7 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoDocumentMetalStrokeInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
             ]

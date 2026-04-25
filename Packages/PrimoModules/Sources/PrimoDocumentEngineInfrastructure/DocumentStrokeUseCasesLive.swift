@@ -1,6 +1,5 @@
 import Foundation
 import PrimoDocumentMetalStrokeInfrastructure
-import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
 public struct DocumentStrokeUseCasesLive: Sendable {

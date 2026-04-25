@@ -6,9 +6,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
-import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentPersistenceInfrastructure
-import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentTimelapseInfrastructure
 
@@ -17,11 +15,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private let services: DocumentEngineServices
     private let gpuServices: DocumentRuntimeGpuServices
-    private let resources: MetalResourceStore
-    private let strokes: MetalStrokeExecutionService
-    private let composites: MetalCompositingService
-    private let layers: MetalLayerMutationService
-    private let text: MetalTextService
     private let store: SwiftDocumentStore
     private var undoStack: [SwiftDocumentStoreSnapshot] = []
     private var redoStack: [SwiftDocumentStoreSnapshot] = []
@@ -45,11 +38,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             uuidClient: uuidClient
         )
         self.gpuServices = gpuServices
-        self.resources = gpuServices.resources
-        self.strokes = gpuServices.strokes
-        self.composites = gpuServices.composites
-        self.layers = gpuServices.layers
-        self.text = gpuServices.text
         self.store = SwiftDocumentStore(width: width, height: height)
         captureDirtyUpdate()
     }
@@ -150,7 +138,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let textScale = min(widthScale, heightScale)
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            guard let scaled = layers.scaledPixelData(
+            guard let scaled = gpuServices.scaledPixelData(
                 layer.pixelData,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
@@ -161,7 +149,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             layer.pixelData = scaled
             if let mask = layer.maskData {
-                guard let scaledMask = layers.scaledMaskData(
+                guard let scaledMask = gpuServices.scaledMaskData(
                     mask,
                     sourceWidth: sourceSize.width,
                     sourceHeight: sourceSize.height,
@@ -211,7 +199,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let offsetY = (targetSize.height - sourceSize.height) / 2
         for index in store.snapshot.layers.indices {
             var layer = store.snapshot.layers[index]
-            guard let translated = layers.translatedPixelData(
+            guard let translated = gpuServices.translatedPixelData(
                 layer.pixelData,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
@@ -224,7 +212,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             layer.pixelData = translated
             if let mask = layer.maskData {
-                guard let translatedMask = layers.translatedMaskData(
+                guard let translatedMask = gpuServices.translatedMaskData(
                     mask,
                     sourceWidth: sourceSize.width,
                     sourceHeight: sourceSize.height,
@@ -434,7 +422,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func applyLayerMask(index: Int) -> DocumentMutationResult {
         guard let failure = validateLayer(index) else {
             guard let mask = store.snapshot.layers[index].maskData else { return .success(()) }
-            guard let maskedPixels = layers.applyLayerMask(
+            guard let maskedPixels = gpuServices.applyLayerMask(
                 pixelData: store.snapshot.layers[index].pixelData,
                 maskData: mask,
                 width: store.snapshot.canvasWidth,
@@ -468,7 +456,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let payload = layers.processLayer(
+        guard let payload = gpuServices.processLayer(
             pixelData: store.snapshot.layers[index].pixelData,
             canvasWidth: store.snapshot.canvasWidth,
             canvasHeight: store.snapshot.canvasHeight,
@@ -647,7 +635,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard validateEditableLayer(index - 1) == nil else { return .failure(validateEditableLayer(index - 1)!) }
         let upper = store.snapshot.layers[index]
         let lower = store.snapshot.layers[index - 1]
-        guard let merged = layers.mergeLayers(
+        guard let merged = gpuServices.mergeLayers(
             lowerPixelData: lower.pixelData,
             upperPixelData: upper.pixelData,
             upperMaskData: upper.maskData,
@@ -685,7 +673,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.emptyInput)
         }
         guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard let payload = text.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
+        guard let payload = gpuServices.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
             return .failure(.bridgeMutationFailed("setTextLayer"))
         }
         return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
@@ -724,7 +712,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             brush: brush,
             samples: (currentBlurStroke?.samples ?? []) + samples
         )
-        guard let payload = layers.blurPixels(
+        guard let payload = gpuServices.blurPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
             sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
@@ -744,7 +732,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 isAlphaLocked: true
             )
             nextHandle = nil
-            resources.release(payload.gpuBufferHandle)
+            gpuServices.release(payload.gpuBufferHandle)
         } else if let handle = payload.gpuBufferHandle {
             nextPixelData = current
             nextHandle = handle
@@ -787,7 +775,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
         let layerIndex = store.snapshot.activeLayerIndex
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
-        guard let payload = layers.fillPixels(
+        guard let payload = gpuServices.fillPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
             sourceBufferHandle: gpuLayerHandles[layerIndex],
             canvasWidth: store.snapshot.canvasWidth,
@@ -807,18 +795,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func applyGpuStrokeSurface(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
-        let gpuResult = strokes.executeStrokeMutation(
-            PrimoMetalStrokeExecutionRequest(
-                basePixelData: store.snapshot.layers[layerIndex].pixelData,
-                baseBufferHandle: gpuLayerHandles[layerIndex],
-                canvasWidth: store.snapshot.canvasWidth,
-                canvasHeight: store.snapshot.canvasHeight,
-                samples: samples,
-                brush: brush,
-                mode: .commit,
-                snapshotRevision: store.snapshot.revision,
-                activeLayerIndex: layerIndex
-            )
+        let gpuResult = gpuServices.commitStrokeMutation(
+            basePixelData: store.snapshot.layers[layerIndex].pixelData,
+            baseBufferHandle: gpuLayerHandles[layerIndex],
+            canvasWidth: store.snapshot.canvasWidth,
+            canvasHeight: store.snapshot.canvasHeight,
+            samples: samples,
+            brush: brush,
+            snapshotRevision: store.snapshot.revision,
+            activeLayerIndex: layerIndex
         )
         guard let gpuResult else {
             return .failure(.bridgeMutationFailed("applyCommittedStroke"))
@@ -835,19 +820,19 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[layerIndex].alphaLocked {
             if let sourceHandle = gpuResult.gpuBufferHandle {
-                guard let alphaPreservedHandle = layers.preservingExistingAlphaBufferHandle(
+                guard let alphaPreservedHandle = gpuServices.preservingExistingAlphaBufferHandle(
                     sourceHandle: sourceHandle,
                     existingHandle: gpuLayerHandles[layerIndex],
                     existingPixelData: existing,
                     width: store.snapshot.canvasWidth,
                     height: store.snapshot.canvasHeight
                 ) else {
-                    resources.release(sourceHandle)
+                    gpuServices.release(sourceHandle)
                     return .failure(.bridgeMutationFailed("applyCommittedStrokeAlphaPreserve"))
                 }
                 adjustedOutput = existing
                 nextHandle = alphaPreservedHandle
-                resources.release(sourceHandle)
+                gpuServices.release(sourceHandle)
             } else {
                 let committedOutput = gpuResult.rectPixelData ?? Data()
                 guard committedOutput.count == rgbaByteCount else {
@@ -982,7 +967,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         from url: URL,
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
-        uuidClient: UUIDClient = .live
+        uuidClient: UUIDClient = .live,
+        gpuServices: DocumentRuntimeGpuServices
     ) throws -> SwiftDocumentRuntime {
         let runtime = SwiftDocumentRuntime(
             width: 1,
@@ -990,7 +976,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient,
-            gpuServices: DocumentRuntimeGpuServicesFactory.live()
+            gpuServices: gpuServices
         )
         let manifestURL = url.appendingPathComponent("manifest.json", isDirectory: false)
         let manifestData = try fileClient.readData(manifestURL)
@@ -1111,7 +1097,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func compositeExportSurface(paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
         let surface = compositeSurface()
-        guard let pixelData = composites.compositedPaperPreviewRGBA(
+        guard let pixelData = gpuServices.compositedPaperPreviewRGBA(
             pixelData: surface.pixelData,
             width: surface.width,
             height: surface.height,
@@ -1275,7 +1261,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nextHandle)
         if nextHandle != payload.gpuBufferHandle {
-            resources.release(payload.gpuBufferHandle)
+            gpuServices.release(payload.gpuBufferHandle)
         }
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
@@ -1314,7 +1300,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private func materializedPixelData(from payload: DocumentLayerMutationPayload, existing: Data) -> Data {
         if let handle = payload.gpuBufferHandle,
-           let gpuPixelData = resources.materializedPixelData(for: handle),
+           let gpuPixelData = gpuServices.materializedPixelData(for: handle),
            gpuPixelData.count == rgbaByteCount {
             return gpuPixelData
         }
@@ -1350,13 +1336,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             gpuLayerHandles.removeValue(forKey: index)
         }
         if previousHandle != gpuBufferHandle {
-            resources.release(previousHandle)
+            gpuServices.release(previousHandle)
         }
     }
 
     private func releaseLayerBufferHandles() {
         for handle in gpuLayerHandles.values {
-            resources.release(handle)
+            gpuServices.release(handle)
         }
         gpuLayerHandles.removeAll(keepingCapacity: true)
     }
@@ -1364,7 +1350,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func currentPixelData(for index: Int) -> Data {
         guard store.snapshot.layers.indices.contains(index) else { return Data() }
         if let handle = gpuLayerHandles[index],
-           let pixelData = resources.materializedPixelData(for: handle),
+           let pixelData = gpuServices.materializedPixelData(for: handle),
            pixelData.count == rgbaByteCount {
             return pixelData
         }
@@ -1389,7 +1375,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {
         let rect = rect ?? LayerPixelRect(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let snapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
-        if let dirtyUpdate = composites.compositedIncrementalUpdate(
+        if let dirtyUpdate = gpuServices.compositedIncrementalUpdate(
             snapshot: snapshot,
             dirtyRect: (rect.originX, rect.originY, rect.width, rect.height)
         ) {
@@ -1411,14 +1397,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func setPendingDirtyUpdate(_ update: IncrementalLayerUpdate) {
         if let previous = pendingDirtyUpdate?.gpuBufferHandle,
            previous != update.gpuBufferHandle {
-            resources.release(previous)
+            gpuServices.release(previous)
         }
         pendingDirtyUpdate = update
     }
 
     private func compositeSurfaceForSnapshot(_ snapshot: SwiftDocumentStoreSnapshot) -> DocumentCompositeSurface {
         let metalSnapshot = makeMetalSnapshot(for: snapshot, includeCompositePixelData: false)
-        if let gpuComposite = composites.compositeDocumentSurface(snapshot: metalSnapshot) {
+        if let gpuComposite = gpuServices.compositeDocumentSurface(snapshot: metalSnapshot) {
             return gpuComposite
         }
         Self.logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
@@ -1453,7 +1439,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     private func makeRenderSnapshot() -> MetalDocumentSnapshot? {
         let baseSnapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
-        let compositeHandle = composites.compositeDocumentBufferHandle(snapshot: baseSnapshot)
+        let compositeHandle = gpuServices.compositeDocumentBufferHandle(snapshot: baseSnapshot)
         let composite = compositeHandle == nil ? compositeSurface() : nil
         return MetalDocumentSnapshot(
             width: baseSnapshot.width,
@@ -1572,7 +1558,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 96)
         let targetWidth = max(Int(targetSize.width.rounded()), 1)
         let targetHeight = max(Int(targetSize.height.rounded()), 1)
-        guard let scaled = layers.scaledPixelData(
+        guard let scaled = gpuServices.scaledPixelData(
             store.snapshot.layers[index].pixelData,
             sourceWidth: store.snapshot.canvasWidth,
             sourceHeight: store.snapshot.canvasHeight,
@@ -1611,7 +1597,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private func makeTimelapseThumbnailSurface() -> DocumentCompositeSurface? {
         guard let source = timelapseCompositeSurface() else { return nil }
         let targetSize = timelapseFrameSize(for: canvasSize, maxDimension: 512)
-        guard let scaled = layers.scaledPixelData(
+        guard let scaled = gpuServices.scaledPixelData(
             source.pixelData,
             sourceWidth: source.width,
             sourceHeight: source.height,

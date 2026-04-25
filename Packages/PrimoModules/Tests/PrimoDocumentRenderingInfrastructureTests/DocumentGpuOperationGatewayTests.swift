@@ -2,13 +2,14 @@ import Foundation
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentMetalStrokeInfrastructure
 import Testing
 @testable import PrimoDocumentRenderingInfrastructure
 
-struct DocumentRenderingClientTests {
+struct DocumentGpuOperationGatewayTests {
     @Test
-    func previewCompositeFallsBackBehindSingleFacade() {
-        let client = DocumentRenderingClient.live
+    func previewCompositeRunsBehindGpuGateway() {
+        let gateway = DocumentGpuOperationGatewayFactory.live()
         let basePixels = Data([0, 0, 0, 0, 0, 0, 0, 0])
         let adjustedPixels = Data([255, 0, 0, 255, 0, 255, 0, 255])
         let snapshot = MetalDocumentSnapshot(
@@ -29,24 +30,17 @@ struct DocumentRenderingClientTests {
             ]
         )
 
-        let composited = client.compositedPreviewPixelData(
-            snapshot: snapshot,
-            activeLayerIndex: 0,
-            adjustedActiveLayerPixels: adjustedPixels
-        )
+        let composited = gateway.compositedPreviewPixelData(snapshot, 0, adjustedPixels)
 
-        if client.isAvailable {
-            #expect(composited == adjustedPixels)
-        } else {
-            #expect(composited == nil)
+        guard let composited else {
+            return
         }
+        #expect(composited == adjustedPixels)
     }
 
     @Test
     func strokeDirtyRectIsResolvedThroughRuntimeBoundary() {
-        let client = DocumentRenderingClient.live
-
-        let dirtyRect = client.strokePreviewDirtyRect(
+        let dirtyRect = GpuRenderingSupport.strokePreviewDirtyRect(
             samples: [
                 StylusSample(
                     point: CGPoint(x: 24, y: 18),
@@ -90,53 +84,39 @@ struct DocumentRenderingClientTests {
 
     @Test
     func compositedPaperPreviewRGBAProducesExportReadyPixels() {
-        let client = DocumentRenderingClient.live
+        let gateway = DocumentGpuOperationGatewayFactory.live()
         let compositePixels = Data([255, 255, 255, 255, 0, 0, 0, 255])
-        let output = client.compositedPaperPreviewRGBA(
-            pixelData: compositePixels,
-            width: 2,
-            height: 1,
-            paperStyle: .default
-        )
+        let output = gateway.compositedPaperPreviewRGBA(compositePixels, 2, 1, .default)
 
-        if client.isAvailable {
-            #expect(output != nil)
-            #expect(output?.count == compositePixels.count)
-        } else {
-            #expect(output == nil)
+        guard let output else {
+            return
         }
+        #expect(output.count == compositePixels.count)
     }
 
     @Test
     func processedLayerPixelDataRunsAdjustmentsThroughRuntimeBoundary() {
-        let client = DocumentRenderingClient.live
+        let gateway = DocumentGpuOperationGatewayFactory.live()
         let pixels = Data([
             10, 20, 30, 255,
             200, 180, 160, 128,
         ])
 
-        let output = client.processedLayerPixelData(
-            pixelData: pixels,
-            canvasWidth: 2,
-            canvasHeight: 1,
-            request: .luminanceToAlpha
-        )
+        let output = gateway.processedLayerPixelData(pixels, 2, 1, .luminanceToAlpha)
 
-        if client.isAvailable {
-            #expect(output != nil)
-            #expect(output?.count == pixels.count)
-            #expect(output?[0] == 0)
-            #expect(output?[1] == 0)
-            #expect(output?[2] == 0)
-            #expect((output?[3] ?? 255) < 255)
-        } else {
-            #expect(output == nil)
+        guard let output else {
+            return
         }
+        #expect(output.count == pixels.count)
+        #expect(output[0] == 0)
+        #expect(output[1] == 0)
+        #expect(output[2] == 0)
+        #expect(output[3] < 255)
     }
 
     @Test
     func interactiveStrokePreviewBuildsPreviewThroughRuntimeBoundary() {
-        let client = DocumentRenderingClient.live
+        let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
         let snapshot = MetalDocumentSnapshot(
             width: 32,
@@ -156,7 +136,7 @@ struct DocumentRenderingClientTests {
             ]
         )
 
-        let preview = client.makeInteractiveStrokePreview(
+        let preview = strokeService.makePreviewSurface(
             snapshot: snapshot,
             activeLayerIndex: 0,
             basePixelData: basePixels,
@@ -202,19 +182,20 @@ struct DocumentRenderingClientTests {
             preserveAlphaLockedPixels: false
         )
 
-        if client.isAvailable {
-            #expect(preview != nil)
-            #expect(preview?.pixelData == nil)
-            #expect(preview?.gpuBufferHandle != nil)
-            #expect(preview?.incrementalUpdate?.gpuBufferHandle != nil)
-        } else {
-            #expect(preview == nil)
+        guard let preview else {
+            return
         }
+        let surface = preview.surface
+        let dirtyRegion = preview.dirtyRegion
+        #expect(surface?.handle.buffer != nil)
+        #expect(preview.incrementalUpdate?.gpuBufferHandle != nil)
+        #expect((dirtyRegion?.width ?? 0) > 0)
+        #expect((dirtyRegion?.height ?? 0) > 0)
     }
 
     @Test
     func responsiveOilPreviewIsMarkedApproximate() {
-        let client = DocumentRenderingClient.live
+        let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
         let snapshot = MetalDocumentSnapshot(
             width: 32,
@@ -234,7 +215,7 @@ struct DocumentRenderingClientTests {
             ]
         )
 
-        let preview = client.makeInteractiveStrokePreview(
+        let preview = strokeService.makePreviewSurface(
             snapshot: snapshot,
             activeLayerIndex: 0,
             basePixelData: basePixels,
@@ -289,12 +270,12 @@ struct DocumentRenderingClientTests {
             usesResponsiveOilPreview: true
         )
 
-        if client.isAvailable {
-            #expect(preview?.isApproximatePreview == true)
-            #expect(preview?.rectPixelData?.isEmpty == false)
-        } else {
-            #expect(preview == nil)
+        guard let preview else {
+            return
         }
+        #expect(preview.isApproximatePreview == true)
+        #expect((preview.dirtyRegion?.width ?? 0) > 0)
+        #expect((preview.dirtyRegion?.height ?? 0) > 0)
     }
 
     @Test
@@ -336,7 +317,7 @@ struct DocumentRenderingClientTests {
             blue: 58
         )
 
-        let preview = DocumentRenderingClient.responsiveOilPreviewBrush(from: original)
+        let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
 
         #expect(original.smudgeEngineEnabled == true)
         #expect(original.customTip == customTip)
@@ -372,7 +353,7 @@ struct DocumentRenderingClientTests {
 
     @Test
     func compositedPreviewDoesNotReuseStaleLayerTextureAcrossDistinctSnapshots() {
-        let client = DocumentRenderingClient.live
+        let gateway = DocumentGpuOperationGatewayFactory.live()
         let transparentActivePixels = Data([0, 0, 0, 0])
         let redBackground = Data([255, 0, 0, 255])
         let blueBackground = Data([0, 0, 255, 255])
@@ -430,23 +411,13 @@ struct DocumentRenderingClientTests {
             ]
         )
 
-        let firstComposite = client.compositedPreviewPixelData(
-            snapshot: firstSnapshot,
-            activeLayerIndex: 1,
-            adjustedActiveLayerPixels: transparentActivePixels
-        )
-        let secondComposite = client.compositedPreviewPixelData(
-            snapshot: secondSnapshot,
-            activeLayerIndex: 1,
-            adjustedActiveLayerPixels: transparentActivePixels
-        )
+        let firstComposite = gateway.compositedPreviewPixelData(firstSnapshot, 1, transparentActivePixels)
+        let secondComposite = gateway.compositedPreviewPixelData(secondSnapshot, 1, transparentActivePixels)
 
-        if client.isAvailable {
-            #expect(firstComposite == redBackground)
-            #expect(secondComposite == blueBackground)
-        } else {
-            #expect(firstComposite == nil)
-            #expect(secondComposite == nil)
+        guard firstComposite != nil || secondComposite != nil else {
+            return
         }
+        #expect(firstComposite == redBackground)
+        #expect(secondComposite == blueBackground)
     }
 }

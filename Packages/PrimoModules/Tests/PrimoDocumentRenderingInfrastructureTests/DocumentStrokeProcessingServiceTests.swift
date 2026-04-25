@@ -1,6 +1,6 @@
 import Foundation
 import PrimoDocumentContracts
-import PrimoDocumentRenderingInfrastructure
+import PrimoDocumentMetalStrokeInfrastructure
 import Testing
 
 struct DocumentStrokeProcessingServiceTests {
