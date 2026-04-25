@@ -37,6 +37,8 @@ struct GpuSideEffectIsolationArchitectureTests {
         let renderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)
         let body = try String(contentsOf: renderer, encoding: .utf8)
         let banned = [
+            "CanvasImageRenderer",
+            "DocumentGpuOperationGateway",
             "StrokeRenderingGateway",
             "LayerCompositingGateway",
             "OverlayRenderingGateway",
@@ -45,6 +47,49 @@ struct GpuSideEffectIsolationArchitectureTests {
         ]
         for token in banned {
             #expect(!body.contains(token), "CanvasImageRenderer should not reference \(token)")
+        }
+    }
+
+    @Test
+    func appCanvasFeatureDoesNotReachGpuGatewayOrPixelTransformHotPath() throws {
+        let repoRoot = try Self.repoRoot()
+        let canvasRoot = repoRoot.appendingPathComponent("App/Features/Canvas", isDirectory: true)
+        let banned = [
+            "DocumentGpuOperationGateway",
+            "CanvasImageRenderer",
+            "PrimoMetalDocumentProcessingClient",
+            "MetalRuntimeContext",
+            "alphaMask(",
+            "croppedSelectionMask(",
+            "transformedLayerPixelData(",
+            "AppFeature.effectiveTransformQuad",
+            "AppFeature.affineTransformQuad"
+        ]
+
+        let sources = try Self.swiftSources(under: canvasRoot)
+        for source in sources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            for token in banned {
+                #expect(!body.contains(token), "\(source.path) should not reference \(token)")
+            }
+        }
+    }
+
+    @Test
+    func canvasPresentationModelsLiveOutsideAppModelLayer() throws {
+        let repoRoot = try Self.repoRoot()
+        let appModels = repoRoot.appendingPathComponent("App/Models/PaintModels.swift", isDirectory: false)
+        let body = try String(contentsOf: appModels, encoding: .utf8)
+        let banned = [
+            "enum StudioToolKind",
+            "enum EyedropperSamplingSource",
+            "struct StrokePoint",
+            "struct Stroke:",
+            "struct PreviewStrokeStyle",
+            "struct SampledColor"
+        ]
+        for token in banned {
+            #expect(!body.contains(token), "Canvas presentation model \(token) should live in PrimoDocumentContracts")
         }
     }
 

@@ -9,19 +9,7 @@ import PrimoLocalization
 import UIKit
 import simd
 
-enum StudioToolKind: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case brush
-    case erase
-    case blur
-    case fill
-    case eyedropper
-    case select
-    case move
-    case shape
-    case text
-
-    var id: String { rawValue }
-
+extension StudioToolKind {
     var title: String {
         localizedTitle(.english)
     }
@@ -98,12 +86,7 @@ enum BrushColorSlot: String, CaseIterable, Equatable, Sendable, Identifiable {
     }
 }
 
-enum EyedropperSamplingSource: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case activeLayer
-    case canvas
-
-    var id: String { rawValue }
-
+extension EyedropperSamplingSource {
     func localizedTitle(_ language: AppLanguage) -> String {
         switch self {
         case .activeLayer:
@@ -1568,98 +1551,4 @@ struct LayerCanvasBuffer: Identifiable, Equatable {
     var opacity: Double
     var blendMode: LayerBlendMode = .normal
     var strokes: [PreviewStrokeTrack] = []
-}
-
-struct StrokePoint: Equatable {
-    var position: SIMD2<Float>
-    var pressure: Float
-    var altitude: Float
-    var azimuth: Float
-    var timestamp: Double
-    var isPredicted: Bool
-
-    var cgPoint: CGPoint {
-        CGPoint(x: CGFloat(position.x), y: CGFloat(position.y))
-    }
-
-    var stylusSample: StylusSample {
-        StylusSample(
-            point: cgPoint,
-            pressure: CGFloat(pressure),
-            altitude: CGFloat(altitude),
-            azimuth: CGFloat(azimuth),
-            timestamp: timestamp
-        )
-    }
-
-    var previewPoint: PreviewStrokePoint {
-        PreviewStrokePoint(
-            point: cgPoint,
-            pressure: CGFloat(pressure)
-        )
-    }
-}
-
-struct Stroke: Equatable {
-    var points: [StrokePoint] = []
-    var predictedPoints: [StrokePoint] = []
-    var color: SIMD4<Float> = SIMD4(0, 0, 0, 1)
-    var brushSize: Float = 4.0
-
-    var confirmedPreviewPoints: [PreviewStrokePoint] {
-        points.map(\.previewPoint)
-    }
-
-    var predictedPreviewPoints: [PreviewStrokePoint] {
-        predictedPoints.map(\.previewPoint)
-    }
-}
-
-struct PreviewStrokePoint: Identifiable, Equatable {
-    let id = UUID()
-    let point: CGPoint
-    let pressure: CGFloat
-
-    static func == (lhs: PreviewStrokePoint, rhs: PreviewStrokePoint) -> Bool {
-        lhs.id == rhs.id &&
-        lhs.point == rhs.point &&
-        lhs.pressure == rhs.pressure
-    }
-}
-
-struct PreviewStrokeStyle: Equatable {
-    let tipKind: BrushTipKind
-    let isEraser: Bool
-    let radius: CGFloat
-    let opacity: CGFloat
-    let flow: CGFloat
-    let hardness: CGFloat
-    let roundness: CGFloat
-    let angle: CGFloat
-    let followsStrokeAngle: Bool
-    let pressureSensitivity: CGFloat
-    let stabilization: CGFloat
-    let customTip: BrushTipRaster?
-    let color: CGColor
-}
-
-struct PreviewStrokeTrack: Identifiable, Equatable {
-    let id = UUID()
-    let layerIndex: Int
-    let points: [PreviewStrokePoint]
-    let style: PreviewStrokeStyle
-
-    static func == (lhs: PreviewStrokeTrack, rhs: PreviewStrokeTrack) -> Bool {
-        lhs.id == rhs.id &&
-        lhs.layerIndex == rhs.layerIndex &&
-        lhs.points == rhs.points &&
-        lhs.style == rhs.style
-    }
-}
-
-struct SampledColor: Equatable {
-    let red: UInt8
-    let green: UInt8
-    let blue: UInt8
-    let alpha: UInt8
 }

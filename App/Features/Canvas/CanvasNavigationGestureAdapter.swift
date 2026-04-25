@@ -1,3 +1,4 @@
+import PrimoDocumentContracts
 import PrimoDocumentDomain
 import QuartzCore
 import UIKit

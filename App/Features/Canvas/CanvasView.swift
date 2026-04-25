@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import PrimoBrushFileFormats
+import PrimoCanvasPresentationDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentContracts
 import PrimoDocumentDomain
@@ -8,59 +9,27 @@ import UIKit
 import simd
 
 struct CanvasView: UIViewRepresentable {
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.canvasPreviewRenderer) var canvasPreviewRenderer
+    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
 
     let store: StoreOf<CanvasFeature>
 
     func makeUIView(context: Context) -> RasterCanvasContainerView {
-        let view = RasterCanvasContainerView()
+        let view = RasterCanvasContainerView(
+            previewRenderer: canvasPreviewRenderer,
+            layerTransformProcessor: layerTransformProcessor
+        )
         view.sendAction = { store.send($0) }
         return view
     }
 
     func updateUIView(_ uiView: RasterCanvasContainerView, context: Context) {
-        uiView.documentSize = store.canvasSize
-        uiView.documentGpuOperationGateway = documentGpuOperationGateway
-        uiView.update(
-            snapshot: store.renderSnapshot,
-            activeLayerIndex: store.activeLayerIndex,
-            activeStroke: store.activeStroke,
-            incrementalUpdate: store.strokeSession.pendingIncrementalUpdate,
-            adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
-            paperStyle: store.paperStyle,
-            previewStyle: store.previewStyle,
-            currentTool: store.currentTool,
-            selectionMode: store.selectionMode,
-            shapeMode: store.shapeMode,
-            eyedropperSamplingSource: store.eyedropperSamplingSource,
-            selection: store.selection,
-            selectionPreviewPoints: store.selectionPreviewPoints,
-            transformPreviewOffset: store.transformPreviewOffset,
-            transformPreviewScaleX: store.transformPreviewScaleX,
-            transformPreviewScaleY: store.transformPreviewScaleY,
-            transformPreviewRotationDegrees: store.transformPreviewRotationDegrees,
-            transformPivot: store.transformPivot,
-            transformMode: store.transformMode,
-            transformLocksAspectRatio: store.transformLocksAspectRatio,
-            transformQuadOffsets: store.transformQuadOffsets,
-            activeTextLayer: store.activeTextLayer,
-            viewportOffset: store.viewportOffset,
-            zoomScale: store.zoomScale,
-            previewResetNonce: store.previewResetNonce
-        )
+        uiView.update(CanvasPresentationState(canvas: store))
     }
 }
 
 final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInteractionDelegate {
     var documentSize: CGSize = .zero
-    var documentGpuOperationGateway: DocumentGpuOperationGateway? {
-        didSet {
-            selectionOverlayView.documentGpuOperationGateway = documentGpuOperationGateway
-            transformPreviewView.documentGpuOperationGateway = documentGpuOperationGateway
-            textTransformOverlayView.documentGpuOperationGateway = documentGpuOperationGateway
-            eyedropperLoupeView.documentGpuOperationGateway = documentGpuOperationGateway
-        }
-    }
     var sendAction: ((CanvasFeature.Action) -> Void)? {
         didSet {
             navigationGestureAdapter.sendAction = sendAction
@@ -72,12 +41,19 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
     }
 
     private let canvasRenderSurfaceView = CanvasRenderSurfaceView()
-    private let canvasImageRenderer = CanvasImageRenderer.live
     private let inputHandler = InputHandler()
-    private lazy var selectionOverlayView = CanvasSelectionOverlayView(canvasImageRenderer: canvasImageRenderer)
-    private lazy var transformPreviewView = CanvasTransformPreviewView(canvasImageRenderer: canvasImageRenderer)
-    private lazy var textTransformOverlayView = CanvasTextTransformOverlayView(canvasImageRenderer: canvasImageRenderer)
-    private lazy var eyedropperLoupeView = CanvasEyedropperLoupeView(canvasImageRenderer: canvasImageRenderer)
+    private let previewRenderer: any CanvasPreviewRendering
+    private let layerTransformProcessor: any LayerTransformProcessing
+    private lazy var selectionOverlayView = CanvasSelectionOverlayView(previewRenderer: previewRenderer)
+    private lazy var transformPreviewView = CanvasTransformPreviewView(
+        previewRenderer: previewRenderer,
+        layerTransformProcessor: layerTransformProcessor
+    )
+    private lazy var textTransformOverlayView = CanvasTextTransformOverlayView(
+        previewRenderer: previewRenderer,
+        layerTransformProcessor: layerTransformProcessor
+    )
+    private lazy var eyedropperLoupeView = CanvasEyedropperLoupeView(previewRenderer: previewRenderer)
     private let navigationGestureAdapter = CanvasNavigationGestureAdapter()
     private let pencilToggleFeedbackGenerator = UIImpactFeedbackGenerator(style: .heavy)
     private let pencilToggleNotificationFeedbackGenerator = UINotificationFeedbackGenerator()
@@ -86,8 +62,13 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
     private var zoomScale: CGFloat = 1.0
     private var currentTool: StudioToolKind = .brush
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    init(
+        previewRenderer: any CanvasPreviewRendering,
+        layerTransformProcessor: any LayerTransformProcessing
+    ) {
+        self.previewRenderer = previewRenderer
+        self.layerTransformProcessor = layerTransformProcessor
+        super.init(frame: .zero)
         backgroundColor = .clear
         isMultipleTouchEnabled = true
         clipsToBounds = true
@@ -152,81 +133,56 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
         textTransformOverlayView.frame = bounds
     }
 
-    func update(
-        snapshot: MetalDocumentSnapshot?,
-        activeLayerIndex: Int,
-        activeStroke: Stroke?,
-        incrementalUpdate: IncrementalLayerUpdate?,
-        adjustmentPreviewPixelData: Data?,
-        paperStyle: CanvasPaperStyle,
-        previewStyle: PreviewStrokeStyle,
-        currentTool: StudioToolKind,
-        selectionMode: SelectionToolMode,
-        shapeMode: ShapeToolMode,
-        eyedropperSamplingSource: EyedropperSamplingSource,
-        selection: CanvasSelection?,
-        selectionPreviewPoints: [CGPoint],
-        transformPreviewOffset: CGSize,
-        transformPreviewScaleX: CGFloat,
-        transformPreviewScaleY: CGFloat,
-        transformPreviewRotationDegrees: Double,
-        transformPivot: CGPoint?,
-        transformMode: CanvasTransformMode,
-        transformLocksAspectRatio: Bool,
-        transformQuadOffsets: TransformQuadOffsets,
-        activeTextLayer: TextLayerData?,
-        viewportOffset: CGSize,
-        zoomScale: CGFloat,
-        previewResetNonce: Int
-    ) {
-        self.currentTool = currentTool
-        self.viewportOffset = viewportOffset
-        self.zoomScale = zoomScale
+    func update(_ state: CanvasPresentationState) {
+        documentSize = state.documentSize
+        currentTool = state.currentTool
+        viewportOffset = state.viewportOffset
+        zoomScale = state.zoomScale
 
         let geometry = viewportGeometry
         canvasRenderSurfaceView.render(
             RenderFrameUpdate(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                incrementalUpdate: incrementalUpdate,
+                snapshot: state.snapshot,
+                activeLayerIndex: state.activeLayerIndex,
+                incrementalUpdate: state.incrementalUpdate,
                 documentSize: documentSize,
-                viewportOffset: viewportOffset,
-                zoomScale: zoomScale,
-                paperStyle: paperStyle,
-                previewResetNonce: previewResetNonce
+                viewportOffset: state.viewportOffset,
+                zoomScale: state.zoomScale,
+                paperStyle: state.paperStyle,
+                previewResetNonce: state.previewResetNonce
             )
         )
 
-        inputHandler.tool = currentTool
-        inputHandler.selectionMode = selectionMode
-        inputHandler.shapeMode = shapeMode
-        inputHandler.eyedropperSamplingSource = eyedropperSamplingSource
-        inputHandler.brushTipKind = previewStyle.tipKind
-        inputHandler.brushSize = Float(previewStyle.radius * 2.0)
-        inputHandler.brushColor = previewStyle.simdColor
-        inputHandler.strokeStabilization = Float(previewStyle.stabilization)
+        inputHandler.tool = state.currentTool
+        inputHandler.selectionMode = state.selectionMode
+        inputHandler.shapeMode = state.shapeMode
+        inputHandler.eyedropperSamplingSource = state.eyedropperSamplingSource
+        inputHandler.brushTipKind = state.previewStyle.tipKind
+        inputHandler.brushSize = Float(state.previewStyle.radius * 2.0)
+        inputHandler.brushColor = state.previewStyle.simdColor
+        inputHandler.strokeStabilization = Float(state.previewStyle.stabilization)
 
-        let shouldHideMoveOverlay = currentTool == .move && (
-            abs(transformPreviewRotationDegrees) > 0.001 ||
-            abs(transformPreviewScaleX - 1.0) > 0.001 ||
-            abs(transformPreviewScaleY - 1.0) > 0.001
+        let shouldHideMoveOverlay = state.currentTool == .move && (
+            abs(state.transformPreviewRotationDegrees) > 0.001 ||
+            abs(state.transformPreviewScaleX - 1.0) > 0.001 ||
+            abs(state.transformPreviewScaleY - 1.0) > 0.001
         )
         selectionOverlayView.update(
-            selection: selection,
-            previewPoints: selectionPreviewPoints,
-            currentTool: currentTool,
+            selection: state.selection,
+            previewPoints: state.selectionPreviewPoints,
+            currentTool: state.currentTool,
             geometry: geometry,
-            transformQuad: currentTool == .move
+            transformQuad: state.currentTool == .move
                 ? { rect in
-                    AppFeature.effectiveTransformQuad(
+                    CanvasTransformGeometry.effectiveTransformQuad(
                         bounds: rect,
-                        translation: transformPreviewOffset,
-                        scaleX: transformPreviewScaleX,
-                        scaleY: transformPreviewScaleY,
-                        rotationDegrees: transformPreviewRotationDegrees,
-                        pivot: transformPivot,
-                        mode: transformMode,
-                        quadOffsets: transformQuadOffsets
+                        translation: state.transformPreviewOffset,
+                        scaleX: state.transformPreviewScaleX,
+                        scaleY: state.transformPreviewScaleY,
+                        rotationDegrees: state.transformPreviewRotationDegrees,
+                        pivot: state.transformPivot,
+                        mode: state.transformMode,
+                        quadOffsets: state.transformQuadOffsets
                     ).effective
                 }
                 : nil,
@@ -234,52 +190,52 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
         )
 
         transformPreviewView.update(
-            snapshot: snapshot,
-            activeLayerIndex: activeLayerIndex,
-            activeStroke: activeStroke,
+            snapshot: state.snapshot,
+            activeLayerIndex: state.activeLayerIndex,
+            activeStroke: state.activeStroke,
             strokePreviewCompositePixelData: nil,
-            adjustmentPreviewPixelData: adjustmentPreviewPixelData,
-            selection: selection,
-            paperStyle: paperStyle,
-            previewStyle: previewStyle,
-            currentTool: currentTool,
-            transformPreviewOffset: transformPreviewOffset,
-            transformPreviewScaleX: transformPreviewScaleX,
-            transformPreviewScaleY: transformPreviewScaleY,
-            transformPreviewRotationDegrees: transformPreviewRotationDegrees,
-            transformPivot: transformPivot,
-            transformMode: transformMode,
-            transformQuadOffsets: transformQuadOffsets,
-            activeTextLayer: activeTextLayer,
+            adjustmentPreviewPixelData: state.adjustmentPreviewPixelData,
+            selection: state.selection,
+            paperStyle: state.paperStyle,
+            previewStyle: state.previewStyle,
+            currentTool: state.currentTool,
+            transformPreviewOffset: state.transformPreviewOffset,
+            transformPreviewScaleX: state.transformPreviewScaleX,
+            transformPreviewScaleY: state.transformPreviewScaleY,
+            transformPreviewRotationDegrees: state.transformPreviewRotationDegrees,
+            transformPivot: state.transformPivot,
+            transformMode: state.transformMode,
+            transformQuadOffsets: state.transformQuadOffsets,
+            activeTextLayer: state.activeTextLayer,
             geometry: geometry,
             renderSurfaceView: canvasRenderSurfaceView
         )
 
         textTransformOverlayView.update(
             context: CanvasTextTransformOverlayView.Context(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                currentTool: currentTool,
-                selection: selection,
-                transformPreviewOffset: transformPreviewOffset,
-                transformPreviewScaleX: transformPreviewScaleX,
-                transformPreviewScaleY: transformPreviewScaleY,
-                transformPreviewRotationDegrees: transformPreviewRotationDegrees,
-                transformPivot: transformPivot,
-                transformMode: transformMode,
-                transformLocksAspectRatio: transformLocksAspectRatio,
-                transformQuadOffsets: transformQuadOffsets,
-                activeTextLayer: activeTextLayer,
+                snapshot: state.snapshot,
+                activeLayerIndex: state.activeLayerIndex,
+                currentTool: state.currentTool,
+                selection: state.selection,
+                transformPreviewOffset: state.transformPreviewOffset,
+                transformPreviewScaleX: state.transformPreviewScaleX,
+                transformPreviewScaleY: state.transformPreviewScaleY,
+                transformPreviewRotationDegrees: state.transformPreviewRotationDegrees,
+                transformPivot: state.transformPivot,
+                transformMode: state.transformMode,
+                transformLocksAspectRatio: state.transformLocksAspectRatio,
+                transformQuadOffsets: state.transformQuadOffsets,
+                activeTextLayer: state.activeTextLayer,
                 geometry: geometry
             )
         )
 
         eyedropperLoupeView.update(
             context: CanvasEyedropperLoupeView.Context(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                paperStyle: paperStyle,
-                source: eyedropperSamplingSource,
+                snapshot: state.snapshot,
+                activeLayerIndex: state.activeLayerIndex,
+                paperStyle: state.paperStyle,
+                source: state.eyedropperSamplingSource,
                 geometry: geometry,
                 shouldBlockSampling: { [weak self] point in
                     self?.textTransformOverlayView.containsInteractivePoint(point) ?? false
@@ -289,8 +245,8 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
 
         navigationGestureAdapter.update(
             context: CanvasNavigationGestureAdapter.Context(
-                currentTool: currentTool,
-                transformMode: transformMode,
+                currentTool: state.currentTool,
+                transformMode: state.transformMode,
                 geometry: geometry
             )
         )
@@ -426,5 +382,38 @@ private extension PreviewStrokeStyle {
         default:
             return SIMD4(0, 0, 0, 1)
         }
+    }
+}
+
+private extension CanvasPresentationState {
+    init(canvas store: StoreOf<CanvasFeature>) {
+        self.init(
+            documentSize: store.canvasSize,
+            snapshot: store.renderSnapshot,
+            activeLayerIndex: store.activeLayerIndex,
+            activeStroke: store.activeStroke,
+            incrementalUpdate: store.strokeSession.pendingIncrementalUpdate,
+            adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
+            paperStyle: store.paperStyle,
+            previewStyle: store.previewStyle,
+            currentTool: store.currentTool,
+            selectionMode: store.selectionMode,
+            shapeMode: store.shapeMode,
+            eyedropperSamplingSource: store.eyedropperSamplingSource,
+            selection: store.selection,
+            selectionPreviewPoints: store.selectionPreviewPoints,
+            transformPreviewOffset: store.transformPreviewOffset,
+            transformPreviewScaleX: store.transformPreviewScaleX,
+            transformPreviewScaleY: store.transformPreviewScaleY,
+            transformPreviewRotationDegrees: store.transformPreviewRotationDegrees,
+            transformPivot: store.transformPivot,
+            transformMode: store.transformMode,
+            transformLocksAspectRatio: store.transformLocksAspectRatio,
+            transformQuadOffsets: store.transformQuadOffsets,
+            activeTextLayer: store.activeTextLayer,
+            viewportOffset: store.viewportOffset,
+            zoomScale: store.zoomScale,
+            previewResetNonce: store.previewResetNonce
+        )
     }
 }

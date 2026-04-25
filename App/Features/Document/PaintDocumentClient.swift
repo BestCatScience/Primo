@@ -1,9 +1,11 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCanvasPresentationDomain
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
+import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
 private enum DocumentRuntimeCompositionKey: DependencyKey {
@@ -49,6 +51,20 @@ private enum DocumentHistoryCommandServiceKey: DependencyKey {
     static var liveValue: DocumentHistoryCommandService {
         @Dependency(\.documentRuntimeComposition) var composition
         return DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+    }
+}
+
+private enum CanvasPreviewRendererKey: DependencyKey {
+    static var liveValue: any CanvasPreviewRendering {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+    }
+}
+
+private enum LayerTransformProcessorKey: DependencyKey {
+    static var liveValue: any LayerTransformProcessing {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return GpuLayerTransformProcessor(gpuOperations: composition.gpuOperationGateway)
     }
 }
 
@@ -177,6 +193,16 @@ extension DependencyValues {
             composition.gpuOperationGateway = newValue
             documentRuntimeComposition = composition
         }
+    }
+
+    var canvasPreviewRenderer: any CanvasPreviewRendering {
+        get { self[CanvasPreviewRendererKey.self] }
+        set { self[CanvasPreviewRendererKey.self] = newValue }
+    }
+
+    var layerTransformProcessor: any LayerTransformProcessing {
+        get { self[LayerTransformProcessorKey.self] }
+        set { self[LayerTransformProcessorKey.self] = newValue }
     }
 
     var documentCanvasCommandService: DocumentCanvasCommandService {

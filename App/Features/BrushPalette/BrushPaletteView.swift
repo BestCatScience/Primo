@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import PrimoDocumentContracts
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers

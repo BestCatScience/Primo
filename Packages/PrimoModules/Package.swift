@@ -12,6 +12,7 @@ let package = Package(
         .library(name: "PrimoLocalization", targets: ["PrimoLocalization"]),
         .library(name: "PrimoDocumentDomain", targets: ["PrimoDocumentDomain"]),
         .library(name: "PrimoCanvasInputDomain", targets: ["PrimoCanvasInputDomain"]),
+        .library(name: "PrimoCanvasPresentationDomain", targets: ["PrimoCanvasPresentationDomain"]),
         .library(name: "PrimoDocumentGPUContracts", targets: ["PrimoDocumentGPUContracts"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
@@ -54,6 +55,15 @@ let package = Package(
                 "PrimoBrushDomain",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+            ]
+        ),
+        .target(
+            name: "PrimoCanvasPresentationDomain",
+            dependencies: [
+                "PrimoCanvasInputDomain",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
+                "PrimoDocumentGPUContracts",
             ]
         ),
         .target(
@@ -124,6 +134,11 @@ let package = Package(
         .target(
             name: "PrimoCanvasPresentationInfrastructure",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoCanvasInputDomain",
+                "PrimoCanvasPresentationDomain",
+                "PrimoDocumentContracts",
+                "PrimoDocumentDomain",
                 "PrimoDocumentGPUContracts",
                 "PrimoDocumentMetalRuntimeInfrastructure",
             ]
@@ -131,6 +146,7 @@ let package = Package(
         .target(
             name: "PrimoDocumentRenderingInfrastructure",
             dependencies: [
+                "PrimoCanvasPresentationDomain",
                 "PrimoDocumentApplication",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",

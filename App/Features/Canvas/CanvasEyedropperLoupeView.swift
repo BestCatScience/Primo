@@ -1,3 +1,4 @@
+import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
@@ -8,11 +9,10 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
     private let ringView = UIView()
     private let focusView = UIView()
     private let longPressRecognizer = UILongPressGestureRecognizer()
-    private let canvasImageRenderer: CanvasImageRenderer
+    private let previewRenderer: any CanvasPreviewRendering
 
     private var context: Context?
     private(set) var isActive = false
-    var documentGpuOperationGateway: DocumentGpuOperationGateway?
     var onSampledColor: ((SampledColor) -> Void)?
     var onBeganSampling: (() -> Void)?
 
@@ -21,8 +21,8 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
     private let previewGridSize = 17
     private let verticalOffset: CGFloat = 86
 
-    init(canvasImageRenderer: CanvasImageRenderer) {
-        self.canvasImageRenderer = canvasImageRenderer
+    init(previewRenderer: any CanvasPreviewRendering) {
+        self.previewRenderer = previewRenderer
         super.init()
         configureViews()
         configureRecognizer()
@@ -232,9 +232,8 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
             blendWithPaper = !context.paperStyle.isTransparent
         }
 
-        if let sourcePixelData, let documentGpuOperationGateway {
-            return canvasImageRenderer.eyedropperLoupeSurface(
-                gpuOperations: documentGpuOperationGateway,
+        if let sourcePixelData {
+            return previewRenderer.eyedropperLoupeSurface(
                 sourcePixelData: sourcePixelData,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,

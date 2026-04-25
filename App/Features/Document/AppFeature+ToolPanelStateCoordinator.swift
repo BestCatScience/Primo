@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentContracts
 
 extension AppFeature {
     struct AppFeatureToolPanelStateCoordinator {

@@ -33,12 +33,7 @@ extension ColorRangeSelectionSource {
     }
 }
 
-enum CanvasTransformMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case standard
-    case freeform
-
-    var id: String { rawValue }
-
+extension CanvasTransformMode {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .standard:

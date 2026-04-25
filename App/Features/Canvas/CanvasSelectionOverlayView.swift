@@ -1,3 +1,4 @@
+import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
@@ -6,11 +7,10 @@ final class CanvasSelectionOverlayView: UIView {
     private let selectionOverlayView = CanvasPixelSurfaceView()
     private let selectionOutlineLayer = CAShapeLayer()
     private let selectionPreviewLayer = CAShapeLayer()
-    private let canvasImageRenderer: CanvasImageRenderer
-    var documentGpuOperationGateway: DocumentGpuOperationGateway?
+    private let previewRenderer: any CanvasPreviewRendering
 
-    init(canvasImageRenderer: CanvasImageRenderer) {
-        self.canvasImageRenderer = canvasImageRenderer
+    init(previewRenderer: any CanvasPreviewRendering) {
+        self.previewRenderer = previewRenderer
         super.init(frame: .zero)
         isUserInteractionEnabled = false
         backgroundColor = .clear
@@ -142,9 +142,8 @@ final class CanvasSelectionOverlayView: UIView {
         let height = selection.maskHeight
         guard width > 0, height > 0 else { return nil }
         let expectedCount = width * height
-        guard selection.maskData.count == expectedCount, let documentGpuOperationGateway else { return nil }
-        return canvasImageRenderer.selectionOverlaySurface(
-            gpuOperations: documentGpuOperationGateway,
+        guard selection.maskData.count == expectedCount else { return nil }
+        return previewRenderer.selectionOverlaySurface(
             maskData: selection.maskData,
             width: width,
             height: height

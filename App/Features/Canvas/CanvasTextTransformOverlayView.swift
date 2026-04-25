@@ -1,3 +1,4 @@
+import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
@@ -14,7 +15,8 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     private let bottomMidHandleView = UIView()
     private let rotationHandleView = UIView()
     private let pivotHandleView = UIView()
-    private let canvasImageRenderer: CanvasImageRenderer
+    private let previewRenderer: any CanvasPreviewRendering
+    private let layerTransformProcessor: any LayerTransformProcessing
 
     private var context: Context?
     private var currentTransformGeometry: TextTransformGeometry?
@@ -23,11 +25,14 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     private var pivotTouchOffset: CGPoint = .zero
     private var activeTransformHandle: TransformOverlayHandle = .bottomRight
 
-    var documentGpuOperationGateway: DocumentGpuOperationGateway?
     var sendAction: ((CanvasFeature.Action) -> Void)?
 
-    init(canvasImageRenderer: CanvasImageRenderer) {
-        self.canvasImageRenderer = canvasImageRenderer
+    init(
+        previewRenderer: any CanvasPreviewRendering,
+        layerTransformProcessor: any LayerTransformProcessing
+    ) {
+        self.previewRenderer = previewRenderer
+        self.layerTransformProcessor = layerTransformProcessor
         super.init(frame: .zero)
         isUserInteractionEnabled = true
         backgroundColor = .clear
@@ -309,9 +314,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         transformed.scale = min(max(transformed.scale * Double((context.transformPreviewScaleX + context.transformPreviewScaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += context.transformPreviewRotationDegrees
 
-        guard let documentGpuOperationGateway,
-              let drawRect = canvasImageRenderer.transformedTextLayoutRect(
-            gpuOperations: documentGpuOperationGateway,
+        guard let drawRect = previewRenderer.transformedTextLayoutRect(
             textLayer: transformed,
             canvasSize: context.geometry.documentSize
         ) else {
@@ -327,8 +330,12 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     }
 
     private func layerTransformGeometry(layerData: Data, canvasWidth: Int, canvasHeight: Int, context: Context) -> TextTransformGeometry? {
-        let source = [UInt8](layerData)
-        guard let bounds = transformationBounds(selection: nil, source: source, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard let bounds = layerTransformProcessor.transformationBounds(
+            selection: nil,
+            pixelData: layerData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight
+        ) else {
             return nil
         }
         return transformGeometry(for: bounds, context: context)
@@ -374,7 +381,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     }
 
     private func effectiveTransformQuad(for rect: CGRect, mode overrideMode: CanvasTransformMode? = nil, context: Context) -> TransformQuad {
-        AppFeature.effectiveTransformQuad(
+        CanvasTransformGeometry.effectiveTransformQuad(
             bounds: rect,
             translation: context.transformPreviewOffset,
             scaleX: context.transformPreviewScaleX,
@@ -387,7 +394,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     }
 
     private func affineTransformQuad(for rect: CGRect, context: Context) -> TransformQuad {
-        AppFeature.affineTransformQuad(
+        CanvasTransformGeometry.affineTransformQuad(
             bounds: rect,
             translation: context.transformPreviewOffset,
             scaleX: context.transformPreviewScaleX,
@@ -413,29 +420,6 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         let minY = corners.map(\.y).min() ?? 0
         let maxY = corners.map(\.y).max() ?? 0
         return CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY))
-    }
-
-    private func transformationBounds(selection: CanvasSelection?, source: [UInt8], canvasWidth: Int, canvasHeight: Int) -> CGRect? {
-        if let selection, !selection.isEmpty {
-            return selection.bounds
-        }
-
-        var minX = canvasWidth
-        var minY = canvasHeight
-        var maxX = -1
-        var maxY = -1
-        for y in 0..<canvasHeight {
-            for x in 0..<canvasWidth {
-                if source[((y * canvasWidth) + x) * 4 + 3] == 0 { continue }
-                minX = min(minX, x)
-                minY = min(minY, y)
-                maxX = max(maxX, x)
-                maxY = max(maxY, y)
-            }
-        }
-
-        guard maxX >= minX, maxY >= minY else { return nil }
-        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
     @objc

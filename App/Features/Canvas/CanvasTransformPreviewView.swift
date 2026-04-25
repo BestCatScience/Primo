@@ -1,3 +1,4 @@
+import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
@@ -5,11 +6,15 @@ import UIKit
 final class CanvasTransformPreviewView: UIView {
     private let compositePreviewSurfaceView = CanvasPixelSurfaceView()
     private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
-    private let canvasImageRenderer: CanvasImageRenderer
-    var documentGpuOperationGateway: DocumentGpuOperationGateway?
+    private let previewRenderer: any CanvasPreviewRendering
+    private let layerTransformProcessor: any LayerTransformProcessing
 
-    init(canvasImageRenderer: CanvasImageRenderer) {
-        self.canvasImageRenderer = canvasImageRenderer
+    init(
+        previewRenderer: any CanvasPreviewRendering,
+        layerTransformProcessor: any LayerTransformProcessing
+    ) {
+        self.previewRenderer = previewRenderer
+        self.layerTransformProcessor = layerTransformProcessor
         super.init(frame: .zero)
         isUserInteractionEnabled = false
         backgroundColor = .clear
@@ -88,9 +93,7 @@ final class CanvasTransformPreviewView: UIView {
             return
         }
         guard let snapshot,
-              let documentGpuOperationGateway,
-              let surface = canvasImageRenderer.shapePreviewSurface(
-                gpuOperations: documentGpuOperationGateway,
+              let surface = previewRenderer.shapePreviewSurface(
                 stroke: stroke,
                 style: style,
                 canvasWidth: snapshot.width,
@@ -133,10 +136,8 @@ final class CanvasTransformPreviewView: UIView {
         else {
             if
                 let snapshot,
-                let documentGpuOperationGateway,
                 let strokePreviewCompositePixelData,
-                let surface = canvasImageRenderer.paperCompositeSurface(
-                    gpuOperations: documentGpuOperationGateway,
+                let surface = previewRenderer.paperCompositeSurface(
                     pixelData: strokePreviewCompositePixelData,
                     width: snapshot.width,
                     height: snapshot.height,
@@ -151,10 +152,8 @@ final class CanvasTransformPreviewView: UIView {
 
             if
                 let snapshot,
-                let documentGpuOperationGateway,
                 let adjustmentPreviewPixelData,
-                let surface = canvasImageRenderer.paperCompositeSurface(
-                    gpuOperations: documentGpuOperationGateway,
+                let surface = previewRenderer.paperCompositeSurface(
                     pixelData: adjustmentPreviewPixelData,
                     width: snapshot.width,
                     height: snapshot.height,
@@ -215,7 +214,6 @@ final class CanvasTransformPreviewView: UIView {
         guard let activeLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
             return nil
         }
-        guard let documentGpuOperationGateway else { return nil }
 
         let transformedLayerData: Data?
         if let activeTextLayer, selection == nil {
@@ -229,7 +227,7 @@ final class CanvasTransformPreviewView: UIView {
                 transformPreviewRotationDegrees: transformPreviewRotationDegrees
             )
         } else {
-            transformedLayerData = AppFeature.transformedLayerPixels(
+            transformedLayerData = layerTransformProcessor.transformedLayerPixels(
                 source: activeLayer.pixelData,
                 canvasWidth: snapshot.width,
                 canvasHeight: snapshot.height,
@@ -240,21 +238,18 @@ final class CanvasTransformPreviewView: UIView {
                 rotationDegrees: transformPreviewRotationDegrees,
                 pivot: transformPivot,
                 mode: .freeform,
-                quadOffsets: activeTextLayer == nil ? transformQuadOffsets : .zero,
-                gpuOperations: documentGpuOperationGateway
+                quadOffsets: activeTextLayer == nil ? transformQuadOffsets : .zero
             ) ?? activeLayer.pixelData
         }
         guard let transformedLayerData else { return nil }
 
-        guard let composite = canvasImageRenderer.compositePreviewImageData(
-            gpuOperations: documentGpuOperationGateway,
+        guard let composite = previewRenderer.compositePreviewImageData(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: transformedLayerData
         ) else { return nil }
 
-        return canvasImageRenderer.paperCompositeSurface(
-            gpuOperations: documentGpuOperationGateway,
+        return previewRenderer.paperCompositeSurface(
             pixelData: composite,
             width: snapshot.width,
             height: snapshot.height,
@@ -271,7 +266,6 @@ final class CanvasTransformPreviewView: UIView {
         transformPreviewScaleY: CGFloat,
         transformPreviewRotationDegrees: Double
     ) -> Data? {
-        guard let documentGpuOperationGateway else { return nil }
         var transformed = textLayer
         transformed.position = CGPoint(
             x: transformed.position.x + transformPreviewOffset.width,
@@ -279,8 +273,7 @@ final class CanvasTransformPreviewView: UIView {
         )
         transformed.scale = min(max(transformed.scale * Double((transformPreviewScaleX + transformPreviewScaleY) * 0.5), 0.2), 6.0)
         transformed.rotationDegrees += transformPreviewRotationDegrees
-        return canvasImageRenderer.transformedTextPreviewSurface(
-            gpuOperations: documentGpuOperationGateway,
+        return previewRenderer.transformedTextPreviewSurface(
             textLayer: transformed,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight
