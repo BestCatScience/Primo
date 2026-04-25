@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 
@@ -24,14 +25,22 @@ public struct DocumentStrokePreviewPlan: Sendable {
 }
 
 public struct DocumentStrokeProcessingService: Sendable {
-    public let renderingClient: DocumentRenderingClient
+    public let strokeGateway: StrokeRenderingGateway
+    public let compositingGateway: LayerCompositingGateway
+    public let materializationGateway: SurfaceMaterializationGateway
 
-    public init(renderingClient: DocumentRenderingClient = .live) {
-        self.renderingClient = renderingClient
+    public init(
+        strokeGateway: StrokeRenderingGateway = StrokeRenderingGateway(),
+        compositingGateway: LayerCompositingGateway = LayerCompositingGateway(),
+        materializationGateway: SurfaceMaterializationGateway = SurfaceMaterializationGateway()
+    ) {
+        self.strokeGateway = strokeGateway
+        self.compositingGateway = compositingGateway
+        self.materializationGateway = materializationGateway
     }
 
     public func resetInteractiveStrokeState() {
-        renderingClient.resetInteractiveStrokeState()
+        strokeGateway.resetExecutionSession()
     }
 
     public func makePreviewPlan(
@@ -44,7 +53,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         preserveAlphaLockedPixels: Bool,
         usesResponsiveOilPreview: Bool = false
     ) -> DocumentStrokePreviewPlan? {
-        guard let preview = renderingClient.makeInteractiveStrokePreview(
+        guard let preview = makeInteractiveStrokePreview(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             basePixelData: basePixelData,
@@ -82,7 +91,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        guard let gpuOutput = renderingClient.executeStroke(
+        guard let gpuOutput = strokeGateway.executeStroke(
             MetalStrokeExecutionRequest(
                 basePixelData: baseLayer.pixelData,
                 baseBufferHandle: baseLayer.gpuBufferHandle,
@@ -115,7 +124,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
-        if let gpuOutput = renderingClient.rasterizedStrokePixelData(
+        if let gpuOutput = strokeGateway.rasterizedStrokePixelData(
             basePixelData: baseLayer.pixelData,
             baseBufferHandle: baseLayer.gpuBufferHandle,
             canvasWidth: snapshot.width,
@@ -127,7 +136,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             activeLayerIndex: activeLayerIndex
         ) {
             if preserveAlphaLockedPixels {
-                return renderingClient.preservingExistingAlpha(
+                return materializationGateway.preservingExistingAlpha(
                     source: gpuOutput,
                     existing: baseLayer.pixelData,
                     width: snapshot.width,
@@ -149,7 +158,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         let compositePixelData: Data
         if let stagedCompositePixelData {
             compositePixelData = stagedCompositePixelData
-        } else if let composited = renderingClient.compositedPreviewPixelData(
+        } else if let composited = compositingGateway.compositedPreviewPixelData(
             snapshot: baseSnapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: committedPixels
@@ -180,5 +189,157 @@ public struct DocumentStrokeProcessingService: Sendable {
             compositePixelData: compositePixelData,
             layers: layers
         )
+    }
+
+    private func makeInteractiveStrokePreview(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool,
+        usesResponsiveOilPreview: Bool = false
+    ) -> DocumentInteractiveStrokePreviewResult? {
+        let usesApproximateOilPreview =
+            usesResponsiveOilPreview &&
+            brush.tipKind == .oil &&
+            brush.smudgeEngineEnabled
+        let previewBrush = usesApproximateOilPreview
+            ? DocumentRenderingClient.responsiveOilPreviewBrush(from: brush)
+            : brush
+
+        if !preserveAlphaLockedPixels,
+           Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
+           let gpuResult = strokeGateway.executeStrokeMutation(
+               MetalStrokeExecutionRequest(
+                   basePixelData: basePixelData,
+                   baseBufferHandle: baseBufferHandle,
+                   canvasWidth: snapshot.width,
+                   canvasHeight: snapshot.height,
+                   samples: samples,
+                   brush: previewBrush,
+                   mode: .interactive,
+                   snapshotRevision: snapshot.revision,
+                   activeLayerIndex: activeLayerIndex
+               )
+           ),
+           let bufferHandle = gpuResult.gpuBufferHandle {
+            if let incrementalUpdate = compositingGateway.compositedPreviewIncrementalUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerBufferHandle: bufferHandle,
+                dirtyRect: gpuResult.dirtyRect
+            ) {
+                return DocumentInteractiveStrokePreviewResult(
+                    pixelData: nil,
+                    gpuBufferHandle: bufferHandle,
+                    dirtyRect: gpuResult.dirtyRect,
+                    rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
+                    incrementalUpdate: incrementalUpdate,
+                    isApproximatePreview: usesApproximateOilPreview
+                )
+            }
+            strokeGateway.release(bufferHandle)
+        }
+
+        guard let gpuResult = strokeGateway.executeStroke(
+            MetalStrokeExecutionRequest(
+                basePixelData: basePixelData,
+                baseBufferHandle: baseBufferHandle,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                samples: samples,
+                brush: previewBrush,
+                mode: .interactive,
+                snapshotRevision: snapshot.revision,
+                activeLayerIndex: activeLayerIndex
+            )
+        ) else {
+            return nil
+        }
+
+        let adjustedPixels: Data
+        if preserveAlphaLockedPixels {
+            guard let preserved = materializationGateway.preservingExistingAlpha(
+                source: gpuResult.pixelData,
+                existing: basePixelData,
+                width: snapshot.width,
+                height: snapshot.height
+            ) else {
+                return nil
+            }
+            adjustedPixels = preserved
+        } else {
+            adjustedPixels = gpuResult.pixelData
+        }
+
+        let incrementalUpdate = Self.shouldUseIncrementalPreviewUpdate(for: previewBrush)
+            ? compositingGateway.compositedPreviewIncrementalUpdate(
+                snapshot: snapshot,
+                activeLayerIndex: activeLayerIndex,
+                adjustedActiveLayerPixels: adjustedPixels,
+                dirtyRect: gpuResult.dirtyRect
+            )
+            : nil
+
+        return DocumentInteractiveStrokePreviewResult(
+            pixelData: adjustedPixels,
+            gpuBufferHandle: preserveAlphaLockedPixels ? nil : gpuResult.gpuBufferHandle,
+            dirtyRect: gpuResult.dirtyRect,
+            rectPixelData: gpuResult.rectPixelData ?? Self.pixelData(
+                in: gpuResult.dirtyRect,
+                from: adjustedPixels,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height
+            ),
+            incrementalUpdate: incrementalUpdate,
+            isApproximatePreview: usesApproximateOilPreview
+        )
+    }
+
+    private static func pixelData(
+        in dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
+        from pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> Data? {
+        guard dirtyRect.width > 0, dirtyRect.height > 0 else { return nil }
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth else { return nil }
+        guard dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard pixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
+
+        var rectPixelData = Data(count: dirtyRect.width * dirtyRect.height * 4)
+        rectPixelData.withUnsafeMutableBytes { destinationBytes in
+            pixelData.withUnsafeBytes { sourceBytes in
+                guard
+                    let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else {
+                    return
+                }
+                for row in 0..<dirtyRect.height {
+                    let srcOffset = ((dirtyRect.originY + row) * canvasWidth + dirtyRect.originX) * 4
+                    let dstOffset = row * dirtyRect.width * 4
+                    memcpy(destination + dstOffset, source + srcOffset, dirtyRect.width * 4)
+                }
+            }
+        }
+        return rectPixelData
+    }
+
+    private static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
+        let softness = 1.0 - CGFloat(brush.hardness)
+
+        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
+            return false
+        }
+        if softness >= 0.34 && effectiveDiameter >= 56 {
+            return false
+        }
+        return true
     }
 }

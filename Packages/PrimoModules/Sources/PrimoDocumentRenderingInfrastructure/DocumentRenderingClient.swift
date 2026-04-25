@@ -8,6 +8,7 @@ import PrimoDocumentMetalRuntimeInfrastructure
 public typealias MetalStrokeExecutionMode = PrimoMetalStrokeExecutionMode
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest
 public typealias MetalStrokeExecutionResult = PrimoMetalStrokeExecutionResult
+public typealias MetalStrokeMutationResult = PrimoMetalStrokeMutationResult
 public typealias MetalSelectionCombineMode = PrimoMetalSelectionCombineMode
 public typealias MetalCroppedSelectionMask = PrimoMetalCroppedSelectionMask
 
@@ -36,6 +37,197 @@ public struct DocumentInteractiveStrokePreviewResult: Sendable {
     }
 }
 
+public struct StrokeRenderingGateway: Sendable {
+    private let executor: MetalStrokeExecutor
+    private let surfaceStore: MetalSurfaceStore
+
+    public init(
+        executor: MetalStrokeExecutor = MetalStrokeExecutor(),
+        surfaceStore: MetalSurfaceStore = MetalSurfaceStore()
+    ) {
+        self.executor = executor
+        self.surfaceStore = surfaceStore
+    }
+
+    public func resetExecutionSession() {
+        executor.resetSession()
+    }
+
+    public func executeStroke(_ request: MetalStrokeExecutionRequest) -> MetalStrokeExecutionResult? {
+        executor.executeStroke(request)
+    }
+
+    public func executeStrokeMutation(_ request: MetalStrokeExecutionRequest) -> MetalStrokeMutationResult? {
+        executor.executeStrokeMutation(request)
+    }
+
+    public func rasterizedStrokePixelData(
+        basePixelData: Data,
+        baseBufferHandle: MetalBufferHandle? = nil,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        mode: MetalStrokeExecutionMode = .commit,
+        snapshotRevision: Int? = nil,
+        activeLayerIndex: Int? = nil
+    ) -> Data? {
+        executor.rasterizedStrokePixelData(
+            basePixelData: basePixelData,
+            baseBufferHandle: baseBufferHandle,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            samples: samples,
+            brush: brush,
+            mode: mode,
+            snapshotRevision: snapshotRevision,
+            activeLayerIndex: activeLayerIndex
+        )
+    }
+
+    public func release(_ handle: MetalBufferHandle?) {
+        surfaceStore.release(handle)
+    }
+}
+
+public struct LayerCompositingGateway: Sendable {
+    private let compositor: MetalCompositor
+
+    public init(compositor: MetalCompositor = MetalCompositor()) {
+        self.compositor = compositor
+    }
+
+    public func compositedPreviewPixelData(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data
+    ) -> Data? {
+        compositor.compositedPreviewPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels
+        )
+    }
+
+    public func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        compositor.compositedPreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+            dirtyRect: dirtyRect
+        )
+    }
+
+    public func compositedPreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerBufferHandle: MetalBufferHandle,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        compositor.compositedPreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerBufferHandle: adjustedActiveLayerBufferHandle,
+            dirtyRect: dirtyRect
+        )
+    }
+
+    public func compositedPaperPreviewRGBA(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        paperStyle: CanvasPaperStyle
+    ) -> Data? {
+        compositor.compositedPaperPreviewRGBA(
+            pixelData: pixelData,
+            width: width,
+            height: height,
+            paperStyle: paperStyle
+        )
+    }
+}
+
+public struct SurfaceMaterializationGateway: Sendable {
+    private let surfaceStore: MetalSurfaceStore
+    private let layerMutationExecutor: MetalLayerMutationExecutor
+
+    public init(
+        surfaceStore: MetalSurfaceStore = MetalSurfaceStore(),
+        layerMutationExecutor: MetalLayerMutationExecutor = MetalLayerMutationExecutor()
+    ) {
+        self.surfaceStore = surfaceStore
+        self.layerMutationExecutor = layerMutationExecutor
+    }
+
+    public func materializedPixelData(for handle: MetalBufferHandle) -> Data? {
+        surfaceStore.materializedPixelData(for: handle)
+    }
+
+    public func preservingExistingAlpha(
+        source: Data,
+        existing: Data,
+        width: Int,
+        height: Int
+    ) -> Data? {
+        layerMutationExecutor.preservingExistingAlpha(source: source, existing: existing, width: width, height: height)
+    }
+}
+
+public struct OverlayRenderingGateway: Sendable {
+    private let executor: MetalOverlayExecutor
+
+    public init(executor: MetalOverlayExecutor = MetalOverlayExecutor()) {
+        self.executor = executor
+    }
+
+    public func selectionOverlayRGBA(
+        maskData: Data,
+        width: Int,
+        height: Int,
+        red: UInt8 = 91,
+        green: UInt8 = 181,
+        blue: UInt8 = 255,
+        maximumAlpha: Float = 96.0 / 255.0
+    ) -> Data? {
+        executor.selectionOverlayRGBA(
+            maskData: maskData,
+            width: width,
+            height: height,
+            red: red,
+            green: green,
+            blue: blue,
+            maximumAlpha: maximumAlpha
+        )
+    }
+
+    public func eyedropperLoupeRGBA(
+        sourcePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> Data? {
+        executor.eyedropperLoupeRGBA(
+            sourcePixelData: sourcePixelData,
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            centerX: centerX,
+            centerY: centerY,
+            gridSize: gridSize,
+            paperStyle: paperStyle,
+            blendWithPaper: blendWithPaper
+        )
+    }
+}
+
 public struct DocumentRenderingClient: Sendable {
     private let backend: PrimoMetalDocumentProcessingClient
 
@@ -46,6 +238,27 @@ public struct DocumentRenderingClient: Sendable {
     }
 
     public static let live = DocumentRenderingClient()
+
+    public var strokeGateway: StrokeRenderingGateway {
+        let context = MetalRuntimeContext(client: backend)
+        return StrokeRenderingGateway(executor: context.strokeExecutor, surfaceStore: context.surfaceStore)
+    }
+
+    public var layerCompositingGateway: LayerCompositingGateway {
+        LayerCompositingGateway(compositor: MetalRuntimeContext(client: backend).compositor)
+    }
+
+    public var surfaceMaterializationGateway: SurfaceMaterializationGateway {
+        let context = MetalRuntimeContext(client: backend)
+        return SurfaceMaterializationGateway(
+            surfaceStore: context.surfaceStore,
+            layerMutationExecutor: context.layerMutationExecutor
+        )
+    }
+
+    public var overlayRenderingGateway: OverlayRenderingGateway {
+        OverlayRenderingGateway(executor: MetalRuntimeContext(client: backend).overlayExecutor)
+    }
 
     public var isAvailable: Bool {
         backend.isAvailable

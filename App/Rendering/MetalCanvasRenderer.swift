@@ -7,21 +7,9 @@ import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentRenderingInfrastructure
 import UIKit
 
-struct CanvasRenderSurfaceUpdate {
-    let snapshot: MetalDocumentSnapshot?
-    let activeLayerIndex: Int
-    let incrementalUpdate: IncrementalLayerUpdate?
-    let documentSize: CGSize
-    let viewportOffset: CGSize
-    let zoomScale: CGFloat
-    let paperStyle: CanvasPaperStyle
-    let previewResetNonce: Int
-}
-
 final class CanvasRenderSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
-    private let renderSession = CanvasRenderSession()
-    private var lastPreviewResetNonce = 0
+    private let driver = CanvasRenderSurfaceDriver()
     private(set) var currentActiveLayerIndex: Int = 0
 
     var currentSnapshot: MetalDocumentSnapshot? {
@@ -44,35 +32,9 @@ final class CanvasRenderSurfaceView: UIView {
         backend.frame = bounds
     }
 
-    func render(_ update: CanvasRenderSurfaceUpdate) {
-        renderSession.retainResources(
-            for: RenderFrameUpdate(
-                snapshot: update.snapshot,
-                activeLayerIndex: update.activeLayerIndex,
-                incrementalUpdate: update.incrementalUpdate,
-                documentSize: update.documentSize,
-                viewportOffset: update.viewportOffset,
-                zoomScale: update.zoomScale,
-                paperStyle: update.paperStyle,
-                previewResetNonce: update.previewResetNonce
-            )
-        )
-        currentActiveLayerIndex = update.activeLayerIndex
-        backend.currentActiveLayerIndex = update.activeLayerIndex
-        backend.updateDocumentSize(update.documentSize)
-        if update.previewResetNonce != lastPreviewResetNonce {
-            backend.reloadSnapshot(update.snapshot)
-            lastPreviewResetNonce = update.previewResetNonce
-        }
-        backend.update(
-            snapshot: update.snapshot,
-            viewportOffset: update.viewportOffset,
-            zoomScale: update.zoomScale,
-            paperStyle: update.paperStyle
-        )
-        if let incrementalUpdate = update.incrementalUpdate {
-            backend.applyIncrementalUpdate(incrementalUpdate)
-        }
+    func render(_ update: RenderFrameUpdate) {
+        driver.render(update, into: backend)
+        currentActiveLayerIndex = driver.currentActiveLayerIndex
     }
 
     func contentRect(
@@ -120,11 +82,15 @@ final class CanvasPixelSurfaceView: UIView {
 }
 
 struct CanvasImageRenderer {
-    let renderingClient: DocumentRenderingClient
+    let strokeGateway: StrokeRenderingGateway
+    let compositingGateway: LayerCompositingGateway
+    let overlayGateway: OverlayRenderingGateway
     let textService: MetalTextService
 
     static let live = CanvasImageRenderer(
-        renderingClient: .live,
+        strokeGateway: StrokeRenderingGateway(),
+        compositingGateway: LayerCompositingGateway(),
+        overlayGateway: OverlayRenderingGateway(),
         textService: MetalTextService()
     )
 
@@ -138,7 +104,7 @@ struct CanvasImageRenderer {
         paperStyle: CanvasPaperStyle,
         blendWithPaper: Bool
     ) -> DocumentCompositeSurface? {
-        guard let rgba = renderingClient.eyedropperLoupeRGBA(
+        guard let rgba = overlayGateway.eyedropperLoupeRGBA(
             sourcePixelData: sourcePixelData,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -158,7 +124,7 @@ struct CanvasImageRenderer {
         width: Int,
         height: Int
     ) -> DocumentCompositeSurface? {
-        guard let rgba = renderingClient.selectionOverlayRGBA(
+        guard let rgba = overlayGateway.selectionOverlayRGBA(
             maskData: maskData,
             width: width,
             height: height
@@ -173,7 +139,7 @@ struct CanvasImageRenderer {
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        renderingClient.compositedPreviewPixelData(
+        compositingGateway.compositedPreviewPixelData(
             snapshot: snapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels
@@ -186,7 +152,7 @@ struct CanvasImageRenderer {
         height: Int,
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface? {
-        guard let rgba = renderingClient.compositedPaperPreviewRGBA(
+        guard let rgba = compositingGateway.compositedPaperPreviewRGBA(
             pixelData: pixelData,
             width: width,
             height: height,
@@ -206,7 +172,7 @@ struct CanvasImageRenderer {
         let samples = stroke.points.map(\.stylusSample)
         guard !samples.isEmpty else { return nil }
         let brush = brushSettings(for: style)
-        guard let pixelData = renderingClient.rasterizedStrokePixelData(
+        guard let pixelData = strokeGateway.rasterizedStrokePixelData(
             basePixelData: Data(count: canvasWidth * canvasHeight * 4),
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,

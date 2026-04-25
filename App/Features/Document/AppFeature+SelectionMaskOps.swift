@@ -166,8 +166,8 @@ extension AppFeature {
 
         guard let selected = CanvasDocumentRenderingServices.live.autoSelection(
             pixelData: layer.pixelData,
-            width: width,
-            height: height,
+            canvasWidth: width,
+            canvasHeight: height,
             seedX: startX,
             seedY: startY,
             thresholdMode: thresholdMode,

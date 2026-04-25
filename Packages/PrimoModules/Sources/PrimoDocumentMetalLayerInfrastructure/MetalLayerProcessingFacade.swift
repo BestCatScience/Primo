@@ -1,11 +1,17 @@
 import Foundation
 import PrimoDocumentGPUContracts
+import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoDocumentRenderingInfrastructure
 
 public struct MetalLayerProcessingFacade: Sendable {
-    public let renderingClient: DocumentRenderingClient
+    public let layerMutationExecutor: MetalLayerMutationExecutor
+    public let materializationGateway: SurfaceMaterializationGateway
 
-    public init(renderingClient: DocumentRenderingClient = .live) {
-        self.renderingClient = renderingClient
+    public init(
+        layerMutationExecutor: MetalLayerMutationExecutor = MetalLayerMutationExecutor(),
+        materializationGateway: SurfaceMaterializationGateway = SurfaceMaterializationGateway()
+    ) {
+        self.layerMutationExecutor = layerMutationExecutor
+        self.materializationGateway = materializationGateway
     }
 }

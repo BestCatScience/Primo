@@ -98,6 +98,53 @@ struct DocumentStrokeApplicationTests {
         #expect(renderer.requests[0].preserveAlphaLockedPixels)
     }
 
+    @Test
+    func strokeSessionTrimsDuplicateSamplesAndTracksPreviewSurface() throws {
+        let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
+        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        var session = StrokeSessionState()
+        let sample = stylusSample(x: 1, y: 1)
+
+        session.setPendingFinalizationSamples([sample, sample])
+        session.applyPreview(
+            baseSnapshot: snapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 1,
+                width: 2,
+                height: 2,
+                handle: GpuSurfaceHandle(buffer: handle)
+            ),
+            dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 1, width: 2, height: 1),
+            isApproximatePreview: true,
+            incrementalUpdate: nil
+        )
+        session.markCommittedPointCount(2)
+
+        #expect(session.pendingFinalizationSamples == [sample])
+        #expect(session.baseSnapshot?.revision == 11)
+        #expect(session.renderState?.surfaceHandle == handle)
+        #expect(session.renderState?.dirtyRect == LayerPixelRect(originX: 0, originY: 1, width: 2, height: 1))
+        #expect(session.renderState?.isApproximatePreview == true)
+        #expect(session.hasCommittedPoints)
+    }
+
+    @Test
+    func strokeSessionResetKeepsCommittedCountSeparateFromPreviewReset() {
+        var session = StrokeSessionState(
+            baseSnapshot: makeSnapshot(layerIndex: 0),
+            pendingFinalizationSamples: [stylusSample(x: 1, y: 1)],
+            committedPointCount: 4
+        )
+
+        session.resetPreview()
+        #expect(session.baseSnapshot == nil)
+        #expect(session.pendingFinalizationSamples.isEmpty)
+        #expect(session.committedPointCount == 4)
+
+        session.resetInteraction()
+        #expect(session.committedPointCount == 0)
+    }
+
     private func makeSnapshot(layerIndex: Int, revision: Int = 7) -> MetalDocumentSnapshot {
         MetalDocumentSnapshot(
             width: 2,

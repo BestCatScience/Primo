@@ -84,7 +84,7 @@ extension AppFeature {
             state: inout State,
             ensureCurrentPresentationLoaded: (inout State) -> Void
         ) {
-            guard state.canvas.activeStrokeBaseSnapshot == nil else { return }
+            guard state.canvas.strokeSession.baseSnapshot == nil else { return }
             if let pendingCommittedSnapshot = state.canvas.pendingCommittedSnapshot {
                 state.canvas.captureStrokeBaseSnapshot(pendingCommittedSnapshot)
                 return
@@ -154,7 +154,7 @@ extension AppFeature {
                 context: context
             )
             if canCommitPreviewSurface,
-               let renderState = state.canvas.activeStrokeRenderState {
+               let renderState = state.canvas.strokeSession.renderState {
                 commitResult = layerCommands.applyLayerSurfaceMutation(
                     context.activeLayerIndex,
                     GpuLayerMutationPayload(
@@ -192,7 +192,7 @@ extension AppFeature {
             state: State,
             context: CanvasStrokeContext
         ) -> Bool {
-            guard let renderState = state.canvas.activeStrokeRenderState else { return false }
+            guard let renderState = state.canvas.strokeSession.renderState else { return false }
             if !renderState.isApproximatePreview {
                 return true
             }
@@ -434,7 +434,7 @@ extension AppFeature {
         context: CanvasStrokeContext
     ) -> StrokePreviewResolution? {
         canvasStrokePreviewUseCase.resolveInitial(
-            baseSnapshot: state.canvas.activeStrokeBaseSnapshot,
+            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
             sample: sample,
             context: DocumentStrokeContext(context),
             usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
@@ -446,11 +446,11 @@ extension AppFeature {
         samples: [StylusSample],
         context: CanvasStrokeContext
     ) -> StrokePreviewResolution? {
-        let fullSamples = !state.canvas.pendingStrokeFinalizationSamples.isEmpty
-            ? state.canvas.pendingStrokeFinalizationSamples
+        let fullSamples = !state.canvas.strokeSession.pendingFinalizationSamples.isEmpty
+            ? state.canvas.strokeSession.pendingFinalizationSamples
             : (state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples)
         return canvasStrokePreviewUseCase.resolveAppended(
-            activeStrokeBaseSnapshot: state.canvas.activeStrokeBaseSnapshot,
+            activeStrokeBaseSnapshot: state.canvas.strokeSession.baseSnapshot,
             renderSnapshot: state.canvas.renderSnapshot,
             samples: samples,
             fullSamples: fullSamples,
@@ -543,7 +543,7 @@ extension AppFeature {
             height: plan.dirtyRect.height
         )
         state.canvas.setActiveStrokeRenderState(
-            CanvasFeature.ActiveStrokeRenderState(
+            StrokeSessionRenderState(
                 baseRevision: plan.baseSnapshot.revision,
                 layerIndex: activeLayerIndex,
                 surfaceHandle: plan.adjustedBufferHandle,
@@ -567,8 +567,8 @@ extension AppFeature {
             ensureCurrentCanvasPresentationLoaded(state: &state)
         }
         let fallbackSnapshot = refreshViaDirtyPresentation
-            ? state.canvas.activeStrokeBaseSnapshot
-            : (state.canvas.activeStrokeBaseSnapshot ?? state.canvas.renderSnapshot)
+            ? state.canvas.strokeSession.baseSnapshot
+            : (state.canvas.strokeSession.baseSnapshot ?? state.canvas.renderSnapshot)
         guard
             let snapshot = fallbackSnapshot,
             let committedResult = canvasStrokeCommitUseCase.makeCommittedPixels(

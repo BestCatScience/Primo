@@ -115,7 +115,7 @@ extension AppFeature {
     func handleClearActiveLayer(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         state.canvas.activeStroke = nil
-        state.canvas.activeStrokeCommittedPointCount = 0
+        state.canvas.strokeSession.committedPointCount = 0
         state.canvas.shapePreviewIsLive = false
         state.canvas.isStrokeActive = false
         state.canvas.isAwaitingCommittedRender = false

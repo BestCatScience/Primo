@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import PrimoBrushFileFormats
+import PrimoDocumentGPUContracts
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
@@ -22,7 +23,7 @@ struct CanvasView: UIViewRepresentable {
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
             activeStroke: store.activeStroke,
-            incrementalUpdate: store.pendingIncrementalUpdate,
+            incrementalUpdate: store.strokeSession.pendingIncrementalUpdate,
             adjustmentPreviewPixelData: store.adjustmentPreviewPixelData,
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
@@ -174,7 +175,7 @@ final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInt
 
         let geometry = viewportGeometry
         canvasRenderSurfaceView.render(
-            CanvasRenderSurfaceUpdate(
+            RenderFrameUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 incrementalUpdate: incrementalUpdate,

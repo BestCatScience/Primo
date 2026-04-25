@@ -1,0 +1,117 @@
+import Foundation
+import PrimoDocumentContracts
+import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
+
+public struct StrokeSessionRenderState: Equatable, Sendable {
+    public let baseRevision: Int
+    public let layerIndex: Int
+    public let surfaceHandle: MetalBufferHandle
+    public let dirtyRect: LayerPixelRect
+    public let isApproximatePreview: Bool
+
+    public init(
+        baseRevision: Int,
+        layerIndex: Int,
+        surfaceHandle: MetalBufferHandle,
+        dirtyRect: LayerPixelRect,
+        isApproximatePreview: Bool
+    ) {
+        self.baseRevision = baseRevision
+        self.layerIndex = layerIndex
+        self.surfaceHandle = surfaceHandle
+        self.dirtyRect = dirtyRect
+        self.isApproximatePreview = isApproximatePreview
+    }
+}
+
+public struct StrokeSessionState: Equatable, Sendable {
+    public var baseSnapshot: MetalDocumentSnapshot?
+    public var renderState: StrokeSessionRenderState?
+    public var pendingIncrementalUpdate: IncrementalLayerUpdate?
+    public var pendingFinalizationSamples: [StylusSample]
+    public var committedPointCount: Int
+
+    public init(
+        baseSnapshot: MetalDocumentSnapshot? = nil,
+        renderState: StrokeSessionRenderState? = nil,
+        pendingIncrementalUpdate: IncrementalLayerUpdate? = nil,
+        pendingFinalizationSamples: [StylusSample] = [],
+        committedPointCount: Int = 0
+    ) {
+        self.baseSnapshot = baseSnapshot
+        self.renderState = renderState
+        self.pendingIncrementalUpdate = pendingIncrementalUpdate
+        self.pendingFinalizationSamples = pendingFinalizationSamples
+        self.committedPointCount = committedPointCount
+    }
+
+    public var hasCommittedPoints: Bool {
+        committedPointCount > 0
+    }
+
+    public mutating func captureBaseSnapshot(_ snapshot: MetalDocumentSnapshot) {
+        baseSnapshot = snapshot
+    }
+
+    public mutating func applyPreview(
+        baseSnapshot: MetalDocumentSnapshot,
+        surface: GpuLayerSurface,
+        dirtyRegion: GpuSurfaceRegion,
+        isApproximatePreview: Bool,
+        incrementalUpdate: IncrementalLayerUpdate?
+    ) {
+        self.baseSnapshot = baseSnapshot
+        renderState = StrokeSessionRenderState(
+            baseRevision: baseSnapshot.revision,
+            layerIndex: surface.layerIndex,
+            surfaceHandle: surface.handle.buffer,
+            dirtyRect: dirtyRegion.layerPixelRect,
+            isApproximatePreview: isApproximatePreview
+        )
+        if let incrementalUpdate {
+            pendingIncrementalUpdate = incrementalUpdate
+        }
+    }
+
+    public mutating func setPendingFinalizationSamples(_ samples: [StylusSample]) {
+        pendingFinalizationSamples = Self.trimmingDuplicateTrailingSamples(samples)
+    }
+
+    public mutating func markCommittedPointCount(_ pointCount: Int) {
+        committedPointCount = max(committedPointCount, pointCount)
+    }
+
+    public mutating func resetPreview() {
+        baseSnapshot = nil
+        renderState = nil
+        pendingFinalizationSamples = []
+        pendingIncrementalUpdate = nil
+    }
+
+    public mutating func resetInteraction() {
+        resetPreview()
+        committedPointCount = 0
+    }
+
+    public static func trimmingDuplicateLeadingSamples(
+        _ samples: [StylusSample],
+        after previousSample: StylusSample?
+    ) -> [StylusSample] {
+        guard let previousSample else { return samples }
+        var trimmed = samples
+        while trimmed.first == previousSample {
+            trimmed.removeFirst()
+        }
+        return trimmed
+    }
+
+    public static func trimmingDuplicateTrailingSamples(_ samples: [StylusSample]) -> [StylusSample] {
+        guard samples.count >= 2 else { return samples }
+        var trimmed = samples
+        while trimmed.count >= 2, trimmed[trimmed.count - 1] == trimmed[trimmed.count - 2] {
+            trimmed.removeLast()
+        }
+        return trimmed
+    }
+}

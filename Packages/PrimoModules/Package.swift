@@ -17,6 +17,7 @@ let package = Package(
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoDocumentMetalRuntimeInfrastructure", targets: ["PrimoDocumentMetalRuntimeInfrastructure"]),
+        .library(name: "PrimoDocumentMetalSurfaceInfrastructure", targets: ["PrimoDocumentMetalSurfaceInfrastructure"]),
         .library(name: "PrimoDocumentMetalStrokeInfrastructure", targets: ["PrimoDocumentMetalStrokeInfrastructure"]),
         .library(name: "PrimoDocumentMetalLayerInfrastructure", targets: ["PrimoDocumentMetalLayerInfrastructure"]),
         .library(name: "PrimoCanvasPresentationInfrastructure", targets: ["PrimoCanvasPresentationInfrastructure"]),
@@ -98,9 +99,18 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PrimoDocumentMetalSurfaceInfrastructure",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+            ]
+        ),
+        .target(
             name: "PrimoDocumentMetalStrokeInfrastructure",
             dependencies: [
                 "PrimoDocumentGPUContracts",
+                "PrimoDocumentMetalSurfaceInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
             ]
         ),
@@ -108,6 +118,7 @@ let package = Package(
             name: "PrimoDocumentMetalLayerInfrastructure",
             dependencies: [
                 "PrimoDocumentGPUContracts",
+                "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
             ]
         ),
@@ -309,6 +320,15 @@ let package = Package(
                 "PrimoDocumentDomain",
                 "PrimoDocumentMetalRuntimeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
+            ]
+        ),
+        .testTarget(
+            name: "PrimoDocumentMetalSurfaceInfrastructureTests",
+            dependencies: [
+                "PrimoDocumentContracts",
+                "PrimoDocumentGPUContracts",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentMetalSurfaceInfrastructure",
             ]
         ),
         .testTarget(
