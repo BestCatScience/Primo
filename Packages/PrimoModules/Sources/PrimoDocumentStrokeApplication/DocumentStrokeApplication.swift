@@ -72,6 +72,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
     public func resolveAppended(
         activeStrokeBaseSnapshot: MetalDocumentSnapshot?,
         renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
@@ -83,12 +84,28 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             let baseSnapshot = activeStrokeBaseSnapshot,
             let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex })
         {
-            let previewSamples = fullSamples.isEmpty ? samples : fullSamples
+            let baseLayerRef: LayerSurfaceRef
+            let previewSamples: [StylusSample]
+            if let incremental = responsiveOilIncrementalPreview(
+                baseSnapshot: baseSnapshot,
+                baseLayer: baseLayer,
+                renderState: renderState,
+                samples: samples,
+                fullSamples: fullSamples,
+                context: context,
+                usesResponsiveOilPreview: usesResponsiveOilPreview
+            ) {
+                baseLayerRef = incremental.baseLayer
+                previewSamples = incremental.samples
+            } else {
+                baseLayerRef = baseLayer.surfaceRef(canvasWidth: baseSnapshot.width, canvasHeight: baseSnapshot.height)
+                previewSamples = fullSamples.isEmpty ? samples : fullSamples
+            }
             guard let result = planner.makePreview(
                 StrokePreviewRequest(
                     snapshot: baseSnapshot,
                     activeLayerIndex: context.activeLayerIndex,
-                    baseLayer: baseLayer.surfaceRef(canvasWidth: baseSnapshot.width, canvasHeight: baseSnapshot.height),
+                    baseLayer: baseLayerRef,
                     samples: previewSamples,
                     brush: context.previewBrush,
                     preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked,
@@ -118,6 +135,52 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             return nil
         }
         return DocumentStrokePreviewResolution(result: result, baseSnapshotToCapture: snapshot)
+    }
+
+    private func responsiveOilIncrementalPreview(
+        baseSnapshot: MetalDocumentSnapshot,
+        baseLayer: MetalLayerSnapshot,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext,
+        usesResponsiveOilPreview: Bool
+    ) -> (baseLayer: LayerSurfaceRef, samples: [StylusSample])? {
+        guard
+            usesResponsiveOilPreview,
+            !context.activeLayer.isAlphaLocked,
+            let renderState,
+            renderState.isApproximatePreview,
+            renderState.baseRevision == baseSnapshot.revision,
+            renderState.layerIndex == context.activeLayerIndex,
+            renderState.surfaceHandle.width == baseSnapshot.width,
+            renderState.surfaceHandle.height == baseSnapshot.height
+        else {
+            return nil
+        }
+
+        let connectionSample = previousSample(in: fullSamples, beforeSuffix: samples)
+        let incrementalSamples = connectionSample.map { [$0] + samples } ?? samples
+        guard !incrementalSamples.isEmpty else { return nil }
+
+        return (
+            LayerSurfaceRef(
+                layerIndex: baseLayer.index,
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                pixelData: baseLayer.pixelData,
+                gpuHandle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+            ),
+            incrementalSamples
+        )
+    }
+
+    private func previousSample(
+        in fullSamples: [StylusSample],
+        beforeSuffix samples: [StylusSample]
+    ) -> StylusSample? {
+        guard !samples.isEmpty, fullSamples.count > samples.count else { return nil }
+        return fullSamples[fullSamples.count - samples.count - 1]
     }
 }
 
@@ -155,6 +218,7 @@ public enum GpuStrokeSessionCommand: Sendable {
     case append(
         baseSnapshot: MetalDocumentSnapshot?,
         renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
@@ -213,10 +277,11 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             }
             return previewOutcome(from: resolution)
 
-        case let .append(baseSnapshot, renderSnapshot, samples, fullSamples, context, usesResponsiveOilPreview):
+        case let .append(baseSnapshot, renderSnapshot, renderState, samples, fullSamples, context, usesResponsiveOilPreview):
             guard let resolution = preview.resolveAppended(
                 activeStrokeBaseSnapshot: baseSnapshot,
                 renderSnapshot: renderSnapshot,
+                renderState: renderState,
                 samples: samples,
                 fullSamples: fullSamples,
                 context: context,

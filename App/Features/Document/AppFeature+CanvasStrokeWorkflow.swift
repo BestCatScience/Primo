@@ -348,6 +348,7 @@ extension AppFeature {
         canvasStrokeInteractionService.appendPreview(
             baseSnapshot: state.canvas.strokeSession.baseSnapshot,
             renderSnapshot: state.canvas.renderSnapshot,
+            renderState: state.canvas.strokeSession.renderState,
             samples: samples,
             fullSamples: state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples,
             context: DocumentStrokeContext(context),

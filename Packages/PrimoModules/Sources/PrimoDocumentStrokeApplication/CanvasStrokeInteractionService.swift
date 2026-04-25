@@ -32,6 +32,7 @@ public struct CanvasStrokeInteractionService: Sendable {
     public func appendPreview(
         baseSnapshot: MetalDocumentSnapshot?,
         renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
@@ -41,6 +42,7 @@ public struct CanvasStrokeInteractionService: Sendable {
             .append(
                 baseSnapshot: baseSnapshot,
                 renderSnapshot: renderSnapshot,
+                renderState: renderState,
                 samples: samples,
                 fullSamples: fullSamples,
                 context: context,

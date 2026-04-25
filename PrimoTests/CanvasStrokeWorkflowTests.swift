@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Foundation
 import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
 import XCTest
@@ -86,6 +87,47 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(state.canvas.strokeSession.renderState?.surfaceHandle, handle)
         XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
         XCTAssertEqual(state.canvas.strokeSession.renderState?.isApproximatePreview, true)
+    }
+
+    func testAppendStrokePreviewPassesCurrentRenderStateToSessionUseCase() {
+        let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let recordedRenderStates = TestRecorder<StrokeSessionRenderState?>()
+        let result = withDependencies {
+            $0.documentRuntimeComposition = .stub(
+                strokeSessionUseCase: .stub { command in
+                    if case let .append(_, _, renderState, _, _, _, _) = command {
+                        recordedRenderStates.record(renderState)
+                    }
+                    return .failure(.bridgeMutationFailed("recorded"))
+                }
+            )
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+                baseRevision: 12,
+                layerIndex: 0,
+                surfaceHandle: expectedHandle,
+                dirtyRect: LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2),
+                isApproximatePreview: true
+            )
+            return feature.resolveAppendedStrokePreview(
+                state: state,
+                samples: [.testValue()],
+                context: AppFeature.CanvasStrokeContext(
+                    activeLayer: .testValue(),
+                    activeLayerIndex: 0,
+                    brush: feature.resolvedBrushSettings(for: state),
+                    previewBrush: feature.resolvedBrushSettings(for: state)
+                )
+            )
+        }
+
+        guard case .failure = result else {
+            XCTFail("Expected stubbed failure")
+            return
+        }
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.surfaceHandle, expectedHandle)
     }
 
     func testGpuCommitOutcomeAppliesLayerSurfaceMutation() {

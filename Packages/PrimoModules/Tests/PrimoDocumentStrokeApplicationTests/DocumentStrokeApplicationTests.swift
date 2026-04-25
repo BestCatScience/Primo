@@ -45,6 +45,7 @@ struct DocumentStrokeApplicationTests {
         let resolution = try #require(useCase.resolveAppended(
             activeStrokeBaseSnapshot: baseSnapshot,
             renderSnapshot: renderSnapshot,
+            renderState: nil,
             samples: samples,
             fullSamples: fullSamples,
             context: makeContext(layerIndex: 0),
@@ -58,6 +59,117 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
+    func responsiveOilAppendedPreviewUsesPreviousPreviewSurfaceAndIncrementalSamples() throws {
+        let planner = RecordingPreviewPlanner()
+        let useCase = DocumentStrokePreviewUseCase(planner: planner)
+        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
+        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let renderState = StrokeSessionRenderState(
+            baseRevision: 14,
+            layerIndex: 0,
+            surfaceHandle: previousHandle,
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: true
+        )
+        let previous = stylusSample(x: 2, y: 2)
+        let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
+        let fullSamples = [stylusSample(x: 0, y: 0), previous] + appended
+
+        _ = try #require(useCase.resolveAppended(
+            activeStrokeBaseSnapshot: baseSnapshot,
+            renderSnapshot: nil,
+            renderState: renderState,
+            samples: appended,
+            fullSamples: fullSamples,
+            context: makeContext(layerIndex: 0),
+            usesResponsiveOilPreview: true
+        ))
+
+        #expect(planner.requests.count == 1)
+        #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == previousHandle)
+        #expect(planner.requests[0].samples == [previous] + appended)
+        #expect(planner.requests[0].usesResponsiveOilPreview)
+    }
+
+    @Test
+    func highFidelityOilAppendedPreviewKeepsFullSamples() throws {
+        let planner = RecordingPreviewPlanner()
+        let useCase = DocumentStrokePreviewUseCase(planner: planner)
+        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
+        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let renderState = StrokeSessionRenderState(
+            baseRevision: 14,
+            layerIndex: 0,
+            surfaceHandle: previousHandle,
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: true
+        )
+        let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
+        let fullSamples = [stylusSample(x: 0, y: 0), stylusSample(x: 2, y: 2)] + appended
+
+        _ = try #require(useCase.resolveAppended(
+            activeStrokeBaseSnapshot: baseSnapshot,
+            renderSnapshot: nil,
+            renderState: renderState,
+            samples: appended,
+            fullSamples: fullSamples,
+            context: makeContext(layerIndex: 0),
+            usesResponsiveOilPreview: false
+        ))
+
+        #expect(planner.requests.count == 1)
+        #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == baseSnapshot.layers[0].gpuBufferHandle)
+        #expect(planner.requests[0].samples == fullSamples)
+    }
+
+    @Test
+    func responsiveOilPreviewRequestSizeDoesNotGrowWithLongCircularStroke() throws {
+        let planner = RecordingPreviewPlanner()
+        let useCase = DocumentStrokePreviewUseCase(planner: planner)
+        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 21)
+        var renderState = StrokeSessionRenderState(
+            baseRevision: 21,
+            layerIndex: 0,
+            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: true
+        )
+        var fullSamples: [StylusSample] = []
+        let batchSize = 8
+
+        for index in 0..<128 {
+            let appended = (0..<batchSize).map { offset -> StylusSample in
+                let sampleIndex = index * batchSize + offset
+                let angle = Double(sampleIndex) * 0.08
+                return stylusSample(
+                    x: CGFloat(cos(angle) + 1),
+                    y: CGFloat(sin(angle) + 1)
+                )
+            }
+            fullSamples.append(contentsOf: appended)
+            let resolution = try #require(useCase.resolveAppended(
+                activeStrokeBaseSnapshot: baseSnapshot,
+                renderSnapshot: nil,
+                renderState: renderState,
+                samples: appended,
+                fullSamples: fullSamples,
+                context: makeContext(layerIndex: 0),
+                usesResponsiveOilPreview: true
+            ))
+            renderState = StrokeSessionRenderState(
+                baseRevision: resolution.result.baseSnapshot.revision,
+                layerIndex: resolution.result.surface?.layerIndex ?? 0,
+                surfaceHandle: try #require(resolution.result.surface?.handle.buffer),
+                dirtyRect: try #require(resolution.result.dirtyRect),
+                isApproximatePreview: resolution.result.isApproximatePreview
+            )
+        }
+
+        #expect(fullSamples.count > 1_000)
+        #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
+    }
+
+    @Test
     func appendedPreviewCapturesRenderSnapshotWhenNoStrokeBaseExists() throws {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
@@ -66,6 +178,7 @@ struct DocumentStrokeApplicationTests {
         let resolution = try #require(useCase.resolveAppended(
             activeStrokeBaseSnapshot: nil,
             renderSnapshot: renderSnapshot,
+            renderState: nil,
             samples: [stylusSample(x: 1, y: 1)],
             fullSamples: [],
             context: makeContext(layerIndex: 0),
