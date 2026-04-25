@@ -1,7 +1,9 @@
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest

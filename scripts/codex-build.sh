@@ -7,9 +7,17 @@ cd "$ROOT_DIR"
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 
 xcodebuild \
+  -resolvePackageDependencies \
   -project Primo.xcodeproj \
   -scheme Primo \
-  -sdk iphonesimulator \
+  -clonedSourcePackagesDirPath build/SourcePackages
+
+scripts/patch-swift-navigation-package.sh
+
+xcodebuild \
+  -project Primo.xcodeproj \
+  -scheme Primo \
+  -destination 'generic/platform=iOS Simulator' \
   -configuration Debug \
   -derivedDataPath build/DerivedData \
   -clonedSourcePackagesDirPath build/SourcePackages \

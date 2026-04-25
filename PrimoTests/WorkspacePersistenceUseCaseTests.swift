@@ -1,4 +1,7 @@
 import Foundation
+import PrimoCoreTypes
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest
@@ -103,10 +106,10 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         let support = WorkspaceApplicationServices(
             documentPersistenceGateway: .stub(),
             documentWorkspaceClient: .stub(
-                persistProjectSnapshot: { _, _ in savedURL },
                 discardAutosaveSnapshot: { _ in
                     throw TestError.expected("autosave cleanup failed")
-                }
+                },
+                persistProjectSnapshot: { _, _ in savedURL }
             ),
             uuidClient: UUIDClient(
                 generate: { UUID(uuidString: "00000000-0000-0000-0000-0000000000A3")! }

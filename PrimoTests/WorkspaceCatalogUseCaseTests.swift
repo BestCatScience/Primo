@@ -1,4 +1,6 @@
 import Foundation
+import PrimoCoreTypes
+import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest

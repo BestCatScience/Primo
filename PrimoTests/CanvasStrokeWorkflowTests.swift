@@ -1,7 +1,10 @@
 import ComposableArchitecture
 import Foundation
+import PrimoDocumentApplication
+import PrimoDocumentContracts
 import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
+import PrimoNanoBananaDomain
 import XCTest
 @testable import Primo
 
@@ -19,7 +22,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return feature.prepareCanvasStrokeEditing(state: &state)
         }
 
-        XCTAssertEqual(result, .failure(.layerLocked(0)))
+        switch result {
+        case .success:
+            XCTFail("Expected layer locked failure")
+        case let .failure(failure):
+            XCTAssertEqual(failure, .layerLocked(0))
+        }
     }
 
     func testGpuStrokeCommitSurfacesSessionFailure() {
@@ -46,10 +54,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             )
         }
 
-        XCTAssertEqual(
-            result,
-            .failed(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
-        )
+        switch result {
+        case .committed:
+            XCTFail("Expected GPU stroke commit failure")
+        case let .failed(failure):
+            XCTAssertEqual(failure, .bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
+        }
     }
 
     func testPreviewOutcomeAppliesGpuRenderState() {
@@ -174,7 +184,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             )
         }
 
-        XCTAssertEqual(result, .committed(DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false)))
+        switch result {
+        case let .committed(contract):
+            XCTAssertEqual(contract, AppFeature.DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false))
+        case let .failed(failure):
+            XCTFail("Expected committed GPU surface mutation, got \(failure)")
+        }
         XCTAssertEqual(surfaceCalls.values.first?.gpuBufferHandle, handle)
         XCTAssertEqual(surfaceCalls.values.first?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
     }
@@ -182,25 +197,25 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testFillFailureRemainsTyped() {
         let sample = StylusSample.testValue()
         let result = withDependencies {
-            $0.documentInteractionService = .stub(
-                execute: { request in
-                    switch request {
-                    case .fill:
-                        return .failure(.invalidLayerIndex(4))
-                    default:
-                        return .success(.none)
-                    }
-                }
+            $0.documentRuntimeComposition = .stub(
+                strokeGateway: .stub(
+                    fill: { _, _ in .failure(.invalidLayerIndex(4)) }
+                )
             )
         } operation: {
             let feature = AppFeature()
-            return feature.documentInteractionService.fill(
+            return feature.documentStrokeCommandService.fill(
                 sample,
-                brush: feature.resolvedBrushSettings(for: AppFeature.State())
+                feature.resolvedBrushSettings(for: AppFeature.State())
             )
         }
 
-        XCTAssertEqual(result, .failure(.invalidLayerIndex(4)))
+        switch result {
+        case .success:
+            XCTFail("Expected invalid layer failure")
+        case let .failure(failure):
+            XCTAssertEqual(failure, .invalidLayerIndex(4))
+        }
     }
 
     func testLayerContentTransactionRollsBackCreatedLayerOnFailure() {
@@ -328,7 +343,11 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             let preview = NanoBananaPreviewState(
                 descriptor: descriptor,
                 outputLayerIndex: 0,
-                pixelData: Data([0x00]),
+                outputSurface: DocumentCompositeSurface(
+                    width: 1,
+                    height: 1,
+                    pixelData: Data([0x00, 0x00, 0x00, 0x00])
+                ),
                 beforePreviewImageData: nil,
                 afterPreviewImageData: nil
             )

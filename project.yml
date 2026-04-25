@@ -6,6 +6,36 @@ packages:
   ComposableArchitecture:
     url: https://github.com/pointfreeco/swift-composable-architecture
     exactVersion: 1.25.2
+  CasePaths:
+    url: https://github.com/pointfreeco/swift-case-paths
+    exactVersion: 1.7.2
+  Clocks:
+    url: https://github.com/pointfreeco/swift-clocks
+    exactVersion: 1.0.6
+  CombineSchedulers:
+    url: https://github.com/pointfreeco/combine-schedulers
+    exactVersion: 1.1.0
+  ConcurrencyExtras:
+    url: https://github.com/pointfreeco/swift-concurrency-extras
+    exactVersion: 1.3.2
+  CustomDump:
+    url: https://github.com/pointfreeco/swift-custom-dump
+    exactVersion: 1.5.0
+  Dependencies:
+    url: https://github.com/pointfreeco/swift-dependencies
+    exactVersion: 1.11.0
+  IdentifiedCollections:
+    url: https://github.com/pointfreeco/swift-identified-collections
+    exactVersion: 1.1.1
+  IssueReporting:
+    url: https://github.com/pointfreeco/xctest-dynamic-overlay
+    exactVersion: 1.9.0
+  Perception:
+    url: https://github.com/pointfreeco/swift-perception
+    exactVersion: 2.0.9
+  Sharing:
+    url: https://github.com/pointfreeco/swift-sharing
+    exactVersion: 2.7.4
   PrimoModules:
     path: Packages/PrimoModules
 settings:
@@ -28,6 +58,25 @@ targets:
         CLANG_ENABLE_OBJC_ARC: YES
     dependencies:
       - package: ComposableArchitecture
+      - package: CasePaths
+        product: CasePaths
+      - package: CasePaths
+        product: CasePathsCore
+      - package: Clocks
+      - package: CombineSchedulers
+      - package: ConcurrencyExtras
+      - package: CustomDump
+      - package: Dependencies
+        product: Dependencies
+      - package: Dependencies
+        product: DependenciesMacros
+      - package: IdentifiedCollections
+      - package: IssueReporting
+      - package: Perception
+        product: Perception
+      - package: Perception
+        product: PerceptionCore
+      - package: Sharing
       - package: PrimoModules
         product: PrimoWorkspaceApplication
       - package: PrimoModules
@@ -55,4 +104,69 @@ targets:
       - sdk: MetalKit.framework
       - sdk: UIKit.framework
     scheme:
-      testTargets: []
+      preActions:
+        - name: Patch SwiftNavigation package manifest
+          script: '"${PROJECT_DIR}/scripts/patch-swift-navigation-package.sh"'
+          settingsTarget: Primo
+      testTargets:
+        - PrimoTests
+  PrimoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: PrimoTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo.tests
+        PRODUCT_NAME: PrimoTests
+        TARGETED_DEVICE_FAMILY: 2
+        IPHONEOS_DEPLOYMENT_TARGET: 26.0
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Primo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Primo"
+    dependencies:
+      - target: Primo
+      - package: ComposableArchitecture
+      - package: CasePaths
+        product: CasePaths
+      - package: CasePaths
+        product: CasePathsCore
+      - package: Clocks
+      - package: CombineSchedulers
+      - package: ConcurrencyExtras
+      - package: CustomDump
+      - package: Dependencies
+        product: Dependencies
+      - package: Dependencies
+        product: DependenciesMacros
+      - package: IdentifiedCollections
+      - package: IssueReporting
+      - package: Perception
+        product: Perception
+      - package: Perception
+        product: PerceptionCore
+      - package: Sharing
+      - package: PrimoModules
+        product: PrimoCoreTypes
+      - package: PrimoModules
+        product: PrimoDocumentApplication
+      - package: PrimoModules
+        product: PrimoDocumentContracts
+      - package: PrimoModules
+        product: PrimoDocumentDomain
+      - package: PrimoModules
+        product: PrimoDocumentEngineInfrastructure
+      - package: PrimoModules
+        product: PrimoDocumentGPUContracts
+      - package: PrimoModules
+        product: PrimoDocumentStrokeApplication
+      - package: PrimoModules
+        product: PrimoNanoBananaApplication
+      - package: PrimoModules
+        product: PrimoNanoBananaDomain
+      - package: PrimoModules
+        product: PrimoNanoBananaInfrastructure
+      - package: PrimoModules
+        product: PrimoWorkspaceApplication
+      - package: PrimoModules
+        product: PrimoWorkspaceInfrastructure

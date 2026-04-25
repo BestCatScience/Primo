@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo

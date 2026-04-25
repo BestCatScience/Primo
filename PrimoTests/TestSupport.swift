@@ -1,7 +1,10 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
+import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentContracts
+import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
@@ -120,7 +123,7 @@ extension StylusSample {
 
 extension WorkspaceItemID {
     static func testValue(_ rawValue: String = "workspace-item") -> Self {
-        .unchecked(rawValue)
+        Self(unchecked: rawValue)
     }
 }
 
@@ -128,12 +131,16 @@ extension DocumentQueryGateway {
     static func stub(
         presentation: PaintDocumentPresentation = .testValue(),
         compositePixelData: @escaping @Sendable () -> Data = { Data() },
+        compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface = {
+            DocumentCompositeSurface(width: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
+        },
         pixelDataForLayer: @escaping @Sendable (Int) -> Data = { _ in Data() }
     ) -> Self {
         Self(
             lightweightPresentation: { presentation },
             presentation: { presentation },
             compositePixelData: compositePixelData,
+            compositeSurface: compositeSurface,
             pixelDataForLayer: pixelDataForLayer,
             consumeDirtyUpdate: { nil }
         )
@@ -223,22 +230,12 @@ extension DocumentLayerEffectsGateway {
 
 extension DocumentEditingGateway {
     static func stub(
-        execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> = { _ in
-            .success(.none)
-        }
-    ) -> Self {
-        Self(execute: execute)
-    }
-}
-
-extension DocumentInteractionService {
-    static func stub(
-        execute: @escaping @Sendable (DocumentInteractionRequest) -> Result<DocumentInteractionResult, DocumentMutationFailure> = { request in
+        execute: @escaping @Sendable (DocumentEditingRequest) -> Result<DocumentEditingResult, DocumentMutationFailure> = { request in
             switch request {
-            case .compositePixelData:
-                return .success(.compositePixelData(Data()))
-            default:
-                return .success(.none)
+            case .structure:
+                return .success(.structure(LayerStructureMutationPlan()))
+            case .attribute:
+                return .success(.attribute(LayerAttributeMutationPlan()))
             }
         }
     ) -> Self {
@@ -286,7 +283,8 @@ extension DocumentRuntimeComposition {
         textLayerGateway: TextLayerGateway = .stub(),
         layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
         editingGateway: DocumentEditingGateway? = nil,
-        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil
+        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
+        gpuOperationGateway: DocumentGpuOperationGateway = .stub()
     ) -> Self {
         let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
         return Self(
@@ -299,7 +297,40 @@ extension DocumentRuntimeComposition {
             textLayerGateway: textLayerGateway,
             layerEffectsGateway: layerEffectsGateway,
             editingGateway: resolvedEditingGateway,
-            strokeSessionUseCase: strokeSessionUseCase ?? .stub()
+            strokeSessionUseCase: strokeSessionUseCase ?? .stub(),
+            gpuOperationGateway: gpuOperationGateway
+        )
+    }
+}
+
+extension DocumentGpuOperationGateway {
+    static func stub() -> Self {
+        Self(
+            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
+            compositedPreviewPixelData: { _, _, _ in nil },
+            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
+            selectionOverlayRGBA: { _, _, _ in nil },
+            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
+            shapePreviewSurface: { _, _, _, _ in nil },
+            textLayerSurface: { _, _ in nil },
+            textLayoutRect: { _, _ in nil },
+            processedLayerPixelData: { _, _, _, _ in nil },
+            alphaMask: { _, _, _ in nil },
+            croppedSelectionMask: { _, _, _ in nil },
+            combinedSelectionMask: { _, _, _, _, _ in nil },
+            expandedSelectionMask: { _, _, _, _, _, _, _ in nil },
+            lassoSelection: { _, _, _ in nil },
+            autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
+            colorRangeSelection: { _, _, _, _ in nil },
+            expandedMask: { _, _, _, _ in nil },
+            contractedMask: { _, _, _, _ in nil },
+            featheredMask: { _, _, _, _ in nil },
+            invertMask: { _ in nil },
+            transformedSelectionMask: { _, _, _, _, _, _, _, _, _, _, _ in nil },
+            transformedLayerPixelData: { _, _, _, _, _, _, _, _, _, _, _, _ in nil },
+            scaledPixelData: { _, _, _, _, _ in nil },
+            translatedPixelData: { _, _, _, _, _, _, _ in nil },
+            releaseSurfaceHandle: { _ in }
         )
     }
 }
