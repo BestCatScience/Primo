@@ -32,12 +32,13 @@ extension AppFeature {
             baseSnapshot: MetalDocumentSnapshot,
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data,
+            gpuOperations: DocumentGpuOperationGateway,
             to state: inout AppFeature.State
         ) -> Bool {
-            guard let composite = AppFeature.compositedPreviewPixelData(
-                snapshot: baseSnapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedActiveLayerPixels
+            guard let composite = gpuOperations.compositedPreviewPixelData(
+                baseSnapshot,
+                activeLayerIndex,
+                adjustedActiveLayerPixels
             ) else {
                 return false
             }

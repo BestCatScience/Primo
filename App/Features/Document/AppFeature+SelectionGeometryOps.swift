@@ -154,7 +154,8 @@ extension AppFeature {
         rotationDegrees: Double,
         pivot: CGPoint?,
         mode: CanvasTransformMode,
-        quadOffsets: TransformQuadOffsets
+        quadOffsets: TransformQuadOffsets,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> Data? {
         guard
             translation != .zero ||
@@ -172,22 +173,22 @@ extension AppFeature {
         let mask: [UInt8]?
         let bounds: CGRect
         if let selection {
-            guard let expanded = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            guard let expanded = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
                 return nil
             }
             mask = expanded
             bounds = selection.bounds
         } else {
             guard
-                let alphaMask = CanvasDocumentRenderingServices.live.alphaMask(
-                    pixelData: source,
-                    width: canvasWidth,
-                    height: canvasHeight
+                let alphaMask = gpuOperations.alphaMask(
+                    source,
+                    canvasWidth,
+                    canvasHeight
                 ),
-                let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
-                    mask: alphaMask,
-                    width: canvasWidth,
-                    height: canvasHeight
+                let cropped = gpuOperations.croppedSelectionMask(
+                    alphaMask,
+                    canvasWidth,
+                    canvasHeight
                 )
             else {
                 return nil
@@ -206,19 +207,19 @@ extension AppFeature {
             quadOffsets: quadOffsets
         )
 
-        return CanvasDocumentRenderingServices.live.transformedLayerPixelData(
-            source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            expandedSelectionMask: mask,
-            translation: translation,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: resolved.pivot,
-            sourceQuad: resolved.source,
-            destinationQuad: resolved.effective,
-            usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+        return gpuOperations.transformedLayerPixelData(
+            source,
+            canvasWidth,
+            canvasHeight,
+            mask,
+            translation,
+            scaleX,
+            scaleY,
+            rotationDegrees,
+            resolved.pivot,
+            resolved.source,
+            resolved.effective,
+            mode == .freeform && !quadOffsets.isZero
         )
     }
 
@@ -231,12 +232,13 @@ extension AppFeature {
         pivot: CGPoint?,
         mode: CanvasTransformMode,
         quadOffsets: TransformQuadOffsets,
-        canvasSize: CGSize
+        canvasSize: CGSize,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
             return nil
         }
         let bounds = selection.bounds
@@ -250,33 +252,34 @@ extension AppFeature {
             mode: mode,
             quadOffsets: quadOffsets
         )
-        guard let transformed = CanvasDocumentRenderingServices.live.transformedSelectionMask(
-            expandedSelectionMask: mask,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            translation: translation,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            rotationDegrees: rotationDegrees,
-            pivot: resolved.pivot,
-            sourceQuad: resolved.source,
-            destinationQuad: resolved.effective,
-            usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+        guard let transformed = gpuOperations.transformedSelectionMask(
+            mask,
+            canvasWidth,
+            canvasHeight,
+            translation,
+            scaleX,
+            scaleY,
+            rotationDegrees,
+            resolved.pivot,
+            resolved.source,
+            resolved.effective,
+            mode == .freeform && !quadOffsets.isZero
         ) else {
             return nil
         }
 
-        return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+        return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode, gpuOperations: gpuOperations)
     }
 
     static func layerMaskData(
         from selection: CanvasSelection?,
-        canvasSize: CGSize
+        canvasSize: CGSize,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> Data? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
             return nil
         }
         return Data(mask)
@@ -286,21 +289,22 @@ extension AppFeature {
         selection: CanvasSelection?,
         pixelData: Data,
         canvasWidth: Int,
-        canvasHeight: Int
+        canvasHeight: Int,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CGRect? {
         if let selection, !selection.isEmpty {
             return selection.bounds
         }
         guard
-            let alphaMask = CanvasDocumentRenderingServices.live.alphaMask(
-                pixelData: pixelData,
-                width: canvasWidth,
-                height: canvasHeight
+            let alphaMask = gpuOperations.alphaMask(
+                pixelData,
+                canvasWidth,
+                canvasHeight
             ),
-            let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
-                mask: alphaMask,
-                width: canvasWidth,
-                height: canvasHeight
+            let cropped = gpuOperations.croppedSelectionMask(
+                alphaMask,
+                canvasWidth,
+                canvasHeight
             )
         else {
             return nil

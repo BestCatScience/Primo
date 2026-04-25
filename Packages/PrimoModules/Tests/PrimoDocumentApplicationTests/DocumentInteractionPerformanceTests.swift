@@ -6,7 +6,7 @@ import PrimoDocumentContracts
 import XCTest
 
 final class DocumentCommandPerformanceTests: XCTestCase {
-    func testApplySoftwareStrokeRequestDispatchPerformance() {
+    func testApplyGpuStrokeSurfaceRequestDispatchPerformance() {
         let samples = (0..<512).map { index in
             StylusSample(
                 point: CGPoint(x: index, y: index),
@@ -25,7 +25,7 @@ final class DocumentCommandPerformanceTests: XCTestCase {
                 blurStroke: { _, _, _, _ in .success(()) },
                 endBlurStroke: {},
                 fill: { _, _ in .success(()) },
-                applySoftwareStroke: { _, _, _ in .success(()) }
+                applyGpuStrokeSurface: { _, _, _ in .success(()) }
             )
         )
         let brush = BrushRuntimeSettings(
@@ -53,8 +53,8 @@ final class DocumentCommandPerformanceTests: XCTestCase {
         )
 
         measure {
-            guard case .success = service.applySoftwareStroke(samples, brush, 0) else {
-                XCTFail("Expected applySoftwareStroke command dispatch to succeed")
+            guard case .success = service.applyGpuStrokeSurface(samples, brush, 0) else {
+                XCTFail("Expected applyGpuStrokeSurface command dispatch to succeed")
                 return
             }
         }

@@ -3,6 +3,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
 public struct DocumentRuntimeComposition: Sendable {
@@ -16,6 +17,7 @@ public struct DocumentRuntimeComposition: Sendable {
     public var layerEffectsGateway: DocumentLayerEffectsGateway
     public var editingGateway: DocumentEditingGateway
     public var strokeSessionUseCase: DocumentStrokeSessionUseCase
+    public var gpuOperationGateway: DocumentGpuOperationGateway
 
     public init(
         queryGateway: DocumentQueryGateway,
@@ -27,7 +29,8 @@ public struct DocumentRuntimeComposition: Sendable {
         textLayerGateway: TextLayerGateway,
         layerEffectsGateway: DocumentLayerEffectsGateway,
         editingGateway: DocumentEditingGateway,
-        strokeSessionUseCase: DocumentStrokeSessionUseCase
+        strokeSessionUseCase: DocumentStrokeSessionUseCase,
+        gpuOperationGateway: DocumentGpuOperationGateway
     ) {
         self.queryGateway = queryGateway
         self.mutationGateway = mutationGateway
@@ -39,6 +42,7 @@ public struct DocumentRuntimeComposition: Sendable {
         self.layerEffectsGateway = layerEffectsGateway
         self.editingGateway = editingGateway
         self.strokeSessionUseCase = strokeSessionUseCase
+        self.gpuOperationGateway = gpuOperationGateway
     }
 }
 
@@ -67,7 +71,8 @@ public enum DocumentRuntimeCompositionFactory {
                 mergeLayerDown: runtime.mergeLayerDown
             ),
             editingGateway: runtime.makeEditingGateway(),
-            strokeSessionUseCase: strokeUseCases.session
+            strokeSessionUseCase: strokeUseCases.session,
+            gpuOperationGateway: DocumentGpuOperationGatewayFactory.live()
         )
     }
 }

@@ -160,7 +160,7 @@ private func strokeGateway() -> StrokeInputGateway {
         blurStroke: { _, _, _, _ in .success(()) },
         endBlurStroke: {},
         fill: { _, _ in .success(()) },
-        applySoftwareStroke: { _, _, _ in .success(()) }
+        applyGpuStrokeSurface: { _, _, _ in .success(()) }
     )
 }
 

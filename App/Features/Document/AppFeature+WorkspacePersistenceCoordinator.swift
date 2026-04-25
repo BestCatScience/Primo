@@ -3,7 +3,6 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentMetalRuntimeInfrastructure
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 
@@ -117,7 +116,7 @@ extension AppFeature {
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface? {
         state.canvas.renderSnapshot.map {
-            AppFeature.renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
+            renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
         } ?? documentPresentationQueryService.compositeSurface(
             paperStyle: paperStyle
         )

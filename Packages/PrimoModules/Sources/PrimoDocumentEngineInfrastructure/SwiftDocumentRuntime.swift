@@ -708,7 +708,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func endStroke() {
         guard let currentStroke else { return }
-        _ = applySoftwareStroke(samples: currentStroke.samples, brush: currentStroke.brush, layerIndex: currentStroke.layerIndex)
+        _ = applyGpuStrokeSurface(samples: currentStroke.samples, brush: currentStroke.brush, layerIndex: currentStroke.layerIndex)
         self.currentStroke = nil
     }
 
@@ -806,7 +806,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
     }
 
-    func applySoftwareStroke(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
+    func applyGpuStrokeSurface(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
         let gpuResult = strokes.executeStrokeMutation(
@@ -836,19 +836,32 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let adjustedOutput: Data
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[layerIndex].alphaLocked {
-            let committedOutput = gpuResult.gpuBufferHandle.flatMap {
-                resources.materializedPixelData(for: $0)
-            } ?? gpuResult.rectPixelData ?? Data()
-            guard committedOutput.count == rgbaByteCount else {
-                return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+            if let sourceHandle = gpuResult.gpuBufferHandle {
+                guard let alphaPreservedHandle = layers.preservingExistingAlphaBufferHandle(
+                    sourceHandle: sourceHandle,
+                    existingHandle: gpuLayerHandles[layerIndex],
+                    existingPixelData: existing,
+                    width: store.snapshot.canvasWidth,
+                    height: store.snapshot.canvasHeight
+                ) else {
+                    resources.release(sourceHandle)
+                    return .failure(.bridgeMutationFailed("applyCommittedStrokeAlphaPreserve"))
+                }
+                adjustedOutput = existing
+                nextHandle = alphaPreservedHandle
+                resources.release(sourceHandle)
+            } else {
+                let committedOutput = gpuResult.rectPixelData ?? Data()
+                guard committedOutput.count == rgbaByteCount else {
+                    return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+                }
+                adjustedOutput = preserveExistingAlphaIfNeeded(
+                    committedOutput,
+                    existing: existing,
+                    isAlphaLocked: true
+                )
+                nextHandle = nil
             }
-            adjustedOutput = preserveExistingAlphaIfNeeded(
-                committedOutput,
-                existing: existing,
-                isAlphaLocked: true
-            )
-            nextHandle = nil
-            resources.release(gpuResult.gpuBufferHandle)
         } else if let handle = gpuResult.gpuBufferHandle {
             adjustedOutput = existing
             nextHandle = handle
@@ -1146,7 +1159,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         switch operation {
         case let .stroke(layerIndex, brush, samples):
             _ = setActiveLayer(index: layerIndex.rawValue)
-            _ = applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex.rawValue)
+            _ = applyGpuStrokeSurface(samples: samples, brush: brush, layerIndex: layerIndex.rawValue)
         case let .blurStroke(layerIndex, brush, samples):
             _ = blur(samples: samples, brush: brush, layerIndex: layerIndex.rawValue, captureTimelapse: false)
             endBlurStroke()

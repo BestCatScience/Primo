@@ -2,6 +2,7 @@ import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentStrokeInfrastructure
 import SwiftUI
 
 enum PhotoshopDynamicControl: String, CaseIterable, Identifiable {
@@ -372,7 +373,12 @@ struct BrushStrokePreview: View {
         BrushStrokeKernel.previewStampAlpha(
             pressure: pressure,
             opacityJitter: opacityJitter,
-            style: style
+            opacity: style.opacity,
+            flow: style.flow,
+            hardness: style.hardness,
+            opacityPressureSensitivity: style.opacityPressureSensitivity,
+            flowPressureSensitivity: style.flowPressureSensitivity,
+            hasCustomTip: style.customTip != nil
         )
     }
 

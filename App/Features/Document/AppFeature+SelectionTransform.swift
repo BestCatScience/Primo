@@ -63,7 +63,8 @@ extension AppFeature {
             rotationDegrees: rotationDegrees,
             pivot: transformPivot,
             mode: transformMode,
-            quadOffsets: quadOffsets
+            quadOffsets: quadOffsets,
+            gpuOperations: documentGpuOperationGateway
         ) else {
             return nil
         }
@@ -80,7 +81,8 @@ extension AppFeature {
                     pivot: transformPivot,
                     mode: transformMode,
                     quadOffsets: quadOffsets,
-                    canvasSize: state.canvas.canvasSize
+                    canvasSize: state.canvas.canvasSize,
+                    gpuOperations: documentGpuOperationGateway
                 )
             )
         )

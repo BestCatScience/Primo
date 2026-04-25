@@ -728,7 +728,7 @@ public struct StrokeInputGateway: Sendable {
     public var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
     public var endBlurStroke: @Sendable () -> Void
     public var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
-    public var applySoftwareStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
+    public var applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
     public init(
         beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> Void,
@@ -738,7 +738,7 @@ public struct StrokeInputGateway: Sendable {
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> Void,
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult,
-        applySoftwareStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
+        applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     ) {
         self.beginStroke = beginStroke
         self.appendStroke = appendStroke
@@ -747,7 +747,84 @@ public struct StrokeInputGateway: Sendable {
         self.blurStroke = blurStroke
         self.endBlurStroke = endBlurStroke
         self.fill = fill
-        self.applySoftwareStroke = applySoftwareStroke
+        self.applyGpuStrokeSurface = applyGpuStrokeSurface
+    }
+}
+
+public enum DocumentSelectionCombineMode: Sendable {
+    case add
+    case subtract
+}
+
+public struct DocumentCroppedSelectionMask: Sendable, Equatable {
+    public let bounds: CGRect
+    public let maskData: Data
+    public let maskWidth: Int
+    public let maskHeight: Int
+
+    public init(bounds: CGRect, maskData: Data, maskWidth: Int, maskHeight: Int) {
+        self.bounds = bounds
+        self.maskData = maskData
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+    }
+}
+
+public struct DocumentGpuOperationGateway: Sendable {
+    public var compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
+    public var compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?
+    public var compositedPreviewIncrementalUpdate: @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate?
+    public var processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data?
+    public var alphaMask: @Sendable (Data, Int, Int) -> [UInt8]?
+    public var croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    public var combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]?
+    public var expandedSelectionMask: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> [UInt8]?
+    public var lassoSelection: @Sendable ([CGPoint], Int, Int) -> [UInt8]?
+    public var autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]?
+    public var colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]?
+    public var expandedMask: @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?
+    public var contractedMask: @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?
+    public var featheredMask: @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?
+    public var invertMask: @Sendable ([UInt8]) -> [UInt8]?
+    public var transformedSelectionMask: @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?
+    public var transformedLayerPixelData: @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?
+
+    public init(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?,
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?,
+        compositedPreviewIncrementalUpdate: @escaping @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate?,
+        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data?,
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]?,
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
+        combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]?,
+        expandedSelectionMask: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> [UInt8]?,
+        lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> [UInt8]?,
+        autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]?,
+        colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]?,
+        expandedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
+        contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
+        featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
+        invertMask: @escaping @Sendable ([UInt8]) -> [UInt8]?,
+        transformedSelectionMask: @escaping @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?,
+        transformedLayerPixelData: @escaping @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?
+    ) {
+        self.compositedPaperPreviewRGBA = compositedPaperPreviewRGBA
+        self.compositedPreviewPixelData = compositedPreviewPixelData
+        self.compositedPreviewIncrementalUpdate = compositedPreviewIncrementalUpdate
+        self.processedLayerPixelData = processedLayerPixelData
+        self.alphaMask = alphaMask
+        self.croppedSelectionMask = croppedSelectionMask
+        self.combinedSelectionMask = combinedSelectionMask
+        self.expandedSelectionMask = expandedSelectionMask
+        self.lassoSelection = lassoSelection
+        self.autoSelection = autoSelection
+        self.colorRangeSelection = colorRangeSelection
+        self.expandedMask = expandedMask
+        self.contractedMask = contractedMask
+        self.featheredMask = featheredMask
+        self.invertMask = invertMask
+        self.transformedSelectionMask = transformedSelectionMask
+        self.transformedLayerPixelData = transformedLayerPixelData
     }
 }
 

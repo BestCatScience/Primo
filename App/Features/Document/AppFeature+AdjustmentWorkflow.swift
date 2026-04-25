@@ -72,11 +72,11 @@ extension AppFeature {
         else {
             return nil
         }
-        return CanvasDocumentRenderingServices.live.processedLayerPixelData(
-            pixelData: layer.pixelData,
-            canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height,
-            request: request
+        return documentGpuOperationGateway.processedLayerPixelData(
+            layer.pixelData,
+            snapshot.width,
+            snapshot.height,
+            request
         )
     }
 
@@ -87,7 +87,7 @@ extension AppFeature {
         guard
             let adjustedPixels,
             let snapshot = state.canvas.renderSnapshot,
-            let composite = Self.compositedPreviewPixelData(
+            let composite = compositedPreviewPixelData(
                 snapshot: snapshot,
                 activeLayerIndex: state.canvas.activeLayerIndex,
                 adjustedActiveLayerPixels: adjustedPixels

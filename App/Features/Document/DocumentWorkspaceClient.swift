@@ -10,6 +10,7 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
         @Dependency(\.dateClient) var dateClient
         @Dependency(\.uuidClient) var uuidClient
         @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
+        @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
 
         return .live(
             fileClient: fileClient,
@@ -21,7 +22,8 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
                     let previewSurface = loaded.presentation.renderSnapshot.map {
                         AppFeature.renderedCompositeSurface(
                             snapshot: $0,
-                            paperStyle: loaded.paperStyle
+                            paperStyle: loaded.paperStyle,
+                            gpuOperations: documentGpuOperationGateway
                         )
                     }
                     return DocumentWorkspacePreview(

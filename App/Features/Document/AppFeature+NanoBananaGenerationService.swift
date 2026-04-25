@@ -21,7 +21,8 @@ extension AppFeature {
     private struct NanoBananaRequestContract {
         func validate(
             command: SubmitNanoBananaEditCommand,
-            state: AppFeature.State
+            state: AppFeature.State,
+            gpuOperations: DocumentGpuOperationGateway
         ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationFailure> {
             guard
                 let snapshot = state.canvas.renderSnapshot,
@@ -35,7 +36,8 @@ extension AppFeature {
                     state.canvas.selection,
                     canvasSize: state.canvas.canvasSize,
                     expansion: command.descriptor.maskSettings.expansion,
-                    isInverted: command.descriptor.maskSettings.isInverted
+                    isInverted: command.descriptor.maskSettings.isInverted,
+                    gpuOperations: gpuOperations
                 )
                 : nil
             if command.descriptor.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
@@ -55,7 +57,8 @@ extension AppFeature {
                 guard let expandedMask = AppFeature.expandedMask(
                     from: adjustedSelection,
                     canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height
+                    canvasHeight: snapshot.height,
+                    gpuOperations: gpuOperations
                 ) else {
                     return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
                 }
@@ -240,7 +243,11 @@ extension AppFeature {
         request: SubmitNanoBananaEditCommand
     ) -> Effect<Action> {
         let validatedEdit: NanoBananaValidatedEdit
-        switch nanoBananaRequestContract.validate(command: request, state: state) {
+        switch nanoBananaRequestContract.validate(
+            command: request,
+            state: state,
+            gpuOperations: documentGpuOperationGateway
+        ) {
         case let .failure(error):
             state.application.presentFeedback(error.feedback)
             return .none

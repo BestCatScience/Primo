@@ -111,7 +111,7 @@ public struct DocumentStrokeCommandService: Sendable {
     public var appendStroke: @Sendable (StylusSample) -> Void
     public var endStroke: @Sendable () -> Void
     public var cancelStroke: @Sendable () -> Void
-    public var applySoftwareStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
+    public var applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
     public var blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
     public var endBlurStroke: @Sendable () -> Void
     public var fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
@@ -121,7 +121,7 @@ public struct DocumentStrokeCommandService: Sendable {
         appendStroke: @escaping @Sendable (StylusSample) -> Void,
         endStroke: @escaping @Sendable () -> Void,
         cancelStroke: @escaping @Sendable () -> Void,
-        applySoftwareStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
+        applyGpuStrokeSurface: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
         blurStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> Void,
         fill: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
@@ -130,7 +130,7 @@ public struct DocumentStrokeCommandService: Sendable {
         self.appendStroke = appendStroke
         self.endStroke = endStroke
         self.cancelStroke = cancelStroke
-        self.applySoftwareStroke = applySoftwareStroke
+        self.applyGpuStrokeSurface = applyGpuStrokeSurface
         self.blurStroke = blurStroke
         self.endBlurStroke = endBlurStroke
         self.fill = fill
@@ -142,7 +142,7 @@ public struct DocumentStrokeCommandService: Sendable {
             appendStroke: strokeGateway.appendStroke,
             endStroke: strokeGateway.endStroke,
             cancelStroke: strokeGateway.cancelStroke,
-            applySoftwareStroke: strokeGateway.applySoftwareStroke,
+            applyGpuStrokeSurface: strokeGateway.applyGpuStrokeSurface,
             blurStroke: strokeGateway.blurStroke,
             endBlurStroke: strokeGateway.endBlurStroke,
             fill: strokeGateway.fill

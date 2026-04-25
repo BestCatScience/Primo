@@ -100,8 +100,8 @@ public enum DocumentEngineFactory {
             },
             endBlurStroke: { runtimeBox.withRuntime { $0.endBlurStroke() } },
             fill: { sample, brush in runtimeBox.withRuntime { $0.fill(sample: sample, brush: brush) } },
-            applySoftwareStroke: { samples, brush, layerIndex in
-                runtimeBox.withRuntime { $0.applySoftwareStroke(samples: samples, brush: brush, layerIndex: layerIndex) }
+            applyGpuStrokeSurface: { samples, brush, layerIndex in
+                runtimeBox.withRuntime { $0.applyGpuStrokeSurface(samples: samples, brush: brush, layerIndex: layerIndex) }
             }
         )
 

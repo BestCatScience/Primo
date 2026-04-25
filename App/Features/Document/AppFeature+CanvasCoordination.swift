@@ -87,6 +87,7 @@ extension AppFeature {
             baseSnapshot: baseSnapshot,
             activeLayerIndex: activeLayerIndex,
             adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+            gpuOperations: documentGpuOperationGateway,
             to: &state
         ) {
             state.application.finishHydration()

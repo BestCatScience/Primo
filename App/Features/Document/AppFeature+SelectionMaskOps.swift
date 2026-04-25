@@ -8,7 +8,8 @@ extension AppFeature {
         existing: CanvasSelection?,
         incoming: CanvasSelection?,
         mode: SelectionCombineMode,
-        canvasSize: CGSize
+        canvasSize: CGSize,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         switch mode {
         case .replace:
@@ -22,24 +23,24 @@ extension AppFeature {
             let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
             let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
             guard
-                let baseMask = expandedMask(from: existing, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
-                let incomingMask = expandedMask(from: incoming, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
-                let combined = CanvasDocumentRenderingServices.live.combinedSelectionMask(
-                    base: baseMask,
-                    incoming: incomingMask,
-                    mode: mode == .add ? .add : .subtract,
-                    width: canvasWidth,
-                    height: canvasHeight
+                let baseMask = expandedMask(from: existing, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations),
+                let incomingMask = expandedMask(from: incoming, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations),
+                let combined = gpuOperations.combinedSelectionMask(
+                    baseMask,
+                    incomingMask,
+                    mode == .add ? .add : .subtract,
+                    canvasWidth,
+                    canvasHeight
                 )
             else {
                 return nil
             }
 
-            return croppedSelection(from: combined, width: canvasWidth, height: canvasHeight, mode: incoming.mode)
+            return croppedSelection(from: combined, width: canvasWidth, height: canvasHeight, mode: incoming.mode, gpuOperations: gpuOperations)
         }
     }
 
-    static func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+    static func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int, gpuOperations: DocumentGpuOperationGateway) -> [UInt8]? {
         let originX = max(Int(selection.bounds.minX.rounded(.down)), 0)
         let originY = max(Int(selection.bounds.minY.rounded(.down)), 0)
         let width = min(selection.maskWidth, canvasWidth - originX)
@@ -48,14 +49,14 @@ extension AppFeature {
             return [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
         }
 
-        return CanvasDocumentRenderingServices.live.expandedSelectionMask(
-            maskData: selection.maskData,
-            maskWidth: selection.maskWidth,
-            maskHeight: selection.maskHeight,
-            originX: originX,
-            originY: originY,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+        return gpuOperations.expandedSelectionMask(
+            selection.maskData,
+            selection.maskWidth,
+            selection.maskHeight,
+            originX,
+            originY,
+            canvasWidth,
+            canvasHeight
         )
     }
 
@@ -63,32 +64,34 @@ extension AppFeature {
         _ selection: CanvasSelection?,
         canvasSize: CGSize,
         expansion: Int,
-        isInverted: Bool
+        isInverted: Bool,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard var mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard var mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
             return nil
         }
 
         if expansion > 0 {
-            mask = expandedSelectionMask(mask, width: canvasWidth, height: canvasHeight, expansion: expansion)
+            mask = expandedSelectionMask(mask, width: canvasWidth, height: canvasHeight, expansion: expansion, gpuOperations: gpuOperations)
         } else if expansion < 0 {
-            mask = contractedSelectionMask(mask, width: canvasWidth, height: canvasHeight, contraction: abs(expansion))
+            mask = contractedSelectionMask(mask, width: canvasWidth, height: canvasHeight, contraction: abs(expansion), gpuOperations: gpuOperations)
         }
 
         if isInverted {
-            mask = invertedSelectionMask(mask)
+            mask = invertedSelectionMask(mask, gpuOperations: gpuOperations)
         }
 
-        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: selection.mode, gpuOperations: gpuOperations)
     }
 
     static func invertedSelection(
         _ selection: CanvasSelection?,
         canvasSize: CGSize,
-        mode: SelectionToolMode
+        mode: SelectionToolMode,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
@@ -98,30 +101,32 @@ extension AppFeature {
                 selection,
                 canvasSize: canvasSize,
                 expansion: 0,
-                isInverted: true
+                isInverted: true,
+                gpuOperations: gpuOperations
             )
         }
 
         let fullMask = [UInt8](repeating: 255, count: canvasWidth * canvasHeight)
-        return croppedSelection(from: fullMask, width: canvasWidth, height: canvasHeight, mode: mode)
+        return croppedSelection(from: fullMask, width: canvasWidth, height: canvasHeight, mode: mode, gpuOperations: gpuOperations)
     }
 
     static func featheredSelection(
         _ selection: CanvasSelection?,
         canvasSize: CGSize,
-        radius: Int
+        radius: Int,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
             return nil
         }
-        let featheredMask = featheredSelectionMask(mask, width: canvasWidth, height: canvasHeight, radius: radius)
-        return croppedSelection(from: featheredMask, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+        let featheredMask = featheredSelectionMask(mask, width: canvasWidth, height: canvasHeight, radius: radius, gpuOperations: gpuOperations)
+        return croppedSelection(from: featheredMask, width: canvasWidth, height: canvasHeight, mode: selection.mode, gpuOperations: gpuOperations)
     }
 
-    static func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
+    static func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize, gpuOperations: DocumentGpuOperationGateway) -> CanvasSelection? {
         guard points.count >= 3 else { return nil }
 
         let polygon = closedPolygon(points, canvasSize: canvasSize)
@@ -129,14 +134,14 @@ extension AppFeature {
 
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = CanvasDocumentRenderingServices.live.lassoSelection(
-            points: polygon,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+        guard let mask = gpuOperations.lassoSelection(
+            polygon,
+            canvasWidth,
+            canvasHeight
         ) else {
             return nil
         }
-        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .lasso)
+        return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .lasso, gpuOperations: gpuOperations)
     }
 
     static func makeAutoSelection(
@@ -146,7 +151,8 @@ extension AppFeature {
         thresholdMode: FillThresholdMode,
         opacityTolerance: Double,
         colorTolerance: Double,
-        expansion: Int
+        expansion: Int,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         guard
             let snapshot,
@@ -164,16 +170,16 @@ extension AppFeature {
         let expectedCount = width * height * 4
         guard layer.pixelData.count == expectedCount else { return nil }
 
-        guard let selected = CanvasDocumentRenderingServices.live.autoSelection(
-            pixelData: layer.pixelData,
-            canvasWidth: width,
-            canvasHeight: height,
-            seedX: startX,
-            seedY: startY,
-            thresholdMode: thresholdMode,
-            opacityTolerance: opacityTolerance,
-            colorTolerance: colorTolerance,
-            expansion: max(0, expansion)
+        guard let selected = gpuOperations.autoSelection(
+            layer.pixelData,
+            width,
+            height,
+            startX,
+            startY,
+            thresholdMode,
+            opacityTolerance,
+            colorTolerance,
+            max(0, expansion)
         ) else {
             return nil
         }
@@ -181,7 +187,8 @@ extension AppFeature {
             from: selected,
             width: width,
             height: height,
-            mode: .auto
+            mode: .auto,
+            gpuOperations: gpuOperations
         )
     }
 
@@ -189,7 +196,8 @@ extension AppFeature {
         request: ColorRangeSelectionRequest,
         snapshot: MetalDocumentSnapshot?,
         activeLayerIndex: Int,
-        mode: SelectionToolMode
+        mode: SelectionToolMode,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> CanvasSelection? {
         guard let snapshot else { return nil }
         let width = snapshot.width
@@ -206,49 +214,49 @@ extension AppFeature {
         }
 
         guard pixelData.count == width * height * 4 else { return nil }
-        guard let selected = CanvasDocumentRenderingServices.live.colorRangeSelection(
-            pixelData: pixelData,
-            width: width,
-            height: height,
-            request: request
+        guard let selected = gpuOperations.colorRangeSelection(
+            pixelData,
+            width,
+            height,
+            request
         ) else {
             return nil
         }
 
         let expandedMask = request.expansion > 0
-            ? expandedSelectionMask(selected, width: width, height: height, expansion: request.expansion)
+            ? expandedSelectionMask(selected, width: width, height: height, expansion: request.expansion, gpuOperations: gpuOperations)
             : selected
-        return croppedSelection(from: expandedMask, width: width, height: height, mode: mode)
+        return croppedSelection(from: expandedMask, width: width, height: height, mode: mode, gpuOperations: gpuOperations)
     }
 
-    static func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
+    static func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int, gpuOperations: DocumentGpuOperationGateway) -> [UInt8] {
         guard expansion > 0 else { return source }
-        return CanvasDocumentRenderingServices.live.expandedMask(source, width: width, height: height, expansion: expansion)
+        return gpuOperations.expandedMask(source, width, height, expansion)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
-    static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
+    static func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int, gpuOperations: DocumentGpuOperationGateway) -> [UInt8] {
         guard contraction > 0 else { return source }
-        return CanvasDocumentRenderingServices.live.contractedMask(source, width: width, height: height, contraction: contraction)
+        return gpuOperations.contractedMask(source, width, height, contraction)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
-    static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
+    static func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int, gpuOperations: DocumentGpuOperationGateway) -> [UInt8] {
         guard radius > 0 else { return source }
-        return CanvasDocumentRenderingServices.live.featheredMask(source, width: width, height: height, radius: radius)
+        return gpuOperations.featheredMask(source, width, height, radius)
             ?? [UInt8](repeating: 0, count: width * height)
     }
 
-    static func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
-        CanvasDocumentRenderingServices.live.invertMask(source)
+    static func invertedSelectionMask(_ source: [UInt8], gpuOperations: DocumentGpuOperationGateway) -> [UInt8] {
+        gpuOperations.invertMask(source)
             ?? [UInt8](repeating: 0, count: source.count)
     }
 
-    static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
-        guard let cropped = CanvasDocumentRenderingServices.live.croppedSelectionMask(
-            mask: source,
-            width: width,
-            height: height
+    static func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode, gpuOperations: DocumentGpuOperationGateway) -> CanvasSelection? {
+        guard let cropped = gpuOperations.croppedSelectionMask(
+            source,
+            width,
+            height
         ) else {
             return nil
         }

@@ -2,7 +2,6 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentMetalRuntimeInfrastructure
 
 extension AppFeature {
     typealias InpaintCrop = PrimoDocumentApplication.InpaintCrop
@@ -26,12 +25,14 @@ extension AppFeature {
         canvasWidth: Int,
         canvasHeight: Int,
         selection: CanvasSelection,
-        padding: Int = 64
+        padding: Int = 64,
+        gpuOperations: DocumentGpuOperationGateway
     ) -> InpaintCrop? {
         guard let expandedMask = expandedMask(
             from: selection,
             canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
+            canvasHeight: canvasHeight,
+            gpuOperations: gpuOperations
         ) else {
             return nil
         }

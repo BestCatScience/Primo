@@ -195,7 +195,11 @@ extension ContentView {
         else {
             return nil
         }
-        return AppFeature.renderedCompositeSurface(snapshot: snapshot, paperStyle: store.canvas.paperStyle)
+        return AppFeature.renderedCompositeSurface(
+            snapshot: snapshot,
+            paperStyle: store.canvas.paperStyle,
+            gpuOperations: documentGpuOperationGateway
+        )
     }
 
     var toolDockColumn: some View {

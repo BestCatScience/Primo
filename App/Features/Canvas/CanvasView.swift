@@ -3,12 +3,13 @@ import PrimoBrushFileFormats
 import PrimoDocumentGPUContracts
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentMetalRuntimeInfrastructure
 import SwiftUI
 import UIKit
 import simd
 
 struct CanvasView: UIViewRepresentable {
+    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+
     let store: StoreOf<CanvasFeature>
 
     func makeUIView(context: Context) -> RasterCanvasContainerView {
@@ -19,6 +20,7 @@ struct CanvasView: UIViewRepresentable {
 
     func updateUIView(_ uiView: RasterCanvasContainerView, context: Context) {
         uiView.documentSize = store.canvasSize
+        uiView.documentGpuOperationGateway = documentGpuOperationGateway
         uiView.update(
             snapshot: store.renderSnapshot,
             activeLayerIndex: store.activeLayerIndex,
@@ -51,6 +53,11 @@ struct CanvasView: UIViewRepresentable {
 
 final class RasterCanvasContainerView: UIView, InputHandlerDelegate, UIPencilInteractionDelegate {
     var documentSize: CGSize = .zero
+    var documentGpuOperationGateway: DocumentGpuOperationGateway? {
+        didSet {
+            transformPreviewView.documentGpuOperationGateway = documentGpuOperationGateway
+        }
+    }
     var sendAction: ((CanvasFeature.Action) -> Void)? {
         didSet {
             navigationGestureAdapter.sendAction = sendAction

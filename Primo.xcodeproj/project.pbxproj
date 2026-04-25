@@ -126,6 +126,7 @@
 		B90000000000000000000035 /* PrimoDocumentEngineInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */; };
 		B90000000000000000000037 /* PrimoDocumentRenderingInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000038 /* PrimoDocumentRenderingInfrastructure */; };
 		B90000000000000000000039 /* PrimoDocumentTimelapseInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003A /* PrimoDocumentTimelapseInfrastructure */; };
+		B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */; };
 		B9000000000000000000003B /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B9000000000000000000003C /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B91000000000000000000001 /* PrimoCanvasInputDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B91000000000000000000011 /* PrimoCanvasInputDomain */; };
@@ -163,7 +164,6 @@
 		F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* TextFontLibraryClient.swift */; };
 		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
 		F10000000000000000000007 /* DocumentImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* DocumentImportClient.swift */; };
-		F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000A /* BrushStrokeKernel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -300,7 +300,6 @@
 		F10000000000000000000004 /* TextFontLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFontLibraryClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000006 /* BrushImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushImportClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000008 /* DocumentImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImportClient.swift; sourceTree = "<group>"; };
-		F1000000000000000000000A /* BrushStrokeKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushStrokeKernel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -314,6 +313,7 @@
 				B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */,
 				B91000000000000000000001 /* PrimoCanvasInputDomain in Frameworks */,
 				B91000000000000000000002 /* PrimoDocumentStrokeApplication in Frameworks */,
+				B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */,
 				B91000000000000000000004 /* PrimoCanvasPresentationInfrastructure in Frameworks */,
 				B90000000000000000000021 /* PrimoBrushDomain in Frameworks */,
 				B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */,
@@ -458,7 +458,6 @@
 				F10000000000000000000004 /* TextFontLibraryClient.swift */,
 				F10000000000000000000006 /* BrushImportClient.swift */,
 				F10000000000000000000008 /* DocumentImportClient.swift */,
-				F1000000000000000000000A /* BrushStrokeKernel.swift */,
 				A00000000000000000000095 /* BrushPresetStore.swift */,
 				A0000000000000000000004D /* BrushTipFile.swift */,
 				A0000000000000000000004F /* PhotoshopBrushFile.swift */,
@@ -628,6 +627,7 @@
 				B90000000000000000000032 /* PrimoDocumentInfrastructure */,
 				B91000000000000000000011 /* PrimoCanvasInputDomain */,
 				B91000000000000000000012 /* PrimoDocumentStrokeApplication */,
+				B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */,
 				B91000000000000000000014 /* PrimoCanvasPresentationInfrastructure */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B90000000000000000000014 /* PrimoWorkspaceDomain */,
@@ -830,7 +830,6 @@
 				F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */,
 				F10000000000000000000005 /* BrushImportClient.swift in Sources */,
 				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,
-				F10000000000000000000009 /* BrushStrokeKernel.swift in Sources */,
 				A0000000000000000000002F /* PaintShaders.metal in Sources */,
 				A00000000000000000000023 /* AppFeature.swift in Sources */,
 				A00000000000000000000024 /* PaintModels.swift in Sources */,
@@ -1221,6 +1220,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentTimelapseInfrastructure;
+		};
+		B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentStrokeInfrastructure;
 		};
 		B9000000000000000000003D /* PrimoWorkspaceApplication */ = {
 			isa = XCSwiftPackageProductDependency;

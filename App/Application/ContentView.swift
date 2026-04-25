@@ -10,6 +10,7 @@ import UIKit
 
 struct ContentView: View {
     @Dependency(\.mainQueueClient) private var mainQueueClient
+    @Dependency(\.documentGpuOperationGateway) private var documentGpuOperationGateway
     enum NanoBananaFocusedField: Hashable {
         case prompt
         case apiKey

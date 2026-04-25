@@ -6,6 +6,7 @@ final class CanvasTransformPreviewView: UIView {
     private let compositePreviewSurfaceView = CanvasPixelSurfaceView()
     private let shapePreviewSurfaceView = CanvasPixelSurfaceView()
     private let canvasImageRenderer: CanvasImageRenderer
+    var documentGpuOperationGateway: DocumentGpuOperationGateway?
 
     init(canvasImageRenderer: CanvasImageRenderer) {
         self.canvasImageRenderer = canvasImageRenderer
@@ -221,6 +222,7 @@ final class CanvasTransformPreviewView: UIView {
                 transformPreviewRotationDegrees: transformPreviewRotationDegrees
             )
         } else {
+            guard let documentGpuOperationGateway else { return nil }
             transformedLayerData = AppFeature.transformedLayerPixels(
                 source: activeLayer.pixelData,
                 canvasWidth: snapshot.width,
@@ -232,7 +234,8 @@ final class CanvasTransformPreviewView: UIView {
                 rotationDegrees: transformPreviewRotationDegrees,
                 pivot: transformPivot,
                 mode: .freeform,
-                quadOffsets: activeTextLayer == nil ? transformQuadOffsets : .zero
+                quadOffsets: activeTextLayer == nil ? transformQuadOffsets : .zero,
+                gpuOperations: documentGpuOperationGateway
             ) ?? activeLayer.pixelData
         }
         guard let transformedLayerData else { return nil }

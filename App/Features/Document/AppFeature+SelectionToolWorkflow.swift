@@ -39,7 +39,8 @@ extension AppFeature {
             Self.invertedSelection(
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
-                mode: state.canvas.selectionMode
+                mode: state.canvas.selectionMode,
+                gpuOperations: documentGpuOperationGateway
             )
         )
     }
@@ -54,7 +55,8 @@ extension AppFeature {
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
                 expansion: expansion,
-                isInverted: false
+                isInverted: false,
+                gpuOperations: documentGpuOperationGateway
             )
         )
     }
@@ -68,7 +70,8 @@ extension AppFeature {
             Self.featheredSelection(
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
-                radius: radius
+                radius: radius,
+                gpuOperations: documentGpuOperationGateway
             )
         )
     }
@@ -81,13 +84,15 @@ extension AppFeature {
             request: request,
             snapshot: state.canvas.renderSnapshot,
             activeLayerIndex: state.canvas.activeLayerIndex,
-            mode: state.canvas.selectionMode
+            mode: state.canvas.selectionMode,
+            gpuOperations: documentGpuOperationGateway
         )
         let selection = Self.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }
@@ -153,13 +158,15 @@ extension AppFeature {
     ) -> Effect<Action> {
         let incomingSelection = Self.makeLassoSelection(
             from: points,
-            canvasSize: state.canvas.canvasSize
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
         )
         let selection = Self.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }
@@ -175,13 +182,15 @@ extension AppFeature {
             thresholdMode: state.brushPalette.selection.thresholdMode,
             opacityTolerance: state.brushPalette.selection.opacityTolerance,
             colorTolerance: state.brushPalette.selection.colorTolerance,
-            expansion: Int(state.brushPalette.selection.expansion.rounded())
+            expansion: Int(state.brushPalette.selection.expansion.rounded()),
+            gpuOperations: documentGpuOperationGateway
         )
         let selection = Self.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }

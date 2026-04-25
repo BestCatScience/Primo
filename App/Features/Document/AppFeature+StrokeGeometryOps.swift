@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
+import PrimoDocumentStrokeInfrastructure
 
 extension AppFeature {
     static func normalizedCommittedStrokeSamples(

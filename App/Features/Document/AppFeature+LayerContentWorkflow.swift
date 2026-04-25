@@ -141,7 +141,11 @@ extension AppFeature {
 
     func handleCreateLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard let maskData = Self.layerMaskData(from: state.canvas.selection, canvasSize: state.canvas.canvasSize) else {
+        guard let maskData = Self.layerMaskData(
+            from: state.canvas.selection,
+            canvasSize: state.canvas.canvasSize,
+            gpuOperations: documentGpuOperationGateway
+        ) else {
             state.application.presentFeedback(.createLayerMaskNeedsSelection)
             return .none
         }

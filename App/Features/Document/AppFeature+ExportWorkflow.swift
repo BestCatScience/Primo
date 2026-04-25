@@ -67,7 +67,7 @@ extension AppFeature {
     func handleExportDocumentRequest(state: inout State) {
         let paperStyle = resolvedPaperStyle(for: state)
         let surface = state.canvas.renderSnapshot.map {
-            AppFeature.renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
+            renderedCompositeSurface(snapshot: $0, paperStyle: paperStyle)
         } ?? documentPresentationQueryService.compositeSurface(
             paperStyle: paperStyle
         )

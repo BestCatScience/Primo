@@ -170,6 +170,15 @@ extension DependencyValues {
         }
     }
 
+    var documentGpuOperationGateway: DocumentGpuOperationGateway {
+        get { documentRuntimeComposition.gpuOperationGateway }
+        set {
+            var composition = documentRuntimeComposition
+            composition.gpuOperationGateway = newValue
+            documentRuntimeComposition = composition
+        }
+    }
+
     var documentCanvasCommandService: DocumentCanvasCommandService {
         get { self[DocumentCanvasCommandServiceKey.self] }
         set { self[DocumentCanvasCommandServiceKey.self] = newValue }

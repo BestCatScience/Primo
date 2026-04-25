@@ -553,7 +553,8 @@ extension ContentView {
             selection: nil,
             pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
-            canvasHeight: snapshot.height
+            canvasHeight: snapshot.height,
+            gpuOperations: documentGpuOperationGateway
         )
     }
 

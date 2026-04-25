@@ -1,8 +1,9 @@
 import CoreGraphics
+import PrimoBrushDomain
 import PrimoDocumentContracts
 
-enum BrushStrokeKernel {
-    static func taperScale(
+public enum BrushStrokeKernel {
+    public static func taperScale(
         progress: CGFloat,
         taperIn: CGFloat,
         taperOut: CGFloat
@@ -19,7 +20,21 @@ enum BrushStrokeKernel {
         return min(entry, exit)
     }
 
-    static func resolvedRadius(
+    public static func taperScale(
+        progress: Double,
+        taperIn: Double,
+        taperOut: Double
+    ) -> Double {
+        Double(
+            taperScale(
+                progress: CGFloat(progress),
+                taperIn: CGFloat(taperIn),
+                taperOut: CGFloat(taperOut)
+            )
+        )
+    }
+
+    public static func resolvedRadius(
         for sample: StylusSample,
         progress: CGFloat,
         brush: BrushRuntimeSettings
@@ -37,7 +52,34 @@ enum BrushStrokeKernel {
         return max(CGFloat(brush.radius) * pressureFactor * taper, 1.5)
     }
 
-    static func rasterizedSourceAlpha(
+    public static func previewStampAlpha(
+        pressure: Double,
+        opacityJitter: Double,
+        opacity: Double,
+        flow: Double,
+        hardness: Double,
+        opacityPressureSensitivity: Double,
+        flowPressureSensitivity: Double,
+        hasCustomTip: Bool
+    ) -> Double {
+        let base = min(max(opacity, 0.04), 1.0)
+        let clampedFlow = min(max(flow, 0.0), 1.0)
+        let hardnessBias = 0.55 + (hardness * 0.45)
+        let opacityPressure = max(
+            0.2,
+            1.0 - opacityPressureSensitivity + (opacityPressureSensitivity * pressure)
+        )
+        let flowPressure = max(
+            0.2,
+            1.0 - flowPressureSensitivity + (flowPressureSensitivity * pressure)
+        )
+        let customTipBoost = hasCustomTip ? 0.92 : 1.0
+        let alpha = base * clampedFlow * hardnessBias * 0.55
+            * opacityPressure * flowPressure * opacityJitter * customTipBoost
+        return min(max(alpha, 0.0), 1.0)
+    }
+
+    public static func rasterizedSourceAlpha(
         sample: StylusSample,
         brush: BrushRuntimeSettings,
         progress: CGFloat,
@@ -113,7 +155,7 @@ enum BrushStrokeKernel {
         return baseAlpha * falloff * textureAlpha
     }
 
-    static func noise(x: CGFloat, y: CGFloat) -> CGFloat {
+    public static func noise(x: CGFloat, y: CGFloat) -> CGFloat {
         let value = sin((x * 12.9898) + (y * 78.233)) * 43758.5453
         return value - floor(value)
     }
