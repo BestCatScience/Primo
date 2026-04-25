@@ -28,11 +28,11 @@ extension AppFeature {
         padding: Int = 64,
         gpuOperations: DocumentGpuOperationGateway
     ) -> InpaintCrop? {
-        guard let expandedMask = expandedMask(
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+        guard let expandedMask = selectionWorkflow.expandedMask(
             from: selection,
             canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            gpuOperations: gpuOperations
+            canvasHeight: canvasHeight
         ) else {
             return nil
         }

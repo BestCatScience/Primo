@@ -1,0 +1,191 @@
+import Foundation
+import PrimoBrushDomain
+import PrimoDocumentContracts
+import PrimoDocumentDomain
+
+public enum DocumentCanvasMutationIntent<Selection: Equatable & Sendable>: Equatable, Sendable {
+    case none
+    case clearSelection
+    case finalizeLayer(DocumentLayerMutationFinalization)
+    case completeTransform(layerIndex: Int, selection: Selection?)
+    case resetTransientEditingState
+    case resetTransformPreview
+}
+
+public enum DocumentPresentationRefreshIntent: Equatable, Sendable {
+    case none
+    case current
+    case dirty
+}
+
+public struct DocumentLayerMutationFinalization: Equatable, Sendable {
+    public let index: Int
+    public var incrementsRevision: Bool
+    public var clearsSelection: Bool
+
+    public init(index: Int, incrementsRevision: Bool = false, clearsSelection: Bool = true) {
+        self.index = index
+        self.incrementsRevision = incrementsRevision
+        self.clearsSelection = clearsSelection
+    }
+}
+
+public enum DocumentMutationFeedbackIntent<Feedback: Equatable & Sendable>: Equatable, Sendable {
+    case none
+    case success(Feedback)
+    case failure(DocumentMutationFailure, defaultFeedback: Feedback?)
+}
+
+public struct DocumentMutationWorkflowOutcome<Selection: Equatable & Sendable, Feedback: Equatable & Sendable>: Equatable, Sendable {
+    public var canvasMutation: DocumentCanvasMutationIntent<Selection>
+    public var refresh: DocumentPresentationRefreshIntent
+    public var feedback: DocumentMutationFeedbackIntent<Feedback>
+    public var updatesWorkspaceArtifacts: Bool
+
+    public init(
+        canvasMutation: DocumentCanvasMutationIntent<Selection> = .none,
+        refresh: DocumentPresentationRefreshIntent = .dirty,
+        feedback: DocumentMutationFeedbackIntent<Feedback> = .none,
+        updatesWorkspaceArtifacts: Bool = true
+    ) {
+        self.canvasMutation = canvasMutation
+        self.refresh = refresh
+        self.feedback = feedback
+        self.updatesWorkspaceArtifacts = updatesWorkspaceArtifacts
+    }
+
+    public static var dirty: Self { Self() }
+    public static var currentPresentation: Self { Self(refresh: .current) }
+}
+
+public struct DocumentMutationWorkflowService: Sendable {
+    public let documentEditingGateway: DocumentEditingGateway
+    public let documentLayerEffectsGateway: DocumentLayerEffectsGateway
+    public let documentMutationGateway: DocumentMutationGateway
+    public let textLayerGateway: TextLayerGateway
+
+    public init(
+        documentEditingGateway: DocumentEditingGateway,
+        documentLayerEffectsGateway: DocumentLayerEffectsGateway,
+        documentMutationGateway: DocumentMutationGateway,
+        textLayerGateway: TextLayerGateway
+    ) {
+        self.documentEditingGateway = documentEditingGateway
+        self.documentLayerEffectsGateway = documentLayerEffectsGateway
+        self.documentMutationGateway = documentMutationGateway
+        self.textLayerGateway = textLayerGateway
+    }
+
+    public func addLayer(named name: String) -> DocumentIndexedMutationResult {
+        executeIndexed(.structure(.addLayer(name: name)))
+    }
+
+    public func createFolder(named name: String, afterLayerAt activeLayerIndex: Int) -> DocumentIndexedMutationResult {
+        executeIndexed(.structure(.createFolder(name: name, anchorLayerIndex: activeLayerIndex)))
+    }
+
+    public func deleteFolder(_ folderID: Int) -> DocumentMutationResult {
+        execute(.structure(.deleteFolder(folderID: folderID)))
+    }
+
+    public func deleteLayer(_ index: Int) -> DocumentMutationResult {
+        execute(.structure(.deleteLayer(index: index)))
+    }
+
+    public func duplicateLayer(_ index: Int, named duplicateName: String) -> DocumentIndexedMutationResult {
+        executeIndexed(.structure(.duplicateLayer(index: index, name: duplicateName)))
+    }
+
+    public func moveLayer(_ index: Int, to destinationIndex: Int) -> DocumentMutationResult {
+        execute(.structure(.moveLayer(index: index, destinationIndex: destinationIndex)))
+    }
+
+    public func assignLayer(_ index: Int, toFolder folderID: Int) -> DocumentMutationResult {
+        execute(.structure(.assignLayerToFolder(index: index, folderID: folderID)))
+    }
+
+    public func mergeLayerDown(_ index: Int) -> DocumentMutationResult {
+        documentLayerEffectsGateway.mergeLayerDown(index)
+    }
+
+    public func setLayerVisibility(_ index: Int, visible: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setLayerVisibility(index: index, isVisible: visible)))
+    }
+
+    public func setActiveLayer(_ index: Int) -> DocumentMutationResult {
+        execute(.attribute(.setActiveLayer(index: index)))
+    }
+
+    public func setLayerOpacity(_ index: Int, opacity: Double) -> DocumentMutationResult {
+        execute(.attribute(.setLayerOpacity(index: index, opacity: opacity)))
+    }
+
+    public func setLayerLocked(_ index: Int, isLocked: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setLayerLocked(index: index, isLocked: isLocked)))
+    }
+
+    public func setLayerAlphaLocked(_ index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)))
+    }
+
+    public func setLayerClipped(_ index: Int, isClipped: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setLayerClipped(index: index, isClipped: isClipped)))
+    }
+
+    public func setFolderExpanded(_ folderID: Int, isExpanded: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setFolderExpanded(folderID: folderID, isExpanded: isExpanded)))
+    }
+
+    public func setFolderVisibility(_ folderID: Int, visible: Bool) -> DocumentMutationResult {
+        execute(.attribute(.setFolderVisibility(folderID: folderID, isVisible: visible)))
+    }
+
+    public func setFolderName(_ folderID: Int, name: String) -> DocumentMutationResult {
+        execute(.attribute(.setFolderName(folderID: folderID, name: name)))
+    }
+
+    public func setLayerBlendMode(_ index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
+        execute(.attribute(.setLayerBlendMode(index: index, blendMode: blendMode)))
+    }
+
+    public func setLayerName(_ index: Int, name: String) -> DocumentMutationResult {
+        execute(.attribute(.setLayerName(index: index, name: name)))
+    }
+
+    public func replaceLayerPixels(_ index: Int, pixelData: Data) -> DocumentMutationResult {
+        documentMutationGateway.replaceLayerPixels(index, pixelData)
+    }
+
+    public func setTextLayer(_ index: Int, textLayer: TextLayerData) -> DocumentMutationResult {
+        textLayerGateway.setTextLayer(index, textLayer)
+    }
+
+    public func clearLayer(_ index: Int) -> DocumentMutationResult {
+        documentMutationGateway.clearLayer(index)
+    }
+
+    public func replaceLayerMask(_ index: Int, maskData: Data) -> DocumentMutationResult {
+        documentMutationGateway.replaceLayerMask(index, maskData)
+    }
+
+    public func clearLayerMask(_ index: Int) -> DocumentMutationResult {
+        documentMutationGateway.clearLayerMask(index)
+    }
+
+    public func applyLayerMask(_ index: Int) -> DocumentMutationResult {
+        documentMutationGateway.applyLayerMask(index)
+    }
+
+    private func execute(_ request: DocumentEditingRequest) -> DocumentMutationResult {
+        documentEditingGateway.execute(request).map { _ in () }
+    }
+
+    private func executeIndexed(_ request: DocumentEditingRequest) -> DocumentIndexedMutationResult {
+        documentEditingGateway.execute(request).flatMap { result in
+            guard case let .structure(plan) = result, let index = plan.resultingIndex else {
+                return .failure(.bridgeMutationFailed("documentEditingGateway"))
+            }
+            return .success(index)
+        }
+    }
+}

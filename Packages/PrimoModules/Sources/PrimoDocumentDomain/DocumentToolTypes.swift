@@ -7,6 +7,14 @@ public enum SelectionToolMode: String, CaseIterable, Equatable, Sendable, Identi
     public var id: String { rawValue }
 }
 
+public enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case replace
+    case add
+    case subtract
+
+    public var id: String { rawValue }
+}
+
 public enum ShapeToolMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case line
     case rectangle

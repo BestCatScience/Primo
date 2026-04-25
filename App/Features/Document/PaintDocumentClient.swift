@@ -7,6 +7,7 @@ import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
+import PrimoWorkspaceApplication
 
 private enum DocumentRuntimeCompositionKey: DependencyKey {
     static var liveValue: DocumentRuntimeComposition {
@@ -59,6 +60,29 @@ private enum DocumentHistoryCommandServiceKey: DependencyKey {
         @Dependency(\.documentRuntimeComposition) var composition
         return DocumentHistoryCommandService(historyGateway: composition.historyGateway)
     }
+}
+
+private enum DocumentMutationWorkflowServiceKey: DependencyKey {
+    static var liveValue: DocumentMutationWorkflowService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return DocumentMutationWorkflowService(
+            documentEditingGateway: composition.editingGateway,
+            documentLayerEffectsGateway: composition.layerEffectsGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+    }
+}
+
+private enum SelectionWorkflowServiceKey: DependencyKey {
+    static var liveValue: SelectionWorkflowService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return SelectionWorkflowService(gpuOperations: composition.gpuOperationGateway)
+    }
+}
+
+private enum WorkspaceApplicationWorkflowServiceKey: DependencyKey {
+    static let liveValue = WorkspaceApplicationWorkflowService()
 }
 
 private enum CanvasPreviewRendererKey: DependencyKey {
@@ -124,6 +148,15 @@ private extension DependencyValues {
         )
         self[DocumentHistoryCommandServiceKey.self] = DocumentHistoryCommandService(
             historyGateway: composition.historyGateway
+        )
+        self[DocumentMutationWorkflowServiceKey.self] = DocumentMutationWorkflowService(
+            documentEditingGateway: composition.editingGateway,
+            documentLayerEffectsGateway: composition.layerEffectsGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        self[SelectionWorkflowServiceKey.self] = SelectionWorkflowService(
+            gpuOperations: composition.gpuOperationGateway
         )
     }
 }
@@ -281,5 +314,20 @@ extension DependencyValues {
     var documentHistoryCommandService: DocumentHistoryCommandService {
         get { self[DocumentHistoryCommandServiceKey.self] }
         set { self[DocumentHistoryCommandServiceKey.self] = newValue }
+    }
+
+    var documentMutationWorkflowService: DocumentMutationWorkflowService {
+        get { self[DocumentMutationWorkflowServiceKey.self] }
+        set { self[DocumentMutationWorkflowServiceKey.self] = newValue }
+    }
+
+    var selectionWorkflowService: SelectionWorkflowService {
+        get { self[SelectionWorkflowServiceKey.self] }
+        set { self[SelectionWorkflowServiceKey.self] = newValue }
+    }
+
+    var workspaceApplicationWorkflowService: WorkspaceApplicationWorkflowService {
+        get { self[WorkspaceApplicationWorkflowServiceKey.self] }
+        set { self[WorkspaceApplicationWorkflowServiceKey.self] = newValue }
     }
 }

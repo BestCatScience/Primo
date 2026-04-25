@@ -163,13 +163,7 @@ extension ShapeToolMode {
     }
 }
 
-enum SelectionCombineMode: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case replace
-    case add
-    case subtract
-
-    var id: String { rawValue }
-
+extension SelectionCombineMode {
     var title: String {
         localizedTitle(.english)
     }

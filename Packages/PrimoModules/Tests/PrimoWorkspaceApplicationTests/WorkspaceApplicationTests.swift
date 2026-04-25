@@ -123,6 +123,108 @@ struct WorkspaceApplicationTests {
     }
 
     @Test
+    func workflowServiceBuildsLoadedProjectFollowUpOutcome() throws {
+        let activeTab = OpenDocumentTab(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000BC")!,
+            title: "Canvas",
+            backingStoreURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/backing.atelier")),
+            sourceProjectURL: nil,
+            canvasSize: CGSize(width: 320, height: 240),
+            isDirty: false,
+            pane: .primary,
+            previewImageData: nil
+        )
+        let plan = LoadedWorkspaceProjectPlan(
+            destination: .newTab(title: "Loaded", sourceProjectURL: nil),
+            followUp: .init(
+                marksTabDirty: true,
+                persistsToBackingStore: false,
+                persistsAutosave: true
+            )
+        )
+        let service = WorkspaceApplicationWorkflowService()
+
+        let outcome = try service.loadedWorkspaceFollowUp(
+            plan: plan,
+            context: WorkspaceDocumentContext(activeTab: activeTab, paperStyle: .default),
+            requiresBackingStorePersistence: true
+        ).get()
+
+        #expect(outcome.marksActiveTabDirty)
+        guard case let .loadedWorkspaceFollowUp(request)? = outcome.followUpRequest else {
+            Issue.record("Expected loadedWorkspaceFollowUp request")
+            return
+        }
+        #expect(request.activeTab == activeTab)
+        #expect(request.persistsToBackingStore)
+        #expect(request.persistsAutosave)
+    }
+
+    @Test
+    func workflowServiceBuildsSaveActiveDocumentRequest() throws {
+        let activeTab = OpenDocumentTab(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000BD")!,
+            title: "Canvas",
+            backingStoreURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/backing.atelier")),
+            sourceProjectURL: nil,
+            canvasSize: .zero,
+            isDirty: true,
+            pane: .primary,
+            previewImageData: nil
+        )
+        let destination = DocumentProjectPath(URL(fileURLWithPath: "/tmp/destination.atelier"))
+        let service = WorkspaceApplicationWorkflowService()
+
+        let request = try service.saveActiveDocumentRequest(
+            context: WorkspaceDocumentContext(activeTab: activeTab, paperStyle: .default),
+            preferredDestinationURL: destination,
+            trigger: .manualSave,
+            purpose: .saveDocument
+        ).get()
+
+        #expect(
+            request == .saveActiveDocument(
+                WorkspaceDocumentSaveRequest(
+                    activeTab: activeTab,
+                    paperStyle: .default,
+                    preferredDestinationURL: destination,
+                    trigger: .manualSave,
+                    purpose: .saveDocument
+                )
+            )
+        )
+    }
+
+    @Test
+    func workflowServiceCloseTabsIncludesActiveReplacementContext() throws {
+        let activeTab = OpenDocumentTab(
+            id: UUID(uuidString: "00000000-0000-0000-0000-0000000000BE")!,
+            title: "Canvas",
+            backingStoreURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/backing.atelier")),
+            sourceProjectURL: nil,
+            canvasSize: .zero,
+            isDirty: true,
+            pane: .primary,
+            previewImageData: nil
+        )
+        let service = WorkspaceApplicationWorkflowService()
+
+        let request = try service.closeTabsPersistenceRequest(
+            operation: .tab(activeTab.id),
+            tabs: [activeTab],
+            activeTabContext: WorkspaceDocumentContext(activeTab: activeTab, paperStyle: .default)
+        ).get()
+
+        guard case let .saveTabsForClose(closeRequest) = request else {
+            Issue.record("Expected saveTabsForClose request")
+            return
+        }
+        #expect(closeRequest.tabs == [activeTab])
+        #expect(closeRequest.activeTab?.activeTab == activeTab)
+        #expect(closeRequest.activeTab?.paperStyle == .default)
+    }
+
+    @Test
     func saveActiveDocumentResultPreservesPreviewSurface() throws {
         let previewSurface = DocumentCompositeSurface(
             width: 2,

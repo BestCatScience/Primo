@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 
 extension AppFeature {
@@ -173,7 +174,8 @@ extension AppFeature {
         let mask: [UInt8]?
         let bounds: CGRect
         if let selection {
-            guard let expanded = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
+            let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+            guard let expanded = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
                 return nil
             }
             mask = expanded
@@ -238,7 +240,8 @@ extension AppFeature {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+        guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
         let bounds = selection.bounds
@@ -268,7 +271,7 @@ extension AppFeature {
             return nil
         }
 
-        return croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode, gpuOperations: gpuOperations)
+        return selectionWorkflow.croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
     }
 
     static func layerMaskData(
@@ -279,7 +282,8 @@ extension AppFeature {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight, gpuOperations: gpuOperations) else {
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+        guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
         return Data(mask)

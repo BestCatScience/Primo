@@ -14,7 +14,6 @@
 		39BA9FE771F8496D8E5EA854 /* AppFeature+PreviewCompositeOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38659007DA5646399FFA1EB1 /* AppFeature+PreviewCompositeOps.swift */; };
 		6F602A2861F142CEBB3FE6EA /* AppFeature+ImageAdjustmentOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE6 /* AppFeature+ImageAdjustmentOps.swift */; };
 		7ADC402731884EF58613CCC6 /* AppFeature+ToolPanelStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BCCBE365E364E1783DD6EC2 /* AppFeature+ToolPanelStateCoordinator.swift */; };
-		7B6DB0156BC14A2BB465110E /* AppFeature+SelectionMaskOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */; };
 		8DA458906F8C4AC69D670CEB /* AppFeature+WorkspaceStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EBC82C12B64F77B9A28170 /* AppFeature+WorkspaceStateCoordinator.swift */; };
 		976C75F756004B609A33D822 /* AppFeature+SelectionGeometryOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */; };
 		98A1D6D5BE114FCBAE4C8882 /* AppFeature+ApplicationActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5624D1427F44FDAE81DC45 /* AppFeature+ApplicationActionRouting.swift */; };
@@ -179,7 +178,6 @@
 		85DE8EA2D3D64DFFA55C9F18 /* AppFeature+CanvasUIStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasUIStateCoordinator.swift"; sourceTree = "<group>"; };
 		8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionGeometryOps.swift"; sourceTree = "<group>"; };
 		934115DE766E43A6979CF389 /* AppFeature+CanvasCoordination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+CanvasCoordination.swift"; sourceTree = "<group>"; };
-		9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+SelectionMaskOps.swift"; sourceTree = "<group>"; };
 		9BCCBE365E364E1783DD6EC2 /* AppFeature+ToolPanelStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ToolPanelStateCoordinator.swift"; sourceTree = "<group>"; };
 		9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+ImageImportOps.swift"; sourceTree = "<group>"; };
 		A00000000000000000000001 /* PrimoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoApp.swift; sourceTree = "<group>"; };
@@ -524,7 +522,6 @@
 				A000000000000000000000BB /* AppFeature+WorkspacePersistenceCoordinator.swift */,
 				A000000000000000000000BD /* AppFeature+SelectionTransform.swift */,
 				8B535F4B219648258271A7B1 /* AppFeature+SelectionGeometryOps.swift */,
-				9A55C56EA2194B16ADEAEFC2 /* AppFeature+SelectionMaskOps.swift */,
 				A000000000000000000000D9 /* AppFeature+DocumentPersistenceWorkflow.swift */,
 				A000000000000000000000DB /* AppFeature+WorkspaceTabWorkflow.swift */,
 				A000000000000000000000DD /* AppFeature+StartupHomeWorkflow.swift */,
@@ -755,7 +752,6 @@
 				A000000000000000000000BA /* AppFeature+WorkspacePersistenceCoordinator.swift in Sources */,
 				A000000000000000000000BC /* AppFeature+SelectionTransform.swift in Sources */,
 				976C75F756004B609A33D822 /* AppFeature+SelectionGeometryOps.swift in Sources */,
-				7B6DB0156BC14A2BB465110E /* AppFeature+SelectionMaskOps.swift in Sources */,
 				A000000000000000000000D8 /* AppFeature+DocumentPersistenceWorkflow.swift in Sources */,
 				A000000000000000000000DA /* AppFeature+WorkspaceTabWorkflow.swift in Sources */,
 				A000000000000000000000DC /* AppFeature+StartupHomeWorkflow.swift in Sources */,

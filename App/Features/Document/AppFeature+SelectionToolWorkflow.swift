@@ -36,11 +36,10 @@ extension AppFeature {
 
     func handleInvertSelection(state: inout State) {
         state.canvas.replaceSelection(
-            Self.invertedSelection(
+            selectionWorkflowService.invertedSelection(
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
-                mode: state.canvas.selectionMode,
-                gpuOperations: documentGpuOperationGateway
+                mode: state.canvas.selectionMode
             )
         )
     }
@@ -51,12 +50,11 @@ extension AppFeature {
     ) {
         guard state.canvas.selection != nil else { return }
         state.canvas.replaceSelection(
-            Self.adjustedSelection(
+            selectionWorkflowService.adjustedSelection(
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
                 expansion: expansion,
-                isInverted: false,
-                gpuOperations: documentGpuOperationGateway
+                isInverted: false
             )
         )
     }
@@ -67,11 +65,10 @@ extension AppFeature {
     ) {
         guard state.canvas.selection != nil else { return }
         state.canvas.replaceSelection(
-            Self.featheredSelection(
+            selectionWorkflowService.featheredSelection(
                 state.canvas.selection,
                 canvasSize: state.canvas.canvasSize,
-                radius: radius,
-                gpuOperations: documentGpuOperationGateway
+                radius: radius
             )
         )
     }
@@ -80,19 +77,17 @@ extension AppFeature {
         state: inout State,
         request: ColorRangeSelectionRequest
     ) -> Effect<Action> {
-        let incomingSelection = Self.makeColorRangeSelection(
+        let incomingSelection = selectionWorkflowService.makeColorRangeSelection(
             request: request,
             snapshot: state.canvas.renderSnapshot,
             activeLayerIndex: state.canvas.activeLayerIndex,
-            mode: state.canvas.selectionMode,
-            gpuOperations: documentGpuOperationGateway
+            mode: state.canvas.selectionMode
         )
-        let selection = Self.combinedSelection(
+        let selection = selectionWorkflowService.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            canvasSize: state.canvas.canvasSize
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }
@@ -156,17 +151,15 @@ extension AppFeature {
         state: inout State,
         points: [CGPoint]
     ) -> Effect<Action> {
-        let incomingSelection = Self.makeLassoSelection(
+        let incomingSelection = selectionWorkflowService.makeLassoSelection(
             from: points,
-            canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            canvasSize: state.canvas.canvasSize
         )
-        let selection = Self.combinedSelection(
+        let selection = selectionWorkflowService.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            canvasSize: state.canvas.canvasSize
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }
@@ -175,22 +168,20 @@ extension AppFeature {
         state: inout State,
         sample: StylusSample
     ) -> Effect<Action> {
-        let incomingSelection = Self.makeAutoSelection(
+        let incomingSelection = selectionWorkflowService.makeAutoSelection(
             at: sample.point,
             snapshot: state.canvas.renderSnapshot,
             layerIndex: state.canvas.activeLayerIndex,
             thresholdMode: state.brushPalette.selection.thresholdMode,
             opacityTolerance: state.brushPalette.selection.opacityTolerance,
             colorTolerance: state.brushPalette.selection.colorTolerance,
-            expansion: Int(state.brushPalette.selection.expansion.rounded()),
-            gpuOperations: documentGpuOperationGateway
+            expansion: Int(state.brushPalette.selection.expansion.rounded())
         )
-        let selection = Self.combinedSelection(
+        let selection = selectionWorkflowService.combinedSelection(
             existing: state.canvas.selection,
             incoming: incomingSelection,
             mode: state.brushPalette.selection.combineMode,
-            canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            canvasSize: state.canvas.canvasSize
         )
         return .send(.canvas(.selectionUpdated(selection)))
     }

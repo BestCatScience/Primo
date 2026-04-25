@@ -24,6 +24,7 @@ extension AppFeature {
             state: AppFeature.State,
             gpuOperations: DocumentGpuOperationGateway
         ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationFailure> {
+            let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
             guard
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == command.descriptor.inputLayerIndex })
@@ -32,12 +33,11 @@ extension AppFeature {
             }
 
             let adjustedSelection = command.descriptor.editScope == .selectedArea
-                ? AppFeature.adjustedSelection(
+                ? selectionWorkflow.adjustedSelection(
                     state.canvas.selection,
                     canvasSize: state.canvas.canvasSize,
                     expansion: command.descriptor.maskSettings.expansion,
-                    isInverted: command.descriptor.maskSettings.isInverted,
-                    gpuOperations: gpuOperations
+                    isInverted: command.descriptor.maskSettings.isInverted
                 )
                 : nil
             if command.descriptor.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
@@ -54,11 +54,10 @@ extension AppFeature {
             )
             let selectionRegion: NanoBananaSelectionRegion?
             if let adjustedSelection {
-                guard let expandedMask = AppFeature.expandedMask(
+                guard let expandedMask = selectionWorkflow.expandedMask(
                     from: adjustedSelection,
                     canvasWidth: snapshot.width,
-                    canvasHeight: snapshot.height,
-                    gpuOperations: gpuOperations
+                    canvasHeight: snapshot.height
                 ) else {
                     return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
                 }

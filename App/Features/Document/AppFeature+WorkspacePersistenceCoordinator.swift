@@ -41,6 +41,8 @@ extension AppFeature {
     typealias WorkspaceApplicationServices = PrimoWorkspaceInfrastructure.WorkspaceApplicationServices
     typealias PreparedWorkspaceTab = PrimoWorkspaceApplication.PreparedWorkspaceTab
     typealias WorkspaceLoadedProjectFollowUpPlanner = PrimoWorkspaceApplication.WorkspaceLoadedProjectFollowUpPlanner
+    typealias WorkspaceApplicationWorkflowService = PrimoWorkspaceApplication.WorkspaceApplicationWorkflowService
+    typealias WorkspaceDocumentContext = PrimoWorkspaceApplication.WorkspaceDocumentContext
 
     enum PendingWorkspaceTabReservation: Equatable, Sendable {
         case loadedProject(PendingLoadedWorkspaceProject)
@@ -152,17 +154,10 @@ extension AppFeature {
     func documentReplacementRequest(
         state: inout State
     ) -> Result<WorkspaceDocumentReplacementRequest, WorkspacePersistenceFailure> {
-        let activeTab: OpenDocumentTab
-        switch requireActiveTab(in: state) {
-        case let .success(tab):
-            activeTab = tab
-        case let .failure(failure):
-            return .failure(failure)
-        }
-        let refreshedActiveTab = refreshActiveTabMetadataForPersistence(state: &state) ?? activeTab
-        return .success(
-            WorkspaceDocumentReplacementRequest(
-                activeTab: refreshedActiveTab,
+        _ = refreshActiveTabMetadataForPersistence(state: &state)
+        return workspaceApplicationWorkflowService.documentReplacementRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.workspace.activeTab,
                 paperStyle: resolvedPaperStyle(for: state)
             )
         )
@@ -325,12 +320,9 @@ extension AppFeature {
     func dirtyPresentationRequest(
         state: State
     ) -> WorkspacePersistenceRequest? {
-        guard let activeTab = state.workspace.activeTab else {
-            return nil
-        }
-        return .dirtyPresentationRefreshed(
-            WorkspaceDirtyPresentationRequest(
-                activeTab: activeTab,
+        workspaceApplicationWorkflowService.dirtyPresentationRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.workspace.activeTab,
                 paperStyle: resolvedPaperStyle(for: state)
             )
         )
@@ -342,23 +334,15 @@ extension AppFeature {
         trigger: SaveHistoryTrigger,
         purpose: WorkspaceDocumentSavePurpose
     ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
-        let context: WorkspaceDocumentReplacementRequest
-        switch documentReplacementRequest(state: &state) {
-        case let .success(request):
-            context = request
-        case let .failure(failure):
-            return .failure(failure)
-        }
-        return .success(
-            .saveActiveDocument(
-                WorkspaceDocumentSaveRequest(
-                    activeTab: context.activeTab,
-                    paperStyle: context.paperStyle,
-                    preferredDestinationURL: preferredDestinationURL,
-                    trigger: trigger,
-                    purpose: purpose
-                )
-            )
+        _ = refreshActiveTabMetadataForPersistence(state: &state)
+        return workspaceApplicationWorkflowService.saveActiveDocumentRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.workspace.activeTab,
+                paperStyle: resolvedPaperStyle(for: state)
+            ),
+            preferredDestinationURL: preferredDestinationURL,
+            trigger: trigger,
+            purpose: purpose
         )
     }
 
@@ -370,10 +354,7 @@ extension AppFeature {
         plan: LoadedWorkspaceProjectPlan,
         state: inout State
     ) -> Result<WorkspacePersistenceRequest?, WorkspacePersistenceFailure> {
-        if plan.followUp.marksTabDirty {
-            state.workspace.setActiveTabDirty(true)
-        }
-
+        _ = refreshActiveTabMetadataForPersistence(state: &state)
         let requiresBackingStorePersistence: Bool = {
             switch plan.destination {
             case .newTab:
@@ -383,29 +364,22 @@ extension AppFeature {
             }
         }()
 
-        let shouldPersistToBackingStore = requiresBackingStorePersistence || plan.followUp.persistsToBackingStore
-        guard shouldPersistToBackingStore
-            || plan.followUp.persistsAutosave
-            || plan.successEffects.discardedAutosaveEntryID != nil
-        else {
-            return .success(nil)
-        }
-
-        let context: WorkspaceDocumentReplacementRequest
-        switch documentReplacementRequest(state: &state) {
-        case let .success(request):
-            context = request
+        switch workspaceApplicationWorkflowService.loadedWorkspaceFollowUp(
+            plan: plan,
+            context: WorkspaceDocumentContext(
+                activeTab: state.workspace.activeTab,
+                paperStyle: resolvedPaperStyle(for: state)
+            ),
+            requiresBackingStorePersistence: requiresBackingStorePersistence
+        ) {
+        case let .success(outcome):
+            if outcome.marksActiveTabDirty {
+                state.workspace.setActiveTabDirty(true)
+            }
+            return .success(outcome.followUpRequest)
         case let .failure(failure):
             return .failure(failure)
         }
-
-        return .success(
-            loadedWorkspaceFollowUpPlanner.request(
-                plan: plan,
-                context: context,
-                requiresBackingStorePersistence: requiresBackingStorePersistence
-            )
-        )
     }
 
     func closeTabsPersistenceRequest(
@@ -414,11 +388,14 @@ extension AppFeature {
         state: inout State
     ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
         var tabs = tabIDs.compactMap { state.workspace.tab(withID: $0) }
-        let activeTabRequest: WorkspaceDocumentReplacementRequest?
+        let activeTabContext: WorkspaceDocumentContext?
         if let activeTabID = state.workspace.activeTabID, tabIDs.contains(activeTabID) {
             switch documentReplacementRequest(state: &state) {
             case let .success(request):
-                activeTabRequest = request
+                activeTabContext = WorkspaceDocumentContext(
+                    activeTab: request.activeTab,
+                    paperStyle: request.paperStyle
+                )
                 if let index = tabs.firstIndex(where: { $0.id == request.activeTab.id }) {
                     tabs[index] = request.activeTab
                 }
@@ -426,27 +403,19 @@ extension AppFeature {
                 return .failure(failure)
             }
         } else {
-            activeTabRequest = nil
+            activeTabContext = nil
         }
-        return .success(
-            .saveTabsForClose(
-                WorkspaceCloseTabsSaveRequest(
-                    operation: operation,
-                    tabs: tabs,
-                    activeTab: activeTabRequest
-                )
-            )
+        return workspaceApplicationWorkflowService.closeTabsPersistenceRequest(
+            operation: operation,
+            tabs: tabs,
+            activeTabContext: activeTabContext
         )
     }
 
     func discardArtifactsRequest(
         for tabs: [OpenDocumentTab]
     ) -> WorkspacePersistenceRequest {
-        .discardAutosaveArtifacts(
-            WorkspaceArtifactDiscardRequest(
-                tabs: tabs
-            )
-        )
+        workspaceApplicationWorkflowService.discardArtifactsRequest(for: tabs)
     }
 
     func workspacePersistenceEffect(

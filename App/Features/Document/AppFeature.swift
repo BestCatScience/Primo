@@ -32,6 +32,9 @@ struct AppFeature {
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
     @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
+    @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
+    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
+    @Dependency(\.workspaceApplicationWorkflowService) var workspaceApplicationWorkflowService
     @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
     @Dependency(\.documentImportClient) var documentImportClient
