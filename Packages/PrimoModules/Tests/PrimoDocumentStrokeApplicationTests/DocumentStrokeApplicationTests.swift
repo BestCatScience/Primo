@@ -89,7 +89,9 @@ struct DocumentStrokeApplicationTests {
             context: makeContext(layerIndex: 3, isAlphaLocked: true)
         ))
 
-        #expect(result.committedPixels == Data([9, 8, 7, 6]))
+        #expect(result.surface.layerIndex == 3)
+        #expect(result.surface.handle.buffer.width == 2)
+        #expect(result.dirtyRegion == GpuSurfaceRegion(originX: 0, originY: 0, width: 2, height: 2))
         #expect(renderer.requests.count == 1)
         #expect(renderer.requests[0].activeLayerIndex == 3)
         #expect(renderer.requests[0].samples == [sample])
@@ -184,9 +186,13 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
         }
         return StrokePreviewResult(
             baseSnapshot: request.snapshot,
-            adjustedPixels: Data([1, 2, 3, 4]),
-            dirtyRect: LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2),
-            rectPixelData: Data([5, 6, 7, 8]),
+            surface: GpuLayerSurface(
+                layerIndex: request.activeLayerIndex,
+                width: request.snapshot.width,
+                height: request.snapshot.height,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
+            ),
+            dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
             incrementalUpdate: nil,
             isApproximatePreview: request.usesResponsiveOilPreview
         )
@@ -205,6 +211,14 @@ private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked S
         lock.withLock {
             storage.append(request)
         }
-        return StrokeCommitResult(committedPixels: Data([9, 8, 7, 6]))
+        return StrokeCommitResult(
+            surface: GpuLayerSurface(
+                layerIndex: request.activeLayerIndex,
+                width: request.snapshot.width,
+                height: request.snapshot.height,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
+            ),
+            dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: request.snapshot.width, height: request.snapshot.height)
+        )
     }
 }

@@ -3,8 +3,8 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
-import PrimoDocumentMetalStrokeInfrastructure
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
@@ -129,7 +129,6 @@ extension AppFeature {
 
     struct CanvasStrokeCommitService {
         let layerCommands: DocumentLayerCommandService
-        let strokeProcessingService: DocumentStrokeProcessingService
 
         fileprivate func resolve(
             state: inout State,
@@ -150,23 +149,20 @@ extension AppFeature {
                 clearSelectionWithoutRefresh(&state)
             }
             let commitResult: DocumentMutationResult
-            let canCommitPreviewPixels = Self.shouldCommitPreviewPixels(
+            let canCommitPreviewSurface = Self.shouldCommitPreviewSurface(
                 state: state,
                 context: context
             )
-            if canCommitPreviewPixels,
-               let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
-                let rectPixelData = state.canvas.activeStrokePreviewRectPixelData {
-                commitResult = layerCommands.replaceLayerPixelsInRect(
+            if canCommitPreviewSurface,
+               let renderState = state.canvas.activeStrokeRenderState {
+                commitResult = layerCommands.applyLayerSurfaceMutation(
                     context.activeLayerIndex,
-                    dirtyRect,
-                    rectPixelData
-                )
-            } else if canCommitPreviewPixels,
-                      let previewPixels = state.canvas.activeStrokePreviewLayerPixelData {
-                commitResult = layerCommands.replaceLayerPixels(
-                    context.activeLayerIndex,
-                    previewPixels
+                    GpuLayerMutationPayload(
+                        canvasWidth: renderState.surfaceHandle.width,
+                        canvasHeight: renderState.surfaceHandle.height,
+                        dirtyRect: renderState.dirtyRect,
+                        gpuBufferHandle: renderState.surfaceHandle
+                    )
                 )
             } else {
                 commitResult = commitFallbackPixels(
@@ -179,14 +175,6 @@ extension AppFeature {
             }
             switch commitResult {
             case .success:
-                if let stagedSnapshot = Self.stagedCommittedSnapshot(
-                    state: state,
-                    activeLayerIndex: context.activeLayerIndex,
-                    canCommitPreviewPixels: canCommitPreviewPixels,
-                    strokeProcessingService: strokeProcessingService
-                ) {
-                    state.canvas.stagePendingCommittedSnapshot(stagedSnapshot)
-                }
                 break
             case let .failure(failure):
                 return .failed(failure)
@@ -200,81 +188,12 @@ extension AppFeature {
             )
         }
 
-        private static func stagedCommittedSnapshot(
-            state: State,
-            activeLayerIndex: Int,
-            canCommitPreviewPixels: Bool,
-            strokeProcessingService: DocumentStrokeProcessingService
-        ) -> MetalDocumentSnapshot? {
-            guard
-                let baseSnapshot = state.canvas.activeStrokeBaseSnapshot,
-                let committedPixels = committedPreviewLayerPixelData(
-                    state: state,
-                    baseSnapshot: baseSnapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    canCommitPreviewPixels: canCommitPreviewPixels
-                )
-            else {
-                return nil
-            }
-
-            return strokeProcessingService.stageCommittedSnapshot(
-                baseSnapshot: baseSnapshot,
-                committedPixels: committedPixels,
-                lastCommittedRenderRevision: state.canvas.lastCommittedRenderRevision,
-                activeLayerIndex: activeLayerIndex,
-                stagedCompositePixelData: state.canvas.stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot)
-            )
-        }
-
-        private static func committedPreviewLayerPixelData(
-            state: State,
-            baseSnapshot: MetalDocumentSnapshot,
-            activeLayerIndex: Int,
-            canCommitPreviewPixels: Bool
-        ) -> Data? {
-            guard canCommitPreviewPixels else { return nil }
-            if let previewLayerPixelData = state.canvas.activeStrokePreviewLayerPixelData {
-                return previewLayerPixelData
-            }
-            guard
-                let dirtyRect = state.canvas.activeStrokePreviewDirtyRect,
-                let rectPixelData = state.canvas.activeStrokePreviewRectPixelData,
-                let baseLayer = baseSnapshot.layers.first(where: { $0.index == activeLayerIndex }),
-                baseLayer.pixelData.count == baseSnapshot.width * baseSnapshot.height * 4,
-                dirtyRect.originX >= 0,
-                dirtyRect.originY >= 0,
-                dirtyRect.originX + dirtyRect.width <= baseSnapshot.width,
-                dirtyRect.originY + dirtyRect.height <= baseSnapshot.height,
-                rectPixelData.count >= dirtyRect.width * dirtyRect.height * 4
-            else {
-                return nil
-            }
-
-            var committedPixels = baseLayer.pixelData
-            committedPixels.withUnsafeMutableBytes { destinationBytes in
-                rectPixelData.withUnsafeBytes { sourceBytes in
-                    guard
-                        let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                        let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
-                    else {
-                        return
-                    }
-                    for row in 0..<dirtyRect.height {
-                        let sourceOffset = row * dirtyRect.width * 4
-                        let destinationOffset = ((dirtyRect.originY + row) * baseSnapshot.width + dirtyRect.originX) * 4
-                        memcpy(destinationBase + destinationOffset, sourceBase + sourceOffset, dirtyRect.width * 4)
-                    }
-                }
-            }
-            return committedPixels
-        }
-
-        private static func shouldCommitPreviewPixels(
+        private static func shouldCommitPreviewSurface(
             state: State,
             context: CanvasStrokeContext
         ) -> Bool {
-            if !state.canvas.activeStrokePreviewIsApproximate {
+            guard let renderState = state.canvas.activeStrokeRenderState else { return false }
+            if !renderState.isApproximatePreview {
                 return true
             }
             return state.usesResponsiveOilPreview(for: context.previewBrush)
@@ -417,25 +336,20 @@ extension AppFeature {
 
     var canvasStrokeCommitService: CanvasStrokeCommitService {
         CanvasStrokeCommitService(
-            layerCommands: documentLayerCommandService,
-            strokeProcessingService: canvasStrokeProcessingService
+            layerCommands: documentLayerCommandService
         )
     }
 
-    var canvasStrokeProcessingService: DocumentStrokeProcessingService {
-        DocumentStrokeProcessingService()
+    var canvasStrokeUseCases: DocumentStrokeUseCasesLive {
+        DocumentStrokeUseCasesLive.live()
     }
 
     var canvasStrokePreviewUseCase: DocumentStrokePreviewUseCase {
-        DocumentStrokePreviewUseCase(
-            planner: MetalStrokeRenderer(processingService: canvasStrokeProcessingService)
-        )
+        canvasStrokeUseCases.preview
     }
 
     var canvasStrokeCommitUseCase: DocumentStrokeCommitUseCase {
-        DocumentStrokeCommitUseCase(
-            renderer: MetalStrokeRenderer(processingService: canvasStrokeProcessingService)
-        )
+        canvasStrokeUseCases.commit
     }
 
     var canvasStrokeEffectCoordinator: CanvasStrokeEffectCoordinator {
@@ -447,7 +361,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
-        canvasStrokeProcessingService.resetInteractiveStrokeState()
+        canvasStrokeUseCases.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -470,7 +384,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
-        canvasStrokeProcessingService.resetInteractiveStrokeState()
+        canvasStrokeUseCases.resetInteractiveStrokeState()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -622,32 +536,23 @@ extension AppFeature {
         activeLayerIndex: Int,
         state: inout State
     ) {
-        state.canvas.setStrokePreviewLayerPixelData(plan.adjustedPixels)
-        state.canvas.setStrokePreviewIsApproximate(plan.isApproximatePreview)
-        state.canvas.setStrokePreviewRectPixelData(
-            plan.rectPixelData,
-            dirtyRect: plan.dirtyRect.map {
-                LayerPixelRect(
-                    originX: $0.originX,
-                    originY: $0.originY,
-                    width: $0.width,
-                    height: $0.height
-                )
-            }
+        let dirtyRect = LayerPixelRect(
+            originX: plan.dirtyRect.originX,
+            originY: plan.dirtyRect.originY,
+            width: plan.dirtyRect.width,
+            height: plan.dirtyRect.height
+        )
+        state.canvas.setActiveStrokeRenderState(
+            CanvasFeature.ActiveStrokeRenderState(
+                baseRevision: plan.baseSnapshot.revision,
+                layerIndex: activeLayerIndex,
+                surfaceHandle: plan.adjustedBufferHandle,
+                dirtyRect: dirtyRect,
+                isApproximatePreview: plan.isApproximatePreview
+            )
         )
         if let incrementalUpdate = plan.incrementalUpdate {
-            state.canvas.applyIncrementalRenderUpdate(
-                incrementalUpdate,
-                activeLayerIndex: activeLayerIndex,
-                activeLayerPixelData: plan.adjustedPixels
-            )
-        } else if let adjustedPixels = plan.adjustedPixels {
-            applyLiveStrokePreview(
-                baseSnapshot: plan.baseSnapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedPixels,
-                state: &state
-            )
+            state.canvas.applyIncrementalRenderUpdate(incrementalUpdate)
         }
     }
 
@@ -679,9 +584,14 @@ extension AppFeature {
         else {
             return .failure(.bridgeMutationFailed("Missing GPU committed stroke snapshot"))
         }
-        return documentLayerCommandService.replaceLayerPixels(
+        return documentLayerCommandService.applyLayerSurfaceMutation(
             state.canvas.activeLayerIndex,
-            committedResult.committedPixels
+            GpuLayerMutationPayload(
+                canvasWidth: committedResult.surface.width,
+                canvasHeight: committedResult.surface.height,
+                dirtyRect: committedResult.dirtyRegion.layerPixelRect,
+                gpuBufferHandle: committedResult.surface.handle.buffer
+            )
         )
     }
 
@@ -924,23 +834,31 @@ private extension DocumentStrokeContext {
 
 private extension AppFeature.StrokePreviewResolution {
     init?(_ resolution: DocumentStrokePreviewResolution) {
+        guard let plan = DocumentStrokePreviewPlan(resolution.result) else {
+            return nil
+        }
         self.init(
-            plan: DocumentStrokePreviewPlan(resolution.result),
+            plan: plan,
             baseSnapshotToCapture: resolution.baseSnapshotToCapture
         )
     }
 }
 
 private extension DocumentStrokePreviewPlan {
-    init(_ result: StrokePreviewResult) {
+    init?(_ result: StrokePreviewResult) {
+        guard let surface = result.surface,
+              let dirtyRegion = result.dirtyRegion else {
+            return nil
+        }
         self.init(
             baseSnapshot: result.baseSnapshot,
-            adjustedPixels: result.adjustedPixels,
-            adjustedBufferHandle: result.adjustedHandle?.buffer,
-            dirtyRect: result.dirtyRect.map {
-                (originX: $0.originX, originY: $0.originY, width: $0.width, height: $0.height)
-            },
-            rectPixelData: result.rectPixelData,
+            adjustedBufferHandle: surface.handle.buffer,
+            dirtyRect: (
+                originX: dirtyRegion.originX,
+                originY: dirtyRegion.originY,
+                width: dirtyRegion.width,
+                height: dirtyRegion.height
+            ),
             incrementalUpdate: result.incrementalUpdate,
             isApproximatePreview: result.isApproximatePreview
         )

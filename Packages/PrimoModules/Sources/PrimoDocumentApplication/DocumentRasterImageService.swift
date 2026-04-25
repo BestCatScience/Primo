@@ -3,7 +3,6 @@ import Foundation
 import ImageIO
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentMetalRuntimeInfrastructure
 
 public struct InpaintCrop: Sendable, Equatable {
     public let pixelData: Data
@@ -94,24 +93,45 @@ public enum DocumentRasterImageService {
         expandedMask: [UInt8],
         padding: Int = 64
     ) -> InpaintCrop? {
-        guard let gpuCrop = MetalLayerMutationService().inpaintCropPayload(
-            source: source,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            selectionBounds: selectionBounds,
-            expandedMask: expandedMask,
-            padding: padding
-        )
-        else {
+        guard source.count == canvasWidth * canvasHeight * 4,
+              expandedMask.count == canvasWidth * canvasHeight,
+              canvasWidth > 0,
+              canvasHeight > 0 else {
             return nil
         }
+        let minX = max(0, Int(floor(selectionBounds.minX)) - padding)
+        let minY = max(0, Int(floor(selectionBounds.minY)) - padding)
+        let maxX = min(canvasWidth, Int(ceil(selectionBounds.maxX)) + padding)
+        let maxY = min(canvasHeight, Int(ceil(selectionBounds.maxY)) + padding)
+        let cropWidth = max(0, maxX - minX)
+        let cropHeight = max(0, maxY - minY)
+        guard cropWidth > 0, cropHeight > 0 else { return nil }
+        var pixelData = Data(count: cropWidth * cropHeight * 4)
+        var selectionMask = [UInt8](repeating: 0, count: cropWidth * cropHeight)
+        pixelData.withUnsafeMutableBytes { destinationBytes in
+            source.withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<cropHeight {
+                    let sourceOffset = (((minY + row) * canvasWidth) + minX) * 4
+                    let destinationOffset = row * cropWidth * 4
+                    memcpy(destination + destinationOffset, sourceBase + sourceOffset, cropWidth * 4)
+                }
+            }
+        }
+        for row in 0..<cropHeight {
+            for column in 0..<cropWidth {
+                selectionMask[row * cropWidth + column] = expandedMask[(minY + row) * canvasWidth + minX + column]
+            }
+        }
         return InpaintCrop(
-            pixelData: gpuCrop.pixelData,
-            width: gpuCrop.width,
-            height: gpuCrop.height,
-            originX: gpuCrop.originX,
-            originY: gpuCrop.originY,
-            selectionMask: gpuCrop.selectionMask
+            pixelData: pixelData,
+            width: cropWidth,
+            height: cropHeight,
+            originX: minX,
+            originY: minY,
+            selectionMask: selectionMask
         )
     }
 
@@ -125,18 +145,32 @@ public enum DocumentRasterImageService {
     ) -> Data? {
         guard baseLayerPixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
         guard editedCropPixelData.count == crop.width * crop.height * 4 else { return nil }
-        return MetalLayerMutationService().applyInpaintCrop(
-            editedCropPixelData: editedCropPixelData,
-            to: baseLayerPixelData,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight,
-            cropWidth: crop.width,
-            cropHeight: crop.height,
-            originX: crop.originX,
-            originY: crop.originY,
-            selectionMask: crop.selectionMask,
-            featherRadius: featherRadius
-        )
+        guard crop.selectionMask.count == crop.width * crop.height else { return nil }
+        var output = baseLayerPixelData
+        output.withUnsafeMutableBytes { destinationBytes in
+            editedCropPixelData.withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<crop.height {
+                    let canvasY = crop.originY + row
+                    guard (0..<canvasHeight).contains(canvasY) else { continue }
+                    for column in 0..<crop.width {
+                        let canvasX = crop.originX + column
+                        guard (0..<canvasWidth).contains(canvasX) else { continue }
+                        let maskIndex = row * crop.width + column
+                        guard crop.selectionMask[maskIndex] > 0 else { continue }
+                        let sourceOffset = maskIndex * 4
+                        let destinationOffset = ((canvasY * canvasWidth) + canvasX) * 4
+                        destination[destinationOffset] = source[sourceOffset]
+                        destination[destinationOffset + 1] = source[sourceOffset + 1]
+                        destination[destinationOffset + 2] = source[sourceOffset + 2]
+                        destination[destinationOffset + 3] = source[sourceOffset + 3]
+                    }
+                }
+            }
+        }
+        return output
     }
 
     public static func rawLayerPixelData(fromPNGData pngData: Data, width: Int, height: Int) -> Data? {

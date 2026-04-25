@@ -367,6 +367,33 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .failure(failure)
     }
 
+    func applyLayerSurfaceMutation(index: Int, payload: GpuLayerMutationPayload) -> DocumentMutationResult {
+        guard payload.canvasWidth == store.snapshot.canvasWidth,
+              payload.canvasHeight == store.snapshot.canvasHeight else {
+            return .failure(.bridgeMutationFailed("applyLayerSurfaceMutation"))
+        }
+        guard !payload.dirtyRect.isEmpty else {
+            return .failure(.bridgeMutationFailed("applyLayerSurfaceMutation"))
+        }
+        guard let failure = validateEditableLayer(index) else {
+            let layer = store.snapshot.layers[index]
+            let fallbackPayload = DocumentLayerMutationPayload(
+                canvasWidth: payload.canvasWidth,
+                canvasHeight: payload.canvasHeight,
+                dirtyRect: payload.dirtyRect,
+                gpuBufferHandle: payload.gpuBufferHandle,
+                rectPixelData: Data(),
+                fullPixelData: payload.fallbackPixelData
+            )
+            return applyLayerMutationPayload(
+                index: index,
+                payload: fallbackPayload,
+                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: currentPixelData(for: index)) : nil
+            )
+        }
+        return .failure(failure)
+    }
+
     func applyLayerMutation(index: Int, payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
         guard let failure = validateEditableLayer(index) else {
             return applyLayerMutationPayload(

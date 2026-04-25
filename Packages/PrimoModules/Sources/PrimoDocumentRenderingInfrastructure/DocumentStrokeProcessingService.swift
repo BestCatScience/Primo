@@ -3,27 +3,21 @@ import PrimoDocumentContracts
 
 public struct DocumentStrokePreviewPlan: Sendable {
     public let baseSnapshot: MetalDocumentSnapshot
-    public let adjustedPixels: Data?
-    public let adjustedBufferHandle: MetalBufferHandle?
-    public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
-    public let rectPixelData: Data?
+    public let adjustedBufferHandle: MetalBufferHandle
+    public let dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
     public let incrementalUpdate: IncrementalLayerUpdate?
     public let isApproximatePreview: Bool
 
     public init(
         baseSnapshot: MetalDocumentSnapshot,
-        adjustedPixels: Data?,
-        adjustedBufferHandle: MetalBufferHandle? = nil,
-        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?,
-        rectPixelData: Data?,
+        adjustedBufferHandle: MetalBufferHandle,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int),
         incrementalUpdate: IncrementalLayerUpdate?,
         isApproximatePreview: Bool = false
     ) {
         self.baseSnapshot = baseSnapshot
-        self.adjustedPixels = adjustedPixels
         self.adjustedBufferHandle = adjustedBufferHandle
         self.dirtyRect = dirtyRect
-        self.rectPixelData = rectPixelData
         self.incrementalUpdate = incrementalUpdate
         self.isApproximatePreview = isApproximatePreview
     }
@@ -63,15 +57,51 @@ public struct DocumentStrokeProcessingService: Sendable {
             return nil
         }
 
+        guard let gpuBufferHandle = preview.gpuBufferHandle,
+              let dirtyRect = preview.dirtyRect else {
+            return nil
+        }
+
         return DocumentStrokePreviewPlan(
             baseSnapshot: snapshot,
-            adjustedPixels: preview.pixelData,
-            adjustedBufferHandle: preview.gpuBufferHandle,
-            dirtyRect: preview.dirtyRect,
-            rectPixelData: preview.rectPixelData,
+            adjustedBufferHandle: gpuBufferHandle,
+            dirtyRect: dirtyRect,
             incrementalUpdate: preview.incrementalUpdate,
             isApproximatePreview: preview.isApproximatePreview
         )
+    }
+
+    public func makeCommittedSurface(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        preserveAlphaLockedPixels: Bool
+    ) -> (handle: MetalBufferHandle, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int), fallbackPixelData: Data?)? {
+        guard let baseLayer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
+            return nil
+        }
+
+        guard let gpuOutput = renderingClient.executeStroke(
+            MetalStrokeExecutionRequest(
+                basePixelData: baseLayer.pixelData,
+                baseBufferHandle: baseLayer.gpuBufferHandle,
+                canvasWidth: snapshot.width,
+                canvasHeight: snapshot.height,
+                samples: samples,
+                brush: brush,
+                mode: .interactive,
+                snapshotRevision: snapshot.revision,
+                activeLayerIndex: activeLayerIndex
+            )
+        ) else {
+            return nil
+        }
+        guard !preserveAlphaLockedPixels else { return nil }
+        guard let handle = gpuOutput.gpuBufferHandle else {
+            return nil
+        }
+        return (handle, gpuOutput.dirtyRect, gpuOutput.pixelData)
     }
 
     public func makeCommittedPixels(

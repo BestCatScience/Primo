@@ -251,10 +251,9 @@ public struct DocumentRenderingClient: Sendable {
                 adjustedActiveLayerBufferHandle: bufferHandle,
                 dirtyRect: gpuResult.dirtyRect
             ) {
-                backend.releaseBufferHandle(bufferHandle)
                 return DocumentInteractiveStrokePreviewResult(
                     pixelData: nil,
-                    gpuBufferHandle: nil,
+                    gpuBufferHandle: bufferHandle,
                     dirtyRect: gpuResult.dirtyRect,
                     rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
                     incrementalUpdate: incrementalUpdate,

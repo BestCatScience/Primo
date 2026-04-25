@@ -11,6 +11,100 @@ public struct GpuSurfaceHandle: Equatable, Hashable, Sendable {
     }
 }
 
+public struct GpuSurfaceRegion: Equatable, Sendable {
+    public let originX: Int
+    public let originY: Int
+    public let width: Int
+    public let height: Int
+
+    public init(originX: Int, originY: Int, width: Int, height: Int) {
+        self.originX = originX
+        self.originY = originY
+        self.width = width
+        self.height = height
+    }
+
+    public init(_ rect: LayerPixelRect) {
+        self.init(originX: rect.originX, originY: rect.originY, width: rect.width, height: rect.height)
+    }
+
+    public var layerPixelRect: LayerPixelRect {
+        LayerPixelRect(originX: originX, originY: originY, width: width, height: height)
+    }
+
+    public var isEmpty: Bool { width <= 0 || height <= 0 }
+}
+
+public struct GpuLayerSurface: Equatable, Sendable {
+    public let layerIndex: Int
+    public let width: Int
+    public let height: Int
+    public let handle: GpuSurfaceHandle
+
+    public init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle) {
+        self.layerIndex = layerIndex
+        self.width = width
+        self.height = height
+        self.handle = handle
+    }
+}
+
+public struct GpuDocumentSurfaceSnapshot: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+    public let revision: Int
+    public let composite: GpuSurfaceHandle?
+    public let layers: [GpuLayerSurface]
+
+    public init(
+        width: Int,
+        height: Int,
+        revision: Int,
+        composite: GpuSurfaceHandle?,
+        layers: [GpuLayerSurface]
+    ) {
+        self.width = width
+        self.height = height
+        self.revision = revision
+        self.composite = composite
+        self.layers = layers
+    }
+}
+
+public struct GpuIncrementalUpdate: Equatable, Sendable {
+    public let layerIndex: Int
+    public let region: GpuSurfaceRegion
+    public let handle: GpuSurfaceHandle
+
+    public init(layerIndex: Int, region: GpuSurfaceRegion, handle: GpuSurfaceHandle) {
+        self.layerIndex = layerIndex
+        self.region = region
+        self.handle = handle
+    }
+}
+
+public struct MaterializedSurfaceRequest: Equatable, Sendable {
+    public let handle: GpuSurfaceHandle
+    public let region: GpuSurfaceRegion?
+
+    public init(handle: GpuSurfaceHandle, region: GpuSurfaceRegion? = nil) {
+        self.handle = handle
+        self.region = region
+    }
+}
+
+public struct MaterializedSurfaceResult: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+    public let pixelData: Data
+
+    public init(width: Int, height: Int, pixelData: Data) {
+        self.width = width
+        self.height = height
+        self.pixelData = pixelData
+    }
+}
+
 public struct LayerSurfaceRef: Equatable, Sendable {
     public let layerIndex: Int
     public let width: Int
@@ -63,29 +157,27 @@ public struct StrokePreviewRequest: Sendable {
 
 public struct StrokePreviewResult: Sendable {
     public let baseSnapshot: MetalDocumentSnapshot
-    public let adjustedPixels: Data?
-    public let adjustedHandle: GpuSurfaceHandle?
-    public let dirtyRect: LayerPixelRect?
-    public let rectPixelData: Data?
+    public let surface: GpuLayerSurface?
+    public let dirtyRegion: GpuSurfaceRegion?
     public let incrementalUpdate: IncrementalLayerUpdate?
     public let isApproximatePreview: Bool
 
     public init(
         baseSnapshot: MetalDocumentSnapshot,
-        adjustedPixels: Data?,
-        adjustedHandle: GpuSurfaceHandle? = nil,
-        dirtyRect: LayerPixelRect?,
-        rectPixelData: Data?,
+        surface: GpuLayerSurface?,
+        dirtyRegion: GpuSurfaceRegion?,
         incrementalUpdate: IncrementalLayerUpdate?,
         isApproximatePreview: Bool = false
     ) {
         self.baseSnapshot = baseSnapshot
-        self.adjustedPixels = adjustedPixels
-        self.adjustedHandle = adjustedHandle
-        self.dirtyRect = dirtyRect
-        self.rectPixelData = rectPixelData
+        self.surface = surface
+        self.dirtyRegion = dirtyRegion
         self.incrementalUpdate = incrementalUpdate
         self.isApproximatePreview = isApproximatePreview
+    }
+
+    public var dirtyRect: LayerPixelRect? {
+        dirtyRegion?.layerPixelRect
     }
 }
 
@@ -112,10 +204,12 @@ public struct StrokeCommitRequest: Sendable {
 }
 
 public struct StrokeCommitResult: Sendable {
-    public let committedPixels: Data
+    public let surface: GpuLayerSurface
+    public let dirtyRegion: GpuSurfaceRegion
 
-    public init(committedPixels: Data) {
-        self.committedPixels = committedPixels
+    public init(surface: GpuLayerSurface, dirtyRegion: GpuSurfaceRegion) {
+        self.surface = surface
+        self.dirtyRegion = dirtyRegion
     }
 }
 

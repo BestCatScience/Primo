@@ -23,26 +23,49 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
         ) else {
             return nil
         }
+        let region = GpuSurfaceRegion(
+            originX: plan.dirtyRect.originX,
+            originY: plan.dirtyRect.originY,
+            width: plan.dirtyRect.width,
+            height: plan.dirtyRect.height
+        )
         return StrokePreviewResult(
             baseSnapshot: plan.baseSnapshot,
-            adjustedPixels: plan.adjustedPixels,
-            adjustedHandle: plan.adjustedBufferHandle.map(GpuSurfaceHandle.init(buffer:)),
-            dirtyRect: plan.dirtyRect.map {
-                LayerPixelRect(originX: $0.originX, originY: $0.originY, width: $0.width, height: $0.height)
-            },
-            rectPixelData: plan.rectPixelData,
+            surface: GpuLayerSurface(
+                layerIndex: request.activeLayerIndex,
+                width: request.snapshot.width,
+                height: request.snapshot.height,
+                handle: GpuSurfaceHandle(buffer: plan.adjustedBufferHandle)
+            ),
+            dirtyRegion: region,
             incrementalUpdate: plan.incrementalUpdate,
             isApproximatePreview: plan.isApproximatePreview
         )
     }
 
     public func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
-        processingService.makeCommittedPixels(
+        guard let committed = processingService.makeCommittedSurface(
             snapshot: request.snapshot,
             activeLayerIndex: request.activeLayerIndex,
             samples: request.samples,
             brush: request.brush,
             preserveAlphaLockedPixels: request.preserveAlphaLockedPixels
-        ).map(StrokeCommitResult.init(committedPixels:))
+        ) else {
+            return nil
+        }
+        return StrokeCommitResult(
+            surface: GpuLayerSurface(
+                layerIndex: request.activeLayerIndex,
+                width: request.snapshot.width,
+                height: request.snapshot.height,
+                handle: GpuSurfaceHandle(buffer: committed.handle)
+            ),
+            dirtyRegion: GpuSurfaceRegion(
+                originX: committed.dirtyRect.originX,
+                originY: committed.dirtyRect.originY,
+                width: committed.dirtyRect.width,
+                height: committed.dirtyRect.height
+            )
+        )
     }
 }

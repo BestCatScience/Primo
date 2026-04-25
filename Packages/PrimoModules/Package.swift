@@ -68,7 +68,6 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentDomain",
                 "PrimoDocumentContracts",
-                "PrimoDocumentMetalRuntimeInfrastructure",
             ]
         ),
         .target(
@@ -168,8 +167,10 @@ let package = Package(
                 "PrimoDocumentApplication",
                 "PrimoDocumentInfrastructure",
                 "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentMetalStrokeInfrastructure",
                 "PrimoDocumentRenderingInfrastructure",
                 "PrimoDocumentPersistenceInfrastructure",
+                "PrimoDocumentStrokeApplication",
                 "PrimoDocumentStrokeInfrastructure",
                 "PrimoDocumentTimelapseInfrastructure",
             ],
