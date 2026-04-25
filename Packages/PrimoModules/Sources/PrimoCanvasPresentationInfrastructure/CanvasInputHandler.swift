@@ -8,6 +8,7 @@ import PrimoDocumentDomain
 import UIKit
 import simd
 
+@MainActor
 public protocol CanvasInputHandlingDelegate: AnyObject {
     func didUpdateStroke(_ stroke: Stroke)
     func didEndStroke(_ stroke: Stroke)

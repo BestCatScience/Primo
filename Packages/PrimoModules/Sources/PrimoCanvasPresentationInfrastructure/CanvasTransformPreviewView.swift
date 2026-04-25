@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
@@ -281,3 +282,4 @@ final class CanvasTransformPreviewView: UIView {
     }
 
 }
+#endif

@@ -30,6 +30,7 @@ struct AppFeature {
     @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
     @Dependency(\.documentLayerCommandService) var documentLayerCommandService
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
+    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
     @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
     @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient

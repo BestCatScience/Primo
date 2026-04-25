@@ -24,18 +24,12 @@
 		A00000000000000000000024 /* PaintModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* PaintModels.swift */; };
 		A00000000000000000000025 /* CanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* CanvasView.swift */; };
 		D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000001 /* CanvasViewportGeometry.swift */; };
-		D50000000000000000000002 /* CanvasSelectionOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000002 /* CanvasSelectionOverlayView.swift */; };
-		D50000000000000000000003 /* CanvasTransformPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000003 /* CanvasTransformPreviewView.swift */; };
-		D50000000000000000000004 /* CanvasTextTransformOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */; };
-		D50000000000000000000005 /* CanvasEyedropperLoupeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */; };
-		D50000000000000000000006 /* CanvasNavigationGestureAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */; };
 		A00000000000000000000026 /* BrushPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* BrushPaletteView.swift */; };
 		A00000000000000000000027 /* LayerSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* LayerSidebarView.swift */; };
 		A0000000000000000000002A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* UIKit.framework */; };
 		A0000000000000000000002B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* Foundation.framework */; };
 		A0000000000000000000002C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* CoreGraphics.framework */; };
 		A0000000000000000000002D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* AVFoundation.framework */; };
-		A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000013 /* MetalCanvasRenderer.swift */; };
 		A0000000000000000000002F /* PaintShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* PaintShaders.metal */; };
 		A00000000000000000000035 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* Metal.framework */; };
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
@@ -194,15 +188,9 @@
 		A00000000000000000000004 /* PaintModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintModels.swift; sourceTree = "<group>"; };
 		A00000000000000000000005 /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
 		D60000000000000000000001 /* CanvasViewportGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasViewportGeometry.swift; sourceTree = "<group>"; };
-		D60000000000000000000002 /* CanvasSelectionOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasSelectionOverlayView.swift; sourceTree = "<group>"; };
-		D60000000000000000000003 /* CanvasTransformPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTransformPreviewView.swift; sourceTree = "<group>"; };
-		D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasTextTransformOverlayView.swift; sourceTree = "<group>"; };
-		D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasEyedropperLoupeView.swift; sourceTree = "<group>"; };
-		D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasNavigationGestureAdapter.swift; sourceTree = "<group>"; };
 		A00000000000000000000006 /* BrushPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteView.swift; sourceTree = "<group>"; };
 		A00000000000000000000007 /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A00000000000000000000013 /* MetalCanvasRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalCanvasRenderer.swift; sourceTree = "<group>"; };
 		A00000000000000000000014 /* PaintShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PaintShaders.metal; sourceTree = "<group>"; };
 		A00000000000000000000015 /* BrushRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushRuntimeSettings.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PaintDocumentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPresentation.swift; sourceTree = "<group>"; };
@@ -442,7 +430,6 @@
 		A0000000000000000000005A /* Rendering */ = {
 			isa = PBXGroup;
 			children = (
-				A00000000000000000000013 /* MetalCanvasRenderer.swift */,
 				A00000000000000000000014 /* PaintShaders.metal */,
 			);
 			path = Rendering;
@@ -487,11 +474,6 @@
 			children = (
 				A00000000000000000000005 /* CanvasView.swift */,
 				D60000000000000000000001 /* CanvasViewportGeometry.swift */,
-				D60000000000000000000002 /* CanvasSelectionOverlayView.swift */,
-				D60000000000000000000003 /* CanvasTransformPreviewView.swift */,
-				D60000000000000000000004 /* CanvasTextTransformOverlayView.swift */,
-				D60000000000000000000005 /* CanvasEyedropperLoupeView.swift */,
-				D60000000000000000000006 /* CanvasNavigationGestureAdapter.swift */,
 				A00000000000000000000045 /* InputHandler.swift */,
 			);
 			path = Canvas;
@@ -795,11 +777,6 @@
 				A00000000000000000000043 /* CanvasFeature.swift in Sources */,
 				A00000000000000000000025 /* CanvasView.swift in Sources */,
 				D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */,
-				D50000000000000000000002 /* CanvasSelectionOverlayView.swift in Sources */,
-				D50000000000000000000003 /* CanvasTransformPreviewView.swift in Sources */,
-				D50000000000000000000004 /* CanvasTextTransformOverlayView.swift in Sources */,
-				D50000000000000000000005 /* CanvasEyedropperLoupeView.swift in Sources */,
-				D50000000000000000000006 /* CanvasNavigationGestureAdapter.swift in Sources */,
 				A00000000000000000000022 /* ContentView.swift in Sources */,
 				A00000000000000000000096 /* ContentView+Support.swift in Sources */,
 				A00000000000000000000044 /* InputHandler.swift in Sources */,
@@ -807,7 +784,6 @@
 				A00000000000000000000027 /* LayerSidebarView.swift in Sources */,
 				A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */,
 				A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */,
-				A0000000000000000000002E /* MetalCanvasRenderer.swift in Sources */,
 				A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */,
 				A00000000000000000000094 /* BrushPresetStore.swift in Sources */,
 				A0000000000000000000004C /* BrushTipFile.swift in Sources */,

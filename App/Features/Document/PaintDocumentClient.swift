@@ -47,6 +47,13 @@ private enum DocumentStrokeCommandServiceKey: DependencyKey {
     }
 }
 
+private enum CanvasStrokeInteractionServiceKey: DependencyKey {
+    static var liveValue: CanvasStrokeInteractionService {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return CanvasStrokeInteractionService(sessionUseCase: composition.strokeSessionUseCase)
+    }
+}
+
 private enum DocumentHistoryCommandServiceKey: DependencyKey {
     static var liveValue: DocumentHistoryCommandService {
         @Dependency(\.documentRuntimeComposition) var composition
@@ -68,6 +75,34 @@ private enum LayerTransformProcessorKey: DependencyKey {
     }
 }
 
+private enum SelectionMaskProcessorKey: DependencyKey {
+    static var liveValue: any SelectionMaskProcessing {
+        @Dependency(\.documentRuntimeComposition) var composition
+        return GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+    }
+}
+
+private enum CanvasEyedropperSamplerKey: DependencyKey {
+    static var liveValue: any CanvasEyedropperSampling {
+        GpuCanvasEyedropperSampler()
+    }
+}
+
+private enum CanvasPresentationEnvironmentKey: DependencyKey {
+    static var liveValue: CanvasPresentationEnvironment {
+        @Dependency(\.canvasPreviewRenderer) var previewRenderer
+        @Dependency(\.canvasEyedropperSampler) var eyedropperSampler
+        @Dependency(\.selectionMaskProcessor) var selectionMaskProcessor
+        @Dependency(\.layerTransformProcessor) var layerTransformProcessor
+        return CanvasPresentationEnvironment(
+            previewRenderer: previewRenderer,
+            eyedropperSampler: eyedropperSampler,
+            selectionProcessor: selectionMaskProcessor,
+            layerTransformProcessor: layerTransformProcessor
+        )
+    }
+}
+
 private extension DependencyValues {
     mutating func setDocumentRuntimeCompositionAndRefreshCommandServices(
         _ composition: DocumentRuntimeComposition
@@ -83,6 +118,9 @@ private extension DependencyValues {
         )
         self[DocumentStrokeCommandServiceKey.self] = DocumentStrokeCommandService(
             strokeGateway: composition.strokeGateway
+        )
+        self[CanvasStrokeInteractionServiceKey.self] = CanvasStrokeInteractionService(
+            sessionUseCase: composition.strokeSessionUseCase
         )
         self[DocumentHistoryCommandServiceKey.self] = DocumentHistoryCommandService(
             historyGateway: composition.historyGateway
@@ -186,6 +224,11 @@ extension DependencyValues {
         }
     }
 
+    var canvasStrokeInteractionService: CanvasStrokeInteractionService {
+        get { self[CanvasStrokeInteractionServiceKey.self] }
+        set { self[CanvasStrokeInteractionServiceKey.self] = newValue }
+    }
+
     var documentGpuOperationGateway: DocumentGpuOperationGateway {
         get { documentRuntimeComposition.gpuOperationGateway }
         set {
@@ -203,6 +246,21 @@ extension DependencyValues {
     var layerTransformProcessor: any LayerTransformProcessing {
         get { self[LayerTransformProcessorKey.self] }
         set { self[LayerTransformProcessorKey.self] = newValue }
+    }
+
+    var canvasEyedropperSampler: any CanvasEyedropperSampling {
+        get { self[CanvasEyedropperSamplerKey.self] }
+        set { self[CanvasEyedropperSamplerKey.self] = newValue }
+    }
+
+    var selectionMaskProcessor: any SelectionMaskProcessing {
+        get { self[SelectionMaskProcessorKey.self] }
+        set { self[SelectionMaskProcessorKey.self] = newValue }
+    }
+
+    var canvasPresentationEnvironment: CanvasPresentationEnvironment {
+        get { self[CanvasPresentationEnvironmentKey.self] }
+        set { self[CanvasPresentationEnvironmentKey.self] = newValue }
     }
 
     var documentCanvasCommandService: DocumentCanvasCommandService {

@@ -35,6 +35,19 @@ public enum CanvasPresentationAction: Sendable {
     case pencilInteractionToggleRequested
 }
 
+public struct CanvasPresentationActionSink: Sendable {
+    private let sendAction: @MainActor @Sendable (CanvasPresentationAction) -> Void
+
+    public init(_ sendAction: @escaping @MainActor @Sendable (CanvasPresentationAction) -> Void) {
+        self.sendAction = sendAction
+    }
+
+    @MainActor
+    public func send(_ action: CanvasPresentationAction) {
+        sendAction(action)
+    }
+}
+
 public struct CanvasPresentationState: Sendable {
     public var documentSize: CGSize
     public var snapshot: MetalDocumentSnapshot?
@@ -117,6 +130,25 @@ public struct CanvasPresentationState: Sendable {
         self.viewportOffset = viewportOffset
         self.zoomScale = zoomScale
         self.previewResetNonce = previewResetNonce
+    }
+}
+
+public struct CanvasPresentationEnvironment: Sendable {
+    public var previewRenderer: any CanvasPreviewRendering
+    public var eyedropperSampler: any CanvasEyedropperSampling
+    public var selectionProcessor: any SelectionMaskProcessing
+    public var layerTransformProcessor: any LayerTransformProcessing
+
+    public init(
+        previewRenderer: any CanvasPreviewRendering,
+        eyedropperSampler: any CanvasEyedropperSampling,
+        selectionProcessor: any SelectionMaskProcessing,
+        layerTransformProcessor: any LayerTransformProcessing
+    ) {
+        self.previewRenderer = previewRenderer
+        self.eyedropperSampler = eyedropperSampler
+        self.selectionProcessor = selectionProcessor
+        self.layerTransformProcessor = layerTransformProcessor
     }
 }
 
@@ -249,6 +281,22 @@ public protocol CanvasPreviewRendering: Sendable {
     func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface?
     func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface?
     func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect?
+}
+
+public protocol CanvasTransformPreviewRendering: CanvasPreviewRendering {}
+
+public protocol CanvasEyedropperSampling: Sendable {
+    func sampledColor(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        source: EyedropperSamplingSource,
+        point: CGPoint,
+        paperStyle: CanvasPaperStyle
+    ) -> SampledColor?
+}
+
+public protocol SelectionMaskProcessing: Sendable {
+    func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface?
 }
 
 public protocol LayerTransformProcessing: Sendable {

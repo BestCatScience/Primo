@@ -260,7 +260,7 @@ extension AppFeature {
     }
 
     func resetStrokePreviewState(state: inout State) {
-        _ = documentStrokeSessionUseCase.execute(.cancel)
+        _ = canvasStrokeInteractionService.cancel()
         canvasStrokeStateCoordinator.resetPreview(state: &state)
     }
 
@@ -283,7 +283,7 @@ extension AppFeature {
     }
 
     func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
-        _ = documentStrokeSessionUseCase.execute(.cancel)
+        _ = canvasStrokeInteractionService.cancel()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
             ensureCurrentPresentationLoaded: { mutableState in
@@ -332,13 +332,11 @@ extension AppFeature {
         sample: StylusSample,
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
-        documentStrokeSessionUseCase.execute(
-            .begin(
-                sample: sample,
-                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
-                context: DocumentStrokeContext(context),
-                usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
-            )
+        canvasStrokeInteractionService.beginPreview(
+            sample: sample,
+            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+            context: DocumentStrokeContext(context),
+            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
         )
     }
 
@@ -347,15 +345,13 @@ extension AppFeature {
         samples: [StylusSample],
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
-        documentStrokeSessionUseCase.execute(
-            .append(
-                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
-                renderSnapshot: state.canvas.renderSnapshot,
-                samples: samples,
-                fullSamples: state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples,
-                context: DocumentStrokeContext(context),
-                usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
-            )
+        canvasStrokeInteractionService.appendPreview(
+            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+            renderSnapshot: state.canvas.renderSnapshot,
+            samples: samples,
+            fullSamples: state.canvas.activeStroke?.points.map(\.stylusSample) ?? samples,
+            context: DocumentStrokeContext(context),
+            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
         )
     }
 
@@ -394,16 +390,14 @@ extension AppFeature {
             }
         }
 
-        let outcome = documentStrokeSessionUseCase.execute(
-            .finish(
-                renderState: state.canvas.strokeSession.renderState,
-                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
-                renderSnapshot: state.canvas.renderSnapshot,
-                samples: samples,
-                context: DocumentStrokeContext(context),
-                allowsApproximatePreviewCommit: state.usesResponsiveOilPreview(for: context.previewBrush),
-                refreshViaDirtyPresentation: refreshViaDirtyPresentation
-            )
+        let outcome = canvasStrokeInteractionService.finish(
+            renderState: state.canvas.strokeSession.renderState,
+            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+            renderSnapshot: state.canvas.renderSnapshot,
+            samples: samples,
+            context: DocumentStrokeContext(context),
+            allowsApproximatePreviewCommit: state.usesResponsiveOilPreview(for: context.previewBrush),
+            refreshViaDirtyPresentation: refreshViaDirtyPresentation
         )
 
         switch outcome {

@@ -1,3 +1,5 @@
+#if canImport(UIKit)
+import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import QuartzCore
@@ -15,7 +17,7 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
     private var isPinchGestureActive = false
     private var lastNavigationGestureEndedAt: CFTimeInterval = 0
 
-    var sendAction: ((CanvasFeature.Action) -> Void)?
+    var actionSink: CanvasPresentationActionSink?
     var shouldAllowSimultaneousRecognition: ((UIGestureRecognizer, UIGestureRecognizer) -> Bool)?
     var shouldReceiveTouch: ((UIGestureRecognizer, UITouch) -> Bool)?
 
@@ -94,7 +96,7 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
                 width: panStartOffset.width + deltaX,
                 height: panStartOffset.height + deltaY
             )
-            sendAction?(.viewportOffsetChanged(context.geometry.clampedViewportOffset(nextOffset)))
+            actionSink?.send(.viewportOffsetChanged(context.geometry.clampedViewportOffset(nextOffset)))
         case .ended, .cancelled:
             if panDidMove {
                 lastNavigationGestureEndedAt = CACurrentMediaTime()
@@ -115,14 +117,14 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
     private func handleTwoFingerUndoTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         guard !shouldSuppressHistoryTap() else { return }
-        sendAction?(.requestLocalUndo)
+        actionSink?.send(.requestLocalUndo)
     }
 
     @objc
     private func handleThreeFingerRedoTap(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended else { return }
         guard !shouldSuppressHistoryTap() else { return }
-        sendAction?(.requestLocalRedo)
+        actionSink?.send(.requestLocalRedo)
     }
 
     @objc
@@ -137,13 +139,13 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
                     return
                 }
                 isPinchGestureActive = true
-                sendAction?(.transformScaleGestureBegan)
+                actionSink?.send(.transformScaleGestureBegan)
 
             case .changed:
-                sendAction?(.transformScaleChanged(recognizer.scale))
+                actionSink?.send(.transformScaleChanged(recognizer.scale))
 
             case .ended, .cancelled, .failed:
-                sendAction?(.transformScaleEnded(recognizer.scale))
+                actionSink?.send(.transformScaleEnded(recognizer.scale))
                 if isPinchGestureActive {
                     lastNavigationGestureEndedAt = CACurrentMediaTime()
                 }
@@ -170,8 +172,8 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
                 at: location,
                 zoomScale: newScale
             )
-            sendAction?(.zoomScaleChanged(newScale))
-            sendAction?(.viewportOffsetChanged(newOffset))
+            actionSink?.send(.zoomScaleChanged(newScale))
+            actionSink?.send(.viewportOffsetChanged(newOffset))
 
         case .ended, .cancelled, .failed:
             if isPinchGestureActive {
@@ -190,11 +192,11 @@ final class CanvasNavigationGestureAdapter: NSObject, UIGestureRecognizerDelegat
         guard let context, context.currentTool == .move, context.transformMode == .standard else { return }
         switch recognizer.state {
         case .began:
-            sendAction?(.transformRotationGestureBegan)
+            actionSink?.send(.transformRotationGestureBegan)
         case .changed:
-            sendAction?(.transformRotationChanged(recognizer.rotation))
+            actionSink?.send(.transformRotationChanged(recognizer.rotation))
         case .ended, .cancelled, .failed:
-            sendAction?(.transformRotationEnded(recognizer.rotation))
+            actionSink?.send(.transformRotationEnded(recognizer.rotation))
         default:
             break
         }
@@ -223,3 +225,4 @@ extension CanvasNavigationGestureAdapter {
         let geometry: CanvasViewportGeometry
     }
 }
+#endif

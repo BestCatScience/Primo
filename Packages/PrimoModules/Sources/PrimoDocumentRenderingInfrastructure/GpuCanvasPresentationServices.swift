@@ -5,7 +5,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import simd
 
-public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering {
+public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
     private let gpuOperations: DocumentGpuOperationGateway
 
     public init(gpuOperations: DocumentGpuOperationGateway = DocumentGpuOperationGatewayFactory.live()) {
@@ -127,6 +127,71 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering {
             blue: blue,
             isEraser: style.isEraser
         )
+    }
+}
+
+public struct GpuCanvasEyedropperSampler: CanvasEyedropperSampling {
+    public init() {}
+
+    public func sampledColor(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        source: EyedropperSamplingSource,
+        point: CGPoint,
+        paperStyle: CanvasPaperStyle
+    ) -> SampledColor? {
+        guard snapshot.width > 0, snapshot.height > 0 else { return nil }
+        let x = min(max(Int(point.x.rounded()), 0), snapshot.width - 1)
+        let y = min(max(Int(point.y.rounded()), 0), snapshot.height - 1)
+
+        switch source {
+        case .activeLayer:
+            guard let layer = snapshot.layers.first(where: { $0.index == activeLayerIndex }) else {
+                return nil
+            }
+            return samplePixel(in: layer.pixelData, width: snapshot.width, height: snapshot.height, x: x, y: y)
+
+        case .canvas:
+            guard let foreground = samplePixel(in: snapshot.compositePixelData, width: snapshot.width, height: snapshot.height, x: x, y: y) else {
+                return nil
+            }
+            guard !paperStyle.isTransparent else { return foreground }
+            return blend(foreground: foreground, paperStyle: paperStyle)
+        }
+    }
+
+    private func samplePixel(in pixelData: Data, width: Int, height: Int, x: Int, y: Int) -> SampledColor? {
+        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
+        let offset = ((y * width) + x) * 4
+        return pixelData.withUnsafeBytes { bytes in
+            guard let source = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
+            return SampledColor(
+                red: source[offset],
+                green: source[offset + 1],
+                blue: source[offset + 2],
+                alpha: source[offset + 3]
+            )
+        }
+    }
+
+    private func blend(foreground: SampledColor, paperStyle: CanvasPaperStyle) -> SampledColor {
+        let alpha = CGFloat(foreground.alpha) / 255.0
+        let background = SampledColor(
+            red: UInt8(max(0, min(255, Int((CGFloat(paperStyle.red) * 255.0).rounded())))),
+            green: UInt8(max(0, min(255, Int((CGFloat(paperStyle.green) * 255.0).rounded())))),
+            blue: UInt8(max(0, min(255, Int((CGFloat(paperStyle.blue) * 255.0).rounded())))),
+            alpha: 255
+        )
+        return SampledColor(
+            red: blendedChannel(source: foreground.red, background: background.red, alpha: alpha),
+            green: blendedChannel(source: foreground.green, background: background.green, alpha: alpha),
+            blue: blendedChannel(source: foreground.blue, background: background.blue, alpha: alpha),
+            alpha: 255
+        )
+    }
+
+    private func blendedChannel(source: UInt8, background: UInt8, alpha: CGFloat) -> UInt8 {
+        UInt8(max(0, min(255, Int((CGFloat(source) * alpha + CGFloat(background) * (1 - alpha)).rounded()))))
     }
 }
 

@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
@@ -10,6 +11,7 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
     private let focusView = UIView()
     private let longPressRecognizer = UILongPressGestureRecognizer()
     private let previewRenderer: any CanvasPreviewRendering
+    private let eyedropperSampler: any CanvasEyedropperSampling
 
     private var context: Context?
     private(set) var isActive = false
@@ -21,8 +23,9 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
     private let previewGridSize = 17
     private let verticalOffset: CGFloat = 86
 
-    init(previewRenderer: any CanvasPreviewRendering) {
+    init(previewRenderer: any CanvasPreviewRendering, eyedropperSampler: any CanvasEyedropperSampling) {
         self.previewRenderer = previewRenderer
+        self.eyedropperSampler = eyedropperSampler
         super.init()
         configureViews()
         configureRecognizer()
@@ -257,61 +260,12 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
             return nil
         }
 
-        let x = min(max(Int(point.x.rounded()), 0), snapshot.width - 1)
-        let y = min(max(Int(point.y.rounded()), 0), snapshot.height - 1)
-
-        switch context.source {
-        case .activeLayer:
-            guard let layer = snapshot.layers.first(where: { $0.index == context.activeLayerIndex }) else {
-                return nil
-            }
-            return samplePixel(in: layer.pixelData, width: snapshot.width, height: snapshot.height, x: x, y: y)
-
-        case .canvas:
-            return sampleCanvasPixel(in: snapshot.compositePixelData, width: snapshot.width, height: snapshot.height, x: x, y: y, paperStyle: context.paperStyle)
-        }
-    }
-
-    private func samplePixel(in pixelData: Data, width: Int, height: Int, x: Int, y: Int) -> SampledColor? {
-        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
-        let offset = ((y * width) + x) * 4
-        return pixelData.withUnsafeBytes { bytes in
-            guard let source = bytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return nil }
-            return SampledColor(
-                red: source[offset],
-                green: source[offset + 1],
-                blue: source[offset + 2],
-                alpha: source[offset + 3]
-            )
-        }
-    }
-
-    private func sampleCanvasPixel(
-        in pixelData: Data,
-        width: Int,
-        height: Int,
-        x: Int,
-        y: Int,
-        paperStyle: CanvasPaperStyle
-    ) -> SampledColor? {
-        guard let foreground = samplePixel(in: pixelData, width: width, height: height, x: x, y: y) else {
-            return nil
-        }
-        guard !paperStyle.isTransparent else { return foreground }
-
-        let alpha = CGFloat(foreground.alpha) / 255.0
-        let background = SampledColor(
-            red: UInt8(max(0, min(255, Int((CGFloat(paperStyle.red) * 255.0).rounded())))),
-            green: UInt8(max(0, min(255, Int((CGFloat(paperStyle.green) * 255.0).rounded())))),
-            blue: UInt8(max(0, min(255, Int((CGFloat(paperStyle.blue) * 255.0).rounded())))),
-            alpha: 255
-        )
-
-        return SampledColor(
-            red: blendedChannel(source: foreground.red, background: background.red, alpha: alpha),
-            green: blendedChannel(source: foreground.green, background: background.green, alpha: alpha),
-            blue: blendedChannel(source: foreground.blue, background: background.blue, alpha: alpha),
-            alpha: 255
+        return eyedropperSampler.sampledColor(
+            snapshot: snapshot,
+            activeLayerIndex: context.activeLayerIndex,
+            source: context.source,
+            point: point,
+            paperStyle: context.paperStyle
         )
     }
 
@@ -322,10 +276,6 @@ final class CanvasEyedropperLoupeView: NSObject, UIGestureRecognizerDelegate {
             blue: CGFloat(sampledColor.blue) / 255.0,
             alpha: 1.0
         )
-    }
-
-    private func blendedChannel(source: UInt8, background: UInt8, alpha: CGFloat) -> UInt8 {
-        UInt8(max(0, min(255, Int((CGFloat(source) * alpha + CGFloat(background) * (1 - alpha)).rounded()))))
     }
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
@@ -353,3 +303,4 @@ extension CanvasEyedropperLoupeView {
         let shouldBlockSampling: (CGPoint) -> Bool
     }
 }
+#endif

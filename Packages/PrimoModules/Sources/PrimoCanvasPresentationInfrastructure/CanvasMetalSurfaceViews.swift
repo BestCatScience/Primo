@@ -1,43 +1,43 @@
+#if canImport(UIKit)
 import CoreGraphics
 import PrimoCanvasPresentationDomain
-import PrimoCanvasPresentationInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 import UIKit
 
-final class CanvasRenderSurfaceView: UIView {
+public final class CanvasRenderSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
     private let driver = CanvasRenderSurfaceDriver()
-    private(set) var currentActiveLayerIndex: Int = 0
+    public private(set) var currentActiveLayerIndex: Int = 0
 
-    var currentSnapshot: MetalDocumentSnapshot? {
+    public var currentSnapshot: MetalDocumentSnapshot? {
         backend.currentSnapshot
     }
 
-    override init(frame: CGRect) {
+    public override init(frame: CGRect) {
         super.init(frame: frame)
         backend.isUserInteractionEnabled = false
         addSubview(backend)
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layoutSubviews() {
+    public override func layoutSubviews() {
         super.layoutSubviews()
         backend.frame = bounds
     }
 
-    func render(_ update: RenderFrameUpdate) {
+    public func render(_ update: RenderFrameUpdate) {
         driver.render(update, into: backend)
         currentActiveLayerIndex = driver.currentActiveLayerIndex
     }
 
-    func contentRect(
+    public func contentRect(
         for viewSize: CGSize,
         documentSize: CGSize,
         viewportOffset: CGSize,
@@ -52,26 +52,26 @@ final class CanvasRenderSurfaceView: UIView {
     }
 }
 
-final class CanvasPixelSurfaceView: UIView {
+public final class CanvasPixelSurfaceView: UIView {
     private let backend = PrimoMetalCanvasView()
 
-    override init(frame: CGRect) {
+    public override init(frame: CGRect) {
         super.init(frame: frame)
         backend.isUserInteractionEnabled = false
         addSubview(backend)
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layoutSubviews() {
+    public override func layoutSubviews() {
         super.layoutSubviews()
         backend.frame = bounds
     }
 
-    func update(
+    public func update(
         surface: DocumentCompositeSurface?,
         opacity: CGFloat = 1.0,
         filtering: PrimoMetalSurfaceFiltering = .linear
@@ -80,3 +80,4 @@ final class CanvasPixelSurfaceView: UIView {
         isHidden = surface == nil
     }
 }
+#endif

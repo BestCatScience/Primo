@@ -1,3 +1,4 @@
+import PrimoCanvasPresentationInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentApplication
 import PrimoDocumentDomain

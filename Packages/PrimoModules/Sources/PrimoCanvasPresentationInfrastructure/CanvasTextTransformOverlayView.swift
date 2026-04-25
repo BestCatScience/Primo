@@ -1,3 +1,4 @@
+#if canImport(UIKit)
 import PrimoCanvasPresentationDomain
 import PrimoDocumentContracts
 import PrimoDocumentDomain
@@ -25,7 +26,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
     private var pivotTouchOffset: CGPoint = .zero
     private var activeTransformHandle: TransformOverlayHandle = .bottomRight
 
-    var sendAction: ((CanvasFeature.Action) -> Void)?
+    var actionSink: CanvasPresentationActionSink?
 
     init(
         previewRenderer: any CanvasPreviewRendering,
@@ -429,12 +430,12 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         let documentOffset = context.geometry.documentTranslation(from: translation)
         switch recognizer.state {
         case .began:
-            sendAction?(.transformGestureBegan)
-            sendAction?(.transformPreviewChanged(.zero))
+            actionSink?.send(.transformGestureBegan)
+            actionSink?.send(.transformPreviewChanged(.zero))
         case .changed:
-            sendAction?(.transformPreviewChanged(documentOffset))
+            actionSink?.send(.transformPreviewChanged(documentOffset))
         case .ended, .cancelled, .failed:
-            sendAction?(.transformEnded(documentOffset))
+            actionSink?.send(.transformEnded(documentOffset))
         default:
             break
         }
@@ -469,9 +470,9 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         if context.transformMode == .standard {
             let translation = recognizer.translation(in: self)
             let nextScale = freeformScale(from: handleStartScale, translation: translation, handle: handle, context: context)
-            sendAction?(.transformScaleSet(x: nextScale.width, y: nextScale.height))
+            actionSink?.send(.transformScaleSet(x: nextScale.width, y: nextScale.height))
         } else {
-            sendAction?(.transformQuadOffsetsSet(quadOffsetsForDraggedHandle(handle, location: location, geometry: geometry, context: context)))
+            actionSink?.send(.transformQuadOffsetsSet(quadOffsetsForDraggedHandle(handle, location: location, geometry: geometry, context: context)))
         }
     }
 
@@ -485,11 +486,11 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
         switch recognizer.state {
         case .began:
             rotationHandleStartAngle = angle
-            sendAction?(.transformRotationGestureBegan)
+            actionSink?.send(.transformRotationGestureBegan)
         case .changed:
-            sendAction?(.transformRotationChanged(angle - rotationHandleStartAngle))
+            actionSink?.send(.transformRotationChanged(angle - rotationHandleStartAngle))
         case .ended, .cancelled, .failed:
-            sendAction?(.transformRotationEnded(angle - rotationHandleStartAngle))
+            actionSink?.send(.transformRotationEnded(angle - rotationHandleStartAngle))
         default:
             break
         }
@@ -513,7 +514,7 @@ final class CanvasTextTransformOverlayView: UIView, UIGestureRecognizerDelegate 
                 y: location.y + pivotTouchOffset.y
             )
             let documentPoint = context.geometry.documentPoint(fromViewPoint: targetViewPoint)
-            sendAction?(.transformPivotSet(CGPoint(
+            actionSink?.send(.transformPivotSet(CGPoint(
                 x: documentPoint.x - context.transformPreviewOffset.width,
                 y: documentPoint.y - context.transformPreviewOffset.height
             )))
@@ -756,3 +757,4 @@ private final class TransformOutlineView: UIView {
         return currentPath.contains(point)
     }
 }
+#endif

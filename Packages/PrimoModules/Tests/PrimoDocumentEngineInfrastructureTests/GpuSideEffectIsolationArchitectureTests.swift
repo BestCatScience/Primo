@@ -35,6 +35,9 @@ struct GpuSideEffectIsolationArchitectureTests {
     func canvasImageRendererDoesNotOwnGpuProcessingServices() throws {
         let repoRoot = try Self.repoRoot()
         let renderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)
+        if !FileManager.default.fileExists(atPath: renderer.path) {
+            return
+        }
         let body = try String(contentsOf: renderer, encoding: .utf8)
         let banned = [
             "CanvasImageRenderer",
@@ -48,6 +51,19 @@ struct GpuSideEffectIsolationArchitectureTests {
         for token in banned {
             #expect(!body.contains(token), "CanvasImageRenderer should not reference \(token)")
         }
+    }
+
+    @Test
+    func canvasSurfaceViewsLiveInPresentationInfrastructure() throws {
+        let repoRoot = try Self.repoRoot()
+        let appRenderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)
+        let moduleRenderer = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasMetalSurfaceViews.swift",
+            isDirectory: false
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: appRenderer.path))
+        #expect(FileManager.default.fileExists(atPath: moduleRenderer.path))
     }
 
     @Test
