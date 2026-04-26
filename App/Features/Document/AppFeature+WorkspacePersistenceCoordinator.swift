@@ -328,6 +328,13 @@ extension AppFeature {
         )
     }
 
+    func lifecycleAutosaveRequest(
+        state: inout State
+    ) -> WorkspacePersistenceRequest? {
+        _ = refreshActiveTabMetadataForPersistence(state: &state)
+        return dirtyPresentationRequest(state: state)
+    }
+
     func saveActiveDocumentRequest(
         state: inout State,
         preferredDestinationURL: DocumentProjectPath?,
@@ -677,10 +684,10 @@ extension AppFeature {
             documentGpuOperationGateway.releaseSurfaceHandle(dirtyUpdate.gpuBufferHandle)
         }
         applyPresentation(documentPresentationQueryService.presentation(), state: &state)
+        state.workspace.setActiveTabDirty(true)
         guard updatesWorkspaceArtifacts else {
             return .none
         }
-        state.workspace.setActiveTabDirty(true)
         let paperStyle = resolvedPaperStyle(for: state)
         state.workspace.updateActiveTabMetadata(
             previewSurface: currentWorkspacePreviewSurface(

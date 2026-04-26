@@ -104,6 +104,17 @@ extension AppFeature {
         )
     }
 
+    func handleScenePhaseChanged(
+        state: inout State,
+        phase: AppScenePhase
+    ) -> Effect<Action> {
+        guard phase == .background else { return .none }
+        guard !state.application.showsHome else { return .none }
+        guard state.workspace.activeTab?.isDirty == true else { return .none }
+        guard let request = lifecycleAutosaveRequest(state: &state) else { return .none }
+        return .send(.workspacePersistenceRequested(request))
+    }
+
     func handleStartupLanguageLoaded(
         state: inout State,
         language: AppLanguage

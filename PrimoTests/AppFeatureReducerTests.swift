@@ -64,6 +64,51 @@ final class AppFeatureReducerTests: XCTestCase {
         )
     }
 
+    func testBackgroundScenePersistsDirtyActiveTabAutosave() async {
+        let previewSurface = previewSurface()
+        let activeTab = OpenDocumentTab.testValue(isDirty: true)
+        var refreshedTab = activeTab
+        refreshedTab.previewSurface = previewSurface
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.application.showsHome = false
+                state.workspace.openTabs = [activeTab]
+                state.workspace.activeTabID = activeTab.id
+                state.workspace.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.documentRuntimeComposition = .stub(
+                exportGateway: .stub(
+                    compositeSurface: { _ in previewSurface }
+                )
+            )
+            $0.documentWorkspaceClient = .stub()
+            $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
+            $0.uuidClient = UUIDClient(generate: {
+                UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
+            })
+        }
+        store.exhaustivity = .off
+
+        await store.send(.scenePhaseChanged(.background)) {
+            $0.workspace.openTabs = [refreshedTab]
+        }
+        await store.receive(
+            .workspacePersistenceRequested(
+                .dirtyPresentationRefreshed(
+                    AppFeature.WorkspaceDirtyPresentationRequest(
+                        activeTab: refreshedTab,
+                        paperStyle: .default
+                    )
+                )
+            )
+        )
+    }
+
     func testPendingCloseSaveConfirmedEmitsClosePersistenceRequest() async {
         let previewData = DocumentRasterImageService.pngData(from: previewSurface())
         let activeTab = OpenDocumentTab.testValue()

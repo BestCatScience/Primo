@@ -262,7 +262,7 @@ private struct DocumentWorkspaceStorage: Sendable {
                 )
             }
 
-            let preview = try loadProjectPreview(
+            let preview = loadProjectPreviewIfAvailable(
                 from: projectURL,
                 label: "autosave preview"
             )
@@ -273,8 +273,8 @@ private struct DocumentWorkspaceStorage: Sendable {
                 sourceProjectURL: metadata.sourceProjectPath.map { DocumentProjectPath(URL(fileURLWithPath: $0)) },
                 autosaveProjectURL: DocumentProjectPath(projectURL),
                 updatedAt: metadata.updatedAt,
-                previewSurface: preview.previewSurface,
-                previewImageData: preview.previewImageData
+                previewSurface: preview?.previewSurface,
+                previewImageData: preview?.previewImageData
             )
         }
         .sorted { $0.updatedAt > $1.updatedAt }
@@ -525,6 +525,13 @@ private struct DocumentWorkspaceStorage: Sendable {
                 "Could not load \(label) at \(projectURL.lastPathComponent): \(error.localizedDescription)"
             )
         }
+    }
+
+    private func loadProjectPreviewIfAvailable(
+        from projectURL: URL,
+        label: String
+    ) -> DocumentWorkspacePreview? {
+        try? loadProjectPreview(from: projectURL, label: label)
     }
 
     private func readMetadataData(

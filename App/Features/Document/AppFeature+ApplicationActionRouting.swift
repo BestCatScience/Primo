@@ -60,6 +60,9 @@ extension AppFeature {
         case .task:
             return handleTask(state: &state)
 
+        case let .scenePhaseChanged(phase):
+            return handleScenePhaseChanged(state: &state, phase: phase)
+
         case let .startupLanguageLoaded(language):
             handleStartupLanguageLoaded(state: &state, language: language)
             return .none

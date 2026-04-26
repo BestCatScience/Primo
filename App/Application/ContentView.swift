@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 import UIKit
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Dependency(\.mainQueueClient) private var mainQueueClient
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     enum NanoBananaFocusedField: Hashable {
@@ -94,6 +95,9 @@ struct ContentView: View {
         }
         .task {
             store.send(.nanoBanana(.task))
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            store.send(.scenePhaseChanged(AppFeature.AppScenePhase(newPhase)))
         }
         .sheet(item: Binding(
             get: { exportState.shareSheet },
@@ -487,6 +491,21 @@ struct ContentView: View {
         showsNewCanvasSheet = false
         mainQueueClient.async {
             showsNewCanvasPhotoImporter = true
+        }
+    }
+}
+
+private extension AppFeature.AppScenePhase {
+    init(_ scenePhase: ScenePhase) {
+        switch scenePhase {
+        case .active:
+            self = .active
+        case .inactive:
+            self = .inactive
+        case .background:
+            self = .background
+        @unknown default:
+            self = .inactive
         }
     }
 }

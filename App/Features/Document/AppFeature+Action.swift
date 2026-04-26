@@ -6,8 +6,15 @@ import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceApplication
 
 extension AppFeature {
+    enum AppScenePhase: Equatable {
+        case active
+        case inactive
+        case background
+    }
+
     enum ApplicationAction: Equatable {
         case task
+        case scenePhaseChanged(AppScenePhase)
         case startupLanguageLoaded(AppLanguage)
         case documentPaperStyleSyncRequested(CanvasPaperStyle)
         case workspacePersistenceRequested(WorkspacePersistenceRequest)
@@ -143,6 +150,7 @@ extension AppFeature {
 
 extension AppFeature.Action {
     static var task: Self { .application(.task) }
+    static func scenePhaseChanged(_ phase: AppFeature.AppScenePhase) -> Self { .application(.scenePhaseChanged(phase)) }
     static func startupLanguageLoaded(_ language: AppLanguage) -> Self { .application(.startupLanguageLoaded(language)) }
     static func documentPaperStyleSyncRequested(_ paperStyle: CanvasPaperStyle) -> Self { .application(.documentPaperStyleSyncRequested(paperStyle)) }
     static func workspacePersistenceRequested(_ request: AppFeature.WorkspacePersistenceRequest) -> Self { .application(.workspacePersistenceRequested(request)) }

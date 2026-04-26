@@ -78,6 +78,52 @@ struct DocumentWorkspaceClientAutosaveTests {
         #expect(recorder.urls.map(\.standardizedFileURL) == [projectURL.standardizedFileURL])
     }
 
+    @Test
+    func loadAutosaveRecoveryItemsKeepsRestorableEntryWhenPreviewFails() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let autosaveID = "autosave-preview-failed"
+        let autosaveDirectory = documents
+            .appendingPathComponent("primo-projects", isDirectory: true)
+            .appendingPathComponent(".primo-autosaves", isDirectory: true)
+            .appendingPathComponent(autosaveID, isDirectory: true)
+        let projectURL = autosaveDirectory.appendingPathComponent("project.atelier", isDirectory: true)
+        try FileManager.default.createDirectory(at: projectURL, withIntermediateDirectories: true)
+        let metadata = TestAutosaveMetadata(
+            id: autosaveID,
+            title: "Recovered without preview",
+            sourceProjectPath: nil,
+            updatedAt: Date(timeIntervalSince1970: 10)
+        )
+        let metadataData = try JSONEncoder().encode(metadata)
+        try metadataData.write(to: autosaveDirectory.appendingPathComponent("metadata.json"))
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let recorder = PreviewCallRecorder()
+        let client = DocumentWorkspaceClient.live(
+            fileClient: fileClient(documentsDirectory: documents),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000222")! }),
+            previewGateway: DocumentWorkspacePreviewGateway(
+                loadProjectPreview: { url in
+                    recorder.record(url)
+                    throw DocumentWorkspaceCatalogError.projectLoadFailed("preview unavailable")
+                }
+            )
+        )
+
+        let items = try client.loadAutosaveRecoveryItems()
+
+        let item = try #require(items.first)
+        #expect(items.count == 1)
+        #expect(item.title == "Recovered without preview")
+        #expect(item.autosaveProjectURL.fileURL == projectURL)
+        #expect(item.previewSurface == nil)
+        #expect(item.previewImageData == nil)
+        #expect(recorder.urls.map(\.standardizedFileURL) == [projectURL.standardizedFileURL])
+    }
+
     private func fileClient(documentsDirectory: URL) -> FileClient {
         FileClient(
             temporaryDirectory: { FileManager.default.temporaryDirectory },
