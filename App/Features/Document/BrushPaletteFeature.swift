@@ -16,6 +16,7 @@ struct BrushPaletteFeature {
         let savedPresets: [BrushPreset]
         let availableFonts: [TextFontOption]
         let oilLivePreviewQuality: OilLivePreviewQuality
+        let paletteSwatches: [PaletteSwatch]
     }
 
     @ObservableState
@@ -338,6 +339,7 @@ struct BrushPaletteFeature {
             var brushLibraryErrorMessage: String?
             var textFontImportErrorMessage: String?
             var oilLivePreviewQuality: OilLivePreviewQuality = .responsive
+            var paletteSwatches: [PaletteSwatch] = PaletteSwatch.defaults
         }
 
         var brush = BrushSettings()
@@ -363,7 +365,7 @@ struct BrushPaletteFeature {
         case task
         case binding(BindingAction<State>)
         case selectPreset(BrushPreset)
-        case bootstrapLoaded(savedPresets: [BrushPreset], availableFonts: [TextFontOption], oilLivePreviewQuality: OilLivePreviewQuality)
+        case bootstrapLoaded(savedPresets: [BrushPreset], availableFonts: [TextFontOption], oilLivePreviewQuality: OilLivePreviewQuality, paletteSwatches: [PaletteSwatch])
         case importedPresets([BrushPreset])
         case importedTextFonts([TextFontOption])
         case importBrushesRequested([URL])
@@ -406,6 +408,53 @@ struct BrushPaletteFeature {
     @Dependency(\.keyValueStoreClient) var keyValueStoreClient
 
     private static let oilLivePreviewQualityStorageKey = "primo.oilLivePreviewQuality"
+    private static let paletteSwatchesStorageKey = "primo.paletteSwatches"
+
+    private static func encodePaletteSwatches(_ swatches: [PaletteSwatch]) -> String {
+        swatches
+            .map { "\($0.id),\(hexString(for: $0.color))" }
+            .joined(separator: ";")
+    }
+
+    private static func decodePaletteSwatches(_ rawValue: String?) -> [PaletteSwatch] {
+        guard let rawValue else { return PaletteSwatch.defaults }
+        guard !rawValue.isEmpty else { return [] }
+
+        let decoded = rawValue
+            .split(separator: ";")
+            .compactMap { entry -> PaletteSwatch? in
+                let parts = entry.split(separator: ",", maxSplits: 1).map(String.init)
+                guard parts.count == 2, let color = color(fromHexString: parts[1]) else { return nil }
+                return PaletteSwatch(id: parts[0], color: color)
+            }
+        return decoded.isEmpty ? PaletteSwatch.defaults : decoded
+    }
+
+    private static func hexString(for color: Color) -> String {
+        let resolved = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 1
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+
+        return String(
+            format: "#%02X%02X%02X",
+            Int((red * 255.0).rounded()),
+            Int((green * 255.0).rounded()),
+            Int((blue * 255.0).rounded())
+        )
+    }
+
+    private static func color(fromHexString rawValue: String) -> Color? {
+        let trimmed = rawValue.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard trimmed.count == 6, let value = Int(trimmed, radix: 16) else { return nil }
+        return Color(
+            red: Double((value >> 16) & 0xFF) / 255.0,
+            green: Double((value >> 8) & 0xFF) / 255.0,
+            blue: Double(value & 0xFF) / 255.0
+        )
+    }
 
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -416,21 +465,24 @@ struct BrushPaletteFeature {
                 state.ui.hasLoadedLibrary = true
                 return .run { [brushPresetLibraryClient, textFontLibraryClient, keyValueStoreClient] send in
                     let rawQuality = keyValueStoreClient.stringForKey(Self.oilLivePreviewQualityStorageKey)
+                    let rawPalette = keyValueStoreClient.stringForKey(Self.paletteSwatchesStorageKey)
                     await send(
                         .bootstrapLoaded(
                             savedPresets: brushPresetLibraryClient.loadSavedPresets(),
                             availableFonts: textFontLibraryClient.loadAvailableFonts(),
-                            oilLivePreviewQuality: rawQuality.flatMap(OilLivePreviewQuality.init(rawValue:)) ?? .responsive
+                            oilLivePreviewQuality: rawQuality.flatMap(OilLivePreviewQuality.init(rawValue:)) ?? .responsive,
+                            paletteSwatches: Self.decodePaletteSwatches(rawPalette)
                         )
                     )
                 }
 
-            case let .bootstrapLoaded(savedPresets, availableFonts, oilLivePreviewQuality):
+            case let .bootstrapLoaded(savedPresets, availableFonts, oilLivePreviewQuality, paletteSwatches):
                 state.applyLibraryBootstrap(
                     LibraryBootstrap(
                         savedPresets: savedPresets,
                         availableFonts: availableFonts,
-                        oilLivePreviewQuality: oilLivePreviewQuality
+                        oilLivePreviewQuality: oilLivePreviewQuality,
+                        paletteSwatches: paletteSwatches
                     )
                 )
                 return .none
@@ -530,6 +582,13 @@ struct BrushPaletteFeature {
                 )
                 return .none
 
+            case .binding(\.ui.paletteSwatches):
+                keyValueStoreClient.setString(
+                    Self.encodePaletteSwatches(state.ui.paletteSwatches),
+                    Self.paletteSwatchesStorageKey
+                )
+                return .none
+
             case .binding:
                 return .none
 
@@ -554,6 +613,7 @@ struct BrushPaletteFeature {
             case let .importBrushesRequested(urls):
                 let existingNames = state.library.savedPresets.map(\.name) + state.library.presets.map(\.name)
                 let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
+                let paletteSwatches = state.ui.paletteSwatches
                 return .run { [appLanguageClient, brushImportClient, brushPresetLibraryClient] send in
                     let resolvedLanguage = appLanguageClient.load()
                     let importedResult = brushImportClient.importBrushPresets(
@@ -590,7 +650,8 @@ struct BrushPaletteFeature {
                     await send(.bootstrapLoaded(
                         savedPresets: workingSaved,
                         availableFonts: [],
-                        oilLivePreviewQuality: oilLivePreviewQuality
+                        oilLivePreviewQuality: oilLivePreviewQuality,
+                        paletteSwatches: paletteSwatches
                     ))
                     if !resolvedImported.isEmpty {
                         await send(.importedPresets(resolvedImported))
@@ -603,6 +664,7 @@ struct BrushPaletteFeature {
             case let .importTextFontsRequested(urls):
                 let savedPresets = state.library.savedPresets
                 let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
+                let paletteSwatches = state.ui.paletteSwatches
                 return .run { [brushImportClient, textFontLibraryClient] send in
                     let importResult = brushImportClient.importTextFonts(
                         TextFontImportRequest(urls: urls)
@@ -611,7 +673,8 @@ struct BrushPaletteFeature {
                         .bootstrapLoaded(
                             savedPresets: savedPresets,
                             availableFonts: textFontLibraryClient.loadAvailableFonts(),
-                            oilLivePreviewQuality: oilLivePreviewQuality
+                            oilLivePreviewQuality: oilLivePreviewQuality,
+                            paletteSwatches: paletteSwatches
                         )
                     )
                     if !importResult.fonts.isEmpty {
@@ -703,6 +766,7 @@ struct BrushPaletteFeature {
             case .saveCurrentBrushButtonTapped:
                 let savedNames = state.library.savedPresets.map(\.name)
                 let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
+                let paletteSwatches = state.ui.paletteSwatches
                 let isOverwritingSavedPreset = state.library.selectedBrush.map { selected in
                     state.library.savedPresets.contains(where: { $0.name == selected.name })
                 } ?? false
@@ -720,7 +784,8 @@ struct BrushPaletteFeature {
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality
+                            oilLivePreviewQuality: oilLivePreviewQuality,
+                            paletteSwatches: paletteSwatches
                         ))
                         if let matching = saved.first(where: { $0.name == resolvedName }) {
                             await send(.selectPreset(matching))
@@ -738,13 +803,15 @@ struct BrushPaletteFeature {
 
             case let .deleteSavedPresetButtonTapped(name):
                 let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
+                let paletteSwatches = state.ui.paletteSwatches
                 return .run { [brushPresetLibraryClient] send in
                     do {
                         let saved = try brushPresetLibraryClient.deletePreset(name)
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality
+                            oilLivePreviewQuality: oilLivePreviewQuality,
+                            paletteSwatches: paletteSwatches
                         ))
                     } catch {
                         await send(.brushLibraryErrorOccurred(error.localizedDescription))
@@ -757,13 +824,15 @@ struct BrushPaletteFeature {
                 let selectedBrushName = state.library.selectedBrush?.name
                 let selectedCustomTip = state.brush.customTip
                 let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
+                let paletteSwatches = state.ui.paletteSwatches
                 return .run { [brushPresetLibraryClient] send in
                     do {
                         let saved = try brushPresetLibraryClient.renamePreset(oldName, trimmed)
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality
+                            oilLivePreviewQuality: oilLivePreviewQuality,
+                            paletteSwatches: paletteSwatches
                         ))
                         if selectedBrushName == oldName,
                            let renamed = saved.first(where: { $0.name == trimmed })
@@ -890,6 +959,7 @@ extension BrushPaletteFeature.State {
     fileprivate mutating func applyLibraryBootstrap(_ bootstrap: BrushPaletteFeature.LibraryBootstrap) {
         library.savedPresets = bootstrap.savedPresets
         ui.oilLivePreviewQuality = bootstrap.oilLivePreviewQuality
+        ui.paletteSwatches = bootstrap.paletteSwatches
         if !bootstrap.availableFonts.isEmpty {
             text.availableFonts = bootstrap.availableFonts
             if text.selectedFontPostScriptName == nil, let first = bootstrap.availableFonts.first {

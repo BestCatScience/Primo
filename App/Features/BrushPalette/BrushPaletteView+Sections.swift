@@ -324,13 +324,7 @@ extension BrushPaletteView {
                         Spacer(minLength: 0)
                     }
 
-                    SpectrumColorControl(color: editableBrushColorBinding)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(panelHairlineFill)
-                        )
+                    brushColorPalettePanel
                 }
             }
         } else if currentTool == .blur {
@@ -429,35 +423,7 @@ extension BrushPaletteView {
                         Spacer(minLength: 0)
                     }
 
-                    SpectrumColorControl(color: editableBrushColorBinding)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(panelHairlineFill)
-                        )
-                        .opacity(isTransparentBrushColorSelected ? 0.42 : 1.0)
-                        .allowsHitTesting(!isTransparentBrushColorSelected)
-
-                    LazyVGrid(columns: paletteColumns, alignment: .leading, spacing: 8) {
-                        ForEach(PaletteSwatch.defaults) { swatch in
-                            colorSwatch(
-                                color: swatch.color,
-                                isSelected: !isTransparentBrushColorSelected && editableBrushColorBinding.wrappedValue == swatch.color
-                            ) {
-                                store.send(
-                                    .binding(
-                                        .set(
-                                            store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color,
-                                            swatch.color
-                                        )
-                                    )
-                                )
-                            }
-                            .opacity(isTransparentBrushColorSelected ? 0.38 : 1.0)
-                            .allowsHitTesting(!isTransparentBrushColorSelected)
-                        }
-                    }
+                    brushColorPalettePanel
                 }
             }
         } else {

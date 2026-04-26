@@ -25,6 +25,56 @@ extension BrushPaletteView {
         )
     }
 
+    var primaryBrushColorBinding: Binding<Color> {
+        Binding(
+            get: { store.brush.color },
+            set: { store.send(.binding(.set(\.brush.color, $0))) }
+        )
+    }
+
+    var secondaryBrushColorBinding: Binding<Color> {
+        Binding(
+            get: { store.brush.secondaryColor },
+            set: { store.send(.binding(.set(\.brush.secondaryColor, $0))) }
+        )
+    }
+
+    var selectedBrushColorSlotBinding: Binding<BrushColorSlot> {
+        Binding(
+            get: { store.brush.selectedColorSlot },
+            set: { store.send(.binding(.set(\.brush.selectedColorSlot, $0))) }
+        )
+    }
+
+    var paletteSwatchesBinding: Binding<[PaletteSwatch]> {
+        Binding(
+            get: { store.ui.paletteSwatches },
+            set: { store.send(.binding(.set(\.ui.paletteSwatches, $0))) }
+        )
+    }
+
+    var brushColorPalettePanel: some View {
+        BrushColorPalettePanel(
+            primaryColor: primaryBrushColorBinding,
+            secondaryColor: secondaryBrushColorBinding,
+            selectedSlot: selectedBrushColorSlotBinding,
+            paletteSwatches: paletteSwatchesBinding,
+            paletteColumns: paletteColumns,
+            panelHairlineFill: panelHairlineFill,
+            isTransparentSelected: isTransparentBrushColorSelected,
+            transparentTitle: language.localized("透明色で描画")
+        ) { swatchColor in
+            store.send(
+                .binding(
+                    .set(
+                        store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color,
+                        swatchColor
+                    )
+                )
+            )
+        }
+    }
+
     var colorHexLabel: String {
         guard !isTransparentBrushColorSelected else {
             return language.localized("透明")
