@@ -5,10 +5,12 @@ struct SpectrumColorControl: View {
     @Binding var color: Color
     @State private var activeRegion: ActiveRegion?
     @State private var lastChromaticHue: Double?
+    @State private var lastDisplaySaturation: Double?
 
     private let ringWidth: CGFloat = 24
     private let gap: CGFloat = 12
     private let chromaticThreshold = 0.001
+    private let brightnessThreshold = 0.001
 
     var body: some View {
         GeometryReader { geometry in
@@ -28,9 +30,10 @@ struct SpectrumColorControl: View {
             )
             let hsb = ColorHSB(color: color)
             let displayHue = displayedHue(for: hsb)
+            let displaySaturation = displayedSaturation(for: hsb)
             let ringIndicator = ringIndicatorPoint(in: outerRect, hue: displayHue)
             let squareIndicator = CGPoint(
-                x: squareRect.minX + (hsb.saturation * squareRect.width),
+                x: squareRect.minX + (displaySaturation * squareRect.width),
                 y: squareRect.minY + ((1 - hsb.brightness) * squareRect.height)
             )
 
@@ -134,7 +137,7 @@ struct SpectrumColorControl: View {
                         case .square:
                             updateSquare(at: value.location, within: squareRect, hue: displayHue)
                         case .ring:
-                            updateRing(at: value.location, within: outerRect, current: hsb)
+                            updateRing(at: value.location, within: outerRect, current: hsb, saturation: displaySaturation)
                         case .none:
                             break
                         }
@@ -157,9 +160,16 @@ struct SpectrumColorControl: View {
         hsb.saturation > chromaticThreshold ? hsb.hue : (lastChromaticHue ?? hsb.hue)
     }
 
+    private func displayedSaturation(for hsb: ColorHSB) -> Double {
+        hsb.brightness <= brightnessThreshold ? (lastDisplaySaturation ?? hsb.saturation) : hsb.saturation
+    }
+
     private func rememberHueIfChromatic(_ hsb: ColorHSB) {
         if hsb.saturation > chromaticThreshold {
             lastChromaticHue = hsb.hue
+        }
+        if hsb.brightness > brightnessThreshold {
+            lastDisplaySaturation = hsb.saturation
         }
     }
 
@@ -180,13 +190,14 @@ struct SpectrumColorControl: View {
         return nil
     }
 
-    private func updateRing(at point: CGPoint, within rect: CGRect, current: ColorHSB) {
+    private func updateRing(at point: CGPoint, within rect: CGRect, current: ColorHSB, saturation: Double) {
         let dx = point.x - rect.midX
         let dy = point.y - rect.midY
         let angle = atan2(dy, dx) + (.pi / 2)
         let normalized = (angle < 0 ? angle + (.pi * 2) : angle) / (.pi * 2)
         lastChromaticHue = normalized
-        color = Color(hue: normalized, saturation: current.saturation, brightness: current.brightness)
+        lastDisplaySaturation = saturation
+        color = Color(hue: normalized, saturation: saturation, brightness: current.brightness)
     }
 
     private func updateSquare(at point: CGPoint, within rect: CGRect, hue: Double) {
@@ -194,6 +205,7 @@ struct SpectrumColorControl: View {
         let clampedY = min(max(point.y, rect.minY), rect.maxY)
         let saturation = (clampedX - rect.minX) / rect.width
         let brightness = 1 - ((clampedY - rect.minY) / rect.height)
+        lastDisplaySaturation = saturation
         if saturation > chromaticThreshold {
             lastChromaticHue = hue
         }
@@ -346,27 +358,18 @@ struct BrushColorPalettePanel: View {
 
     private var colorStatusRow: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .bottom, spacing: -9) {
-                    paletteSlotButton(slot: .primary, color: primaryColor, size: 46)
-                        .zIndex(selectedSlot == .primary ? 3 : 2)
-                    paletteSlotButton(slot: .secondary, color: secondaryColor, size: 34)
-                        .zIndex(selectedSlot == .secondary ? 4 : 1)
-                }
-
-                Button {
-                    selectedSlot = .transparent
-                } label: {
-                    CheckerboardSwatch(cornerRadius: 8)
-                        .frame(width: 74, height: 17)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(selectedSlot == .transparent ? Color.white.opacity(0.96) : Color.white.opacity(0.42), lineWidth: selectedSlot == .transparent ? 2 : 1)
-                        )
-                        .shadow(color: .black.opacity(selectedSlot == .transparent ? 0.24 : 0.08), radius: selectedSlot == .transparent ? 5 : 2, y: 1)
-                }
-                .buttonStyle(.plain)
+            Button {
+                selectedSlot = .transparent
+            } label: {
+                CheckerboardSwatch(cornerRadius: 8)
+                    .frame(width: 74, height: 17)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(selectedSlot == .transparent ? Color.white.opacity(0.96) : Color.white.opacity(0.42), lineWidth: selectedSlot == .transparent ? 2 : 1)
+                    )
+                    .shadow(color: .black.opacity(selectedSlot == .transparent ? 0.24 : 0.08), radius: selectedSlot == .transparent ? 5 : 2, y: 1)
             }
+            .buttonStyle(.plain)
 
             Spacer(minLength: 0)
 
@@ -463,25 +466,6 @@ struct BrushColorPalettePanel: View {
         if hsb.saturation > chromaticThreshold {
             lastChromaticHue = hsb.hue
         }
-    }
-
-    private func paletteSlotButton(slot: BrushColorSlot, color: Color, size: CGFloat) -> some View {
-        Button {
-            selectedSlot = slot
-        } label: {
-            Circle()
-                .fill(color)
-                .frame(width: size, height: size)
-                .overlay(Circle().stroke(Color.white.opacity(0.92), lineWidth: 3))
-                .overlay(Circle().stroke(Color.black.opacity(0.34), lineWidth: 1).padding(3))
-                .overlay(
-                    Circle()
-                        .stroke(Color(red: 0.57, green: 0.63, blue: 0.77).opacity(selectedSlot == slot ? 0.95 : 0), lineWidth: 5)
-                        .padding(-4)
-                )
-                .shadow(color: .black.opacity(0.32), radius: 5, x: 4, y: 5)
-        }
-        .buttonStyle(.plain)
     }
 
     private func hsbMetric(label: String, value: Int) -> some View {
