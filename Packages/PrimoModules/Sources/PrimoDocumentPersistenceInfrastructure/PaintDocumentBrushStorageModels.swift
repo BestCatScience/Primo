@@ -95,6 +95,9 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
     let smudgeLength: Double
     let colorRate: Double
     let loadPressureSensitivity: Double
+    let paintAmountPressureBypass: Double?
+    let paintDensityPressureBypass: Double?
+    let colorStretchPressureBypass: Double?
     let dualBrushEnabled: Bool
     let dualTipKind: String
     let dualScale: Double
@@ -168,6 +171,9 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
         smudgeLength = brush.smudgeLength
         colorRate = brush.colorRate
         loadPressureSensitivity = brush.loadPressureSensitivity
+        paintAmountPressureBypass = brush.paintAmountPressureBypass
+        paintDensityPressureBypass = brush.paintDensityPressureBypass
+        colorStretchPressureBypass = brush.colorStretchPressureBypass
         dualBrushEnabled = brush.dualBrushEnabled
         dualTipKind = brush.dualTipKind.rawValue
         dualScale = brush.dualScale
@@ -263,6 +269,9 @@ public struct StoredBrushRuntimeSettings: Codable, Equatable, Sendable {
             smudgeLength: smudgeLength,
             colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass ?? 1.0,
+            paintDensityPressureBypass: paintDensityPressureBypass ?? 1.0,
+            colorStretchPressureBypass: colorStretchPressureBypass ?? 1.0,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,

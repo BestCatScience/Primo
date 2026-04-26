@@ -78,6 +78,9 @@ public struct BrushRuntimeDescriptor: Sendable {
     public var smudgeLength: Double
     public var colorRate: Double
     public var loadPressureSensitivity: Double
+    public var paintAmountPressureBypass: Double
+    public var paintDensityPressureBypass: Double
+    public var colorStretchPressureBypass: Double
     public var dualEnabled: Bool
     public var dualTipKind: BrushTipKind
     public var dualScale: Double
@@ -141,6 +144,9 @@ public struct BrushRuntimeDescriptor: Sendable {
         smudgeLength: Double = 0.0,
         colorRate: Double = 1.0,
         loadPressureSensitivity: Double,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
         dualEnabled: Bool,
         dualTipKind: BrushTipKind,
         dualScale: Double,
@@ -203,6 +209,9 @@ public struct BrushRuntimeDescriptor: Sendable {
         self.smudgeLength = smudgeLength
         self.colorRate = colorRate
         self.loadPressureSensitivity = loadPressureSensitivity
+        self.paintAmountPressureBypass = paintAmountPressureBypass
+        self.paintDensityPressureBypass = paintDensityPressureBypass
+        self.colorStretchPressureBypass = colorStretchPressureBypass
         self.dualEnabled = dualEnabled
         self.dualTipKind = dualTipKind
         self.dualScale = dualScale
@@ -271,13 +280,16 @@ public struct BrushRuntimeSettingsAssemblyService: Sendable {
             colorMixStrength: brush.colorMixStrength,
             smudgeBlurEnabled: false,
             smudgeBleed: 0.0,
-            smudgeRadius: brush.smudgeRadius,
+            smudgeRadius: brush.smudgeEngineEnabled ? brush.smudgeRadius : 0.0,
             paintLoad: brush.paintLoad,
             smudgeEngineEnabled: brush.smudgeEngineEnabled,
             smudgeMode: brush.smudgeMode,
             smudgeLength: brush.smudgeLength,
             colorRate: brush.colorRate,
-            loadPressureSensitivity: brush.loadPressureSensitivity,
+            loadPressureSensitivity: 0.0,
+            paintAmountPressureBypass: brush.paintAmountPressureBypass,
+            paintDensityPressureBypass: brush.paintDensityPressureBypass,
+            colorStretchPressureBypass: brush.colorStretchPressureBypass,
             dualBrushEnabled: brush.dualEnabled,
             dualTipKind: brush.dualTipKind,
             dualScale: brush.dualScale,

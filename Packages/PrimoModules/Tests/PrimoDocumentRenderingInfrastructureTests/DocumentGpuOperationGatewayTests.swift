@@ -420,7 +420,7 @@ struct DocumentGpuOperationGatewayTests {
                 colorMixStrength: 0.1,
                 smudgeRadius: 0.36,
                 paintLoad: 0.92,
-                smudgeEngineEnabled: true,
+                smudgeEngineEnabled: false,
                 smudgeMode: .smearing,
                 smudgeLength: 0.4,
                 colorRate: 0.46,
@@ -435,12 +435,97 @@ struct DocumentGpuOperationGatewayTests {
 
         let dirtyRegion = try #require(preview.dirtyRegion)
         #expect(preview.isApproximatePreview == true)
+        #expect(preview.incrementalUpdate?.gpuBufferHandle != nil)
         #expect(dirtyRegion.width > 0)
         #expect(dirtyRegion.height > 0)
     }
 
+    @Test(.enabled(if: metalRuntimeAvailable))
+    func responsiveSmudgePreviewProvidesLiveDisplayUpdateWhenIncrementalContinuationIsDisabled() throws {
+        let strokeService = DocumentStrokeProcessingService()
+        let basePixels = Data(count: 96 * 96 * 4)
+        let snapshot = MetalDocumentSnapshot(
+            width: 96,
+            height: 96,
+            revision: 5,
+            compositePixelData: basePixels,
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: basePixels
+                )
+            ]
+        )
+
+        let preview = try #require(strokeService.makePreviewSurface(
+            snapshot: snapshot,
+            activeLayerIndex: 0,
+            basePixelData: basePixels,
+            samples: [
+                StylusSample(
+                    point: CGPoint(x: 24, y: 24),
+                    pressure: 1,
+                    altitude: .pi / 2,
+                    azimuth: 0,
+                    timestamp: 0
+                ),
+                StylusSample(
+                    point: CGPoint(x: 72, y: 72),
+                    pressure: 1,
+                    altitude: .pi / 2,
+                    azimuth: 0,
+                    timestamp: 0.016
+                )
+            ],
+            brush: .init(
+                tipKind: .oil,
+                radius: 40,
+                opacity: 1,
+                hardness: 0.2,
+                roundness: 1,
+                angle: 0,
+                angleMode: .fixed,
+                stampSpacing: 0.12,
+                spacingJitter: 0,
+                scatterLateral: 0,
+                scatterLinear: 0,
+                count: 1,
+                countJitter: 0,
+                angleJitter: 0,
+                roundnessJitter: 0,
+                textureMode: .off,
+                textureStrength: 0,
+                wetness: 0.2,
+                colorMixStrength: 0.24,
+                smudgeRadius: 0.36,
+                paintLoad: 0.5,
+                smudgeEngineEnabled: true,
+                smudgeMode: .smearing,
+                smudgeLength: 0.32,
+                colorRate: 0.5,
+                pressureSensitivity: 0.12,
+                red: 255,
+                green: 150,
+                blue: 40
+            ),
+            preserveAlphaLockedPixels: false,
+            usesResponsiveOilPreview: true
+        ))
+
+        let liveUpdate = try #require(preview.incrementalUpdate)
+        #expect(!preview.isApproximatePreview)
+        #expect(!liveUpdate.isEmpty)
+        #expect(liveUpdate.width > 0)
+        #expect(liveUpdate.height > 0)
+    }
+
     @Test
-    func responsiveOilPreviewBrushStabilizesCoverageWithoutMutatingOriginal() {
+    func responsiveOilPreviewBrushPreservesToneAndTipSettings() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([0, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -467,7 +552,7 @@ struct DocumentGpuOperationGatewayTests {
             colorMixStrength: 0.1,
             smudgeRadius: 0.36,
             paintLoad: 0.92,
-            smudgeEngineEnabled: true,
+            smudgeEngineEnabled: false,
             smudgeMode: .smearing,
             smudgeLength: 0.4,
             colorRate: 0.46,
@@ -480,36 +565,48 @@ struct DocumentGpuOperationGatewayTests {
 
         let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
 
-        #expect(original.smudgeEngineEnabled == true)
-        #expect(original.customTip == customTip)
-        #expect(original.textureStrength == 0.16)
-        #expect(original.pressureSensitivity == 0.16)
-        #expect(original.opacityPressureSensitivity == 0.1)
-        #expect(original.flowPressureSensitivity == 0.08)
-        #expect(original.radius == 8.4)
-        #expect(original.hardness == 0.8)
-        #expect(original.flow == 0.82)
-        #expect(original.opacity == 0.72)
+        #expect(preview == original)
+    }
 
-        #expect(preview.smudgeEngineEnabled == false)
-        #expect(preview.customTip == nil)
-        #expect(preview.textureStrength == 0.08)
-        #expect(preview.pressureSensitivity == 0.04)
-        #expect(preview.opacityPressureSensitivity == 0.04)
-        #expect(preview.flowPressureSensitivity == 0.04)
-        #expect(preview.radius == original.radius * 1.10)
-        #expect(preview.hardness == 0.86)
-        #expect(preview.flow == 0.96)
-        #expect(preview.opacity == 0.92)
-        #expect(preview.wetness == original.wetness)
-        #expect(preview.paintLoad == original.paintLoad)
-        #expect(preview.colorMixStrength == original.colorMixStrength)
-        #expect(preview.textureMode == original.textureMode)
-        #expect(preview.angleMode == original.angleMode)
-        #expect(preview.stampSpacing == original.stampSpacing)
-        #expect(preview.red == original.red)
-        #expect(preview.green == original.green)
-        #expect(preview.blue == original.blue)
+    @Test
+    func responsiveOilPreviewBrushKeepsSmudgeEnabledForSmudgeBrushes() {
+        let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([64, 255]))
+        let original = BrushRuntimeSettings(
+            tipKind: .oil,
+            radius: 10,
+            opacity: 0.82,
+            hardness: 0.36,
+            roundness: 0.96,
+            angle: 0,
+            angleMode: .fixed,
+            stampSpacing: 0.10,
+            spacingJitter: 0,
+            scatterLateral: 0,
+            scatterLinear: 0,
+            count: 1,
+            countJitter: 0,
+            angleJitter: 0,
+            roundnessJitter: 0,
+            textureMode: .strokeLocked,
+            textureStrength: 0.10,
+            flow: 0.82,
+            wetness: 0.20,
+            colorMixStrength: 0.24,
+            paintLoad: 0.08,
+            smudgeEngineEnabled: true,
+            smudgeMode: .smearing,
+            smudgeLength: 0.32,
+            colorRate: 0.08,
+            customTip: customTip,
+            pressureSensitivity: 0.12,
+            red: 46,
+            green: 47,
+            blue: 50
+        )
+
+        let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
+
+        #expect(preview == original)
     }
 
     @Test(.enabled(if: metalRuntimeAvailable))

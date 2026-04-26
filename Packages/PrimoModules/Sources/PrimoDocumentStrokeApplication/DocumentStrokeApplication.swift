@@ -58,6 +58,10 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         context: DocumentStrokeContext,
         usesResponsiveOilPreview: Bool
     ) -> DocumentStrokePreviewResolution? {
+        let usesResponsiveOilPreview = Self.effectiveResponsiveOilPreview(
+            requested: usesResponsiveOilPreview,
+            brush: context.previewBrush
+        )
         guard
             let baseSnapshot,
             let baseLayer = baseSnapshot.layers.first(where: { $0.index == context.activeLayerIndex }),
@@ -93,6 +97,10 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         usesResponsiveOilPreview: Bool
     ) -> DocumentStrokePreviewResolution? {
         guard !samples.isEmpty else { return nil }
+        let usesResponsiveOilPreview = Self.effectiveResponsiveOilPreview(
+            requested: usesResponsiveOilPreview,
+            brush: context.previewBrush
+        )
 
         if
             let baseSnapshot = activeStrokeBaseSnapshot,
@@ -227,6 +235,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
     ) -> (baseLayer: LayerSurfaceRef, samples: [StylusSample])? {
         guard
             usesResponsiveOilPreview,
+            !context.previewBrush.smudgeEngineEnabled,
             !context.activeLayer.isAlphaLocked,
             let renderState,
             renderState.isApproximatePreview,
@@ -269,6 +278,13 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         !context.activeLayer.isAlphaLocked &&
             StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
+
+    private static func effectiveResponsiveOilPreview(
+        requested: Bool,
+        brush: BrushRuntimeSettings
+    ) -> Bool {
+        requested && !(brush.tipKind == .oil && brush.smudgeEngineEnabled)
+    }
 }
 
 public struct DocumentStrokeCommitUseCase: Sendable {
@@ -288,7 +304,7 @@ public struct DocumentStrokeCommitUseCase: Sendable {
                 snapshot: snapshot,
                 activeLayerIndex: context.activeLayerIndex,
                 samples: samples,
-                brush: context.previewBrush,
+                brush: context.brush,
                 preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked
             )
         )
@@ -379,10 +395,36 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             return previewOutcome(from: resolution)
 
         case let .finish(renderState, baseSnapshot, renderSnapshot, samples, context, allowsApproximatePreviewCommit, refreshViaDirtyPresentation):
+            let snapshot = baseSnapshot ?? renderSnapshot
+            if
+                let renderState,
+                let snapshot,
+                !renderState.isApproximatePreview,
+                renderState.baseRevision == snapshot.revision,
+                renderState.layerIndex == context.activeLayerIndex,
+                renderState.previewBrush == context.previewBrush,
+                renderState.sampleCount == samples.count,
+                renderState.surfaceHandle.width == snapshot.width,
+                renderState.surfaceHandle.height == snapshot.height
+            {
+                return .commit(
+                    GpuCommitMutation(
+                        surface: GpuLayerSurface(
+                            layerIndex: renderState.layerIndex,
+                            width: renderState.surfaceHandle.width,
+                            height: renderState.surfaceHandle.height,
+                            handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+                        ),
+                        dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
+                        refreshViaDirtyPresentation: refreshViaDirtyPresentation
+                    )
+                )
+            }
             if
                 let renderState,
                 renderState.isApproximatePreview,
-                allowsApproximatePreviewCommit
+                allowsApproximatePreviewCommit,
+                !context.previewBrush.smudgeEngineEnabled
             {
                 return .commit(
                     GpuCommitMutation(
@@ -398,7 +440,6 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 )
             }
 
-            let snapshot = baseSnapshot ?? renderSnapshot
             guard let snapshot else {
                 return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
             }

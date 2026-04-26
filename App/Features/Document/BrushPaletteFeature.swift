@@ -67,6 +67,9 @@ struct BrushPaletteFeature {
             var smudgeLength: Double = BrushPreset.defaultPencil.smudgeLength
             var colorRate: Double = BrushPreset.defaultPencil.colorRate
             var loadPressureSensitivity: Double = BrushPreset.defaultPencil.loadPressureSensitivity
+            var paintAmountPressureBypass: Double = BrushPreset.defaultPencil.paintAmountPressureBypass
+            var paintDensityPressureBypass: Double = BrushPreset.defaultPencil.paintDensityPressureBypass
+            var colorStretchPressureBypass: Double = BrushPreset.defaultPencil.colorStretchPressureBypass
             var dualEnabled: Bool = BrushPreset.defaultPencil.dualBrushEnabled
             var dualTipKind: BrushTipKind = BrushPreset.defaultPencil.dualTipKind
             var dualScale: Double = BrushPreset.defaultPencil.dualScale
@@ -168,6 +171,9 @@ struct BrushPaletteFeature {
                 smudgeLength = preset.smudgeLength
                 colorRate = preset.colorRate
                 loadPressureSensitivity = preset.loadPressureSensitivity
+                paintAmountPressureBypass = preset.paintAmountPressureBypass
+                paintDensityPressureBypass = preset.paintDensityPressureBypass
+                colorStretchPressureBypass = preset.colorStretchPressureBypass
                 dualEnabled = preset.dualBrushEnabled
                 dualTipKind = preset.dualTipKind
                 dualScale = preset.dualScale
@@ -257,6 +263,9 @@ struct BrushPaletteFeature {
                     smudgeLength: smudgeLength,
                     colorRate: colorRate,
                     loadPressureSensitivity: loadPressureSensitivity,
+                    paintAmountPressureBypass: paintAmountPressureBypass,
+                    paintDensityPressureBypass: paintDensityPressureBypass,
+                    colorStretchPressureBypass: colorStretchPressureBypass,
                     dualBrushEnabled: dualEnabled,
                     dualTipKind: dualTipKind,
                     dualScale: dualScale,
@@ -538,6 +547,9 @@ struct BrushPaletteFeature {
                  .binding(\.brush.smudgeLength),
                  .binding(\.brush.colorRate),
                  .binding(\.brush.loadPressureSensitivity),
+                 .binding(\.brush.paintAmountPressureBypass),
+                 .binding(\.brush.paintDensityPressureBypass),
+                 .binding(\.brush.colorStretchPressureBypass),
                  .binding(\.brush.dualEnabled),
                  .binding(\.brush.dualTipKind),
                  .binding(\.brush.dualScale),
@@ -908,6 +920,9 @@ private extension BrushPaletteFeature.State.BrushSettings {
             smudgeLength: smudgeLength,
             colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
             dualEnabled: dualEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,
@@ -1100,6 +1115,9 @@ private extension BrushPreset {
             smudgeLength: smudgeLength,
             colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,

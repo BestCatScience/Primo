@@ -52,6 +52,9 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
                 smudgeLength: 0.67,
                 colorRate: 0.23,
                 loadPressureSensitivity: 0.27,
+                paintAmountPressureBypass: 0.34,
+                paintDensityPressureBypass: 0.56,
+                colorStretchPressureBypass: 0.78,
                 dualEnabled: true,
                 dualTipKind: .oil,
                 dualScale: 0.63,
@@ -91,6 +94,11 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
         #expect(settings.smudgeLength == 0.67)
         #expect(settings.colorRate == 0.23)
         #expect(settings.smudgeRadius == 0.52)
+        #expect(settings.paintLoad == 0.91)
+        #expect(settings.loadPressureSensitivity == 0.0)
+        #expect(settings.paintAmountPressureBypass == 0.34)
+        #expect(settings.paintDensityPressureBypass == 0.56)
+        #expect(settings.colorStretchPressureBypass == 0.78)
     }
 
     @Test
@@ -169,5 +177,7 @@ struct BrushRuntimeSettingsAssemblyServiceTests {
         #expect(settings.green == 255)
         #expect(settings.blue == 0)
         #expect(settings.isEraser)
+        #expect(settings.smudgeRadius == 0.0)
+        #expect(settings.loadPressureSensitivity == 0.0)
     }
 }

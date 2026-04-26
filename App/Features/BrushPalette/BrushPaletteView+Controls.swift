@@ -614,44 +614,47 @@ extension BrushPaletteView {
                 .pickerStyle(.segmented)
             }
             segmentedModeRow(
-                title: language.localized("Color Smudge"),
-                selectedTitle: store.brush.smudgeEngineEnabled ? store.brush.smudgeMode.localizedTitle(language) : language.localized("オフ")
+                title: language.localized("Smudge"),
+                selectedTitle: store.brush.smudgeEngineEnabled ? language.localized("On") : language.localized("Off")
             ) {
                 VStack(alignment: .leading, spacing: 10) {
                     Toggle(isOn: $store.brush.smudgeEngineEnabled) {
-                        Text(language.localized("Enable Color Smudge"))
+                        Text(language.localized("Enable Smudge"))
                             .font(StudioTheme.Typography.label(11))
                             .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.8) : .white.opacity(0.86))
                     }
                     .toggleStyle(.switch)
 
                     if store.brush.smudgeEngineEnabled {
-                        Picker(language.localized("Smudge Mode"), selection: $store.brush.smudgeMode) {
-                            ForEach(BrushSmudgeMode.allCases) { mode in
-                                Text(mode.localizedTitle(language)).tag(mode)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-
                         sliderRow(
-                            title: language.localized("Smudge Length"),
-                            value: "\(Int(store.brush.smudgeLength * 100))%",
-                            slider: Slider(value: $store.brush.smudgeLength, in: 0.0...1.0)
-                        )
-                        sliderRow(
-                            title: language.localized("Color Rate"),
+                            title: language.localized("Paint Amount"),
                             value: "\(Int(store.brush.colorRate * 100))%",
                             slider: Slider(value: $store.brush.colorRate, in: 0.0...1.0)
                         )
                         sliderRow(
-                            title: language.localized("Smudge Radius"),
-                            value: "\(Int(store.brush.smudgeRadius * 100))%",
-                            slider: Slider(value: $store.brush.smudgeRadius, in: 0.0...1.0)
+                            title: language.localized("Paint Amount Pressure Bypass"),
+                            value: "\(Int(store.brush.paintAmountPressureBypass * 100))%",
+                            slider: Slider(value: $store.brush.paintAmountPressureBypass, in: 0.0...1.0)
                         )
                         sliderRow(
-                            title: language.localized("Mix Pressure"),
-                            value: "\(Int(store.brush.loadPressureSensitivity * 100))%",
-                            slider: Slider(value: $store.brush.loadPressureSensitivity, in: 0.0...1.0)
+                            title: language.localized("Paint Density"),
+                            value: "\(Int(store.brush.paintLoad * 100))%",
+                            slider: Slider(value: $store.brush.paintLoad, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Paint Density Pressure Bypass"),
+                            value: "\(Int(store.brush.paintDensityPressureBypass * 100))%",
+                            slider: Slider(value: $store.brush.paintDensityPressureBypass, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Color Stretch"),
+                            value: "\(Int(store.brush.smudgeLength * 100))%",
+                            slider: Slider(value: $store.brush.smudgeLength, in: 0.0...1.0)
+                        )
+                        sliderRow(
+                            title: language.localized("Color Stretch Pressure Bypass"),
+                            value: "\(Int(store.brush.colorStretchPressureBypass * 100))%",
+                            slider: Slider(value: $store.brush.colorStretchPressureBypass, in: 0.0...1.0)
                         )
                     }
                 }

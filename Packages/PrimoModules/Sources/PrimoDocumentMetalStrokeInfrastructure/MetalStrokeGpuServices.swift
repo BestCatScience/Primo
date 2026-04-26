@@ -173,18 +173,7 @@ public enum GpuRenderingSupport {
     }
 
     public static func responsiveOilPreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
-        var copy = brush
-        copy.smudgeEngineEnabled = false
-        copy.customTip = nil
-        copy.textureStrength = min(copy.textureStrength, 0.08)
-        copy.pressureSensitivity = min(copy.pressureSensitivity, 0.04)
-        copy.opacityPressureSensitivity = min(copy.opacityPressureSensitivity, 0.04)
-        copy.flowPressureSensitivity = min(copy.flowPressureSensitivity, 0.04)
-        copy.radius *= 1.10
-        copy.hardness = max(copy.hardness, 0.86)
-        copy.flow = max(copy.flow, 0.96)
-        copy.opacity = max(copy.opacity, 0.92)
-        return copy
+        brush
     }
 
     public static func strokePreviewDirtyRect(

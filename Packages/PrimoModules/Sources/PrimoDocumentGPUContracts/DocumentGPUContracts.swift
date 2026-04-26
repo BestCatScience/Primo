@@ -37,6 +37,9 @@ public struct GpuSurfaceRegion: Equatable, Sendable {
 
 public enum StrokePreviewContinuationPolicy {
     public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        if brush.tipKind == .oil && brush.smudgeEngineEnabled {
+            return false
+        }
         let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
         let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
         let softness = 1.0 - CGFloat(brush.hardness)

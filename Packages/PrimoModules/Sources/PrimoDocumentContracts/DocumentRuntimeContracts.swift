@@ -77,6 +77,9 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
     public var smudgeLength: Double = 0.0
     public var colorRate: Double = 1.0
     public var loadPressureSensitivity: Double = 0.0
+    public var paintAmountPressureBypass: Double = 1.0
+    public var paintDensityPressureBypass: Double = 1.0
+    public var colorStretchPressureBypass: Double = 1.0
     public var dualBrushEnabled: Bool = false
     public var dualTipKind: BrushTipKind = .ink
     public var dualScale: Double = 0.72
@@ -150,6 +153,9 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
         smudgeLength: Double,
         colorRate: Double,
         loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
         dualScale: Double = 0.72,
@@ -222,6 +228,9 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
         self.smudgeLength = smudgeLength
         self.colorRate = colorRate
         self.loadPressureSensitivity = loadPressureSensitivity
+        self.paintAmountPressureBypass = paintAmountPressureBypass
+        self.paintDensityPressureBypass = paintDensityPressureBypass
+        self.colorStretchPressureBypass = colorStretchPressureBypass
         self.dualBrushEnabled = dualBrushEnabled
         self.dualTipKind = dualTipKind
         self.dualScale = dualScale
@@ -292,6 +301,9 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
         smudgeRadius: Double = 0.0,
         paintLoad: Double = 1.0,
         loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
         dualScale: Double = 0.72,
@@ -365,6 +377,9 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
             smudgeLength: 0.0,
             colorRate: 1.0,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,

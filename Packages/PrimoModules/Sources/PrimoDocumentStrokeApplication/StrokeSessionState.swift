@@ -70,20 +70,27 @@ public struct StrokeSessionState: Equatable, Sendable {
         sampleCount: Int,
         supportsIncrementalContinuation: Bool
     ) {
+        guard let incrementalUpdate else { return }
+        let dirtyRect = mergedDirtyRect(
+            previous: renderState,
+            next: dirtyRegion.layerPixelRect,
+            baseSnapshot: baseSnapshot,
+            surface: surface,
+            previewBrush: previewBrush,
+            sampleCount: sampleCount
+        )
         self.baseSnapshot = baseSnapshot
         renderState = StrokeSessionRenderState(
             baseRevision: baseSnapshot.revision,
             layerIndex: surface.layerIndex,
             surfaceHandle: surface.handle.buffer,
-            dirtyRect: dirtyRegion.layerPixelRect,
+            dirtyRect: dirtyRect,
             isApproximatePreview: isApproximatePreview,
             previewBrush: previewBrush,
             sampleCount: sampleCount,
             supportsIncrementalContinuation: supportsIncrementalContinuation
         )
-        if let incrementalUpdate {
-            pendingIncrementalUpdate = incrementalUpdate
-        }
+        pendingIncrementalUpdate = incrementalUpdate
     }
 
     public mutating func markCommittedPointCount(_ pointCount: Int) {
@@ -120,5 +127,40 @@ public struct StrokeSessionState: Equatable, Sendable {
             trimmed.removeLast()
         }
         return trimmed
+    }
+
+    private func mergedDirtyRect(
+        previous: StrokeSessionRenderState?,
+        next: LayerPixelRect,
+        baseSnapshot: MetalDocumentSnapshot,
+        surface: GpuLayerSurface,
+        previewBrush: BrushRuntimeSettings?,
+        sampleCount: Int
+    ) -> LayerPixelRect {
+        guard
+            let previous,
+            previous.baseRevision == baseSnapshot.revision,
+            previous.layerIndex == surface.layerIndex,
+            previous.previewBrush == previewBrush,
+            previous.sampleCount <= sampleCount
+        else {
+            return next
+        }
+        return Self.union(previous.dirtyRect, next)
+    }
+
+    private static func union(_ lhs: LayerPixelRect, _ rhs: LayerPixelRect) -> LayerPixelRect {
+        if lhs.isEmpty { return rhs }
+        if rhs.isEmpty { return lhs }
+        let minX = min(lhs.originX, rhs.originX)
+        let minY = min(lhs.originY, rhs.originY)
+        let maxX = max(lhs.originX + lhs.width, rhs.originX + rhs.width)
+        let maxY = max(lhs.originY + lhs.height, rhs.originY + rhs.height)
+        return LayerPixelRect(
+            originX: minX,
+            originY: minY,
+            width: max(0, maxX - minX),
+            height: max(0, maxY - minY)
+        )
     }
 }

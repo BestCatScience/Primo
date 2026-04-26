@@ -287,6 +287,9 @@ private struct StoredBrushPreset: Codable {
     let smudgeLength: Double
     let colorRate: Double
     let loadPressureSensitivity: Double
+    let paintAmountPressureBypass: Double
+    let paintDensityPressureBypass: Double
+    let colorStretchPressureBypass: Double
     let dualBrushEnabled: Bool
     let dualTipKindRawValue: String
     let dualScale: Double
@@ -352,6 +355,9 @@ private struct StoredBrushPreset: Codable {
         case smudgeLength
         case colorRate
         case loadPressureSensitivity
+        case paintAmountPressureBypass
+        case paintDensityPressureBypass
+        case colorStretchPressureBypass
         case dualBrushEnabled
         case dualTipKindRawValue
         case dualScale
@@ -418,6 +424,9 @@ private struct StoredBrushPreset: Codable {
         smudgeLength = preset.smudgeLength
         colorRate = preset.colorRate
         loadPressureSensitivity = preset.loadPressureSensitivity
+        paintAmountPressureBypass = preset.paintAmountPressureBypass
+        paintDensityPressureBypass = preset.paintDensityPressureBypass
+        colorStretchPressureBypass = preset.colorStretchPressureBypass
         dualBrushEnabled = preset.dualBrushEnabled
         dualTipKindRawValue = preset.dualTipKind.rawValue
         dualScale = preset.dualScale
@@ -485,6 +494,9 @@ private struct StoredBrushPreset: Codable {
         smudgeLength = try container.decodeIfPresent(Double.self, forKey: .smudgeLength) ?? 0.0
         colorRate = try container.decodeIfPresent(Double.self, forKey: .colorRate) ?? 1.0
         loadPressureSensitivity = try container.decodeIfPresent(Double.self, forKey: .loadPressureSensitivity) ?? 0.0
+        paintAmountPressureBypass = try container.decodeIfPresent(Double.self, forKey: .paintAmountPressureBypass) ?? 1.0
+        paintDensityPressureBypass = try container.decodeIfPresent(Double.self, forKey: .paintDensityPressureBypass) ?? 1.0
+        colorStretchPressureBypass = try container.decodeIfPresent(Double.self, forKey: .colorStretchPressureBypass) ?? 1.0
         dualBrushEnabled = try container.decodeIfPresent(Bool.self, forKey: .dualBrushEnabled) ?? false
         dualTipKindRawValue = try container.decodeIfPresent(String.self, forKey: .dualTipKindRawValue) ?? BrushTipKind.ink.rawValue
         dualScale = try container.decodeIfPresent(Double.self, forKey: .dualScale) ?? 0.72
@@ -573,6 +585,9 @@ private struct StoredBrushPreset: Codable {
             smudgeLength: smudgeLength,
             colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,

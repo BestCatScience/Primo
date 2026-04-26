@@ -493,6 +493,9 @@ struct BrushPreset: Identifiable, Equatable {
     let smudgeLength: Double
     let colorRate: Double
     let loadPressureSensitivity: Double
+    let paintAmountPressureBypass: Double
+    let paintDensityPressureBypass: Double
+    let colorStretchPressureBypass: Double
     let dualBrushEnabled: Bool
     let dualTipKind: BrushTipKind
     let dualScale: Double
@@ -558,6 +561,9 @@ struct BrushPreset: Identifiable, Equatable {
         lhs.smudgeLength == rhs.smudgeLength &&
         lhs.colorRate == rhs.colorRate &&
         lhs.loadPressureSensitivity == rhs.loadPressureSensitivity &&
+        lhs.paintAmountPressureBypass == rhs.paintAmountPressureBypass &&
+        lhs.paintDensityPressureBypass == rhs.paintDensityPressureBypass &&
+        lhs.colorStretchPressureBypass == rhs.colorStretchPressureBypass &&
         lhs.dualBrushEnabled == rhs.dualBrushEnabled &&
         lhs.dualTipKind == rhs.dualTipKind &&
         lhs.dualScale == rhs.dualScale &&
@@ -625,6 +631,9 @@ struct BrushPreset: Identifiable, Equatable {
         smudgeLength: Double = 0.0,
         colorRate: Double = 1.0,
         loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
         dualScale: Double = 0.72,
@@ -690,6 +699,9 @@ struct BrushPreset: Identifiable, Equatable {
         self.smudgeLength = smudgeLength
         self.colorRate = colorRate
         self.loadPressureSensitivity = loadPressureSensitivity
+        self.paintAmountPressureBypass = paintAmountPressureBypass
+        self.paintDensityPressureBypass = paintDensityPressureBypass
+        self.colorStretchPressureBypass = colorStretchPressureBypass
         self.dualBrushEnabled = dualBrushEnabled
         self.dualTipKind = dualTipKind
         self.dualScale = dualScale
@@ -1012,13 +1024,13 @@ struct BrushPreset: Identifiable, Equatable {
             wetnessPressureSensitivity: 0.08,
             opacityPressureSensitivity: 0.12,
             colorMixStrength: 0.08,
-            paintLoad: 0.92,
+            paintLoad: 0.86,
             smudgeEngineEnabled: true,
             smudgeMode: .dulling,
-            smudgeLength: 0.34,
-            colorRate: 0.58,
+            smudgeLength: 0.12,
+            colorRate: 0.82,
             smudgeRadius: 0.32,
-            loadPressureSensitivity: 0.04,
+            loadPressureSensitivity: 0.0,
             dualBrushEnabled: false,
             dualTipKind: .oil,
             dualScale: 0.64,
@@ -1073,13 +1085,13 @@ struct BrushPreset: Identifiable, Equatable {
             wetnessPressureSensitivity: 0.04,
             opacityPressureSensitivity: 0.10,
             colorMixStrength: 0.08,
-            paintLoad: 0.92,
+            paintLoad: 0.46,
             smudgeEngineEnabled: true,
             smudgeMode: .smearing,
-            smudgeLength: 0.28,
-            colorRate: 0.42,
+            smudgeLength: 0.26,
+            colorRate: 0.54,
             smudgeRadius: 0.26,
-            loadPressureSensitivity: 0.04,
+            loadPressureSensitivity: 0.0,
             dualBrushEnabled: false,
             dualTipKind: .oil,
             dualScale: 0.60,
@@ -1120,13 +1132,13 @@ struct BrushPreset: Identifiable, Equatable {
             wetnessPressureSensitivity: 0.08,
             opacityPressureSensitivity: 0.10,
             colorMixStrength: 0.10,
-            paintLoad: 0.92,
+            paintLoad: 0.58,
             smudgeEngineEnabled: true,
             smudgeMode: .smearing,
-            smudgeLength: 0.40,
-            colorRate: 0.46,
+            smudgeLength: 0.34,
+            colorRate: 0.64,
             smudgeRadius: 0.36,
-            loadPressureSensitivity: 0.06,
+            loadPressureSensitivity: 0.0,
             grainScale: 1.08,
             grainContrast: 1.24,
             paperScale: 0.08,
@@ -1156,12 +1168,12 @@ struct BrushPreset: Identifiable, Equatable {
             flow: 0.82,
             wetness: 0.20,
             colorMixStrength: 0.24,
-            paintLoad: 0.65,
+            paintLoad: 0.08,
             smudgeEngineEnabled: true,
             smudgeMode: .smearing,
-            smudgeLength: 0.56,
-            colorRate: 0.24,
-            loadPressureSensitivity: 0.72,
+            smudgeLength: 0.32,
+            colorRate: 0.08,
+            loadPressureSensitivity: 0.0,
             pressureSensitivity: 0.12,
             red: 46,
             green: 47,
@@ -1186,12 +1198,12 @@ struct BrushPreset: Identifiable, Equatable {
             flow: 0.86,
             wetness: 0.18,
             colorMixStrength: 0.18,
-            paintLoad: 0.40,
+            paintLoad: 0.02,
             smudgeEngineEnabled: true,
             smudgeMode: .smearing,
-            smudgeLength: 0.84,
-            colorRate: 0.12,
-            loadPressureSensitivity: 0.78,
+            smudgeLength: 0.90,
+            colorRate: 0.02,
+            loadPressureSensitivity: 0.0,
             pressureSensitivity: 0.18,
             red: 40,
             green: 42,
@@ -1216,13 +1228,13 @@ struct BrushPreset: Identifiable, Equatable {
             flow: 0.74,
             wetness: 0.10,
             colorMixStrength: 0.14,
-            paintLoad: 0.72,
+            paintLoad: 0.18,
             smudgeEngineEnabled: true,
             smudgeMode: .dulling,
-            smudgeLength: 0.68,
-            colorRate: 0.46,
+            smudgeLength: 0.58,
+            colorRate: 0.28,
             smudgeRadius: 0.58,
-            loadPressureSensitivity: 0.66,
+            loadPressureSensitivity: 0.0,
             pressureSensitivity: 0.08,
             red: 52,
             green: 54,
@@ -1277,6 +1289,9 @@ struct BrushPreset: Identifiable, Equatable {
         colorRate: Double = 1.0,
         smudgeRadius: Double = 0.0,
         loadPressureSensitivity: Double = 0.0,
+        paintAmountPressureBypass: Double = 1.0,
+        paintDensityPressureBypass: Double = 1.0,
+        colorStretchPressureBypass: Double = 1.0,
         dualBrushEnabled: Bool = false,
         dualTipKind: BrushTipKind = .ink,
         dualScale: Double = 0.72,
@@ -1340,6 +1355,9 @@ struct BrushPreset: Identifiable, Equatable {
             smudgeLength: smudgeLength,
             colorRate: colorRate,
             loadPressureSensitivity: loadPressureSensitivity,
+            paintAmountPressureBypass: paintAmountPressureBypass,
+            paintDensityPressureBypass: paintDensityPressureBypass,
+            colorStretchPressureBypass: colorStretchPressureBypass,
             dualBrushEnabled: dualBrushEnabled,
             dualTipKind: dualTipKind,
             dualScale: dualScale,

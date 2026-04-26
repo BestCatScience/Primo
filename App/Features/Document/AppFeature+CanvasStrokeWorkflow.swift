@@ -728,7 +728,6 @@ private extension DocumentStrokeContext {
 private extension AppFeature.State {
     func usesResponsiveOilPreview(for brush: BrushRuntimeSettings) -> Bool {
         brushPalette.ui.oilLivePreviewQuality == .responsive &&
-        brush.tipKind == .oil &&
-        brush.smudgeEngineEnabled
+        brush.tipKind == .oil
     }
 }

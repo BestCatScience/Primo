@@ -235,6 +235,9 @@ private struct PrimoMetalStrokeBrushDescriptor {
     let loadPressureSensitivity: Float
     let smudgeLength: Float
     let colorRate: Float
+    let paintAmountPressureBypass: Float
+    let paintDensityPressureBypass: Float
+    let colorStretchPressureBypass: Float
     let red: Float
     let green: Float
     let blue: Float
@@ -273,9 +276,15 @@ private struct PrimoMetalColorSmudgeDabDescriptor {
     let centerY: Float
     let previousCenterX: Float
     let previousCenterY: Float
+    let startCenterX: Float
+    let startCenterY: Float
     let pressure: Float
     let progress: Float
     let radius: Float
+}
+
+private struct PrimoMetalSmudgeDabIndexDescriptor {
+    let dabIndex: UInt32
 }
 
 private struct PrimoMetalStrokePreprocessDescriptor {
@@ -318,14 +327,6 @@ private struct PrimoMetalSmudgeDabGenerationSummary {
     let dirtyOriginY: Int32
     let dirtyWidth: UInt32
     let dirtyHeight: UInt32
-}
-
-private struct PrimoMetalColorSmudgeDab {
-    let center: CGPoint
-    let radius: CGFloat
-    let progress: CGFloat
-    let sample: StylusSample
-    let destinationRect: CGRect
 }
 
 private struct PrimoMetalStrokeRasterRequestDescriptor {
@@ -596,7 +597,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     let strokePrimitiveScatterPipeline: MTLComputePipelineState?
     let strokeRasterPipeline: MTLComputePipelineState?
     let strokeColorSmudgePipeline: MTLComputePipelineState?
+    let strokeColorSmudgeBatchPipeline: MTLComputePipelineState?
     let copyStrokeRectPipeline: MTLComputePipelineState?
+    let copySmudgeDabRectPipeline: MTLComputePipelineState?
 
     private var cachedSignature: SnapshotTextureSignature?
     private var cachedLayerTexture: MTLTexture?
@@ -660,7 +663,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         self.strokePrimitiveScatterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokePrimitiveScatterKernel")
         self.strokeRasterPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeRasterKernel")
         self.strokeColorSmudgePipeline = Self.makePipeline(device: device, library: library, functionName: "strokeColorSmudgeKernel")
+        self.strokeColorSmudgeBatchPipeline = Self.makePipeline(device: device, library: library, functionName: "strokeColorSmudgeBatchKernel")
         self.copyStrokeRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copyStrokeRectKernel")
+        self.copySmudgeDabRectPipeline = Self.makePipeline(device: device, library: library, functionName: "copySmudgeDabRectKernel")
     }
 
     public var isAvailable: Bool {
@@ -717,7 +722,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         strokePrimitiveScatterPipeline != nil &&
         strokeRasterPipeline != nil &&
         strokeColorSmudgePipeline != nil &&
-        copyStrokeRectPipeline != nil
+        strokeColorSmudgeBatchPipeline != nil &&
+        copyStrokeRectPipeline != nil &&
+        copySmudgeDabRectPipeline != nil
     }
 
     public func resetStrokeExecutionSession() {
@@ -1985,8 +1992,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             request.canvasHeight > 0,
             request.basePixelData.count == request.canvasWidth * request.canvasHeight * 4,
             let commandQueue,
-            let smudgePipeline = strokeColorSmudgePipeline,
-            let copyPipeline = copyStrokeRectPipeline
+            let smudgePipeline = strokeColorSmudgeBatchPipeline,
+            let copyPipeline = copySmudgeDabRectPipeline
         else {
             return nil
         }
@@ -2007,7 +2014,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 canvasWidth: request.canvasWidth,
                 canvasHeight: request.canvasHeight
             ),
-            !smudgeGeneration.descriptors.isEmpty
+            smudgeGeneration.dabCount > 0
         else {
             return nil
         }
@@ -2036,58 +2043,39 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
 
-        let generatedDabs = smudgeGeneration.descriptors
-        for dab in generatedDabs {
-            let rect = (
-                originX: Int(dab.rectOriginX),
-                originY: Int(dab.rectOriginY),
-                width: Int(dab.rectWidth),
-                height: Int(dab.rectHeight)
-            )
-            guard rect.width > 0, rect.height > 0 else { continue }
-
-            guard
-                let copyRequestBuffer = makeBuffer(
-                    PrimoMetalStrokeRectCopyDescriptor(
-                        canvasWidth: UInt32(request.canvasWidth),
-                        canvasHeight: UInt32(request.canvasHeight),
-                        originX: UInt32(rect.originX),
-                        originY: UInt32(rect.originY),
-                        rectWidth: UInt32(rect.width),
-                        rectHeight: UInt32(rect.height)
-                    )
-                ),
-                let dabBuffer = makeBuffer(
-                    dab
-                ),
-                let copyEncoder = commandBuffer.makeComputeCommandEncoder()
-            else {
-                return nil
-            }
+        for (dabIndex, dab) in smudgeGeneration.dabs.enumerated() {
+            let rectWidth = Int(dab.rectWidth)
+            let rectHeight = Int(dab.rectHeight)
+            guard rectWidth > 0, rectHeight > 0 else { continue }
+            var dabIndexDescriptor = PrimoMetalSmudgeDabIndexDescriptor(dabIndex: UInt32(dabIndex))
+            guard let copyEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
 
             copyEncoder.setComputePipelineState(copyPipeline)
             copyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
             copyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
-            copyEncoder.setBuffer(copyRequestBuffer, offset: 0, index: 2)
-            dispatch2D(encoder: copyEncoder, pipeline: copyPipeline, width: rect.width, height: rect.height)
+            copyEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
+            copyEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
+            dispatch2D(encoder: copyEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
             copyEncoder.endEncoding()
 
             guard let smudgeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
             smudgeEncoder.setComputePipelineState(smudgePipeline)
             smudgeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
             smudgeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
-            smudgeEncoder.setBuffer(dabBuffer, offset: 0, index: 2)
+            smudgeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
             smudgeEncoder.setBuffer(brushBuffer, offset: 0, index: 3)
             smudgeEncoder.setBuffer(customTipBuffer, offset: 0, index: 4)
-            dispatch2D(encoder: smudgeEncoder, pipeline: smudgePipeline, width: rect.width, height: rect.height)
+            smudgeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 5)
+            dispatch2D(encoder: smudgeEncoder, pipeline: smudgePipeline, width: rectWidth, height: rectHeight)
             smudgeEncoder.endEncoding()
 
             guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
             finalizeEncoder.setComputePipelineState(copyPipeline)
             finalizeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 0)
             finalizeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 1)
-            finalizeEncoder.setBuffer(copyRequestBuffer, offset: 0, index: 2)
-            dispatch2D(encoder: finalizeEncoder, pipeline: copyPipeline, width: rect.width, height: rect.height)
+            finalizeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
+            finalizeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
+            dispatch2D(encoder: finalizeEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
             finalizeEncoder.endEncoding()
         }
 
@@ -2905,6 +2893,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
     private static func makeStrokeBrushDescriptor(_ brush: BrushRuntimeSettings, customTip: BrushTipRaster) -> PrimoMetalStrokeBrushDescriptor {
         let profile = strokeRasterProfile(for: brush)
+        let smudgeEnabled = brush.smudgeEngineEnabled
         return PrimoMetalStrokeBrushDescriptor(
             radius: Float(brush.radius),
             pressureSensitivity: Float(brush.pressureSensitivity),
@@ -2926,9 +2915,12 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             smudgeBleed: profile.smudgeBleed,
             smudgeRadius: profile.smudgeRadius,
             paintLoad: profile.paintLoad,
-            loadPressureSensitivity: Float(min(max(brush.loadPressureSensitivity, 0.0), 1.0)),
-            smudgeLength: Float(min(max(brush.smudgeLength, 0.0), 1.0)),
-            colorRate: Float(min(max(brush.colorRate, 0.0), 1.0)),
+            loadPressureSensitivity: 0.0,
+            smudgeLength: smudgeEnabled ? Float(min(max(brush.smudgeLength, 0.0), 1.0)) : 0.0,
+            colorRate: smudgeEnabled ? Float(min(max(brush.colorRate, 0.0), 1.0)) : 0.0,
+            paintAmountPressureBypass: Float(min(max(brush.paintAmountPressureBypass, 0.0), 1.0)),
+            paintDensityPressureBypass: Float(min(max(brush.paintDensityPressureBypass, 0.0), 1.0)),
+            colorStretchPressureBypass: Float(min(max(brush.colorStretchPressureBypass, 0.0), 1.0)),
             red: Float(brush.red) / 255.0,
             green: Float(brush.green) / 255.0,
             blue: Float(brush.blue) / 255.0,
@@ -2945,7 +2937,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             customTipHeight: UInt32(customTip.height),
             isEraser: brush.isEraser ? 1 : 0,
             isPencil: brush.tipKind == .pencil ? 1 : 0,
-            isOil: brush.tipKind == .oil ? 1 : 0,
+            isOil: brush.tipKind == .oil && smudgeEnabled ? 1 : 0,
             isAirbrush: brush.tipKind == .airbrush ? 1 : 0,
             dualBrushEnabled: brush.dualBrushEnabled ? 1 : 0,
             customTipEnabled: brush.customTip == nil ? 0 : 1,
@@ -2966,6 +2958,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 }
             }(),
             colorMixingMode: {
+                guard smudgeEnabled else { return 0 }
                 switch brush.colorMixingMode {
                 case .off: return 0
                 case .blend: return 1
@@ -2984,129 +2977,6 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
     private static func supportsStrokeRasterization(_ brush: BrushRuntimeSettings) -> Bool {
         brush.radius >= 0.5
-    }
-
-    private static func makeColorSmudgeDabs(
-        samples: [StylusSample],
-        progressTable: [CGFloat],
-        brush: BrushRuntimeSettings,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> [PrimoMetalColorSmudgeDab] {
-        guard let first = samples.first else { return [] }
-        var dabs: [PrimoMetalColorSmudgeDab] = []
-        let firstRadius = resolvedSmudgeStrokeRadius(for: first, progress: progressTable.first ?? 0, brush: brush)
-        if let firstDab = makeColorSmudgeDab(
-            sample: first,
-            progress: progressTable.first ?? 0,
-            radius: firstRadius,
-            canvasWidth: canvasWidth,
-            canvasHeight: canvasHeight
-        ) {
-            dabs.append(firstDab)
-        }
-
-        guard samples.count > 1 else { return dabs }
-
-        for index in samples.indices.dropFirst() {
-            let start = samples[index - 1]
-            let end = samples[index]
-            let startProgress = progressTable[index - 1]
-            let endProgress = progressTable[index]
-            let startRadius = resolvedSmudgeStrokeRadius(for: start, progress: startProgress, brush: brush)
-            let endRadius = resolvedSmudgeStrokeRadius(for: end, progress: endProgress, brush: brush)
-            let dx = end.point.x - start.point.x
-            let dy = end.point.y - start.point.y
-            let distance = sqrt((dx * dx) + (dy * dy))
-            let spacing = max(1.0, ((startRadius + endRadius) * 0.5) * max(CGFloat(brush.stampSpacing), 0.02))
-            guard distance.isFinite, spacing.isFinite, spacing > 0 else { continue }
-            let steps = max(1, Int(ceil(distance / spacing)))
-            for step in 1...steps {
-                let t = CGFloat(step) / CGFloat(steps)
-                let interpolated = interpolatedStylusSample(from: start, to: end, progress: t)
-                let progress = startProgress + ((endProgress - startProgress) * t)
-                let radius = resolvedSmudgeStrokeRadius(for: interpolated, progress: progress, brush: brush)
-                if let dab = makeColorSmudgeDab(
-                    sample: interpolated,
-                    progress: progress,
-                    radius: radius,
-                    canvasWidth: canvasWidth,
-                    canvasHeight: canvasHeight
-                ) {
-                    dabs.append(dab)
-                }
-            }
-        }
-        return dabs
-    }
-
-    private static func makeColorSmudgeDab(
-        sample: StylusSample,
-        progress: CGFloat,
-        radius: CGFloat,
-        canvasWidth: Int,
-        canvasHeight: Int
-    ) -> PrimoMetalColorSmudgeDab? {
-        guard sample.point.x.isFinite, sample.point.y.isFinite, progress.isFinite, radius.isFinite else { return nil }
-        let margin = max(2.0, radius + 2.0)
-        guard margin.isFinite else { return nil }
-        let rawRect = CGRect(
-            x: floor(sample.point.x - margin),
-            y: floor(sample.point.y - margin),
-            width: ceil(margin * 2.0),
-            height: ceil(margin * 2.0)
-        )
-        guard rawRect.origin.x.isFinite, rawRect.origin.y.isFinite, rawRect.width.isFinite, rawRect.height.isFinite else {
-            return nil
-        }
-        let clipped = rawRect.intersection(CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight))
-        guard clipped.origin.x.isFinite, clipped.origin.y.isFinite, clipped.width.isFinite, clipped.height.isFinite else {
-            return nil
-        }
-        return PrimoMetalColorSmudgeDab(
-            center: sample.point,
-            radius: radius,
-            progress: progress,
-            sample: sample,
-            destinationRect: clipped
-        )
-    }
-
-    private static func resolvedSmudgeStrokeRadius(
-        for sample: StylusSample,
-        progress: CGFloat,
-        brush: BrushRuntimeSettings
-    ) -> CGFloat {
-        let clampedPressure = max(0.08, min(sample.pressure, 1.0))
-        let pressureFactor = max(0.1, 1.0 + ((clampedPressure - 1.0) * CGFloat(brush.pressureSensitivity)))
-        let taper = strokeTaperScale(progress: progress, taperIn: CGFloat(brush.taperIn), taperOut: CGFloat(brush.taperOut))
-        return max(CGFloat(brush.radius) * pressureFactor * taper, 1.5)
-    }
-
-    private static func strokeTaperScale(progress: CGFloat, taperIn: CGFloat, taperOut: CGFloat) -> CGFloat {
-        func easedRamp(_ progress: CGFloat, length: CGFloat) -> CGFloat {
-            guard length > 0.001 else { return 1.0 }
-            let t = max(0.0, min(1.0, progress / length))
-            let eased = t * t * (3.0 - (2.0 * t))
-            return 0.08 + (0.92 * eased)
-        }
-
-        let entry = easedRamp(progress, length: taperIn)
-        let exit = easedRamp(1.0 - progress, length: taperOut)
-        return min(entry, exit)
-    }
-
-    private static func interpolatedStylusSample(from start: StylusSample, to end: StylusSample, progress t: CGFloat) -> StylusSample {
-        StylusSample(
-            point: CGPoint(
-                x: start.point.x + ((end.point.x - start.point.x) * t),
-                y: start.point.y + ((end.point.y - start.point.y) * t)
-            ),
-            pressure: start.pressure + ((end.pressure - start.pressure) * t),
-            altitude: start.altitude + ((end.altitude - start.altitude) * t),
-            azimuth: start.azimuth + ((end.azimuth - start.azimuth) * t),
-            timestamp: start.timestamp + ((end.timestamp - start.timestamp) * Double(t))
-        )
     }
 
     private func preprocessStrokeSamples(
@@ -3195,7 +3065,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         canvasWidth: Int,
         canvasHeight: Int
     ) -> (
-        descriptors: [PrimoMetalColorSmudgeDabDescriptor],
+        dabBuffer: MTLBuffer,
+        dabs: [PrimoMetalColorSmudgeDabDescriptor],
+        dabCount: Int,
         dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)?
     )? {
         guard
@@ -3264,8 +3136,9 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
         let summary = generationSummaryBuffer.contents().assumingMemoryBound(to: PrimoMetalSmudgeDabGenerationSummary.self).pointee
         let generatedCount = Int(summary.dabCount)
+        guard generatedCount > 0 else { return nil }
         let base = dabBuffer.contents().assumingMemoryBound(to: PrimoMetalColorSmudgeDabDescriptor.self)
-        let generatedDescriptors = Array(UnsafeBufferPointer(start: base, count: generatedCount))
+        let generatedDabs = Array(UnsafeBufferPointer(start: base, count: generatedCount))
         let dirtyRect = summary.dirtyWidth > 0 && summary.dirtyHeight > 0
             ? (
                 originX: Int(summary.dirtyOriginX),
@@ -3274,7 +3147,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                 height: Int(summary.dirtyHeight)
             )
             : nil
-        return (descriptors: generatedDescriptors, dirtyRect: dirtyRect)
+        return (dabBuffer: dabBuffer, dabs: generatedDabs, dabCount: generatedCount, dirtyRect: dirtyRect)
     }
 
     private func resolvedCustomTipMask(_ raster: BrushTipRaster?) -> BrushTipRaster {
@@ -3316,32 +3189,38 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
     }
 
     private static func strokeRasterProfile(for brush: BrushRuntimeSettings) -> (wetness: Float, colorMixStrength: Float, smudgeBleed: Float, smudgeRadius: Float, paintLoad: Float) {
+        guard brush.smudgeEngineEnabled else {
+            return (0, 0, 0, 0, 1)
+        }
+        let hardness = Float(min(max(brush.hardness, 0.0), 1.0))
+        let internalSmudgeRadius = Float(min(max(0.55 + ((1.0 - hardness) * 0.65), 0.45), 1.20))
+        let paintDensity = Float(min(max(brush.paintLoad, 0.0), 1.0))
         switch brush.tipKind {
         case .pencil:
-            return (0, 0, 0, 0, 1)
+            return (0, 0, 0, internalSmudgeRadius * 0.70, paintDensity)
         case .ink:
             return (
                 Float(min(max(brush.wetness * 0.35, 0), 0.22)),
                 Float(min(max(brush.colorMixStrength * 0.28, 0), 0.18)),
                 Float(min(max(brush.smudgeBleed * 0.22, 0), 0.16)),
-                Float(min(max(brush.smudgeRadius * 0.20, 0), 0.18)),
-                Float(max(0.82, min(brush.paintLoad, 1.0)))
+                internalSmudgeRadius * 0.80,
+                paintDensity
             )
         case .oil:
             return (
                 Float(min(max((brush.wetness * 0.88) + 0.08, 0), 1)),
                 Float(min(max((brush.colorMixStrength * 0.92) + 0.06, 0), 1)),
                 Float(min(max((brush.smudgeBleed * 0.78) + 0.08, 0), 1)),
-                Float(min(max((brush.smudgeRadius * 0.82) + 0.06, 0), 1)),
-                Float(min(max((brush.paintLoad * 0.90) + 0.05, 0.08), 1))
+                internalSmudgeRadius,
+                paintDensity
             )
         case .airbrush:
             return (
                 Float(min(max(brush.wetness * 0.16, 0), 0.12)),
                 Float(min(max(brush.colorMixStrength * 0.12, 0), 0.10)),
                 0,
-                Float(min(max(brush.smudgeRadius * 0.08, 0), 0.08)),
-                Float(max(0.88, min(brush.paintLoad, 1.0)))
+                internalSmudgeRadius * 0.65,
+                paintDensity
             )
         }
     }

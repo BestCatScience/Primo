@@ -47,7 +47,9 @@ public struct DocumentStrokeProcessingService: Sendable {
         }
 
         guard let gpuBufferHandle = preview.gpuBufferHandle,
-              let dirtyRect = preview.dirtyRect else {
+              let dirtyRect = preview.dirtyRect,
+              let incrementalUpdate = preview.incrementalUpdate else {
+            strokeService.release(preview.gpuBufferHandle)
             return nil
         }
 
@@ -65,7 +67,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 width: dirtyRect.width,
                 height: dirtyRect.height
             ),
-            incrementalUpdate: preview.incrementalUpdate,
+            incrementalUpdate: incrementalUpdate,
             isApproximatePreview: preview.isApproximatePreview
         )
     }
@@ -209,7 +211,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         let usesApproximateOilPreview =
             usesResponsiveOilPreview &&
             brush.tipKind == .oil &&
-            brush.smudgeEngineEnabled
+            !brush.smudgeEngineEnabled
         let previewBrush = usesApproximateOilPreview
             ? GpuRenderingSupport.responsiveOilPreviewBrush(from: brush)
             : brush
@@ -238,6 +240,24 @@ public struct DocumentStrokeProcessingService: Sendable {
             ) {
                 return DocumentInteractiveStrokePreviewResult(
                     pixelData: nil,
+                    gpuBufferHandle: bufferHandle,
+                    dirtyRect: gpuResult.dirtyRect,
+                    rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
+                    incrementalUpdate: incrementalUpdate,
+                    isApproximatePreview: usesApproximateOilPreview
+                )
+            }
+            if
+                let adjustedPixels = materializationService.materializedPixelData(for: bufferHandle),
+                let incrementalUpdate = livePreviewIncrementalUpdate(
+                    snapshot: snapshot,
+                    activeLayerIndex: activeLayerIndex,
+                    adjustedActiveLayerPixels: adjustedPixels,
+                    dirtyRect: gpuResult.dirtyRect
+                )
+            {
+                return DocumentInteractiveStrokePreviewResult(
+                    pixelData: adjustedPixels,
                     gpuBufferHandle: bufferHandle,
                     dirtyRect: gpuResult.dirtyRect,
                     rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
@@ -279,12 +299,20 @@ public struct DocumentStrokeProcessingService: Sendable {
                 return nil
             }
             strokeService.release(sourceHandle)
+            let alphaPreservedPixels = materializationService.materializedPixelData(for: alphaPreservedHandle)
             guard let incrementalUpdate = compositingService.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
                 adjustedActiveLayerBufferHandle: alphaPreservedHandle,
                 dirtyRect: gpuResult.dirtyRect
-            ) else {
+            ) ?? alphaPreservedPixels.flatMap({
+                livePreviewIncrementalUpdate(
+                    snapshot: snapshot,
+                    activeLayerIndex: activeLayerIndex,
+                    adjustedActiveLayerPixels: $0,
+                    dirtyRect: gpuResult.dirtyRect
+                )
+            }) else {
                 strokeService.release(alphaPreservedHandle)
                 return nil
             }
@@ -301,14 +329,12 @@ public struct DocumentStrokeProcessingService: Sendable {
         let adjustedPixels: Data
         adjustedPixels = gpuResult.pixelData
 
-        let incrementalUpdate = GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush)
-            ? compositingService.compositedPreviewIncrementalUpdate(
-                snapshot: snapshot,
-                activeLayerIndex: activeLayerIndex,
-                adjustedActiveLayerPixels: adjustedPixels,
-                dirtyRect: gpuResult.dirtyRect
-            )
-            : nil
+        let incrementalUpdate = livePreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedPixels,
+            dirtyRect: gpuResult.dirtyRect
+        )
 
         return DocumentInteractiveStrokePreviewResult(
             pixelData: adjustedPixels,
@@ -322,6 +348,37 @@ public struct DocumentStrokeProcessingService: Sendable {
             ),
             incrementalUpdate: incrementalUpdate,
             isApproximatePreview: usesApproximateOilPreview
+        )
+    }
+
+    private func livePreviewIncrementalUpdate(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data,
+        dirtyRect: (originX: Int, originY: Int, width: Int, height: Int)
+    ) -> IncrementalLayerUpdate? {
+        if let incrementalUpdate = compositingService.compositedPreviewIncrementalUpdate(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels,
+            dirtyRect: dirtyRect
+        ) {
+            return incrementalUpdate
+        }
+        guard let composite = compositingService.compositedPreviewPixelData(
+            snapshot: snapshot,
+            activeLayerIndex: activeLayerIndex,
+            adjustedActiveLayerPixels: adjustedActiveLayerPixels
+        ) else {
+            return nil
+        }
+        return IncrementalLayerUpdate(
+            layerIndex: -1,
+            originX: 0,
+            originY: 0,
+            width: snapshot.width,
+            height: snapshot.height,
+            pixelData: composite
         )
     }
 

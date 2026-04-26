@@ -371,6 +371,9 @@ struct MetalStrokeBrushDescriptor {
     float loadPressureSensitivity;
     float smudgeLength;
     float colorRate;
+    float paintAmountPressureBypass;
+    float paintDensityPressureBypass;
+    float colorStretchPressureBypass;
     float red;
     float green;
     float blue;
@@ -409,9 +412,15 @@ struct MetalColorSmudgeDabDescriptor {
     float centerY;
     float previousCenterX;
     float previousCenterY;
+    float startCenterX;
+    float startCenterY;
     float pressure;
     float progress;
     float radius;
+};
+
+struct MetalSmudgeDabIndexDescriptor {
+    uint dabIndex;
 };
 
 struct MetalRawStrokeSample {
@@ -892,6 +901,12 @@ inline float strokeClampUnit(float value) {
     return clamp(value, 0.0f, 1.0f);
 }
 
+inline float smudgePressureAdjustedValue(float value, float pressure, float pressureBypass) {
+    float influence = 1.0f - strokeClampUnit(pressureBypass);
+    float pressureScale = mix(1.0f, strokeClampUnit(pressure), influence);
+    return strokeClampUnit(value * pressureScale);
+}
+
 inline float strokeNoise(float x, float y) {
     float value = sin((x * 12.9898f) + (y * 78.233f)) * 43758.5453f;
     return value - floor(value);
@@ -1114,6 +1129,23 @@ inline float4 smudgeSourcePixel(
     );
 }
 
+inline float4 smudgeSourcePixelDevice(
+    const device uchar *pixels,
+    device const MetalColorSmudgeDabDescriptor *dab,
+    int x,
+    int y
+) {
+    int clampedX = clamp(x, 0, int(dab->canvasWidth) - 1);
+    int clampedY = clamp(y, 0, int(dab->canvasHeight) - 1);
+    uint offset = (uint(clampedY) * dab->canvasWidth + uint(clampedX)) * 4u;
+    return float4(
+        float(pixels[offset]) / 255.0f,
+        float(pixels[offset + 1u]) / 255.0f,
+        float(pixels[offset + 2u]) / 255.0f,
+        float(pixels[offset + 3u]) / 255.0f
+    );
+}
+
 inline float4 strokeNeighborhoodSample(
     const device uchar *pixels,
     constant MetalStrokeRasterRequestDescriptor& request,
@@ -1198,6 +1230,56 @@ inline float4 smudgeRepresentativeColor(
 
     if (totalWeight <= 0.0001f) {
         return smudgeSourcePixel(pixels, dab, int(round(dab.centerX)), int(round(dab.centerY)));
+    }
+    return accumulated / totalWeight;
+}
+
+inline float4 smudgeRepresentativeColorDevice(
+    const device uchar *pixels,
+    device const MetalColorSmudgeDabDescriptor *dab,
+    constant MetalStrokeBrushDescriptor& brush,
+    const device uchar *customTipPixels
+) {
+    float radiusFactor = 0.18f + (strokeClampUnit(brush.smudgeRadius) * 0.82f);
+    float sampleRadius = max(1.0f, dab->radius * radiusFactor);
+    const float2 offsets[9] = {
+        float2(0.0f, 0.0f),
+        float2(-0.6f, 0.0f),
+        float2(0.6f, 0.0f),
+        float2(0.0f, -0.6f),
+        float2(0.0f, 0.6f),
+        float2(-0.42f, -0.42f),
+        float2(0.42f, -0.42f),
+        float2(-0.42f, 0.42f),
+        float2(0.42f, 0.42f)
+    };
+
+    float4 accumulated = float4(0.0f);
+    float totalWeight = 0.0f;
+    for (uint index = 0; index < 9u; ++index) {
+        float2 point = float2(
+            dab->centerX + (offsets[index].x * sampleRadius),
+            dab->centerY + (offsets[index].y * sampleRadius)
+        );
+        float4 sample = smudgeSourcePixelDevice(pixels, dab, int(round(point.x)), int(round(point.y)));
+        float weight = max(
+            0.05f,
+            rasterizedSourceAlpha(
+                brush,
+                customTipPixels,
+                float2(dab->centerX, dab->centerY),
+                dab->pressure,
+                dab->progress,
+                max(sampleRadius, dab->radius),
+                point
+            )
+        );
+        accumulated += sample * weight;
+        totalWeight += weight;
+    }
+
+    if (totalWeight <= 0.0001f) {
+        return smudgeSourcePixelDevice(pixels, dab, int(round(dab->centerX)), int(round(dab->centerY)));
     }
     return accumulated / totalWeight;
 }
@@ -1481,6 +1563,8 @@ inline void emitSmudgeDab(
     float radius,
     thread float &previousCenterX,
     thread float &previousCenterY,
+    float startCenterX,
+    float startCenterY,
     thread bool &hasBounds,
     thread int &dirtyMinX,
     thread int &dirtyMinY,
@@ -1517,6 +1601,8 @@ inline void emitSmudgeDab(
         centerY,
         previousCenterX,
         previousCenterY,
+        startCenterX,
+        startCenterY,
         pressure,
         progress,
         radius
@@ -1567,6 +1653,8 @@ kernel void smudgeDabGenerationKernel(
     int dirtyMaxY = 0;
     float previousCenterX = samples[0].x;
     float previousCenterY = samples[0].y;
+    float startCenterX = samples[0].x;
+    float startCenterY = samples[0].y;
 
     MetalStrokeSampleDescriptor first = samples[0];
     emitSmudgeDab(
@@ -1580,6 +1668,8 @@ kernel void smudgeDabGenerationKernel(
         resolvedStrokeRadius(brush, first.pressure, first.progress),
         previousCenterX,
         previousCenterY,
+        startCenterX,
+        startCenterY,
         hasBounds,
         dirtyMinX,
         dirtyMinY,
@@ -1618,6 +1708,8 @@ kernel void smudgeDabGenerationKernel(
                 resolvedStrokeRadius(brush, pressure, progress),
                 previousCenterX,
                 previousCenterY,
+                startCenterX,
+                startCenterY,
                 hasBounds,
                 dirtyMinX,
                 dirtyMinY,
@@ -2045,14 +2137,21 @@ kernel void strokeColorSmudgeKernel(
     }
 
     float4 destination = smudgeSourcePixel(sourcePixels, dab, int(x), int(y));
-    float4 representative = smudgeRepresentativeColor(
+    float4 blurredBase = smudgeRepresentativeColor(
         sourcePixels,
         dab,
         brush,
         customTipPixels
     );
 
-    float4 sourceColor;
+    int startX = int(round(dab.startCenterX));
+    int startY = int(round(dab.startCenterY));
+    float4 strokeStartBase = smudgeSourcePixel(sourcePixels, dab, startX, startY);
+    if (strokeStartBase.a <= 0.001f) {
+        strokeStartBase = blurredBase;
+    }
+
+    float4 draggedBase = blurredBase;
     if (brush.smudgeMode == 0u) {
         float2 sourcePoint = float2(
             pixelCenter.x + (dab.previousCenterX - dab.centerX),
@@ -2064,47 +2163,156 @@ kernel void strokeColorSmudgeKernel(
             brush,
             customTipPixels,
             sourcePoint,
-            representative
+            blurredBase
         );
-        sourceColor = sampled.a > 0.001f ? sampled : representative;
-    } else {
-        sourceColor = representative;
+        if (sampled.a > 0.001f) {
+            draggedBase = sampled;
+        }
     }
 
     float baseOpacity = strokeClampUnit(brush.opacity * brush.flow);
-    float spacingInfluence = 0.2f;
-    float pressureMixScale = max(
-        0.12f,
-        1.0f - brush.loadPressureSensitivity + (brush.loadPressureSensitivity * strokeClampUnit(dab.pressure))
-    );
-    float smudgeBlend = strokeClampUnit(brush.smudgeLength * pressureMixScale);
-    float colorBlend = strokeClampUnit(brush.colorRate * pressureMixScale);
-    float colorContribution = min(colorBlend * colorBlend * baseOpacity * (1.0f - (smudgeBlend * 0.55f)), 0.85f);
-    float smudgeContribution = strokeClampUnit(smudgeBlend * (0.35f + (baseOpacity * 0.65f)) * (1.08f - min(spacingInfluence, 0.9f) * 0.35f));
+    float paintAmount = smudgePressureAdjustedValue(brush.colorRate, dab.pressure, brush.paintAmountPressureBypass);
+    float paintDensity = smudgePressureAdjustedValue(brush.paintLoad, dab.pressure, brush.paintDensityPressureBypass);
+    float colorStretch = smudgePressureAdjustedValue(brush.smudgeLength, dab.pressure, brush.colorStretchPressureBypass);
+    float colorInfluence = strokeClampUnit(maskAlpha * baseOpacity);
+    float alphaInfluence = strokeClampUnit(maskAlpha);
 
-    float4 smudged = sourceColor;
-    smudged.a *= maskAlpha * smudgeContribution;
-    smudged.rgb *= smudged.a;
+    float dragInfluence = brush.smudgeMode == 0u
+        ? strokeClampUnit(0.28f + (brush.smudgeRadius * 0.52f) + (brush.wetness * 0.20f))
+        : 0.0f;
+    float4 movingBase = mix(blurredBase, draggedBase, dragInfluence);
+    float4 stretchedBase = mix(movingBase, strokeStartBase, colorStretch);
+    float paintChange = 1.0f - colorStretch;
+    float effectivePaintAmount = paintAmount * paintChange;
+    float effectivePaintDensity = paintDensity * paintChange;
+    float3 mixedRGB = mix(stretchedBase.rgb, float3(brush.red, brush.green, brush.blue), effectivePaintAmount);
+    float paintAlphaTarget = max(stretchedBase.a, baseOpacity);
+    float mixedAlpha = mix(stretchedBase.a, paintAlphaTarget, effectivePaintDensity);
+    float4 targetColor = float4(mixedRGB, mixedAlpha);
 
-    float pigmentAlpha = maskAlpha * colorContribution;
-    float3 pigmentRGB = float3(brush.red, brush.green, brush.blue) * pigmentAlpha;
+    float outAlpha = mix(destination.a, targetColor.a, alphaInfluence);
+    float3 resolved = mix(destination.rgb, targetColor.rgb, colorInfluence);
 
-    float combinedAlpha;
-    float3 combinedRGB;
-    if (colorContribution > 0.001f) {
-        combinedAlpha = pigmentAlpha + (smudged.a * (1.0f - pigmentAlpha));
-        combinedRGB = pigmentRGB + (smudged.rgb * (1.0f - pigmentAlpha));
-    } else {
-        combinedAlpha = smudged.a;
-        combinedRGB = smudged.rgb;
-    }
-    if (combinedAlpha <= 0.001f) {
+    outputPixels[offset] = uchar(clamp(int(round(resolved.r * 255.0f)), 0, 255));
+    outputPixels[offset + 1u] = uchar(clamp(int(round(resolved.g * 255.0f)), 0, 255));
+    outputPixels[offset + 2u] = uchar(clamp(int(round(resolved.b * 255.0f)), 0, 255));
+    outputPixels[offset + 3u] = uchar(clamp(int(round(outAlpha * 255.0f)), 0, 255));
+}
+
+kernel void copySmudgeDabRectKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    const device MetalColorSmudgeDabDescriptor *dabs [[buffer(2)]],
+    constant MetalSmudgeDabIndexDescriptor& descriptor [[buffer(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    device const MetalColorSmudgeDabDescriptor *dab = &dabs[descriptor.dabIndex];
+    if (gid.x >= dab->rectWidth || gid.y >= dab->rectHeight) {
         return;
     }
 
-    float outAlpha = combinedAlpha + (destination.a * (1.0f - combinedAlpha));
-    float3 outRGB = combinedRGB + (destination.rgb * destination.a * (1.0f - combinedAlpha));
-    float3 resolved = outAlpha > 0.0001f ? outRGB / outAlpha : float3(0.0f);
+    uint x = dab->rectOriginX + gid.x;
+    uint y = dab->rectOriginY + gid.y;
+    if (x >= dab->canvasWidth || y >= dab->canvasHeight) {
+        return;
+    }
+
+    uint offset = ((y * dab->canvasWidth) + x) * 4u;
+    outputPixels[offset] = sourcePixels[offset];
+    outputPixels[offset + 1u] = sourcePixels[offset + 1u];
+    outputPixels[offset + 2u] = sourcePixels[offset + 2u];
+    outputPixels[offset + 3u] = sourcePixels[offset + 3u];
+}
+
+kernel void strokeColorSmudgeBatchKernel(
+    const device uchar *sourcePixels [[buffer(0)]],
+    device uchar *outputPixels [[buffer(1)]],
+    const device MetalColorSmudgeDabDescriptor *dabs [[buffer(2)]],
+    constant MetalStrokeBrushDescriptor& brush [[buffer(3)]],
+    const device uchar *customTipPixels [[buffer(4)]],
+    constant MetalSmudgeDabIndexDescriptor& descriptor [[buffer(5)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    device const MetalColorSmudgeDabDescriptor *dab = &dabs[descriptor.dabIndex];
+    if (gid.x >= dab->rectWidth || gid.y >= dab->rectHeight) {
+        return;
+    }
+
+    uint x = dab->rectOriginX + gid.x;
+    uint y = dab->rectOriginY + gid.y;
+    if (x >= dab->canvasWidth || y >= dab->canvasHeight) {
+        return;
+    }
+
+    uint offset = ((y * dab->canvasWidth) + x) * 4u;
+    float2 pixelCenter = float2(float(x) + 0.5f, float(y) + 0.5f);
+    float maskAlpha = rasterizedSourceAlpha(
+        brush,
+        customTipPixels,
+        float2(dab->centerX, dab->centerY),
+        dab->pressure,
+        dab->progress,
+        dab->radius,
+        pixelCenter
+    );
+    if (maskAlpha <= 0.001f) {
+        return;
+    }
+
+    float4 destination = smudgeSourcePixelDevice(sourcePixels, dab, int(x), int(y));
+    float4 blurredBase = smudgeRepresentativeColorDevice(
+        sourcePixels,
+        dab,
+        brush,
+        customTipPixels
+    );
+
+    int startX = int(round(dab->startCenterX));
+    int startY = int(round(dab->startCenterY));
+    float4 strokeStartBase = smudgeSourcePixelDevice(sourcePixels, dab, startX, startY);
+    if (strokeStartBase.a <= 0.001f) {
+        strokeStartBase = blurredBase;
+    }
+
+    float4 draggedBase = blurredBase;
+    if (brush.smudgeMode == 0u) {
+        float2 sourcePoint = float2(
+            pixelCenter.x + (dab->previousCenterX - dab->centerX),
+            pixelCenter.y + (dab->previousCenterY - dab->centerY)
+        );
+        float4 sampled = smudgeSourcePixelDevice(
+            sourcePixels,
+            dab,
+            int(round(sourcePoint.x)),
+            int(round(sourcePoint.y))
+        );
+        if (sampled.a > 0.001f) {
+            draggedBase = sampled;
+        }
+    }
+
+    float baseOpacity = strokeClampUnit(brush.opacity * brush.flow);
+    float paintAmount = smudgePressureAdjustedValue(brush.colorRate, dab->pressure, brush.paintAmountPressureBypass);
+    float paintDensity = smudgePressureAdjustedValue(brush.paintLoad, dab->pressure, brush.paintDensityPressureBypass);
+    float colorStretch = smudgePressureAdjustedValue(brush.smudgeLength, dab->pressure, brush.colorStretchPressureBypass);
+    float colorInfluence = strokeClampUnit(maskAlpha * baseOpacity);
+    float alphaInfluence = strokeClampUnit(maskAlpha);
+
+    float dragInfluence = brush.smudgeMode == 0u
+        ? strokeClampUnit(0.28f + (brush.smudgeRadius * 0.52f) + (brush.wetness * 0.20f))
+        : 0.0f;
+    float4 movingBase = mix(blurredBase, draggedBase, dragInfluence);
+    float4 stretchedBase = mix(movingBase, strokeStartBase, colorStretch);
+    float paintChange = 1.0f - colorStretch;
+    float effectivePaintAmount = paintAmount * paintChange;
+    float effectivePaintDensity = paintDensity * paintChange;
+    float3 mixedRGB = mix(stretchedBase.rgb, float3(brush.red, brush.green, brush.blue), effectivePaintAmount);
+    float paintAlphaTarget = max(stretchedBase.a, baseOpacity);
+    float mixedAlpha = mix(stretchedBase.a, paintAlphaTarget, effectivePaintDensity);
+    float4 targetColor = float4(mixedRGB, mixedAlpha);
+
+    float outAlpha = mix(destination.a, targetColor.a, alphaInfluence);
+    float3 resolved = mix(destination.rgb, targetColor.rgb, colorInfluence);
 
     outputPixels[offset] = uchar(clamp(int(round(resolved.r * 255.0f)), 0, 255));
     outputPixels[offset + 1u] = uchar(clamp(int(round(resolved.g * 255.0f)), 0, 255));
