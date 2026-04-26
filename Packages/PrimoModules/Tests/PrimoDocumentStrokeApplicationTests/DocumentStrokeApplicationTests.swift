@@ -196,7 +196,7 @@ struct DocumentStrokeApplicationTests {
         let snapshot = makeSnapshot(layerIndex: 3)
         let sample = stylusSample(x: 10, y: 11)
 
-        let result = try #require(useCase.makeCommittedPixels(
+        let result = try #require(useCase.makeCommittedSurface(
             snapshot: snapshot,
             samples: [sample],
             context: makeContext(layerIndex: 3, isAlphaLocked: true)
@@ -404,7 +404,7 @@ private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked S
         lock.withLock { storage }
     }
 
-    func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
+    func makeCommittedSurface(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
         lock.withLock {
             storage.append(request)
         }

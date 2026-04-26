@@ -125,8 +125,8 @@ private extension DocumentGpuOperationGateway {
                     }
                 }
             },
-            expandedSelectionMask: { data, _, _, _, _, width, height in
-                Array(data.prefix(width * height))
+            expandedSelectionMask: { request in
+                Array(request.maskData.prefix(request.canvasWidth * request.canvasHeight))
             },
             lassoSelection: { _, width, height in
                 [UInt8](repeating: 255, count: width * height)
@@ -141,8 +141,8 @@ private extension DocumentGpuOperationGateway {
             contractedMask: { source, _, _, _ in source },
             featheredMask: { source, _, _, _ in source },
             invertMask: { source in source.map { $0 > 0 ? 0 : 255 } },
-            transformedSelectionMask: { _, _, _, _, _, _, _, _, _, _, _ in nil },
-            transformedLayerPixelData: { _, _, _, _, _, _, _, _, _, _, _, _ in nil },
+            transformedSelectionMask: { _ in nil },
+            transformedLayerPixelData: { _ in nil },
             scaledPixelData: { _, _, _, _, _ in nil },
             translatedPixelData: { _, _, _, _, _, _, _ in nil },
             releaseSurfaceHandle: { _ in }

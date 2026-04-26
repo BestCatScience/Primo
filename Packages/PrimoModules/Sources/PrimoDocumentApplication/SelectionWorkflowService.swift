@@ -55,13 +55,15 @@ public struct SelectionWorkflowService: Sendable {
         }
 
         return gpuOperations.expandedSelectionMask(
-            selection.maskData,
-            selection.maskWidth,
-            selection.maskHeight,
-            originX,
-            originY,
-            canvasWidth,
-            canvasHeight
+            ExpandedSelectionMaskRequest(
+                maskData: selection.maskData,
+                maskWidth: selection.maskWidth,
+                maskHeight: selection.maskHeight,
+                originX: originX,
+                originY: originY,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight
+            )
         )
     }
 

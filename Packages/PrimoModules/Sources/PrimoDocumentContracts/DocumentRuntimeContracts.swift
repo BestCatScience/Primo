@@ -770,6 +770,117 @@ public struct DocumentCroppedSelectionMask: Sendable, Equatable {
     }
 }
 
+public struct ExpandedSelectionMaskRequest: Sendable, Equatable {
+    public let maskData: Data
+    public let maskWidth: Int
+    public let maskHeight: Int
+    public let originX: Int
+    public let originY: Int
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+
+    public init(
+        maskData: Data,
+        maskWidth: Int,
+        maskHeight: Int,
+        originX: Int,
+        originY: Int,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) {
+        self.maskData = maskData
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+        self.originX = originX
+        self.originY = originY
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+    }
+}
+
+public struct TransformedSelectionMaskRequest: Sendable, Equatable {
+    public let expandedSelectionMask: [UInt8]
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let translation: CGSize
+    public let scaleX: CGFloat
+    public let scaleY: CGFloat
+    public let rotationDegrees: Double
+    public let pivot: CGPoint
+    public let sourceQuad: TransformQuad
+    public let destinationQuad: TransformQuad
+    public let usesFreeformQuad: Bool
+
+    public init(
+        expandedSelectionMask: [UInt8],
+        canvasWidth: Int,
+        canvasHeight: Int,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) {
+        self.expandedSelectionMask = expandedSelectionMask
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.translation = translation
+        self.scaleX = scaleX
+        self.scaleY = scaleY
+        self.rotationDegrees = rotationDegrees
+        self.pivot = pivot
+        self.sourceQuad = sourceQuad
+        self.destinationQuad = destinationQuad
+        self.usesFreeformQuad = usesFreeformQuad
+    }
+}
+
+public struct TransformedLayerPixelDataRequest: Sendable, Equatable {
+    public let source: Data
+    public let canvasWidth: Int
+    public let canvasHeight: Int
+    public let expandedSelectionMask: [UInt8]?
+    public let translation: CGSize
+    public let scaleX: CGFloat
+    public let scaleY: CGFloat
+    public let rotationDegrees: Double
+    public let pivot: CGPoint
+    public let sourceQuad: TransformQuad
+    public let destinationQuad: TransformQuad
+    public let usesFreeformQuad: Bool
+
+    public init(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        expandedSelectionMask: [UInt8]?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint,
+        sourceQuad: TransformQuad,
+        destinationQuad: TransformQuad,
+        usesFreeformQuad: Bool
+    ) {
+        self.source = source
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.expandedSelectionMask = expandedSelectionMask
+        self.translation = translation
+        self.scaleX = scaleX
+        self.scaleY = scaleY
+        self.rotationDegrees = rotationDegrees
+        self.pivot = pivot
+        self.sourceQuad = sourceQuad
+        self.destinationQuad = destinationQuad
+        self.usesFreeformQuad = usesFreeformQuad
+    }
+}
+
 public struct DocumentGpuOperationGateway: Sendable {
     public var compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
     public var compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> Data?
@@ -783,7 +894,7 @@ public struct DocumentGpuOperationGateway: Sendable {
     public var alphaMask: @Sendable (Data, Int, Int) -> [UInt8]?
     public var croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
     public var combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]?
-    public var expandedSelectionMask: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> [UInt8]?
+    public var expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]?
     public var lassoSelection: @Sendable ([CGPoint], Int, Int) -> [UInt8]?
     public var autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]?
     public var colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]?
@@ -791,8 +902,8 @@ public struct DocumentGpuOperationGateway: Sendable {
     public var contractedMask: @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?
     public var featheredMask: @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?
     public var invertMask: @Sendable ([UInt8]) -> [UInt8]?
-    public var transformedSelectionMask: @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?
-    public var transformedLayerPixelData: @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?
+    public var transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> [UInt8]?
+    public var transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> Data?
     public var scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
     public var translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
     public var releaseSurfaceHandle: @Sendable (MetalBufferHandle?) -> Void
@@ -810,7 +921,7 @@ public struct DocumentGpuOperationGateway: Sendable {
         alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]?,
         croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
         combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]?,
-        expandedSelectionMask: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> [UInt8]?,
+        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]?,
         lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> [UInt8]?,
         autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]?,
         colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]?,
@@ -818,8 +929,8 @@ public struct DocumentGpuOperationGateway: Sendable {
         contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
         featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]?,
         invertMask: @escaping @Sendable ([UInt8]) -> [UInt8]?,
-        transformedSelectionMask: @escaping @Sendable ([UInt8], Int, Int, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> [UInt8]?,
-        transformedLayerPixelData: @escaping @Sendable (Data, Int, Int, [UInt8]?, CGSize, CGFloat, CGFloat, Double, CGPoint, TransformQuad, TransformQuad, Bool) -> Data?,
+        transformedSelectionMask: @escaping @Sendable (TransformedSelectionMaskRequest) -> [UInt8]?,
+        transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> Data?,
         scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data?,
         translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?,
         releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void

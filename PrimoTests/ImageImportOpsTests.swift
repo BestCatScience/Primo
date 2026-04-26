@@ -60,7 +60,7 @@ final class ImageImportOpsTests: XCTestCase {
             alphaMask: { _, _, _ in nil },
             croppedSelectionMask: { _, _, _ in nil },
             combinedSelectionMask: { _, _, _, _, _ in nil },
-            expandedSelectionMask: { _, _, _, _, _, _, _ in nil },
+            expandedSelectionMask: { _ in nil },
             lassoSelection: { _, _, _ in nil },
             autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
             colorRangeSelection: { _, _, _, _ in nil },
@@ -68,8 +68,8 @@ final class ImageImportOpsTests: XCTestCase {
             contractedMask: { _, _, _, _ in nil },
             featheredMask: { _, _, _, _ in nil },
             invertMask: { _ in nil },
-            transformedSelectionMask: { _, _, _, _, _, _, _, _, _, _, _ in nil },
-            transformedLayerPixelData: { _, _, _, _, _, _, _, _, _, _, _, _ in nil },
+            transformedSelectionMask: { _ in nil },
+            transformedLayerPixelData: { _ in nil },
             scaledPixelData: { data, _, _, targetWidth, targetHeight in
                 let pixel = data.prefix(4)
                 return Data(Array(repeating: Array(pixel), count: targetWidth * targetHeight).flatMap { $0 })

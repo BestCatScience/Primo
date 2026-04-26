@@ -303,7 +303,7 @@ public protocol StrokePreviewPlanning: Sendable {
 }
 
 public protocol StrokeCommitRendering: Sendable {
-    func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult?
+    func makeCommittedSurface(_ request: StrokeCommitRequest) -> StrokeCommitResult?
 }
 
 public extension MetalLayerSnapshot {

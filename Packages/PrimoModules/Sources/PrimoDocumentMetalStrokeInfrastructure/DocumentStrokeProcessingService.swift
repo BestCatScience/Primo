@@ -89,7 +89,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 canvasHeight: snapshot.height,
                 samples: samples,
                 brush: brush,
-                mode: .interactive,
+                mode: .commit,
                 snapshotRevision: snapshot.revision,
                 activeLayerIndex: activeLayerIndex
             )
@@ -135,7 +135,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 canvasHeight: snapshot.height,
                 samples: samples,
                 brush: brush,
-                mode: .interactive,
+                mode: .commit,
                 snapshotRevision: snapshot.revision,
                 activeLayerIndex: activeLayerIndex
             )
@@ -215,7 +215,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             : brush
 
         if !preserveAlphaLockedPixels,
-           Self.shouldUseIncrementalPreviewUpdate(for: previewBrush),
+           GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush),
            let gpuResult = strokeService.executeStrokeMutation(
                MetalStrokeExecutionRequest(
                    basePixelData: basePixelData,
@@ -301,7 +301,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         let adjustedPixels: Data
         adjustedPixels = gpuResult.pixelData
 
-        let incrementalUpdate = Self.shouldUseIncrementalPreviewUpdate(for: previewBrush)
+        let incrementalUpdate = GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush)
             ? compositingService.compositedPreviewIncrementalUpdate(
                 snapshot: snapshot,
                 activeLayerIndex: activeLayerIndex,
@@ -356,17 +356,4 @@ public struct DocumentStrokeProcessingService: Sendable {
         return rectPixelData
     }
 
-    private static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
-        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
-        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
-        let softness = 1.0 - CGFloat(brush.hardness)
-
-        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
-            return false
-        }
-        if softness >= 0.34 && effectiveDiameter >= 56 {
-            return false
-        }
-        return true
-    }
 }

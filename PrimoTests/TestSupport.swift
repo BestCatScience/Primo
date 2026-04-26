@@ -318,7 +318,7 @@ extension DocumentGpuOperationGateway {
             alphaMask: { _, _, _ in nil },
             croppedSelectionMask: { _, _, _ in nil },
             combinedSelectionMask: { _, _, _, _, _ in nil },
-            expandedSelectionMask: { _, _, _, _, _, _, _ in nil },
+            expandedSelectionMask: { _ in nil },
             lassoSelection: { _, _, _ in nil },
             autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
             colorRangeSelection: { _, _, _, _ in nil },
@@ -326,8 +326,8 @@ extension DocumentGpuOperationGateway {
             contractedMask: { _, _, _, _ in nil },
             featheredMask: { _, _, _, _ in nil },
             invertMask: { _ in nil },
-            transformedSelectionMask: { _, _, _, _, _, _, _, _, _, _, _ in nil },
-            transformedLayerPixelData: { _, _, _, _, _, _, _, _, _, _, _, _ in nil },
+            transformedSelectionMask: { _ in nil },
+            transformedLayerPixelData: { _ in nil },
             scaledPixelData: { _, _, _, _, _ in nil },
             translatedPixelData: { _, _, _, _, _, _, _ in nil },
             releaseSurfaceHandle: { _ in }
@@ -381,7 +381,7 @@ private final class StubStrokeSessionAdapter: StrokePreviewPlanning, StrokeCommi
         )
     }
 
-    func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
+    func makeCommittedSurface(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
         guard case let .commit(mutation) = execute(
             .finish(
                 renderState: nil,

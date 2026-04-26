@@ -52,7 +52,7 @@ extension AppFeature {
         let source = selectionTransformService.pixelDataForLayer(activeLayerIndex)
         let canvasWidth = max(Int(state.canvas.canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(state.canvas.canvasSize.height.rounded()), 1)
-        guard let transformed = Self.transformedLayerPixels(
+        guard let transformed = layerTransformProcessor.transformedLayerPixels(
             source: source,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -63,8 +63,7 @@ extension AppFeature {
             rotationDegrees: rotationDegrees,
             pivot: transformPivot,
             mode: transformMode,
-            quadOffsets: quadOffsets,
-            gpuOperations: documentGpuOperationGateway
+            quadOffsets: quadOffsets
         ) else {
             return nil
         }
@@ -72,7 +71,7 @@ extension AppFeature {
             payload: .pixels(
                 layerIndex: activeLayerIndex,
                 pixelData: transformed,
-                selection: Self.transformedSelection(
+                selection: layerTransformProcessor.transformedSelection(
                     state.canvas.selection,
                     translation: translation,
                     scaleX: scaleX,
@@ -81,8 +80,7 @@ extension AppFeature {
                     pivot: transformPivot,
                     mode: transformMode,
                     quadOffsets: quadOffsets,
-                    canvasSize: state.canvas.canvasSize,
-                    gpuOperations: documentGpuOperationGateway
+                    canvasSize: state.canvas.canvasSize
                 )
             )
         )

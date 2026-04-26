@@ -8,10 +8,12 @@ enum MetalDocumentGpuOperationBackendFactory {
     static func live(
         backend: PrimoMetalDocumentProcessingClient = .shared
     ) -> DocumentGpuOperationBackend {
-        let layerMutationService = MetalLayerMutationService()
-        let resourceStore = MetalResourceStore()
-        let overlayService = GpuOverlayRenderingService()
-        let textService = MetalTextService()
+        let layerMutationService = MetalLayerMutationService(client: backend)
+        let resourceStore = MetalResourceStore(client: backend)
+        let overlayService = GpuOverlayRenderingService(
+            executor: MetalOverlayExecutor(client: backend)
+        )
+        let textService = MetalTextService(client: backend)
 
         return DocumentGpuOperationBackend(
             compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
@@ -88,15 +90,15 @@ enum MetalDocumentGpuOperationBackendFactory {
             combinedSelectionMask: { base, incoming, mode, width, height in
                 backend.combinedSelectionMask(base: base, incoming: incoming, mode: mode == .add ? .add : .subtract, width: width, height: height)
             },
-            expandedSelectionMask: { maskData, maskWidth, maskHeight, originX, originY, canvasWidth, canvasHeight in
+            expandedSelectionMask: { request in
                 backend.expandedSelectionMask(
-                    maskData: maskData,
-                    maskWidth: maskWidth,
-                    maskHeight: maskHeight,
-                    originX: originX,
-                    originY: originY,
-                    canvasWidth: canvasWidth,
-                    canvasHeight: canvasHeight
+                    maskData: request.maskData,
+                    maskWidth: request.maskWidth,
+                    maskHeight: request.maskHeight,
+                    originX: request.originX,
+                    originY: request.originY,
+                    canvasWidth: request.canvasWidth,
+                    canvasHeight: request.canvasHeight
                 )
             },
             lassoSelection: { points, canvasWidth, canvasHeight in
@@ -130,35 +132,35 @@ enum MetalDocumentGpuOperationBackendFactory {
             invertMask: { source in
                 backend.invertMask(source)
             },
-            transformedSelectionMask: { mask, canvasWidth, canvasHeight, translation, scaleX, scaleY, rotationDegrees, pivot, sourceQuad, destinationQuad, usesFreeformQuad in
+            transformedSelectionMask: { request in
                 backend.transformedSelectionMask(
-                    expandedSelectionMask: mask,
-                    canvasWidth: canvasWidth,
-                    canvasHeight: canvasHeight,
-                    translation: translation,
-                    scaleX: scaleX,
-                    scaleY: scaleY,
-                    rotationDegrees: rotationDegrees,
-                    pivot: pivot,
-                    sourceQuad: sourceQuad,
-                    destinationQuad: destinationQuad,
-                    usesFreeformQuad: usesFreeformQuad
+                    expandedSelectionMask: request.expandedSelectionMask,
+                    canvasWidth: request.canvasWidth,
+                    canvasHeight: request.canvasHeight,
+                    translation: request.translation,
+                    scaleX: request.scaleX,
+                    scaleY: request.scaleY,
+                    rotationDegrees: request.rotationDegrees,
+                    pivot: request.pivot,
+                    sourceQuad: request.sourceQuad,
+                    destinationQuad: request.destinationQuad,
+                    usesFreeformQuad: request.usesFreeformQuad
                 )
             },
-            transformedLayerPixelData: { source, canvasWidth, canvasHeight, mask, translation, scaleX, scaleY, rotationDegrees, pivot, sourceQuad, destinationQuad, usesFreeformQuad in
+            transformedLayerPixelData: { request in
                 backend.transformedLayerPixelData(
-                    source: source,
-                    canvasWidth: canvasWidth,
-                    canvasHeight: canvasHeight,
-                    expandedSelectionMask: mask,
-                    translation: translation,
-                    scaleX: scaleX,
-                    scaleY: scaleY,
-                    rotationDegrees: rotationDegrees,
-                    pivot: pivot,
-                    sourceQuad: sourceQuad,
-                    destinationQuad: destinationQuad,
-                    usesFreeformQuad: usesFreeformQuad
+                    source: request.source,
+                    canvasWidth: request.canvasWidth,
+                    canvasHeight: request.canvasHeight,
+                    expandedSelectionMask: request.expandedSelectionMask,
+                    translation: request.translation,
+                    scaleX: request.scaleX,
+                    scaleY: request.scaleY,
+                    rotationDegrees: request.rotationDegrees,
+                    pivot: request.pivot,
+                    sourceQuad: request.sourceQuad,
+                    destinationQuad: request.destinationQuad,
+                    usesFreeformQuad: request.usesFreeformQuad
                 )
             },
             scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in

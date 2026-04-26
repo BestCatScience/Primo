@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoCanvasPresentationDomain
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import simd
@@ -96,10 +97,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
     }
 
     private func brushSettings(for style: PreviewStrokeStyle) -> BrushRuntimeSettings {
-        let components = style.color.components ?? [0, 0, 0, 1]
-        let red = UInt8(max(0, min(255, Int((components[safe: 0] ?? 0) * 255.0))))
-        let green = UInt8(max(0, min(255, Int((components[safe: 1] ?? 0) * 255.0))))
-        let blue = UInt8(max(0, min(255, Int((components[safe: 2] ?? 0) * 255.0))))
+        let color = rgbaComponents(for: style.color)
         return BrushRuntimeSettings(
             tipKind: style.tipKind,
             radius: Double(style.radius),
@@ -122,11 +120,61 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
             customTip: style.customTip,
             pressureSensitivity: Double(style.pressureSensitivity),
             stabilization: Double(style.stabilization),
-            red: red,
-            green: green,
-            blue: blue,
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
             isEraser: style.isEraser
         )
+    }
+
+    private func rgbaComponents(for color: CGColor) -> (red: UInt8, green: UInt8, blue: UInt8, alpha: UInt8) {
+        let components = convertedRGBAComponents(for: color) ?? fallbackRGBAComponents(for: color)
+        return (
+            red: byte(from: components.red),
+            green: byte(from: components.green),
+            blue: byte(from: components.blue),
+            alpha: byte(from: components.alpha)
+        )
+    }
+
+    private func convertedRGBAComponents(for color: CGColor) -> (red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)? {
+        guard
+            let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+            let converted = color.converted(to: colorSpace, intent: .defaultIntent, options: nil),
+            let components = converted.components,
+            components.count >= 3
+        else {
+            return nil
+        }
+        return (
+            red: components[0],
+            green: components[1],
+            blue: components[2],
+            alpha: components[safe: 3] ?? converted.alpha
+        )
+    }
+
+    private func fallbackRGBAComponents(for color: CGColor) -> (red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {
+        guard let components = color.components else {
+            return (0, 0, 0, color.alpha)
+        }
+        switch components.count {
+        case 2:
+            return (components[0], components[0], components[0], components[1])
+        case 3:
+            return (components[0], components[1], components[2], color.alpha)
+        default:
+            return (
+                components[safe: 0] ?? 0,
+                components[safe: 1] ?? 0,
+                components[safe: 2] ?? 0,
+                components[safe: 3] ?? color.alpha
+            )
+        }
+    }
+
+    private func byte(from component: CGFloat) -> UInt8 {
+        UInt8(max(0, min(255, Int((component * 255.0).rounded()))))
     }
 }
 
@@ -259,18 +307,20 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
         )
 
         return gpuOperations.transformedLayerPixelData(
-            source,
-            canvasWidth,
-            canvasHeight,
-            mask,
-            translation,
-            scaleX,
-            scaleY,
-            rotationDegrees,
-            resolved.pivot,
-            resolved.source,
-            resolved.effective,
-            mode == .freeform && !quadOffsets.isZero
+            TransformedLayerPixelDataRequest(
+                source: source,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                expandedSelectionMask: mask,
+                translation: translation,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                rotationDegrees: rotationDegrees,
+                pivot: resolved.pivot,
+                sourceQuad: resolved.source,
+                destinationQuad: resolved.effective,
+                usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+            )
         )
     }
 
@@ -292,22 +342,58 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
         return cropped.bounds
     }
 
-    private func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
-        guard selection.maskWidth > 0, selection.maskHeight > 0 else { return nil }
-        if selection.maskWidth == canvasWidth,
-           selection.maskHeight == canvasHeight,
-           selection.bounds.origin == .zero {
-            return [UInt8](selection.maskData)
+    public func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        guard let selection else { return nil }
+        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
+        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+        guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
+            return nil
         }
-        return gpuOperations.expandedSelectionMask(
-            selection.maskData,
-            selection.maskWidth,
-            selection.maskHeight,
-            canvasWidth,
-            canvasHeight,
-            Int(selection.bounds.origin.x.rounded(.down)),
-            Int(selection.bounds.origin.y.rounded(.down))
+        let resolved = CanvasTransformGeometry.effectiveTransformQuad(
+            bounds: selection.bounds,
+            translation: translation,
+            scaleX: scaleX,
+            scaleY: scaleY,
+            rotationDegrees: rotationDegrees,
+            pivot: pivot,
+            mode: mode,
+            quadOffsets: quadOffsets
         )
+        guard let transformed = gpuOperations.transformedSelectionMask(
+            TransformedSelectionMaskRequest(
+                expandedSelectionMask: mask,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                translation: translation,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                rotationDegrees: rotationDegrees,
+                pivot: resolved.pivot,
+                sourceQuad: resolved.source,
+                destinationQuad: resolved.effective,
+                usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
+            )
+        ) else {
+            return nil
+        }
+
+        return selectionWorkflow.croppedSelection(from: transformed, width: canvasWidth, height: canvasHeight, mode: selection.mode)
+    }
+
+    private func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+        SelectionWorkflowService(gpuOperations: gpuOperations)
+            .expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
     }
 }
 

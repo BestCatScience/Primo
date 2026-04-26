@@ -185,13 +185,125 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         }
 
         switch result {
-        case let .committed(contract):
+        case let .committed(contract, transferredSurfaceHandle):
             XCTAssertEqual(contract, AppFeature.DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false))
+            XCTAssertEqual(transferredSurfaceHandle, handle)
         case let .failed(failure):
             XCTFail("Expected committed GPU surface mutation, got \(failure)")
         }
         XCTAssertEqual(surfaceCalls.values.first?.gpuBufferHandle, handle)
         XCTAssertEqual(surfaceCalls.values.first?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
+    }
+
+    func testPreviewReplacementReleasesPreviousSurfaceHandle() {
+        let oldHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let newHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let releasedHandles = TestRecorder<MetalBufferHandle?>()
+        var gpuOperations = DocumentGpuOperationGateway.stub()
+        gpuOperations.releaseSurfaceHandle = { handle in
+            releasedHandles.record(handle)
+        }
+
+        withDependencies {
+            $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            let snapshot = MetalDocumentSnapshot(
+                width: 4,
+                height: 4,
+                revision: 12,
+                compositePixelData: Data(repeating: 0, count: 64),
+                layers: []
+            )
+            state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+                baseRevision: 11,
+                layerIndex: 0,
+                surfaceHandle: oldHandle,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+                isApproximatePreview: false
+            )
+
+            feature.applyStrokePreviewOutcome(
+                .preview(
+                    GpuPreviewMutation(
+                        baseSnapshot: snapshot,
+                        surface: GpuLayerSurface(
+                            layerIndex: 0,
+                            width: 4,
+                            height: 4,
+                            handle: GpuSurfaceHandle(buffer: newHandle)
+                        ),
+                        dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
+                        incrementalUpdate: nil,
+                        isApproximatePreview: false
+                    )
+                ),
+                activeLayerIndex: 0,
+                state: &state
+            )
+
+            XCTAssertEqual(state.canvas.strokeSession.renderState?.surfaceHandle, newHandle)
+        }
+
+        XCTAssertEqual(releasedHandles.values, [oldHandle])
+    }
+
+    func testResetStrokePreviewReleasesCurrentSurfaceHandle() {
+        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let releasedHandles = TestRecorder<MetalBufferHandle?>()
+        var gpuOperations = DocumentGpuOperationGateway.stub()
+        gpuOperations.releaseSurfaceHandle = { handle in
+            releasedHandles.record(handle)
+        }
+
+        withDependencies {
+            $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+                baseRevision: 11,
+                layerIndex: 0,
+                surfaceHandle: handle,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+                isApproximatePreview: false
+            )
+
+            feature.resetStrokePreviewState(state: &state)
+        }
+
+        XCTAssertEqual(releasedHandles.values, [handle])
+    }
+
+    func testCompletedCommitDoesNotReleaseTransferredPreviewSurfaceHandle() {
+        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let releasedHandles = TestRecorder<MetalBufferHandle?>()
+        var gpuOperations = DocumentGpuOperationGateway.stub()
+        gpuOperations.releaseSurfaceHandle = { handle in
+            releasedHandles.record(handle)
+        }
+
+        withDependencies {
+            $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
+        } operation: {
+            let feature = AppFeature()
+            var state = AppFeature.State()
+            state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+                baseRevision: 11,
+                layerIndex: 0,
+                surfaceHandle: handle,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+                isApproximatePreview: false
+            )
+
+            _ = feature.completeResolvedStrokeCommit(
+                .committed(.dirty, transferredSurfaceHandle: handle),
+                state: &state
+            )
+        }
+
+        XCTAssertTrue(releasedHandles.values.isEmpty)
     }
 
     func testFillFailureRemainsTyped() {

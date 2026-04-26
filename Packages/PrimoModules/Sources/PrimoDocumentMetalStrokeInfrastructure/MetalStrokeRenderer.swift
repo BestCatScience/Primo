@@ -22,7 +22,7 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
         )
     }
 
-    public func makeCommittedPixels(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
+    public func makeCommittedSurface(_ request: StrokeCommitRequest) -> StrokeCommitResult? {
         guard let committed = processingService.makeCommittedSurface(
             snapshot: request.snapshot,
             activeLayerIndex: request.activeLayerIndex,

@@ -16,7 +16,7 @@ extension AppFeature {
     }
 
     enum StrokeCommitResolution {
-        case committed(DocumentMutationContract)
+        case committed(DocumentMutationContract, transferredSurfaceHandle: MetalBufferHandle?)
         case failed(DocumentMutationFailure)
     }
 
@@ -105,8 +105,10 @@ extension AppFeature {
         func applyPreviewMutation(
             _ mutation: GpuPreviewMutation,
             activeLayerIndex: Int,
-            state: inout State
+            state: inout State,
+            releaseSurfaceHandle: (MetalBufferHandle?) -> Void
         ) {
+            let previousSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
             if let baseSnapshotToCapture = mutation.baseSnapshotToCapture {
                 state.canvas.captureStrokeBaseSnapshot(baseSnapshotToCapture)
             }
@@ -117,6 +119,10 @@ extension AppFeature {
                 isApproximatePreview: mutation.isApproximatePreview,
                 incrementalUpdate: mutation.incrementalUpdate
             )
+            let nextSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
+            if previousSurfaceHandle != nextSurfaceHandle {
+                releaseSurfaceHandle(previousSurfaceHandle)
+            }
         }
     }
 
@@ -124,17 +130,23 @@ extension AppFeature {
         func complete(
             _ resolution: StrokeCommitResolution,
             state: inout State,
-            resetPreview: (inout State) -> Void,
+            resetPreview: (inout State, MetalBufferHandle?) -> Void,
             completeMutation: (inout State, DocumentMutationContract) -> Effect<Action>,
             applyFailureFeedback: (DocumentMutationFailure, inout State) -> Void,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
+            let transferredSurfaceHandle: MetalBufferHandle?
+            if case let .committed(_, handle) = resolution {
+                transferredSurfaceHandle = handle
+            } else {
+                transferredSurfaceHandle = nil
+            }
             if case .failed = resolution {
                 state.canvas.isAwaitingCommittedRender = false
             }
-            resetPreview(&state)
+            resetPreview(&state, transferredSurfaceHandle)
             switch resolution {
-            case let .committed(contract):
+            case let .committed(contract, _):
                 return completeMutation(&state, contract)
             case let .failed(failure):
                 applyFailureFeedback(failure, &state)
@@ -207,12 +219,12 @@ extension AppFeature {
             keepsSelectionCleared: Bool,
             refreshViaDirtyPresentation: Bool,
             resolveContext: (State) -> CanvasStrokeContext?,
-            resetPreview: (inout State) -> Void,
+            resetPreview: (inout State, MetalBufferHandle?) -> Void,
             resolveCommit: (inout State, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
             completeCommit: (StrokeCommitResolution, inout State) -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
-                resetPreview(&state)
+                resetPreview(&state, nil)
                 return .none
             }
             let commitResolution = resolveCommit(
@@ -259,9 +271,16 @@ extension AppFeature {
         CanvasStrokeInteractionCoordinator()
     }
 
-    func resetStrokePreviewState(state: inout State) {
+    func resetStrokePreviewState(
+        state: inout State,
+        preserving transferredSurfaceHandle: MetalBufferHandle? = nil
+    ) {
         _ = canvasStrokeInteractionService.cancel()
+        let previewSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
         canvasStrokeStateCoordinator.resetPreview(state: &state)
+        if previewSurfaceHandle != transferredSurfaceHandle {
+            documentGpuOperationGateway.releaseSurfaceHandle(previewSurfaceHandle)
+        }
     }
 
     func clearCanvasSelectionWithoutRefresh(state: inout State) {
@@ -366,7 +385,10 @@ extension AppFeature {
             canvasStrokeStateCoordinator.applyPreviewMutation(
                 mutation,
                 activeLayerIndex: activeLayerIndex,
-                state: &state
+                state: &state,
+                releaseSurfaceHandle: { handle in
+                    documentGpuOperationGateway.releaseSurfaceHandle(handle)
+                }
             )
         case let .failure(failure):
             applyCanvasStrokeFailure(failure, state: &state)
@@ -419,7 +441,8 @@ extension AppFeature {
                         canvasMutation: keepsSelectionCleared ? .clearSelection : .none,
                         refresh: mutation.refreshViaDirtyPresentation ? .dirty : .current,
                         updatesWorkspaceArtifacts: false
-                    )
+                    ),
+                    transferredSurfaceHandle: mutation.surface.handle.buffer
                 )
             case let .failure(failure):
                 return .failed(failure)
@@ -438,8 +461,11 @@ extension AppFeature {
         canvasStrokeEffectCoordinator.complete(
             resolution,
             state: &state,
-            resetPreview: { state in
-                resetStrokePreviewState(state: &state)
+            resetPreview: { state, transferredSurfaceHandle in
+                resetStrokePreviewState(
+                    state: &state,
+                    preserving: transferredSurfaceHandle
+                )
             },
             completeMutation: { state, contract in
                 completeCanvasStrokeMutation(
@@ -580,8 +606,11 @@ extension AppFeature {
             resolveContext: { state in
                 canvasStrokeContext(in: state)
             },
-            resetPreview: { state in
-                resetStrokePreviewState(state: &state)
+            resetPreview: { state, transferredSurfaceHandle in
+                resetStrokePreviewState(
+                    state: &state,
+                    preserving: transferredSurfaceHandle
+                )
             },
             resolveCommit: { state, samples, context, keepsSelectionCleared, refreshViaDirtyPresentation in
                 resolveStrokeCommit(

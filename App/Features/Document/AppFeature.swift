@@ -27,6 +27,7 @@ struct AppFeature {
     @Dependency(\.documentEditingGateway) var documentEditingGateway
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
     @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
     @Dependency(\.documentLayerCommandService) var documentLayerCommandService
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService

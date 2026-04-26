@@ -5,6 +5,27 @@ import Testing
 
 struct DocumentStrokeProcessingServiceTests {
     @Test
+    func committedStrokeRenderingUsesCommitExecutionMode() throws {
+        let repoRoot = try Self.repoRoot()
+        let serviceSource = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: serviceSource, encoding: .utf8)
+        let committedSurface = try #require(
+            body[function: "makeCommittedSurface", before: "makeCommittedPixels"]
+        )
+        let committedPixels = try #require(
+            body[function: "makeCommittedPixels", before: "stageCommittedSnapshot"]
+        )
+
+        #expect(committedSurface.contains("mode: .commit"))
+        #expect(!committedSurface.contains("mode: .interactive"))
+        #expect(committedPixels.contains("mode: .commit"))
+        #expect(!committedPixels.contains("mode: .interactive"))
+    }
+
+    @Test
     func stageCommittedSnapshotUsesProvidedCompositePixels() {
         let baseSnapshot = MetalDocumentSnapshot(
             width: 2,
@@ -38,5 +59,29 @@ struct DocumentStrokeProcessingServiceTests {
         #expect(staged?.revision == 8)
         #expect(staged?.compositePixelData == stagedComposite)
         #expect(staged?.layers.first?.pixelData == committedPixels)
+    }
+
+    private static func repoRoot() throws -> URL {
+        var url = URL(fileURLWithPath: #filePath)
+        while url.lastPathComponent != "PrimoModules" {
+            let parent = url.deletingLastPathComponent()
+            if parent.path == url.path {
+                throw CocoaError(.fileReadNoSuchFile)
+            }
+            url = parent
+        }
+        return url.deletingLastPathComponent().deletingLastPathComponent()
+    }
+}
+
+private extension String {
+    subscript(function name: String, before nextName: String) -> Substring? {
+        guard
+            let start = range(of: "func \(name)"),
+            let end = self[start.upperBound...].range(of: "func \(nextName)")
+        else {
+            return nil
+        }
+        return self[start.lowerBound..<end.lowerBound]
     }
 }

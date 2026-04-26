@@ -191,12 +191,12 @@ public struct DocumentStrokeCommitUseCase: Sendable {
         self.renderer = renderer
     }
 
-    public func makeCommittedPixels(
+    public func makeCommittedSurface(
         snapshot: MetalDocumentSnapshot,
         samples: [StylusSample],
         context: DocumentStrokeContext
     ) -> StrokeCommitResult? {
-        renderer.makeCommittedPixels(
+        renderer.makeCommittedSurface(
             StrokeCommitRequest(
                 snapshot: snapshot,
                 activeLayerIndex: context.activeLayerIndex,
@@ -314,7 +314,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             guard let snapshot else {
                 return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
             }
-            guard let result = commit.makeCommittedPixels(
+            guard let result = commit.makeCommittedSurface(
                 snapshot: snapshot,
                 samples: samples,
                 context: context

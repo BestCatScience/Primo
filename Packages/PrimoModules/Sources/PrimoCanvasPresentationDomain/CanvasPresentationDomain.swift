@@ -314,6 +314,18 @@ public protocol LayerTransformProcessing: Sendable {
         quadOffsets: TransformQuadOffsets
     ) -> Data?
 
+    func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection?
+
     func transformationBounds(
         selection: CanvasSelection?,
         pixelData: Data,
