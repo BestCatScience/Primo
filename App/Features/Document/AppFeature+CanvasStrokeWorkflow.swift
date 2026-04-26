@@ -117,7 +117,10 @@ extension AppFeature {
                 surface: mutation.surface,
                 dirtyRegion: mutation.dirtyRegion,
                 isApproximatePreview: mutation.isApproximatePreview,
-                incrementalUpdate: mutation.incrementalUpdate
+                incrementalUpdate: mutation.incrementalUpdate,
+                previewBrush: mutation.previewBrush,
+                sampleCount: mutation.sampleCount,
+                supportsIncrementalContinuation: mutation.supportsIncrementalContinuation
             )
             let nextSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
             if previousSurfaceHandle != nextSurfaceHandle {

@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 
 public typealias MetalStrokeExecutionRequest = PrimoMetalStrokeExecutionRequest
@@ -168,17 +169,7 @@ public struct GpuSurfaceMaterializationService: Sendable {
 
 public enum GpuRenderingSupport {
     public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
-        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
-        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
-        let softness = 1.0 - CGFloat(brush.hardness)
-
-        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
-            return false
-        }
-        if softness >= 0.34 && effectiveDiameter >= 56 {
-            return false
-        }
-        return true
+        StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
 
     public static func responsiveOilPreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {

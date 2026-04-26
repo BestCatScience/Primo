@@ -35,6 +35,22 @@ public struct GpuSurfaceRegion: Equatable, Sendable {
     public var isEmpty: Bool { width <= 0 || height <= 0 }
 }
 
+public enum StrokePreviewContinuationPolicy {
+    public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        let scatterExtent = brush.scatterEnabled ? max(CGFloat(brush.scatterLateral), CGFloat(brush.scatterLinear)) : 0
+        let effectiveDiameter = (CGFloat(brush.radius) * 2.0) * (1.0 + scatterExtent)
+        let softness = 1.0 - CGFloat(brush.hardness)
+
+        if brush.tipKind == .airbrush && effectiveDiameter >= 42 {
+            return false
+        }
+        if softness >= 0.34 && effectiveDiameter >= 56 {
+            return false
+        }
+        return true
+    }
+}
+
 public struct GpuLayerSurface: Equatable, Sendable {
     public let layerIndex: Int
     public let width: Int
@@ -220,6 +236,9 @@ public struct GpuPreviewMutation: Sendable {
     public let incrementalUpdate: IncrementalLayerUpdate?
     public let isApproximatePreview: Bool
     public let baseSnapshotToCapture: MetalDocumentSnapshot?
+    public let previewBrush: BrushRuntimeSettings?
+    public let sampleCount: Int
+    public let supportsIncrementalContinuation: Bool
 
     public init(
         baseSnapshot: MetalDocumentSnapshot,
@@ -227,7 +246,10 @@ public struct GpuPreviewMutation: Sendable {
         dirtyRegion: GpuSurfaceRegion,
         incrementalUpdate: IncrementalLayerUpdate?,
         isApproximatePreview: Bool,
-        baseSnapshotToCapture: MetalDocumentSnapshot? = nil
+        baseSnapshotToCapture: MetalDocumentSnapshot? = nil,
+        previewBrush: BrushRuntimeSettings? = nil,
+        sampleCount: Int = 0,
+        supportsIncrementalContinuation: Bool = false
     ) {
         self.baseSnapshot = baseSnapshot
         self.surface = surface
@@ -235,6 +257,9 @@ public struct GpuPreviewMutation: Sendable {
         self.incrementalUpdate = incrementalUpdate
         self.isApproximatePreview = isApproximatePreview
         self.baseSnapshotToCapture = baseSnapshotToCapture
+        self.previewBrush = previewBrush
+        self.sampleCount = sampleCount
+        self.supportsIncrementalContinuation = supportsIncrementalContinuation
     }
 }
 

@@ -9,19 +9,28 @@ public struct StrokeSessionRenderState: Equatable, Sendable {
     public let surfaceHandle: MetalBufferHandle
     public let dirtyRect: LayerPixelRect
     public let isApproximatePreview: Bool
+    public let previewBrush: BrushRuntimeSettings?
+    public let sampleCount: Int
+    public let supportsIncrementalContinuation: Bool
 
     public init(
         baseRevision: Int,
         layerIndex: Int,
         surfaceHandle: MetalBufferHandle,
         dirtyRect: LayerPixelRect,
-        isApproximatePreview: Bool
+        isApproximatePreview: Bool,
+        previewBrush: BrushRuntimeSettings? = nil,
+        sampleCount: Int = 0,
+        supportsIncrementalContinuation: Bool = false
     ) {
         self.baseRevision = baseRevision
         self.layerIndex = layerIndex
         self.surfaceHandle = surfaceHandle
         self.dirtyRect = dirtyRect
         self.isApproximatePreview = isApproximatePreview
+        self.previewBrush = previewBrush
+        self.sampleCount = sampleCount
+        self.supportsIncrementalContinuation = supportsIncrementalContinuation
     }
 }
 
@@ -56,7 +65,10 @@ public struct StrokeSessionState: Equatable, Sendable {
         surface: GpuLayerSurface,
         dirtyRegion: GpuSurfaceRegion,
         isApproximatePreview: Bool,
-        incrementalUpdate: IncrementalLayerUpdate?
+        incrementalUpdate: IncrementalLayerUpdate?,
+        previewBrush: BrushRuntimeSettings?,
+        sampleCount: Int,
+        supportsIncrementalContinuation: Bool
     ) {
         self.baseSnapshot = baseSnapshot
         renderState = StrokeSessionRenderState(
@@ -64,7 +76,10 @@ public struct StrokeSessionState: Equatable, Sendable {
             layerIndex: surface.layerIndex,
             surfaceHandle: surface.handle.buffer,
             dirtyRect: dirtyRegion.layerPixelRect,
-            isApproximatePreview: isApproximatePreview
+            isApproximatePreview: isApproximatePreview,
+            previewBrush: previewBrush,
+            sampleCount: sampleCount,
+            supportsIncrementalContinuation: supportsIncrementalContinuation
         )
         if let incrementalUpdate {
             pendingIncrementalUpdate = incrementalUpdate

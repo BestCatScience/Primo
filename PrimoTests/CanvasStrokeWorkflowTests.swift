@@ -114,12 +114,16 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
+            let previewBrush = feature.resolvedBrushSettings(for: state)
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 12,
                 layerIndex: 0,
                 surfaceHandle: expectedHandle,
                 dirtyRect: LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2),
-                isApproximatePreview: true
+                isApproximatePreview: true,
+                previewBrush: previewBrush,
+                sampleCount: 32,
+                supportsIncrementalContinuation: true
             )
             return feature.resolveAppendedStrokePreview(
                 state: state,
@@ -138,6 +142,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return
         }
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.surfaceHandle, expectedHandle)
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.previewBrush, AppFeature().resolvedBrushSettings(for: AppFeature.State()))
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.sampleCount, 32)
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.supportsIncrementalContinuation, true)
     }
 
     func testGpuCommitOutcomeAppliesLayerSurfaceMutation() {
@@ -209,6 +216,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         } operation: {
             let feature = AppFeature()
             var state = AppFeature.State()
+            let previewBrush = feature.resolvedBrushSettings(for: state)
             let snapshot = MetalDocumentSnapshot(
                 width: 4,
                 height: 4,
@@ -236,7 +244,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                         ),
                         dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
                         incrementalUpdate: nil,
-                        isApproximatePreview: false
+                        isApproximatePreview: false,
+                        previewBrush: previewBrush,
+                        sampleCount: 12,
+                        supportsIncrementalContinuation: true
                     )
                 ),
                 activeLayerIndex: 0,
@@ -244,6 +255,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             )
 
             XCTAssertEqual(state.canvas.strokeSession.renderState?.surfaceHandle, newHandle)
+            XCTAssertEqual(state.canvas.strokeSession.renderState?.previewBrush, previewBrush)
+            XCTAssertEqual(state.canvas.strokeSession.renderState?.sampleCount, 12)
+            XCTAssertEqual(state.canvas.strokeSession.renderState?.supportsIncrementalContinuation, true)
         }
 
         XCTAssertEqual(releasedHandles.values, [oldHandle])

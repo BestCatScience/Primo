@@ -26,13 +26,22 @@ public struct DocumentStrokeContext: Equatable, Sendable {
 public struct DocumentStrokePreviewResolution: Sendable {
     public let result: StrokePreviewResult
     public let baseSnapshotToCapture: MetalDocumentSnapshot?
+    public let previewBrush: BrushRuntimeSettings
+    public let sampleCount: Int
+    public let supportsIncrementalContinuation: Bool
 
     public init(
         result: StrokePreviewResult,
-        baseSnapshotToCapture: MetalDocumentSnapshot? = nil
+        baseSnapshotToCapture: MetalDocumentSnapshot? = nil,
+        previewBrush: BrushRuntimeSettings,
+        sampleCount: Int,
+        supportsIncrementalContinuation: Bool
     ) {
         self.result = result
         self.baseSnapshotToCapture = baseSnapshotToCapture
+        self.previewBrush = previewBrush
+        self.sampleCount = sampleCount
+        self.supportsIncrementalContinuation = supportsIncrementalContinuation
     }
 }
 
@@ -66,7 +75,12 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         else {
             return nil
         }
-        return DocumentStrokePreviewResolution(result: result)
+        return DocumentStrokePreviewResolution(
+            result: result,
+            previewBrush: context.previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: Self.supportsIncrementalContinuation(for: context.previewBrush, context: context)
+        )
     }
 
     public func resolveAppended(
@@ -86,7 +100,21 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         {
             let baseLayerRef: LayerSurfaceRef
             let previewSamples: [StylusSample]
-            if let incremental = responsiveOilIncrementalPreview(
+            let supportsIncrementalContinuation = Self.supportsIncrementalContinuation(
+                for: context.previewBrush,
+                context: context
+            )
+            if let incremental = exactIncrementalPreview(
+                baseSnapshot: baseSnapshot,
+                baseLayer: baseLayer,
+                renderState: renderState,
+                samples: samples,
+                fullSamples: fullSamples,
+                context: context
+            ) {
+                baseLayerRef = incremental.baseLayer
+                previewSamples = incremental.samples
+            } else if let incremental = responsiveOilIncrementalPreview(
                 baseSnapshot: baseSnapshot,
                 baseLayer: baseLayer,
                 renderState: renderState,
@@ -114,7 +142,12 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             ) else {
                 return nil
             }
-            return DocumentStrokePreviewResolution(result: result)
+            return DocumentStrokePreviewResolution(
+                result: result,
+                previewBrush: context.previewBrush,
+                sampleCount: fullSamples.isEmpty ? samples.count : fullSamples.count,
+                supportsIncrementalContinuation: supportsIncrementalContinuation
+            )
         }
 
         guard
@@ -134,7 +167,53 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         else {
             return nil
         }
-        return DocumentStrokePreviewResolution(result: result, baseSnapshotToCapture: snapshot)
+        return DocumentStrokePreviewResolution(
+            result: result,
+            baseSnapshotToCapture: snapshot,
+            previewBrush: context.previewBrush,
+            sampleCount: samples.count,
+            supportsIncrementalContinuation: Self.supportsIncrementalContinuation(for: context.previewBrush, context: context)
+        )
+    }
+
+    private func exactIncrementalPreview(
+        baseSnapshot: MetalDocumentSnapshot,
+        baseLayer: MetalLayerSnapshot,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        fullSamples: [StylusSample],
+        context: DocumentStrokeContext
+    ) -> (baseLayer: LayerSurfaceRef, samples: [StylusSample])? {
+        guard
+            !context.activeLayer.isAlphaLocked,
+            let renderState,
+            !renderState.isApproximatePreview,
+            renderState.supportsIncrementalContinuation,
+            renderState.previewBrush == context.previewBrush,
+            renderState.baseRevision == baseSnapshot.revision,
+            renderState.layerIndex == context.activeLayerIndex,
+            renderState.surfaceHandle.width == baseSnapshot.width,
+            renderState.surfaceHandle.height == baseSnapshot.height,
+            renderState.sampleCount + samples.count == fullSamples.count,
+            Self.supportsIncrementalContinuation(for: context.previewBrush, context: context)
+        else {
+            return nil
+        }
+
+        let connectionSample = previousSample(in: fullSamples, beforeSuffix: samples)
+        let incrementalSamples = connectionSample.map { [$0] + samples } ?? samples
+        guard !incrementalSamples.isEmpty else { return nil }
+
+        return (
+            LayerSurfaceRef(
+                layerIndex: baseLayer.index,
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                pixelData: baseLayer.pixelData,
+                gpuHandle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+            ),
+            incrementalSamples
+        )
     }
 
     private func responsiveOilIncrementalPreview(
@@ -181,6 +260,14 @@ public struct DocumentStrokePreviewUseCase: Sendable {
     ) -> StylusSample? {
         guard !samples.isEmpty, fullSamples.count > samples.count else { return nil }
         return fullSamples[fullSamples.count - samples.count - 1]
+    }
+
+    private static func supportsIncrementalContinuation(
+        for brush: BrushRuntimeSettings,
+        context: DocumentStrokeContext
+    ) -> Bool {
+        !context.activeLayer.isAlphaLocked &&
+            StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
 }
 
@@ -294,7 +381,8 @@ public struct DocumentStrokeSessionUseCase: Sendable {
         case let .finish(renderState, baseSnapshot, renderSnapshot, samples, context, allowsApproximatePreviewCommit, refreshViaDirtyPresentation):
             if
                 let renderState,
-                (!renderState.isApproximatePreview || allowsApproximatePreviewCommit)
+                renderState.isApproximatePreview,
+                allowsApproximatePreviewCommit
             {
                 return .commit(
                     GpuCommitMutation(
@@ -349,7 +437,10 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 dirtyRegion: dirtyRegion,
                 incrementalUpdate: resolution.result.incrementalUpdate,
                 isApproximatePreview: resolution.result.isApproximatePreview,
-                baseSnapshotToCapture: resolution.baseSnapshotToCapture
+                baseSnapshotToCapture: resolution.baseSnapshotToCapture,
+                previewBrush: resolution.previewBrush,
+                sampleCount: resolution.sampleCount,
+                supportsIncrementalContinuation: resolution.supportsIncrementalContinuation
             )
         )
     }
