@@ -280,6 +280,65 @@ final class AppFeatureReducerTests: XCTestCase {
         await store.receive(.workspaceCatalogRequested(.loadAutosaveRecoveryItems))
     }
 
+    func testAutosaveRecoveryRestoreLoadsSelectedAutosaveProject() async {
+        let autosaveID = WorkspaceItemID.testValue("autosave-restore")
+        let autosaveURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/autosave-restore.atelier"))
+        let item = AutosaveRecoveryItem(
+            id: autosaveID,
+            title: "Recovered",
+            sourceProjectURL: nil,
+            autosaveProjectURL: autosaveURL,
+            updatedAt: Date(timeIntervalSince1970: 0),
+            previewImageData: nil
+        )
+        let loaded = LoadedPaintProject.testValue()
+        let loadProjectCalls = TestRecorder<URL>()
+        let reservedID = UUID(uuidString: "00000000-0000-0000-0000-00000000A001")!
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.recovery.items = [item]
+                state.recovery.isPresented = true
+                return state
+            }()
+        ) {
+            AppFeature()
+        } withDependencies: {
+            $0.uuidClient = UUIDClient(generate: { reservedID })
+            $0.documentRuntimeComposition = .stub(
+                persistenceGateway: .stub(
+                    loadProject: { url in
+                        loadProjectCalls.record(url)
+                        return loaded
+                    }
+                )
+            )
+            $0.documentWorkspaceClient = .stub(
+                createTabBackingStoreURL: { id in
+                    DocumentProjectPath(URL(fileURLWithPath: "/tmp/\(id.uuidString).atelier"))
+                }
+            )
+        }
+        store.exhaustivity = .off
+
+        await store.send(.autosaveRecoveryRestoreRequested(autosaveID)) {
+            $0.application.isHydrating = true
+        }
+        await store.receive(.autosaveRecoveryOpened(loaded, item, []))
+        await store.receive(
+            .workspacePersistenceRequested(
+                .reserveNewTabBackingStore(
+                    AppFeature.WorkspaceTabReservationRequest(
+                        title: item.title,
+                        sourceProjectURL: nil,
+                        pane: .primary
+                    )
+                )
+            )
+        )
+        XCTAssertEqual(loadProjectCalls.values, [autosaveURL.fileURL])
+    }
+
     func testSaveHistoryLoadUsesWorkspaceCatalogRequest() async {
         let activeTab = OpenDocumentTab.testValue()
         let store = TestStore(

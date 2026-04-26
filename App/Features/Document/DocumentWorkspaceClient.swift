@@ -2,6 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceInfrastructure
 
 private enum DocumentWorkspaceClientKey: DependencyKey {
@@ -9,8 +10,6 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
         @Dependency(\.fileClient) var fileClient
         @Dependency(\.dateClient) var dateClient
         @Dependency(\.uuidClient) var uuidClient
-        @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
-        @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
 
         return .live(
             fileClient: fileClient,
@@ -18,18 +17,16 @@ private enum DocumentWorkspaceClientKey: DependencyKey {
             uuidClient: uuidClient,
             previewGateway: DocumentWorkspacePreviewGateway(
                 loadProjectPreview: { url in
-                    let loaded = try documentPersistenceGateway.loadProject(url)
-                    let previewSurface = loaded.presentation.renderSnapshot.map {
-                        AppFeature.renderedCompositeSurface(
-                            snapshot: $0,
-                            paperStyle: loaded.paperStyle,
-                            gpuOperations: documentGpuOperationGateway
-                        )
-                    }
+                    let preview = try DocumentProjectPreviewLoader.loadPreview(
+                        from: url,
+                        fileClient: fileClient,
+                        dateClient: dateClient,
+                        uuidClient: uuidClient
+                    )
                     return DocumentWorkspacePreview(
-                        canvasSize: loaded.presentation.canvasSize,
-                        layerCount: loaded.presentation.layerRows.count,
-                        previewSurface: previewSurface,
+                        canvasSize: preview.canvasSize,
+                        layerCount: preview.layerCount,
+                        previewSurface: preview.previewSurface,
                         previewImageData: nil
                     )
                 }
