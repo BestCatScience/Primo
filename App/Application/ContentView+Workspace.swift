@@ -5,7 +5,7 @@ import UIKit
 
 extension ContentView {
     func dismissBrushSettingsPopover() {
-        if store.brushPalette.ui.showsBrushSettingsPopover {
+        if store.document.brushPalette.ui.showsBrushSettingsPopover {
             store.send(.document(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false)))))
         }
     }
@@ -191,13 +191,13 @@ extension ContentView {
     private func liveWorkspacePreviewSurface(for selectedTab: OpenDocumentTab) -> DocumentCompositeSurface? {
         guard
             selectedTab.id == workspaceState.activeTabID,
-            let snapshot = store.canvas.renderSnapshot
+            let snapshot = store.document.canvas.renderSnapshot
         else {
             return nil
         }
-        return DocumentFeatureRuntimeReducer.renderedCompositeSurface(
+        return DocumentFeature.renderedCompositeSurface(
             snapshot: snapshot,
-            paperStyle: store.canvas.paperStyle,
+            paperStyle: store.document.canvas.paperStyle,
             gpuOperations: documentGpuOperationGateway
         )
     }
@@ -299,14 +299,14 @@ extension ContentView {
                         state: \.document.brushPalette,
                         action: \.document.brushPalette
                     ),
-                    currentTool: store.canvas.currentTool,
-                    hasSelection: store.canvas.selection != nil,
-                    transformPreviewOffset: store.canvas.transformPreviewOffset,
-                    transformPreviewScaleX: store.canvas.transformPreviewScaleX,
-                    transformPreviewScaleY: store.canvas.transformPreviewScaleY,
-                    transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
-                    transformMode: store.canvas.transformMode,
-                    transformLocksAspectRatio: store.canvas.transformLocksAspectRatio,
+                    currentTool: store.document.canvas.currentTool,
+                    hasSelection: store.document.canvas.selection != nil,
+                    transformPreviewOffset: store.document.canvas.transformPreviewOffset,
+                    transformPreviewScaleX: store.document.canvas.transformPreviewScaleX,
+                    transformPreviewScaleY: store.document.canvas.transformPreviewScaleY,
+                    transformPreviewRotationDegrees: store.document.canvas.transformPreviewRotationDegrees,
+                    transformMode: store.document.canvas.transformMode,
+                    transformLocksAspectRatio: store.document.canvas.transformLocksAspectRatio,
                     language: language,
                     showsTitle: false,
                     onSelectTool: { tool in
@@ -337,7 +337,7 @@ extension ContentView {
                         state: \.document.layerSidebar,
                         action: \.document.layerSidebar
                     ),
-                    layerSnapshots: store.canvas.renderSnapshot?.layers ?? [],
+                    layerSnapshots: store.document.canvas.renderSnapshot?.layers ?? [],
                     language: language,
                     showsTitle: false
                 )
@@ -350,9 +350,9 @@ extension ContentView {
     func panelState(for panel: StudioPanelKind) -> StudioPanelLayoutState {
         switch panel {
         case .brush:
-            return store.brushPanel
+            return store.document.brushPanel
         case .layers:
-            return store.layerPanel
+            return store.document.layerPanel
         }
     }
 
@@ -593,12 +593,12 @@ extension ContentView {
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(
-                        (nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
+                        (nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty)
                         ? StudioTheme.Palette.accentBright.opacity(0.34)
                         : StudioTheme.Palette.accentBright.opacity(0.8)
                     )
             )
-            .disabled(nanoBananaState.isGenerating || store.layerSidebar.layers.isEmpty)
+            .disabled(nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty)
 
             Button(language.localized("フルパネルを開く")) {
                 store.send(.nanoBanana(.sheetPresentationChanged(true)))
@@ -711,7 +711,7 @@ extension ContentView {
     var toolDock: some View {
         VStack(spacing: 8) {
             ForEach(studioTools) { tool in
-                let isActive = store.canvas.currentTool == tool
+                let isActive = store.document.canvas.currentTool == tool
 
                 toolDockItem(tool: tool, isActive: isActive)
                 .minimumHitTarget()
@@ -778,13 +778,13 @@ extension ContentView {
     var toolDockMetrics: some View {
         VStack(spacing: 8) {
             toolMetricBubble(
-                text: "\(Int(store.brushPalette.brush.storedRadius(for: store.canvas.currentTool).rounded()))",
+                text: "\(Int(store.document.brushPalette.brush.storedRadius(for: store.document.canvas.currentTool).rounded()))",
                 title: language.localized("ブラシサイズ"),
                 metric: .size
             )
 
             toolMetricBubble(
-                text: "\(Int((store.brushPalette.brush.opacity * 100).rounded()))",
+                text: "\(Int((store.document.brushPalette.brush.opacity * 100).rounded()))",
                 title: language.localized("不透明度"),
                 metric: .opacity
             )
@@ -844,9 +844,9 @@ extension ContentView {
                 selectedToolMetricEditor = metric
                 switch metric {
                 case .size:
-                    toolMetricSizeText = "\(Int(store.brushPalette.brush.radius.rounded()))"
+                    toolMetricSizeText = "\(Int(store.document.brushPalette.brush.radius.rounded()))"
                 case .opacity:
-                    toolMetricOpacityText = "\(Int((store.brushPalette.brush.opacity * 100).rounded()))"
+                    toolMetricOpacityText = "\(Int((store.document.brushPalette.brush.opacity * 100).rounded()))"
                 }
             }
         }
@@ -855,7 +855,7 @@ extension ContentView {
 
     func commitToolMetricSizeInput() {
         guard let value = Double(toolMetricSizeText) else {
-            toolMetricSizeText = "\(Int(store.brushPalette.brush.radius.rounded()))"
+            toolMetricSizeText = "\(Int(store.document.brushPalette.brush.radius.rounded()))"
             return
         }
         let clamped = min(max(value, 1), BrushPaletteFeature.maximumBrushRadius)
@@ -866,7 +866,7 @@ extension ContentView {
 
     func commitToolMetricOpacityInput() {
         guard let value = Double(toolMetricOpacityText) else {
-            toolMetricOpacityText = "\(Int((store.brushPalette.brush.opacity * 100).rounded()))"
+            toolMetricOpacityText = "\(Int((store.document.brushPalette.brush.opacity * 100).rounded()))"
             return
         }
         let clampedPercent = min(max(value, 10), 100)
@@ -912,8 +912,8 @@ extension ContentView {
 
             HStack(spacing: 6) {
                 toolDockActionButton(systemImage: "arrow.triangle.2.circlepath") {
-                    let primary = store.brushPalette.brush.color
-                    let secondary = store.brushPalette.brush.secondaryColor
+                    let primary = store.document.brushPalette.brush.color
+                    let secondary = store.document.brushPalette.brush.secondaryColor
                     store.send(.document(.brushPalette(.binding(.set(\.brush.color, secondary)))))
                     store.send(.document(.brushPalette(.binding(.set(\.brush.secondaryColor, primary)))))
                 }
@@ -927,7 +927,7 @@ extension ContentView {
         size: CGFloat,
         cornerRadius: CGFloat
     ) -> some View {
-        let isSelected = store.brushPalette.brush.selectedColorSlot == slot
+        let isSelected = store.document.brushPalette.brush.selectedColorSlot == slot
 
         return Button {
             store.send(.document(.brushPalette(.binding(.set(\.brush.selectedColorSlot, slot)))))
@@ -945,7 +945,7 @@ extension ContentView {
                         .foregroundStyle(.white.opacity(0.92))
                 } else {
                     RoundedRectangle(cornerRadius: max(4, cornerRadius - 2), style: .continuous)
-                        .fill(slot == .primary ? store.brushPalette.brush.color : store.brushPalette.brush.secondaryColor)
+                        .fill(slot == .primary ? store.document.brushPalette.brush.color : store.document.brushPalette.brush.secondaryColor)
                         .padding(3)
                 }
             }

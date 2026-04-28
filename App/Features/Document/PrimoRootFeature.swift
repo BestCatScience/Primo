@@ -8,6 +8,10 @@ struct PrimoRootFeature {
 
     var body: some ReducerOf<Self> {
         CombineReducers {
+            Scope(state: \.application, action: \.application) {
+                ApplicationFeature()
+            }
+
             Scope(state: \.workspace, action: \.workspace) {
                 WorkspaceFeature()
             }
@@ -24,10 +28,7 @@ struct PrimoRootFeature {
                 NanoBananaFeature()
             }
 
-            ApplicationFeatureRuntimeReducer()
-            WorkspaceFeatureRuntimeReducer()
-            DocumentFeatureRuntimeReducer()
-            ImportExportFeatureRuntimeReducer()
+            CrossFeatureIntegrationReducer()
         }
     }
 }

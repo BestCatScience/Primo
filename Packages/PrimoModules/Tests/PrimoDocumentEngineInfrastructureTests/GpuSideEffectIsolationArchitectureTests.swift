@@ -67,6 +67,147 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func appFeatureRuntimeReducerShimsAreRemoved() throws {
+        let repoRoot = try Self.repoRoot()
+        let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        let sources = try Self.swiftSources(under: documentRoot)
+        let filenames = Set(sources.map(\.lastPathComponent))
+
+        #expect(!filenames.contains("FeatureRuntimeReducers.swift"))
+        #expect(!filenames.contains("DocumentFeatureRuntimeReducer.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+StartupLifecycleWorkflow.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+ApplicationActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+CanvasUIStateCoordinator.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+CanvasPreviewStateCoordinator.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+CanvasCoordination.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+PreviewCompositeOps.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+AdjustmentActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+AdjustmentWorkflow.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+SelectionActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+LayerActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+CanvasEditingActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+DocumentActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+WorkspaceActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+SelectionTransform.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+LayerPropertiesWorkflow.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+LayerStructureWorkflow.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+LayerContentWorkflow.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+EditingActionRouting.swift"))
+        #expect(!filenames.contains("RootFeatureWorkflow+LayerEditingWorkflow.swift"))
+        #expect(filenames.allSatisfy { !$0.hasPrefix("CrossFeatureIntegrationReducer+") })
+        #expect(filenames.allSatisfy { !$0.hasPrefix("PrimoRootFeature+") || !$0.contains("Workflow") })
+        #expect(filenames.allSatisfy { !$0.hasPrefix("PrimoRootFeature+") || !$0.contains("Routing") })
+
+        let banned = [
+            "DocumentFeatureRuntimeReducer",
+            "PrimoFeatureRuntimeReducer",
+            "ApplicationFeatureRuntimeReducer",
+            "WorkspaceFeatureRuntimeReducer",
+            "ImportExportFeatureRuntimeReducer"
+        ]
+        for source in sources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            for token in banned {
+                #expect(!body.contains(token), "\(source.path) should not contain \(token)")
+            }
+        }
+    }
+
+    @Test
+    func crossFeatureIntegrationReducerOwnsNoDependencies() throws {
+        let repoRoot = try Self.repoRoot()
+        let reducerFile = repoRoot.appendingPathComponent(
+            "App/Features/Document/CrossFeatureIntegrationReducer.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: reducerFile, encoding: .utf8)
+        #expect(!body.contains("@Dependency"), "CrossFeatureIntegrationReducer should be dependency-free")
+        #expect(!body.contains("state."), "CrossFeatureIntegrationReducer should relay feature actions without direct root state access")
+        #expect(body.contains("RootFeatureWorkflowReducer().reduce"), "CrossFeatureIntegrationReducer should delegate workflow execution")
+
+        let rootWorkflowReducer = repoRoot.appendingPathComponent(
+            "App/Features/Document/RootFeatureWorkflowReducer.swift",
+            isDirectory: false
+        )
+        let rootWorkflowBody = try String(contentsOf: rootWorkflowReducer, encoding: .utf8)
+        #expect(!rootWorkflowBody.contains("processEnvironmentClient"), "Startup logging and environment access should be feature-owned")
+    }
+
+    @Test
+    func rootWorkflowDoesNotMutateApplicationStateDirectly() throws {
+        let repoRoot = try Self.repoRoot()
+        let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        let rootWorkflowSources = try Self.swiftSources(under: documentRoot)
+            .filter { source in
+                let filename = source.lastPathComponent
+                return filename == "RootFeatureWorkflowReducer.swift"
+                    || filename.hasPrefix("RootFeatureWorkflow+")
+                    || filename == "CrossFeatureIntegrationReducer.swift"
+            }
+        let banned = [
+            "state.application.beginStartup(",
+            "state.application.beginHydration(",
+            "state.application.finishHydration(",
+            "state.application.failHydration(",
+            "state.application.completeWorkspaceProjectLoad(",
+            "state.application.presentBanner(",
+            "state.application.presentFeedback(",
+            "state.application.showHome(",
+            "state.application.showWorkspace(",
+            "state.application.clearBanner(",
+            "state.application.recovery.",
+            "state.application.recovery.removeItem(",
+            "state.application.recovery.completeRestore(",
+            "state.application.recovery.dismiss("
+        ]
+        for source in rootWorkflowSources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            for token in banned {
+                #expect(!body.contains(token), "\(source.path) should relay \(token) through ApplicationFeature actions")
+            }
+        }
+    }
+
+    @Test
+    func primoRootStateDoesNotExposeFeatureSlicePassthroughs() throws {
+        let repoRoot = try Self.repoRoot()
+        let stateFile = repoRoot.appendingPathComponent(
+            "App/Features/Document/PrimoRootFeature+State.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: stateFile, encoding: .utf8)
+        let banned = [
+            "var saveHistory:",
+            "var export:",
+            "var brushPalette:",
+            "var layerSidebar:",
+            "var canvas:",
+            "var brushPanel:",
+            "var layerPanel:"
+        ]
+        for token in banned {
+            #expect(!body.contains(token), "PrimoRootFeature.State should not expose \(token) passthrough")
+        }
+    }
+
+    @Test
+    func topLevelFeaturesHaveReducerBodiesAndDelegateSurfaces() throws {
+        let repoRoot = try Self.repoRoot()
+        let featureFiles = [
+            "ApplicationFeature.swift",
+            "WorkspaceFeature.swift",
+            "DocumentFeature.swift",
+            "ImportExportFeature.swift"
+        ]
+        for filename in featureFiles {
+            let url = repoRoot.appendingPathComponent("App/Features/Document/\(filename)")
+            let body = try String(contentsOf: url, encoding: .utf8)
+            #expect(!body.contains("Reduce { _, _ in .none }"), "\(filename) should not be an empty reducer shell")
+            #expect(body.contains("case delegate(") || body.contains("case delegate"), "\(filename) should expose delegate action surface")
+        }
+    }
+
+    @Test
     func canvasImageRendererDoesNotOwnGpuProcessingServices() throws {
         let repoRoot = try Self.repoRoot()
         let renderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)
@@ -135,8 +276,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             "AppFeature.",
             "PrimoRootFeature.effectiveTransformQuad",
             "PrimoRootFeature.affineTransformQuad",
-            "CrossFeatureIntegrationReducer.effectiveTransformQuad",
-            "CrossFeatureIntegrationReducer.affineTransformQuad"
+            "RootFeatureWorkflowReducer.effectiveTransformQuad",
+            "RootFeatureWorkflowReducer.affineTransformQuad"
         ]
 
         let sources = try Self.swiftSources(under: canvasRoot)

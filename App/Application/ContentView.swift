@@ -314,7 +314,7 @@ struct ContentView: View {
             .zIndex(1000)
         }
         .overlay(alignment: .topLeading) {
-            if store.brushPalette.ui.showsBrushSettingsPopover {
+            if store.document.brushPalette.ui.showsBrushSettingsPopover {
                 GeometryReader { proxy in
                     let panelWidth = min(max(proxy.size.width * 0.58, 520), 760)
                     let panelHeight = min(max(proxy.size.height - 128, 520), 760)
@@ -333,14 +333,14 @@ struct ContentView: View {
                                 state: \.document.brushPalette,
                                 action: \.document.brushPalette
                             ),
-                            currentTool: store.canvas.currentTool,
-                            hasSelection: store.canvas.selection != nil,
-                            transformPreviewOffset: store.canvas.transformPreviewOffset,
-                            transformPreviewScaleX: store.canvas.transformPreviewScaleX,
-                            transformPreviewScaleY: store.canvas.transformPreviewScaleY,
-                            transformPreviewRotationDegrees: store.canvas.transformPreviewRotationDegrees,
-                            transformMode: store.canvas.transformMode,
-                            transformLocksAspectRatio: store.canvas.transformLocksAspectRatio,
+                            currentTool: store.document.canvas.currentTool,
+                            hasSelection: store.document.canvas.selection != nil,
+                            transformPreviewOffset: store.document.canvas.transformPreviewOffset,
+                            transformPreviewScaleX: store.document.canvas.transformPreviewScaleX,
+                            transformPreviewScaleY: store.document.canvas.transformPreviewScaleY,
+                            transformPreviewRotationDegrees: store.document.canvas.transformPreviewRotationDegrees,
+                            transformMode: store.document.canvas.transformMode,
+                            transformLocksAspectRatio: store.document.canvas.transformLocksAspectRatio,
                             language: language,
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
@@ -409,7 +409,7 @@ struct ContentView: View {
 
     private var nanoBananaInputPreviewSurface: DocumentCompositeSurface? {
         guard
-            let snapshot = store.canvas.renderSnapshot,
+            let snapshot = store.document.canvas.renderSnapshot,
             let layer = snapshot.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })
         else {
             return nil
@@ -425,7 +425,7 @@ struct ContentView: View {
         guard let surface = nanoBananaInputPreviewSurface else {
             return nil
         }
-        return DocumentFeatureRuntimeReducer.pngData(
+        return DocumentFeature.pngData(
             fromLayerPixelData: surface.pixelData,
             width: surface.width,
             height: surface.height
@@ -452,7 +452,7 @@ struct ContentView: View {
             store.send(
                 .importExport(.photoImportFailed(
                     ApplicationFeature.Feedback
-                        .couldNotImportPhoto(DocumentFeatureRuntimeReducer.optionalErrorMessage(error))
+                        .couldNotImportPhoto(ImportExportFeature.optionalErrorMessage(error))
                         .message(for: language)
                 ))
             )
@@ -480,7 +480,7 @@ struct ContentView: View {
             store.send(
                 .importExport(.newCanvasFromImageFailed(
                     ApplicationFeature.Feedback
-                        .couldNotCreateCanvasFromImage(DocumentFeatureRuntimeReducer.optionalErrorMessage(error))
+                        .couldNotCreateCanvasFromImage(ImportExportFeature.optionalErrorMessage(error))
                         .message(for: language)
                 ))
             )

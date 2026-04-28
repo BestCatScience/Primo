@@ -13,15 +13,15 @@ import PrimoWorkspaceInfrastructure
 @testable import Primo
 
 extension PrimoRootFeature.Action {
-    static func workspacePersistenceRequested(_ request: DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest) -> Self {
+    static func workspacePersistenceRequested(_ request: WorkspaceFeature.WorkspacePersistenceRequest) -> Self {
         .workspace(.persistenceRequested(request))
     }
 
-    static func workspaceCatalogRequested(_ request: DocumentFeatureRuntimeReducer.WorkspaceCatalogRequest) -> Self {
+    static func workspaceCatalogRequested(_ request: WorkspaceFeature.WorkspaceCatalogRequest) -> Self {
         .workspace(.catalogRequested(request))
     }
 
-    static func workspaceCatalogSucceeded(_ result: DocumentFeatureRuntimeReducer.WorkspaceCatalogResult) -> Self {
+    static func workspaceCatalogSucceeded(_ result: WorkspaceFeature.WorkspaceCatalogResult) -> Self {
         .workspace(.catalogSucceeded(result))
     }
 }

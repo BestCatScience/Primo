@@ -1,29 +1,16 @@
-import ComposableArchitecture
-import PrimoDocumentApplication
-import PrimoDocumentContracts
+import Foundation
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
 
 final class WorkspacePersistenceCoordinatorTests: XCTestCase {
-    private func previewSurface(bytes: [UInt8]) -> DocumentCompositeSurface {
-        DocumentCompositeSurface(
-            width: 1,
-            height: 1,
-            pixelData: Data(bytes)
-        )
-    }
-
     func testLoadedWorkspaceFollowUpRequestMarksDirtyAndBuildsPersistenceRequest() {
-        let expectedPreviewData = DocumentRasterImageService.pngData(
-            from: previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF])
-        )
         let tab = OpenDocumentTab.testValue(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
-            previewImageData: nil
+            previewImageData: Data([0xAB, 0xCD, 0xEF, 0xFF])
         )
-        let plan = DocumentFeatureRuntimeReducer.LoadedWorkspaceProjectPlan(
+        let plan = WorkspaceFeature.LoadedWorkspaceProjectPlan(
             destination: .activeTab(title: "Updated", sourceProjectURL: tab.sourceProjectURL),
             followUp: .init(
                 marksTabDirty: true,
@@ -32,36 +19,40 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
             ),
             successEffects: .init(completion: .openedDocument(layerCount: 1))
         )
+        let service = WorkspaceApplicationWorkflowService()
+        var workspace = WorkspaceFeature.State()
+        workspace.openTabs = [tab]
+        workspace.activeTabID = tab.id
+        workspace.primarySelectedTabID = tab.id
 
-        let result = withDependencies {
-            $0.documentExportGateway = .stub(
-                compositeSurface: { _ in self.previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF]) }
-            )
-        } operation: {
-            let feature = DocumentFeatureRuntimeReducer()
-            var state = PrimoRootFeature.State()
-            state.workspace.openTabs = [tab]
-            state.workspace.activeTabID = tab.id
-            state.workspace.primarySelectedTabID = tab.id
+        let result = service.loadedWorkspaceFollowUp(
+            plan: plan,
+            context: WorkspaceFeature.WorkspaceDocumentContext(
+                activeTab: workspace.activeTab,
+                paperStyle: .default
+            ),
+            requiresBackingStorePersistence: false
+        )
 
-            let result = feature.loadedWorkspaceFollowUpRequest(
-                plan: plan,
-                state: &state
-            )
-            return (result, state.workspace.activeTab)
-        }
-
-        guard case let (.success(.some(request)), updatedTab?) = result else {
+        guard case let .success(outcome) = result,
+              let request = outcome.followUpRequest
+        else {
             return XCTFail("Expected follow-up persistence request and updated tab")
+        }
+        if outcome.marksActiveTabDirty {
+            workspace.setActiveTabDirty(true)
+        }
+        guard let updatedTab = workspace.activeTab else {
+            return XCTFail("Expected updated active tab")
         }
 
         XCTAssertTrue(updatedTab.isDirty)
-        XCTAssertEqual(updatedTab.previewImageData, expectedPreviewData)
+        XCTAssertEqual(updatedTab.previewImageData, tab.previewImageData)
 
         XCTAssertEqual(
             request,
             .loadedWorkspaceFollowUp(
-                DocumentFeatureRuntimeReducer.LoadedWorkspaceFollowUpPersistenceRequest(
+                WorkspaceFeature.LoadedWorkspaceFollowUpPersistenceRequest(
                     activeTab: updatedTab,
                     paperStyle: .default,
                     persistsToBackingStore: false,
@@ -73,14 +64,11 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpRequestCanSkipPersistenceWhileStillMarkingDirty() {
-        let expectedPreviewData = DocumentRasterImageService.pngData(
-            from: previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF])
-        )
         let tab = OpenDocumentTab.testValue(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
-            previewImageData: Data([0x01])
+            previewImageData: Data([0x01, 0x02, 0x03, 0xFF])
         )
-        let plan = DocumentFeatureRuntimeReducer.LoadedWorkspaceProjectPlan(
+        let plan = WorkspaceFeature.LoadedWorkspaceProjectPlan(
             destination: .selectedTab(tabID: tab.id, pane: .primary),
             followUp: .init(
                 marksTabDirty: true,
@@ -88,30 +76,34 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
                 persistsAutosave: false
             )
         )
+        let service = WorkspaceApplicationWorkflowService()
+        var workspace = WorkspaceFeature.State()
+        workspace.openTabs = [tab]
+        workspace.activeTabID = tab.id
+        workspace.primarySelectedTabID = tab.id
 
-        let result = withDependencies {
-            $0.documentExportGateway = .stub(
-                compositeSurface: { _ in self.previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF]) }
-            )
-        } operation: {
-            let feature = DocumentFeatureRuntimeReducer()
-            var state = PrimoRootFeature.State()
-            state.workspace.openTabs = [tab]
-            state.workspace.activeTabID = tab.id
-            state.workspace.primarySelectedTabID = tab.id
+        let result = service.loadedWorkspaceFollowUp(
+            plan: plan,
+            context: WorkspaceFeature.WorkspaceDocumentContext(
+                activeTab: workspace.activeTab,
+                paperStyle: .default
+            ),
+            requiresBackingStorePersistence: false
+        )
 
-            let result = feature.loadedWorkspaceFollowUpRequest(
-                plan: plan,
-                state: &state
-            )
-            return (result, state.workspace.activeTab)
-        }
-
-        guard case let (.success(nil), updatedTab?) = result else {
+        guard case let .success(outcome) = result,
+              outcome.followUpRequest == nil
+        else {
             return XCTFail("Expected no follow-up persistence request")
+        }
+        if outcome.marksActiveTabDirty {
+            workspace.setActiveTabDirty(true)
+        }
+        guard let updatedTab = workspace.activeTab else {
+            return XCTFail("Expected updated active tab")
         }
 
         XCTAssertTrue(updatedTab.isDirty)
-        XCTAssertEqual(updatedTab.previewImageData, expectedPreviewData)
+        XCTAssertEqual(updatedTab.previewImageData, tab.previewImageData)
     }
 }

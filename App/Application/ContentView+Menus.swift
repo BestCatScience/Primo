@@ -6,14 +6,14 @@ import PrimoNanoBananaDomain
 
 extension ContentView {
     var resolvedNanoBananaInputLayerIndex: Int {
-        if store.layerSidebar.layers.contains(where: { $0.index == nanoBananaState.composer.inputLayerIndex }) {
+        if store.document.layerSidebar.layers.contains(where: { $0.index == nanoBananaState.composer.inputLayerIndex }) {
             return nanoBananaState.composer.inputLayerIndex
         }
-        return store.layerSidebar.activeLayerIndex
+        return store.document.layerSidebar.activeLayerIndex
     }
 
     var resolvedNanoBananaInputLayerName: String {
-        store.layerSidebar.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })?.name ?? "-"
+        store.document.layerSidebar.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })?.name ?? "-"
     }
 
     var nanoBananaPromptBinding: Binding<String> {
@@ -83,15 +83,15 @@ extension ContentView {
         store.send(
             .nanoBanana(
                 .prepareComposer(
-                    activeLayerIndex: store.layerSidebar.activeLayerIndex,
-                    hasSelection: store.canvas.selection?.isEmpty == false
+                    activeLayerIndex: store.document.layerSidebar.activeLayerIndex,
+                    hasSelection: store.document.canvas.selection?.isEmpty == false
                 )
             )
         )
     }
 
     var nanoBananaGenerateDisabled: Bool {
-        nanoBananaState.generateDisabled || store.layerSidebar.layers.isEmpty
+        nanoBananaState.generateDisabled || store.document.layerSidebar.layers.isEmpty
     }
 
     func requestNanoBananaGeneration(closeSheet: Bool) {
@@ -211,9 +211,9 @@ extension ContentView {
     var canvasSizePresets: [(label: String, width: Int, height: Int)] {
         [
             (
-                "現在のサイズ (\(max(Int(store.canvas.canvasSize.width.rounded()), 1)) × \(max(Int(store.canvas.canvasSize.height.rounded()), 1)))",
-                max(Int(store.canvas.canvasSize.width.rounded()), 1),
-                max(Int(store.canvas.canvasSize.height.rounded()), 1)
+                "現在のサイズ (\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1)) × \(max(Int(store.document.canvas.canvasSize.height.rounded()), 1)))",
+                max(Int(store.document.canvas.canvasSize.width.rounded()), 1),
+                max(Int(store.document.canvas.canvasSize.height.rounded()), 1)
             ),
             ("768 × 1024", 768, 1024),
             ("1024 × 1024", 1024, 1024),
@@ -306,22 +306,22 @@ extension ContentView {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("変更")) {
                         guard
-                            let width = resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)),
-                            let height = resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1))
+                            let width = resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)),
+                            let height = resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1))
                         else { return }
                         store.send(.document(.resizeCanvasRequested(width: width, height: height)))
                         showsResizeCanvasSheet = false
                     }
                     .disabled(
-                        resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)) == nil ||
-                        resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1)) == nil
+                        resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)) == nil ||
+                        resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1)) == nil
                     )
                 }
             }
         }
         .onAppear {
-            resizeCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-            resizeCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+            resizeCanvasWidthText = "\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1))"
+            resizeCanvasHeightText = "\(max(Int(store.document.canvas.canvasSize.height.rounded()), 1))"
         }
         .presentationDetents([.height(280)])
         .presentationDragIndicator(.visible)
@@ -356,22 +356,22 @@ extension ContentView {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("変更")) {
                         guard
-                            let width = resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)),
-                            let height = resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1))
+                            let width = resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)),
+                            let height = resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1))
                         else { return }
                         store.send(.document(.resizeCanvasExtentRequested(width: width, height: height)))
                         showsResizeCanvasExtentSheet = false
                     }
                     .disabled(
-                        resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.canvas.canvasSize.width.rounded()), 1)) == nil ||
-                        resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.canvas.canvasSize.height.rounded()), 1)) == nil
+                        resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)) == nil ||
+                        resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1)) == nil
                     )
                 }
             }
         }
         .onAppear {
-            resizeCanvasExtentWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-            resizeCanvasExtentHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+            resizeCanvasExtentWidthText = "\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1))"
+            resizeCanvasExtentHeightText = "\(max(Int(store.document.canvas.canvasSize.height.rounded()), 1))"
         }
         .presentationDetents([.height(280)])
         .presentationDragIndicator(.visible)
@@ -427,7 +427,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("スケール")) {
-                    if store.canvas.transformMode == .standard {
+                    if store.document.canvas.transformMode == .standard {
                         LabeledContent("X") {
                             TextField("100", text: $transformScaleXText)
                                 .multilineTextAlignment(.trailing)
@@ -446,7 +446,7 @@ extension ContentView {
                     }
                 }
 
-                if store.canvas.transformMode == .standard {
+                if store.document.canvas.transformMode == .standard {
                     Section(language.localized("回転")) {
                         TextField("0", text: $transformRotationText)
                             .keyboardType(.numbersAndPunctuation)
@@ -528,28 +528,28 @@ extension ContentView {
     }
 
     func syncTransformNumericDraft() {
-        transformOffsetXText = String(Int(store.canvas.transformPreviewOffset.width.rounded()))
-        transformOffsetYText = String(Int(store.canvas.transformPreviewOffset.height.rounded()))
-        transformScaleXText = String(Int((store.canvas.transformPreviewScaleX * 100).rounded()))
-        transformScaleYText = String(Int((store.canvas.transformPreviewScaleY * 100).rounded()))
-        transformRotationText = String(Int(store.canvas.transformPreviewRotationDegrees.rounded()))
-        transformLocksAspectRatio = store.canvas.transformLocksAspectRatio
+        transformOffsetXText = String(Int(store.document.canvas.transformPreviewOffset.width.rounded()))
+        transformOffsetYText = String(Int(store.document.canvas.transformPreviewOffset.height.rounded()))
+        transformScaleXText = String(Int((store.document.canvas.transformPreviewScaleX * 100).rounded()))
+        transformScaleYText = String(Int((store.document.canvas.transformPreviewScaleY * 100).rounded()))
+        transformRotationText = String(Int(store.document.canvas.transformPreviewRotationDegrees.rounded()))
+        transformLocksAspectRatio = store.document.canvas.transformLocksAspectRatio
         let visualPivot = currentTransformVisualPivot()
         transformPivotXText = String(Int(visualPivot.x.rounded()))
         transformPivotYText = String(Int(visualPivot.y.rounded()))
     }
 
     func currentTransformBounds() -> CGRect? {
-        if let selection = store.canvas.selection, !selection.isEmpty {
+        if let selection = store.document.canvas.selection, !selection.isEmpty {
             return selection.bounds
         }
         guard
-            let snapshot = store.canvas.renderSnapshot,
-            let layer = snapshot.layers.first(where: { $0.index == store.canvas.activeLayerIndex })
+            let snapshot = store.document.canvas.renderSnapshot,
+            let layer = snapshot.layers.first(where: { $0.index == store.document.canvas.activeLayerIndex })
         else {
             return nil
         }
-        return DocumentFeatureRuntimeReducer.transformationBounds(
+        return DocumentFeature.transformationBounds(
             selection: nil,
             pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
@@ -559,8 +559,8 @@ extension ContentView {
     }
 
     func currentTransformVisualPivot() -> CGPoint {
-        let translation = store.canvas.transformPreviewOffset
-        if let pivot = store.canvas.transformPivot {
+        let translation = store.document.canvas.transformPreviewOffset
+        if let pivot = store.document.canvas.transformPivot {
             return CGPoint(x: pivot.x + translation.width, y: pivot.y + translation.height)
         }
         let fallback = currentTransformBounds().map { CGPoint(x: $0.midX, y: $0.midY) } ?? .zero
@@ -576,10 +576,10 @@ extension ContentView {
         let pivotX = Double(transformPivotXText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         let pivotY = Double(transformPivotYText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         let offset = CGSize(width: offsetX, height: offsetY)
-        let resolvedScaleYPercent = (store.canvas.transformMode == .standard && transformLocksAspectRatio) ? scaleXPercent : scaleYPercent
+        let resolvedScaleYPercent = (store.document.canvas.transformMode == .standard && transformLocksAspectRatio) ? scaleXPercent : scaleYPercent
         store.send(.document(.canvas(.transformOffsetSet(offset))))
         store.send(.document(.canvas(.transformAspectRatioLockChanged(transformLocksAspectRatio))))
-        if store.canvas.transformMode == .standard {
+        if store.document.canvas.transformMode == .standard {
             store.send(.document(.canvas(.transformScaleSet(
                 x: CGFloat(scaleXPercent / 100.0),
                 y: CGFloat(resolvedScaleYPercent / 100.0)
@@ -606,7 +606,7 @@ extension ContentView {
                 Section(language.localized("現在色")) {
                     HStack(spacing: 12) {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(store.brushPalette.brush.activeOpaqueColor)
+                            .fill(store.document.brushPalette.brush.activeOpaqueColor)
                             .frame(width: 42, height: 42)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -1048,7 +1048,7 @@ extension ContentView {
 
                         ForEach(GradientMapPreset.allCases) { preset in
                             Button(preset.localizedTitle(language)) {
-                                gradientMapSettings = DocumentFeatureRuntimeReducer.gradientMapSettings(for: preset)
+                                gradientMapSettings = DocumentFeature.gradientMapSettings(for: preset)
                                 selectedGradientStopID = gradientMapSettings.stops.dropFirst().first?.id
                             }
                         }
@@ -1164,7 +1164,7 @@ extension ContentView {
                     }
 
                     Picker(language.localized("入力レイヤー"), selection: nanoBananaInputLayerIndexBinding) {
-                        ForEach(store.layerSidebar.layers) { layer in
+                        ForEach(store.document.layerSidebar.layers) { layer in
                             Text(layer.name).tag(layer.index)
                         }
                     }
@@ -1174,9 +1174,9 @@ extension ContentView {
                             Text(scope.title(language)).tag(scope)
                         }
                     }
-                    .disabled(store.canvas.selection?.isEmpty != false)
+                    .disabled(store.document.canvas.selection?.isEmpty != false)
 
-                    if store.canvas.selection?.isEmpty != false {
+                    if store.document.canvas.selection?.isEmpty != false {
                         Text(language.localized("インペイントを使うには選択範囲を作成してください"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -1406,7 +1406,7 @@ extension ContentView {
     }
 
     var normalizedGradientMapSettings: GradientMapSettings {
-        DocumentFeatureRuntimeReducer.normalizeGradientMapSettings(gradientMapSettings)
+        DocumentFeature.normalizeGradientMapSettings(gradientMapSettings)
     }
 
     func gradientStopTitle(for id: GradientMapStopSettings.ID) -> String {
@@ -1454,9 +1454,9 @@ extension ContentView {
     func insertGradientStop(at position: Double) {
         guard gradientMapSettings.stops.count < 8 else { return }
         let clampedPosition = min(max(position, 0.0), 1.0)
-        let mixed = DocumentFeatureRuntimeReducer.mappedGradientColor(
+        let mixed = DocumentFeature.mappedGradientColor(
             for: clampedPosition,
-            stops: DocumentFeatureRuntimeReducer.gradientMapStops(for: normalizedGradientMapSettings)
+            stops: DocumentFeature.gradientMapStops(for: normalizedGradientMapSettings)
         )
         let newStop = GradientMapStopSettings(
             position: clampedPosition,
@@ -1485,7 +1485,7 @@ extension ContentView {
         )
     }
 
-    func color(from stop: DocumentFeatureRuntimeReducer.GradientMapStop) -> Color {
+    func color(from stop: DocumentFeature.GradientMapStop) -> Color {
         Color(
             red: Double(stop.red) / 255.0,
             green: Double(stop.green) / 255.0,
@@ -1526,7 +1526,7 @@ extension ContentView {
     }
 
     var currentColorRangeRequest: ColorRangeSelectionRequest {
-        let resolved = UIColor(store.brushPalette.brush.activeOpaqueColor)
+        let resolved = UIColor(store.document.brushPalette.brush.activeOpaqueColor)
         var red: CGFloat = 0
         var green: CGFloat = 0
         var blue: CGFloat = 0
@@ -1601,8 +1601,8 @@ extension ContentView {
                     Divider()
 
                     Button(StudioStrings.customSize(language)) {
-                        newCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-                        newCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                        newCanvasWidthText = "\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1))"
+                        newCanvasHeightText = "\(max(Int(store.document.canvas.canvasSize.height.rounded()), 1))"
                         showsNewCanvasSheet = true
                     }
                 }
@@ -1651,9 +1651,9 @@ extension ContentView {
                     }
 
                     Button(language.localized("色域選択")) {
-                        colorRangeTolerance = store.brushPalette.selection.colorTolerance
+                        colorRangeTolerance = store.document.brushPalette.selection.colorTolerance
                         colorRangeMinimumAlpha = 0.05
-                        colorRangeExpansion = max(store.brushPalette.selection.expansion, 0)
+                        colorRangeExpansion = max(store.document.brushPalette.selection.expansion, 0)
                         colorRangeSource = .activeLayer
                         showsColorRangeSelectionSheet = true
                     }
@@ -1662,14 +1662,14 @@ extension ContentView {
                 Divider()
 
                 Button(language.localized("キャンバスサイズを変更")) {
-                    resizeCanvasExtentWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-                    resizeCanvasExtentHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    resizeCanvasExtentWidthText = "\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1))"
+                    resizeCanvasExtentHeightText = "\(max(Int(store.document.canvas.canvasSize.height.rounded()), 1))"
                     showsResizeCanvasExtentSheet = true
                 }
 
                 Button(language.localized("画像解像度を変更")) {
-                    resizeCanvasWidthText = "\(max(Int(store.canvas.canvasSize.width.rounded()), 1))"
-                    resizeCanvasHeightText = "\(max(Int(store.canvas.canvasSize.height.rounded()), 1))"
+                    resizeCanvasWidthText = "\(max(Int(store.document.canvas.canvasSize.width.rounded()), 1))"
+                    resizeCanvasHeightText = "\(max(Int(store.document.canvas.canvasSize.height.rounded()), 1))"
                     showsResizeCanvasSheet = true
                 }
 
@@ -1720,7 +1720,7 @@ extension ContentView {
 
                     Menu(StudioStrings.gradientMap(language)) {
                         Button(language.localized("カスタム…")) {
-                            gradientMapSettings = DocumentFeatureRuntimeReducer.gradientMapSettings(for: .graphite)
+                            gradientMapSettings = DocumentFeature.gradientMapSettings(for: .graphite)
                             showsGradientMapSheet = true
                         }
 
@@ -1733,13 +1733,13 @@ extension ContentView {
                         }
                     }
                 }
-                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil)
+                .disabled(activeLayer == nil || store.document.canvas.renderSnapshot == nil)
 
                 Button(StudioStrings.nanoBananaEdit(language)) {
                     prepareNanoBananaComposer()
                     store.send(.nanoBanana(.sheetPresentationChanged(true)))
                 }
-                .disabled(activeLayer == nil || store.canvas.renderSnapshot == nil || nanoBananaState.isGenerating)
+                .disabled(activeLayer == nil || store.document.canvas.renderSnapshot == nil || nanoBananaState.isGenerating)
 
                 Divider()
 
@@ -1796,7 +1796,7 @@ extension ContentView {
                 Button(language.localized("選択範囲からマスク作成")) {
                     store.send(.document(.editing(.createLayerMaskFromSelectionRequested)))
                 }
-                .disabled(activeLayer == nil || store.canvas.selection?.isEmpty != false)
+                .disabled(activeLayer == nil || store.document.canvas.selection?.isEmpty != false)
 
                 Button(language.localized("マスクを削除")) {
                     store.send(.document(.editing(.clearLayerMaskRequested)))
@@ -1833,11 +1833,11 @@ extension ContentView {
 
                 Divider()
 
-                Button(store.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
+                Button(store.document.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
                     store.send(.document(.editing(.panelCollapseToggled(.brush))))
                 }
 
-                Button(store.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
+                Button(store.document.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
                     store.send(.document(.editing(.panelCollapseToggled(.layers))))
                 }
             }
@@ -1980,7 +1980,7 @@ extension ContentView {
     }
 
     var activeLayer: LayerRowModel? {
-        store.layerSidebar.layers.first { $0.index == store.layerSidebar.activeLayerIndex }
+        store.document.layerSidebar.layers.first { $0.index == store.document.layerSidebar.activeLayerIndex }
     }
 
     var activeLayerIsVisible: Bool {
@@ -1992,7 +1992,7 @@ extension ContentView {
     }
 
     var activeLayerPosition: Int? {
-        store.layerSidebar.layers.firstIndex { $0.index == store.layerSidebar.activeLayerIndex }
+        store.document.layerSidebar.layers.firstIndex { $0.index == store.document.layerSidebar.activeLayerIndex }
     }
 
     var normalizedLevelsSettings: LevelsAdjustmentSettings {
@@ -2012,6 +2012,6 @@ extension ContentView {
 
     var canSelectNextLayer: Bool {
         guard let activeLayerPosition else { return false }
-        return activeLayerPosition < store.layerSidebar.layers.count - 1
+        return activeLayerPosition < store.document.layerSidebar.layers.count - 1
     }
 }
