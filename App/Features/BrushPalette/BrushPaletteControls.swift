@@ -216,8 +216,8 @@ struct SpectrumColorControl: View {
         let angle = (hue * .pi * 2) - (.pi / 2)
         let radius = (rect.width - ringWidth) / 2
         return CGPoint(
-            x: rect.midX + (cos(angle) * radius),
-            y: rect.midY + (sin(angle) * radius)
+            x: rect.midX + (CGFloat(cos(angle)) * radius),
+            y: rect.midY + (CGFloat(sin(angle)) * radius)
         )
     }
 
