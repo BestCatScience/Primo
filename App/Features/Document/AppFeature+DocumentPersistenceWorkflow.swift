@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
         guard let activeTab = state.workspace.activeTab else { return .none }
         state.saveHistory.beginPresentation()

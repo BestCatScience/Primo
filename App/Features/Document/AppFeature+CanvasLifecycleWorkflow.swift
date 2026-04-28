@@ -6,7 +6,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {
         case unsupportedCanvasSize
         case invalidImageData

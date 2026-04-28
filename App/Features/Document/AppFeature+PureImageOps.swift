@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import SwiftUI
 
-extension AppFeature {
+extension AppIntegrationFeature {
     static func clampUnit(_ value: CGFloat) -> CGFloat {
         max(0, min(1, value))
     }

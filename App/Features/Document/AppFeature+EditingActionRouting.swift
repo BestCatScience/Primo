@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func routeDocumentEditorEditingAction(
         state: inout State,
         action: Action

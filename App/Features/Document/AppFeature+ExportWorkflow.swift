@@ -5,7 +5,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 
-extension AppFeature {
+extension AppIntegrationFeature {
     private struct ExportWorkflowService {
         let documentExportGateway: DocumentExportGateway
         let workspaceArtifactService: WorkspaceArtifactService

@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func handleBootstrapPresentationLoaded(
         state: inout State,
         presentation: PaintDocumentPresentation
@@ -70,25 +70,6 @@ extension AppFeature {
         case let .documentPaperStyleSyncRequested(paperStyle):
             return handleDocumentPaperStyleSyncRequested(paperStyle: paperStyle)
 
-        case let .workspacePersistenceRequested(request):
-            return handleWorkspacePersistenceRequested(request: request)
-
-        case let .workspacePersistenceSucceeded(result):
-            return handleWorkspacePersistenceSucceeded(state: &state, result: result)
-
-        case let .workspacePersistenceFailed(failure):
-            return handleWorkspacePersistenceFailed(state: &state, failure: failure)
-
-        case let .workspaceCatalogRequested(request):
-            return handleWorkspaceCatalogRequested(request: request)
-
-        case let .workspaceCatalogSucceeded(result):
-            return handleWorkspaceCatalogSucceeded(state: &state, result: result)
-
-        case let .workspaceCatalogFailed(failure):
-            handleWorkspaceCatalogFailed(state: &state, failure: failure)
-            return .none
-
         case let .bootstrapPresentationLoaded(presentation):
             handleBootstrapPresentationLoaded(state: &state, presentation: presentation)
             return .none
@@ -151,10 +132,6 @@ extension AppFeature {
 
         case let .languageChanged(language):
             return handleLanguageChanged(state: &state, language: language)
-
-        case .exportSheetDismissed:
-            handleExportSheetDismissed(state: &state)
-            return .none
 
         case .bannerDismissed:
             handleBannerDismissed(state: &state)

@@ -23,7 +23,7 @@ final class ImageImportOpsTests: XCTestCase {
             DocumentRasterImageService.pngData(from: sampleSurface())
         )
 
-        let imported = try XCTUnwrap(AppFeature.importedCanvasImage(from: encoded))
+        let imported = try XCTUnwrap(AppIntegrationFeature.importedCanvasImage(from: encoded))
 
         XCTAssertEqual(imported.width, 2)
         XCTAssertEqual(imported.height, 2)
@@ -36,7 +36,7 @@ final class ImageImportOpsTests: XCTestCase {
         )
 
         let fitted = try XCTUnwrap(
-            AppFeature.fittedLayerPixelData(
+            AppIntegrationFeature.fittedLayerPixelData(
                 fromImageData: encoded,
                 canvasSize: CGSize(width: 6, height: 4),
                 gpuOperations: imageImportGpuOperations()

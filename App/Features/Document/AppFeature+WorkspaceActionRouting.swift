@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func requestCloseOperation(
         state: inout State,
         operation: PendingCloseOperation
@@ -134,6 +134,25 @@ extension AppFeature {
         action: WorkspaceAction
     ) -> Effect<Action> {
         switch action {
+        case let .persistenceRequested(request):
+            return handleWorkspacePersistenceRequested(request: request)
+
+        case let .persistenceSucceeded(result):
+            return handleWorkspacePersistenceSucceeded(state: &state, result: result)
+
+        case let .persistenceFailed(failure):
+            return handleWorkspacePersistenceFailed(state: &state, failure: failure)
+
+        case let .catalogRequested(request):
+            return handleWorkspaceCatalogRequested(request: request)
+
+        case let .catalogSucceeded(result):
+            return handleWorkspaceCatalogSucceeded(state: &state, result: result)
+
+        case let .catalogFailed(failure):
+            handleWorkspaceCatalogFailed(state: &state, failure: failure)
+            return .none
+
         case let .tabSelected(tabID):
             return handleTabSelection(state: &state, tabID: tabID)
 

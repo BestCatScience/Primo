@@ -4,7 +4,7 @@ import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct StartupPresentationService {
         let documentQueryGateway: DocumentQueryGateway
         let documentPersistenceGateway: DocumentPersistenceGateway

@@ -17,7 +17,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             return feature.prepareCanvasStrokeEditing(state: &state)
         }
@@ -38,7 +38,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             return feature.resolveStrokeCommit(
                 state: &state,
@@ -63,7 +63,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testPreviewOutcomeAppliesGpuRenderState() {
-        let feature = AppFeature()
+        let feature = AppIntegrationFeature()
         var state = AppFeature.State()
         let snapshot = MetalDocumentSnapshot(
             width: 4,
@@ -112,7 +112,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             let previewBrush = feature.resolvedBrushSettings(for: state)
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
@@ -142,7 +142,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return
         }
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.surfaceHandle, expectedHandle)
-        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.previewBrush, AppFeature().resolvedBrushSettings(for: AppFeature.State()))
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.previewBrush, AppIntegrationFeature().resolvedBrushSettings(for: AppFeature.State()))
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.sampleCount, 32)
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.supportsIncrementalContinuation, true)
     }
@@ -175,7 +175,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             return feature.resolveStrokeCommit(
                 state: &state,
@@ -214,7 +214,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             let previewBrush = feature.resolvedBrushSettings(for: state)
             let snapshot = MetalDocumentSnapshot(
@@ -274,7 +274,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 11,
@@ -301,7 +301,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 11,
@@ -329,7 +329,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             return feature.documentStrokeCommandService.fill(
                 sample,
                 feature.resolvedBrushSettings(for: AppFeature.State())
@@ -373,7 +373,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             return feature.layerContentWorkflowService.applyPixels(
                 Data([0x00]),
                 to: .newLayer(name: "Imported")
@@ -406,7 +406,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             return feature.layerContentWorkflowService.applyPixels(
                 Data([0x00]),
                 to: .newLayer(name: "Imported")
@@ -456,7 +456,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             let descriptor = NanoBananaEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch")!,

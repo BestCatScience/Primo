@@ -4,7 +4,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func handleToolSelection(
         state: inout State,
         tool: StudioToolKind,

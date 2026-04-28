@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension AppFeature {
+extension AppIntegrationFeature {
     static func layerMaskData(
         from selection: CanvasSelection?,
         canvasSize: CGSize,

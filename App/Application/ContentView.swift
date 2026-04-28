@@ -330,8 +330,8 @@ struct ContentView: View {
 
                         BrushPaletteView(
                             store: store.scope(
-                                state: \.brushPalette,
-                                action: \.brushPalette
+                                state: \.document.brushPalette,
+                                action: \.document.brushPalette
                             ),
                             currentTool: store.canvas.currentTool,
                             hasSelection: store.canvas.selection != nil,

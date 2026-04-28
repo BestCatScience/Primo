@@ -78,8 +78,8 @@ extension ContentView {
             if isLivePane {
                 CanvasView(
                     store: store.scope(
-                        state: \.canvas,
-                        action: \.canvas
+                        state: \.document.canvas,
+                        action: \.document.canvas
                     )
                 )
                 .padding(10)
@@ -296,8 +296,8 @@ extension ContentView {
             case .brush:
                 BrushPaletteView(
                     store: store.scope(
-                        state: \.brushPalette,
-                        action: \.brushPalette
+                        state: \.document.brushPalette,
+                        action: \.document.brushPalette
                     ),
                     currentTool: store.canvas.currentTool,
                     hasSelection: store.canvas.selection != nil,
@@ -334,8 +334,8 @@ extension ContentView {
             case .layers:
                 LayerSidebarView(
                     store: store.scope(
-                        state: \.layerSidebar,
-                        action: \.layerSidebar
+                        state: \.document.layerSidebar,
+                        action: \.document.layerSidebar
                     ),
                     layerSnapshots: store.canvas.renderSnapshot?.layers ?? [],
                     language: language,

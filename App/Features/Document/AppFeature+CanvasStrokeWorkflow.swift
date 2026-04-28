@@ -7,7 +7,7 @@ import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct CanvasStrokeContext {
         let activeLayer: LayerRowModel
         let activeLayerIndex: Int
@@ -715,7 +715,7 @@ extension AppFeature {
 }
 
 private extension DocumentStrokeContext {
-    init(_ context: AppFeature.CanvasStrokeContext) {
+    init(_ context: AppIntegrationFeature.CanvasStrokeContext) {
         self.init(
             activeLayer: context.activeLayer,
             activeLayerIndex: context.activeLayerIndex,
@@ -725,7 +725,7 @@ private extension DocumentStrokeContext {
     }
 }
 
-private extension AppFeature.State {
+private extension AppIntegrationFeature.State {
     func usesResponsiveOilPreview(for brush: BrushRuntimeSettings) -> Bool {
         brushPalette.ui.oilLivePreviewQuality == .responsive &&
         brush.tipKind == .oil

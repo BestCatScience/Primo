@@ -16,45 +16,25 @@ struct AppFeature {
         case nanoBananaEdit
     }
 
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
-    @Dependency(\.documentMutationGateway) var documentMutationGateway
-    @Dependency(\.strokeInputGateway) var strokeInputGateway
-    @Dependency(\.documentHistoryGateway) var documentHistoryGateway
-    @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
-    @Dependency(\.documentExportGateway) var documentExportGateway
-    @Dependency(\.textLayerGateway) var textLayerGateway
-    @Dependency(\.documentLayerEffectsGateway) var documentLayerEffectsGateway
-    @Dependency(\.documentEditingGateway) var documentEditingGateway
-    @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
-    @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
-    @Dependency(\.documentLayerCommandService) var documentLayerCommandService
-    @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
-    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
-    @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
-    @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
-    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
-    @Dependency(\.workspaceApplicationWorkflowService) var workspaceApplicationWorkflowService
-    @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
-    @Dependency(\.documentWorkspaceClient) var documentWorkspaceClient
-    @Dependency(\.documentImportClient) var documentImportClient
-    @Dependency(\.fileClient) var fileClient
-    @Dependency(\.processEnvironmentClient) var processEnvironmentClient
-    @Dependency(\.dateClient) var dateClient
-    @Dependency(\.uuidClient) var uuidClient
-    @Dependency(\.appLanguageClient) var appLanguageClient
-
     var body: some ReducerOf<Self> {
         CombineReducers {
-            WorkspaceShellFeature()
-            DocumentEditorFeature()
-            CanvasInteractionFeature()
-            AssetImportExportFeature()
+            Scope(state: \.workspace, action: \.workspace) {
+                WorkspaceFeature()
+            }
+
+            Scope(state: \.document, action: \.document) {
+                DocumentFeature()
+            }
+
+            Scope(state: \.importExport, action: \.importExport) {
+                ImportExportFeature()
+            }
 
             Scope(state: \.nanoBanana, action: \.nanoBanana) {
                 NanoBananaFeature()
             }
+
+            AppIntegrationFeature()
         }
     }
 }

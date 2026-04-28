@@ -83,7 +83,7 @@ struct PaintDocumentMutationContractTests {
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
             let output = runtime.queryGateway.pixelDataForLayer(0)
-            #expect(output.count == 4)
+            #expect(output.count == width * height * 4)
             #expect(output[0] == 10)
             #expect(output[1] == 20)
             #expect(output[2] == 30)
@@ -116,7 +116,7 @@ struct PaintDocumentMutationContractTests {
             if PrimoMetalDocumentProcessingClient.shared.isAvailable {
                 expectSuccess(result)
                 let merged = runtime.queryGateway.pixelDataForLayer(0)
-                #expect(merged.count == 4)
+                #expect(merged.count == width * height * 4)
                 #expect(merged[2] == 255)
             } else {
                 expectFailure(result, .bridgeMutationFailed("mergeLayerDown"))

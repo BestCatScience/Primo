@@ -38,7 +38,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
                 compositeSurface: { _ in self.previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF]) }
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             state.workspace.openTabs = [tab]
             state.workspace.activeTabID = tab.id
@@ -94,7 +94,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
                 compositeSurface: { _ in self.previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF]) }
             )
         } operation: {
-            let feature = AppFeature()
+            let feature = AppIntegrationFeature()
             var state = AppFeature.State()
             state.workspace.openTabs = [tab]
             state.workspace.activeTabID = tab.id

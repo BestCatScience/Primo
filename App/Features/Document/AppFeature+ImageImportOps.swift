@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension AppFeature {
+extension AppIntegrationFeature {
     typealias InpaintCrop = PrimoDocumentApplication.InpaintCrop
 
     struct ImportedCanvasImage {

@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct DocumentPresentationQueryService {
         let documentQueryGateway: DocumentQueryGateway
         let documentExportGateway: DocumentExportGateway

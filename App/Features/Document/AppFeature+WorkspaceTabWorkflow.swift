@@ -4,7 +4,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 
-extension AppFeature {
+extension AppIntegrationFeature {
     typealias WorkspaceProjectLoadIssue = PrimoWorkspaceApplication.WorkspaceProjectLoadIssue
     typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceApplication.WorkspaceProjectLoadFailureReason
     typealias WorkspaceProjectLoadOperation = PrimoWorkspaceApplication.WorkspaceProjectLoadOperation

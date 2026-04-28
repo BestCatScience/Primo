@@ -160,7 +160,7 @@ final class AppFeatureReducerTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpSuccessCompletesHydration() {
-        let feature = AppFeature()
+        let feature = AppIntegrationFeature()
         var state = AppFeature.State()
         state.application.beginHydration()
 
@@ -185,7 +185,7 @@ final class AppFeatureReducerTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpFailureSurfacesFeedback() {
-        let feature = AppFeature()
+        let feature = AppIntegrationFeature()
         var state = AppFeature.State()
         state.application.beginHydration()
 
@@ -494,7 +494,7 @@ final class AppFeatureReducerTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpIssuesOverrideSuccessBanner() {
-        let feature = AppFeature()
+        let feature = AppIntegrationFeature()
         var state = AppFeature.State()
         state.application.beginHydration()
 
@@ -515,7 +515,7 @@ final class AppFeatureReducerTests: XCTestCase {
     }
 
     func testWorkspaceCatalogFailureUsesReasonBasedMapper() {
-        let feature = AppFeature()
+        let feature = AppIntegrationFeature()
         var state = AppFeature.State()
         state.application.beginHydration()
 
@@ -563,9 +563,9 @@ final class AppFeatureReducerTests: XCTestCase {
         XCTAssertTrue(contents.contains("CanvasLifecycleFeedbackMapper"))
     }
 
-    func testWorkspaceShellFeatureHomeProjectsLoadRoutesToCatalogRequest() async {
+    func testAppIntegrationFeatureHomeProjectsLoadRoutesToCatalogRequest() async {
         let store = TestStore(initialState: AppFeature.State()) {
-            WorkspaceShellFeature()
+            AppIntegrationFeature()
         }
         store.exhaustivity = .off
 
@@ -575,7 +575,7 @@ final class AppFeatureReducerTests: XCTestCase {
         await store.receive(.workspaceCatalogRequested(.loadSavedProjects))
     }
 
-    func testDocumentEditorFeatureUndoRoutesToHistoryMutation() async {
+    func testAppIntegrationFeatureUndoRoutesToHistoryMutation() async {
         let store = TestStore(
             initialState: {
                 var state = AppFeature.State()
@@ -583,7 +583,7 @@ final class AppFeatureReducerTests: XCTestCase {
                 return state
             }()
         ) {
-            DocumentEditorFeature()
+            AppIntegrationFeature()
         } withDependencies: {
             $0.documentHistoryGateway = .stub(undo: { .success(()) })
         }
@@ -593,7 +593,7 @@ final class AppFeatureReducerTests: XCTestCase {
         await store.receive(.refreshPresentationRequested)
     }
 
-    func testAssetImportExportFeatureSaveHistoryRoutesToCatalogRequest() async {
+    func testAppIntegrationFeatureSaveHistoryRoutesToCatalogRequest() async {
         let activeTab = OpenDocumentTab.testValue()
         let store = TestStore(
             initialState: {
@@ -604,7 +604,7 @@ final class AppFeatureReducerTests: XCTestCase {
                 return state
             }()
         ) {
-            AssetImportExportFeature()
+            AppIntegrationFeature()
         }
         store.exhaustivity = .off
 
@@ -616,5 +616,42 @@ final class AppFeatureReducerTests: XCTestCase {
                 )
             )
         )
+    }
+
+    func testAppFeatureStateStoresEditorAndImportExportInFeatureSlices() {
+        var state = AppFeature.State()
+
+        state.canvas.zoomScale = 2.0
+        state.saveHistory.isPresented = true
+
+        XCTAssertEqual(state.document.canvas.zoomScale, 2.0)
+        XCTAssertTrue(state.importExport.saveHistory.isPresented)
+    }
+
+    func testDocumentFeatureOwnsCanvasReducerScope() async {
+        let store = TestStore(initialState: DocumentFeature.State()) {
+            DocumentFeature()
+        }
+
+        await store.send(.canvas(.zoomScaleChanged(1.75))) {
+            $0.canvas.zoomScale = 1.75
+        }
+    }
+
+    func testImportExportDismissalRoutesThroughFeatureSlice() async {
+        let store = TestStore(
+            initialState: {
+                var state = AppFeature.State()
+                state.importExport.saveHistory.isPresented = true
+                return state
+            }()
+        ) {
+            AppFeature()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.saveHistoryDismissed) {
+            $0.importExport.saveHistory.isPresented = false
+        }
     }
 }

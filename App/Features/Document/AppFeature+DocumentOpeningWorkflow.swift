@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func handleOpenImportedDocumentRequest(
         state: inout State,
         sourceURL: URL

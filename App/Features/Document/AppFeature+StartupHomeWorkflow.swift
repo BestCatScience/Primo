@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct ShareExportFactory {
         let uuidClient: UUIDClient
 

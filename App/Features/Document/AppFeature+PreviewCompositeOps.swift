@@ -3,7 +3,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     static func renderedCompositeSurface(
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle,

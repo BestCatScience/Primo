@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 
-extension AppFeature {
+extension AppIntegrationFeature {
     typealias SelectionTransformCommit = PrimoDocumentApplication.SelectionTransformCommit
     typealias SelectionTransformService = PrimoDocumentApplication.DocumentContentService
 

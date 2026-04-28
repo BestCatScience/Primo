@@ -1,5 +1,5 @@
 import Foundation
 
-extension AppFeature {
+extension AppIntegrationFeature {
     // GPU stroke rasterization is owned by DocumentStrokeSessionUseCase.
 }

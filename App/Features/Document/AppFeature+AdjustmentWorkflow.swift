@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct ActiveLayerPixelContext {
         let index: Int
         let pixelData: Data

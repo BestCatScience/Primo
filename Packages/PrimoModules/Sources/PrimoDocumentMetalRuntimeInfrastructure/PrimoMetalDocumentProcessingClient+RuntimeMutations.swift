@@ -736,12 +736,16 @@ extension PrimoMetalDocumentProcessingClient {
         guard commandBuffer.status == .completed else { return nil }
 
         let dirtyRect = blurDirtyRect(samples: samples, brush: brush, width: canvasWidth, height: canvasHeight)
+        let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
+        let rectPixelData = dirtyRect.width == canvasWidth && dirtyRect.height == canvasHeight
+            ? fullPixelData
+            : crop(pixelData: fullPixelData, canvasWidth: canvasWidth, rect: dirtyRect)
         return DocumentLayerMutationPayload(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: dirtyRect,
             gpuBufferHandle: makeBufferHandle(width: canvasWidth, height: canvasHeight, bytesPerRow: canvasWidth * 4, buffer: outputBuffer),
-            rectPixelData: Data(),
+            rectPixelData: rectPixelData,
             fullPixelData: nil
         )
     }

@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func routeDocumentEditorAction(
         state: inout State,
         action: Action
@@ -35,39 +35,39 @@ extension AppFeature {
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case let .document(.newCanvasFromImageReceived(name, data)):
+        case let .importExport(.newCanvasFromImageReceived(name, data)):
             return handleNewCanvasFromImageReceived(state: &state, name: name, data: data)
 
-        case let .document(.newCanvasFromImagePreparationCompleted(plan)):
+        case let .importExport(.newCanvasFromImagePreparationCompleted(plan)):
             return handleNewCanvasFromImagePreparationCompleted(state: &state, plan: plan)
 
-        case let .document(.newCanvasFromImageFailed(message)):
+        case let .importExport(.newCanvasFromImageFailed(message)):
             handleNewCanvasFromImageFailed(state: &state, message: message)
             return .none
 
-        case .document(.saveHistoryRequested):
+        case .importExport(.saveHistoryRequested):
             return handleSaveHistoryRequest(state: &state)
 
-        case let .document(.saveHistoryLoaded(entries)):
+        case let .importExport(.saveHistoryLoaded(entries)):
             state.saveHistory.present(entries: entries)
             return .none
 
-        case let .document(.saveHistoryLoadFailed(message)):
+        case let .importExport(.saveHistoryLoadFailed(message)):
             handleSaveHistoryLoadFailed(state: &state, message: message)
             return .none
 
-        case .document(.saveHistoryDismissed):
+        case .importExport(.saveHistoryDismissed):
             state.saveHistory.dismiss()
             return .none
 
-        case let .document(.saveHistoryRestoreRequested(projectURL, openInNewTab)):
+        case let .importExport(.saveHistoryRestoreRequested(projectURL, openInNewTab)):
             return handleSaveHistoryRestoreRequest(
                 state: &state,
                 projectURL: projectURL,
                 openInNewTab: openInNewTab
             )
 
-        case let .document(.saveHistoryOpened(loaded, projectURL, openInNewTab, issues)):
+        case let .importExport(.saveHistoryOpened(loaded, projectURL, openInNewTab, issues)):
             return handleSaveHistoryOpened(
                 state: &state,
                 loaded: loaded,
@@ -76,45 +76,45 @@ extension AppFeature {
                 issues: issues
             )
 
-        case let .document(.saveHistoryRestoreFailed(message)):
+        case let .importExport(.saveHistoryRestoreFailed(message)):
             handleSaveHistoryRestoreFailed(state: &state, message: message)
             return .none
 
-        case .document(.exportDocumentRequested):
+        case .importExport(.exportDocumentRequested):
             handleExportDocumentRequest(state: &state)
             return .none
 
-        case .document(.saveDocumentRequested):
+        case .importExport(.saveDocumentRequested):
             return handleSaveDocumentRequest(
                 state: &state,
                 preferredDestinationURL: state.workspace.activeTab?.sourceProjectURL
             )
 
-        case .document(.saveDocumentCopyRequested):
+        case .importExport(.saveDocumentCopyRequested):
             return handleSaveDocumentRequest(
                 state: &state,
                 preferredDestinationURL: nil
             )
 
-        case .document(.exportTimelapseRequested):
+        case .importExport(.exportTimelapseRequested):
             return handleTimelapseExportRequest(state: &state)
 
-        case let .document(.timelapseExportProgressUpdated(progress)):
+        case let .importExport(.timelapseExportProgressUpdated(progress)):
             handleTimelapseExportProgressUpdated(state: &state, progress: progress)
             return .none
 
-        case let .document(.timelapseExportSucceeded(result)):
+        case let .importExport(.timelapseExportSucceeded(result)):
             handleTimelapseExportSucceeded(state: &state, result: result)
             return .none
 
-        case let .document(.timelapseExportFailed(message)):
+        case let .importExport(.timelapseExportFailed(message)):
             handleTimelapseExportFailed(state: &state, message: message)
             return .none
 
-        case let .document(.photoImportReceived(name, data)):
+        case let .importExport(.photoImportReceived(name, data)):
             return handlePhotoImport(state: &state, name: name, data: data)
 
-        case let .document(.photoImportFailed(message)):
+        case let .importExport(.photoImportFailed(message)):
             handlePhotoImportFailed(state: &state, message: message)
             return .none
 

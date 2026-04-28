@@ -1,7 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func panelState(
         for panel: StudioPanelKind,
         state: State

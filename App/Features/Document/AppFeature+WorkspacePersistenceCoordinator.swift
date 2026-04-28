@@ -6,7 +6,7 @@ import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 
-extension AppFeature {
+extension AppIntegrationFeature {
     typealias WorkspacePersistenceIssue = PrimoWorkspaceApplication.WorkspacePersistenceIssue
     typealias WorkspacePersistenceFailureReason = PrimoWorkspaceApplication.WorkspacePersistenceFailureReason
     typealias WorkspacePersistenceFailure = PrimoWorkspaceApplication.WorkspacePersistenceFailure
@@ -731,7 +731,7 @@ extension AppFeature {
     }
 }
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct WorkspaceFeedbackMapper: Sendable {
         func feedback(for failure: WorkspacePersistenceFailure) -> ApplicationFeedback {
             switch failure.reason {

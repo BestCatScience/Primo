@@ -1,13 +1,13 @@
 import ComposableArchitecture
 import Foundation
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func routeSelectionEditingAction(
         state: inout State,
         action: Action
     ) -> Effect<Action>? {
         switch action {
-        case let .editing(.toolSelected(tool)):
+        case let .document(.editing(.toolSelected(tool))):
             handleToolSelection(
                 state: &state,
                 tool: tool,
@@ -15,7 +15,7 @@ extension AppFeature {
             )
             return .none
 
-        case let .editing(.toolLongPressed(tool)):
+        case let .document(.editing(.toolLongPressed(tool))):
             handleToolSelection(
                 state: &state,
                 tool: tool,
@@ -23,57 +23,57 @@ extension AppFeature {
             )
             return .none
 
-        case let .editing(.panelCollapseToggled(panel)):
+        case let .document(.editing(.panelCollapseToggled(panel))):
             togglePanelCollapse(for: panel, state: &state)
             return .none
 
-        case .brushPalette(.delegate(.clearSelection)):
+        case .document(.brushPalette(.delegate(.clearSelection))):
             handleClearSelection(state: &state)
             return .none
 
-        case .brushPalette(.delegate(.invertSelection)):
+        case .document(.brushPalette(.delegate(.invertSelection))):
             handleInvertSelection(state: &state)
             return .none
 
-        case let .brushPalette(.delegate(.expandSelection(expansion))):
+        case let .document(.brushPalette(.delegate(.expandSelection(expansion)))):
             handleAdjustSelection(state: &state, expansion: max(expansion, 1))
             return .none
 
-        case let .brushPalette(.delegate(.contractSelection(contraction))):
+        case let .document(.brushPalette(.delegate(.contractSelection(contraction)))):
             handleAdjustSelection(state: &state, expansion: -max(contraction, 1))
             return .none
 
-        case let .editing(.featherSelectionRequested(radius)):
+        case let .document(.editing(.featherSelectionRequested(radius))):
             handleFeatherSelection(state: &state, radius: max(radius, 1))
             return .none
 
-        case let .editing(.colorRangeSelectionRequested(request)):
+        case let .document(.editing(.colorRangeSelectionRequested(request))):
             return handleColorRangeSelectionRequest(state: &state, request: request)
 
-        case .brushPalette(.delegate(.cancelTransform)):
+        case .document(.brushPalette(.delegate(.cancelTransform))):
             discardTransformPreview(state: &state)
             return .none
 
-        case .brushPalette(.delegate(.applyTransform)):
+        case .document(.brushPalette(.delegate(.applyTransform))):
             return applyTransform(state: &state)
 
-        case let .brushPalette(.delegate(.applyText(draft))):
+        case let .document(.brushPalette(.delegate(.applyText(draft)))):
             return handleApplyText(state: &state, draft: draft)
 
-        case .canvas(.delegate(.applyTransform)):
+        case .document(.canvas(.delegate(.applyTransform))):
             return .none
 
-        case let .canvas(.delegate(.placeText(point))):
+        case let .document(.canvas(.delegate(.placeText(point)))):
             handlePlaceText(state: &state, point: point)
             return .none
 
-        case .editing(.createLayerMaskFromSelectionRequested):
+        case .document(.editing(.createLayerMaskFromSelectionRequested)):
             return handleCreateLayerMask(state: &state)
 
-        case .editing(.clearLayerMaskRequested):
+        case .document(.editing(.clearLayerMaskRequested)):
             return handleClearLayerMask(state: &state)
 
-        case .editing(.applyLayerMaskRequested):
+        case .document(.editing(.applyLayerMaskRequested)):
             return handleApplyLayerMask(state: &state)
 
         default:

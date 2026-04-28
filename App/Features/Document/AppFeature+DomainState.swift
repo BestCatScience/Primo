@@ -256,7 +256,7 @@ extension AppFeature.ApplicationFeedback {
     }
 }
 
-extension AppFeature {
+extension AppIntegrationFeature {
     static func optionalErrorMessage(_ error: Error) -> String? {
         let message = error.localizedDescription
         return message.isEmpty ? nil : message

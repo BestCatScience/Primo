@@ -13,16 +13,7 @@ extension AppFeature {
         var appLanguage: AppLanguage = .japanese
     }
 
-    struct WorkspaceState: Equatable {
-        var openTabs: [OpenDocumentTab] = []
-        var activeTabID: OpenDocumentTab.ID?
-        var primarySelectedTabID: OpenDocumentTab.ID?
-        var secondarySelectedTabID: OpenDocumentTab.ID?
-        var focusedWorkspacePane: WorkspacePane = .primary
-        var workspaceLayout: WorkspaceLayoutMode = .single
-        var pendingCloseConfirmation: PendingCloseConfirmationState?
-        var pendingWorkspaceTabReservation: PendingWorkspaceTabReservation?
-    }
+    typealias WorkspaceState = WorkspaceFeature.State
 
     struct RecoveryState: Equatable {
         var items: [AutosaveRecoveryItem] = []
@@ -42,15 +33,45 @@ extension AppFeature {
     @ObservableState
     struct State: Equatable {
         var application = ApplicationState()
-        var workspace = WorkspaceState()
         var recovery = RecoveryState()
-        var saveHistory = SaveHistoryState()
-        var export = ExportState()
         var nanoBanana = NanoBananaState()
-        var brushPalette = BrushPaletteFeature.State()
-        var layerSidebar = LayerSidebarFeature.State()
-        var canvas = CanvasFeature.State()
-        var brushPanel = StudioPanelLayoutState()
-        var layerPanel = StudioPanelLayoutState()
+        var workspace = WorkspaceFeature.State()
+        var document = DocumentFeature.State()
+        var importExport = ImportExportFeature.State()
+
+        var saveHistory: SaveHistoryState {
+            get { importExport.saveHistory }
+            set { importExport.saveHistory = newValue }
+        }
+
+        var export: ExportState {
+            get { importExport.export }
+            set { importExport.export = newValue }
+        }
+
+        var brushPalette: BrushPaletteFeature.State {
+            get { document.brushPalette }
+            set { document.brushPalette = newValue }
+        }
+
+        var layerSidebar: LayerSidebarFeature.State {
+            get { document.layerSidebar }
+            set { document.layerSidebar = newValue }
+        }
+
+        var canvas: CanvasFeature.State {
+            get { document.canvas }
+            set { document.canvas = newValue }
+        }
+
+        var brushPanel: StudioPanelLayoutState {
+            get { document.brushPanel }
+            set { document.brushPanel = newValue }
+        }
+
+        var layerPanel: StudioPanelLayoutState {
+            get { document.layerPanel }
+            set { document.layerPanel = newValue }
+        }
     }
 }

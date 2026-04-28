@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension AppFeature {
+extension AppIntegrationFeature {
     func handleNewCanvasFromImageFailed(
         state: inout State,
         message: String?

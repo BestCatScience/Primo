@@ -6,7 +6,7 @@ import PrimoDocumentContracts
 import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
-extension AppFeature {
+extension AppIntegrationFeature {
     private struct NanoBananaValidatedEdit {
         let command: SubmitNanoBananaEditCommand
         let selectionRegion: NanoBananaSelectionRegion?
@@ -166,7 +166,7 @@ extension AppFeature {
                     await send(
                         .nanoBanana(
                             .generationFailed(
-                                AppFeature.nanoBananaFailureFeedback(failure)
+                                AppIntegrationFeature.nanoBananaFailureFeedback(failure)
                             )
                         )
                     )

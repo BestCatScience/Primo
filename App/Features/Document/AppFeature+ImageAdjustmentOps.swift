@@ -1,7 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 
-extension AppFeature {
+extension AppIntegrationFeature {
     struct GradientMapStop {
         var position: Double
         var red: UInt8
