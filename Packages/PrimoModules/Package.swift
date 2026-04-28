@@ -106,6 +106,9 @@ let package = Package(
                 "PrimoDocumentDomain",
                 "PrimoBrushDomain",
                 "PrimoBrushFileFormats",
+            ],
+            resources: [
+                .process("Shaders"),
             ]
         ),
         .target(

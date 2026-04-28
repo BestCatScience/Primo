@@ -194,6 +194,34 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func metalShadersAreOwnedByRuntimePackage() throws {
+        let repoRoot = try Self.repoRoot()
+        let appShader = repoRoot.appendingPathComponent("App/Rendering/PaintShaders.metal", isDirectory: false)
+        let runtimeShader = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure/Shaders/PaintShaders.metal",
+            isDirectory: false
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: appShader.path))
+        #expect(FileManager.default.fileExists(atPath: runtimeShader.path))
+    }
+
+    @Test
+    func metalRuntimeDoesNotUseMainBundleDefaultLibrary() throws {
+        let repoRoot = try Self.repoRoot()
+        let runtimeRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalRuntimeInfrastructure",
+            isDirectory: true
+        )
+
+        let sources = try Self.swiftSources(under: runtimeRoot)
+        for source in sources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            #expect(!body.contains(".makeDefaultLibrary()"), "\(source.path) should load the package Metal library explicitly")
+        }
+    }
+
+    @Test
     func testSupportUsesGpuStrokeSurfaceContractName() throws {
         let repoRoot = try Self.repoRoot()
         let support = repoRoot.appendingPathComponent("PrimoTests/TestSupport.swift", isDirectory: false)

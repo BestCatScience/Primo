@@ -169,9 +169,8 @@ extension PrimoMetalDocumentProcessingClient {
             seedY >= 0,
             seedY < canvasHeight,
             let commandQueue,
-            let eligibilityPipeline = autoSelectionEligibilityPipeline,
-            let propagationPipeline = fillPropagationPipeline,
-            let expansionPipeline = fillExpansionPipeline
+            let eligibilityPipeline = fillEligibilityPipeline,
+            let device
         else {
             return nil
         }
@@ -184,12 +183,9 @@ extension PrimoMetalDocumentProcessingClient {
 
         guard
             let sourceBuffer = makeBuffer(pixelData),
-            let eligibleBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
-            let firstFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
-            let secondFillBuffer = device?.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
-            let changeFlagBuffer = device?.makeBuffer(length: MemoryLayout<UInt32>.stride, options: .storageModeShared),
+            let eligibleBuffer = device.makeBuffer(length: canvasWidth * canvasHeight, options: .storageModeShared),
             let eligibilityDescriptorBuffer = makeBuffer(
-                PrimoMetalAutoSelectionDescriptor(
+                PrimoMetalFillDescriptor(
                     width: UInt32(canvasWidth),
                     height: UInt32(canvasHeight),
                     seedX: UInt32(seedX),
@@ -204,21 +200,6 @@ extension PrimoMetalDocumentProcessingClient {
                     seedRed: seedRed,
                     seedGreen: seedGreen,
                     seedBlue: seedBlue,
-                    seedAlpha: seedAlpha
-                )
-            ),
-            let propagationDescriptorBuffer = makeBuffer(
-                PrimoMetalFillDescriptor(
-                    width: UInt32(canvasWidth),
-                    height: UInt32(canvasHeight),
-                    seedX: UInt32(seedX),
-                    seedY: UInt32(seedY),
-                    thresholdMode: thresholdMode == .opacity ? 0 : 1,
-                    expansion: UInt32(max(0, expansion)),
-                    tolerance: 0,
-                    seedRed: seedRed,
-                    seedGreen: seedGreen,
-                    seedBlue: seedBlue,
                     seedAlpha: seedAlpha,
                     targetRed: 0,
                     targetGreen: 0,
@@ -229,10 +210,6 @@ extension PrimoMetalDocumentProcessingClient {
         else {
             return nil
         }
-
-        memset(firstFillBuffer.contents(), 0, canvasWidth * canvasHeight)
-        memset(secondFillBuffer.contents(), 0, canvasWidth * canvasHeight)
-        firstFillBuffer.contents().assumingMemoryBound(to: UInt8.self)[seedY * canvasWidth + seedX] = 255
 
         guard let eligibilityCommandBuffer = commandQueue.makeCommandBuffer(),
               let eligibilityEncoder = eligibilityCommandBuffer.makeComputeCommandEncoder()
@@ -249,47 +226,117 @@ extension PrimoMetalDocumentProcessingClient {
         eligibilityCommandBuffer.waitUntilCompleted()
         guard eligibilityCommandBuffer.status == .completed else { return nil }
 
-        var currentFill = firstFillBuffer
-        var nextFill = secondFillBuffer
-        let maxPropagationIterations = max(1, canvasWidth + canvasHeight)
-        for _ in 0..<maxPropagationIterations {
-            changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee = 0
-            guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
-            guard let propagationEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
-            propagationEncoder.setComputePipelineState(propagationPipeline)
-            propagationEncoder.setBuffer(eligibleBuffer, offset: 0, index: 0)
-            propagationEncoder.setBuffer(currentFill, offset: 0, index: 1)
-            propagationEncoder.setBuffer(nextFill, offset: 0, index: 2)
-            propagationEncoder.setBuffer(changeFlagBuffer, offset: 0, index: 3)
-            propagationEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 4)
-            dispatch2D(encoder: propagationEncoder, pipeline: propagationPipeline, width: canvasWidth, height: canvasHeight)
-            propagationEncoder.endEncoding()
-            commandBuffer.commit()
-            commandBuffer.waitUntilCompleted()
-            guard commandBuffer.status == .completed else { return nil }
-            swap(&currentFill, &nextFill)
-            if changeFlagBuffer.contents().assumingMemoryBound(to: UInt32.self).pointee == 0 {
-                break
+        let gpuEligible = byteArray(from: eligibleBuffer, count: canvasWidth * canvasHeight)
+        let seedIndex = seedY * canvasWidth + seedX
+        let eligible = gpuEligible.indices.contains(seedIndex) && gpuEligible[seedIndex] != 0
+            ? gpuEligible
+            : Self.autoSelectionEligibilityMask(
+                pixelData: pixelData,
+                width: canvasWidth,
+                height: canvasHeight,
+                seedRed: seedRed,
+                seedGreen: seedGreen,
+                seedBlue: seedBlue,
+                seedAlpha: seedAlpha,
+                thresholdMode: thresholdMode,
+                opacityTolerance: opacityTolerance,
+                colorTolerance: colorTolerance
+            )
+        return Self.contiguousMask(
+            eligible: eligible,
+            width: canvasWidth,
+            height: canvasHeight,
+            seedX: seedX,
+            seedY: seedY,
+            expansion: max(0, expansion)
+        )
+    }
+
+    private static func autoSelectionEligibilityMask(
+        pixelData: Data,
+        width: Int,
+        height: Int,
+        seedRed: Float,
+        seedGreen: Float,
+        seedBlue: Float,
+        seedAlpha: Float,
+        thresholdMode: FillThresholdMode,
+        opacityTolerance: Double,
+        colorTolerance: Double
+    ) -> [UInt8] {
+        let tolerance = Float(max(0.0, min(1.0, thresholdMode == .opacity ? opacityTolerance : colorTolerance)))
+        var mask = [UInt8](repeating: 0, count: width * height)
+        for index in 0..<mask.count {
+            let offset = index * 4
+            let red = Float(pixelData[offset]) / 255.0
+            let green = Float(pixelData[offset + 1]) / 255.0
+            let blue = Float(pixelData[offset + 2]) / 255.0
+            let alpha = Float(pixelData[offset + 3]) / 255.0
+            let matches: Bool
+            if thresholdMode == .opacity {
+                matches = abs(alpha - seedAlpha) <= tolerance
+            } else {
+                let deltaRed = red - seedRed
+                let deltaGreen = green - seedGreen
+                let deltaBlue = blue - seedBlue
+                matches = sqrt((deltaRed * deltaRed) + (deltaGreen * deltaGreen) + (deltaBlue * deltaBlue)) / sqrt(3.0) <= tolerance
+            }
+            mask[index] = matches ? 255 : 0
+        }
+        return mask
+    }
+
+    private static func contiguousMask(
+        eligible: [UInt8],
+        width: Int,
+        height: Int,
+        seedX: Int,
+        seedY: Int,
+        expansion: Int
+    ) -> [UInt8] {
+        let count = width * height
+        var mask = [UInt8](repeating: 0, count: count)
+        let seedIndex = seedY * width + seedX
+        guard eligible.indices.contains(seedIndex), eligible[seedIndex] != 0 else {
+            return mask
+        }
+
+        var queue = [seedIndex]
+        var cursor = 0
+        mask[seedIndex] = 255
+        while cursor < queue.count {
+            let index = queue[cursor]
+            cursor += 1
+            let x = index % width
+            let y = index / width
+            let neighbors = [
+                x > 0 ? index - 1 : nil,
+                x + 1 < width ? index + 1 : nil,
+                y > 0 ? index - width : nil,
+                y + 1 < height ? index + width : nil,
+            ]
+            for neighbor in neighbors.compactMap(\.self) where eligible[neighbor] != 0 && mask[neighbor] == 0 {
+                mask[neighbor] = 255
+                queue.append(neighbor)
             }
         }
 
-        if expansion > 0 {
-            for _ in 0..<expansion {
-                guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
-                guard let expansionEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
-                expansionEncoder.setComputePipelineState(expansionPipeline)
-                expansionEncoder.setBuffer(currentFill, offset: 0, index: 0)
-                expansionEncoder.setBuffer(nextFill, offset: 0, index: 1)
-                expansionEncoder.setBuffer(propagationDescriptorBuffer, offset: 0, index: 2)
-                dispatch2D(encoder: expansionEncoder, pipeline: expansionPipeline, width: canvasWidth, height: canvasHeight)
-                expansionEncoder.endEncoding()
-                commandBuffer.commit()
-                commandBuffer.waitUntilCompleted()
-                guard commandBuffer.status == .completed else { return nil }
-                swap(&currentFill, &nextFill)
+        guard expansion > 0 else { return mask }
+        for _ in 0..<expansion {
+            var expanded = mask
+            for index in 0..<count where mask[index] == 0 {
+                let x = index % width
+                let y = index / width
+                if (x > 0 && mask[index - 1] != 0) ||
+                    (x + 1 < width && mask[index + 1] != 0) ||
+                    (y > 0 && mask[index - width] != 0) ||
+                    (y + 1 < height && mask[index + width] != 0) {
+                    expanded[index] = 255
+                }
             }
+            mask = expanded
         }
-        return byteArray(from: currentFill, count: canvasWidth * canvasHeight)
+        return mask
     }
 
     public func scaledPixelData(

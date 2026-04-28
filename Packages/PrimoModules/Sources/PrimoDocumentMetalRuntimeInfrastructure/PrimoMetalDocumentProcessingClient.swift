@@ -485,7 +485,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let isClipped: Bool
         let blendMode: LayerBlendMode
         let gpuHandleID: UUID?
-        let pixelStorageIdentity: UInt
+        let pixelSignature: Int
     }
 
     private struct SnapshotTextureSignature: Equatable {
@@ -493,7 +493,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let width: Int
         let height: Int
         let transferKind: MetalSnapshotTransferKind
-        let compositeStorageIdentity: UInt
+        let compositePixelSignature: Int
         let layers: [SnapshotLayerSignature]
     }
 
@@ -611,7 +611,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let device = MTLCreateSystemDefaultDevice()
         self.device = device
         self.commandQueue = device?.makeCommandQueue()
-        self.library = device?.makeDefaultLibrary()
+        self.library = device.flatMap(PrimoMetalShaderLibrary.makeDefaultLibrary(device:))
         self.compositePipeline = Self.makePipeline(device: device, library: library, functionName: "compositePreviewKernel")
         self.invertMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "invertMaskKernel")
         self.dilateMaskPipeline = Self.makePipeline(device: device, library: library, functionName: "dilateMaskKernel")
@@ -2306,7 +2306,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             width: snapshot.width,
             height: snapshot.height,
             transferKind: snapshot.transferKind,
-            compositeStorageIdentity: snapshot.compositeBufferHandle.map(Self.handleIdentity(_:)) ?? Self.dataStorageIdentity(snapshot.compositePixelData),
+            compositePixelSignature: snapshot.compositeBufferHandle.map(Self.handleSignature(_:)) ?? Self.dataContentSignature(snapshot.compositePixelData),
             layers: orderedLayers.map {
                 SnapshotLayerSignature(
                     index: $0.index,
@@ -2315,7 +2315,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     isClipped: $0.isClipped,
                     blendMode: $0.blendMode,
                     gpuHandleID: $0.gpuBufferHandle?.id,
-                    pixelStorageIdentity: Self.dataStorageIdentity($0.pixelData)
+                    pixelSignature: Self.dataContentSignature($0.pixelData)
                 )
             }
         )
@@ -2371,15 +2371,12 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         return texture
     }
 
-    private static func dataStorageIdentity(_ data: Data) -> UInt {
-        data.withUnsafeBytes { bytes in
-            guard let baseAddress = bytes.baseAddress else { return 0 }
-            return UInt(bitPattern: baseAddress)
-        }
+    private static func dataContentSignature(_ data: Data) -> Int {
+        data.hashValue
     }
 
-    private static func handleIdentity(_ handle: MetalBufferHandle) -> UInt {
-        UInt(bitPattern: handle.id.uuidString.hashValue)
+    private static func handleSignature(_ handle: MetalBufferHandle) -> Int {
+        handle.id.hashValue
     }
 
     func makeBuffer<T>(_ values: [T]) -> MTLBuffer? {

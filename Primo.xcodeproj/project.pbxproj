@@ -22,30 +22,15 @@
 		A00000000000000000000023 /* AppFeature.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000003 /* AppFeature.swift */; };
 		A00000000000000000000024 /* PaintModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000004 /* PaintModels.swift */; };
 		A00000000000000000000025 /* CanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000005 /* CanvasView.swift */; };
-		D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000001 /* CanvasViewportGeometry.swift */; };
 		A00000000000000000000026 /* BrushPaletteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000006 /* BrushPaletteView.swift */; };
 		A00000000000000000000027 /* LayerSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000007 /* LayerSidebarView.swift */; };
 		A0000000000000000000002A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000031 /* UIKit.framework */; };
 		A0000000000000000000002B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* Foundation.framework */; };
 		A0000000000000000000002C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* CoreGraphics.framework */; };
 		A0000000000000000000002D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* AVFoundation.framework */; };
-		A0000000000000000000002F /* PaintShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* PaintShaders.metal */; };
 		A00000000000000000000035 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* Metal.framework */; };
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
 		A00000000000000000000039 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
-		C30000000000000000000001 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000001 /* CombineSchedulers */; };
-		C30000000000000000000002 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000002 /* CasePaths */; };
-		C30000000000000000000003 /* CasePathsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000003 /* CasePathsCore */; };
-		C30000000000000000000004 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000004 /* Clocks */; };
-		C30000000000000000000005 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000005 /* ConcurrencyExtras */; };
-		C30000000000000000000006 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000006 /* CustomDump */; };
-		C30000000000000000000007 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000007 /* Dependencies */; };
-		C30000000000000000000008 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000008 /* DependenciesMacros */; };
-		C30000000000000000000009 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000009 /* IdentifiedCollections */; };
-		C3000000000000000000000D /* PerceptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000D /* PerceptionCore */; };
-		C3000000000000000000000E /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000E /* Perception */; };
-		C3000000000000000000000F /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000F /* Sharing */; };
-		C30000000000000000000010 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000010 /* IssueReporting */; };
 		A0000000000000000000003A /* BrushRuntimeSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* BrushRuntimeSettings.swift */; };
 		A0000000000000000000003B /* PaintDocumentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* PaintDocumentPresentation.swift */; };
 		A0000000000000000000003D /* PaintDocumentClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* PaintDocumentClient.swift */; };
@@ -92,19 +77,6 @@
 		A000000000000000000000E6 /* AppFeature+ReducerRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E7 /* AppFeature+ReducerRouting.swift */; };
 		A000000000000000000000F6 /* AppFeature+ActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* AppFeature+ActionRouting.swift */; };
 		AA1000000000000000000002 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
-		C40000000000000000000001 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000001 /* CombineSchedulers */; };
-		C40000000000000000000002 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000002 /* CasePaths */; };
-		C40000000000000000000003 /* CasePathsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000003 /* CasePathsCore */; };
-		C40000000000000000000004 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000004 /* Clocks */; };
-		C40000000000000000000005 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000005 /* ConcurrencyExtras */; };
-		C40000000000000000000006 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000006 /* CustomDump */; };
-		C40000000000000000000007 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000007 /* Dependencies */; };
-		C40000000000000000000008 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000008 /* DependenciesMacros */; };
-		C40000000000000000000009 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000009 /* IdentifiedCollections */; };
-		C4000000000000000000000D /* PerceptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000D /* PerceptionCore */; };
-		C4000000000000000000000E /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000E /* Perception */; };
-		C4000000000000000000000F /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000F /* Sharing */; };
-		C40000000000000000000010 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000010 /* IssueReporting */; };
 		AA1000000000000000000003 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000003 /* TestSupport.swift */; };
 		AA1000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000004 /* WorkspacePersistenceUseCaseTests.swift */; };
 		AA1000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000000000000005 /* WorkspaceProjectLoadUseCaseTests.swift */; };
@@ -151,15 +123,41 @@
 		B90000000000000000000035 /* PrimoDocumentEngineInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */; };
 		B90000000000000000000037 /* PrimoDocumentRenderingInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000038 /* PrimoDocumentRenderingInfrastructure */; };
 		B90000000000000000000039 /* PrimoDocumentTimelapseInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003A /* PrimoDocumentTimelapseInfrastructure */; };
-		B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */; };
 		B9000000000000000000003B /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B9000000000000000000003C /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
+		B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */; };
 		B91000000000000000000001 /* PrimoCanvasInputDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B91000000000000000000011 /* PrimoCanvasInputDomain */; };
 		B91000000000000000000002 /* PrimoDocumentStrokeApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B91000000000000000000012 /* PrimoDocumentStrokeApplication */; };
 		B91000000000000000000004 /* PrimoCanvasPresentationInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B91000000000000000000014 /* PrimoCanvasPresentationInfrastructure */; };
 		C20000000000000000000001 /* AppFeature+StrokeGeometryOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000002 /* AppFeature+StrokeGeometryOps.swift */; };
 		C20000000000000000000003 /* AppFeature+StrokeRasterizationCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000004 /* AppFeature+StrokeRasterizationCore.swift */; };
 		C20000000000000000000005 /* AppFeature+StrokeBlendOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000006 /* AppFeature+StrokeBlendOps.swift */; };
+		C30000000000000000000001 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000001 /* CombineSchedulers */; };
+		C30000000000000000000002 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000002 /* CasePaths */; };
+		C30000000000000000000003 /* CasePathsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000003 /* CasePathsCore */; };
+		C30000000000000000000004 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000004 /* Clocks */; };
+		C30000000000000000000005 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000005 /* ConcurrencyExtras */; };
+		C30000000000000000000006 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000006 /* CustomDump */; };
+		C30000000000000000000007 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000007 /* Dependencies */; };
+		C30000000000000000000008 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000008 /* DependenciesMacros */; };
+		C30000000000000000000009 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000009 /* IdentifiedCollections */; };
+		C3000000000000000000000D /* PerceptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000D /* PerceptionCore */; };
+		C3000000000000000000000E /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000E /* Perception */; };
+		C3000000000000000000000F /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000F /* Sharing */; };
+		C30000000000000000000010 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000010 /* IssueReporting */; };
+		C40000000000000000000001 /* CombineSchedulers in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000001 /* CombineSchedulers */; };
+		C40000000000000000000002 /* CasePaths in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000002 /* CasePaths */; };
+		C40000000000000000000003 /* CasePathsCore in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000003 /* CasePathsCore */; };
+		C40000000000000000000004 /* Clocks in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000004 /* Clocks */; };
+		C40000000000000000000005 /* ConcurrencyExtras in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000005 /* ConcurrencyExtras */; };
+		C40000000000000000000006 /* CustomDump in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000006 /* CustomDump */; };
+		C40000000000000000000007 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000007 /* Dependencies */; };
+		C40000000000000000000008 /* DependenciesMacros in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000008 /* DependenciesMacros */; };
+		C40000000000000000000009 /* IdentifiedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000009 /* IdentifiedCollections */; };
+		C4000000000000000000000D /* PerceptionCore in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000D /* PerceptionCore */; };
+		C4000000000000000000000E /* Perception in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000E /* Perception */; };
+		C4000000000000000000000F /* Sharing in Frameworks */ = {isa = PBXBuildFile; productRef = C2100000000000000000000F /* Sharing */; };
+		C40000000000000000000010 /* IssueReporting in Frameworks */ = {isa = PBXBuildFile; productRef = C21000000000000000000010 /* IssueReporting */; };
 		C8C52E9EC0B44A888AEB7B2F /* AppFeature+ImageImportOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6182AC743040C7B82E2FA6 /* AppFeature+ImageImportOps.swift */; };
 		D30000000000000000000001 /* AppFeature+CanvasPreviewStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000002 /* AppFeature+CanvasPreviewStateCoordinator.swift */; };
 		D30000000000000000000003 /* AppFeature+CanvasToolStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000004 /* AppFeature+CanvasToolStateCoordinator.swift */; };
@@ -172,6 +170,7 @@
 		D4000000000000000000000D /* AppFeature+LayerContentWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */; };
 		D4000000000000000000000F /* AppFeature+LayerStructureWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */; };
 		D40000000000000000000011 /* AppFeature+LayerPropertiesWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */; };
+		D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000001 /* CanvasViewportGeometry.swift */; };
 		D6B81F2981D84D67805BFF2F /* AppFeature+StrokeRasterization.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBFC5AFA41DE4ED6ADED78C7 /* AppFeature+StrokeRasterization.swift */; };
 		DE2EE6961B83425CAAFEACBC /* AppFeature+DocumentActionRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED876FE803A549B6B0A5E369 /* AppFeature+DocumentActionRouting.swift */; };
 		E10000000000000000000001 /* AppFeature+DomainState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* AppFeature+DomainState.swift */; };
@@ -217,11 +216,9 @@
 		A00000000000000000000003 /* AppFeature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFeature.swift; sourceTree = "<group>"; };
 		A00000000000000000000004 /* PaintModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintModels.swift; sourceTree = "<group>"; };
 		A00000000000000000000005 /* CanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasView.swift; sourceTree = "<group>"; };
-		D60000000000000000000001 /* CanvasViewportGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasViewportGeometry.swift; sourceTree = "<group>"; };
 		A00000000000000000000006 /* BrushPaletteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteView.swift; sourceTree = "<group>"; };
 		A00000000000000000000007 /* LayerSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LayerSidebarView.swift; sourceTree = "<group>"; };
 		A0000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A00000000000000000000014 /* PaintShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PaintShaders.metal; sourceTree = "<group>"; };
 		A00000000000000000000015 /* BrushRuntimeSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushRuntimeSettings.swift; sourceTree = "<group>"; };
 		A00000000000000000000016 /* PaintDocumentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentPresentation.swift; sourceTree = "<group>"; };
 		A00000000000000000000018 /* PaintDocumentClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaintDocumentClient.swift; sourceTree = "<group>"; };
@@ -303,6 +300,7 @@
 		D4000000000000000000000E /* AppFeature+LayerContentWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerContentWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000010 /* AppFeature+LayerStructureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerStructureWorkflow.swift"; sourceTree = "<group>"; };
 		D40000000000000000000012 /* AppFeature+LayerPropertiesWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+LayerPropertiesWorkflow.swift"; sourceTree = "<group>"; };
+		D60000000000000000000001 /* CanvasViewportGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasViewportGeometry.swift; sourceTree = "<group>"; };
 		D6E00941144B432589C8F631 /* AppFeature+WorkspaceActionRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+WorkspaceActionRouting.swift"; sourceTree = "<group>"; };
 		E10000000000000000000002 /* AppFeature+DomainState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+DomainState.swift"; sourceTree = "<group>"; };
 		E70000000000000000000001 /* AppFeature+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppFeature+State.swift"; sourceTree = "<group>"; };
@@ -430,7 +428,6 @@
 				A00000000000000000000057 /* Application */,
 				A00000000000000000000058 /* Features */,
 				A00000000000000000000059 /* Models */,
-				A0000000000000000000005A /* Rendering */,
 				A0000000000000000000005B /* Support */,
 			);
 			path = App;
@@ -487,14 +484,6 @@
 				A00000000000000000000004 /* PaintModels.swift */,
 			);
 			path = Models;
-			sourceTree = "<group>";
-		};
-		A0000000000000000000005A /* Rendering */ = {
-			isa = PBXGroup;
-			children = (
-				A00000000000000000000014 /* PaintShaders.metal */,
-			);
-			path = Rendering;
 			sourceTree = "<group>";
 		};
 		A0000000000000000000005B /* Support */ = {
@@ -908,7 +897,6 @@
 				F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */,
 				F10000000000000000000005 /* BrushImportClient.swift in Sources */,
 				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,
-				A0000000000000000000002F /* PaintShaders.metal in Sources */,
 				A00000000000000000000023 /* AppFeature.swift in Sources */,
 				A00000000000000000000024 /* PaintModels.swift in Sources */,
 				A000000000000000000000A6 /* TimelapseExporter.swift in Sources */,
@@ -1299,71 +1287,6 @@
 			package = A00000000000000000000092 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
 		};
-		C21000000000000000000001 /* CombineSchedulers */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000001 /* XCRemoteSwiftPackageReference "combine-schedulers" */;
-			productName = CombineSchedulers;
-		};
-		C21000000000000000000002 /* CasePaths */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
-			productName = CasePaths;
-		};
-		C21000000000000000000003 /* CasePathsCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
-			productName = CasePathsCore;
-		};
-		C21000000000000000000004 /* Clocks */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000003 /* XCRemoteSwiftPackageReference "swift-clocks" */;
-			productName = Clocks;
-		};
-		C21000000000000000000005 /* ConcurrencyExtras */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000004 /* XCRemoteSwiftPackageReference "swift-concurrency-extras" */;
-			productName = ConcurrencyExtras;
-		};
-		C21000000000000000000006 /* CustomDump */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000005 /* XCRemoteSwiftPackageReference "swift-custom-dump" */;
-			productName = CustomDump;
-		};
-		C21000000000000000000007 /* Dependencies */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000006 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
-			productName = Dependencies;
-		};
-		C21000000000000000000008 /* DependenciesMacros */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000006 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
-			productName = DependenciesMacros;
-		};
-		C21000000000000000000009 /* IdentifiedCollections */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000007 /* XCRemoteSwiftPackageReference "swift-identified-collections" */;
-			productName = IdentifiedCollections;
-		};
-		C2100000000000000000000D /* PerceptionCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000009 /* XCRemoteSwiftPackageReference "swift-perception" */;
-			productName = PerceptionCore;
-		};
-		C2100000000000000000000E /* Perception */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C10000000000000000000009 /* XCRemoteSwiftPackageReference "swift-perception" */;
-			productName = Perception;
-		};
-		C2100000000000000000000F /* Sharing */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C1000000000000000000000A /* XCRemoteSwiftPackageReference "swift-sharing" */;
-			productName = Sharing;
-		};
-		C21000000000000000000010 /* IssueReporting */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C1000000000000000000000B /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */;
-			productName = IssueReporting;
-		};
 		AA9000000000000000000001 /* PrimoDocumentGPUContracts */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
@@ -1454,15 +1377,15 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentTimelapseInfrastructure;
 		};
-		B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoDocumentStrokeInfrastructure;
-		};
 		B9000000000000000000003D /* PrimoWorkspaceApplication */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoWorkspaceApplication;
+		};
+		B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentStrokeInfrastructure;
 		};
 		B91000000000000000000011 /* PrimoCanvasInputDomain */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1478,6 +1401,71 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoCanvasPresentationInfrastructure;
+		};
+		C21000000000000000000001 /* CombineSchedulers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000001 /* XCRemoteSwiftPackageReference "combine-schedulers" */;
+			productName = CombineSchedulers;
+		};
+		C21000000000000000000002 /* CasePaths */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
+			productName = CasePaths;
+		};
+		C21000000000000000000003 /* CasePathsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-case-paths" */;
+			productName = CasePathsCore;
+		};
+		C21000000000000000000004 /* Clocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000003 /* XCRemoteSwiftPackageReference "swift-clocks" */;
+			productName = Clocks;
+		};
+		C21000000000000000000005 /* ConcurrencyExtras */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000004 /* XCRemoteSwiftPackageReference "swift-concurrency-extras" */;
+			productName = ConcurrencyExtras;
+		};
+		C21000000000000000000006 /* CustomDump */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000005 /* XCRemoteSwiftPackageReference "swift-custom-dump" */;
+			productName = CustomDump;
+		};
+		C21000000000000000000007 /* Dependencies */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000006 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = Dependencies;
+		};
+		C21000000000000000000008 /* DependenciesMacros */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000006 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
+			productName = DependenciesMacros;
+		};
+		C21000000000000000000009 /* IdentifiedCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000007 /* XCRemoteSwiftPackageReference "swift-identified-collections" */;
+			productName = IdentifiedCollections;
+		};
+		C2100000000000000000000D /* PerceptionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000009 /* XCRemoteSwiftPackageReference "swift-perception" */;
+			productName = PerceptionCore;
+		};
+		C2100000000000000000000E /* Perception */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000009 /* XCRemoteSwiftPackageReference "swift-perception" */;
+			productName = Perception;
+		};
+		C2100000000000000000000F /* Sharing */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1000000000000000000000A /* XCRemoteSwiftPackageReference "swift-sharing" */;
+			productName = Sharing;
+		};
+		C21000000000000000000010 /* IssueReporting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C1000000000000000000000B /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */;
+			productName = IssueReporting;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

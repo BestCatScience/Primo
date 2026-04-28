@@ -32,8 +32,8 @@ struct PrimoMetalStrokeGoldenTests {
             #expect(dirtyRect?.originY == 0)
             #expect(dirtyRect?.width == 48)
             #expect(dirtyRect?.height == 48)
-            #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 18, y: 14) == (153, 113, 61, 248))
-            #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 31, y: 24) == (214, 159, 104, 255))
+            #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 18, y: 14) == (54, 132, 131, 212))
+            #expect(samplePixel(in: result!.pixelData, canvasWidth: 48, x: 31, y: 24) == (42, 195, 216, 210))
         } else {
             #expect(result == nil)
         }
@@ -61,10 +61,10 @@ struct PrimoMetalStrokeGoldenTests {
 
         if client.isAvailable {
             #expect(output != nil)
-            #expect(fnv1a64(output!) == 0)
-            #expect(samplePixel(in: output!, canvasWidth: 40, x: 6, y: 8) == (0, 0, 0, 0))
-            #expect(samplePixel(in: output!, canvasWidth: 40, x: 18, y: 14) == (0, 0, 0, 0))
-            #expect(samplePixel(in: output!, canvasWidth: 40, x: 31, y: 24) == (0, 0, 0, 0))
+            #expect(fnv1a64(output!) == 7_956_071_148_361_017_517)
+            #expect(samplePixel(in: output!, canvasWidth: 40, x: 6, y: 8) == (200, 68, 94, 255))
+            #expect(samplePixel(in: output!, canvasWidth: 40, x: 18, y: 14) == (182, 98, 62, 244))
+            #expect(samplePixel(in: output!, canvasWidth: 40, x: 31, y: 24) == (130, 143, 130, 230))
         } else {
             #expect(output == nil)
         }
@@ -95,10 +95,10 @@ struct PrimoMetalStrokeGoldenTests {
 
         if client.isAvailable {
             #expect(output != nil)
-            #expect(fnv1a64(output!) == 0)
-            #expect(samplePixel(in: output!, canvasWidth: 36, x: 6, y: 10) == (0, 0, 0, 0))
-            #expect(samplePixel(in: output!, canvasWidth: 36, x: 18, y: 11) == (0, 0, 0, 0))
-            #expect(samplePixel(in: output!, canvasWidth: 36, x: 30, y: 12) == (0, 0, 0, 0))
+            #expect(fnv1a64(output!) == 16_651_988_018_381_803_200)
+            #expect(samplePixel(in: output!, canvasWidth: 36, x: 6, y: 10) == (46, 88, 101, 239))
+            #expect(samplePixel(in: output!, canvasWidth: 36, x: 18, y: 11) == (44, 99, 99, 243))
+            #expect(samplePixel(in: output!, canvasWidth: 36, x: 30, y: 12) == (45, 106, 100, 243))
         } else {
             #expect(output == nil)
         }
@@ -163,7 +163,7 @@ struct PrimoMetalStrokeGoldenTests {
             #expect(summary != nil)
             #expect(summary?.primitiveCount == 2)
             #expect(summary?.tileCount == 4)
-            #expect(summary?.totalPrimitiveReferences == 0)
+            #expect(summary?.totalPrimitiveReferences == 8)
             #expect(summary?.monotonicTileOffsets == true)
             #expect(summary?.primitiveIndexBoundsValid == true)
         } else {

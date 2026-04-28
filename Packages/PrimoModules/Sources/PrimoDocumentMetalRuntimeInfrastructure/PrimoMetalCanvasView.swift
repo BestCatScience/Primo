@@ -89,7 +89,7 @@ private enum PrimoMetalCanvasRendererCache {
                     PrimoMetalQuadVertex(position: SIMD2<Float>(1, 1), uv: SIMD2<Float>(1, 1)),
                 ], length: MemoryLayout<PrimoMetalQuadVertex>.stride * 4)
 
-                let library = metalDevice.makeDefaultLibrary()
+                let library = PrimoMetalShaderLibrary.makeDefaultLibrary(device: metalDevice)
                 self.paperPipeline = primoMakeRenderPipeline(
                     device: metalDevice,
                     library: library,

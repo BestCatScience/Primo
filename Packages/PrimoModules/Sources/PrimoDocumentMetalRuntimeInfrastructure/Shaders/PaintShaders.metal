@@ -916,18 +916,18 @@ inline float strokeSignedNoise(float x, float y) {
     return (strokeNoise(x, y) * 2.0f) - 1.0f;
 }
 
-inline float strokeTaperScale(float progress, float taperIn, float taperOut) {
-    auto easedRamp = [](float localProgress, float length) -> float {
-        if (length <= 0.001f) {
-            return 1.0f;
-        }
-        float t = strokeClampUnit(localProgress / length);
-        float eased = t * t * (3.0f - (2.0f * t));
-        return 0.08f + (0.92f * eased);
-    };
+inline float strokeTaperRamp(float localProgress, float length) {
+    if (length <= 0.001f) {
+        return 1.0f;
+    }
+    float t = strokeClampUnit(localProgress / length);
+    float eased = t * t * (3.0f - (2.0f * t));
+    return 0.08f + (0.92f * eased);
+}
 
-    float entry = easedRamp(progress, taperIn);
-    float exit = easedRamp(1.0f - progress, taperOut);
+inline float strokeTaperScale(float progress, float taperIn, float taperOut) {
+    float entry = strokeTaperRamp(progress, taperIn);
+    float exit = strokeTaperRamp(1.0f - progress, taperOut);
     return min(entry, exit);
 }
 
@@ -3178,7 +3178,7 @@ kernel void colorRangeSelectionKernel(
 }
 
 kernel void autoSelectionEligibilityKernel(
-    const device uchar4 *sourcePixels [[buffer(0)]],
+    const device uchar *sourcePixels [[buffer(0)]],
     device uchar *eligiblePixels [[buffer(1)]],
     constant MetalAutoSelectionDescriptor& descriptor [[buffer(2)]],
     uint2 gid [[thread_position_in_grid]]
@@ -3188,7 +3188,13 @@ kernel void autoSelectionEligibilityKernel(
     }
 
     const uint index = (gid.y * descriptor.width) + gid.x;
-    const uchar4 pixel = sourcePixels[index];
+    const uint offset = index * 4u;
+    const uchar4 pixel = uchar4(
+        sourcePixels[offset],
+        sourcePixels[offset + 1u],
+        sourcePixels[offset + 2u],
+        sourcePixels[offset + 3u]
+    );
     bool matches = false;
     if (descriptor.thresholdMode == 0u) {
         const bool sameColor =
