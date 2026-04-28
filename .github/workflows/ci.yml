@@ -79,6 +79,7 @@ jobs:
             -project Primo.xcodeproj \
             -scheme Primo \
             -destination "id=${{ steps.simulator.outputs.id }}" \
+            -skipMacroValidation \
             -configuration Debug \
             -derivedDataPath build/DerivedData \
             -clonedSourcePackagesDirPath build/SourcePackages \
