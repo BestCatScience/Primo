@@ -36,7 +36,7 @@ final class NanoBananaFeatureTests: XCTestCase {
 
         await store.send(.task)
         await store.receive(.settingsLoaded(NanoBananaSettings(accessMode: .appManaged, apiKey: "persisted-key"))) {
-            $0.settings = NanoBananaSettings(accessMode: .appManaged, apiKey: "persisted-key")
+            $0.settings = NanoBananaSettings(accessMode: .userAPIKey, apiKey: "persisted-key")
         }
         await store.receive(.commerceUpdated(snapshot)) {
             $0.commerce = snapshot

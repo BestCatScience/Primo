@@ -133,7 +133,7 @@ extension NanoBananaFeature {
             composer.outputMode = descriptor.outputMode
             composer.maskSettings = descriptor.maskSettings
             composer.model = descriptor.model
-            accessMode = descriptor.accessMode
+            accessMode = descriptor.accessMode == .appManaged ? .userAPIKey : descriptor.accessMode
             workspaceBottomPanelSection = .nanoBanana
         }
 
@@ -166,7 +166,7 @@ extension NanoBananaFeature {
             builder.build(
                 draft: NanoBananaDraft(
                     prompt: descriptor.prompt.rawValue,
-                    accessMode: descriptor.accessMode,
+                    accessMode: descriptor.accessMode == .appManaged ? .userAPIKey : descriptor.accessMode,
                     model: descriptor.model,
                     inputLayerIndex: descriptor.inputLayerIndex,
                     editScope: descriptor.editScope,

@@ -18,7 +18,11 @@ extension NanoBananaFeature {
             )
 
         case let .settingsLoaded(settings):
-            state.settings = settings
+            var sanitizedSettings = settings
+            if sanitizedSettings.accessMode == .appManaged {
+                sanitizedSettings.accessMode = .userAPIKey
+            }
+            state.settings = sanitizedSettings
             return .none
 
         case let .commerceUpdated(snapshot):
@@ -58,7 +62,7 @@ extension NanoBananaFeature {
             return .none
 
         case let .accessModeChanged(accessMode):
-            state.accessMode = accessMode
+            state.accessMode = accessMode == .appManaged ? .userAPIKey : accessMode
             let updatedSettings = state.settings
             return .run { [nanoBananaSettingsClient] _ in
                 nanoBananaSettingsClient.persist(updatedSettings)

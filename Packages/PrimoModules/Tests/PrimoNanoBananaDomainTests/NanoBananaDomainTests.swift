@@ -26,4 +26,10 @@ struct NanoBananaDomainTests {
         #expect(request.maskSettings.expansion == 12)
         #expect(request.maskSettings.isInverted)
     }
+
+    @Test
+    func proxyEndpointRequiresHTTPS() {
+        #expect(ProxyEndpoint("https://proxy.example.com/nanobanana/edit")?.rawValue == "https://proxy.example.com/nanobanana/edit")
+        #expect(ProxyEndpoint("http://127.0.0.1:8787/nanobanana/edit") == nil)
+    }
 }

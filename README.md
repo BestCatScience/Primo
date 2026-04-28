@@ -64,8 +64,6 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   app 側 workflow と reducer まわりのテストです。
 - `Packages/PrimoModules/Tests/`
   package 化された domain / application / infrastructure のテストです。
-- `server/nanobanana-proxy/`
-  app managed な NanoBanana 実行で使う proxy server の実装です。
 - `project.yml`
   XcodeGen 用のプロジェクト定義です。チェックイン済みの `Primo.xcodeproj` もあります。
 - `docs/`
@@ -168,4 +166,3 @@ scripts/codex-build.sh
 - これはプロトタイプであり、機能ごとの完成度には差があります。
 - UI に先に露出している操作でも、内部実装や GPU path は継続的に整理中です。
 - document runtime は package 側へ移っていますが、app 側にはまだ workflow / reducer helper が多く残っています。
-

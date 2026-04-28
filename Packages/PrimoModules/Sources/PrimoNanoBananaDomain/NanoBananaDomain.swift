@@ -78,7 +78,11 @@ public struct ProxyEndpoint: Equatable, Sendable {
 
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, URL(string: trimmed) != nil else { return nil }
+        guard
+            !trimmed.isEmpty,
+            let url = URL(string: trimmed),
+            url.scheme == "https"
+        else { return nil }
         self.rawValue = trimmed
     }
 }
@@ -307,7 +311,7 @@ public enum NanoBananaEditFailure: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidEndpoint:
-            return "Nano Banana endpoint is invalid."
+            return "Nano Banana endpoint must be a valid HTTPS URL."
         case .invalidResponse:
             return "Nano Banana returned an invalid response."
         case let .missingImageData(message):

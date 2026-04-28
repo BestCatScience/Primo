@@ -1158,7 +1158,7 @@ extension ContentView {
 
                 Section(language.localized("入力")) {
                     Picker(language.localized("接続方式"), selection: nanoBananaAccessModeBinding) {
-                        ForEach(NanoBananaAccessMode.allCases) { mode in
+                        ForEach([NanoBananaAccessMode.userAPIKey]) { mode in
                             Text(mode.title(language)).tag(mode)
                         }
                     }
