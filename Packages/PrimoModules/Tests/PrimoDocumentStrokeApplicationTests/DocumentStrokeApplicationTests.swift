@@ -30,7 +30,7 @@ struct DocumentStrokeApplicationTests {
         #expect(planner.requests[0].baseLayer.layerIndex == 2)
         #expect(planner.requests[0].samples == [sample])
         #expect(planner.requests[0].preserveAlphaLockedPixels)
-        #expect(planner.requests[0].usesResponsiveOilPreview)
+        #expect(!planner.requests[0].usesResponsiveOilPreview)
     }
 
     @Test
@@ -189,7 +189,7 @@ struct DocumentStrokeApplicationTests {
             renderState: renderState,
             samples: appended,
             fullSamples: fullSamples,
-            context: makeContext(layerIndex: 0),
+            context: makeContext(layerIndex: 0, brush: oilBrushSettings()),
             usesResponsiveOilPreview: true
         ))
 
@@ -200,7 +200,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func smudgeAppendedPreviewUsesBaseSnapshotAndFullSamples() throws {
+    func responsiveSmudgeOilAppendedPreviewUsesPreviousPreviewSurfaceAndIncrementalSamples() throws {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
@@ -214,8 +214,7 @@ struct DocumentStrokeApplicationTests {
             layerIndex: 0,
             surfaceHandle: previousHandle,
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
-            isApproximatePreview: false,
-            previewBrush: context.previewBrush,
+            isApproximatePreview: true,
             sampleCount: 2,
             supportsIncrementalContinuation: false
         )
@@ -231,10 +230,10 @@ struct DocumentStrokeApplicationTests {
         ))
 
         #expect(planner.requests.count == 1)
-        #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == baseSnapshot.layers[0].gpuBufferHandle)
-        #expect(planner.requests[0].samples == fullSamples)
-        #expect(!planner.requests[0].usesResponsiveOilPreview)
-        #expect(!resolution.result.isApproximatePreview)
+        #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == previousHandle)
+        #expect(planner.requests[0].samples == [previous] + appended)
+        #expect(planner.requests[0].usesResponsiveOilPreview)
+        #expect(resolution.result.isApproximatePreview)
         #expect(!resolution.supportsIncrementalContinuation)
     }
 
@@ -300,7 +299,7 @@ struct DocumentStrokeApplicationTests {
                 renderState: renderState,
                 samples: appended,
                 fullSamples: fullSamples,
-                context: makeContext(layerIndex: 0),
+                context: makeContext(layerIndex: 0, brush: oilBrushSettings()),
                 usesResponsiveOilPreview: true
             ))
             renderState = StrokeSessionRenderState(
@@ -314,6 +313,55 @@ struct DocumentStrokeApplicationTests {
 
         #expect(fullSamples.count > 1_000)
         #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
+    }
+
+    @Test
+    func responsiveSmudgeOilPreviewRequestSizeDoesNotGrowWithLongCircularStroke() throws {
+        let planner = RecordingPreviewPlanner()
+        let useCase = DocumentStrokePreviewUseCase(planner: planner)
+        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 21)
+        let context = makeContext(layerIndex: 0, brush: smudgeBrushSettings())
+        var renderState = StrokeSessionRenderState(
+            baseRevision: 21,
+            layerIndex: 0,
+            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: true
+        )
+        var fullSamples: [StylusSample] = []
+        let batchSize = 8
+
+        for index in 0..<128 {
+            let appended = (0..<batchSize).map { offset -> StylusSample in
+                let sampleIndex = index * batchSize + offset
+                let angle = Double(sampleIndex) * 0.08
+                return stylusSample(
+                    x: CGFloat(cos(angle) + 1),
+                    y: CGFloat(sin(angle) + 1)
+                )
+            }
+            fullSamples.append(contentsOf: appended)
+            let resolution = try #require(useCase.resolveAppended(
+                activeStrokeBaseSnapshot: baseSnapshot,
+                renderSnapshot: nil,
+                renderState: renderState,
+                samples: appended,
+                fullSamples: fullSamples,
+                context: context,
+                usesResponsiveOilPreview: true
+            ))
+            renderState = StrokeSessionRenderState(
+                baseRevision: resolution.result.baseSnapshot.revision,
+                layerIndex: resolution.result.surface?.layerIndex ?? 0,
+                surfaceHandle: try #require(resolution.result.surface?.handle.buffer),
+                dirtyRect: try #require(resolution.result.dirtyRect),
+                isApproximatePreview: resolution.result.isApproximatePreview
+            )
+        }
+
+        #expect(fullSamples.count > 1_000)
+        #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
+        #expect(planner.requests.allSatisfy { $0.usesResponsiveOilPreview })
     }
 
     @Test
@@ -628,7 +676,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: makeContext(layerIndex: 0),
-                usesResponsiveOilPreview: true
+                usesResponsiveOilPreview: false
             )
         ).previewMutation)
 
@@ -671,7 +719,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsiveOilPreview: true
+                usesResponsiveOilPreview: false
             )
         ).previewMutation)
 
@@ -865,6 +913,14 @@ struct DocumentStrokeApplicationTests {
             green: 255,
             blue: 255
         )
+    }
+
+    private func oilBrushSettings() -> BrushRuntimeSettings {
+        var brush = smudgeBrushSettings()
+        brush.smudgeEngineEnabled = false
+        brush.paintLoad = 0.92
+        brush.smudgeRadius = 0.36
+        return brush
     }
 
     private func smudgeBrushSettings() -> BrushRuntimeSettings {

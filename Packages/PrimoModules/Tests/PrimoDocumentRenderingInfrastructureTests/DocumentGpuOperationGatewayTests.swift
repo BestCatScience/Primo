@@ -518,7 +518,7 @@ struct DocumentGpuOperationGatewayTests {
         ))
 
         let liveUpdate = try #require(preview.incrementalUpdate)
-        #expect(!preview.isApproximatePreview)
+        #expect(preview.isApproximatePreview)
         #expect(!liveUpdate.isEmpty)
         #expect(liveUpdate.width > 0)
         #expect(liveUpdate.height > 0)
@@ -569,7 +569,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
-    func responsiveOilPreviewBrushKeepsSmudgeEnabledForSmudgeBrushes() {
+    func responsiveOilPreviewBrushDisablesSmudgeOnlyForLiveSmudgePreview() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([64, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -606,7 +606,22 @@ struct DocumentGpuOperationGatewayTests {
 
         let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
 
-        #expect(preview == original)
+        #expect(!preview.smudgeEngineEnabled)
+        #expect(preview.tipKind == original.tipKind)
+        #expect(preview.radius == original.radius)
+        #expect(preview.opacity == original.opacity)
+        #expect(preview.hardness == original.hardness)
+        #expect(preview.roundness == original.roundness)
+        #expect(preview.textureMode == original.textureMode)
+        #expect(preview.textureStrength == original.textureStrength)
+        #expect(preview.wetness == original.wetness)
+        #expect(preview.colorMixStrength == original.colorMixStrength)
+        #expect(preview.smudgeRadius == original.smudgeRadius)
+        #expect(preview.paintLoad == original.paintLoad)
+        #expect(preview.customTip == original.customTip)
+        #expect(preview.red == original.red)
+        #expect(preview.green == original.green)
+        #expect(preview.blue == original.blue)
     }
 
     @Test(.enabled(if: metalRuntimeAvailable))

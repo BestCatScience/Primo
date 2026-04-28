@@ -210,8 +210,7 @@ public struct DocumentStrokeProcessingService: Sendable {
     ) -> DocumentInteractiveStrokePreviewResult? {
         let usesApproximateOilPreview =
             usesResponsiveOilPreview &&
-            brush.tipKind == .oil &&
-            !brush.smudgeEngineEnabled
+            brush.tipKind == .oil
         let previewBrush = usesApproximateOilPreview
             ? GpuRenderingSupport.responsiveOilPreviewBrush(from: brush)
             : brush

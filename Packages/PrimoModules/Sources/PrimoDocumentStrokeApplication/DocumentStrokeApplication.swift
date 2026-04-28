@@ -235,7 +235,6 @@ public struct DocumentStrokePreviewUseCase: Sendable {
     ) -> (baseLayer: LayerSurfaceRef, samples: [StylusSample])? {
         guard
             usesResponsiveOilPreview,
-            !context.previewBrush.smudgeEngineEnabled,
             !context.activeLayer.isAlphaLocked,
             let renderState,
             renderState.isApproximatePreview,
@@ -283,7 +282,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         requested: Bool,
         brush: BrushRuntimeSettings
     ) -> Bool {
-        requested && !(brush.tipKind == .oil && brush.smudgeEngineEnabled)
+        requested && brush.tipKind == .oil
     }
 }
 
