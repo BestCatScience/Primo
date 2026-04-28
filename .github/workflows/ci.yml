@@ -59,17 +59,16 @@ jobs:
         id: simulator
         run: |
           simulator_id="$(
-            xcrun simctl list devices available --json | ruby -rjson -e '
-              devices = JSON.parse(STDIN.read).fetch("devices").values.flatten
-              preferred = devices.find { |device|
-                device.fetch("isAvailable") &&
-                  device.fetch("name").start_with?("iPad")
-              } || devices.find { |device|
-                device.fetch("isAvailable") &&
-                  device.fetch("name").start_with?("iPhone")
-              }
-              abort("No available iOS simulator found") unless preferred
-              puts preferred.fetch("udid")
+            xcodebuild \
+              -showdestinations \
+              -project Primo.xcodeproj \
+              -scheme Primo \
+              -clonedSourcePackagesDirPath build/SourcePackages 2>&1 | ruby -e '
+              destinations = STDIN.read.scan(/\{ platform:iOS Simulator, .*?id:([^,]+), .*?name:([^,}]+)/)
+              preferred = destinations.find { |_, name| name.start_with?("iPad") } ||
+                destinations.find { |_, name| name.start_with?("iPhone") }
+              abort("No available iOS simulator destination found") unless preferred
+              puts preferred.first
             '
           )"
           echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
