@@ -19,27 +19,36 @@ public struct LayerStructureUseCase: Sendable {
 
         switch command {
         case let .addLayer(name):
-            let createdIndex = gateway.addLayer(name: name)
-            gateway.setActiveLayerIndex(createdIndex)
-            return .success(
-                LayerStructureMutationPlan(
-                    resultingIndex: createdIndex,
-                    lifecycleEvent: .addLayer(name: name, index: createdIndex)
-                )
-            )
+            switch gateway.addLayer(name: name) {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(createdIndex):
+                switch gateway.setActiveLayerIndex(createdIndex) {
+                case let .failure(failure):
+                    return .failure(failure)
+                case .success:
+                    return .success(
+                        LayerStructureMutationPlan(
+                            resultingIndex: createdIndex,
+                            lifecycleEvent: .addLayer(name: name, index: createdIndex)
+                        )
+                    )
+                }
+            }
 
         case let .duplicateLayer(index, name):
-            let duplicatedIndex = gateway.duplicateLayer(index: index, name: name)
-            guard duplicatedIndex >= 0 else {
-                return .failure(.bridgeMutationFailed("duplicateLayer"))
-            }
-            return .success(
-                LayerStructureMutationPlan(
-                    resultingIndex: duplicatedIndex,
-                    indexMutation: .duplication(sourceIndex: index, duplicatedIndex: duplicatedIndex),
-                    lifecycleEvent: .duplicateLayer(index: index, duplicatedIndex: duplicatedIndex, name: name)
+            switch gateway.duplicateLayer(index: index, name: name) {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(duplicatedIndex):
+                return .success(
+                    LayerStructureMutationPlan(
+                        resultingIndex: duplicatedIndex,
+                        indexMutation: .duplication(sourceIndex: index, duplicatedIndex: duplicatedIndex),
+                        lifecycleEvent: .duplicateLayer(index: index, duplicatedIndex: duplicatedIndex, name: name)
+                    )
                 )
-            )
+            }
 
         case let .deleteLayer(index):
             switch gateway.deleteLayer(index: index) {
@@ -68,17 +77,21 @@ public struct LayerStructureUseCase: Sendable {
             }
 
         case let .createFolder(name, anchorLayerIndex):
-            let folderID = gateway.createFolder(name: name, anchorLayerIndex: anchorLayerIndex)
-            return .success(
-                LayerStructureMutationPlan(
-                    resultingIndex: folderID,
-                    lifecycleEvent: .createFolder(
-                        folderID: folderID,
-                        name: name,
-                        anchorLayerIndex: anchorLayerIndex >= 0 ? anchorLayerIndex : nil
+            switch gateway.createFolder(name: name, anchorLayerIndex: anchorLayerIndex) {
+            case let .failure(failure):
+                return .failure(failure)
+            case let .success(folderID):
+                return .success(
+                    LayerStructureMutationPlan(
+                        resultingIndex: folderID,
+                        lifecycleEvent: .createFolder(
+                            folderID: folderID,
+                            name: name,
+                            anchorLayerIndex: anchorLayerIndex >= 0 ? anchorLayerIndex : nil
+                        )
                     )
                 )
-            )
+            }
 
         case let .deleteFolder(folderID):
             switch gateway.deleteFolder(id: folderID) {
@@ -128,52 +141,47 @@ public struct LayerAttributeUseCase: Sendable {
 
         switch command {
         case let .setActiveLayer(index):
-            gateway.setActiveLayerIndex(index)
-            return .success(.init())
+            return gateway.setActiveLayerIndex(index).map { .init() }
 
         case let .setLayerName(index, name):
-            gateway.setLayerName(name, index: index)
-            return .success(.init())
+            return gateway.setLayerName(name, index: index).map { .init() }
 
         case let .setLayerVisibility(index, isVisible):
-            gateway.setLayerVisible(isVisible, index: index)
-            return .success(.init(lifecycleEvent: .setLayerVisibility(index: index, isVisible: isVisible)))
+            return gateway.setLayerVisible(isVisible, index: index)
+                .map { .init(lifecycleEvent: .setLayerVisibility(index: index, isVisible: isVisible)) }
 
         case let .setLayerLocked(index, isLocked):
-            gateway.setLayerLocked(isLocked, index: index)
-            return .success(.init(lifecycleEvent: .setLayerLocked(index: index, isLocked: isLocked)))
+            return gateway.setLayerLocked(isLocked, index: index)
+                .map { .init(lifecycleEvent: .setLayerLocked(index: index, isLocked: isLocked)) }
 
         case let .setLayerAlphaLocked(index, isAlphaLocked):
-            gateway.setLayerAlphaLocked(isAlphaLocked, index: index)
-            return .success(.init(lifecycleEvent: .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)))
+            return gateway.setLayerAlphaLocked(isAlphaLocked, index: index)
+                .map { .init(lifecycleEvent: .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)) }
 
         case let .setLayerClipped(index, isClipped):
-            gateway.setLayerClipped(isClipped, index: index)
-            return .success(.init(lifecycleEvent: .setLayerClipped(index: index, isClipped: isClipped)))
+            return gateway.setLayerClipped(isClipped, index: index)
+                .map { .init(lifecycleEvent: .setLayerClipped(index: index, isClipped: isClipped)) }
 
         case let .revealLayerForEditing(index):
-            gateway.setLayerVisible(true, index: index)
-            return .success(.init())
+            return gateway.setLayerVisible(true, index: index).map { .init() }
 
         case let .setLayerOpacity(index, opacity):
-            gateway.setLayerOpacity(opacity, index: index)
-            return .success(.init(lifecycleEvent: .setLayerOpacity(index: index, opacity: opacity)))
+            return gateway.setLayerOpacity(opacity, index: index)
+                .map { .init(lifecycleEvent: .setLayerOpacity(index: index, opacity: opacity)) }
 
         case let .setLayerBlendMode(index, blendMode):
-            gateway.setLayerBlendMode(blendMode, index: index)
-            return .success(.init(lifecycleEvent: .setLayerBlendMode(index: index, blendMode: blendMode)))
+            return gateway.setLayerBlendMode(blendMode, index: index)
+                .map { .init(lifecycleEvent: .setLayerBlendMode(index: index, blendMode: blendMode)) }
 
         case let .setFolderExpanded(folderID, isExpanded):
-            gateway.setFolderExpanded(isExpanded, folderID: folderID)
-            return .success(.init())
+            return gateway.setFolderExpanded(isExpanded, folderID: folderID).map { .init() }
 
         case let .setFolderVisibility(folderID, isVisible):
-            gateway.setFolderVisible(isVisible, folderID: folderID)
-            return .success(.init(lifecycleEvent: .setFolderVisibility(folderID: folderID, isVisible: isVisible)))
+            return gateway.setFolderVisible(isVisible, folderID: folderID)
+                .map { .init(lifecycleEvent: .setFolderVisibility(folderID: folderID, isVisible: isVisible)) }
 
         case let .setFolderName(folderID, name):
-            gateway.setFolderName(name, folderID: folderID)
-            return .success(.init())
+            return gateway.setFolderName(name, folderID: folderID).map { .init() }
         }
     }
 }

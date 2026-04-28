@@ -7,35 +7,37 @@ private final class DocumentEditorGatewaySpy: @unchecked Sendable, DocumentEdito
     var activeLayerIndices: [Int] = []
     var lastLayerNameUpdate: (name: String, index: Int)?
 
-    func addLayer(name: String) -> Int {
+    func addLayer(name: String) -> DocumentLayerIndexedMutationResult {
         addedLayerNames.append(name)
-        return 2
+        return .success(2)
     }
 
-    func setActiveLayerIndex(_ index: Int) {
+    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult {
         activeLayerIndices.append(index)
+        return .success(())
     }
 
-    func duplicateLayer(index: Int, name: String) -> Int { -1 }
+    func duplicateLayer(index: Int, name: String) -> DocumentLayerIndexedMutationResult { .failure(.bridgeMutationFailed("unused")) }
     func deleteLayer(index: Int) -> DocumentLayerMutationResult { .success(()) }
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: Int) -> Int { 1 }
+    func createFolder(name: String, anchorLayerIndex: Int) -> DocumentLayerIndexedMutationResult { .success(1) }
     func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult { .success(()) }
     func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult { .success(()) }
 
-    func setLayerName(_ name: String, index: Int) {
+    func setLayerName(_ name: String, index: Int) -> DocumentLayerMutationResult {
         lastLayerNameUpdate = (name, index)
+        return .success(())
     }
 
-    func setLayerVisible(_ isVisible: Bool, index: Int) {}
-    func setLayerLocked(_ isLocked: Bool, index: Int) {}
-    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) {}
-    func setLayerClipped(_ isClipped: Bool, index: Int) {}
-    func setLayerOpacity(_ opacity: Double, index: Int) {}
-    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) {}
-    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) {}
-    func setFolderVisible(_ isVisible: Bool, folderID: Int) {}
-    func setFolderName(_ name: String, folderID: Int) {}
+    func setLayerVisible(_ isVisible: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerLocked(_ isLocked: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerClipped(_ isClipped: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerOpacity(_ opacity: Double, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderVisible(_ isVisible: Bool, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderName(_ name: String, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
 }
 
 struct DocumentEditorUseCaseTests {
@@ -55,7 +57,7 @@ struct DocumentEditorUseCaseTests {
             gateway: gateway
         )
 
-        let plan = try #require(try result.get())
+        let plan = try result.get()
         #expect(plan == .structure(
             LayerStructureMutationPlan(
                 resultingIndex: 2,
@@ -82,7 +84,7 @@ struct DocumentEditorUseCaseTests {
             gateway: gateway
         )
 
-        let plan = try #require(try result.get())
+        let plan = try result.get()
         #expect(plan == .attribute(LayerAttributeMutationPlan()))
         #expect(gateway.lastLayerNameUpdate?.name == "Foreground")
         #expect(gateway.lastLayerNameUpdate?.index == 1)

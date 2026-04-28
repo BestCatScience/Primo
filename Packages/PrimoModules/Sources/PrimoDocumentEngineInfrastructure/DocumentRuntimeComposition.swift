@@ -106,26 +106,19 @@ extension DocumentEngineLive {
 private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     let runtime: DocumentEngineLive
 
-    func addLayer(name: String) -> Int {
-        switch runtime.mutationGateway.addLayer(name) {
-        case let .success(index):
-            return index
-        case .failure:
-            return -1
-        }
+    func addLayer(name: String) -> DocumentLayerIndexedMutationResult {
+        runtime.mutationGateway.addLayer(name)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setActiveLayerIndex(_ index: Int) {
-        _ = runtime.mutationGateway.setActiveLayer(index)
+    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult {
+        runtime.mutationGateway.setActiveLayer(index)
+            .mapError(mapRuntimeFailure)
     }
 
-    func duplicateLayer(index: Int, name: String) -> Int {
-        switch runtime.duplicateLayer(index, name) {
-        case let .success(duplicatedIndex):
-            return duplicatedIndex
-        case .failure:
-            return -1
-        }
+    func duplicateLayer(index: Int, name: String) -> DocumentLayerIndexedMutationResult {
+        runtime.duplicateLayer(index, name)
+            .mapError(mapRuntimeFailure)
     }
 
     func deleteLayer(index: Int) -> DocumentLayerMutationResult {
@@ -146,13 +139,9 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
         }
     }
 
-    func createFolder(name: String, anchorLayerIndex: Int) -> Int {
-        switch runtime.createFolder(name, anchorLayerIndex) {
-        case let .success(folderID):
-            return folderID
-        case .failure:
-            return -1
-        }
+    func createFolder(name: String, anchorLayerIndex: Int) -> DocumentLayerIndexedMutationResult {
+        runtime.createFolder(name, anchorLayerIndex)
+            .mapError(mapRuntimeFailure)
     }
 
     func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult {
@@ -173,44 +162,54 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
         }
     }
 
-    func setLayerName(_ name: String, index: Int) {
-        _ = runtime.mutationGateway.setLayerName(index, name)
+    func setLayerName(_ name: String, index: Int) -> DocumentLayerMutationResult {
+        runtime.mutationGateway.setLayerName(index, name)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerVisible(_ isVisible: Bool, index: Int) {
-        _ = runtime.mutationGateway.setLayerVisibility(index, isVisible)
+    func setLayerVisible(_ isVisible: Bool, index: Int) -> DocumentLayerMutationResult {
+        runtime.mutationGateway.setLayerVisibility(index, isVisible)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerLocked(_ isLocked: Bool, index: Int) {
-        _ = runtime.setLayerLocked(index, isLocked)
+    func setLayerLocked(_ isLocked: Bool, index: Int) -> DocumentLayerMutationResult {
+        runtime.setLayerLocked(index, isLocked)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) {
-        _ = runtime.setLayerAlphaLocked(index, isAlphaLocked)
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) -> DocumentLayerMutationResult {
+        runtime.setLayerAlphaLocked(index, isAlphaLocked)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerClipped(_ isClipped: Bool, index: Int) {
-        _ = runtime.setLayerClipped(index, isClipped)
+    func setLayerClipped(_ isClipped: Bool, index: Int) -> DocumentLayerMutationResult {
+        runtime.setLayerClipped(index, isClipped)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerOpacity(_ opacity: Double, index: Int) {
-        _ = runtime.setLayerOpacity(index, opacity)
+    func setLayerOpacity(_ opacity: Double, index: Int) -> DocumentLayerMutationResult {
+        runtime.setLayerOpacity(index, opacity)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) {
-        _ = runtime.setLayerBlendMode(index, blendMode)
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) -> DocumentLayerMutationResult {
+        runtime.setLayerBlendMode(index, blendMode)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) {
-        _ = runtime.setFolderExpanded(folderID, isExpanded)
+    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) -> DocumentLayerMutationResult {
+        runtime.setFolderExpanded(folderID, isExpanded)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setFolderVisible(_ isVisible: Bool, folderID: Int) {
-        _ = runtime.setFolderVisibility(folderID, isVisible)
+    func setFolderVisible(_ isVisible: Bool, folderID: Int) -> DocumentLayerMutationResult {
+        runtime.setFolderVisibility(folderID, isVisible)
+            .mapError(mapRuntimeFailure)
     }
 
-    func setFolderName(_ name: String, folderID: Int) {
-        _ = runtime.setFolderName(folderID, name)
+    func setFolderName(_ name: String, folderID: Int) -> DocumentLayerMutationResult {
+        runtime.setFolderName(folderID, name)
+            .mapError(mapRuntimeFailure)
     }
 }
 

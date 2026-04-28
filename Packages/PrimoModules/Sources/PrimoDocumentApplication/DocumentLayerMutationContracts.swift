@@ -101,28 +101,28 @@ public struct LayerAttributeMutationPlan: Equatable, Sendable {
 }
 
 public protocol LayerStructureGateway: Sendable {
-    func addLayer(name: String) -> Int
-    func setActiveLayerIndex(_ index: Int)
-    func duplicateLayer(index: Int, name: String) -> Int
+    func addLayer(name: String) -> DocumentLayerIndexedMutationResult
+    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult
+    func duplicateLayer(index: Int, name: String) -> DocumentLayerIndexedMutationResult
     func deleteLayer(index: Int) -> DocumentLayerMutationResult
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult
-    func createFolder(name: String, anchorLayerIndex: Int) -> Int
+    func createFolder(name: String, anchorLayerIndex: Int) -> DocumentLayerIndexedMutationResult
     func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult
     func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult
 }
 
 public protocol LayerAttributeGateway: Sendable {
-    func setActiveLayerIndex(_ index: Int)
-    func setLayerName(_ name: String, index: Int)
-    func setLayerVisible(_ isVisible: Bool, index: Int)
-    func setLayerLocked(_ isLocked: Bool, index: Int)
-    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int)
-    func setLayerClipped(_ isClipped: Bool, index: Int)
-    func setLayerOpacity(_ opacity: Double, index: Int)
-    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int)
-    func setFolderExpanded(_ isExpanded: Bool, folderID: Int)
-    func setFolderVisible(_ isVisible: Bool, folderID: Int)
-    func setFolderName(_ name: String, folderID: Int)
+    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult
+    func setLayerName(_ name: String, index: Int) -> DocumentLayerMutationResult
+    func setLayerVisible(_ isVisible: Bool, index: Int) -> DocumentLayerMutationResult
+    func setLayerLocked(_ isLocked: Bool, index: Int) -> DocumentLayerMutationResult
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) -> DocumentLayerMutationResult
+    func setLayerClipped(_ isClipped: Bool, index: Int) -> DocumentLayerMutationResult
+    func setLayerOpacity(_ opacity: Double, index: Int) -> DocumentLayerMutationResult
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) -> DocumentLayerMutationResult
+    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) -> DocumentLayerMutationResult
+    func setFolderVisible(_ isVisible: Bool, folderID: Int) -> DocumentLayerMutationResult
+    func setFolderName(_ name: String, folderID: Int) -> DocumentLayerMutationResult
 }
 
 public struct LayerStructureCommandValidator: Sendable {
