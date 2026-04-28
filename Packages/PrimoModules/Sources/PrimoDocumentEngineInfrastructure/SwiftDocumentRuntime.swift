@@ -869,7 +869,20 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func saveProject(to url: URL, paperStyle: CanvasPaperStyle) throws {
         let persistenceService = services.persistence.projectStore
-        try persistenceService.prepareProjectDirectory(at: url)
+        let stagedURL = try persistenceService.createStagedProjectDirectory(
+            for: url,
+            id: services.ids.generate()
+        )
+        defer {
+            try? persistenceService.cleanupStagedProjectDirectory(stagedURL)
+        }
+        try writeProjectContents(to: stagedURL, paperStyle: paperStyle)
+        try persistenceService.validateProjectPackage(at: stagedURL)
+        try persistenceService.publishStagedProjectDirectory(stagedURL, to: url)
+    }
+
+    private func writeProjectContents(to url: URL, paperStyle: CanvasPaperStyle) throws {
+        let persistenceService = services.persistence.projectStore
         let directories = try persistenceService.createProjectSubdirectories(
             in: url,
             usesOperationTimelapsePersistence: store.snapshot.timelapseUsesOperationPersistence

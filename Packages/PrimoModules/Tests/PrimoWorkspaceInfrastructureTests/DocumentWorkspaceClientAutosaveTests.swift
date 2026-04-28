@@ -124,7 +124,127 @@ struct DocumentWorkspaceClientAutosaveTests {
         #expect(recorder.urls.map(\.standardizedFileURL) == [projectURL.standardizedFileURL])
     }
 
-    private func fileClient(documentsDirectory: URL) -> FileClient {
+    @Test
+    func persistProjectSnapshotCopyFailurePreservesExistingDestination() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let sourceURL = root.appendingPathComponent("source.atelier", isDirectory: true)
+        let destinationURL = root.appendingPathComponent("destination.atelier", isDirectory: true)
+        try writeMinimalProject(at: sourceURL, byte: 0x20)
+        try writeMinimalProject(at: destinationURL, byte: 0x10)
+        let originalFingerprint = try fileFingerprint(at: destinationURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let client = DocumentWorkspaceClient.live(
+            fileClient: fileClient(
+                documentsDirectory: documents,
+                copyItem: { source, destination in
+                    if destination.path.contains(".primo-staging") {
+                        throw CocoaError(.fileWriteUnknown)
+                    }
+                    try FileManager.default.copyItem(at: source, to: destination)
+                }
+            ),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000444")! }),
+            previewGateway: previewGateway()
+        )
+
+        #expect(throws: Error.self) {
+            _ = try client.persistProjectSnapshot(
+                DocumentProjectPath(sourceURL),
+                DocumentProjectPath(destinationURL)
+            )
+        }
+
+        #expect(try fileFingerprint(at: destinationURL) == originalFingerprint)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(".primo-staging").path))
+    }
+
+    @Test
+    func persistProjectSnapshotValidationFailurePreservesExistingDestination() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let sourceURL = root.appendingPathComponent("source.atelier", isDirectory: true)
+        let destinationURL = root.appendingPathComponent("destination.atelier", isDirectory: true)
+        try writeMinimalProject(at: sourceURL, byte: 0x20)
+        try FileManager.default.removeItem(
+            at: sourceURL
+                .appendingPathComponent("Layers", isDirectory: true)
+                .appendingPathComponent("layer-0000.rgba", isDirectory: false)
+        )
+        try writeMinimalProject(at: destinationURL, byte: 0x10)
+        let originalFingerprint = try fileFingerprint(at: destinationURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let client = DocumentWorkspaceClient.live(
+            fileClient: fileClient(documentsDirectory: documents),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000555")! }),
+            previewGateway: previewGateway()
+        )
+
+        #expect(throws: Error.self) {
+            _ = try client.persistProjectSnapshot(
+                DocumentProjectPath(sourceURL),
+                DocumentProjectPath(destinationURL)
+            )
+        }
+
+        #expect(try fileFingerprint(at: destinationURL) == originalFingerprint)
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(".primo-staging").path))
+    }
+
+    @Test
+    func persistProjectSnapshotRestoresExistingDestinationWhenPublishedPackageValidationFails() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        let sourceURL = root.appendingPathComponent("source.atelier", isDirectory: true)
+        let destinationURL = root.appendingPathComponent("destination.atelier", isDirectory: true)
+        try writeMinimalProject(at: sourceURL, byte: 0x20)
+        try writeMinimalProject(at: destinationURL, byte: 0x10)
+        let originalFingerprint = try fileFingerprint(at: destinationURL)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let client = DocumentWorkspaceClient.live(
+            fileClient: fileClient(
+                documentsDirectory: documents,
+                readData: { url in
+                    if url.standardizedFileURL == destinationURL
+                        .appendingPathComponent("manifest.json", isDirectory: false)
+                        .standardizedFileURL {
+                        throw CocoaError(.fileReadUnknown)
+                    }
+                    return try Data(contentsOf: url)
+                }
+            ),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000666")! }),
+            previewGateway: previewGateway()
+        )
+
+        #expect(throws: Error.self) {
+            _ = try client.persistProjectSnapshot(
+                DocumentProjectPath(sourceURL),
+                DocumentProjectPath(destinationURL)
+            )
+        }
+
+        #expect(try fileFingerprint(at: destinationURL) == originalFingerprint)
+        #expect(try fileFingerprint(at: sourceURL)["Layers/layer-0000.rgba"] == Data([0x20, 0x20, 0x20, 0xFF]))
+        #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent(".primo-staging").path))
+    }
+
+    private func fileClient(
+        documentsDirectory: URL,
+        copyItem: @escaping @Sendable (URL, URL) throws -> Void = {
+            try FileManager.default.copyItem(at: $0, to: $1)
+        },
+        readData: @escaping @Sendable (URL) throws -> Data = { try Data(contentsOf: $0) }
+    ) -> FileClient {
         FileClient(
             temporaryDirectory: { FileManager.default.temporaryDirectory },
             urls: { directory, _ in
@@ -133,8 +253,16 @@ struct DocumentWorkspaceClientAutosaveTests {
             fileExists: { FileManager.default.fileExists(atPath: $0) },
             createDirectory: { try FileManager.default.createDirectory(at: $0, withIntermediateDirectories: $1) },
             removeItem: { try FileManager.default.removeItem(at: $0) },
-            copyItem: { try FileManager.default.copyItem(at: $0, to: $1) },
+            copyItem: copyItem,
             moveItem: { try FileManager.default.moveItem(at: $0, to: $1) },
+            replaceItem: { destinationURL, replacementURL, backupItemName in
+                _ = try FileManager.default.replaceItemAt(
+                    destinationURL,
+                    withItemAt: replacementURL,
+                    backupItemName: backupItemName,
+                    options: backupItemName == nil ? [] : [.withoutDeletingBackupItem]
+                )
+            },
             contentsOfDirectory: {
                 try FileManager.default.contentsOfDirectory(
                     at: $0,
@@ -152,8 +280,84 @@ struct DocumentWorkspaceClientAutosaveTests {
                 }
                 return enumerator.compactMap { $0 as? URL }
             },
-            readData: { try Data(contentsOf: $0) },
+            readData: readData,
             writeData: { try $0.write(to: $1, options: $2) }
         )
+    }
+
+    private func previewGateway() -> DocumentWorkspacePreviewGateway {
+        DocumentWorkspacePreviewGateway(
+            loadProjectPreview: { _ in
+                DocumentWorkspacePreview(
+                    canvasSize: CGSize(width: 1, height: 1),
+                    layerCount: 1,
+                    previewSurface: nil,
+                    previewImageData: nil
+                )
+            }
+        )
+    }
+
+    private func writeMinimalProject(at url: URL, byte: UInt8) throws {
+        let layersURL = url.appendingPathComponent("Layers", isDirectory: true)
+        try FileManager.default.createDirectory(at: layersURL, withIntermediateDirectories: true)
+        try Data([byte, byte, byte, 0xFF]).write(
+            to: layersURL.appendingPathComponent("layer-0000.rgba", isDirectory: false)
+        )
+        let manifest = """
+        {
+          "version" : 5,
+          "canvasWidth" : 1,
+          "canvasHeight" : 1,
+          "activeLayerIndex" : 0,
+          "paperStyle" : {
+            "red" : 1,
+            "green" : 1,
+            "blue" : 1,
+            "alpha" : 1,
+            "isTransparent" : false
+          },
+          "layers" : [
+            {
+              "index" : 0,
+              "name" : "Layer 1",
+              "visible" : true,
+              "locked" : false,
+              "alphaLocked" : false,
+              "clipped" : false,
+              "opacity" : 1,
+              "blendMode" : "normal",
+              "pixelFilename" : "Layers/layer-0000.rgba"
+            }
+          ],
+          "folders" : [],
+          "timelapseFrames" : [],
+          "timelapseOperations" : []
+        }
+        """
+        try manifest.data(using: .utf8)!.write(
+            to: url.appendingPathComponent("manifest.json", isDirectory: false)
+        )
+    }
+
+    private func fileFingerprint(at root: URL) throws -> [String: Data] {
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: []
+        )
+        var fingerprint: [String: Data] = [:]
+        for url in urls {
+            let values = try url.resourceValues(forKeys: [.isDirectoryKey])
+            if values.isDirectory == true {
+                let nested = try fileFingerprint(at: url)
+                for (path, data) in nested {
+                    fingerprint["\(url.lastPathComponent)/\(path)"] = data
+                }
+            } else {
+                fingerprint[url.lastPathComponent] = try Data(contentsOf: url)
+            }
+        }
+        return fingerprint
     }
 }

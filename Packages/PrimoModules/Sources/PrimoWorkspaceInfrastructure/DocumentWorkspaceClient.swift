@@ -3,6 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPersistenceInfrastructure
 
 public enum DocumentWorkspaceCatalogError: LocalizedError, Equatable, OperationFailure {
     case projectLoadFailed(String)
@@ -617,9 +618,18 @@ private struct DocumentWorkspaceStorage: Sendable {
         guard sourceURL.standardizedFileURL != destinationURL.standardizedFileURL else {
             return
         }
-        try fileClient.createDirectory(destinationURL.deletingLastPathComponent(), true)
-        try removeItemIfExists(at: destinationURL)
-        try fileClient.copyItem(sourceURL, destinationURL)
+        let projectStore = PaintDocumentPersistenceService(fileClient: fileClient)
+        let stagedURL = try projectStore.createStagedProjectDirectory(
+            for: destinationURL,
+            id: uuidClient.generate()
+        )
+        defer {
+            try? projectStore.cleanupStagedProjectDirectory(stagedURL)
+        }
+        try fileClient.removeItem(stagedURL)
+        try fileClient.copyItem(sourceURL, stagedURL)
+        try projectStore.validateProjectPackage(at: stagedURL)
+        try projectStore.publishStagedProjectDirectory(stagedURL, to: destinationURL)
     }
 
     private func requireProjectDirectory(at url: URL, label: String) throws {

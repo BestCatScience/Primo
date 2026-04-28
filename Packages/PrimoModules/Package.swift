@@ -257,6 +257,7 @@ let package = Package(
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoDocumentPersistenceInfrastructure",
                 "PrimoWorkspaceApplication",
                 "PrimoWorkspaceDomain",
             ]

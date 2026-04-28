@@ -54,6 +54,7 @@ public struct FileClient: Sendable {
     public var removeItem: @Sendable (URL) throws -> Void
     public var copyItem: @Sendable (URL, URL) throws -> Void
     public var moveItem: @Sendable (URL, URL) throws -> Void
+    public var replaceItem: @Sendable (URL, URL, String?) throws -> Void
     public var contentsOfDirectory: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) throws -> [URL]
     public var enumerateURLs: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) -> [URL]
     public var readData: @Sendable (URL) throws -> Data
@@ -67,6 +68,14 @@ public struct FileClient: Sendable {
         removeItem: @escaping @Sendable (URL) throws -> Void,
         copyItem: @escaping @Sendable (URL, URL) throws -> Void,
         moveItem: @escaping @Sendable (URL, URL) throws -> Void,
+        replaceItem: @escaping @Sendable (URL, URL, String?) throws -> Void = { destinationURL, replacementURL, backupItemName in
+            _ = try FileManager.default.replaceItemAt(
+                destinationURL,
+                withItemAt: replacementURL,
+                backupItemName: backupItemName,
+                options: backupItemName == nil ? [] : [.withoutDeletingBackupItem]
+            )
+        },
         contentsOfDirectory: @escaping @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) throws -> [URL],
         enumerateURLs: @escaping @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) -> [URL],
         readData: @escaping @Sendable (URL) throws -> Data,
@@ -79,6 +88,7 @@ public struct FileClient: Sendable {
         self.removeItem = removeItem
         self.copyItem = copyItem
         self.moveItem = moveItem
+        self.replaceItem = replaceItem
         self.contentsOfDirectory = contentsOfDirectory
         self.enumerateURLs = enumerateURLs
         self.readData = readData
@@ -101,6 +111,14 @@ public struct FileClient: Sendable {
             },
             moveItem: { sourceURL, destinationURL in
                 try FileManager.default.moveItem(at: sourceURL, to: destinationURL)
+            },
+            replaceItem: { destinationURL, replacementURL, backupItemName in
+                _ = try FileManager.default.replaceItemAt(
+                    destinationURL,
+                    withItemAt: replacementURL,
+                    backupItemName: backupItemName,
+                    options: backupItemName == nil ? [] : [.withoutDeletingBackupItem]
+                )
             },
             contentsOfDirectory: { url, keys, options in
                 try FileManager.default.contentsOfDirectory(
