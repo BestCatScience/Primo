@@ -2037,51 +2037,59 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let customTip = resolvedCustomTipMask(request.brush.customTip)
         guard
             let brushBuffer = makeBuffer(Self.makeStrokeBrushDescriptor(request.brush, customTip: customTip)),
-            let customTipBuffer = makeBuffer(customTip.alphaData),
-            let commandBuffer = commandQueue.makeCommandBuffer()
+            let customTipBuffer = makeBuffer(customTip.alphaData)
         else {
             return nil
         }
 
-        for (dabIndex, dab) in smudgeGeneration.dabs.enumerated() {
-            let rectWidth = Int(dab.rectWidth)
-            let rectHeight = Int(dab.rectHeight)
-            guard rectWidth > 0, rectHeight > 0 else { continue }
-            var dabIndexDescriptor = PrimoMetalSmudgeDabIndexDescriptor(dabIndex: UInt32(dabIndex))
-            guard let copyEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+        let dabsPerCommandBuffer = 64
+        var batchStart = 0
+        while batchStart < smudgeGeneration.dabs.count {
+            guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
+            let batchEnd = min(batchStart + dabsPerCommandBuffer, smudgeGeneration.dabs.count)
 
-            copyEncoder.setComputePipelineState(copyPipeline)
-            copyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
-            copyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
-            copyEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
-            copyEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
-            dispatch2D(encoder: copyEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
-            copyEncoder.endEncoding()
+            for dabIndex in batchStart..<batchEnd {
+                let dab = smudgeGeneration.dabs[dabIndex]
+                let rectWidth = Int(dab.rectWidth)
+                let rectHeight = Int(dab.rectHeight)
+                guard rectWidth > 0, rectHeight > 0 else { continue }
+                var dabIndexDescriptor = PrimoMetalSmudgeDabIndexDescriptor(dabIndex: UInt32(dabIndex))
+                guard let copyEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
 
-            guard let smudgeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
-            smudgeEncoder.setComputePipelineState(smudgePipeline)
-            smudgeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
-            smudgeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
-            smudgeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
-            smudgeEncoder.setBuffer(brushBuffer, offset: 0, index: 3)
-            smudgeEncoder.setBuffer(customTipBuffer, offset: 0, index: 4)
-            smudgeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 5)
-            dispatch2D(encoder: smudgeEncoder, pipeline: smudgePipeline, width: rectWidth, height: rectHeight)
-            smudgeEncoder.endEncoding()
+                copyEncoder.setComputePipelineState(copyPipeline)
+                copyEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
+                copyEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
+                copyEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
+                copyEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
+                dispatch2D(encoder: copyEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
+                copyEncoder.endEncoding()
 
-            guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
-            finalizeEncoder.setComputePipelineState(copyPipeline)
-            finalizeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 0)
-            finalizeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 1)
-            finalizeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
-            finalizeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
-            dispatch2D(encoder: finalizeEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
-            finalizeEncoder.endEncoding()
+                guard let smudgeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+                smudgeEncoder.setComputePipelineState(smudgePipeline)
+                smudgeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 0)
+                smudgeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 1)
+                smudgeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
+                smudgeEncoder.setBuffer(brushBuffer, offset: 0, index: 3)
+                smudgeEncoder.setBuffer(customTipBuffer, offset: 0, index: 4)
+                smudgeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 5)
+                dispatch2D(encoder: smudgeEncoder, pipeline: smudgePipeline, width: rectWidth, height: rectHeight)
+                smudgeEncoder.endEncoding()
+
+                guard let finalizeEncoder = commandBuffer.makeComputeCommandEncoder() else { return nil }
+                finalizeEncoder.setComputePipelineState(copyPipeline)
+                finalizeEncoder.setBuffer(executionContext.buffers.scratch, offset: 0, index: 0)
+                finalizeEncoder.setBuffer(executionContext.buffers.current, offset: 0, index: 1)
+                finalizeEncoder.setBuffer(smudgeGeneration.dabBuffer, offset: 0, index: 2)
+                finalizeEncoder.setBytes(&dabIndexDescriptor, length: MemoryLayout<PrimoMetalSmudgeDabIndexDescriptor>.stride, index: 3)
+                dispatch2D(encoder: finalizeEncoder, pipeline: copyPipeline, width: rectWidth, height: rectHeight)
+                finalizeEncoder.endEncoding()
+            }
+
+            commandBuffer.commit()
+            commandBuffer.waitUntilCompleted()
+            guard commandBuffer.status == .completed else { return nil }
+            batchStart = batchEnd
         }
-
-        commandBuffer.commit()
-        commandBuffer.waitUntilCompleted()
-        guard commandBuffer.status == .completed else { return nil }
         guard let resolvedDirtyRect = smudgeGeneration.dirtyRect else {
             return (
                 pixelData: includeFullPixelData ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count) : nil,
