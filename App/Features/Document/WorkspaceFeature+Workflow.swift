@@ -146,35 +146,6 @@ extension WorkspaceFeature {
         )
     }
 
-    func handleSaveHistoryProjectLoadRequested(
-        projectURL: DocumentProjectPath,
-        openInNewTab: Bool,
-        replacementRequest: WorkspaceDocumentReplacementRequest?
-    ) -> Effect<Action> {
-        let command = WorkspaceProjectLoadCommand(
-            loadRequest: .project(
-                WorkspaceProjectLoadOperation(
-                    fileURL: projectURL.fileURL,
-                    removeWorkspaceItemOnSuccess: nil
-                )
-            ),
-            prepareDocumentReplacementRequest: replacementRequest
-        )
-        return runProjectLoad(
-            command,
-            onSuccess: { loaded, issues in
-                .delegate(.saveHistoryProjectOpened(loaded, projectURL, openInNewTab, issues))
-            },
-            onFailure: { failure in
-                .delegate(
-                    .saveHistoryRestoreFailedFeedback(
-                        WorkspaceFeedbackMapper().feedback(for: failure, context: .saveHistoryRestore)
-                    )
-                )
-            }
-        )
-    }
-
     func handleAutosaveRecoveryProjectLoadRequested(
         item: AutosaveRecoveryItem,
         replacementRequest: WorkspaceDocumentReplacementRequest?
@@ -450,6 +421,830 @@ extension WorkspaceFeature {
         for tabs: [OpenDocumentTab]
     ) -> WorkspacePersistenceRequest {
         workspaceApplicationWorkflowService.discardArtifactsRequest(for: tabs)
+    }
+}
+
+extension WorkspaceFeature {
+    func requestDocumentSnapshot(
+        state: inout State,
+        operation: PendingDocumentSnapshotOperation
+    ) -> Effect<Action> {
+        state.pendingDocumentSnapshotOperation = operation
+        return .send(.delegate(.requestDocumentSnapshot))
+    }
+
+    func applySnapshotToActiveTab(
+        _ snapshot: DocumentFeature.WorkspaceDocumentSnapshot,
+        state: inout State
+    ) -> OpenDocumentTab? {
+        state.updateActiveTabMetadata(
+            previewSurface: snapshot.previewSurface,
+            canvasSize: snapshot.canvasSize
+        )
+        return state.activeTab
+    }
+
+    func documentReplacementRequest(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot
+    ) -> Result<WorkspaceDocumentReplacementRequest, WorkspacePersistenceFailure> {
+        _ = applySnapshotToActiveTab(snapshot, state: &state)
+        return workspaceApplicationWorkflowService.documentReplacementRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.activeTab,
+                paperStyle: snapshot.paperStyle
+            )
+        )
+    }
+
+    func dirtyPresentationRequest(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot
+    ) -> WorkspacePersistenceRequest? {
+        _ = applySnapshotToActiveTab(snapshot, state: &state)
+        return workspaceApplicationWorkflowService.dirtyPresentationRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.activeTab,
+                paperStyle: snapshot.paperStyle
+            )
+        )
+    }
+
+    func saveActiveDocumentRequest(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot,
+        preferredDestinationURL: DocumentProjectPath?,
+        trigger: SaveHistoryTrigger,
+        purpose: WorkspaceDocumentSavePurpose
+    ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
+        _ = applySnapshotToActiveTab(snapshot, state: &state)
+        return workspaceApplicationWorkflowService.saveActiveDocumentRequest(
+            context: WorkspaceDocumentContext(
+                activeTab: state.activeTab,
+                paperStyle: snapshot.paperStyle
+            ),
+            preferredDestinationURL: preferredDestinationURL,
+            trigger: trigger,
+            purpose: purpose
+        )
+    }
+
+    func closeTabsPersistenceRequest(
+        operation: PendingCloseOperation,
+        tabIDs: [OpenDocumentTab.ID],
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot,
+        state: inout State
+    ) -> Result<WorkspacePersistenceRequest, WorkspacePersistenceFailure> {
+        var tabs = tabIDs.compactMap { state.tab(withID: $0) }
+        let activeTabContext: WorkspaceDocumentContext?
+        if let activeTabID = state.activeTabID, tabIDs.contains(activeTabID) {
+            switch documentReplacementRequest(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                activeTabContext = WorkspaceDocumentContext(
+                    activeTab: request.activeTab,
+                    paperStyle: request.paperStyle
+                )
+                if let index = tabs.firstIndex(where: { $0.id == request.activeTab.id }) {
+                    tabs[index] = request.activeTab
+                }
+            case let .failure(failure):
+                return .failure(failure)
+            }
+        } else {
+            activeTabContext = nil
+        }
+        return workspaceApplicationWorkflowService.closeTabsPersistenceRequest(
+            operation: operation,
+            tabs: tabs,
+            activeTabContext: activeTabContext
+        )
+    }
+
+    func replacementRequestIfNeeded(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot
+    ) -> Result<WorkspaceDocumentReplacementRequest?, WorkspacePersistenceFailure> {
+        guard state.activeTab != nil else { return .success(nil) }
+        return documentReplacementRequest(state: &state, snapshot: snapshot).map(Optional.some)
+    }
+
+    func handleLifecycleAutosaveRequested(state: inout State) -> Effect<Action> {
+        guard state.activeTab?.isDirty == true else { return .none }
+        return requestDocumentSnapshot(state: &state, operation: .lifecycleAutosave)
+    }
+
+    func handleHomeReturnRequested(state: inout State) -> Effect<Action> {
+        guard state.activeTab != nil else {
+            return .merge(
+                .send(.delegate(.showHome)),
+                .send(.delegate(.requestHomeProjectsLoad))
+            )
+        }
+        return requestDocumentSnapshot(state: &state, operation: .homeReturnSave)
+    }
+
+    func handlePendingCloseSaveConfirmed(state: inout State) -> Effect<Action> {
+        guard let confirmation = state.consumeCloseConfirmation() else { return .none }
+        return requestDocumentSnapshot(
+            state: &state,
+            operation: .closeTabsSave(confirmation.operation, confirmation.tabIDs)
+        )
+    }
+
+    func handleSaveActiveDocumentRequested(
+        state: inout State,
+        preferredDestinationURL: DocumentProjectPath?
+    ) -> Effect<Action> {
+        requestDocumentSnapshot(
+            state: &state,
+            operation: .saveActiveDocument(preferredDestinationURL)
+        )
+    }
+
+    func handleOpenImportedDocumentRequest(
+        state: inout State,
+        sourceURL: URL
+    ) -> Effect<Action> {
+        guard state.activeTab != nil else {
+            return .send(.importedProjectLoadRequested(sourceURL, replacementRequest: nil))
+        }
+        return requestDocumentSnapshot(state: &state, operation: .openImportedDocument(sourceURL))
+    }
+
+    func handleOpenDocumentSelection(
+        state: inout State,
+        url: DocumentProjectPath,
+        removesStagedWorkspaceItem: Bool
+    ) -> Effect<Action> {
+        if let existingTabID = state.tabID(forSourceProjectURL: url) {
+            return .merge(
+                .send(.delegate(.workspaceProjectLoadCompleted(nil))),
+                .send(.tabSelected(existingTabID))
+            )
+        }
+        guard state.activeTab != nil else {
+            return .send(
+                .projectLoadRequested(
+                    url,
+                    removesStagedWorkspaceItem: removesStagedWorkspaceItem,
+                    replacementRequest: nil
+                )
+            )
+        }
+        return requestDocumentSnapshot(
+            state: &state,
+            operation: .openDocument(url, removesStagedWorkspaceItem: removesStagedWorkspaceItem)
+        )
+    }
+
+    func handleAutosaveRecoveryRestoreRequest(
+        state: inout State,
+        item: AutosaveRecoveryItem
+    ) -> Effect<Action> {
+        guard state.activeTab != nil else {
+            return .send(.autosaveRecoveryProjectLoadRequested(item, replacementRequest: nil))
+        }
+        return requestDocumentSnapshot(state: &state, operation: .autosaveRecoveryRestore(item))
+    }
+
+    func handleSaveHistoryProjectLoadRequested(
+        state: inout State,
+        projectURL: DocumentProjectPath,
+        openInNewTab: Bool,
+        replacementRequest: WorkspaceDocumentReplacementRequest?
+    ) -> Effect<Action> {
+        if let replacementRequest {
+            return loadSaveHistoryProject(
+                projectURL: projectURL,
+                openInNewTab: openInNewTab,
+                replacementRequest: replacementRequest
+            )
+        }
+        guard state.activeTab != nil else {
+            return loadSaveHistoryProject(
+                projectURL: projectURL,
+                openInNewTab: openInNewTab,
+                replacementRequest: nil
+            )
+        }
+        return requestDocumentSnapshot(
+            state: &state,
+            operation: .saveHistoryRestore(projectURL, openInNewTab: openInNewTab)
+        )
+    }
+
+    func loadSaveHistoryProject(
+        projectURL: DocumentProjectPath,
+        openInNewTab: Bool,
+        replacementRequest: WorkspaceDocumentReplacementRequest?
+    ) -> Effect<Action> {
+        let command = WorkspaceProjectLoadCommand(
+            loadRequest: .project(
+                WorkspaceProjectLoadOperation(
+                    fileURL: projectURL.fileURL,
+                    removeWorkspaceItemOnSuccess: nil
+                )
+            ),
+            prepareDocumentReplacementRequest: replacementRequest
+        )
+        return runProjectLoad(
+            command,
+            onSuccess: { loaded, issues in
+                .delegate(.saveHistoryProjectOpened(loaded, projectURL, openInNewTab, issues))
+            },
+            onFailure: { failure in
+                .delegate(
+                    .saveHistoryRestoreFailedFeedback(
+                        WorkspaceFeedbackMapper().feedback(for: failure, context: .saveHistoryRestore)
+                    )
+                )
+            }
+        )
+    }
+
+    func handleDocumentSnapshotPrepared(
+        state: inout State,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot
+    ) -> Effect<Action> {
+        guard let operation = state.pendingDocumentSnapshotOperation else { return .none }
+        state.pendingDocumentSnapshotOperation = nil
+        switch operation {
+        case .lifecycleAutosave:
+            guard let request = dirtyPresentationRequest(state: &state, snapshot: snapshot) else { return .none }
+            return .send(.persistenceRequested(request))
+
+        case .homeReturnSave:
+            switch saveActiveDocumentRequest(
+                state: &state,
+                snapshot: snapshot,
+                preferredDestinationURL: state.activeTab?.sourceProjectURL,
+                trigger: .autoSave,
+                purpose: .homeReturn
+            ) {
+            case let .success(request):
+                return .send(.persistenceRequested(request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .closeTabsSave(operation, tabIDs):
+            switch closeTabsPersistenceRequest(
+                operation: operation,
+                tabIDs: tabIDs,
+                snapshot: snapshot,
+                state: &state
+            ) {
+            case let .success(request):
+                return .send(.persistenceRequested(request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .saveActiveDocument(preferredDestinationURL):
+            switch saveActiveDocumentRequest(
+                state: &state,
+                snapshot: snapshot,
+                preferredDestinationURL: preferredDestinationURL,
+                trigger: .manualSave,
+                purpose: .saveDocument
+            ) {
+            case let .success(request):
+                return .send(.persistenceRequested(request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .openImportedDocument(sourceURL):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                return .send(.importedProjectLoadRequested(sourceURL, replacementRequest: request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .openDocument(url, removesStagedWorkspaceItem):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                return .send(
+                    .projectLoadRequested(
+                        url,
+                        removesStagedWorkspaceItem: removesStagedWorkspaceItem,
+                        replacementRequest: request
+                    )
+                )
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .tabSelection(tabID):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                return .send(.tabProjectLoadRequested(tabID, request))
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .saveHistoryRestore(projectURL, openInNewTab):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                return loadSaveHistoryProject(
+                    projectURL: projectURL,
+                    openInNewTab: openInNewTab,
+                    replacementRequest: request
+                )
+            case let .failure(failure):
+                return .send(.delegate(.saveHistoryRestoreFailedFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+
+        case let .autosaveRecoveryRestore(item):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case let .success(request):
+                return .send(.autosaveRecoveryProjectLoadRequested(item, replacementRequest: request))
+            case let .failure(failure):
+                return .send(.delegate(.workspaceProjectLoadFailedFeedback(WorkspaceFeedbackMapper().feedback(for: failure), showingHome: nil)))
+            }
+
+        case let .freshDocument(request):
+            switch replacementRequestIfNeeded(state: &state, snapshot: snapshot) {
+            case .success:
+                return beginFreshDocumentTabReservation(state: &state, request: request)
+            case let .failure(failure):
+                return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
+            }
+        }
+    }
+
+    func handleTabSelection(
+        state: inout State,
+        tabID: OpenDocumentTab.ID
+    ) -> Effect<Action> {
+        guard state.tab(withID: tabID) != nil else { return .none }
+        if state.isActiveTab(tabID) {
+            return .send(.delegate(.workspaceProjectLoadCompleted(nil)))
+        }
+        guard state.activeTab != nil else {
+            return .merge(
+                .send(.delegate(.workspaceProjectLoadCompleted(nil))),
+                .send(.tabProjectLoadRequested(tabID, nil))
+            )
+        }
+        return requestDocumentSnapshot(state: &state, operation: .tabSelection(tabID))
+    }
+
+    func handleTabSelectionLoaded(
+        state: inout State,
+        tabID: OpenDocumentTab.ID,
+        loaded: LoadedPaintProject
+    ) -> Effect<Action> {
+        guard let tab = state.tab(withID: tabID) else { return .none }
+        return applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .selectedTab(tabID: tabID, pane: tab.pane),
+                successEffects: .init(
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+                )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+            ),
+            state: &state
+        )
+    }
+
+    func beginFreshDocumentTabReservation(
+        state: inout State,
+        request: FreshDocumentRequest
+    ) -> Effect<Action> {
+        state.pendingWorkspaceTabReservation = .freshDocument(
+            PendingFreshDocumentMutation(
+                contract: request.contract,
+                operation: {
+                    switch request.operation {
+                    case let .newCanvas(dimensions):
+                        return .newCanvas(dimensions)
+                    case let .importedCanvas(plan):
+                        return .importedCanvas(plan)
+                    }
+                }()
+            )
+        )
+        return .send(
+            .persistenceRequested(
+                .reserveNewTabBackingStore(
+                    WorkspaceTabReservationRequest(
+                        title: request.contract.tabTitle,
+                        sourceProjectURL: nil,
+                        pane: state.focusedWorkspacePane
+                    )
+                )
+            )
+        )
+    }
+
+    func handleFreshDocumentRequested(
+        state: inout State,
+        contract: DocumentFeature.FreshDocumentReplacementContract,
+        operation: DocumentFeature.FreshDocumentMutationOperation
+    ) -> Effect<Action> {
+        let request = FreshDocumentRequest(contract: contract, operation: operation)
+        guard state.activeTab != nil else {
+            return beginFreshDocumentTabReservation(state: &state, request: request)
+        }
+        return requestDocumentSnapshot(state: &state, operation: .freshDocument(request))
+    }
+
+    func handleFreshDocumentMutationSucceeded(
+        state: inout State,
+        preparedTab: PreparedWorkspaceTab,
+        contract: DocumentFeature.FreshDocumentReplacementContract,
+        snapshot: DocumentFeature.WorkspaceDocumentSnapshot
+    ) -> Effect<Action> {
+        let tab = OpenDocumentTab(
+            id: preparedTab.id,
+            title: preparedTab.title,
+            backingStoreURL: preparedTab.backingStoreURL,
+            sourceProjectURL: preparedTab.sourceProjectURL,
+            canvasSize: snapshot.canvasSize,
+            isDirty: false,
+            pane: preparedTab.pane,
+            previewSurface: snapshot.previewSurface,
+            previewImageData: nil
+        )
+        state.appendTab(tab)
+        state.activateTab(preparedTab.id, pane: preparedTab.pane)
+        var effects: [Effect<Action>] = [
+            .send(.delegate(.workspaceProjectLoadCompleted(nil)))
+        ]
+        if let feedback = contract.successFeedback {
+            effects.append(.send(.delegate(.presentFeedback(feedback))))
+        }
+        return .merge(effects)
+    }
+
+    func applyLoadedWorkspaceProject(
+        _ loaded: LoadedPaintProject,
+        using plan: LoadedWorkspaceProjectPlan,
+        presentation: LoadedWorkspacePresentation = LoadedWorkspacePresentation(),
+        state: inout State
+    ) -> Effect<Action> {
+        switch plan.destination {
+        case let .newTab(title, sourceProjectURL):
+            state.pendingWorkspaceTabReservation = .loadedProject(
+                PendingLoadedWorkspaceProject(
+                    loaded: loaded,
+                    plan: plan,
+                    presentation: presentation
+                )
+            )
+            return .send(
+                .persistenceRequested(
+                    .reserveNewTabBackingStore(
+                        WorkspaceTabReservationRequest(
+                            title: title,
+                            sourceProjectURL: sourceProjectURL,
+                            pane: state.focusedWorkspacePane
+                        )
+                    )
+                )
+            )
+
+        case .selectedTab, .activeTab:
+            return requestLoadedProjectApplication(
+                loaded,
+                using: plan,
+                presentation: presentation,
+                preparedTab: nil,
+                state: &state
+            )
+        }
+    }
+
+    func requestLoadedProjectApplication(
+        _ loaded: LoadedPaintProject,
+        using plan: LoadedWorkspaceProjectPlan,
+        presentation: LoadedWorkspacePresentation,
+        preparedTab: PreparedWorkspaceTab?,
+        state: inout State
+    ) -> Effect<Action> {
+        state.pendingLoadedWorkspaceApplication = PendingLoadedWorkspaceApplication(
+            loaded: loaded,
+            plan: plan,
+            presentation: presentation,
+            preparedTab: preparedTab
+        )
+        return .send(.delegate(.applyLoadedProject(loaded)))
+    }
+
+    func handleLoadedProjectApplied(state: inout State) -> Effect<Action> {
+        guard let pending = state.pendingLoadedWorkspaceApplication else { return .none }
+        state.pendingLoadedWorkspaceApplication = nil
+        let loaded = pending.loaded
+        let plan = pending.plan
+        _ = pending.presentation
+
+        switch plan.destination {
+        case let .selectedTab(tabID, pane):
+            state.activateTab(tabID, pane: pane)
+
+        case .newTab:
+            guard let preparedTab = pending.preparedTab else {
+                return .send(.delegate(.workspaceProjectLoadFailedFeedback(.couldNotCreateTab, showingHome: nil)))
+            }
+            let tab = OpenDocumentTab(
+                id: preparedTab.id,
+                title: preparedTab.title,
+                backingStoreURL: preparedTab.backingStoreURL,
+                sourceProjectURL: preparedTab.sourceProjectURL,
+                canvasSize: loaded.presentation.canvasSize,
+                isDirty: false,
+                pane: preparedTab.pane,
+                previewSurface: nil,
+                previewImageData: nil
+            )
+            state.appendTab(tab)
+            state.activateTab(preparedTab.id, pane: preparedTab.pane)
+
+        case let .activeTab(title, sourceProjectURL):
+            state.updateActiveTabMetadata(
+                title: title,
+                sourceProjectURL: sourceProjectURL,
+                canvasSize: loaded.presentation.canvasSize
+            )
+        }
+
+        switch loadedWorkspaceFollowUpRequest(plan: plan, state: &state) {
+        case let .failure(failure):
+            return .send(.delegate(.workspaceProjectLoadFailedFeedback(WorkspaceFeedbackMapper().feedback(for: failure), showingHome: nil)))
+        case let .success(.some(request)):
+            return .merge(
+                applyLoadedWorkspaceSuccessEffects(plan.successEffects, state: &state),
+                .send(.persistenceRequested(request)),
+                .send(.delegate(.workspaceProjectLoadCompleted(nil)))
+            )
+        case .success(.none):
+            return .merge(
+                applyLoadedWorkspaceSuccessEffects(plan.successEffects, state: &state),
+                .send(.delegate(.workspaceProjectLoadCompleted(nil)))
+            )
+        }
+    }
+
+    func loadedWorkspaceFollowUpRequest(
+        plan: LoadedWorkspaceProjectPlan,
+        state: inout State
+    ) -> Result<WorkspacePersistenceRequest?, WorkspacePersistenceFailure> {
+        let requiresBackingStorePersistence: Bool
+        switch plan.destination {
+        case .newTab:
+            requiresBackingStorePersistence = true
+        case .selectedTab, .activeTab:
+            requiresBackingStorePersistence = false
+        }
+        switch workspaceApplicationWorkflowService.loadedWorkspaceFollowUp(
+            plan: plan,
+            context: WorkspaceDocumentContext(activeTab: state.activeTab, paperStyle: .default),
+            requiresBackingStorePersistence: requiresBackingStorePersistence
+        ) {
+        case let .success(outcome):
+            if outcome.marksActiveTabDirty {
+                state.setActiveTabDirty(true)
+            }
+            return .success(outcome.followUpRequest)
+        case let .failure(failure):
+            return .failure(failure)
+        }
+    }
+
+    func applyLoadedWorkspaceSuccessEffects(
+        _ successEffects: LoadedWorkspaceProjectPlan.SuccessEffects,
+        state: inout State
+    ) -> Effect<Action> {
+        var effects: [Effect<Action>] = []
+        switch successEffects.recoveryResolution {
+        case .none:
+            break
+        case let .removeItem(id):
+            effects.append(.send(.delegate(.autosaveRecoveryDiscarded(id))))
+        case let .completeRestore(id):
+            effects.append(.send(.delegate(.autosaveRecoveryRestoreCompleted(id))))
+        case .dismiss:
+            effects.append(.send(.delegate(.autosaveRecoveryDismissed)))
+        }
+
+        switch successEffects.saveHistoryResolution {
+        case .none:
+            break
+        case .completeRestore:
+            effects.append(.send(.delegate(.saveHistoryRestoreCompleted)))
+        }
+        return .merge(effects)
+    }
+
+    func handleOpenImportedDocumentLoaded(
+        state: inout State,
+        loaded: LoadedPaintProject,
+        suggestedTitle: String,
+        issues: [WorkspaceProjectLoadIssue]
+    ) -> Effect<Action> {
+        let trimmedTitle = suggestedTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle = trimmedTitle.isEmpty ? "Imported Document" : trimmedTitle
+        return applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(title: resolvedTitle, sourceProjectURL: nil),
+                successEffects: .init(
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+                )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+            ),
+            state: &state
+        )
+    }
+
+    func handleOpenDocumentLoaded(
+        state: inout State,
+        loaded: LoadedPaintProject,
+        sourceURL: DocumentProjectPath,
+        issues: [WorkspaceProjectLoadIssue]
+    ) -> Effect<Action> {
+        if let existingTabID = state.tabID(forSourceProjectURL: sourceURL) {
+            return .merge(
+                .send(.delegate(.workspaceProjectLoadCompleted(nil))),
+                .send(.tabSelected(existingTabID))
+            )
+        }
+        return applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(title: sourceURL.displayName, sourceProjectURL: sourceURL),
+                successEffects: .init(
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+                )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+            ),
+            state: &state
+        )
+    }
+
+    func handleAutosaveRecoveryOpened(
+        state: inout State,
+        loaded: LoadedPaintProject,
+        item: AutosaveRecoveryItem,
+        issues: [WorkspaceProjectLoadIssue]
+    ) -> Effect<Action> {
+        applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: .newTab(title: item.title, sourceProjectURL: item.sourceProjectURL),
+                followUp: .init(
+                    marksTabDirty: true,
+                    persistsToBackingStore: true,
+                    persistsAutosave: true
+                ),
+                successEffects: .init(
+                    discardedAutosaveEntryID: item.id,
+                    recoveryResolution: .completeRestore(item.id),
+                    completion: .restoredAutosave
+                )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .restoredAutosave
+            ),
+            state: &state
+        )
+    }
+
+    func handleSaveHistoryOpened(
+        state: inout State,
+        loaded: LoadedPaintProject,
+        projectURL: DocumentProjectPath,
+        openInNewTab: Bool,
+        issues: [WorkspaceProjectLoadIssue]
+    ) -> Effect<Action> {
+        let restoredTitle = projectURL.displayName
+        let destination: LoadedWorkspaceProjectPlan.Destination = {
+            if openInNewTab || state.activeTab == nil {
+                return .newTab(title: "\(restoredTitle) Snapshot", sourceProjectURL: nil)
+            }
+            return .activeTab(
+                title: state.activeTab?.title ?? restoredTitle,
+                sourceProjectURL: state.activeTab?.sourceProjectURL
+            )
+        }()
+        return applyLoadedWorkspaceProject(
+            loaded,
+            using: LoadedWorkspaceProjectPlan(
+                destination: destination,
+                followUp: .init(
+                    marksTabDirty: true,
+                    persistsToBackingStore: true,
+                    persistsAutosave: true
+                ),
+                successEffects: .init(
+                    saveHistoryResolution: .completeRestore,
+                    completion: .restoredSaveHistory
+                )
+            ),
+            presentation: LoadedWorkspacePresentation(
+                issues: issues,
+                completion: .restoredSaveHistory
+            ),
+            state: &state
+        )
+    }
+
+    func handleWorkspacePersistenceSucceeded(
+        state: inout State,
+        result: WorkspacePersistenceResult
+    ) -> Effect<Action> {
+        switch result {
+        case .dirtyPresentationPersisted:
+            return .none
+        case let .activeDocumentSaved(saved):
+            state.updateTab(
+                id: saved.activeTabID,
+                title: saved.savedURL.displayName,
+                sourceProjectURL: saved.savedURL,
+                previewSurface: saved.previewSurface,
+                previewImageData: saved.previewImageData,
+                canvasSize: saved.canvasSize,
+                isDirty: false
+            )
+            switch saved.purpose {
+            case .saveDocument:
+                return .merge(
+                    .send(.delegate(.presentFeedback(.savedDocument(saved.savedURL.fileURL.lastPathComponent)))),
+                    .send(.delegate(.requestHomeProjectsLoad))
+                )
+            case .homeReturn:
+                return .merge(
+                    .send(.delegate(.presentFeedback(.savedDocument(saved.savedURL.fileURL.lastPathComponent)))),
+                    .send(.delegate(.showHome)),
+                    .send(.delegate(.requestHomeProjectsLoad))
+                )
+            }
+        case .documentReplacementPrepared:
+            return .none
+        case let .newTabBackingStoreReserved(preparedTab):
+            guard let pendingReservation = state.pendingWorkspaceTabReservation else { return .none }
+            state.pendingWorkspaceTabReservation = nil
+            switch pendingReservation {
+            case let .loadedProject(pending):
+                return requestLoadedProjectApplication(
+                    pending.loaded,
+                    using: pending.plan,
+                    presentation: pending.presentation,
+                    preparedTab: preparedTab,
+                    state: &state
+                )
+            case let .freshDocument(pending):
+                let operation: DocumentFeature.FreshDocumentMutationOperation
+                switch pending.operation {
+                case let .newCanvas(dimensions):
+                    operation = .newCanvas(dimensions)
+                case let .importedCanvas(plan):
+                    operation = .importedCanvas(plan)
+                }
+                return .send(
+                    .delegate(
+                        .requestFreshDocumentMutation(
+                            DocumentFeature.FreshDocumentMutationRequest(
+                                contract: pending.contract,
+                                operation: operation,
+                                preparedTab: preparedTab
+                            )
+                        )
+                    )
+                )
+            }
+        case let .loadedWorkspaceFollowUpApplied(followUp):
+            return .merge(
+                applyLoadedWorkspaceSuccessEffects(followUp.successEffects, state: &state),
+                .send(.delegate(.workspaceProjectLoadCompleted(nil)))
+            )
+        case let .tabsSavedForClose(closeResult):
+            return performCloseOperation(closeResult.operation)
+        case .autosaveArtifactsDiscarded:
+            return .none
+        }
+    }
+
+    func handleWorkspacePersistenceFailed(
+        state: inout State,
+        failure: WorkspacePersistenceFailure
+    ) -> Effect<Action> {
+        if case .some(.reserveNewTabBackingStore) = failure.request {
+            state.pendingWorkspaceTabReservation = nil
+        }
+        return .send(.delegate(.presentFeedback(WorkspaceFeedbackMapper().feedback(for: failure))))
     }
 }
 

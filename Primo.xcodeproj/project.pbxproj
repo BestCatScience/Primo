@@ -14,6 +14,8 @@
 		6F602A2861F142CEBB3FE6EC /* DocumentFeature+DocumentMutationWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE8 /* DocumentFeature+DocumentMutationWorkflow.swift */; };
 		6F602A2861F142CEBB3FE6ED /* DocumentFeature+SelectionTransformWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAE9 /* DocumentFeature+SelectionTransformWorkflow.swift */; };
 		6F602A2861F142CEBB3FE6EE /* DocumentFeature+CanvasLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEA /* DocumentFeature+CanvasLifecycleWorkflow.swift */; };
+		6F602A2861F142CEBB3FE6EF /* DocumentFeature+CanvasStrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEB /* DocumentFeature+CanvasStrokeWorkflow.swift */; };
+		6F602A2861F142CEBB3FE6F0 /* DocumentFeature+NanoBananaWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1686F75A86724FBA8A0DAAEC /* DocumentFeature+NanoBananaWorkflow.swift */; };
 		7ADC402731884EF58613CCC6 /* DocumentFeature+ToolPanelStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BCCBE365E364E1783DD6EC2 /* DocumentFeature+ToolPanelStateCoordinator.swift */; };
 		7B1D7B5CA1C44D498EB4D001 /* DocumentFeature+DocumentMutationFeedbackMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1D7B5CA1C44D498EB4D002 /* DocumentFeature+DocumentMutationFeedbackMapper.swift */; };
 		8DA458906F8C4AC69D670CEB /* WorkspaceFeature+StateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77EBC82C12B64F77B9A28170 /* WorkspaceFeature+StateCoordinator.swift */; };
@@ -64,17 +66,12 @@
 		A000000000000000000000B2 /* LayerSidebarView+Rows.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B3 /* LayerSidebarView+Rows.swift */; };
 		A000000000000000000000B4 /* LayerSidebarView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B5 /* LayerSidebarView+Support.swift */; };
 		A000000000000000000000B6 /* NanoBananaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000B7 /* NanoBananaClient.swift */; };
-		A000000000000000000000BA /* RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BB /* RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift */; };
 		A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000BF /* DocumentWorkspaceClient.swift */; };
 		A000000000000000000000C8 /* SystemClients.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000C9 /* SystemClients.swift */; };
 		A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000CB /* SystemClients+Dependencies.swift */; };
-		A000000000000000000000D2 /* RootFeatureWorkflow+NanoBananaGenerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D3 /* RootFeatureWorkflow+NanoBananaGenerationService.swift */; };
 		A000000000000000000000D4 /* PrimoRootFeatureModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D5 /* PrimoRootFeatureModels.swift */; };
-		A000000000000000000000D8 /* RootFeatureWorkflow+DocumentPersistenceWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000D9 /* RootFeatureWorkflow+DocumentPersistenceWorkflow.swift */; };
-		A000000000000000000000E2 /* RootFeatureWorkflow+CanvasStrokeWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E3 /* RootFeatureWorkflow+CanvasStrokeWorkflow.swift */; };
 		A000000000000000000000E4 /* DocumentFeature+SelectionWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000E5 /* DocumentFeature+SelectionWorkflow.swift */; };
 		A000000000000000000000F6 /* CrossFeatureIntegrationReducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */; };
-		A000000000000000000000F8 /* RootFeatureWorkflowReducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000F9 /* RootFeatureWorkflowReducer.swift */; };
 		A00000000000000000000100 /* ImportExportFeature+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000101 /* ImportExportFeature+Workflow.swift */; };
 		A00000000000000000000102 /* WorkspaceFeature+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */; };
 		A00000000000000000000104 /* ApplicationFeature+Workflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000105 /* ApplicationFeature+Workflow.swift */; };
@@ -158,9 +155,6 @@
 		C8C52E9EC0B44A888AEB7B2F /* DocumentFeature+ImageImportOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D6182AC743040C7B82E2FA6 /* DocumentFeature+ImageImportOps.swift */; };
 		D30000000000000000000001 /* DocumentFeature+CanvasPreviewStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000002 /* DocumentFeature+CanvasPreviewStateCoordinator.swift */; };
 		D30000000000000000000003 /* DocumentFeature+CanvasToolStateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30000000000000000000004 /* DocumentFeature+CanvasToolStateCoordinator.swift */; };
-		D40000000000000000000003 /* RootFeatureWorkflow+CanvasLifecycleWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D40000000000000000000004 /* RootFeatureWorkflow+CanvasLifecycleWorkflow.swift */; };
-		D40000000000000000000009 /* RootFeatureWorkflow+TabSelectionWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000A /* RootFeatureWorkflow+TabSelectionWorkflow.swift */; };
-		D4000000000000000000000B /* RootFeatureWorkflow+DocumentOpeningWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4000000000000000000000C /* RootFeatureWorkflow+DocumentOpeningWorkflow.swift */; };
 		D50000000000000000000001 /* CanvasViewportGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = D60000000000000000000001 /* CanvasViewportGeometry.swift */; };
 		E70000000000000000000011 /* PrimoRootFeature+State.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000001 /* PrimoRootFeature+State.swift */; };
 		E70000000000000000000012 /* PrimoRootFeature+Action.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000002 /* PrimoRootFeature+Action.swift */; };
@@ -238,6 +232,8 @@
 		1686F75A86724FBA8A0DAAE8 /* DocumentFeature+DocumentMutationWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+DocumentMutationWorkflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAE9 /* DocumentFeature+SelectionTransformWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+SelectionTransformWorkflow.swift"; sourceTree = "<group>"; };
 		1686F75A86724FBA8A0DAAEA /* DocumentFeature+CanvasLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+CanvasLifecycleWorkflow.swift"; sourceTree = "<group>"; };
+		1686F75A86724FBA8A0DAAEB /* DocumentFeature+CanvasStrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+CanvasStrokeWorkflow.swift"; sourceTree = "<group>"; };
+		1686F75A86724FBA8A0DAAEC /* DocumentFeature+NanoBananaWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+NanoBananaWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A7 /* TimelapseExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseExporter.swift; sourceTree = "<group>"; };
 		A000000000000000000000A9 /* ContentView+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Menus.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AB /* ContentView+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Workspace.swift"; sourceTree = "<group>"; };
@@ -247,17 +243,12 @@
 		A000000000000000000000B3 /* LayerSidebarView+Rows.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Rows.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B5 /* LayerSidebarView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LayerSidebarView+Support.swift"; sourceTree = "<group>"; };
 		A000000000000000000000B7 /* NanoBananaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaClient.swift; sourceTree = "<group>"; };
-		A000000000000000000000BB /* RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift"; sourceTree = "<group>"; };
 		A000000000000000000000BF /* DocumentWorkspaceClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentWorkspaceClient.swift; sourceTree = "<group>"; };
 		A000000000000000000000C9 /* SystemClients.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemClients.swift; sourceTree = "<group>"; };
 		A000000000000000000000CB /* SystemClients+Dependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SystemClients+Dependencies.swift"; sourceTree = "<group>"; };
-		A000000000000000000000D3 /* RootFeatureWorkflow+NanoBananaGenerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+NanoBananaGenerationService.swift"; sourceTree = "<group>"; };
 		A000000000000000000000D5 /* PrimoRootFeatureModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoRootFeatureModels.swift; sourceTree = "<group>"; };
-		A000000000000000000000D9 /* RootFeatureWorkflow+DocumentPersistenceWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+DocumentPersistenceWorkflow.swift"; sourceTree = "<group>"; };
-		A000000000000000000000E3 /* RootFeatureWorkflow+CanvasStrokeWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+CanvasStrokeWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000E5 /* DocumentFeature+SelectionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+SelectionWorkflow.swift"; sourceTree = "<group>"; };
 		A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CrossFeatureIntegrationReducer.swift"; sourceTree = "<group>"; };
-		A000000000000000000000F9 /* RootFeatureWorkflowReducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflowReducer.swift"; sourceTree = "<group>"; };
 		A00000000000000000000101 /* ImportExportFeature+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ImportExportFeature+Workflow.swift"; sourceTree = "<group>"; };
 		A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkspaceFeature+Workflow.swift"; sourceTree = "<group>"; };
 		A00000000000000000000105 /* ApplicationFeature+Workflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ApplicationFeature+Workflow.swift"; sourceTree = "<group>"; };
@@ -275,9 +266,6 @@
 		C20000000000000000000002 /* DocumentFeature+StrokeGeometryOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+StrokeGeometryOps.swift"; sourceTree = "<group>"; };
 		D30000000000000000000002 /* DocumentFeature+CanvasPreviewStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+CanvasPreviewStateCoordinator.swift"; sourceTree = "<group>"; };
 		D30000000000000000000004 /* DocumentFeature+CanvasToolStateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+CanvasToolStateCoordinator.swift"; sourceTree = "<group>"; };
-		D40000000000000000000004 /* RootFeatureWorkflow+CanvasLifecycleWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+CanvasLifecycleWorkflow.swift"; sourceTree = "<group>"; };
-		D4000000000000000000000A /* RootFeatureWorkflow+TabSelectionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+TabSelectionWorkflow.swift"; sourceTree = "<group>"; };
-		D4000000000000000000000C /* RootFeatureWorkflow+DocumentOpeningWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RootFeatureWorkflow+DocumentOpeningWorkflow.swift"; sourceTree = "<group>"; };
 		D60000000000000000000001 /* CanvasViewportGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasViewportGeometry.swift; sourceTree = "<group>"; };
 		E70000000000000000000001 /* PrimoRootFeature+State.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimoRootFeature+State.swift"; sourceTree = "<group>"; };
 		E70000000000000000000002 /* PrimoRootFeature+Action.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PrimoRootFeature+Action.swift"; sourceTree = "<group>"; };
@@ -517,31 +505,25 @@
 				85DE8EA2D3D64F77B9A28170 /* DocumentFeature+CanvasPresentationStateCoordinator.swift */,
 				D30000000000000000000002 /* DocumentFeature+CanvasPreviewStateCoordinator.swift */,
 				D30000000000000000000004 /* DocumentFeature+CanvasToolStateCoordinator.swift */,
-				D40000000000000000000004 /* RootFeatureWorkflow+CanvasLifecycleWorkflow.swift */,
 				A00000000000000000000101 /* ImportExportFeature+Workflow.swift */,
 				A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */,
 				A00000000000000000000105 /* ApplicationFeature+Workflow.swift */,
 				A00000000000000000000107 /* DocumentFeature+Workflow.swift */,
-				D4000000000000000000000A /* RootFeatureWorkflow+TabSelectionWorkflow.swift */,
-				D4000000000000000000000C /* RootFeatureWorkflow+DocumentOpeningWorkflow.swift */,
 				A000000000000000000000F7 /* CrossFeatureIntegrationReducer.swift */,
-				A000000000000000000000F9 /* RootFeatureWorkflowReducer.swift */,
 				A000000000000000000000A5 /* DocumentFeature+PureImageOps.swift */,
 				1686F75A86724FBA8A0DAAE6 /* DocumentFeature+ImageAdjustmentOps.swift */,
 				1686F75A86724FBA8A0DAAE7 /* DocumentFeature+AdjustmentPreviewWorkflow.swift */,
 				1686F75A86724FBA8A0DAAE8 /* DocumentFeature+DocumentMutationWorkflow.swift */,
 				1686F75A86724FBA8A0DAAE9 /* DocumentFeature+SelectionTransformWorkflow.swift */,
 				1686F75A86724FBA8A0DAAEA /* DocumentFeature+CanvasLifecycleWorkflow.swift */,
+				1686F75A86724FBA8A0DAAEB /* DocumentFeature+CanvasStrokeWorkflow.swift */,
+				1686F75A86724FBA8A0DAAEC /* DocumentFeature+NanoBananaWorkflow.swift */,
 				38659007DA5646399FFA1EB1 /* DocumentFeature+PreviewCompositeOps.swift */,
 				C20000000000000000000002 /* DocumentFeature+StrokeGeometryOps.swift */,
 				9D6182AC743040C7B82E2FA6 /* DocumentFeature+ImageImportOps.swift */,
-				A000000000000000000000BB /* RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift */,
 				8B535F4B219648258271A7B1 /* DocumentFeature+SelectionGeometryOps.swift */,
-				A000000000000000000000D9 /* RootFeatureWorkflow+DocumentPersistenceWorkflow.swift */,
 				7B1D7B5CA1C44D498EB4D002 /* DocumentFeature+DocumentMutationFeedbackMapper.swift */,
-				A000000000000000000000E3 /* RootFeatureWorkflow+CanvasStrokeWorkflow.swift */,
 				A000000000000000000000E5 /* DocumentFeature+SelectionWorkflow.swift */,
-				A000000000000000000000D3 /* RootFeatureWorkflow+NanoBananaGenerationService.swift */,
 				A00000000000000000000015 /* BrushRuntimeSettings.swift */,
 				A00000000000000000000016 /* PaintDocumentPresentation.swift */,
 				A00000000000000000000018 /* PaintDocumentClient.swift */,
@@ -775,31 +757,25 @@
 				25A873499A1348AA99A538DF /* DocumentFeature+CanvasPresentationStateCoordinator.swift in Sources */,
 				D30000000000000000000001 /* DocumentFeature+CanvasPreviewStateCoordinator.swift in Sources */,
 				D30000000000000000000003 /* DocumentFeature+CanvasToolStateCoordinator.swift in Sources */,
-				D40000000000000000000003 /* RootFeatureWorkflow+CanvasLifecycleWorkflow.swift in Sources */,
 				A00000000000000000000100 /* ImportExportFeature+Workflow.swift in Sources */,
 				A00000000000000000000102 /* WorkspaceFeature+Workflow.swift in Sources */,
 				A00000000000000000000104 /* ApplicationFeature+Workflow.swift in Sources */,
 				A00000000000000000000106 /* DocumentFeature+Workflow.swift in Sources */,
-				D40000000000000000000009 /* RootFeatureWorkflow+TabSelectionWorkflow.swift in Sources */,
-				D4000000000000000000000B /* RootFeatureWorkflow+DocumentOpeningWorkflow.swift in Sources */,
 				A000000000000000000000F6 /* CrossFeatureIntegrationReducer.swift in Sources */,
-				A000000000000000000000F8 /* RootFeatureWorkflowReducer.swift in Sources */,
 				A000000000000000000000A4 /* DocumentFeature+PureImageOps.swift in Sources */,
 				6F602A2861F142CEBB3FE6EA /* DocumentFeature+ImageAdjustmentOps.swift in Sources */,
 				6F602A2861F142CEBB3FE6EB /* DocumentFeature+AdjustmentPreviewWorkflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6EC /* DocumentFeature+DocumentMutationWorkflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6ED /* DocumentFeature+SelectionTransformWorkflow.swift in Sources */,
 				6F602A2861F142CEBB3FE6EE /* DocumentFeature+CanvasLifecycleWorkflow.swift in Sources */,
+				6F602A2861F142CEBB3FE6EF /* DocumentFeature+CanvasStrokeWorkflow.swift in Sources */,
+				6F602A2861F142CEBB3FE6F0 /* DocumentFeature+NanoBananaWorkflow.swift in Sources */,
 				39BA9FE771F8496D8E5EA854 /* DocumentFeature+PreviewCompositeOps.swift in Sources */,
 				C20000000000000000000001 /* DocumentFeature+StrokeGeometryOps.swift in Sources */,
 				C8C52E9EC0B44A888AEB7B2F /* DocumentFeature+ImageImportOps.swift in Sources */,
-				A000000000000000000000BA /* RootFeatureWorkflow+WorkspacePersistenceCoordinator.swift in Sources */,
 				976C75F756004B609A33D822 /* DocumentFeature+SelectionGeometryOps.swift in Sources */,
-				A000000000000000000000D8 /* RootFeatureWorkflow+DocumentPersistenceWorkflow.swift in Sources */,
 				7B1D7B5CA1C44D498EB4D001 /* DocumentFeature+DocumentMutationFeedbackMapper.swift in Sources */,
-				A000000000000000000000E2 /* RootFeatureWorkflow+CanvasStrokeWorkflow.swift in Sources */,
 				A000000000000000000000E4 /* DocumentFeature+SelectionWorkflow.swift in Sources */,
-				A000000000000000000000D2 /* RootFeatureWorkflow+NanoBananaGenerationService.swift in Sources */,
 				A0000000000000000000009C /* BrushPaletteControls.swift in Sources */,
 				A0000000000000000000003E /* BrushPaletteFeature.swift in Sources */,
 				A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */,

@@ -64,6 +64,31 @@ struct WorkspaceFeature {
         case freshDocument(PendingFreshDocumentMutation)
     }
 
+    enum PendingDocumentSnapshotOperation: Equatable, Sendable {
+        case lifecycleAutosave
+        case homeReturnSave
+        case closeTabsSave(PendingCloseOperation, [OpenDocumentTab.ID])
+        case saveActiveDocument(DocumentProjectPath?)
+        case openImportedDocument(URL)
+        case openDocument(DocumentProjectPath, removesStagedWorkspaceItem: Bool)
+        case tabSelection(OpenDocumentTab.ID)
+        case saveHistoryRestore(DocumentProjectPath, openInNewTab: Bool)
+        case autosaveRecoveryRestore(AutosaveRecoveryItem)
+        case freshDocument(FreshDocumentRequest)
+    }
+
+    struct FreshDocumentRequest: Equatable, Sendable {
+        let contract: DocumentFeature.FreshDocumentReplacementContract
+        let operation: DocumentFeature.FreshDocumentMutationOperation
+    }
+
+    struct PendingLoadedWorkspaceApplication: Equatable, Sendable {
+        let loaded: LoadedPaintProject
+        let plan: LoadedWorkspaceProjectPlan
+        let presentation: LoadedWorkspacePresentation
+        let preparedTab: PreparedWorkspaceTab?
+    }
+
     struct PendingLoadedWorkspaceProject: Equatable, Sendable {
         let loaded: LoadedPaintProject
         let plan: PrimoWorkspaceApplication.LoadedWorkspaceProjectPlan
@@ -95,6 +120,8 @@ struct WorkspaceFeature {
         var workspaceLayout: WorkspaceLayoutMode = .single
         var pendingCloseConfirmation: PendingCloseConfirmationState?
         var pendingWorkspaceTabReservation: PendingWorkspaceTabReservation?
+        var pendingDocumentSnapshotOperation: PendingDocumentSnapshotOperation?
+        var pendingLoadedWorkspaceApplication: PendingLoadedWorkspaceApplication?
     }
 
     @CasePathable
@@ -106,15 +133,21 @@ struct WorkspaceFeature {
             case applyLoadedProject(LoadedPaintProject)
             case workspaceProjectLoadFailed(message: String?, showingHome: Bool?)
             case workspaceProjectLoadFailedFeedback(ApplicationFeedback, showingHome: Bool?)
+            case workspaceProjectLoadCompleted(String?)
             case homeProjectsLoaded([SavedProjectSummary])
             case autosaveRecoveryLoaded([AutosaveRecoveryItem])
             case autosaveRecoveryLoadFailed(ApplicationFeedback)
             case autosaveRecoveryDiscarded(WorkspaceItemID)
+            case autosaveRecoveryRestoreCompleted(WorkspaceItemID)
+            case autosaveRecoveryDismissed
             case saveHistoryLoaded([SaveHistoryEntry])
             case saveHistoryLoadFailed(ApplicationFeedback)
             case saveHistoryProjectOpened(LoadedPaintProject, DocumentProjectPath, Bool, [WorkspaceProjectLoadIssue])
             case saveHistoryRestoreFailedFeedback(ApplicationFeedback)
+            case saveHistoryRestoreCompleted
             case requestHomeProjectsLoad
+            case requestDocumentSnapshot
+            case requestFreshDocumentMutation(DocumentFeature.FreshDocumentMutationRequest)
         }
 
         case tabSelected(OpenDocumentTab.ID)
@@ -163,6 +196,19 @@ struct WorkspaceFeature {
             openInNewTab: Bool,
             replacementRequest: WorkspaceDocumentReplacementRequest?
         )
+        case saveHistoryProjectOpened(LoadedPaintProject, DocumentProjectPath, Bool, [WorkspaceProjectLoadIssue])
+        case saveActiveDocumentRequested(preferredDestinationURL: DocumentProjectPath?)
+        case saveDocumentCopyRequested
+        case documentSnapshotPrepared(DocumentFeature.WorkspaceDocumentSnapshot)
+        case loadedProjectApplied
+        case loadedProjectApplySkipped
+        case freshDocumentRequested(DocumentFeature.FreshDocumentReplacementContract, DocumentFeature.FreshDocumentMutationOperation)
+        case freshDocumentMutationSucceeded(
+            WorkspaceFeature.PreparedWorkspaceTab,
+            DocumentFeature.FreshDocumentReplacementContract,
+            DocumentFeature.WorkspaceDocumentSnapshot
+        )
+        case freshDocumentMutationFailed(ApplicationFeedback?)
         case catalogRequested(WorkspaceCatalogRequest)
         case catalogSucceeded(WorkspaceCatalogResult)
         case catalogFailed(WorkspaceCatalogFailure)
@@ -183,6 +229,9 @@ struct WorkspaceFeature {
 
             case .pendingCloseDiscardConfirmed:
                 return handlePendingCloseDiscardConfirmed(state: &state)
+
+            case .pendingCloseSaveConfirmed:
+                return handlePendingCloseSaveConfirmed(state: &state)
 
             case .pendingCloseCancelled:
                 handlePendingCloseCancelled(state: &state)
@@ -227,17 +276,119 @@ struct WorkspaceFeature {
                     relativeFolderPath: relativeFolderPath
                 )
 
+            case .homeReturnRequested:
+                return handleHomeReturnRequested(state: &state)
+
+            case .lifecycleAutosaveRequested:
+                return handleLifecycleAutosaveRequested(state: &state)
+
+            case let .openImportedDocumentRequested(sourceURL):
+                return handleOpenImportedDocumentRequest(state: &state, sourceURL: sourceURL)
+
+            case let .openImportedDocumentLoaded(loaded, suggestedTitle, issues):
+                return handleOpenImportedDocumentLoaded(
+                    state: &state,
+                    loaded: loaded,
+                    suggestedTitle: suggestedTitle,
+                    issues: issues
+                )
+
+            case let .openDocumentSelected(url):
+                return handleOpenDocumentSelection(
+                    state: &state,
+                    url: url,
+                    removesStagedWorkspaceItem: true
+                )
+
+            case let .homeProjectSelected(url):
+                return handleOpenDocumentSelection(
+                    state: &state,
+                    url: url,
+                    removesStagedWorkspaceItem: false
+                )
+
+            case let .openDocumentLoaded(loaded, sourceURL, issues):
+                return handleOpenDocumentLoaded(
+                    state: &state,
+                    loaded: loaded,
+                    sourceURL: sourceURL,
+                    issues: issues
+                )
+
+            case let .autosaveRecoveryRestoreRequested(item):
+                return handleAutosaveRecoveryRestoreRequest(state: &state, item: item)
+
+            case let .autosaveRecoveryOpened(loaded, item, issues):
+                return handleAutosaveRecoveryOpened(
+                    state: &state,
+                    loaded: loaded,
+                    item: item,
+                    issues: issues
+                )
+
+            case let .saveActiveDocumentRequested(preferredDestinationURL):
+                return handleSaveActiveDocumentRequested(
+                    state: &state,
+                    preferredDestinationURL: preferredDestinationURL ?? state.activeTab?.sourceProjectURL
+                )
+
+            case .saveDocumentCopyRequested:
+                return handleSaveActiveDocumentRequested(
+                    state: &state,
+                    preferredDestinationURL: nil
+                )
+
+            case let .documentSnapshotPrepared(snapshot):
+                return handleDocumentSnapshotPrepared(state: &state, snapshot: snapshot)
+
+            case .loadedProjectApplied:
+                return handleLoadedProjectApplied(state: &state)
+
+            case .loadedProjectApplySkipped:
+                state.pendingLoadedWorkspaceApplication = nil
+                return .send(.delegate(.workspaceProjectLoadFailed(message: nil, showingHome: nil)))
+
+            case let .freshDocumentRequested(contract, operation):
+                return handleFreshDocumentRequested(state: &state, contract: contract, operation: operation)
+
+            case let .freshDocumentMutationSucceeded(preparedTab, contract, snapshot):
+                return handleFreshDocumentMutationSucceeded(
+                    state: &state,
+                    preparedTab: preparedTab,
+                    contract: contract,
+                    snapshot: snapshot
+                )
+
+            case let .freshDocumentMutationFailed(feedback):
+                return .send(.delegate(.presentFeedback(feedback ?? .couldNotCreateTab)))
+
             case let .persistenceRequested(request):
                 return handleWorkspacePersistenceRequested(request: request)
+
+            case let .persistenceSucceeded(result):
+                return handleWorkspacePersistenceSucceeded(state: &state, result: result)
+
+            case let .persistenceFailed(failure):
+                return handleWorkspacePersistenceFailed(state: &state, failure: failure)
 
             case .saveHistoryEntriesRequested:
                 return handleSaveHistoryEntriesRequested(state: &state)
 
             case let .saveHistoryProjectLoadRequested(projectURL, openInNewTab, replacementRequest):
                 return handleSaveHistoryProjectLoadRequested(
+                    state: &state,
                     projectURL: projectURL,
                     openInNewTab: openInNewTab,
                     replacementRequest: replacementRequest
+                )
+
+            case let .saveHistoryProjectOpened(loaded, projectURL, openInNewTab, issues):
+                return handleSaveHistoryOpened(
+                    state: &state,
+                    loaded: loaded,
+                    projectURL: projectURL,
+                    openInNewTab: openInNewTab,
+                    issues: issues
                 )
 
             case let .tabProjectLoadRequested(tabID, replacementRequest):

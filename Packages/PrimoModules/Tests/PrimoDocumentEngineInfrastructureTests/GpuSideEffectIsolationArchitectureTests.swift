@@ -72,28 +72,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
         let sources = try Self.swiftSources(under: documentRoot)
         let filenames = Set(sources.map(\.lastPathComponent))
+        let rootWorkflowPrefix = "RootFeature" + "Workflow"
 
         #expect(!filenames.contains("FeatureRuntimeReducers.swift"))
         #expect(!filenames.contains("DocumentFeatureRuntimeReducer.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+StartupLifecycleWorkflow.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+ApplicationActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+CanvasUIStateCoordinator.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+CanvasPreviewStateCoordinator.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+CanvasCoordination.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+PreviewCompositeOps.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+AdjustmentActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+AdjustmentWorkflow.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+SelectionActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+LayerActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+CanvasEditingActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+DocumentActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+WorkspaceActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+SelectionTransform.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+LayerPropertiesWorkflow.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+LayerStructureWorkflow.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+LayerContentWorkflow.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+EditingActionRouting.swift"))
-        #expect(!filenames.contains("RootFeatureWorkflow+LayerEditingWorkflow.swift"))
+        #expect(filenames.allSatisfy { !$0.hasPrefix(rootWorkflowPrefix) })
         #expect(filenames.allSatisfy { !$0.hasPrefix("CrossFeatureIntegrationReducer+") })
         #expect(filenames.allSatisfy { !$0.hasPrefix("PrimoRootFeature+") || !$0.contains("Workflow") })
         #expect(filenames.allSatisfy { !$0.hasPrefix("PrimoRootFeature+") || !$0.contains("Routing") })
@@ -121,16 +104,40 @@ struct GpuSideEffectIsolationArchitectureTests {
             isDirectory: false
         )
         let body = try String(contentsOf: reducerFile, encoding: .utf8)
+        let rootWorkflowReducerName = "RootFeature" + "WorkflowReducer"
         #expect(!body.contains("@Dependency"), "CrossFeatureIntegrationReducer should be dependency-free")
         #expect(!body.contains("state."), "CrossFeatureIntegrationReducer should relay feature actions without direct root state access")
-        #expect(body.contains("RootFeatureWorkflowReducer().reduce"), "CrossFeatureIntegrationReducer should delegate workflow execution")
+        #expect(!body.contains(rootWorkflowReducerName), "CrossFeatureIntegrationReducer should not delegate to root workflow execution")
+        #expect(!body.contains("func handle"), "CrossFeatureIntegrationReducer should not own workflow handlers")
+        #expect(!body.contains("func route"), "CrossFeatureIntegrationReducer should not own workflow routing helpers")
 
         let rootWorkflowReducer = repoRoot.appendingPathComponent(
-            "App/Features/Document/RootFeatureWorkflowReducer.swift",
+            "App/Features/Document/\(rootWorkflowReducerName).swift",
             isDirectory: false
         )
-        let rootWorkflowBody = try String(contentsOf: rootWorkflowReducer, encoding: .utf8)
-        #expect(!rootWorkflowBody.contains("processEnvironmentClient"), "Startup logging and environment access should be feature-owned")
+        #expect(!FileManager.default.fileExists(atPath: rootWorkflowReducer.path), "\(rootWorkflowReducerName).swift should be removed")
+
+        let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        let rootWorkflowPrefix = "RootFeature" + "Workflow"
+        let rootWorkflowSources = try Self.swiftSources(under: documentRoot)
+            .filter { source in
+                let filename = source.lastPathComponent
+                return filename.hasPrefix(rootWorkflowPrefix + "+")
+            }
+        #expect(rootWorkflowSources.isEmpty, "\(rootWorkflowPrefix)+*.swift should be removed")
+
+        let checkedRoots = [
+            "App",
+            "PrimoTests",
+            "Packages/PrimoModules/Tests"
+        ]
+        for checkedRoot in checkedRoots {
+            let sourceRoot = repoRoot.appendingPathComponent(checkedRoot, isDirectory: true)
+            for source in try Self.swiftSources(under: sourceRoot) {
+                let sourceBody = try String(contentsOf: source, encoding: .utf8)
+                #expect(!sourceBody.contains(rootWorkflowReducerName), "\(source.path) should not reference \(rootWorkflowReducerName)")
+            }
+        }
     }
 
     @Test
@@ -140,8 +147,9 @@ struct GpuSideEffectIsolationArchitectureTests {
         let rootWorkflowSources = try Self.swiftSources(under: documentRoot)
             .filter { source in
                 let filename = source.lastPathComponent
-                return filename == "RootFeatureWorkflowReducer.swift"
-                    || filename.hasPrefix("RootFeatureWorkflow+")
+                let rootWorkflowPrefix = "RootFeature" + "Workflow"
+                return filename == "\(rootWorkflowPrefix)Reducer.swift"
+                    || filename.hasPrefix(rootWorkflowPrefix + "+")
                     || filename == "CrossFeatureIntegrationReducer.swift"
             }
         let banned = [
@@ -275,9 +283,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "transformedLayerPixelData(",
             "AppFeature.",
             "PrimoRootFeature.effectiveTransformQuad",
-            "PrimoRootFeature.affineTransformQuad",
-            "RootFeatureWorkflowReducer.effectiveTransformQuad",
-            "RootFeatureWorkflowReducer.affineTransformQuad"
+            "PrimoRootFeature.affineTransformQuad"
         ]
 
         let sources = try Self.swiftSources(under: canvasRoot)

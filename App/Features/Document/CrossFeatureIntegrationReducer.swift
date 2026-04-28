@@ -1,84 +1,10 @@
 import ComposableArchitecture
-import Foundation
-import PrimoDocumentApplication
-import PrimoDocumentContracts
-import PrimoDocumentDomain
-import PrimoDocumentEngineInfrastructure
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
-import os
 
-protocol RootFeatureIntegrationReducer {
-    static var startupLogger: Logger { get }
-}
-
-extension RootFeatureIntegrationReducer {
-    static var startupLogger: Logger { PrimoRootFeature.startupLogger }
-
+struct CrossFeatureIntegrationReducer: Reducer {
     typealias State = PrimoRootFeature.State
     typealias Action = PrimoRootFeature.Action
-    typealias ApplicationAction = ApplicationFeature.Action
-    typealias WorkspaceAction = WorkspaceFeature.Action
-    typealias DocumentAction = DocumentFeature.Action
-    typealias EditingAction = DocumentFeature.EditingAction
-    typealias AppScenePhase = ApplicationFeature.ScenePhase
-    typealias ApplicationFeedback = ApplicationFeature.Feedback
-    typealias DocumentNamingPolicy = DocumentFeature.DocumentNamingPolicy
-    typealias CancelID = ApplicationFeature.CancelID
-    typealias WorkspaceTabClosureDisposition = WorkspaceFeature.WorkspaceTabClosureDisposition
-    typealias WorkspacePaneActivationDisposition = WorkspaceFeature.WorkspacePaneActivationDisposition
-    typealias WorkspaceTabClosureResult = WorkspaceFeature.WorkspaceTabClosureResult
 
-    typealias CanvasDimensions = DocumentFeature.CanvasDimensions
-    typealias ImportedCanvasPlan = ImportExportFeature.ImportedCanvasPlan
-    typealias FreshDocumentReplacementContract = DocumentFeature.FreshDocumentReplacementContract
-    typealias PendingWorkspaceTabReservation = WorkspaceFeature.PendingWorkspaceTabReservation
-    typealias PendingLoadedWorkspaceProject = WorkspaceFeature.PendingLoadedWorkspaceProject
-    typealias PendingFreshDocumentMutation = WorkspaceFeature.PendingFreshDocumentMutation
-    typealias LoadedWorkspacePresentation = WorkspaceFeature.LoadedWorkspacePresentation
-    typealias WorkspaceFeedbackMapper = WorkspaceFeature.WorkspaceFeedbackMapper
-    typealias WorkspaceLoadFailureContext = WorkspaceFeature.WorkspaceLoadFailureContext
-
-    typealias WorkspacePersistenceIssue = PrimoWorkspaceApplication.WorkspacePersistenceIssue
-    typealias WorkspacePersistenceFailureReason = PrimoWorkspaceApplication.WorkspacePersistenceFailureReason
-    typealias WorkspacePersistenceFailure = PrimoWorkspaceApplication.WorkspacePersistenceFailure
-    typealias WorkspaceDirtyPresentationRequest = PrimoWorkspaceApplication.WorkspaceDirtyPresentationRequest
-    typealias WorkspaceDocumentSavePurpose = PrimoWorkspaceApplication.WorkspaceDocumentSavePurpose
-    typealias WorkspaceDocumentSaveRequest = PrimoWorkspaceApplication.WorkspaceDocumentSaveRequest
-    typealias WorkspaceDocumentSaveResult = PrimoWorkspaceApplication.WorkspaceDocumentSaveResult
-    typealias WorkspaceDocumentReplacementRequest = PrimoWorkspaceApplication.WorkspaceDocumentReplacementRequest
-    typealias LoadedWorkspaceFollowUpPersistenceRequest = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceRequest
-    typealias LoadedWorkspaceFollowUpPersistenceResult = PrimoWorkspaceApplication.LoadedWorkspaceFollowUpPersistenceResult
-    typealias WorkspaceCloseTabsSaveRequest = PrimoWorkspaceApplication.WorkspaceCloseTabsSaveRequest
-    typealias WorkspaceCloseTabsSaveResult = PrimoWorkspaceApplication.WorkspaceCloseTabsSaveResult
-    typealias WorkspaceArtifactDiscardRequest = PrimoWorkspaceApplication.WorkspaceArtifactDiscardRequest
-    typealias WorkspaceTabReservationRequest = PrimoWorkspaceApplication.WorkspaceTabReservationRequest
-    typealias WorkspaceSavedProjectMoveRequest = PrimoWorkspaceApplication.WorkspaceSavedProjectMoveRequest
-    typealias WorkspaceSavedProjectMoveResult = PrimoWorkspaceApplication.WorkspaceSavedProjectMoveResult
-    typealias WorkspaceAutosaveEntryDiscardRequest = PrimoWorkspaceApplication.WorkspaceAutosaveEntryDiscardRequest
-    typealias WorkspaceSaveHistoryLoadRequest = PrimoWorkspaceApplication.WorkspaceSaveHistoryLoadRequest
-    typealias WorkspaceCatalogFailureReason = PrimoWorkspaceApplication.WorkspaceCatalogFailureReason
-    typealias WorkspaceCatalogFailure = PrimoWorkspaceApplication.WorkspaceCatalogFailure
-    typealias WorkspacePersistenceRequest = PrimoWorkspaceApplication.WorkspacePersistenceRequest
-    typealias WorkspacePersistenceResult = PrimoWorkspaceApplication.WorkspacePersistenceResult
-    typealias WorkspaceCatalogRequest = PrimoWorkspaceApplication.WorkspaceCatalogRequest
-    typealias WorkspaceCatalogResult = PrimoWorkspaceApplication.WorkspaceCatalogResult
-    typealias LoadedWorkspaceProjectPlan = PrimoWorkspaceApplication.LoadedWorkspaceProjectPlan
-    typealias PreparedWorkspaceTab = PrimoWorkspaceApplication.PreparedWorkspaceTab
-    typealias WorkspaceProjectLoadIssue = PrimoWorkspaceApplication.WorkspaceProjectLoadIssue
-    typealias WorkspaceProjectLoadFailureReason = PrimoWorkspaceApplication.WorkspaceProjectLoadFailureReason
-    typealias WorkspaceProjectLoadOperation = PrimoWorkspaceApplication.WorkspaceProjectLoadOperation
-    typealias WorkspaceImportedProjectLoadOperation = PrimoWorkspaceApplication.WorkspaceImportedProjectLoadOperation
-    typealias WorkspaceProjectLoadRequest = PrimoWorkspaceApplication.WorkspaceProjectLoadRequest
-    typealias WorkspaceProjectLoadResult = PrimoWorkspaceApplication.WorkspaceProjectLoadResult<LoadedPaintProject>
-    typealias WorkspaceProjectLoadFailure = PrimoWorkspaceApplication.WorkspaceProjectLoadFailure
-    typealias WorkspaceProjectPreparationUseCase = PrimoWorkspaceApplication.WorkspaceProjectPreparationUseCase
-    typealias WorkspaceProjectLoadUseCase = PrimoWorkspaceApplication.WorkspaceProjectLoadUseCase<LoadedPaintProject>
-    typealias WorkspaceProjectLoadCommand = PrimoWorkspaceApplication.WorkspaceProjectLoadCommand
-    typealias WorkspaceProjectLoadingService = PrimoWorkspaceApplication.WorkspaceProjectLoadingService<LoadedPaintProject>
-}
-
-struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
     func reduce(into state: inout State, action: Action) -> Effect<Action> {
         switch action {
         case .application(.delegate(.requestHomeProjectsLoad)):
@@ -95,7 +21,7 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
                 .workspace(
                     .catalogRequested(
                         .discardAutosaveEntry(
-                            WorkspaceAutosaveEntryDiscardRequest(autosaveID: id)
+                            PrimoWorkspaceApplication.WorkspaceAutosaveEntryDiscardRequest(autosaveID: id)
                         )
                     )
                 )
@@ -112,6 +38,12 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
 
         case .importExport(.delegate(.saveHistoryEntriesRequested)):
             return .send(.workspace(.saveHistoryEntriesRequested))
+
+        case let .importExport(.delegate(.saveActiveDocumentRequested(preferredDestinationURL))):
+            return .send(.workspace(.saveActiveDocumentRequested(preferredDestinationURL: preferredDestinationURL)))
+
+        case .importExport(.delegate(.saveDocumentCopyRequested)):
+            return .send(.workspace(.saveDocumentCopyRequested))
 
         case .importExport(.delegate(.exportFailed)):
             return .send(.application(.feedbackPresented(.exportFailed)))
@@ -131,8 +63,25 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
         case let .importExport(.delegate(.presentFeedback(feedback))):
             return .send(.application(.feedbackPresented(feedback)))
 
+        case let .importExport(.delegate(.newCanvasFromImagePrepared(plan))):
+            return .send(.document(.newCanvasFromImagePreparationCompleted(plan)))
+
         case let .importExport(.saveHistoryRestoreFailed(message)):
             return .send(.application(.hydrationFailed(message)))
+
+        case let .importExport(.saveHistoryRestoreRequested(projectURL, openInNewTab)):
+            return .send(
+                .workspace(
+                    .saveHistoryProjectLoadRequested(
+                        projectURL,
+                        openInNewTab: openInNewTab,
+                        replacementRequest: nil
+                    )
+                )
+            )
+
+        case let .importExport(.saveHistoryOpened(loaded, projectURL, openInNewTab, issues)):
+            return .send(.workspace(.saveHistoryProjectOpened(loaded, projectURL, openInNewTab, issues)))
 
         case let .workspace(.delegate(.homeProjectsLoaded(projects))):
             return .send(.application(.homeProjectsLoaded(projects)))
@@ -152,6 +101,9 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
         case let .workspace(.delegate(.workspaceProjectLoadFailedFeedback(feedback, showingHome))):
             return .send(.application(.hydrationFeedbackPresented(feedback, showingHome: showingHome)))
 
+        case let .workspace(.delegate(.workspaceProjectLoadCompleted(message))):
+            return .send(.application(.workspaceProjectLoadCompleted(message)))
+
         case let .workspace(.delegate(.autosaveRecoveryLoaded(items))):
             return .send(.application(.autosaveRecoveryLoaded(items)))
 
@@ -160,6 +112,12 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
 
         case let .workspace(.delegate(.autosaveRecoveryDiscarded(id))):
             return .send(.application(.autosaveRecoveryDiscarded(id)))
+
+        case let .workspace(.delegate(.autosaveRecoveryRestoreCompleted(id))):
+            return .send(.application(.autosaveRecoveryRestoreCompleted(id)))
+
+        case .workspace(.delegate(.autosaveRecoveryDismissed)):
+            return .send(.application(.autosaveRecoveryDismissed))
 
         case let .workspace(.delegate(.saveHistoryLoaded(entries))):
             return .send(.importExport(.saveHistoryLoaded(entries)))
@@ -173,8 +131,56 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
         case let .workspace(.delegate(.saveHistoryRestoreFailedFeedback(feedback))):
             return .send(.application(.hydrationFeedbackPresented(feedback)))
 
+        case .workspace(.delegate(.saveHistoryRestoreCompleted)):
+            return .send(.importExport(.saveHistoryRestoreCompleted))
+
         case .workspace(.delegate(.requestHomeProjectsLoad)):
             return .send(.application(.homeProjectsLoadRequested))
+
+        case .workspace(.delegate(.requestDocumentSnapshot)):
+            return .send(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+
+        case let .workspace(.delegate(.applyLoadedProject(loaded))):
+            return .send(.document(.applyLoadedProjectRequested(loaded)))
+
+        case let .workspace(.delegate(.requestFreshDocumentMutation(request))):
+            return .send(.document(.freshDocumentMutationRequested(request)))
+
+        case let .document(.delegate(.workspaceSnapshotPrepared(_, snapshot))):
+            return .send(.workspace(.documentSnapshotPrepared(snapshot)))
+
+        case .document(.delegate(.loadedProjectApplied)):
+            return .send(.workspace(.loadedProjectApplied))
+
+        case .document(.delegate(.loadedProjectApplySkipped)):
+            return .send(.workspace(.loadedProjectApplySkipped))
+
+        case let .document(.delegate(.freshDocumentRequested(contract, operation))):
+            return .send(.workspace(.freshDocumentRequested(contract, operation)))
+
+        case let .document(.delegate(.freshDocumentMutationSucceeded(preparedTab, contract, snapshot))):
+            return .send(.workspace(.freshDocumentMutationSucceeded(preparedTab, contract, snapshot)))
+
+        case let .document(.delegate(.freshDocumentMutationFailed(feedback))):
+            return .send(.workspace(.freshDocumentMutationFailed(feedback)))
+
+        case let .document(.delegate(.nanoBananaGenerationStarted(start))):
+            return .send(.nanoBanana(.generationStarted(start)))
+
+        case let .document(.delegate(.nanoBananaGenerationFailed(feedback, language))):
+            return .merge(
+                .send(.nanoBanana(.generationFailedFeedback(feedback, language))),
+                .send(.application(.feedbackPresented(feedback)))
+            )
+
+        case let .document(.delegate(.nanoBananaEditApplied(applied))):
+            return .send(.nanoBanana(.generationApplied(applied)))
+
+        case let .nanoBanana(.delegate(.requestEdit(request))):
+            return .send(.document(.nanoBananaEditRequested(request)))
+
+        case .nanoBanana(.delegate(.cancelEdit)):
+            return .send(.document(.nanoBananaCancelRequested))
 
         case let .document(.delegate(.paperStyleSyncRequested(paperStyle))):
             return .send(.document(.paperStyleSyncRequested(paperStyle)))
@@ -303,6 +309,10 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
              .workspace(.catalogRequested),
              .workspace(.catalogSucceeded),
              .workspace(.catalogFailed),
+             .workspace(.persistenceRequested),
+             .workspace(.persistenceSucceeded),
+             .workspace(.persistenceFailed),
+             .workspace(.pendingCloseSaveConfirmed),
              .workspace(.tabCloseRequested),
              .workspace(.closeOtherTabsRequested),
              .workspace(.closeTabsToRightRequested),
@@ -318,16 +328,32 @@ struct CrossFeatureIntegrationReducer: Reducer, RootFeatureIntegrationReducer {
              .workspace(.mergeWorkspacePanes),
              .workspace(.workspacePaneActivated),
              .workspace(.moveSavedProject),
+             .workspace(.homeReturnRequested),
+             .workspace(.lifecycleAutosaveRequested),
+             .workspace(.openImportedDocumentRequested),
+             .workspace(.openImportedDocumentLoaded),
+             .workspace(.openDocumentSelected),
+             .workspace(.homeProjectSelected),
+             .workspace(.openDocumentLoaded),
+             .workspace(.autosaveRecoveryRestoreRequested),
+             .workspace(.autosaveRecoveryOpened),
              .workspace(.autosaveRecoveryProjectLoadRequested),
              .workspace(.projectLoadRequested),
              .workspace(.importedProjectLoadRequested),
+             .workspace(.saveActiveDocumentRequested),
+             .workspace(.saveDocumentCopyRequested),
+             .workspace(.documentSnapshotPrepared),
+             .workspace(.loadedProjectApplied),
+             .workspace(.loadedProjectApplySkipped),
+             .workspace(.freshDocumentRequested),
+             .workspace(.freshDocumentMutationSucceeded),
+             .workspace(.freshDocumentMutationFailed),
              .workspace(.openDocumentFailed),
              .workspace(.tabSelectionFailed):
             return .none
 
         default:
-            break
+            return .none
         }
-        return RootFeatureWorkflowReducer().reduce(into: &state, action: action)
     }
 }

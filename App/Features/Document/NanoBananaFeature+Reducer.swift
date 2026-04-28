@@ -155,6 +155,31 @@ extension NanoBananaFeature {
             state.applyHistoryItem(descriptor)
             return .none
 
+        case let .generationStarted(start):
+            state.beginGeneration(
+                descriptor: start.descriptor,
+                jobID: start.jobID,
+                createdAt: start.createdAt
+            )
+            return .none
+
+        case let .generationApplied(applied):
+            state.recordSucceededGeneration(
+                preview: applied.preview,
+                historyID: applied.historyID,
+                createdAt: applied.createdAt
+            )
+            state.completeAppliedEdit(request: applied.preview.descriptor)
+            return .none
+
+        case let .generationFailedFeedback(feedback, language):
+            if feedback == .nanoBananaGenerationCanceled {
+                state.markCanceled(feedback: feedback, language: language)
+            } else {
+                state.markFailed(feedback: feedback, language: language)
+            }
+            return .none
+
         case .generationSucceeded, .generationFailed:
             return .none
 

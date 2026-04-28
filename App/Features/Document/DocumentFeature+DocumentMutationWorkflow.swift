@@ -114,7 +114,7 @@ extension DocumentFeature {
         }
     }
 
-    private func documentMutationFeedbackEffect(
+    func documentMutationFeedbackEffect(
         for feedback: ApplicationFeature.Feedback?
     ) -> Effect<Action> {
         guard let feedback else { return .none }

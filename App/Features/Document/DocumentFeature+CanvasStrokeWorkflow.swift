@@ -7,31 +7,28 @@ import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
 
-extension RootFeatureWorkflowReducer {
-    typealias CanvasStrokeContext = DocumentFeature.CanvasStrokeContext
-    typealias StrokeCommitResolution = DocumentFeature.StrokeCommitResolution
-
+extension DocumentFeature {
     func routeDocumentEditorEditingAction(
-        state: inout State,
-        action: Action
-    ) -> Effect<Action>? {
+        state: inout DocumentFeature.State,
+        action: DocumentFeature.Action
+    ) -> Effect<DocumentFeature.Action>? {
         switch action {
-        case .document(.layerSidebar):
+        case .layerSidebar:
             return .none
 
-        case let .document(.canvas(.delegate(.beginStroke(sample)))):
+        case let .canvas(.delegate(.beginStroke(sample))):
             return handleBeginStroke(state: &state, sample: sample)
 
-        case let .document(.canvas(.delegate(.appendSamples(samples)))):
+        case let .canvas(.delegate(.appendSamples(samples))):
             return handleAppendStrokeSamples(state: &state, samples: samples)
 
-        case let .document(.canvas(.delegate(.previewShapeStroke(samples)))):
+        case let .canvas(.delegate(.previewShapeStroke(samples))):
             return handlePreviewShapeStroke(state: &state, samples: samples)
 
-        case .document(.canvas(.delegate(.commitPreviewShapeStroke))):
+        case .canvas(.delegate(.commitPreviewShapeStroke)):
             return handleCommitPreviewShapeStroke(state: &state)
 
-        case let .document(.canvas(.delegate(.endStroke(samples)))):
+        case let .canvas(.delegate(.endStroke(samples))):
             return handleFinishStroke(
                 state: &state,
                 samples: samples,
@@ -39,10 +36,10 @@ extension RootFeatureWorkflowReducer {
                 refreshViaDirtyPresentation: true
             )
 
-        case .document(.canvas(.delegate(.cancelStroke))):
+        case .canvas(.delegate(.cancelStroke)):
             return handleCancelStroke(state: &state)
 
-        case let .document(.canvas(.delegate(.commitStroke(samples)))):
+        case let .canvas(.delegate(.commitStroke(samples))):
             return handleFinishStroke(
                 state: &state,
                 samples: samples,
@@ -50,16 +47,16 @@ extension RootFeatureWorkflowReducer {
                 refreshViaDirtyPresentation: false
             )
 
-        case let .document(.canvas(.delegate(.blurSamples(samples)))):
+        case let .canvas(.delegate(.blurSamples(samples))):
             return handleBlurSamples(state: &state, samples: samples)
 
-        case .document(.canvas(.delegate(.endBlurStroke))):
+        case .canvas(.delegate(.endBlurStroke)):
             return handleEndBlurStroke(state: &state)
 
-        case let .document(.canvas(.delegate(.fill(sample)))):
+        case let .canvas(.delegate(.fill(sample))):
             return handleFill(state: &state, sample: sample)
 
-        case .document(.canvas):
+        case .canvas:
             return .none
 
         default:
@@ -68,9 +65,9 @@ extension RootFeatureWorkflowReducer {
     }
 
     func routeCanvasInteractionAction(
-        state: inout State,
-        action: Action
-    ) -> Effect<Action>? {
+        state: inout DocumentFeature.State,
+        action: DocumentFeature.Action
+    ) -> Effect<DocumentFeature.Action>? {
         routeDocumentEditorEditingAction(state: &state, action: action)
     }
 
@@ -80,9 +77,9 @@ extension RootFeatureWorkflowReducer {
         }
 
         func resolve(
-            in state: State,
-            resolvedBrushSettings: (State) -> BrushRuntimeSettings,
-            activeEditableLayer: (State) -> LayerRowModel?
+            in state: DocumentFeature.State,
+            resolvedBrushSettings: (DocumentFeature.State) -> BrushRuntimeSettings,
+            activeEditableLayer: (DocumentFeature.State) -> LayerRowModel?
         ) -> CanvasStrokeContext? {
             guard let activeLayer = activeEditableLayer(state) else {
                 return nil
@@ -90,78 +87,22 @@ extension RootFeatureWorkflowReducer {
             let brush = resolvedBrushSettings(state)
             return CanvasStrokeContext(
                 activeLayer: activeLayer,
-                activeLayerIndex: state.document.canvas.activeLayerIndex,
+                activeLayerIndex: state.canvas.activeLayerIndex,
                 brush: brush,
                 previewBrush: previewBrush(for: brush)
             )
         }
     }
 
-    struct CanvasStrokeStateCoordinator {
-        let layerCommands: DocumentLayerCommandService
-        let strokeCommands: DocumentStrokeCommandService
-
-        func clearSelectionWithoutRefresh(
-            state: inout State,
-            performDocumentMutation: (inout State, DocumentMutationContract) -> Void
-        ) {
-            performDocumentMutation(
-                &state,
-                DocumentMutationContract(
-                    canvasMutation: .clearSelection,
-                    refresh: .none
-                )
-            )
-        }
-
-        func ensureCurrentPresentationLoaded(
-            state: inout State,
-            performDocumentMutation: (inout State, DocumentMutationContract) -> Void
-        ) {
-            guard state.document.canvas.renderSnapshot == nil else { return }
-            performDocumentMutation(&state, .currentPresentation)
-        }
-
-        func captureBaseSnapshotIfNeeded(
-            state: inout State,
-            ensureCurrentPresentationLoaded: (inout State) -> Void
-        ) {
-            guard state.document.canvas.strokeSession.baseSnapshot == nil else { return }
-            if let pendingCommittedSnapshot = state.document.canvas.pendingCommittedSnapshot {
-                state.document.canvas.captureStrokeBaseSnapshot(pendingCommittedSnapshot)
-                return
-            }
-            ensureCurrentPresentationLoaded(&state)
-            if let renderSnapshot = state.document.canvas.renderSnapshot {
-                state.document.canvas.captureStrokeBaseSnapshot(renderSnapshot)
-            }
-        }
-
-        func prepareEditing(
-            state: inout State,
-            clearSelectionWithoutRefresh: (inout State) -> Void
-        ) -> DocumentMutationResult {
-            switch layerCommands.ensureLayerVisible(state.document.canvas.activeLayerIndex) {
-            case .success:
-                break
-            case let .failure(failure):
-                return .failure(failure)
-            }
-            clearSelectionWithoutRefresh(&state)
-            strokeCommands.cancelStroke()
-            return .success(())
-        }
-    }
-
     struct CanvasStrokeEffectCoordinator {
         func complete(
             _ resolution: StrokeCommitResolution,
-            state: inout State,
-            resetPreview: (inout State, MetalBufferHandle?) -> Void,
-            completeMutation: (inout State, DocumentMutationContract) -> Effect<Action>,
-            applyFailureFeedback: (DocumentMutationFailure, inout State) -> Effect<Action>,
-            cancelEffects: () -> Effect<Action>
-        ) -> Effect<Action> {
+            state: inout DocumentFeature.State,
+            resetPreview: (inout DocumentFeature.State, MetalBufferHandle?) -> Void,
+            completeMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Effect<DocumentFeature.Action>,
+            applyFailureFeedback: (DocumentMutationFailure, inout DocumentFeature.State) -> Effect<DocumentFeature.Action>,
+            cancelEffects: () -> Effect<DocumentFeature.Action>
+        ) -> Effect<DocumentFeature.Action> {
             let transferredSurfaceHandle: MetalBufferHandle?
             if case let .committed(_, handle) = resolution {
                 transferredSurfaceHandle = handle
@@ -169,7 +110,7 @@ extension RootFeatureWorkflowReducer {
                 transferredSurfaceHandle = nil
             }
             if case .failed = resolution {
-                state.document.canvas.isAwaitingCommittedRender = false
+                state.canvas.isAwaitingCommittedRender = false
             }
             resetPreview(&state, transferredSurfaceHandle)
             switch resolution {
@@ -186,16 +127,16 @@ extension RootFeatureWorkflowReducer {
 
     struct CanvasStrokeInteractionCoordinator {
         func begin(
-            state: inout State,
+            state: inout DocumentFeature.State,
             sample: StylusSample,
-            resolveContext: (State) -> CanvasStrokeContext?,
-            prepareEditing: (inout State) -> DocumentMutationResult,
-            applyFailureFeedback: (DocumentMutationFailure, inout State) -> Effect<Action>,
-            captureBaseSnapshot: (inout State) -> Void,
-            resolveInitialPreview: (State, StylusSample, CanvasStrokeContext) -> GpuStrokeSessionOutcome,
-            applyPreview: (GpuStrokeSessionOutcome, Int, inout State) -> Effect<Action>,
-            cancelEffects: () -> Effect<Action>
-        ) -> Effect<Action> {
+            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
+            prepareEditing: (inout DocumentFeature.State) -> DocumentMutationResult,
+            applyFailureFeedback: (DocumentMutationFailure, inout DocumentFeature.State) -> Effect<DocumentFeature.Action>,
+            captureBaseSnapshot: (inout DocumentFeature.State) -> Void,
+            resolveInitialPreview: (DocumentFeature.State, StylusSample, CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentFeature.State) -> Effect<DocumentFeature.Action>,
+            cancelEffects: () -> Effect<DocumentFeature.Action>
+        ) -> Effect<DocumentFeature.Action> {
             guard let context = resolveContext(state) else {
                 return .none
             }
@@ -222,12 +163,12 @@ extension RootFeatureWorkflowReducer {
         }
 
         func append(
-            state: inout State,
+            state: inout DocumentFeature.State,
             samples: [StylusSample],
-            resolveContext: (State) -> CanvasStrokeContext?,
-            resolvePreview: (State, [StylusSample], CanvasStrokeContext) -> GpuStrokeSessionOutcome,
-            applyPreview: (GpuStrokeSessionOutcome, Int, inout State) -> Effect<Action>
-        ) -> Effect<Action> {
+            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
+            resolvePreview: (DocumentFeature.State, [StylusSample], CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentFeature.State) -> Effect<DocumentFeature.Action>
+        ) -> Effect<DocumentFeature.Action> {
             guard let context = resolveContext(state) else {
                 return .none
             }
@@ -244,15 +185,15 @@ extension RootFeatureWorkflowReducer {
         }
 
         func finish(
-            state: inout State,
+            state: inout DocumentFeature.State,
             samples: [StylusSample],
             keepsSelectionCleared: Bool,
             refreshViaDirtyPresentation: Bool,
-            resolveContext: (State) -> CanvasStrokeContext?,
-            resetPreview: (inout State, MetalBufferHandle?) -> Void,
-            resolveCommit: (inout State, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
-            completeCommit: (StrokeCommitResolution, inout State) -> Effect<Action>
-        ) -> Effect<Action> {
+            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
+            resetPreview: (inout DocumentFeature.State, MetalBufferHandle?) -> Void,
+            resolveCommit: (inout DocumentFeature.State, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
+            completeCommit: (StrokeCommitResolution, inout DocumentFeature.State) -> Effect<DocumentFeature.Action>
+        ) -> Effect<DocumentFeature.Action> {
             guard let context = resolveContext(state) else {
                 resetPreview(&state, nil)
                 return .none
@@ -268,11 +209,11 @@ extension RootFeatureWorkflowReducer {
         }
 
         func cancel(
-            state: inout State,
-            cancelShapeStrokeIfNeeded: (inout State) -> Void,
-            resetPreview: (inout State) -> Void,
-            completeMutation: (inout State, DocumentMutationContract) -> Effect<Action>
-        ) -> Effect<Action> {
+            state: inout DocumentFeature.State,
+            cancelShapeStrokeIfNeeded: (inout DocumentFeature.State) -> Void,
+            resetPreview: (inout DocumentFeature.State) -> Void,
+            completeMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Effect<DocumentFeature.Action>
+        ) -> Effect<DocumentFeature.Action> {
             cancelShapeStrokeIfNeeded(&state)
             resetPreview(&state)
             return completeMutation(
@@ -316,19 +257,19 @@ extension RootFeatureWorkflowReducer {
     }
 
     func resetStrokePreviewState(
-        state: inout State,
+        state: inout DocumentFeature.State,
         preserving transferredSurfaceHandle: MetalBufferHandle? = nil
     ) {
         _ = canvasStrokeInteractionService.cancel()
         documentCanvasStrokeStateCoordinator.resetPreviewState(
-            state: &state.document,
+            state: &state,
             preserving: transferredSurfaceHandle
         ) { handle in
             documentGpuOperationGateway.releaseSurfaceHandle(handle)
         }
     }
 
-    func clearCanvasSelectionWithoutRefresh(state: inout State) {
+    func clearCanvasSelectionWithoutRefresh(state: inout DocumentFeature.State) {
         canvasStrokeStateCoordinator.clearSelectionWithoutRefresh(
             state: &state,
             performDocumentMutation: { mutableState, contract in
@@ -337,7 +278,7 @@ extension RootFeatureWorkflowReducer {
         )
     }
 
-    func ensureCurrentCanvasPresentationLoaded(state: inout State) {
+    func ensureCurrentCanvasPresentationLoaded(state: inout DocumentFeature.State) {
         canvasStrokeStateCoordinator.ensureCurrentPresentationLoaded(
             state: &state,
             performDocumentMutation: { mutableState, contract in
@@ -346,7 +287,7 @@ extension RootFeatureWorkflowReducer {
         )
     }
 
-    func captureActiveStrokeBaseSnapshotIfNeeded(state: inout State) {
+    func captureActiveStrokeBaseSnapshotIfNeeded(state: inout DocumentFeature.State) {
         _ = canvasStrokeInteractionService.cancel()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
@@ -358,14 +299,12 @@ extension RootFeatureWorkflowReducer {
 
     func applyCanvasStrokeFailure(
         _ failure: DocumentMutationFailure,
-        state: inout State
-    ) -> Effect<Action> {
-        documentMutationFeedbackCoordinator.effect(
-            for: documentMutationFeedbackMapper.feedback(for: failure)
-        )
+        state: inout DocumentFeature.State
+    ) -> Effect<DocumentFeature.Action> {
+        documentMutationFeedbackEffect(for: DocumentMutationFeedbackMapper().feedback(for: failure))
     }
 
-    func prepareCanvasStrokeEditing(state: inout State) -> DocumentMutationResult {
+    func prepareCanvasStrokeEditing(state: inout DocumentFeature.State) -> DocumentMutationResult {
         canvasStrokeStateCoordinator.prepareEditing(
             state: &state,
             clearSelectionWithoutRefresh: { state in
@@ -378,11 +317,11 @@ extension RootFeatureWorkflowReducer {
         canvasStrokeContextResolver.previewBrush(for: brush)
     }
 
-    func canvasStrokeContext(in state: State) -> CanvasStrokeContext? {
+    func canvasStrokeContext(in state: DocumentFeature.State) -> CanvasStrokeContext? {
         canvasStrokeContextResolver.resolve(
             in: state,
             resolvedBrushSettings: { state in
-                resolvedBrushSettings(for: state)
+                DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
             },
             activeEditableLayer: { state in
                 activeEditableCanvasLayer(in: state)
@@ -391,25 +330,25 @@ extension RootFeatureWorkflowReducer {
     }
 
     func resolveInitialStrokePreview(
-        state: State,
+        state: DocumentFeature.State,
         sample: StylusSample,
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
         canvasStrokeInteractionService.beginPreview(
             sample: sample,
-            baseSnapshot: state.document.canvas.strokeSession.baseSnapshot,
+            baseSnapshot: state.canvas.strokeSession.baseSnapshot,
             context: DocumentStrokeContext(context),
             usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
         )
     }
 
     func resolveAppendedStrokePreview(
-        state: State,
+        state: DocumentFeature.State,
         samples: [StylusSample],
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
         documentCanvasStrokeSessionCoordinator.resolveAppendedStrokePreview(
-            state: state.document,
+            state: state,
             samples: samples,
             context: context
         )
@@ -418,13 +357,13 @@ extension RootFeatureWorkflowReducer {
     func applyStrokePreviewOutcome(
         _ outcome: GpuStrokeSessionOutcome,
         activeLayerIndex: Int,
-        state: inout State
-    ) -> Effect<Action> {
+        state: inout DocumentFeature.State
+    ) -> Effect<DocumentFeature.Action> {
         switch outcome {
         case let .preview(mutation):
             documentCanvasStrokeStateCoordinator.applyPreviewMutation(
                 mutation,
-                state: &state.document,
+                state: &state,
                 releaseSurfaceHandle: { handle in
                     documentGpuOperationGateway.releaseSurfaceHandle(handle)
                 }
@@ -437,8 +376,21 @@ extension RootFeatureWorkflowReducer {
         }
     }
 
+    func applyLiveCompositeSurface(
+        _ compositeSurface: DocumentCompositeSurface,
+        state: inout DocumentFeature.State
+    ) -> Effect<DocumentFeature.Action> {
+        guard Self.canvasPreviewStateCoordinator.applyLiveCompositeSurface(
+            compositeSurface,
+            to: &state
+        ) else {
+            return .none
+        }
+        return .send(.delegate(.presentationApplied))
+    }
+
     func resolveStrokeCommit(
-        state: inout State,
+        state: inout DocumentFeature.State,
         samples: [StylusSample],
         context: CanvasStrokeContext,
         keepsSelectionCleared: Bool,
@@ -455,7 +407,7 @@ extension RootFeatureWorkflowReducer {
         }
 
         let resolution = documentCanvasStrokeSessionCoordinator.resolveStrokeCommit(
-            state: &state.document,
+            state: &state,
             samples: samples,
             context: context,
             keepsSelectionCleared: false,
@@ -480,8 +432,8 @@ extension RootFeatureWorkflowReducer {
 
     func completeResolvedStrokeCommit(
         _ resolution: StrokeCommitResolution,
-        state: inout State
-    ) -> Effect<Action> {
+        state: inout DocumentFeature.State
+    ) -> Effect<DocumentFeature.Action> {
         canvasStrokeEffectCoordinator.complete(
             resolution,
             state: &state,
@@ -501,13 +453,13 @@ extension RootFeatureWorkflowReducer {
                 applyCanvasStrokeFailure(failure, state: &state)
             },
             cancelEffects: {
-                cancelStartupPresentationEffects()
+                .none
             }
         )
     }
 
-    func activeEditableCanvasLayer(in state: State) -> LayerRowModel? {
-        guard let activeLayer = state.document.layerSidebar.layers.first(where: { $0.index == state.document.canvas.activeLayerIndex }),
+    func activeEditableCanvasLayer(in state: DocumentFeature.State) -> LayerRowModel? {
+        guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
               !activeLayer.isLocked
         else {
             return nil
@@ -516,19 +468,16 @@ extension RootFeatureWorkflowReducer {
     }
 
     func completeCanvasStrokeMutation(
-        state: inout State,
+        state: inout DocumentFeature.State,
         contract: DocumentMutationContract = .dirty
-    ) -> Effect<Action> {
-        .merge(
-            completeDocumentMutation(state: &state, contract: contract),
-            cancelStartupPresentationEffects()
-        )
+    ) -> Effect<DocumentFeature.Action> {
+        completeDocumentMutation(state: &state, contract: contract)
     }
 
     func handleBeginStroke(
-        state: inout State,
+        state: inout DocumentFeature.State,
         sample: StylusSample
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         canvasStrokeInteractionCoordinator.begin(
             state: &state,
             sample: sample,
@@ -559,15 +508,15 @@ extension RootFeatureWorkflowReducer {
                 )
             },
             cancelEffects: {
-                cancelStartupPresentationEffects()
+                .none
             }
         )
     }
 
     func handleAppendStrokeSamples(
-        state: inout State,
+        state: inout DocumentFeature.State,
         samples: [StylusSample]
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         canvasStrokeInteractionCoordinator.append(
             state: &state,
             samples: samples,
@@ -592,9 +541,9 @@ extension RootFeatureWorkflowReducer {
     }
 
     func handlePreviewShapeStroke(
-        state: inout State,
+        state: inout DocumentFeature.State,
         samples: [StylusSample]
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         guard let first = samples.first else { return .none }
         switch prepareCanvasStrokeEditing(state: &state) {
         case .success:
@@ -602,27 +551,27 @@ extension RootFeatureWorkflowReducer {
         case let .failure(failure):
             return applyCanvasStrokeFailure(failure, state: &state)
         }
-        documentStrokeCommandService.beginStroke(first, resolvedBrushSettings(for: state))
+        documentStrokeCommandService.beginStroke(first, DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state))
         for sample in samples.dropFirst() {
             documentStrokeCommandService.appendStroke(sample)
         }
         return .merge(
             applyLiveCompositeSurface(documentCanvasCommandService.compositeSurface(), state: &state),
-            cancelStartupPresentationEffects()
+            .none
         )
     }
 
-    func handleCommitPreviewShapeStroke(state: inout State) -> Effect<Action> {
+    func handleCommitPreviewShapeStroke(state: inout DocumentFeature.State) -> Effect<DocumentFeature.Action> {
         documentStrokeCommandService.endStroke()
         return completeCanvasStrokeMutation(state: &state)
     }
 
     func handleFinishStroke(
-        state: inout State,
+        state: inout DocumentFeature.State,
         samples: [StylusSample],
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         canvasStrokeInteractionCoordinator.finish(
             state: &state,
             samples: samples,
@@ -655,11 +604,11 @@ extension RootFeatureWorkflowReducer {
         )
     }
 
-    func handleCancelStroke(state: inout State) -> Effect<Action> {
+    func handleCancelStroke(state: inout DocumentFeature.State) -> Effect<DocumentFeature.Action> {
         canvasStrokeInteractionCoordinator.cancel(
             state: &state,
             cancelShapeStrokeIfNeeded: { state in
-                if state.document.canvas.currentTool == .shape {
+                if state.canvas.currentTool == .shape {
                     documentStrokeCommandService.cancelStroke()
                 }
             },
@@ -676,15 +625,15 @@ extension RootFeatureWorkflowReducer {
     }
 
     func handleBlurSamples(
-        state: inout State,
+        state: inout DocumentFeature.State,
         samples: [StylusSample]
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         guard !samples.isEmpty else { return .none }
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        let activeLayerIndex = state.document.canvas.activeLayerIndex
-        let brush = resolvedBrushSettings(for: state)
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
@@ -704,20 +653,20 @@ extension RootFeatureWorkflowReducer {
         )
     }
 
-    func handleEndBlurStroke(state: inout State) -> Effect<Action> {
+    func handleEndBlurStroke(state: inout DocumentFeature.State) -> Effect<DocumentFeature.Action> {
         documentStrokeCommandService.endBlurStroke()
         return completeCanvasStrokeMutation(state: &state)
     }
 
     func handleFill(
-        state: inout State,
+        state: inout DocumentFeature.State,
         sample: StylusSample
-    ) -> Effect<Action> {
+    ) -> Effect<DocumentFeature.Action> {
         guard activeEditableCanvasLayer(in: state) != nil else {
             return .none
         }
-        let activeLayerIndex = state.document.canvas.activeLayerIndex
-        let brush = resolvedBrushSettings(for: state)
+        let activeLayerIndex = state.canvas.activeLayerIndex
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),
@@ -747,9 +696,9 @@ private extension DocumentStrokeContext {
     }
 }
 
-private extension PrimoRootFeature.State {
+private extension DocumentFeature.State {
     func usesResponsiveOilPreview(for brush: BrushRuntimeSettings) -> Bool {
-        document.brushPalette.ui.oilLivePreviewQuality == .responsive &&
+        brushPalette.ui.oilLivePreviewQuality == .responsive &&
         brush.tipKind == .oil
     }
 }

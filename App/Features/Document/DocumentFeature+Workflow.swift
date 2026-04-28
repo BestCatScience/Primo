@@ -4,6 +4,23 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 
 extension DocumentFeature {
+    func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {
+        let paperStyle = Self.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
+        let previewSurface = state.canvas.renderSnapshot.map {
+            Self.renderedCompositeSurface(
+                snapshot: $0,
+                paperStyle: paperStyle,
+                gpuOperations: documentGpuOperationGateway
+            )
+        } ?? documentExportGateway.compositeSurface(paperStyle)
+        return WorkspaceDocumentSnapshot(
+            activeTab: nil,
+            paperStyle: paperStyle,
+            previewSurface: previewSurface,
+            canvasSize: state.canvas.canvasSize
+        )
+    }
+
     func startupPresentationBootstrapEffect() -> Effect<Action> {
         .run { [documentPersistenceGateway, documentQueryGateway, processEnvironmentClient] send in
             let startupClock = ContinuousClock()

@@ -53,6 +53,7 @@ struct ImportExportFeature {
         case saveHistoryDismissed
         case saveHistoryRestoreRequested(DocumentProjectPath, Bool)
         case saveHistoryOpened(LoadedPaintProject, DocumentProjectPath, Bool, [WorkspaceProjectLoadIssue])
+        case saveHistoryRestoreCompleted
         case saveHistoryRestoreFailed(String?)
         case saveDocumentRequested
         case saveDocumentCopyRequested
@@ -97,6 +98,10 @@ struct ImportExportFeature {
 
             case .saveHistoryDismissed:
                 state.saveHistory.dismiss()
+                return .none
+
+            case .saveHistoryRestoreCompleted:
+                state.saveHistory.completeRestore()
                 return .none
 
             case .saveDocumentRequested:

@@ -581,7 +581,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testCanvasLifecycleFailureNoLongerEmbedsPresentationFeedback() throws {
         let contents = try String(
-            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/CrossFeatureIntegrationReducer+CanvasLifecycleWorkflow.swift"),
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/DocumentFeature+CanvasLifecycleWorkflow.swift"),
             encoding: .utf8
         )
 

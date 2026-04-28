@@ -1,6 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 
 extension DocumentFeature {
@@ -69,6 +70,23 @@ extension DocumentFeature {
 
     func redoCanvasMutation() -> DocumentMutationResult {
         documentHistoryCommandService.redo()
+    }
+
+    func createCanvas(_ dimensions: CanvasDimensions) -> DocumentMutationResult {
+        documentCanvasCommandService.createCanvas(
+            dimensions.width,
+            dimensions.height
+        )
+    }
+
+    func initializeImportedCanvas(
+        _ request: ImportedCanvasRequest,
+        layerName: String
+    ) -> DocumentMutationResult {
+        documentCanvasCommandService.initializeImportedCanvas(
+            request,
+            layerName
+        )
     }
 
     func validatedCanvasDimensions(
@@ -203,5 +221,44 @@ extension DocumentFeature {
             operation: .redo,
             performMutation: { redoCanvasMutation() }
         )
+    }
+
+    func handleFreshDocumentMutationRequest(
+        state: inout State,
+        request: FreshDocumentMutationRequest
+    ) -> Effect<Action> {
+        let result: DocumentMutationResult
+        switch request.operation {
+        case let .newCanvas(dimensions):
+            result = createCanvas(dimensions)
+        case let .importedCanvas(plan):
+            result = initializeImportedCanvas(plan.request, layerName: plan.layerName)
+        }
+
+        switch result {
+        case .success:
+            state.canvas = CanvasFeature.State()
+            state.canvas.setCanvasSize(request.contract.canvasSize)
+            state.layerSidebar = LayerSidebarFeature.State()
+            state.brushPalette = BrushPaletteFeature.State()
+            Self.toolPanelStateCoordinator.resetPanels(in: &state)
+            _ = applyPresentation(documentQueryGateway.presentation(), to: &state)
+            return .send(
+                .delegate(
+                    .freshDocumentMutationSucceeded(
+                        request.preparedTab,
+                        request.contract,
+                        workspaceDocumentSnapshot(state: state)
+                    )
+                )
+            )
+
+        case let .failure(failure):
+            let feedback = DocumentMutationFeedbackMapper().feedback(
+                for: failure,
+                default: request.contract.mutationFailureFeedback
+            )
+            return .send(.delegate(.freshDocumentMutationFailed(feedback)))
+        }
     }
 }

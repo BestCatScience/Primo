@@ -6,7 +6,7 @@ import PrimoDocumentContracts
 import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
-extension RootFeatureWorkflowReducer {
+extension DocumentFeature {
     private struct NanoBananaValidatedEdit {
         let command: SubmitNanoBananaEditCommand
         let selectionRegion: NanoBananaSelectionRegion?
@@ -15,18 +15,18 @@ extension RootFeatureWorkflowReducer {
     }
 
     private struct NanoBananaValidationFailure: Error, Equatable {
-        let feedback: ApplicationFeedback
+        let feedback: ApplicationFeature.Feedback
     }
 
     private struct NanoBananaRequestContract {
         func validate(
             command: SubmitNanoBananaEditCommand,
-            state: PrimoRootFeature.State,
+            state: DocumentFeature.State,
             gpuOperations: DocumentGpuOperationGateway
         ) -> Result<NanoBananaValidatedEdit, NanoBananaValidationFailure> {
             let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
             guard
-                let snapshot = state.document.canvas.renderSnapshot,
+                let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == command.descriptor.inputLayerIndex })
             else {
                 return .failure(NanoBananaValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
@@ -34,8 +34,8 @@ extension RootFeatureWorkflowReducer {
 
             let adjustedSelection = command.descriptor.editScope == .selectedArea
                 ? selectionWorkflow.adjustedSelection(
-                    state.document.canvas.selection,
-                    canvasSize: state.document.canvas.canvasSize,
+                    state.canvas.selection,
+                    canvasSize: state.canvas.canvasSize,
                     expansion: command.descriptor.maskSettings.expansion,
                     isInverted: command.descriptor.maskSettings.isInverted
                 )
@@ -46,7 +46,7 @@ extension RootFeatureWorkflowReducer {
 
             let outputLayerIndex = command.descriptor.outputMode == .replaceCurrentLayer
                 ? command.descriptor.inputLayerIndex
-                : state.document.canvas.activeLayerIndex
+                : state.canvas.activeLayerIndex
             let sourceSurface = DocumentCompositeSurface(
                 width: snapshot.width,
                 height: snapshot.height,
@@ -88,12 +88,12 @@ extension RootFeatureWorkflowReducer {
     private struct NanoBananaPreviewApplicationContract {
         func validate(
             preview: NanoBananaPreviewState,
-            state: PrimoRootFeature.State
+            state: DocumentFeature.State,
+            namingPolicy: DocumentNamingPolicy
         ) -> Result<NanoBananaPreviewApplicationPlan, NanoBananaValidationFailure> {
-            let namingPolicy = DocumentFeature.DocumentNamingPolicy(language: state.application.appLanguage)
             switch preview.descriptor.outputMode {
             case .replaceCurrentLayer:
-                guard state.document.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
+                guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
                     return .failure(NanoBananaValidationFailure(feedback: .nanoBananaApplyFailed))
                 }
                 return .success(
@@ -107,7 +107,7 @@ extension RootFeatureWorkflowReducer {
                 return .success(
                     NanoBananaPreviewApplicationPlan(
                         preview: preview,
-                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.document.layerSidebar))
+                        target: .newLayer(name: namingPolicy.nanoBananaLayerName(for: state.layerSidebar))
                     )
                 )
             }
@@ -121,108 +121,13 @@ extension RootFeatureWorkflowReducer {
 
         let contentService: DocumentContentService
 
-        func apply(
-            _ plan: NanoBananaPreviewApplicationPlan
-        ) -> Result<AppliedPreview, DocumentMutationFailure> {
+        func apply(_ plan: NanoBananaPreviewApplicationPlan) -> Result<AppliedPreview, DocumentMutationFailure> {
             contentService.applyPixels(
                 plan.preview.outputSurface.pixelData,
                 to: plan.target
             )
             .map { AppliedPreview(targetLayerIndex: $0.targetLayerIndex) }
         }
-    }
-
-    private struct NanoBananaGenerationService {
-        let previewPreparationService: NanoBananaPreviewPreparationService
-        let uuidClient: UUIDClient
-        let dateClient: DateClient
-
-        func beginGeneration(
-            state: inout State,
-            edit: NanoBananaValidatedEdit
-        ) -> NanoBananaValidatedEdit {
-            let jobID = uuidClient.generate()
-            state.nanoBanana.beginGeneration(
-                descriptor: edit.command.descriptor,
-                jobID: jobID,
-                createdAt: dateClient.now()
-            )
-            return edit
-        }
-
-        func makeEditEffect(_ prepared: NanoBananaValidatedEdit) -> Effect<Action> {
-            .run { [previewPreparationService] send in
-                switch await previewPreparationService.preparePreview(
-                    NanoBananaPreviewPreparationRequest(
-                        command: prepared.command,
-                        selectionRegion: prepared.selectionRegion,
-                        outputLayerIndex: prepared.outputLayerIndex,
-                        sourceSurface: prepared.sourceSurface
-                    )
-                ) {
-                case let .success(preview):
-                    await send(.nanoBanana(.generationSucceeded(preview)))
-                case let .failure(.editFailed(failure)):
-                    await send(
-                        .nanoBanana(
-                            .generationFailed(
-                                DocumentFeature.nanoBananaFailureFeedback(failure)
-                            )
-                        )
-                    )
-                case .failure(.unsupportedImage):
-                    await send(
-                        .nanoBanana(
-                            .generationFailed(.nanoBananaUnsupportedImage)
-                        )
-                    )
-                }
-            }
-            .cancellable(id: CancelID.nanoBananaEdit, cancelInFlight: true)
-        }
-
-        func applySuccess(
-            state: inout State,
-            preview: NanoBananaPreviewState
-        ) {
-            state.nanoBanana.recordSucceededGeneration(
-                preview: preview,
-                historyID: uuidClient.generate(),
-                createdAt: dateClient.now()
-            )
-        }
-
-        func applyFailure(
-            state: inout State,
-            feedback: ApplicationFeedback
-        ) -> Effect<Action> {
-            state.nanoBanana.markFailed(
-                feedback: feedback,
-                language: state.application.appLanguage
-            )
-            return .send(.application(.feedbackPresented(feedback)))
-        }
-
-        func cancel(state: inout State) -> Effect<Action> {
-            state.nanoBanana.markCanceled(
-                feedback: .nanoBananaGenerationCanceled,
-                language: state.application.appLanguage
-            )
-            return .merge(
-                .send(.application(.feedbackPresented(.nanoBananaGenerationCanceled))),
-                .cancel(id: CancelID.nanoBananaEdit)
-            )
-        }
-    }
-
-    private var nanoBananaGenerationService: NanoBananaGenerationService {
-        NanoBananaGenerationService(
-            previewPreparationService: NanoBananaPreviewPreparationService(
-                editUseCase: nanoBananaEditUseCase
-            ),
-            uuidClient: uuidClient,
-            dateClient: dateClient
-        )
     }
 
     private var nanoBananaRequestContract: NanoBananaRequestContract {
@@ -233,8 +138,12 @@ extension RootFeatureWorkflowReducer {
         NanoBananaPreviewApplicationContract()
     }
 
-    private var nanoBananaLayerContentService: PrimoDocumentApplication.DocumentContentService {
-        PrimoDocumentApplication.DocumentContentService(
+    private var nanoBananaPreviewPreparationService: NanoBananaPreviewPreparationService {
+        NanoBananaPreviewPreparationService(editUseCase: nanoBananaEditUseCase)
+    }
+
+    private var nanoBananaLayerContentService: DocumentContentService {
+        DocumentContentService(
             documentQueryGateway: documentQueryGateway,
             documentMutationGateway: documentMutationGateway,
             textLayerGateway: textLayerGateway
@@ -242,9 +151,7 @@ extension RootFeatureWorkflowReducer {
     }
 
     private var nanoBananaDocumentService: NanoBananaDocumentService {
-        NanoBananaDocumentService(
-            contentService: nanoBananaLayerContentService
-        )
+        NanoBananaDocumentService(contentService: nanoBananaLayerContentService)
     }
 
     func handleNanoBananaEditRequest(
@@ -258,72 +165,108 @@ extension RootFeatureWorkflowReducer {
             gpuOperations: documentGpuOperationGateway
         ) {
         case let .failure(error):
-            return .send(.application(.feedbackPresented(error.feedback)))
+            return .send(.delegate(.documentMutationFeedback(error.feedback)))
         case let .success(edit):
             validatedEdit = edit
         }
-        let prepared = nanoBananaGenerationService.beginGeneration(
-            state: &state,
-            edit: validatedEdit
+
+        let generationStart = NanoBananaGenerationStart(
+            descriptor: validatedEdit.command.descriptor,
+            jobID: uuidClient.generate(),
+            createdAt: dateClient.now()
         )
-        return nanoBananaGenerationService.makeEditEffect(prepared)
+        return .merge(
+            .send(.delegate(.nanoBananaGenerationStarted(generationStart))),
+            .run { [nanoBananaPreviewPreparationService] send in
+                switch await nanoBananaPreviewPreparationService.preparePreview(
+                    NanoBananaPreviewPreparationRequest(
+                        command: validatedEdit.command,
+                        selectionRegion: validatedEdit.selectionRegion,
+                        outputLayerIndex: validatedEdit.outputLayerIndex,
+                        sourceSurface: validatedEdit.sourceSurface
+                    )
+                ) {
+                case let .success(preview):
+                    await send(.nanoBananaPreviewPrepared(preview))
+                case let .failure(.editFailed(failure)):
+                    await send(.nanoBananaPreviewPreparationFailed(Self.nanoBananaFailureFeedback(failure)))
+                case .failure(.unsupportedImage):
+                    await send(.nanoBananaPreviewPreparationFailed(.nanoBananaUnsupportedImage))
+                }
+            }
+            .cancellable(id: ApplicationFeature.CancelID.nanoBananaEdit, cancelInFlight: true)
+        )
     }
 
     func handleNanoBananaEditSucceeded(
         state: inout State,
         preview: NanoBananaPreviewState
     ) -> Effect<Action> {
+        let language = appLanguageClient.load()
         let applicationPlan: NanoBananaPreviewApplicationPlan
-        switch nanoBananaPreviewApplicationContract.validate(preview: preview, state: state) {
+        switch nanoBananaPreviewApplicationContract.validate(
+            preview: preview,
+            state: state,
+            namingPolicy: DocumentNamingPolicy(language: language)
+        ) {
         case let .failure(error):
-            return nanoBananaGenerationService.applyFailure(
-                state: &state,
-                feedback: error.feedback
-            )
+            return handleNanoBananaEditFailed(state: &state, feedback: error.feedback)
         case let .success(plan):
             applicationPlan = plan
         }
+
         let appliedPreview: NanoBananaDocumentService.AppliedPreview
         switch nanoBananaDocumentService.apply(applicationPlan) {
         case let .success(preview):
             appliedPreview = preview
         case let .failure(failure):
-            return nanoBananaGenerationService.applyFailure(
+            return handleNanoBananaEditFailed(
                 state: &state,
-                feedback: documentMutationFeedbackMapper.feedback(
+                feedback: DocumentMutationFeedbackMapper().feedback(
                     for: failure,
                     default: .nanoBananaApplyFailed
                 ) ?? .nanoBananaApplyFailed
             )
         }
-        nanoBananaGenerationService.applySuccess(
-            state: &state,
-            preview: preview
-        )
-        state.nanoBanana.completeAppliedEdit(request: preview.descriptor)
-        return completeDocumentMutation(
-            state: &state,
-            contract: DocumentMutationContract(
-                canvasMutation: .finalizeLayer(
-                    LayerMutationFinalization(
-                        index: appliedPreview.targetLayerIndex,
-                        incrementsRevision: true
+
+        return .merge(
+            .send(
+                .delegate(
+                    .nanoBananaEditApplied(
+                        NanoBananaAppliedEdit(
+                            preview: preview,
+                            historyID: uuidClient.generate(),
+                            createdAt: dateClient.now()
+                        )
                     )
-                ),
-                successFeedback: .nanoBananaEditApplied
+                )
+            ),
+            completeDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .finalizeLayer(
+                        LayerMutationFinalization(
+                            index: appliedPreview.targetLayerIndex,
+                            incrementsRevision: true
+                        )
+                    ),
+                    successFeedback: .nanoBananaEditApplied
+                )
             )
         )
     }
 
     func handleNanoBananaEditFailed(
         state: inout State,
-        feedback: ApplicationFeedback
+        feedback: ApplicationFeature.Feedback
     ) -> Effect<Action> {
-        nanoBananaGenerationService.applyFailure(state: &state, feedback: feedback)
+        .send(.delegate(.nanoBananaGenerationFailed(feedback, appLanguageClient.load())))
     }
 
     func handleNanoBananaCancelRequested(state: inout State) -> Effect<Action> {
-        nanoBananaGenerationService.cancel(state: &state)
+        .merge(
+            .send(.delegate(.nanoBananaGenerationFailed(.nanoBananaGenerationCanceled, appLanguageClient.load()))),
+            .cancel(id: ApplicationFeature.CancelID.nanoBananaEdit)
+        )
     }
-
 }

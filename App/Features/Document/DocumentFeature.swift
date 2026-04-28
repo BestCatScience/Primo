@@ -1,10 +1,13 @@
 import CasePaths
 import ComposableArchitecture
 import Foundation
+import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
+import PrimoNanoBananaApplication
+import PrimoNanoBananaDomain
 import PrimoWorkspaceApplication
 
 @Reducer
@@ -13,18 +16,25 @@ struct DocumentFeature {
     static let canvasPreviewStateCoordinator = CanvasPreviewStateCoordinator()
 
     @Dependency(\.appLanguageClient) var appLanguageClient
+    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
+    @Dependency(\.dateClient) var dateClient
     @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
+    @Dependency(\.documentExportGateway) var documentExportGateway
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentLayerCommandService) var documentLayerCommandService
     @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
     @Dependency(\.documentMutationGateway) var documentMutationGateway
     @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
     @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
     @Dependency(\.layerTransformProcessor) var layerTransformProcessor
+    @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
     @Dependency(\.processEnvironmentClient) var processEnvironmentClient
     @Dependency(\.selectionWorkflowService) var selectionWorkflowService
     @Dependency(\.textLayerGateway) var textLayerGateway
+    @Dependency(\.uuidClient) var uuidClient
 
     typealias DocumentCanvasMutation = DocumentCanvasMutationIntent<CanvasSelection>
     typealias DocumentPresentationRefresh = DocumentPresentationRefreshIntent
@@ -108,11 +118,45 @@ struct DocumentFeature {
         var mutationFailureFeedback: ApplicationFeature.Feedback? = nil
     }
 
+    struct WorkspaceDocumentSnapshot: Equatable, Sendable {
+        let activeTab: OpenDocumentTab?
+        let paperStyle: CanvasPaperStyle
+        let previewSurface: DocumentCompositeSurface?
+        let canvasSize: CGSize
+    }
+
+    enum WorkspaceSnapshotPurpose: Equatable, Sendable {
+        case pendingWorkspaceOperation
+    }
+
+    enum FreshDocumentMutationOperation: Equatable, Sendable {
+        case newCanvas(CanvasDimensions)
+        case importedCanvas(ImportExportFeature.ImportedCanvasPlan)
+    }
+
+    struct FreshDocumentMutationRequest: Equatable, Sendable {
+        let contract: FreshDocumentReplacementContract
+        let operation: FreshDocumentMutationOperation
+        let preparedTab: WorkspaceFeature.PreparedWorkspaceTab
+    }
+
     struct CanvasStrokeContext {
         let activeLayer: LayerRowModel
         let activeLayerIndex: Int
         let brush: BrushRuntimeSettings
         let previewBrush: BrushRuntimeSettings
+    }
+
+    struct NanoBananaGenerationStart: Equatable, Sendable {
+        let descriptor: NanoBananaEditDescriptor
+        let jobID: UUID
+        let createdAt: Date
+    }
+
+    struct NanoBananaAppliedEdit: Equatable, Sendable {
+        let preview: NanoBananaPreviewState
+        let historyID: UUID
+        let createdAt: Date
     }
 
     @ObservableState
@@ -164,6 +208,15 @@ struct DocumentFeature {
             case documentMutationFeedback(ApplicationFeature.Feedback)
             case paperStyleSyncRequested(CanvasPaperStyle)
             case presentationApplied
+            case workspaceSnapshotPrepared(WorkspaceSnapshotPurpose, WorkspaceDocumentSnapshot)
+            case loadedProjectApplied
+            case loadedProjectApplySkipped
+            case freshDocumentMutationSucceeded(WorkspaceFeature.PreparedWorkspaceTab, FreshDocumentReplacementContract, WorkspaceDocumentSnapshot)
+            case freshDocumentMutationFailed(ApplicationFeature.Feedback?)
+            case freshDocumentRequested(FreshDocumentReplacementContract, FreshDocumentMutationOperation)
+            case nanoBananaGenerationStarted(NanoBananaGenerationStart)
+            case nanoBananaGenerationFailed(ApplicationFeature.Feedback, AppLanguage)
+            case nanoBananaEditApplied(NanoBananaAppliedEdit)
         }
 
         case startupPresentationBootstrapRequested
@@ -173,8 +226,16 @@ struct DocumentFeature {
         case paperStyleSyncRequested(CanvasPaperStyle)
         case bootstrapPresentationLoaded(PaintDocumentPresentation)
         case presentationLoaded(PaintDocumentPresentation)
+        case workspaceSnapshotRequested(WorkspaceSnapshotPurpose)
+        case applyLoadedProjectRequested(LoadedPaintProject)
+        case freshDocumentMutationRequested(FreshDocumentMutationRequest)
         case newCanvasRequested(width: Int, height: Int)
         case newCanvasPreparationCompleted(CanvasDimensions)
+        case newCanvasFromImagePreparationCompleted(ImportExportFeature.ImportedCanvasPlan)
+        case nanoBananaEditRequested(SubmitNanoBananaEditCommand)
+        case nanoBananaPreviewPrepared(NanoBananaPreviewState)
+        case nanoBananaPreviewPreparationFailed(ApplicationFeature.Feedback)
+        case nanoBananaCancelRequested
         case undoRequested
         case redoRequested
         case resizeCanvasRequested(width: Int, height: Int)
@@ -232,6 +293,81 @@ struct DocumentFeature {
                 case let .presentationLoaded(presentation):
                     guard !state.canvas.isStrokeActive else { return .none }
                     return applyPresentation(presentation, to: &state)
+
+                case let .workspaceSnapshotRequested(purpose):
+                    return .send(
+                        .delegate(
+                            .workspaceSnapshotPrepared(
+                                purpose,
+                                workspaceDocumentSnapshot(state: state)
+                            )
+                        )
+                    )
+
+                case let .applyLoadedProjectRequested(loaded):
+                    guard Self.canvasPresentationStateCoordinator.applyLoadedProject(loaded, to: &state) else {
+                        return .send(.delegate(.loadedProjectApplySkipped))
+                    }
+                    return .send(.delegate(.loadedProjectApplied))
+
+                case let .freshDocumentMutationRequested(request):
+                    return handleFreshDocumentMutationRequest(state: &state, request: request)
+
+                case let .newCanvasRequested(width, height):
+                    guard let dimensions = validatedCanvasDimensions(width: width, height: height) else {
+                        return presentCanvasLifecycleFailure(.unsupportedCanvasSize)
+                    }
+                    return .send(
+                        .delegate(
+                            .freshDocumentRequested(
+                                FreshDocumentReplacementContract(
+                                    canvasSize: dimensions.size,
+                                    tabTitle: "Untitled"
+                                ),
+                                .newCanvas(dimensions)
+                            )
+                        )
+                    )
+
+                case let .newCanvasPreparationCompleted(dimensions):
+                    return .send(
+                        .delegate(
+                            .freshDocumentRequested(
+                                FreshDocumentReplacementContract(
+                                    canvasSize: dimensions.size,
+                                    tabTitle: "Untitled"
+                                ),
+                                .newCanvas(dimensions)
+                            )
+                        )
+                    )
+
+                case let .newCanvasFromImagePreparationCompleted(plan):
+                    return .send(
+                        .delegate(
+                            .freshDocumentRequested(
+                                FreshDocumentReplacementContract(
+                                    canvasSize: CGSize(width: plan.request.width, height: plan.request.height),
+                                    tabTitle: plan.layerName,
+                                    successFeedback: .canvasCreatedFromImage,
+                                    mutationFailureFeedback: .couldNotCreateCanvasFromImage(nil)
+                                ),
+                                .importedCanvas(plan)
+                            )
+                        )
+                    )
+
+                case let .nanoBananaEditRequested(request):
+                    return handleNanoBananaEditRequest(state: &state, request: request)
+
+                case let .nanoBananaPreviewPrepared(preview):
+                    return handleNanoBananaEditSucceeded(state: &state, preview: preview)
+
+                case let .nanoBananaPreviewPreparationFailed(feedback):
+                    return handleNanoBananaEditFailed(state: &state, feedback: feedback)
+
+                case .nanoBananaCancelRequested:
+                    return handleNanoBananaCancelRequested(state: &state)
 
                 case let .resizeCanvasRequested(width, height):
                     return handleResizeCanvasRequest(state: &state, width: width, height: height)
@@ -518,6 +654,18 @@ struct DocumentFeature {
 
                 case .canvas(.delegate(.requestRedo)):
                     return .send(.redoRequested)
+
+                case .canvas(.delegate(.beginStroke)),
+                     .canvas(.delegate(.appendSamples)),
+                     .canvas(.delegate(.previewShapeStroke)),
+                     .canvas(.delegate(.commitPreviewShapeStroke)),
+                     .canvas(.delegate(.endStroke)),
+                     .canvas(.delegate(.cancelStroke)),
+                     .canvas(.delegate(.commitStroke)),
+                     .canvas(.delegate(.blurSamples)),
+                     .canvas(.delegate(.endBlurStroke)),
+                     .canvas(.delegate(.fill)):
+                    return routeDocumentEditorEditingAction(state: &state, action: action) ?? .none
 
                 case .canvas(.delegate(.toggleBrushAndEraser)):
                     state.toggleBrushAndEraser()

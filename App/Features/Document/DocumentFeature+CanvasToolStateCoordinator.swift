@@ -130,6 +130,42 @@ extension DocumentFeature {
             }
         }
 
+        func clearSelectionWithoutRefresh(
+            state: inout DocumentFeature.State,
+            performDocumentMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Void
+        ) {
+            performDocumentMutation(
+                &state,
+                DocumentMutationContract(
+                    canvasMutation: .clearSelection,
+                    refresh: .none
+                )
+            )
+        }
+
+        func ensureCurrentPresentationLoaded(
+            state: inout DocumentFeature.State,
+            performDocumentMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Void
+        ) {
+            guard state.canvas.renderSnapshot == nil else { return }
+            performDocumentMutation(&state, .currentPresentation)
+        }
+
+        func captureBaseSnapshotIfNeeded(
+            state: inout DocumentFeature.State,
+            ensureCurrentPresentationLoaded: (inout DocumentFeature.State) -> Void
+        ) {
+            guard state.canvas.strokeSession.baseSnapshot == nil else { return }
+            if let pendingCommittedSnapshot = state.canvas.pendingCommittedSnapshot {
+                state.canvas.captureStrokeBaseSnapshot(pendingCommittedSnapshot)
+                return
+            }
+            ensureCurrentPresentationLoaded(&state)
+            if let renderSnapshot = state.canvas.renderSnapshot {
+                state.canvas.captureStrokeBaseSnapshot(renderSnapshot)
+            }
+        }
+
         func prepareEditing(
             state: inout DocumentFeature.State,
             clearSelectionWithoutRefresh: (inout DocumentFeature.State) -> Void
