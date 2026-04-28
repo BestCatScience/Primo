@@ -530,7 +530,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func strokeSessionIgnoresPreviewWithoutLiveDisplayUpdate() throws {
+    func strokeSessionAppliesPreviewWithoutIncrementalUpdate() throws {
         let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
         let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
         var session = StrokeSessionState()
@@ -551,8 +551,17 @@ struct DocumentStrokeApplicationTests {
             supportsIncrementalContinuation: true
         )
 
-        #expect(session.baseSnapshot == nil)
-        #expect(session.renderState == nil)
+        #expect(session.baseSnapshot == snapshot)
+        #expect(session.renderState == StrokeSessionRenderState(
+            baseRevision: 11,
+            layerIndex: 1,
+            surfaceHandle: handle,
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: true,
+            previewBrush: brushSettings(),
+            sampleCount: 1,
+            supportsIncrementalContinuation: true
+        ))
         #expect(session.pendingIncrementalUpdate == nil)
     }
 

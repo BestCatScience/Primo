@@ -72,7 +72,6 @@ public struct StrokeSessionState: Equatable, Sendable {
         sampleCount: Int,
         supportsIncrementalContinuation: Bool
     ) {
-        guard let incrementalUpdate else { return }
         let dirtyRect = mergedDirtyRect(
             previous: renderState,
             next: dirtyRegion.layerPixelRect,

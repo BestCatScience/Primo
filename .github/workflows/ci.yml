@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-tests:
+    name: Swift Package Tests
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Run package tests
+        working-directory: Packages/PrimoModules
+        run: swift test
+
+  app-tests:
+    name: Xcode App Tests
+    runs-on: macos-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project Primo.xcodeproj \
+            -scheme Primo \
+            -clonedSourcePackagesDirPath build/SourcePackages
+
+      - name: Patch SwiftNavigation manifest
+        run: scripts/patch-swift-navigation-package.sh
+
+      - name: Pick simulator
+        id: simulator
+        run: |
+          simulator_id="$(
+            xcrun simctl list devices available --json | ruby -rjson -e '
+              devices = JSON.parse(STDIN.read).fetch("devices").values.flatten
+              preferred = devices.find { |device|
+                device.fetch("isAvailable") &&
+                  device.fetch("name").start_with?("iPad")
+              } || devices.find { |device|
+                device.fetch("isAvailable") &&
+                  device.fetch("name").start_with?("iPhone")
+              }
+              abort("No available iOS simulator found") unless preferred
+              puts preferred.fetch("udid")
+            '
+          )"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run Xcode app tests
+        run: |
+          xcodebuild \
+            -project Primo.xcodeproj \
+            -scheme Primo \
+            -destination "id=${{ steps.simulator.outputs.id }}" \
+            -configuration Debug \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            CODE_SIGNING_ALLOWED=NO \
+            test

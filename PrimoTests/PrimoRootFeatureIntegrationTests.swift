@@ -23,11 +23,46 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         )
     }
 
+    private func workspaceSnapshot(
+        activeTab: OpenDocumentTab? = nil,
+        previewSurface: DocumentCompositeSurface? = nil
+    ) -> DocumentFeature.WorkspaceDocumentSnapshot {
+        DocumentFeature.WorkspaceDocumentSnapshot(
+            activeTab: activeTab,
+            paperStyle: .default,
+            previewSurface: previewSurface,
+            canvasSize: activeTab?.canvasSize ?? CanvasFeature.defaultCanvasSize
+        )
+    }
+
+    private func makeRootStore(
+        initialState: PrimoRootFeature.State = PrimoRootFeature.State(),
+        configureDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
+    ) -> TestStoreOf<PrimoRootFeature> {
+        TestStore(initialState: initialState) {
+            PrimoRootFeature()
+        } withDependencies: {
+            $0.documentRuntimeComposition = .stub()
+            $0.documentWorkspaceClient = .stub()
+            $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
+            $0.dateClient = DateClient(now: { Date(timeIntervalSince1970: 1_234) })
+            $0.uuidClient = UUIDClient(generate: {
+                UUID(uuidString: "00000000-0000-0000-0000-00000000BEEF")!
+            })
+            $0.fileClient = .stub()
+            configureDependencies(&$0)
+        }
+    }
+
     func testHomeReturnRequestedEmitsWorkspacePersistenceRequest() async {
-        let previewData = DocumentRasterImageService.pngData(from: previewSurface())
+        let previewSurface = previewSurface()
         let activeTab = OpenDocumentTab.testValue()
-        let refreshedTab = OpenDocumentTab.testValue(previewImageData: previewData)
-        let store = TestStore(
+        var refreshedTab = activeTab
+        refreshedTab.previewSurface = previewSurface
+        var savedTab = refreshedTab
+        savedTab.title = "source"
+        savedTab.isDirty = false
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
@@ -37,31 +72,20 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentRuntimeComposition = .stub(
                 exportGateway: .stub(
-                    compositeSurface: { _ in self.previewSurface() }
+                    compositeSurface: { _ in previewSurface }
                 )
             )
-            $0.documentWorkspaceClient = .stub()
         }
         store.exhaustivity = .off
 
         await store.send(.workspace(.homeReturnRequested))
-        await store.receive(
-            .workspacePersistenceRequested(
-                .saveActiveDocument(
-                    WorkspaceFeature.WorkspaceDocumentSaveRequest(
-                        activeTab: refreshedTab,
-                        paperStyle: .default,
-                        preferredDestinationURL: activeTab.sourceProjectURL,
-                        trigger: .autoSave,
-                        purpose: .homeReturn
-                    )
-                )
-            )
-        )
+        await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
+        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
+            $0.workspace.openTabs = [savedTab]
+        }
     }
 
     func testBackgroundScenePersistsDirtyActiveTabAutosave() async {
@@ -69,7 +93,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         let activeTab = OpenDocumentTab.testValue(isDirty: true)
         var refreshedTab = activeTab
         refreshedTab.previewSurface = previewSurface
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
@@ -79,41 +103,35 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentRuntimeComposition = .stub(
                 exportGateway: .stub(
                     compositeSurface: { _ in previewSurface }
                 )
             )
-            $0.documentWorkspaceClient = .stub()
-            $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
             $0.uuidClient = UUIDClient(generate: {
                 UUID(uuidString: "00000000-0000-0000-0000-0000000000B1")!
             })
         }
         store.exhaustivity = .off
 
-        await store.send(.application(.scenePhaseChanged(.background))) {
-            $0.workspace.openTabs = [refreshedTab]
+        await store.send(.application(.scenePhaseChanged(.background)))
+        await store.receive(.workspace(.lifecycleAutosaveRequested)) {
+            $0.workspace.pendingDocumentSnapshotOperation = .lifecycleAutosave
         }
-        await store.receive(
-            .workspacePersistenceRequested(
-                .dirtyPresentationRefreshed(
-                    WorkspaceFeature.WorkspaceDirtyPresentationRequest(
-                        activeTab: refreshedTab,
-                        paperStyle: .default
-                    )
-                )
-            )
-        )
+        await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
+        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
+            $0.workspace.openTabs = [refreshedTab]
+            $0.workspace.pendingDocumentSnapshotOperation = nil
+        }
     }
 
     func testPendingCloseSaveConfirmedEmitsClosePersistenceRequest() async {
-        let previewData = DocumentRasterImageService.pngData(from: previewSurface())
+        let previewSurface = previewSurface()
         let activeTab = OpenDocumentTab.testValue()
-        let refreshedTab = OpenDocumentTab.testValue(previewImageData: previewData)
-        let store = TestStore(
+        var refreshedTab = activeTab
+        refreshedTab.previewSurface = previewSurface
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
@@ -128,47 +146,36 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentRuntimeComposition = .stub(
                 exportGateway: .stub(
-                    compositeSurface: { _ in self.previewSurface() }
+                    compositeSurface: { _ in previewSurface }
                 )
             )
-            $0.documentWorkspaceClient = .stub()
         }
         store.exhaustivity = .off
 
         await store.send(.workspace(.pendingCloseSaveConfirmed)) {
             $0.workspace.pendingCloseConfirmation = nil
-            $0.workspace.openTabs = [refreshedTab]
+            $0.workspace.pendingDocumentSnapshotOperation = .closeTabsSave(.tab(activeTab.id), [activeTab.id])
         }
-        await store.receive(
-            .workspacePersistenceRequested(
-                .saveTabsForClose(
-                    WorkspaceFeature.WorkspaceCloseTabsSaveRequest(
-                        operation: .tab(activeTab.id),
-                        tabs: [refreshedTab],
-                        activeTab: WorkspaceFeature.WorkspaceDocumentReplacementRequest(
-                            activeTab: refreshedTab,
-                            paperStyle: .default
-                        )
-                    )
-                )
-            )
-        )
+        await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
+        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
+            $0.workspace.openTabs = []
+            $0.workspace.activeTabID = nil
+            $0.workspace.primarySelectedTabID = nil
+            $0.workspace.pendingDocumentSnapshotOperation = nil
+        }
     }
 
     func testLoadedWorkspaceFollowUpSuccessCompletesHydration() async {
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.beginHydration()
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(
@@ -182,10 +189,11 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                     )
                 )
             ))
-        ) {
+        )
+        await store.receive(.workspace(.delegate(.workspaceProjectLoadCompleted(nil))))
+        await store.receive(.application(.workspaceProjectLoadCompleted(nil))) {
             $0.application.isHydrating = false
             $0.application.showsHome = false
-            $0.application.bannerMessage = ApplicationFeature.Feedback.restoredAutosave.message(for: .japanese)
         }
     }
 
@@ -202,20 +210,18 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             ),
             reason: .saveFailed("workspace follow-up failed")
         )
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.beginHydration()
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
-        await store.send(.workspace(.persistenceFailed(failure))) {
-            $0.application.isHydrating = false
-            $0.application.showsHome = false
+        await store.send(.workspace(.persistenceFailed(failure)))
+        await store.receive(.workspace(.delegate(.presentFeedback(.saveFailed("workspace follow-up failed")))))
+        await store.receive(.application(.feedbackPresented(.saveFailed("workspace follow-up failed")))) {
             $0.application.bannerMessage = "workspace follow-up failed"
         }
     }
@@ -224,7 +230,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/source.atelier"))
         let destinationURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/moved.atelier"))
         let activeTab = OpenDocumentTab.testValue(sourceProjectURL: sourceURL)
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.workspace.openTabs = [activeTab]
@@ -233,8 +239,6 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentWorkspaceClient = .stub(
                 moveSavedProject: { _, _ in destinationURL }
             )
@@ -279,16 +283,14 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 0),
             previewImageData: nil
         )
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
-                state.recovery.items = [autosaveItem]
-                state.recovery.isPresented = true
+                state.application.recovery.items = [autosaveItem]
+                state.application.recovery.isPresented = true
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentWorkspaceClient = .stub(
                 discardAutosaveEntry: { _ in }
             )
@@ -296,7 +298,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.application(.autosaveRecoveryDiscardRequested(autosaveID)))
-        XCTAssertEqual(store.state.recovery.items, [autosaveItem])
+        XCTAssertEqual(store.state.application.recovery.items, [autosaveItem])
         await store.receive(
             .workspaceCatalogRequested(
                 .discardAutosaveEntry(
@@ -308,15 +310,15 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         )
         await store.receive(
             .workspace(.catalogSucceeded(.autosaveEntryDiscarded(autosaveID)))
-        ) {
-            $0.recovery.items = []
+        )
+        await store.receive(.workspace(.delegate(.autosaveRecoveryDiscarded(autosaveID))))
+        await store.receive(.application(.autosaveRecoveryDiscarded(autosaveID))) {
+            $0.application.recovery.items = []
         }
     }
 
     func testHomeProjectsLoadUsesWorkspaceCatalogRequest() async {
-        let store = TestStore(initialState: PrimoRootFeature.State()) {
-            PrimoRootFeature()
-        }
+        let store = makeRootStore()
         store.exhaustivity = .off
 
         await store.send(.application(.homeProjectsLoadRequested)) {
@@ -326,9 +328,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testAutosaveRecoveryLoadUsesWorkspaceCatalogRequest() async {
-        let store = TestStore(initialState: PrimoRootFeature.State()) {
-            PrimoRootFeature()
-        }
+        let store = makeRootStore()
         store.exhaustivity = .off
 
         await store.send(.application(.autosaveRecoveryLoadRequested))
@@ -349,16 +349,14 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         let loaded = LoadedPaintProject.testValue()
         let loadProjectCalls = TestRecorder<URL>()
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-00000000A001")!
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
-                state.recovery.items = [item]
-                state.recovery.isPresented = true
+                state.application.recovery.items = [item]
+                state.application.recovery.isPresented = true
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.uuidClient = UUIDClient(generate: { reservedID })
             $0.documentRuntimeComposition = .stub(
                 persistenceGateway: .stub(
@@ -379,7 +377,8 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         await store.send(.application(.autosaveRecoveryRestoreRequested(autosaveID))) {
             $0.application.isHydrating = true
         }
-        await store.receive(.application(.autosaveRecoveryOpened(loaded, item, [])))
+        await store.receive(.workspace(.autosaveRecoveryRestoreRequested(item)))
+        await store.receive(.workspace(.autosaveRecoveryOpened(loaded, item, [])))
         await store.receive(
             .workspacePersistenceRequested(
                 .reserveNewTabBackingStore(
@@ -396,7 +395,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testSaveHistoryLoadUsesWorkspaceCatalogRequest() async {
         let activeTab = OpenDocumentTab.testValue()
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.workspace.openTabs = [activeTab]
@@ -404,9 +403,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 state.workspace.primarySelectedTabID = activeTab.id
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(.importExport(.saveHistoryRequested)) {
@@ -425,12 +422,21 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testFreshDocumentPreparationRequestsReservation() async {
         let dimensions = DocumentFeature.CanvasDimensions(width: 640, height: 480)!
-        let store = TestStore(initialState: PrimoRootFeature.State()) {
-            PrimoRootFeature()
-        }
+        let store = makeRootStore()
         store.exhaustivity = .off
 
-        await store.send(.document(.newCanvasPreparationCompleted(dimensions))) {
+        await store.send(.document(.newCanvasPreparationCompleted(dimensions)))
+        await store.receive(
+            .workspace(
+                .freshDocumentRequested(
+                    DocumentFeature.FreshDocumentReplacementContract(
+                        canvasSize: dimensions.size,
+                        tabTitle: "Untitled"
+                    ),
+                    .newCanvas(dimensions)
+                )
+            )
+        ) {
             $0.workspace.pendingWorkspaceTabReservation = .freshDocument(
                 WorkspaceFeature.PendingFreshDocumentMutation(
                     contract: DocumentFeature.FreshDocumentReplacementContract(
@@ -458,9 +464,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/imported.atelier"))
         let reservedID = UUID(uuidString: "00000000-0000-0000-0000-0000000000D1")!
         let loaded = LoadedPaintProject.testValue()
-        let store = TestStore(initialState: PrimoRootFeature.State()) {
-            PrimoRootFeature()
-        } withDependencies: {
+        let store = makeRootStore {
             $0.uuidClient = UUIDClient(generate: { reservedID })
             $0.documentWorkspaceClient = .stub(
                 createTabBackingStoreURL: { id in
@@ -504,15 +508,13 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testLoadedWorkspaceFollowUpIssuesOverrideSuccessBanner() async {
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.beginHydration()
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(
@@ -526,10 +528,11 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                     )
                 )
             ))
-        ) {
+        )
+        await store.receive(.workspace(.delegate(.workspaceProjectLoadCompleted(nil))))
+        await store.receive(.application(.workspaceProjectLoadCompleted(nil))) {
             $0.application.isHydrating = false
             $0.application.showsHome = false
-            $0.application.bannerMessage = "discard failed"
         }
     }
 
@@ -538,15 +541,13 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             request: .loadAutosaveRecoveryItems,
             reason: .loadAutosaveRecoveryItemsFailed("catalog load failed")
         )
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.beginHydration()
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(.workspace(.catalogFailed(failure)))
@@ -559,7 +560,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testArchitectureContractsExposeLayeredProtocolVocabulary() throws {
         let contents = try String(
-            contentsOf: repoRoot.appendingPathComponent("App/Support/OperationContracts.swift"),
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Sources/PrimoCoreTypes/OperationContracts.swift"),
             encoding: .utf8
         )
 
@@ -590,9 +591,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testCrossFeatureIntegrationReducerHomeProjectsLoadRoutesToCatalogRequest() async {
-        let store = TestStore(initialState: PrimoRootFeature.State()) {
-            PrimoRootFeature()
-        }
+        let store = makeRootStore()
         store.exhaustivity = .off
 
         await store.send(.application(.homeProjectsLoadRequested)) {
@@ -602,26 +601,25 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testCrossFeatureIntegrationReducerUndoRoutesToHistoryMutation() async {
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
                 return state
             }()
         ) {
-            PrimoRootFeature()
-        } withDependencies: {
             $0.documentHistoryGateway = .stub(undo: { .success(()) })
         }
         store.exhaustivity = .off
 
         await store.send(.document(.undoRequested))
-        await store.receive(.application(.refreshPresentationRequested))
+        await store.receive(.document(.delegate(.presentationRefreshRequested)))
+        await store.receive(.document(.presentationRefreshRequested))
     }
 
     func testCrossFeatureIntegrationReducerSaveHistoryRoutesToCatalogRequest() async {
         let activeTab = OpenDocumentTab.testValue()
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.workspace.openTabs = [activeTab]
@@ -629,9 +627,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 state.workspace.primarySelectedTabID = activeTab.id
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(.importExport(.saveHistoryRequested))
@@ -665,15 +661,13 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testImportExportDismissalRoutesThroughFeatureSlice() async {
-        let store = TestStore(
+        let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.importExport.saveHistory.isPresented = true
                 return state
             }()
-        ) {
-            PrimoRootFeature()
-        }
+        )
         store.exhaustivity = .off
 
         await store.send(.importExport(.saveHistoryDismissed)) {

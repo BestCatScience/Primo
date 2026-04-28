@@ -498,3 +498,39 @@ extension DocumentImportClient {
         )
     }
 }
+
+extension FileClient {
+    static func stub(
+        temporaryDirectory: @escaping @Sendable () -> URL = {
+            URL(fileURLWithPath: "/tmp")
+        },
+        urls: @escaping @Sendable (FileManager.SearchPathDirectory, FileManager.SearchPathDomainMask) -> [URL] = { _, _ in
+            [URL(fileURLWithPath: "/tmp")]
+        },
+        fileExists: @escaping @Sendable (String) -> Bool = { _ in false },
+        createDirectory: @escaping @Sendable (URL, Bool) throws -> Void = { _, _ in },
+        removeItem: @escaping @Sendable (URL) throws -> Void = { _ in },
+        copyItem: @escaping @Sendable (URL, URL) throws -> Void = { _, _ in },
+        moveItem: @escaping @Sendable (URL, URL) throws -> Void = { _, _ in },
+        replaceItem: @escaping @Sendable (URL, URL, String?) throws -> Void = { _, _, _ in },
+        contentsOfDirectory: @escaping @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) throws -> [URL] = { _, _, _ in [] },
+        enumerateURLs: @escaping @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) -> [URL] = { _, _, _ in [] },
+        readData: @escaping @Sendable (URL) throws -> Data = { _ in Data() },
+        writeData: @escaping @Sendable (Data, URL, Data.WritingOptions) throws -> Void = { _, _, _ in }
+    ) -> Self {
+        Self(
+            temporaryDirectory: temporaryDirectory,
+            urls: urls,
+            fileExists: fileExists,
+            createDirectory: createDirectory,
+            removeItem: removeItem,
+            copyItem: copyItem,
+            moveItem: moveItem,
+            replaceItem: replaceItem,
+            contentsOfDirectory: contentsOfDirectory,
+            enumerateURLs: enumerateURLs,
+            readData: readData,
+            writeData: writeData
+        )
+    }
+}

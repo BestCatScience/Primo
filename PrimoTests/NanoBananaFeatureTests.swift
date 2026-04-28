@@ -90,6 +90,8 @@ final class NanoBananaFeatureTests: XCTestCase {
 
         let store = TestStore(initialState: initialState) {
             NanoBananaFeature()
+        } withDependencies: {
+            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.generateButtonTapped(closeSheet: true)) {
@@ -115,6 +117,7 @@ final class NanoBananaFeatureTests: XCTestCase {
         let createdAt = Date(timeIntervalSince1970: 1_234)
 
         var initialState = NanoBananaFeature.State()
+        initialState.settings = NanoBananaSettings(accessMode: .userAPIKey, apiKey: "user-key")
         initialState.jobs = [
             NanoBananaJob(
                 id: jobID,
@@ -128,6 +131,8 @@ final class NanoBananaFeatureTests: XCTestCase {
 
         let store = TestStore(initialState: initialState) {
             NanoBananaFeature()
+        } withDependencies: {
+            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.retryJobTapped(jobID))

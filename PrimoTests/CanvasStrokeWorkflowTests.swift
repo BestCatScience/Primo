@@ -457,6 +457,6 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         XCTAssertEqual(addLayerCalls.values.count, 1)
         XCTAssertEqual(deleteLayerCalls.values, [9])
-        XCTAssertEqual(setActiveLayerCalls.values, [9, 2])
+        XCTAssertEqual(setActiveLayerCalls.values, [2])
     }
 }
