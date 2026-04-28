@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     static func layerMaskData(
         from selection: CanvasSelection?,
         canvasSize: CGSize,

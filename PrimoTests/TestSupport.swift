@@ -12,6 +12,20 @@ import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 @testable import Primo
 
+extension PrimoRootFeature.Action {
+    static func workspacePersistenceRequested(_ request: DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest) -> Self {
+        .workspace(.persistenceRequested(request))
+    }
+
+    static func workspaceCatalogRequested(_ request: DocumentFeatureRuntimeReducer.WorkspaceCatalogRequest) -> Self {
+        .workspace(.catalogRequested(request))
+    }
+
+    static func workspaceCatalogSucceeded(_ result: DocumentFeatureRuntimeReducer.WorkspaceCatalogResult) -> Self {
+        .workspace(.catalogSucceeded(result))
+    }
+}
+
 enum TestError: LocalizedError, Equatable {
     case expected(String)
 

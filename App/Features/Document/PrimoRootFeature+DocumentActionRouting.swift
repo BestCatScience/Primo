@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func routeDocumentEditorAction(
         state: inout State,
         action: Action

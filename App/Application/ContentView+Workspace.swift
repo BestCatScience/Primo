@@ -6,7 +6,7 @@ import UIKit
 extension ContentView {
     func dismissBrushSettingsPopover() {
         if store.brushPalette.ui.showsBrushSettingsPopover {
-            store.send(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false))))
+            store.send(.document(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false)))))
         }
     }
 
@@ -110,7 +110,7 @@ extension ContentView {
         )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture {
-            store.send(.workspacePaneActivated(pane))
+            store.send(.workspace(.workspacePaneActivated(pane)))
         }
         .dropDestination(for: String.self) { items, _ in
             guard
@@ -119,7 +119,7 @@ extension ContentView {
             else {
                 return false
             }
-            store.send(.tabDropped(moving: movingID, toPane: pane, before: nil))
+            store.send(.workspace(.tabDropped(moving: movingID, toPane: pane, before: nil)))
             return true
         }
     }
@@ -195,7 +195,7 @@ extension ContentView {
         else {
             return nil
         }
-        return PrimoRootFeature.renderedCompositeSurface(
+        return DocumentFeatureRuntimeReducer.renderedCompositeSurface(
             snapshot: snapshot,
             paperStyle: store.canvas.paperStyle,
             gpuOperations: documentGpuOperationGateway
@@ -237,18 +237,18 @@ extension ContentView {
                 case .brush:
                     if panelState.isCollapsed {
                         if translation > dragThreshold {
-                            store.send(.panelCollapseToggled(panel))
+                            store.send(.document(.editing(.panelCollapseToggled(panel))))
                         }
                     } else if translation < -dragThreshold {
-                        store.send(.panelCollapseToggled(panel))
+                        store.send(.document(.editing(.panelCollapseToggled(panel))))
                     }
                 case .layers:
                     if panelState.isCollapsed {
                         if translation < -dragThreshold {
-                            store.send(.panelCollapseToggled(panel))
+                            store.send(.document(.editing(.panelCollapseToggled(panel))))
                         }
                     } else if translation > dragThreshold {
-                        store.send(.panelCollapseToggled(panel))
+                        store.send(.document(.editing(.panelCollapseToggled(panel))))
                     }
                 }
             }
@@ -270,7 +270,7 @@ extension ContentView {
                 .gesture(panelDragGesture)
                 .onTapGesture {
                     if panelState.isCollapsed {
-                        store.send(.panelCollapseToggled(panel))
+                        store.send(.document(.editing(.panelCollapseToggled(panel))))
                     }
                 }
         }
@@ -290,7 +290,7 @@ extension ContentView {
         StudioPanelShell(
             title: panel.title(language),
             isCollapsed: panelState.isCollapsed,
-            onToggleCollapse: { store.send(.panelCollapseToggled(panel)) }
+            onToggleCollapse: { store.send(.document(.editing(.panelCollapseToggled(panel)))) }
         ) {
             switch panel {
             case .brush:
@@ -310,7 +310,7 @@ extension ContentView {
                     language: language,
                     showsTitle: false,
                     onSelectTool: { tool in
-                        store.send(.toolSelected(tool))
+                        store.send(.document(.editing(.toolSelected(tool))))
                     },
                     onRequestExpandSelection: {
                         selectionExpansionText = "4"
@@ -325,10 +325,10 @@ extension ContentView {
                         showsTransformNumericSheet = true
                     },
                     onSetTransformMode: { mode in
-                        store.send(.canvas(.transformModeChanged(mode)))
+                        store.send(.document(.canvas(.transformModeChanged(mode))))
                     },
                     onSetTransformAspectRatioLock: { isLocked in
-                        store.send(.canvas(.transformAspectRatioLockChanged(isLocked)))
+                        store.send(.document(.canvas(.transformAspectRatioLockChanged(isLocked))))
                     }
                 )
             case .layers:
@@ -766,11 +766,11 @@ extension ContentView {
             )
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
-                store.send(.toolSelected(tool))
+                store.send(.document(.editing(.toolSelected(tool))))
             }
             .onLongPressGesture(minimumDuration: 0.45) {
                 if tool == .brush || tool == .erase {
-                    store.send(.toolLongPressed(tool))
+                    store.send(.document(.editing(.toolLongPressed(tool))))
                 }
             }
     }
@@ -859,7 +859,7 @@ extension ContentView {
             return
         }
         let clamped = min(max(value, 1), BrushPaletteFeature.maximumBrushRadius)
-        store.send(.brushPalette(.binding(.set(\.brush.radius, clamped))))
+        store.send(.document(.brushPalette(.binding(.set(\.brush.radius, clamped)))))
         toolMetricSizeText = "\(Int(clamped.rounded()))"
         selectedToolMetricEditor = nil
     }
@@ -870,7 +870,7 @@ extension ContentView {
             return
         }
         let clampedPercent = min(max(value, 10), 100)
-        store.send(.brushPalette(.binding(.set(\.brush.opacity, clampedPercent / 100.0))))
+        store.send(.document(.brushPalette(.binding(.set(\.brush.opacity, clampedPercent / 100.0)))))
         toolMetricOpacityText = "\(Int(clampedPercent.rounded()))"
         selectedToolMetricEditor = nil
     }
@@ -914,8 +914,8 @@ extension ContentView {
                 toolDockActionButton(systemImage: "arrow.triangle.2.circlepath") {
                     let primary = store.brushPalette.brush.color
                     let secondary = store.brushPalette.brush.secondaryColor
-                    store.send(.brushPalette(.binding(.set(\.brush.color, secondary))))
-                    store.send(.brushPalette(.binding(.set(\.brush.secondaryColor, primary))))
+                    store.send(.document(.brushPalette(.binding(.set(\.brush.color, secondary)))))
+                    store.send(.document(.brushPalette(.binding(.set(\.brush.secondaryColor, primary)))))
                 }
             }
         }
@@ -930,7 +930,7 @@ extension ContentView {
         let isSelected = store.brushPalette.brush.selectedColorSlot == slot
 
         return Button {
-            store.send(.brushPalette(.binding(.set(\.brush.selectedColorSlot, slot))))
+            store.send(.document(.brushPalette(.binding(.set(\.brush.selectedColorSlot, slot)))))
         } label: {
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

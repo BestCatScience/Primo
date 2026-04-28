@@ -7,6 +7,14 @@ import PrimoWorkspaceApplication
 
 @Reducer
 struct WorkspaceFeature {
+    typealias PendingWorkspaceTabReservation = DocumentFeatureRuntimeReducer.PendingWorkspaceTabReservation
+    typealias WorkspacePersistenceRequest = DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest
+    typealias WorkspacePersistenceResult = DocumentFeatureRuntimeReducer.WorkspacePersistenceResult
+    typealias WorkspacePersistenceFailure = DocumentFeatureRuntimeReducer.WorkspacePersistenceFailure
+    typealias WorkspaceCatalogRequest = DocumentFeatureRuntimeReducer.WorkspaceCatalogRequest
+    typealias WorkspaceCatalogResult = DocumentFeatureRuntimeReducer.WorkspaceCatalogResult
+    typealias WorkspaceCatalogFailure = DocumentFeatureRuntimeReducer.WorkspaceCatalogFailure
+
     @ObservableState
     struct State: Equatable {
         var openTabs: [OpenDocumentTab] = []
@@ -16,7 +24,7 @@ struct WorkspaceFeature {
         var focusedWorkspacePane: WorkspacePane = .primary
         var workspaceLayout: WorkspaceLayoutMode = .single
         var pendingCloseConfirmation: PendingCloseConfirmationState?
-        var pendingWorkspaceTabReservation: PrimoRootFeature.PendingWorkspaceTabReservation?
+        var pendingWorkspaceTabReservation: PendingWorkspaceTabReservation?
     }
 
     @CasePathable
@@ -47,12 +55,12 @@ struct WorkspaceFeature {
         case openDocumentSelected(DocumentProjectPath)
         case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath, [WorkspaceProjectLoadIssue])
         case openDocumentFailed(String?)
-        case persistenceRequested(PrimoRootFeature.WorkspacePersistenceRequest)
-        case persistenceSucceeded(PrimoRootFeature.WorkspacePersistenceResult)
-        case persistenceFailed(PrimoRootFeature.WorkspacePersistenceFailure)
-        case catalogRequested(PrimoRootFeature.WorkspaceCatalogRequest)
-        case catalogSucceeded(PrimoRootFeature.WorkspaceCatalogResult)
-        case catalogFailed(PrimoRootFeature.WorkspaceCatalogFailure)
+        case persistenceRequested(WorkspacePersistenceRequest)
+        case persistenceSucceeded(WorkspacePersistenceResult)
+        case persistenceFailed(WorkspacePersistenceFailure)
+        case catalogRequested(WorkspaceCatalogRequest)
+        case catalogSucceeded(WorkspaceCatalogResult)
+        case catalogFailed(WorkspaceCatalogFailure)
     }
 
     var body: some ReducerOf<Self> {

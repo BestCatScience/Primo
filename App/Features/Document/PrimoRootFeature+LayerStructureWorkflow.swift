@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleAddLayer(state: inout State) -> Effect<Action> {
         let layerName = namingPolicy(for: state).defaultLayerName(for: state.layerSidebar)
         return performDocumentMutation(

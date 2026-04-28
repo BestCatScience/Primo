@@ -113,8 +113,8 @@ extension ApplicationFeature.Feedback {
                     ? "ドキュメントの更新に失敗しました"
                     : "The document update failed")
         case let .documentMutationTransactionFailed(primary, rollback):
-            let primaryMessage = CrossFeatureIntegrationReducer.documentMutationFailureMessage(primary, language: language)
-            let rollbackMessage = CrossFeatureIntegrationReducer.documentMutationFailureMessage(rollback, language: language)
+            let primaryMessage = DocumentFeatureRuntimeReducer.documentMutationFailureMessage(primary, language: language)
+            let rollbackMessage = DocumentFeatureRuntimeReducer.documentMutationFailureMessage(rollback, language: language)
             return language == .japanese
                 ? "\(primaryMessage)\n復旧処理にも失敗しました: \(rollbackMessage)"
                 : "\(primaryMessage)\nRollback also failed: \(rollbackMessage)"
@@ -202,7 +202,7 @@ extension ApplicationFeature.Feedback {
     }
 }
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     static func optionalErrorMessage(_ error: Error) -> String? {
         let message = error.localizedDescription
         return message.isEmpty ? nil : message

@@ -3,7 +3,7 @@ import XCTest
 
 final class DocumentMutationFeedbackMapperTests: XCTestCase {
     func testInvalidOpacityUsesDedicatedFeedback() {
-        let mapper = CrossFeatureIntegrationReducer().documentMutationFeedbackMapper
+        let mapper = DocumentFeatureRuntimeReducer().documentMutationFeedbackMapper
 
         XCTAssertEqual(
             mapper.feedback(for: .invalidOpacity(1.4)),
@@ -12,7 +12,7 @@ final class DocumentMutationFeedbackMapperTests: XCTestCase {
     }
 
     func testPrimaryDocumentMutationFailuresMapToUserVisibleFeedback() {
-        let mapper = CrossFeatureIntegrationReducer().documentMutationFeedbackMapper
+        let mapper = DocumentFeatureRuntimeReducer().documentMutationFeedbackMapper
 
         XCTAssertEqual(mapper.feedback(for: .invalidLayerIndex(2)), .layerUnavailable)
         XCTAssertEqual(mapper.feedback(for: .invalidFolderID(7)), .folderUnavailable)

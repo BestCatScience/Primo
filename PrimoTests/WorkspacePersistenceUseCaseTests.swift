@@ -33,8 +33,8 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             )
         )
 
-        let request = PrimoRootFeature.WorkspacePersistenceRequest.saveActiveDocument(
-            PrimoRootFeature.WorkspaceDocumentSaveRequest(
+        let request = DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest.saveActiveDocument(
+            DocumentFeatureRuntimeReducer.WorkspaceDocumentSaveRequest(
                 activeTab: activeTab,
                 paperStyle: .default,
                 preferredDestinationURL: nil,
@@ -49,7 +49,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             result,
             .success(
                 .activeDocumentSaved(
-                    PrimoRootFeature.WorkspaceDocumentSaveResult(
+                    DocumentFeatureRuntimeReducer.WorkspaceDocumentSaveResult(
                         activeTabID: activeTab.id,
                         savedURL: savedURL,
                         purpose: .saveDocument,
@@ -79,8 +79,8 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             )
         )
 
-        let request = PrimoRootFeature.WorkspacePersistenceRequest.saveTabsForClose(
-            PrimoRootFeature.WorkspaceCloseTabsSaveRequest(
+        let request = DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest.saveTabsForClose(
+            DocumentFeatureRuntimeReducer.WorkspaceCloseTabsSaveRequest(
                 operation: .tab(tab.id),
                 tabs: [tab],
                 activeTab: nil
@@ -91,7 +91,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             support.persistenceUseCase.execute(request),
             .success(
                 .tabsSavedForClose(
-                    PrimoRootFeature.WorkspaceCloseTabsSaveResult(
+                    DocumentFeatureRuntimeReducer.WorkspaceCloseTabsSaveResult(
                         operation: .tab(tab.id),
                         issues: [.saveHistoryPersistFailed("save history unavailable")]
                     )
@@ -119,7 +119,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         XCTAssertEqual(
             support.persistenceUseCase.execute(
                 .saveActiveDocument(
-                    PrimoRootFeature.WorkspaceDocumentSaveRequest(
+                    DocumentFeatureRuntimeReducer.WorkspaceDocumentSaveRequest(
                         activeTab: activeTab,
                         paperStyle: .default,
                         preferredDestinationURL: nil,
@@ -130,7 +130,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             ),
             .success(
                 .activeDocumentSaved(
-                    PrimoRootFeature.WorkspaceDocumentSaveResult(
+                    DocumentFeatureRuntimeReducer.WorkspaceDocumentSaveResult(
                         activeTabID: activeTab.id,
                         savedURL: savedURL,
                         purpose: .saveDocument,
@@ -154,8 +154,8 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             uuidClient: UUIDClient(generate: { reservedID })
         )
 
-        let request = PrimoRootFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
-            PrimoRootFeature.WorkspaceTabReservationRequest(
+        let request = DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest.reserveNewTabBackingStore(
+            DocumentFeatureRuntimeReducer.WorkspaceTabReservationRequest(
                 title: "Imported",
                 sourceProjectURL: nil,
                 pane: .secondary
@@ -166,7 +166,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             support.persistenceUseCase.execute(request),
             .success(
                 .newTabBackingStoreReserved(
-                    PrimoRootFeature.PreparedWorkspaceTab(
+                    DocumentFeatureRuntimeReducer.PreparedWorkspaceTab(
                         id: reservedID,
                         title: "Imported",
                         backingStoreURL: reservedURL,
@@ -190,8 +190,8 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
             uuidClient: UUIDClient(generate: { reservedID })
         )
 
-        let request = PrimoRootFeature.WorkspacePersistenceRequest.reserveNewTabBackingStore(
-            PrimoRootFeature.WorkspaceTabReservationRequest(
+        let request = DocumentFeatureRuntimeReducer.WorkspacePersistenceRequest.reserveNewTabBackingStore(
+            DocumentFeatureRuntimeReducer.WorkspaceTabReservationRequest(
                 title: "Imported",
                 sourceProjectURL: nil,
                 pane: .primary
@@ -201,7 +201,7 @@ final class WorkspacePersistenceUseCaseTests: XCTestCase {
         XCTAssertEqual(
             support.persistenceUseCase.execute(request),
             .failure(
-                PrimoRootFeature.WorkspacePersistenceFailure(
+                DocumentFeatureRuntimeReducer.WorkspacePersistenceFailure(
                     request: request,
                     reason: .couldNotCreateTab
                 )

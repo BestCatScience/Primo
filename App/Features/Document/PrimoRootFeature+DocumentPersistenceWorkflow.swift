@@ -3,18 +3,18 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleSaveHistoryRequest(state: inout State) -> Effect<Action> {
         guard let activeTab = state.workspace.activeTab else { return .none }
         state.saveHistory.beginPresentation()
         return .send(
-            .workspaceCatalogRequested(
+            .workspace(.catalogRequested(
                 .loadSaveHistoryEntries(
                     WorkspaceSaveHistoryLoadRequest(
                         activeTab: activeTab
                     )
                 )
-            )
+            ))
         )
     }
 
@@ -27,14 +27,14 @@ extension CrossFeatureIntegrationReducer {
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: projectURL.fileURL,
-            onSuccess: { .saveHistoryOpened($0, projectURL, openInNewTab, $1) },
+            onSuccess: { .importExport(.saveHistoryOpened($0, projectURL, openInNewTab, $1)) },
             onFailure: {
-                .saveHistoryRestoreFailed(
+                .importExport(.saveHistoryRestoreFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .saveHistoryRestore),
                         language: language
                     )
-                )
+                ))
             }
         )
     }
@@ -111,7 +111,7 @@ extension CrossFeatureIntegrationReducer {
             purpose: .saveDocument
         ) {
         case let .success(request):
-            return .send(.workspacePersistenceRequested(request))
+            return .send(.workspace(.persistenceRequested(request)))
         case let .failure(failure):
             state.application.presentBanner(
                 workspaceFeedbackMapper.message(

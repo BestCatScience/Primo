@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct ActiveLayerPixelContext {
         let index: Int
         let pixelData: Data

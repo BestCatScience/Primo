@@ -48,23 +48,23 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
 
         XCTAssertEqual(
             loadingService.execute(
-                PrimoRootFeature.WorkspaceProjectLoadCommand(
+                DocumentFeatureRuntimeReducer.WorkspaceProjectLoadCommand(
                     loadRequest: .project(
-                        PrimoRootFeature.WorkspaceProjectLoadOperation(
+                        DocumentFeatureRuntimeReducer.WorkspaceProjectLoadOperation(
                             fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
                             removeWorkspaceItemOnSuccess: nil
                         )
                     ),
-                    prepareDocumentReplacementRequest: PrimoRootFeature.WorkspaceDocumentReplacementRequest(
+                    prepareDocumentReplacementRequest: DocumentFeatureRuntimeReducer.WorkspaceDocumentReplacementRequest(
                         activeTab: activeTab,
                         paperStyle: .default
                     )
                 )
             ),
             .failure(
-                PrimoRootFeature.WorkspaceProjectLoadFailure(
+                DocumentFeatureRuntimeReducer.WorkspaceProjectLoadFailure(
                     request: .project(
-                        PrimoRootFeature.WorkspaceProjectLoadOperation(
+                        DocumentFeatureRuntimeReducer.WorkspaceProjectLoadOperation(
                             fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
                             removeWorkspaceItemOnSuccess: nil
                         )
@@ -122,7 +122,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
 
         let result = useCase.execute(
             .imported(
-                PrimoRootFeature.WorkspaceImportedProjectLoadOperation(
+                DocumentFeatureRuntimeReducer.WorkspaceImportedProjectLoadOperation(
                     sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier")
                 )
             )
@@ -176,7 +176,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
         XCTAssertEqual(
             useCase.execute(
                 .imported(
-                    PrimoRootFeature.WorkspaceImportedProjectLoadOperation(
+                    DocumentFeatureRuntimeReducer.WorkspaceImportedProjectLoadOperation(
                         sourceURL: URL(fileURLWithPath: "/tmp/import-source.atelier")
                     )
                 )
@@ -228,7 +228,7 @@ final class WorkspaceProjectLoadUseCaseTests: XCTestCase {
         XCTAssertEqual(
             useCase.execute(
                 .project(
-                    PrimoRootFeature.WorkspaceProjectLoadOperation(
+                    DocumentFeatureRuntimeReducer.WorkspaceProjectLoadOperation(
                         fileURL: URL(fileURLWithPath: "/tmp/open-target.atelier"),
                         removeWorkspaceItemOnSuccess: stagedWorkspaceURL
                     )

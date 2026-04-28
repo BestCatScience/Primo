@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleActiveLayerVisibilityToggle(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         guard let layer = state.layerSidebar.layer(withIndex: activeLayerIndex) else {

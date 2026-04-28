@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct ShareExportFactory {
         let uuidClient: UUIDClient
 

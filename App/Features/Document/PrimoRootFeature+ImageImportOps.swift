@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     typealias InpaintCrop = PrimoDocumentApplication.InpaintCrop
 
     struct ImportedCanvasImage {

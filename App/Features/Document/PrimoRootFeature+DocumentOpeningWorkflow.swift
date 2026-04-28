@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleOpenImportedDocumentRequest(
         state: inout State,
         sourceURL: URL
@@ -12,14 +12,14 @@ extension CrossFeatureIntegrationReducer {
         return beginImportedWorkspaceProjectLoad(
             state: &state,
             sourceURL: sourceURL,
-            onSuccess: { Action.openImportedDocumentLoaded($0, $1, $2) },
+            onSuccess: { Action.workspace(.openImportedDocumentLoaded($0, $1, $2)) },
             onFailure: {
-                Action.openDocumentFailed(
+                Action.workspace(.openDocumentFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .importDocument),
                         language: language
                     )
-                )
+                ))
             }
         )
     }
@@ -65,7 +65,7 @@ extension CrossFeatureIntegrationReducer {
                 openTabID: state.workspace.tabID(forSourceProjectURL: url)
             )
         )
-        return .send(.workspaceCatalogRequested(request))
+        return .send(.workspace(.catalogRequested(request)))
     }
 
     func handleOpenDocumentSelection(
@@ -76,21 +76,21 @@ extension CrossFeatureIntegrationReducer {
         if let existingTabID = state.workspace.tabID(forSourceProjectURL: url) {
             state.application.showWorkspace()
             state.application.completeWorkspaceProjectLoad()
-            return .send(.tabSelected(existingTabID))
+            return .send(.workspace(.tabSelected(existingTabID)))
         }
         let language = state.application.appLanguage
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: url.fileURL,
             removeWorkspaceItemOnSuccess: removesStagedWorkspaceItem ? url : nil,
-            onSuccess: { Action.openDocumentLoaded($0, url, $1) },
+            onSuccess: { Action.workspace(.openDocumentLoaded($0, url, $1)) },
             onFailure: {
-                Action.openDocumentFailed(
+                Action.workspace(.openDocumentFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
                         language: language
                     )
-                )
+                ))
             }
         )
     }
@@ -108,7 +108,7 @@ extension CrossFeatureIntegrationReducer {
                     language: state.application.appLanguage
                 )
             )
-            return .send(.tabSelected(existingTabID))
+            return .send(.workspace(.tabSelected(existingTabID)))
         }
         return applyLoadedWorkspaceProject(
             loaded,

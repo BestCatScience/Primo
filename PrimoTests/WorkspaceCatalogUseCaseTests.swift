@@ -84,7 +84,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
         XCTAssertEqual(
             support.catalogUseCase.execute(
                 .loadSaveHistoryEntries(
-                    PrimoRootFeature.WorkspaceSaveHistoryLoadRequest(
+                    DocumentFeatureRuntimeReducer.WorkspaceSaveHistoryLoadRequest(
                         activeTab: activeTab
                     )
                 )
@@ -95,8 +95,8 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
 
     func testMoveFailureRetainsRequestContext() {
         let sourceURL = DocumentProjectPath(URL(fileURLWithPath: "/tmp/source.atelier"))
-        let request = PrimoRootFeature.WorkspaceCatalogRequest.moveSavedProject(
-            PrimoRootFeature.WorkspaceSavedProjectMoveRequest(
+        let request = DocumentFeatureRuntimeReducer.WorkspaceCatalogRequest.moveSavedProject(
+            DocumentFeatureRuntimeReducer.WorkspaceSavedProjectMoveRequest(
                 sourceURL: sourceURL,
                 relativeFolderPath: nil,
                 openTabID: nil
@@ -115,7 +115,7 @@ final class WorkspaceCatalogUseCaseTests: XCTestCase {
         XCTAssertEqual(
             support.catalogUseCase.execute(request),
             .failure(
-                PrimoRootFeature.WorkspaceCatalogFailure(
+                DocumentFeatureRuntimeReducer.WorkspaceCatalogFailure(
                     request: request,
                     reason: .moveSavedProjectFailed("move failed")
                 )

@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func routeAdjustmentEditingAction(
         state: inout State,
         action: Action

@@ -1,7 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func panelState(
         for panel: StudioPanelKind,
         state: State

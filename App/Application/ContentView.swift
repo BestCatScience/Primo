@@ -91,17 +91,17 @@ struct ContentView: View {
         }
         .ignoresSafeArea(edges: [.horizontal, .bottom])
         .task {
-            store.send(.task)
+            store.send(.application(.task))
         }
         .task {
             store.send(.nanoBanana(.task))
         }
         .onChange(of: scenePhase) { _, newPhase in
-            store.send(.scenePhaseChanged(ApplicationFeature.ScenePhase(newPhase)))
+            store.send(.application(.scenePhaseChanged(ApplicationFeature.ScenePhase(newPhase))))
         }
         .sheet(item: Binding(
             get: { exportState.shareSheet },
-            set: { _ in store.send(.exportSheetDismissed) }
+            set: { _ in store.send(.importExport(.exportSheetDismissed)) }
         )) { export in
             ShareSheet(items: [export.url])
         }
@@ -172,30 +172,30 @@ struct ContentView: View {
         .sheet(
             isPresented: Binding(
                 get: { recoveryState.isPresented },
-                set: { if !$0 { store.send(.autosaveRecoveryDismissed) } }
+                set: { if !$0 { store.send(.application(.autosaveRecoveryDismissed)) } }
             )
         ) {
             AutosaveRecoverySheet(
                 items: recoveryState.items,
                 language: language,
-                onRestore: { store.send(.autosaveRecoveryRestoreRequested($0)) },
-                onDiscard: { store.send(.autosaveRecoveryDiscardRequested($0)) },
-                onClose: { store.send(.autosaveRecoveryDismissed) }
+                onRestore: { store.send(.application(.autosaveRecoveryRestoreRequested($0))) },
+                onDiscard: { store.send(.application(.autosaveRecoveryDiscardRequested($0))) },
+                onClose: { store.send(.application(.autosaveRecoveryDismissed)) }
             )
         }
         .sheet(
             isPresented: Binding(
                 get: { saveHistoryState.isPresented },
-                set: { if !$0 { store.send(.saveHistoryDismissed) } }
+                set: { if !$0 { store.send(.importExport(.saveHistoryDismissed)) } }
             )
         ) {
             SaveHistorySheet(
                 title: language.localized("保存履歴"),
                 entries: saveHistoryState.entries,
                 language: language,
-                onRestoreCurrent: { store.send(.saveHistoryRestoreRequested($0, false)) },
-                onOpenNewTab: { store.send(.saveHistoryRestoreRequested($0, true)) },
-                onClose: { store.send(.saveHistoryDismissed) }
+                onRestoreCurrent: { store.send(.importExport(.saveHistoryRestoreRequested($0, false))) },
+                onOpenNewTab: { store.send(.importExport(.saveHistoryRestoreRequested($0, true))) },
+                onClose: { store.send(.importExport(.saveHistoryDismissed)) }
             )
         }
         .fileImporter(
@@ -204,7 +204,7 @@ struct ContentView: View {
             allowsMultipleSelection: false
         ) { result in
             guard case let .success(urls) = result, let sourceURL = urls.first else { return }
-            store.send(.openImportedDocumentRequested(sourceURL))
+            store.send(.workspace(.openImportedDocumentRequested(sourceURL)))
         }
         .photosPicker(
             isPresented: $showsPhotoLayerImporter,
@@ -238,23 +238,23 @@ struct ContentView: View {
                 return
             }
             guard !Task.isCancelled else { return }
-            store.send(.bannerDismissed)
+            store.send(.application(.bannerDismissed))
         }
         .alert(
             language.localized("未保存の変更があります"),
             isPresented: Binding(
                 get: { workspaceState.pendingCloseConfirmation != nil },
-                set: { if !$0 { store.send(.pendingCloseCancelled) } }
+                set: { if !$0 { store.send(.workspace(.pendingCloseCancelled)) } }
             )
         ) {
             Button(language.localized("保存して閉じる")) {
-                store.send(.pendingCloseSaveConfirmed)
+                store.send(.workspace(.pendingCloseSaveConfirmed))
             }
             Button(language.localized("保存せず閉じる"), role: .destructive) {
-                store.send(.pendingCloseDiscardConfirmed)
+                store.send(.workspace(.pendingCloseDiscardConfirmed))
             }
             Button(language.localized("キャンセル"), role: .cancel) {
-                store.send(.pendingCloseCancelled)
+                store.send(.workspace(.pendingCloseCancelled))
             }
         } message: {
             Text(
@@ -345,7 +345,7 @@ struct ContentView: View {
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
                             onSelectTool: { tool in
-                                store.send(.toolSelected(tool))
+                                store.send(.document(.editing(.toolSelected(tool))))
                             },
                             onRequestExpandSelection: {
                                 selectionExpansionText = "4"
@@ -360,10 +360,10 @@ struct ContentView: View {
                                 showsTransformNumericSheet = true
                             },
                             onSetTransformMode: { mode in
-                                store.send(.canvas(.transformModeChanged(mode)))
+                                store.send(.document(.canvas(.transformModeChanged(mode))))
                             },
                             onSetTransformAspectRatioLock: { isLocked in
-                                store.send(.canvas(.transformAspectRatioLockChanged(isLocked)))
+                                store.send(.document(.canvas(.transformAspectRatioLockChanged(isLocked))))
                             }
                         )
                         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
@@ -425,7 +425,7 @@ struct ContentView: View {
         guard let surface = nanoBananaInputPreviewSurface else {
             return nil
         }
-        return PrimoRootFeature.pngData(
+        return DocumentFeatureRuntimeReducer.pngData(
             fromLayerPixelData: surface.pixelData,
             width: surface.width,
             height: surface.height
@@ -439,22 +439,22 @@ struct ContentView: View {
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 store.send(
-                    .photoImportFailed(
+                    .importExport(.photoImportFailed(
                         ApplicationFeature.Feedback
                             .couldNotImportPhoto(nil)
                             .message(for: language)
-                    )
+                    ))
                 )
                 return
             }
-            store.send(.photoImportReceived(name: nil, data: data))
+            store.send(.importExport(.photoImportReceived(name: nil, data: data)))
         } catch {
             store.send(
-                .photoImportFailed(
+                .importExport(.photoImportFailed(
                     ApplicationFeature.Feedback
-                        .couldNotImportPhoto(PrimoRootFeature.optionalErrorMessage(error))
+                        .couldNotImportPhoto(DocumentFeatureRuntimeReducer.optionalErrorMessage(error))
                         .message(for: language)
-                )
+                ))
             )
         }
     }
@@ -466,23 +466,23 @@ struct ContentView: View {
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 store.send(
-                    .newCanvasFromImageFailed(
+                    .importExport(.newCanvasFromImageFailed(
                         ApplicationFeature.Feedback
                             .couldNotCreateCanvasFromImage(nil)
                             .message(for: language)
-                    )
+                    ))
                 )
                 return
             }
-            store.send(.newCanvasFromImageReceived(name: nil, data: data))
+            store.send(.importExport(.newCanvasFromImageReceived(name: nil, data: data)))
             showsNewCanvasSheet = false
         } catch {
             store.send(
-                .newCanvasFromImageFailed(
+                .importExport(.newCanvasFromImageFailed(
                     ApplicationFeature.Feedback
-                        .couldNotCreateCanvasFromImage(PrimoRootFeature.optionalErrorMessage(error))
+                        .couldNotCreateCanvasFromImage(DocumentFeatureRuntimeReducer.optionalErrorMessage(error))
                         .message(for: language)
-                )
+                ))
             )
         }
     }

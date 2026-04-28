@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func routeCanvasEditingAction(
         state: inout State,
         action: Action
@@ -55,10 +55,10 @@ extension CrossFeatureIntegrationReducer {
             return handleAutoSelection(state: &state, sample: sample)
 
         case .document(.canvas(.delegate(.requestUndo))):
-            return .send(.undoRequested)
+            return .send(.document(.undoRequested))
 
         case .document(.canvas(.delegate(.requestRedo))):
-            return .send(.redoRequested)
+            return .send(.document(.redoRequested))
 
         case .document(.canvas(.delegate(.toggleBrushAndEraser))):
             handleToggleBrushAndEraser(state: &state)

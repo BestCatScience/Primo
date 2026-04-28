@@ -6,7 +6,7 @@ import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     typealias WorkspacePersistenceIssue = PrimoWorkspaceApplication.WorkspacePersistenceIssue
     typealias WorkspacePersistenceFailureReason = PrimoWorkspaceApplication.WorkspacePersistenceFailureReason
     typealias WorkspacePersistenceFailure = PrimoWorkspaceApplication.WorkspacePersistenceFailure
@@ -207,7 +207,7 @@ extension CrossFeatureIntegrationReducer {
                 )
             )
             return .send(
-                .workspacePersistenceRequested(
+                .workspace(.persistenceRequested(
                     .reserveNewTabBackingStore(
                         WorkspaceTabReservationRequest(
                             title: title,
@@ -215,7 +215,7 @@ extension CrossFeatureIntegrationReducer {
                             pane: state.workspace.focusedWorkspacePane
                         )
                     )
-                )
+                ))
             )
 
         case .selectedTab, .activeTab:
@@ -299,8 +299,8 @@ extension CrossFeatureIntegrationReducer {
             return .none
         case let .success(.some(request)):
             return .merge(
-                .send(.workspacePersistenceRequested(request)),
-                .send(.deferredPresentationRefresh)
+                .send(.workspace(.persistenceRequested(request))),
+                .send(.application(.deferredPresentationRefresh))
             )
         case .success(.none):
             applyLoadedWorkspaceSuccessEffects(
@@ -313,7 +313,7 @@ extension CrossFeatureIntegrationReducer {
                     language: state.application.appLanguage
                 )
             )
-            return .send(.deferredPresentationRefresh)
+            return .send(.application(.deferredPresentationRefresh))
         }
     }
 
@@ -431,9 +431,9 @@ extension CrossFeatureIntegrationReducer {
         .run { [workspacePersistenceUseCase] send in
             switch workspacePersistenceUseCase.execute(request) {
             case let .success(result):
-                await send(.workspacePersistenceSucceeded(result))
+                await send(.workspace(.persistenceSucceeded(result)))
             case let .failure(failure):
-                await send(.workspacePersistenceFailed(failure))
+                await send(.workspace(.persistenceFailed(failure)))
             }
         }
     }
@@ -444,9 +444,9 @@ extension CrossFeatureIntegrationReducer {
         .run { [workspaceCatalogUseCase] send in
             switch workspaceCatalogUseCase.execute(request) {
             case let .success(result):
-                await send(.workspaceCatalogSucceeded(result))
+                await send(.workspace(.catalogSucceeded(result)))
             case let .failure(failure):
-                await send(.workspaceCatalogFailed(failure))
+                await send(.workspace(.catalogFailed(failure)))
             }
         }
     }
@@ -516,10 +516,10 @@ extension CrossFeatureIntegrationReducer {
             }
             switch saved.purpose {
             case .saveDocument:
-                return .send(.homeProjectsLoadRequested)
+                return .send(.application(.homeProjectsLoadRequested))
             case .homeReturn:
                 state.application.showHome()
-                return .send(.homeProjectsLoadRequested)
+                return .send(.application(.homeProjectsLoadRequested))
             }
 
         case .documentReplacementPrepared:
@@ -633,7 +633,7 @@ extension CrossFeatureIntegrationReducer {
             if let openTabID = moveResult.openTabID {
                 state.workspace.updateTab(id: openTabID, sourceProjectURL: moveResult.destinationURL)
             }
-            return .send(.homeProjectsLoadRequested)
+            return .send(.application(.homeProjectsLoadRequested))
 
         case let .autosaveEntryDiscarded(autosaveID):
             state.recovery.removeItem(id: autosaveID)
@@ -699,7 +699,7 @@ extension CrossFeatureIntegrationReducer {
         guard let request = dirtyPresentationRequest(state: state) else {
             return .none
         }
-        return .send(.workspacePersistenceRequested(request))
+        return .send(.workspace(.persistenceRequested(request)))
     }
 
     func applyLoadedWorkspaceSuccessEffects(
@@ -731,7 +731,7 @@ extension CrossFeatureIntegrationReducer {
     }
 }
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct WorkspaceFeedbackMapper: Sendable {
         func feedback(for failure: WorkspacePersistenceFailure) -> ApplicationFeedback {
             switch failure.reason {

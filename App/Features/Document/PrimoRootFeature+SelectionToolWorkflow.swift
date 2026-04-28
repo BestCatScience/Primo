@@ -4,7 +4,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleToolSelection(
         state: inout State,
         tool: StudioToolKind,
@@ -89,7 +89,7 @@ extension CrossFeatureIntegrationReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        return .send(.document(.canvas(.selectionUpdated(selection))))
     }
 
     func handlePlaceText(
@@ -121,9 +121,9 @@ extension CrossFeatureIntegrationReducer {
         handleBrushPaletteStateRefresh(state: &state)
         state.canvas.updatePaperStyle(resolvedPaperStyle(for: state))
         return .send(
-            .documentPaperStyleSyncRequested(
+            .application(.documentPaperStyleSyncRequested(
                 resolvedPaperStyle(for: state)
-            )
+            ))
         )
     }
 
@@ -161,7 +161,7 @@ extension CrossFeatureIntegrationReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        return .send(.document(.canvas(.selectionUpdated(selection))))
     }
 
     func handleAutoSelection(
@@ -183,7 +183,7 @@ extension CrossFeatureIntegrationReducer {
             mode: state.brushPalette.selection.combineMode,
             canvasSize: state.canvas.canvasSize
         )
-        return .send(.canvas(.selectionUpdated(selection)))
+        return .send(.document(.canvas(.selectionUpdated(selection))))
     }
 
     func handleColorSampled(

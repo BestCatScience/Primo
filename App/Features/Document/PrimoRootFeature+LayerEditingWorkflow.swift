@@ -21,7 +21,7 @@ extension DocumentMutationWorkflowOutcome where Selection == CanvasSelection, Fe
     }
 }
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     typealias DocumentCanvasMutation = DocumentCanvasMutationIntent<CanvasSelection>
     typealias DocumentPresentationRefresh = DocumentPresentationRefreshIntent
     typealias LayerMutationFinalization = DocumentLayerMutationFinalization

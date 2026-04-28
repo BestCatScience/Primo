@@ -6,7 +6,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {
         case unsupportedCanvasSize
         case invalidImageData
@@ -367,7 +367,7 @@ extension CrossFeatureIntegrationReducer {
             )
         )
         return .send(
-            .workspacePersistenceRequested(
+            .workspace(.persistenceRequested(
                 .reserveNewTabBackingStore(
                     WorkspaceTabReservationRequest(
                         title: contract.tabTitle,
@@ -375,7 +375,7 @@ extension CrossFeatureIntegrationReducer {
                         pane: state.workspace.focusedWorkspacePane
                     )
                 )
-            )
+            ))
         )
     }
 
@@ -432,9 +432,9 @@ extension CrossFeatureIntegrationReducer {
         switch documentReplacementRequest(state: &state) {
         case let .success(request):
             persistenceEffect = .send(
-                .workspacePersistenceRequested(
+                .workspace(.persistenceRequested(
                     .prepareDocumentReplacement(request)
-                )
+                ))
             )
         case let .failure(failure):
             state.application.presentBanner(
@@ -517,8 +517,8 @@ extension CrossFeatureIntegrationReducer {
         }
         return documentReplacementPreparationEffect(
             request: prepareRequest,
-            onPrepared: { .newCanvasPreparationCompleted(dimensions) },
-            onFailure: { .workspacePersistenceFailed($0) }
+            onPrepared: { .document(.newCanvasPreparationCompleted(dimensions)) },
+            onFailure: { .workspace(.persistenceFailed($0)) }
         )
     }
 
@@ -633,8 +633,8 @@ extension CrossFeatureIntegrationReducer {
         }
         return documentReplacementPreparationEffect(
             request: prepareRequest,
-            onPrepared: { .newCanvasFromImagePreparationCompleted(importedPlan) },
-            onFailure: { .workspacePersistenceFailed($0) }
+            onPrepared: { .importExport(.newCanvasFromImagePreparationCompleted(importedPlan)) },
+            onFailure: { .workspace(.persistenceFailed($0)) }
         )
     }
 

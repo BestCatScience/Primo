@@ -1,5 +1,5 @@
 import Foundation
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     // GPU stroke rasterization is owned by DocumentStrokeSessionUseCase.
 }

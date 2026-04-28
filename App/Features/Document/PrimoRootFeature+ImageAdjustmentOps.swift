@@ -1,7 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct GradientMapStop {
         var position: Double
         var red: UInt8

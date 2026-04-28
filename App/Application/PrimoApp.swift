@@ -15,29 +15,29 @@ struct PrimoApp: App {
         .commands {
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
-                    store.send(.undoRequested)
+                    store.send(.document(.undoRequested))
                 }
                 .keyboardShortcut("z", modifiers: .command)
 
                 Button("Redo") {
-                    store.send(.redoRequested)
+                    store.send(.document(.redoRequested))
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
             }
 
             CommandGroup(after: .saveItem) {
                 Button("Save") {
-                    store.send(.saveDocumentRequested)
+                    store.send(.importExport(.saveDocumentRequested))
                 }
                 .keyboardShortcut("s", modifiers: .command)
 
                 Button("Save As") {
-                    store.send(.saveDocumentCopyRequested)
+                    store.send(.importExport(.saveDocumentCopyRequested))
                 }
                 .keyboardShortcut("S", modifiers: [.command, .shift])
 
                 Button("Save History") {
-                    store.send(.saveHistoryRequested)
+                    store.send(.importExport(.saveHistoryRequested))
                 }
             }
         }

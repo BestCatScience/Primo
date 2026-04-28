@@ -596,7 +596,7 @@ extension ContentView {
                 else {
                     return false
                 }
-                store.send(.tabDropped(moving: movingID, toPane: pane, before: nil))
+                store.send(.workspace(.tabDropped(moving: movingID, toPane: pane, before: nil)))
                 return true
             }
 
@@ -604,11 +604,11 @@ extension ContentView {
                 if pane == .primary {
                     if workspaceState.workspaceLayout == .single, workspaceState.activeTabID != nil {
                         workspaceTabChromeButton(symbol: "square.split.2x1") {
-                            store.send(.splitActiveTabIntoSecondaryPane)
+                            store.send(.workspace(.splitActiveTabIntoSecondaryPane))
                         }
                     } else if workspaceState.workspaceLayout == .split {
                         workspaceTabChromeButton(symbol: "sidebar.leading") {
-                            store.send(.mergeWorkspacePanes)
+                            store.send(.workspace(.mergeWorkspacePanes))
                         }
                     }
                 }
@@ -637,7 +637,7 @@ extension ContentView {
                 .lineLimit(1)
 
             Button {
-                store.send(.tabCloseRequested(tab.id))
+                store.send(.workspace(.tabCloseRequested(tab.id)))
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 9, weight: .bold))
@@ -663,20 +663,20 @@ extension ContentView {
         )
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture {
-            store.send(.tabSelected(tab.id))
+            store.send(.workspace(.tabSelected(tab.id)))
         }
         .contextMenu {
             Button(language.localized("閉じる")) {
-                store.send(.tabCloseRequested(tab.id))
+                store.send(.workspace(.tabCloseRequested(tab.id)))
             }
             Button(language.localized("他を閉じる")) {
-                store.send(.closeOtherTabsRequested(tab.id))
+                store.send(.workspace(.closeOtherTabsRequested(tab.id)))
             }
             Button(language.localized("右側を閉じる")) {
-                store.send(.closeTabsToRightRequested(tab.id))
+                store.send(.workspace(.closeTabsToRightRequested(tab.id)))
             }
             Button(language.localized("右ペインへ移動")) {
-                store.send(.moveTabToSecondaryPane(tab.id))
+                store.send(.workspace(.moveTabToSecondaryPane(tab.id)))
             }
         }
         .draggable(tab.id.uuidString)
@@ -688,7 +688,7 @@ extension ContentView {
             else {
                 return false
             }
-            store.send(.tabDropped(moving: movingID, toPane: pane, before: tab.id))
+            store.send(.workspace(.tabDropped(moving: movingID, toPane: pane, before: tab.id)))
             return true
         }
     }
@@ -752,8 +752,8 @@ extension ContentView {
                     systemName: "doc.fill",
                     title: language.localized("自分のファイル"),
                     action: {
-                        store.send(.homeProjectsLoadRequested)
-                        store.send(.homeSectionSelected(.home))
+                        store.send(.application(.homeProjectsLoadRequested))
+                        store.send(.application(.homeSectionSelected(.home)))
                     }
                 )
             }
@@ -795,7 +795,7 @@ extension ContentView {
         let isSelected = applicationState.homeSection == section
 
         return Button {
-            store.send(.homeSectionSelected(section))
+            store.send(.application(.homeSectionSelected(section)))
         } label: {
             HStack(spacing: 12) {
                 homeGlyphBadge(systemName: section.iconSystemName, accent: isSelected ? Color.white : Color(red: 0.60, green: 0.82, blue: 0.98))
@@ -917,7 +917,7 @@ extension ContentView {
 
                 Picker(StudioStrings.appLanguageTitle(language), selection: Binding(
                     get: { applicationState.appLanguage },
-                    set: { store.send(.languageChanged($0)) }
+                    set: { store.send(.application(.languageChanged($0))) }
                 )) {
                     ForEach(AppLanguage.allCases) { item in
                         Text(item.title).tag(item)
@@ -986,7 +986,7 @@ extension ContentView {
 
     private func homeProjectCard(_ project: SavedProjectSummary) -> some View {
         Button {
-            store.send(.homeProjectSelected(project.url))
+            store.send(.workspace(.homeProjectSelected(project.url)))
         } label: {
             VStack(alignment: .leading, spacing: 12) {
                 Group {

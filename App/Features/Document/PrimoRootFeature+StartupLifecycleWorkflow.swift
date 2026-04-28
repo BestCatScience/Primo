@@ -4,7 +4,7 @@ import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct StartupPresentationService {
         let documentQueryGateway: DocumentQueryGateway
         let documentPersistenceGateway: DocumentPersistenceGateway
@@ -27,9 +27,9 @@ extension CrossFeatureIntegrationReducer {
                     "Lightweight presentation loaded in \(String(describing: bootstrapDuration))",
                     processEnvironmentClient: processEnvironmentClient
                 )
-                await send(.bootstrapPresentationLoaded(lightweightPresentation))
+                await send(.application(.bootstrapPresentationLoaded(lightweightPresentation)))
                 documentPersistenceGateway.prewarmDrawingResources()
-                await send(.loadPresentationAfterLaunch)
+                await send(.application(.loadPresentationAfterLaunch))
             }
         }
 
@@ -55,14 +55,14 @@ extension CrossFeatureIntegrationReducer {
                     "Full presentation loaded in \(String(describing: presentationDuration))",
                     processEnvironmentClient: processEnvironmentClient
                 )
-                await send(.presentationLoaded(presentation))
+                await send(.application(.presentationLoaded(presentation)))
             }
             .cancellable(id: CancelID.startupPresentationLoad, cancelInFlight: true)
         }
 
         func deferredPresentationRefreshEffect() -> Effect<Action> {
             .run { [documentQueryGateway] send in
-                await send(.presentationLoaded(documentQueryGateway.presentation()))
+                await send(.application(.presentationLoaded(documentQueryGateway.presentation())))
             }
             .cancellable(id: CancelID.deferredPresentationRefresh, cancelInFlight: true)
         }
@@ -78,7 +78,7 @@ extension CrossFeatureIntegrationReducer {
 
     func startupLanguageLoadEffect() -> Effect<Action> {
         .run { [appLanguageClient] send in
-            await send(.startupLanguageLoaded(appLanguageClient.load()))
+            await send(.application(.startupLanguageLoaded(appLanguageClient.load())))
         }
     }
 
@@ -99,8 +99,8 @@ extension CrossFeatureIntegrationReducer {
             startupPresentationService.bootstrapPresentationEffect(),
             startupLanguageLoadEffect(),
             documentPaperStyleSyncClient.synchronizeEffect(resolvedPaperStyle(for: state)),
-            .send(.homeProjectsLoadRequested),
-            .send(.autosaveRecoveryLoadRequested)
+            .send(.application(.homeProjectsLoadRequested)),
+            .send(.application(.autosaveRecoveryLoadRequested))
         )
     }
 
@@ -112,7 +112,7 @@ extension CrossFeatureIntegrationReducer {
         guard !state.application.showsHome else { return .none }
         guard state.workspace.activeTab?.isDirty == true else { return .none }
         guard let request = lifecycleAutosaveRequest(state: &state) else { return .none }
-        return .send(.workspacePersistenceRequested(request))
+        return .send(.workspace(.persistenceRequested(request)))
     }
 
     func handleStartupLanguageLoaded(
@@ -128,7 +128,7 @@ extension CrossFeatureIntegrationReducer {
 
     func handleHomeProjectsLoadRequest(state: inout State) -> Effect<Action> {
         state.application.beginLoadingHomeProjects()
-        return .send(.workspaceCatalogRequested(.loadSavedProjects))
+        return .send(.workspace(.catalogRequested(.loadSavedProjects)))
     }
 
     func handleHomeProjectsLoaded(
@@ -155,7 +155,7 @@ extension CrossFeatureIntegrationReducer {
                 purpose: .homeReturn
             ) {
             case let .success(request):
-                return .send(.workspacePersistenceRequested(request))
+                return .send(.workspace(.persistenceRequested(request)))
             case let .failure(failure):
                 state.application.presentBanner(
                     workspaceFeedbackMapper.message(
@@ -167,7 +167,7 @@ extension CrossFeatureIntegrationReducer {
             }
         }
         state.application.showHome()
-        return .send(.homeProjectsLoadRequested)
+        return .send(.application(.homeProjectsLoadRequested))
     }
 
     func handleDeferredPresentationRefresh() -> Effect<Action> {

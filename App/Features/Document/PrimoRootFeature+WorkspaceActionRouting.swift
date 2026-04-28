@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func requestCloseOperation(
         state: inout State,
         operation: PendingCloseOperation
@@ -33,11 +33,11 @@ extension CrossFeatureIntegrationReducer {
     ) -> Effect<Action> {
         switch operation {
         case let .tab(tabID):
-            return .send(.tabClosed(tabID))
+            return .send(.workspace(.tabClosed(tabID)))
         case let .closeOtherTabs(tabID):
-            return .send(.closeOtherTabs(tabID))
+            return .send(.workspace(.closeOtherTabs(tabID)))
         case let .closeTabsToRight(tabID):
-            return .send(.closeTabsToRight(tabID))
+            return .send(.workspace(.closeTabsToRight(tabID)))
         }
     }
 
@@ -52,7 +52,7 @@ extension CrossFeatureIntegrationReducer {
             state.application.showHome()
             return .none
         case let .select(tabID):
-            return .send(.tabSelected(tabID))
+            return .send(.workspace(.tabSelected(tabID)))
         }
     }
 
@@ -64,7 +64,7 @@ extension CrossFeatureIntegrationReducer {
             state: &state
         ) {
         case let .success(request):
-            return .send(.workspacePersistenceRequested(request))
+            return .send(.workspace(.persistenceRequested(request)))
         case let .failure(failure):
             state.application.presentBanner(
                 workspaceFeedbackMapper.message(
@@ -125,7 +125,7 @@ extension CrossFeatureIntegrationReducer {
         case .none:
             return .none
         case let .select(tabID):
-            return .send(.tabSelected(tabID))
+            return .send(.workspace(.tabSelected(tabID)))
         }
     }
 

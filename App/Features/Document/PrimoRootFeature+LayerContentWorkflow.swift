@@ -5,7 +5,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import UIKit
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     typealias LayerContentMutationTarget = PrimoDocumentApplication.LayerContentMutationTarget
     typealias AppliedLayerContentMutation = PrimoDocumentApplication.AppliedLayerContentMutation
     typealias LayerContentWorkflowService = PrimoDocumentApplication.DocumentContentService

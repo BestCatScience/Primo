@@ -8,7 +8,7 @@ import PrimoWorkspaceApplication
 
 @Reducer
 struct DocumentFeature {
-    typealias CanvasDimensions = CrossFeatureIntegrationReducer.CanvasDimensions
+    typealias CanvasDimensions = DocumentFeatureRuntimeReducer.CanvasDimensions
 
     @ObservableState
     struct State: Equatable {

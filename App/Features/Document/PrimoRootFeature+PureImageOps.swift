@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import SwiftUI
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     static func clampUnit(_ value: CGFloat) -> CGFloat {
         max(0, min(1, value))
     }

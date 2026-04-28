@@ -3,9 +3,9 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleAutosaveRecoveryLoadRequest() -> Effect<Action> {
-        .send(.workspaceCatalogRequested(.loadAutosaveRecoveryItems))
+        .send(.workspace(.catalogRequested(.loadAutosaveRecoveryItems)))
     }
 
     func handleAutosaveRecoveryRestoreRequest(
@@ -19,14 +19,14 @@ extension CrossFeatureIntegrationReducer {
         return beginWorkspaceProjectLoad(
             state: &state,
             fileURL: item.autosaveProjectURL.fileURL,
-            onSuccess: { .autosaveRecoveryOpened($0, item, $1) },
+            onSuccess: { .application(.autosaveRecoveryOpened($0, item, $1)) },
             onFailure: {
-                .autosaveRecoveryRestoreFailed(
+                .application(.autosaveRecoveryRestoreFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .autosaveRestore),
                         language: language
                     )
-                )
+                ))
             }
         )
     }
@@ -68,13 +68,13 @@ extension CrossFeatureIntegrationReducer {
         autosaveID: WorkspaceItemID
     ) -> Effect<Action> {
         .send(
-            .workspaceCatalogRequested(
+            .workspace(.catalogRequested(
                 .discardAutosaveEntry(
                     WorkspaceAutosaveEntryDiscardRequest(
                         autosaveID: autosaveID
                     )
                 )
-            )
+            ))
         )
     }
 

@@ -24,7 +24,10 @@ struct PrimoRootFeature {
                 NanoBananaFeature()
             }
 
-            CrossFeatureIntegrationReducer()
+            ApplicationFeatureRuntimeReducer()
+            WorkspaceFeatureRuntimeReducer()
+            DocumentFeatureRuntimeReducer()
+            ImportExportFeatureRuntimeReducer()
         }
     }
 }

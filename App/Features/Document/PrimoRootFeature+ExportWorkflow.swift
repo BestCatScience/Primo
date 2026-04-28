@@ -5,7 +5,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     private struct ExportWorkflowService {
         let documentExportGateway: DocumentExportGateway
         let workspaceArtifactService: WorkspaceArtifactService
@@ -34,15 +34,15 @@ extension CrossFeatureIntegrationReducer {
                         dateClient: dateClient
                     ) { progress in
                         Task {
-                            await send(.timelapseExportProgressUpdated(progress))
+                            await send(.importExport(.timelapseExportProgressUpdated(progress)))
                         }
                     }
-                    await send(.timelapseExportSucceeded(result))
+                    await send(.importExport(.timelapseExportSucceeded(result)))
                 } catch {
                     await send(
-                        .timelapseExportFailed(
-                            PrimoRootFeature.optionalErrorMessage(error)
-                        )
+                        .importExport(.timelapseExportFailed(
+                            DocumentFeatureRuntimeReducer.optionalErrorMessage(error)
+                        ))
                     )
                 }
             }

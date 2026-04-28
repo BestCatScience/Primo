@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentStrokeInfrastructure
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     static func normalizedCommittedStrokeSamples(
         _ samples: [StylusSample],
         brush: BrushRuntimeSettings

@@ -8,7 +8,7 @@ import PrimoWorkspaceApplication
 
 @Reducer
 struct ImportExportFeature {
-    typealias ImportedCanvasPlan = CrossFeatureIntegrationReducer.ImportedCanvasPlan
+    typealias ImportedCanvasPlan = DocumentFeatureRuntimeReducer.ImportedCanvasPlan
 
     struct SaveHistoryState: Equatable {
         var entries: [SaveHistoryEntry] = []

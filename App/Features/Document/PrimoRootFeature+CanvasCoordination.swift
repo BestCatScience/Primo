@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     struct DocumentPresentationQueryService {
         let documentQueryGateway: DocumentQueryGateway
         let documentExportGateway: DocumentExportGateway

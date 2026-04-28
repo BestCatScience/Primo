@@ -3,7 +3,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     static func renderedCompositeSurface(
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle,

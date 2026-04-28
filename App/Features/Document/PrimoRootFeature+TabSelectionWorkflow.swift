@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension CrossFeatureIntegrationReducer {
+extension DocumentFeatureRuntimeReducer {
     func handleTabSelection(
         state: inout State,
         tabID: OpenDocumentTab.ID
@@ -19,14 +19,14 @@ extension CrossFeatureIntegrationReducer {
             state: &state,
             fileURL: targetTab.backingStoreURL.fileURL,
             persistCurrentTab: state.workspace.isActiveTab(tabID) == false,
-            onSuccess: { loaded, _ in Action.tabSelectionLoaded(tabID, loaded) },
+            onSuccess: { loaded, _ in Action.workspace(.tabSelectionLoaded(tabID, loaded)) },
             onFailure: {
-                Action.tabSelectionFailed(
+                Action.workspace(.tabSelectionFailed(
                     workspaceFeedbackMapper.message(
                         for: workspaceFeedbackMapper.feedback(for: $0, context: .openDocument),
                         language: language
                     )
-                )
+                ))
             }
         )
     }
@@ -66,7 +66,7 @@ extension CrossFeatureIntegrationReducer {
         guard let closure = state.workspace.closeTab(id: tabID) else { return .none }
         return .merge(
             effect(for: closure.disposition, state: &state),
-            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+            .send(.workspace(.persistenceRequested(discardArtifactsRequest(for: closure.removedTabs))))
         )
     }
 
@@ -77,7 +77,7 @@ extension CrossFeatureIntegrationReducer {
         let closure = state.workspace.closeOtherTabs(retaining: tabID)
         return .merge(
             effect(for: closure.disposition, state: &state),
-            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+            .send(.workspace(.persistenceRequested(discardArtifactsRequest(for: closure.removedTabs))))
         )
     }
 
@@ -88,7 +88,7 @@ extension CrossFeatureIntegrationReducer {
         let closure = state.workspace.closeTabsToRight(of: tabID)
         return .merge(
             effect(for: closure.disposition, state: &state),
-            .send(.workspacePersistenceRequested(discardArtifactsRequest(for: closure.removedTabs)))
+            .send(.workspace(.persistenceRequested(discardArtifactsRequest(for: closure.removedTabs))))
         )
     }
 }
