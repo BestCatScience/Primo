@@ -3,8 +3,8 @@ import SwiftUI
 
 @main
 struct PrimoApp: App {
-    let store = Store(initialState: AppFeature.State()) {
-        AppFeature()
+    let store = Store(initialState: PrimoRootFeature.State()) {
+        PrimoRootFeature()
     }
 
     var body: some Scene {

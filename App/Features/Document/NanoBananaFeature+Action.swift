@@ -29,7 +29,7 @@ extension NanoBananaFeature {
         case purchaseErrorDismissed
         case historyItemSelected(NanoBananaEditDescriptor)
         case generationSucceeded(NanoBananaPreviewState)
-        case generationFailed(AppFeature.ApplicationFeedback)
+        case generationFailed(ApplicationFeature.Feedback)
         case delegate(Delegate)
     }
 

@@ -16,7 +16,7 @@ struct WorkspaceFeature {
         var focusedWorkspacePane: WorkspacePane = .primary
         var workspaceLayout: WorkspaceLayoutMode = .single
         var pendingCloseConfirmation: PendingCloseConfirmationState?
-        var pendingWorkspaceTabReservation: AppFeature.PendingWorkspaceTabReservation?
+        var pendingWorkspaceTabReservation: PrimoRootFeature.PendingWorkspaceTabReservation?
     }
 
     @CasePathable
@@ -47,12 +47,12 @@ struct WorkspaceFeature {
         case openDocumentSelected(DocumentProjectPath)
         case openDocumentLoaded(LoadedPaintProject, DocumentProjectPath, [WorkspaceProjectLoadIssue])
         case openDocumentFailed(String?)
-        case persistenceRequested(AppFeature.WorkspacePersistenceRequest)
-        case persistenceSucceeded(AppFeature.WorkspacePersistenceResult)
-        case persistenceFailed(AppFeature.WorkspacePersistenceFailure)
-        case catalogRequested(AppFeature.WorkspaceCatalogRequest)
-        case catalogSucceeded(AppFeature.WorkspaceCatalogResult)
-        case catalogFailed(AppFeature.WorkspaceCatalogFailure)
+        case persistenceRequested(PrimoRootFeature.WorkspacePersistenceRequest)
+        case persistenceSucceeded(PrimoRootFeature.WorkspacePersistenceResult)
+        case persistenceFailed(PrimoRootFeature.WorkspacePersistenceFailure)
+        case catalogRequested(PrimoRootFeature.WorkspaceCatalogRequest)
+        case catalogSucceeded(PrimoRootFeature.WorkspaceCatalogResult)
+        case catalogFailed(PrimoRootFeature.WorkspaceCatalogFailure)
     }
 
     var body: some ReducerOf<Self> {

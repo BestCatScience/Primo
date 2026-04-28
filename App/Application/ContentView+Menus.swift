@@ -549,7 +549,7 @@ extension ContentView {
         else {
             return nil
         }
-        return AppFeature.transformationBounds(
+        return PrimoRootFeature.transformationBounds(
             selection: nil,
             pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
@@ -1048,7 +1048,7 @@ extension ContentView {
 
                         ForEach(GradientMapPreset.allCases) { preset in
                             Button(preset.localizedTitle(language)) {
-                                gradientMapSettings = AppFeature.gradientMapSettings(for: preset)
+                                gradientMapSettings = PrimoRootFeature.gradientMapSettings(for: preset)
                                 selectedGradientStopID = gradientMapSettings.stops.dropFirst().first?.id
                             }
                         }
@@ -1406,7 +1406,7 @@ extension ContentView {
     }
 
     var normalizedGradientMapSettings: GradientMapSettings {
-        AppFeature.normalizeGradientMapSettings(gradientMapSettings)
+        PrimoRootFeature.normalizeGradientMapSettings(gradientMapSettings)
     }
 
     func gradientStopTitle(for id: GradientMapStopSettings.ID) -> String {
@@ -1454,9 +1454,9 @@ extension ContentView {
     func insertGradientStop(at position: Double) {
         guard gradientMapSettings.stops.count < 8 else { return }
         let clampedPosition = min(max(position, 0.0), 1.0)
-        let mixed = AppFeature.mappedGradientColor(
+        let mixed = PrimoRootFeature.mappedGradientColor(
             for: clampedPosition,
-            stops: AppFeature.gradientMapStops(for: normalizedGradientMapSettings)
+            stops: PrimoRootFeature.gradientMapStops(for: normalizedGradientMapSettings)
         )
         let newStop = GradientMapStopSettings(
             position: clampedPosition,
@@ -1485,7 +1485,7 @@ extension ContentView {
         )
     }
 
-    func color(from stop: AppFeature.GradientMapStop) -> Color {
+    func color(from stop: PrimoRootFeature.GradientMapStop) -> Color {
         Color(
             red: Double(stop.red) / 255.0,
             green: Double(stop.green) / 255.0,
@@ -1720,7 +1720,7 @@ extension ContentView {
 
                     Menu(StudioStrings.gradientMap(language)) {
                         Button(language.localized("カスタム…")) {
-                            gradientMapSettings = AppFeature.gradientMapSettings(for: .graphite)
+                            gradientMapSettings = PrimoRootFeature.gradientMapSettings(for: .graphite)
                             showsGradientMapSheet = true
                         }
 

@@ -195,7 +195,7 @@ extension ContentView {
         else {
             return nil
         }
-        return AppFeature.renderedCompositeSurface(
+        return PrimoRootFeature.renderedCompositeSurface(
             snapshot: snapshot,
             paperStyle: store.canvas.paperStyle,
             gpuOperations: documentGpuOperationGateway

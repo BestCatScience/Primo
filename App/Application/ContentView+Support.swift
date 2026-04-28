@@ -506,11 +506,11 @@ struct DiagonalStageLines: View {
 }
 
 extension ContentView {
-    var applicationState: AppFeature.ApplicationState { store.application }
-    var workspaceState: AppFeature.WorkspaceState { store.workspace }
-    var recoveryState: AppFeature.RecoveryState { store.recovery }
-    var saveHistoryState: AppFeature.SaveHistoryState { store.saveHistory }
-    var exportState: AppFeature.ExportState { store.export }
+    var applicationState: ApplicationFeature.State { store.application }
+    var workspaceState: PrimoRootFeature.WorkspaceState { store.workspace }
+    var recoveryState: ApplicationFeature.RecoveryState { store.recovery }
+    var saveHistoryState: ImportExportFeature.SaveHistoryState { store.saveHistory }
+    var exportState: ImportExportFeature.ExportState { store.export }
     var nanoBananaState: NanoBananaFeature.State { store.nanoBanana }
 
     func workspaceTabs(in pane: WorkspacePane) -> [OpenDocumentTab] {

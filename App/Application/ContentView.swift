@@ -17,7 +17,7 @@ struct ContentView: View {
         case apiKey
     }
 
-    let store: StoreOf<AppFeature>
+    let store: StoreOf<PrimoRootFeature>
     private let studioUIScale: CGFloat = 0.56
     @State var showsOpenDocumentImporter = false
     @State var showsPhotoLayerImporter = false
@@ -97,7 +97,7 @@ struct ContentView: View {
             store.send(.nanoBanana(.task))
         }
         .onChange(of: scenePhase) { _, newPhase in
-            store.send(.scenePhaseChanged(AppFeature.AppScenePhase(newPhase)))
+            store.send(.scenePhaseChanged(ApplicationFeature.ScenePhase(newPhase)))
         }
         .sheet(item: Binding(
             get: { exportState.shareSheet },
@@ -425,7 +425,7 @@ struct ContentView: View {
         guard let surface = nanoBananaInputPreviewSurface else {
             return nil
         }
-        return AppFeature.pngData(
+        return PrimoRootFeature.pngData(
             fromLayerPixelData: surface.pixelData,
             width: surface.width,
             height: surface.height
@@ -440,7 +440,7 @@ struct ContentView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 store.send(
                     .photoImportFailed(
-                        AppFeature.ApplicationFeedback
+                        ApplicationFeature.Feedback
                             .couldNotImportPhoto(nil)
                             .message(for: language)
                     )
@@ -451,8 +451,8 @@ struct ContentView: View {
         } catch {
             store.send(
                 .photoImportFailed(
-                    AppFeature.ApplicationFeedback
-                        .couldNotImportPhoto(AppFeature.optionalErrorMessage(error))
+                    ApplicationFeature.Feedback
+                        .couldNotImportPhoto(PrimoRootFeature.optionalErrorMessage(error))
                         .message(for: language)
                 )
             )
@@ -467,7 +467,7 @@ struct ContentView: View {
             guard let data = try await item.loadTransferable(type: Data.self) else {
                 store.send(
                     .newCanvasFromImageFailed(
-                        AppFeature.ApplicationFeedback
+                        ApplicationFeature.Feedback
                             .couldNotCreateCanvasFromImage(nil)
                             .message(for: language)
                     )
@@ -479,8 +479,8 @@ struct ContentView: View {
         } catch {
             store.send(
                 .newCanvasFromImageFailed(
-                    AppFeature.ApplicationFeedback
-                        .couldNotCreateCanvasFromImage(AppFeature.optionalErrorMessage(error))
+                    ApplicationFeature.Feedback
+                        .couldNotCreateCanvasFromImage(PrimoRootFeature.optionalErrorMessage(error))
                         .message(for: language)
                 )
             )
@@ -495,7 +495,7 @@ struct ContentView: View {
     }
 }
 
-private extension AppFeature.AppScenePhase {
+private extension ApplicationFeature.ScenePhase {
     init(_ scenePhase: ScenePhase) {
         switch scenePhase {
         case .active:

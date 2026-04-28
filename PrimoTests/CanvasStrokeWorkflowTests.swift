@@ -17,8 +17,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             return feature.prepareCanvasStrokeEditing(state: &state)
         }
 
@@ -38,12 +38,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             return feature.resolveStrokeCommit(
                 state: &state,
                 samples: [.testValue()],
-                context: AppFeature.CanvasStrokeContext(
+                context: PrimoRootFeature.CanvasStrokeContext(
                     activeLayer: .testValue(),
                     activeLayerIndex: 0,
                     brush: feature.resolvedBrushSettings(for: state),
@@ -63,8 +63,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testPreviewOutcomeAppliesGpuRenderState() {
-        let feature = AppIntegrationFeature()
-        var state = AppFeature.State()
+        let feature = CrossFeatureIntegrationReducer()
+        var state = PrimoRootFeature.State()
         let snapshot = MetalDocumentSnapshot(
             width: 4,
             height: 4,
@@ -112,8 +112,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             let previewBrush = feature.resolvedBrushSettings(for: state)
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 12,
@@ -128,7 +128,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return feature.resolveAppendedStrokePreview(
                 state: state,
                 samples: [.testValue()],
-                context: AppFeature.CanvasStrokeContext(
+                context: PrimoRootFeature.CanvasStrokeContext(
                     activeLayer: .testValue(),
                     activeLayerIndex: 0,
                     brush: feature.resolvedBrushSettings(for: state),
@@ -142,7 +142,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return
         }
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.surfaceHandle, expectedHandle)
-        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.previewBrush, AppIntegrationFeature().resolvedBrushSettings(for: AppFeature.State()))
+        XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.previewBrush, CrossFeatureIntegrationReducer().resolvedBrushSettings(for: PrimoRootFeature.State()))
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.sampleCount, 32)
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.supportsIncrementalContinuation, true)
     }
@@ -175,12 +175,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             return feature.resolveStrokeCommit(
                 state: &state,
                 samples: [.testValue()],
-                context: AppFeature.CanvasStrokeContext(
+                context: PrimoRootFeature.CanvasStrokeContext(
                     activeLayer: .testValue(),
                     activeLayerIndex: 0,
                     brush: feature.resolvedBrushSettings(for: state),
@@ -193,7 +193,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         switch result {
         case let .committed(contract, transferredSurfaceHandle):
-            XCTAssertEqual(contract, AppFeature.DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false))
+            XCTAssertEqual(contract, PrimoRootFeature.DocumentMutationContract(canvasMutation: .none, refresh: .dirty, updatesWorkspaceArtifacts: false))
             XCTAssertEqual(transferredSurfaceHandle, handle)
         case let .failed(failure):
             XCTFail("Expected committed GPU surface mutation, got \(failure)")
@@ -214,8 +214,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             let previewBrush = feature.resolvedBrushSettings(for: state)
             let snapshot = MetalDocumentSnapshot(
                 width: 4,
@@ -274,8 +274,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 11,
                 layerIndex: 0,
@@ -301,8 +301,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         withDependencies {
             $0.documentRuntimeComposition = .stub(gpuOperationGateway: gpuOperations)
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             state.canvas.strokeSession.renderState = StrokeSessionRenderState(
                 baseRevision: 11,
                 layerIndex: 0,
@@ -329,10 +329,10 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppIntegrationFeature()
+            let feature = CrossFeatureIntegrationReducer()
             return feature.documentStrokeCommandService.fill(
                 sample,
-                feature.resolvedBrushSettings(for: AppFeature.State())
+                feature.resolvedBrushSettings(for: PrimoRootFeature.State())
             )
         }
 
@@ -373,7 +373,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppIntegrationFeature()
+            let feature = CrossFeatureIntegrationReducer()
             return feature.layerContentWorkflowService.applyPixels(
                 Data([0x00]),
                 to: .newLayer(name: "Imported")
@@ -406,7 +406,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppIntegrationFeature()
+            let feature = CrossFeatureIntegrationReducer()
             return feature.layerContentWorkflowService.applyPixels(
                 Data([0x00]),
                 to: .newLayer(name: "Imported")
@@ -456,8 +456,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             let descriptor = NanoBananaEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch")!,
                 accessMode: .appManaged,

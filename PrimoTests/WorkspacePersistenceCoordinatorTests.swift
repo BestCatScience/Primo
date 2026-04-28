@@ -23,7 +23,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
             previewImageData: nil
         )
-        let plan = AppFeature.LoadedWorkspaceProjectPlan(
+        let plan = PrimoRootFeature.LoadedWorkspaceProjectPlan(
             destination: .activeTab(title: "Updated", sourceProjectURL: tab.sourceProjectURL),
             followUp: .init(
                 marksTabDirty: true,
@@ -38,8 +38,8 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
                 compositeSurface: { _ in self.previewSurface(bytes: [0xAB, 0xCD, 0xEF, 0xFF]) }
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             state.workspace.openTabs = [tab]
             state.workspace.activeTabID = tab.id
             state.workspace.primarySelectedTabID = tab.id
@@ -61,7 +61,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
         XCTAssertEqual(
             request,
             .loadedWorkspaceFollowUp(
-                AppFeature.LoadedWorkspaceFollowUpPersistenceRequest(
+                PrimoRootFeature.LoadedWorkspaceFollowUpPersistenceRequest(
                     activeTab: updatedTab,
                     paperStyle: .default,
                     persistsToBackingStore: false,
@@ -80,7 +80,7 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
             previewImageData: Data([0x01])
         )
-        let plan = AppFeature.LoadedWorkspaceProjectPlan(
+        let plan = PrimoRootFeature.LoadedWorkspaceProjectPlan(
             destination: .selectedTab(tabID: tab.id, pane: .primary),
             followUp: .init(
                 marksTabDirty: true,
@@ -94,8 +94,8 @@ final class WorkspacePersistenceCoordinatorTests: XCTestCase {
                 compositeSurface: { _ in self.previewSurface(bytes: [0x01, 0x02, 0x03, 0xFF]) }
             )
         } operation: {
-            let feature = AppIntegrationFeature()
-            var state = AppFeature.State()
+            let feature = CrossFeatureIntegrationReducer()
+            var state = PrimoRootFeature.State()
             state.workspace.openTabs = [tab]
             state.workspace.activeTabID = tab.id
             state.workspace.primarySelectedTabID = tab.id

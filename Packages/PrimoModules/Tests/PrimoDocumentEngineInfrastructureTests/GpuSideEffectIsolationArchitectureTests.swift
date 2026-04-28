@@ -32,6 +32,41 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func appDocumentFeatureRootUsesPrimoRootNamesWithoutAppFeatureShims() throws {
+        let repoRoot = try Self.repoRoot()
+        let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        let oldCanvasFeature = documentRoot.appendingPathComponent("CanvasFeature.swift", isDirectory: false)
+
+        #expect(!FileManager.default.fileExists(atPath: oldCanvasFeature.path))
+
+        let sources = try Self.swiftSources(under: documentRoot)
+        let appFeatureShimFiles = sources.filter { source in
+            source.lastPathComponent == "AppFeature.swift" ||
+                source.lastPathComponent.hasPrefix("AppFeature+")
+        }
+        #expect(appFeatureShimFiles.isEmpty, "AppFeature shim files should be removed or renamed to feature-owned roots")
+
+        for source in sources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let banned = [
+                "struct AppFeature ",
+                "struct AppFeature:",
+                "enum AppFeature ",
+                "enum AppFeature:",
+                "extension AppFeature ",
+                "extension AppFeature:",
+                "typealias AppFeature =",
+                "AppFeature.",
+                "PrimoRootIntegrationFeature",
+                "IntegrationTypeAliases"
+            ]
+            for token in banned {
+                #expect(!body.contains(token), "\(source.path) should use PrimoRootFeature or CrossFeatureIntegrationReducer instead of \(token)")
+            }
+        }
+    }
+
+    @Test
     func canvasImageRendererDoesNotOwnGpuProcessingServices() throws {
         let repoRoot = try Self.repoRoot()
         let renderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)
@@ -67,19 +102,41 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
-    func appCanvasFeatureDoesNotReachGpuGatewayOrPixelTransformHotPath() throws {
+    func appCanvasFeatureDoesNotReachGpuGatewayDocumentMutationOrPixelTransformHotPath() throws {
         let repoRoot = try Self.repoRoot()
         let canvasRoot = repoRoot.appendingPathComponent("App/Features/Canvas", isDirectory: true)
         let banned = [
+            "import PrimoDocumentApplication",
+            "import PrimoDocumentEngineInfrastructure",
+            "import PrimoDocumentRenderingInfrastructure",
             "DocumentGpuOperationGateway",
+            "DocumentGpuOperationGatewayFactory",
+            "DocumentMutationGateway",
+            "DocumentMutationWorkflowService",
+            "DocumentMutationContract",
+            "DocumentMutationFailure",
+            "DocumentCanvasMutation",
+            "DocumentPresentationRefresh",
+            "LayerMutationFinalization",
+            "SelectionWorkflowService",
+            "GpuCanvasPreviewRenderer",
+            "GpuLayerTransformProcessor",
             "CanvasImageRenderer",
             "PrimoMetalDocumentProcessingClient",
             "MetalRuntimeContext",
+            "documentGpuOperationGateway",
+            "documentMutationGateway",
+            "documentMutationWorkflowService",
+            "completeDocumentMutation",
+            "performDocumentMutation",
             "alphaMask(",
             "croppedSelectionMask(",
             "transformedLayerPixelData(",
-            "AppFeature.effectiveTransformQuad",
-            "AppFeature.affineTransformQuad"
+            "AppFeature.",
+            "PrimoRootFeature.effectiveTransformQuad",
+            "PrimoRootFeature.affineTransformQuad",
+            "CrossFeatureIntegrationReducer.effectiveTransformQuad",
+            "CrossFeatureIntegrationReducer.affineTransformQuad"
         ]
 
         let sources = try Self.swiftSources(under: canvasRoot)

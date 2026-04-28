@@ -8,6 +8,8 @@ import PrimoWorkspaceApplication
 
 @Reducer
 struct DocumentFeature {
+    typealias CanvasDimensions = CrossFeatureIntegrationReducer.CanvasDimensions
+
     @ObservableState
     struct State: Equatable {
         var brushPalette = BrushPaletteFeature.State()
@@ -17,15 +19,48 @@ struct DocumentFeature {
         var layerPanel = StudioPanelLayoutState()
     }
 
+    enum EditingAction: Equatable {
+        case featherSelectionRequested(Int)
+        case colorRangeSelectionRequested(ColorRangeSelectionRequest)
+        case toolSelected(StudioToolKind)
+        case toolLongPressed(StudioToolKind)
+        case clearActiveLayerButtonTapped
+        case createLayerMaskFromSelectionRequested
+        case clearLayerMaskRequested
+        case applyLayerMaskRequested
+        case gradientMapSelected(GradientMapPreset)
+        case gradientMapPreviewChanged(GradientMapSettings?)
+        case gradientMapApplied(GradientMapSettings)
+        case hueSaturationBrightnessPreviewChanged(HueSaturationBrightnessSettings?)
+        case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
+        case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
+        case brightnessContrastApplied(BrightnessContrastSettings)
+        case levelsPreviewChanged(LevelsAdjustmentSettings?)
+        case levelsApplied(LevelsAdjustmentSettings)
+        case toneCurvePreviewChanged(ToneCurveSettings?)
+        case toneCurveApplied(ToneCurveSettings)
+        case colorBalancePreviewChanged(ColorBalanceSettings?)
+        case colorBalanceApplied(ColorBalanceSettings)
+        case thresholdPreviewChanged(ThresholdSettings?)
+        case thresholdApplied(ThresholdSettings)
+        case posterizePreviewChanged(PosterizeSettings?)
+        case posterizeApplied(PosterizeSettings)
+        case luminanceToAlphaRequested
+        case activeLayerVisibilityToggled
+        case selectPreviousLayer
+        case selectNextLayer
+        case panelCollapseToggled(StudioPanelKind)
+    }
+
     @CasePathable
     enum Action: Equatable {
         case newCanvasRequested(width: Int, height: Int)
-        case newCanvasPreparationCompleted(AppFeature.CanvasDimensions)
+        case newCanvasPreparationCompleted(CanvasDimensions)
         case undoRequested
         case redoRequested
         case resizeCanvasRequested(width: Int, height: Int)
         case resizeCanvasExtentRequested(width: Int, height: Int)
-        case editing(AppFeature.EditingAction)
+        case editing(EditingAction)
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)

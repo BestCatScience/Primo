@@ -251,7 +251,7 @@ extension NanoBananaFeature {
         }
 
         mutating func markFailed(
-            feedback: AppFeature.ApplicationFeedback,
+            feedback: ApplicationFeature.Feedback,
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)
@@ -264,7 +264,7 @@ extension NanoBananaFeature {
         }
 
         mutating func markCanceled(
-            feedback: AppFeature.ApplicationFeedback,
+            feedback: ApplicationFeature.Feedback,
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)

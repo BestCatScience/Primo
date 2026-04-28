@@ -8,10 +8,22 @@ import PrimoWorkspaceApplication
 
 @Reducer
 struct ImportExportFeature {
+    typealias ImportedCanvasPlan = CrossFeatureIntegrationReducer.ImportedCanvasPlan
+
+    struct SaveHistoryState: Equatable {
+        var entries: [SaveHistoryEntry] = []
+        var isPresented = false
+    }
+
+    struct ExportState: Equatable {
+        var shareSheet: ShareExport?
+        var timelapsePreview: TimelapseExportPreview?
+    }
+
     @ObservableState
     struct State: Equatable {
-        var saveHistory = AppFeature.SaveHistoryState()
-        var export = AppFeature.ExportState()
+        var saveHistory = SaveHistoryState()
+        var export = ExportState()
     }
 
     @CasePathable
@@ -34,7 +46,7 @@ struct ImportExportFeature {
         case photoImportReceived(name: String?, data: Data)
         case photoImportFailed(String?)
         case newCanvasFromImageReceived(name: String?, data: Data)
-        case newCanvasFromImagePreparationCompleted(AppFeature.ImportedCanvasPlan)
+        case newCanvasFromImagePreparationCompleted(ImportedCanvasPlan)
         case newCanvasFromImageFailed(String?)
     }
 
