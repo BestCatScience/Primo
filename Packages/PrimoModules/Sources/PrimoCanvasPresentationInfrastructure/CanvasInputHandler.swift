@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoBrushDomain
 import PrimoCanvasInputDomain
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import UIKit
 import simd

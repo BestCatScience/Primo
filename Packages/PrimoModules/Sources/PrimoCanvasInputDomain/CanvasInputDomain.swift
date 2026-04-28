@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoBrushDomain
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import simd
 

@@ -1,6 +1,9 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 struct DocumentGpuOperationBackend: Sendable {

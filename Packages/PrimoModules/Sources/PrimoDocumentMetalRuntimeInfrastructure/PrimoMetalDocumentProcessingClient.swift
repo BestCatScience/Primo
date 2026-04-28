@@ -4,7 +4,8 @@ import Metal
 import os
 import PrimoBrushDomain
 import PrimoBrushFileFormats
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 private struct PrimoMetalCompositeLayerDescriptor {

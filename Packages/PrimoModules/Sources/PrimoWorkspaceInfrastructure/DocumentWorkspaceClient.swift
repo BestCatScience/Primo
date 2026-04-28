@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoCoreTypes
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentPersistenceInfrastructure
 

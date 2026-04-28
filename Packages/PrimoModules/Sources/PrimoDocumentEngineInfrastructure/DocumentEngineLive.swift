@@ -1,7 +1,10 @@
 import CoreGraphics
 import Foundation
 import PrimoCoreTypes
-import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 

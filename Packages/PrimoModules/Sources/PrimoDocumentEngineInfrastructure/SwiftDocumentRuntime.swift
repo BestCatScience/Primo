@@ -3,7 +3,10 @@ import Foundation
 import os
 import PrimoCoreTypes
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 import PrimoDocumentPersistenceInfrastructure

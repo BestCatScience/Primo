@@ -1,7 +1,7 @@
 import Foundation
 import PrimoBrushDomain
 import PrimoBrushFileFormats
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
 
 public struct BrushColorComponents: Equatable, Sendable {
     public var red: Double

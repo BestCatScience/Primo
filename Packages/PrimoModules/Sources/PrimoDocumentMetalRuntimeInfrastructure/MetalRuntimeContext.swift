@@ -1,7 +1,9 @@
 import CoreGraphics
 import Foundation
 import PrimoBrushDomain
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 public struct MetalRuntimeContext: Sendable {

@@ -1,5 +1,9 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 public struct ImportedCanvasRequest: Equatable, Sendable {

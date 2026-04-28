@@ -1,5 +1,6 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 public enum LayerContentMutationTarget: Equatable, Sendable {

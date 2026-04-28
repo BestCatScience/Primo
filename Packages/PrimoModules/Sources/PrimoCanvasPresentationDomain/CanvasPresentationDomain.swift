@@ -2,7 +2,8 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import PrimoCanvasInputDomain
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 

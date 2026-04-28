@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 public struct InpaintCrop: Sendable, Equatable {

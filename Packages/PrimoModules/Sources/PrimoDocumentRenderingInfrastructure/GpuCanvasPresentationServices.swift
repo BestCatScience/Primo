@@ -2,7 +2,9 @@ import CoreGraphics
 import Foundation
 import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import simd
 

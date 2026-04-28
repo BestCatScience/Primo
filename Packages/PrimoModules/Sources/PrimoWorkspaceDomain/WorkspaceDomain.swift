@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 public func optionalErrorMessage(_ error: Error) -> String? {

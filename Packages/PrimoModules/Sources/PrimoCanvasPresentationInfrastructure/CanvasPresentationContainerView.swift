@@ -1,6 +1,6 @@
 #if canImport(UIKit)
 import PrimoCanvasPresentationDomain
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import UIKit

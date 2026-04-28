@@ -1,7 +1,9 @@
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication

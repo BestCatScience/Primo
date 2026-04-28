@@ -1,5 +1,5 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 
 public enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
     case wholeLayer

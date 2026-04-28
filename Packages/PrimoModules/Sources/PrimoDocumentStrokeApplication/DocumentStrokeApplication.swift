@@ -1,6 +1,8 @@
 import Foundation
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 

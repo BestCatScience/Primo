@@ -255,6 +255,42 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
 
 public typealias DocumentCompositeSurface = PrimoDocumentDomain.DocumentCompositeSurface
 
+public struct CanvasSelection: Equatable, Sendable {
+    public let bounds: CGRect
+    public let maskWidth: Int
+    public let maskHeight: Int
+    public let maskData: Data
+    public let mode: SelectionToolMode
+
+    public init(bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
+        self.bounds = bounds
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+        self.maskData = maskData
+        self.mode = mode
+    }
+
+    public var isEmpty: Bool {
+        maskWidth <= 0 || maskHeight <= 0 || maskData.isEmpty || bounds.isNull || bounds.isEmpty
+    }
+}
+
+public struct LayerPixelRect: Equatable, Sendable {
+    public let originX: Int
+    public let originY: Int
+    public let width: Int
+    public let height: Int
+
+    public init(originX: Int, originY: Int, width: Int, height: Int) {
+        self.originX = originX
+        self.originY = originY
+        self.width = width
+        self.height = height
+    }
+
+    public var isEmpty: Bool { width <= 0 || height <= 0 }
+}
+
 public struct DocumentLayerMutationPayload: Equatable, Sendable {
     public let canvasWidth: Int
     public let canvasHeight: Int

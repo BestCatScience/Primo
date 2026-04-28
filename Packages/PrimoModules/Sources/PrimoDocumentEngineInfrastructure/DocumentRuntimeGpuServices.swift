@@ -1,6 +1,8 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
 

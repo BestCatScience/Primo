@@ -151,7 +151,17 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentApplication
       - package: PrimoModules
+        product: PrimoBrushRuntimeContracts
+      - package: PrimoModules
         product: PrimoDocumentContracts
+      - package: PrimoModules
+        product: PrimoDocumentMutationContracts
+      - package: PrimoModules
+        product: PrimoDocumentPersistenceContracts
+      - package: PrimoModules
+        product: PrimoDocumentPresentationContracts
+      - package: PrimoModules
+        product: PrimoDocumentRenderingContracts
       - package: PrimoModules
         product: PrimoDocumentDomain
       - package: PrimoModules

@@ -1,5 +1,5 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentGPUContracts
 
 public struct CanvasStrokeInteractionService: Sendable {

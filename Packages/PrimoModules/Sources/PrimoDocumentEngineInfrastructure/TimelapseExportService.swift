@@ -2,7 +2,8 @@ import AVFoundation
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
 
 public struct TimelapseExportProgress: Equatable, Sendable {
     public var progress: Double

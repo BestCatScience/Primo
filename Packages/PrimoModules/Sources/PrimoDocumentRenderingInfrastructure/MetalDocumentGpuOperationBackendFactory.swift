@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
 

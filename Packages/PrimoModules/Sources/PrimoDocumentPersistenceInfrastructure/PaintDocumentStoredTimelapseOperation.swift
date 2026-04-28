@@ -1,5 +1,5 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentDomain
 
 public struct StoredTimelapseOperation: Codable, Equatable, Sendable {

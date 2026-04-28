@@ -314,6 +314,32 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentRuntimeContractsStaysUmbrellaOnly() throws {
+        let repoRoot = try Self.repoRoot()
+        let runtimeContracts = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentContracts/DocumentRuntimeContracts.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: runtimeContracts, encoding: .utf8)
+        let lineCount = body.split(separator: "\n", omittingEmptySubsequences: false).count
+        let banned = [
+            "struct BrushRuntimeSettings",
+            "struct DocumentGpuOperationGateway",
+            "struct DocumentMutationGateway",
+            "struct DocumentPersistenceGateway",
+            "struct DocumentExportGateway",
+            "struct CanvasSelection",
+            "enum LayerProcessingRequest",
+            "struct TimelapseCapture"
+        ]
+
+        #expect(lineCount < 100, "DocumentRuntimeContracts.swift should stay a thin compatibility umbrella")
+        for token in banned {
+            #expect(!body.contains(token), "Runtime contract type \(token) should live in a narrow contract target")
+        }
+    }
+
+    @Test
     func swiftDocumentRuntimeDoesNotConstructMetalServicesOrUseSharedSingleton() throws {
         let repoRoot = try Self.repoRoot()
         let runtime = repoRoot.appendingPathComponent(

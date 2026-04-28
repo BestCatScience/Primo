@@ -1,6 +1,6 @@
 import Foundation
 import PrimoCoreTypes
-import PrimoDocumentContracts
+import PrimoDocumentPersistenceContracts
 import PrimoDocumentDomain
 import PrimoDocumentPersistenceInfrastructure
 

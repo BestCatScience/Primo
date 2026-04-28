@@ -1,5 +1,5 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentRenderingContracts
 
 public enum DocumentGpuOperationGatewayFactory {
     public static func live() -> DocumentGpuOperationGateway {

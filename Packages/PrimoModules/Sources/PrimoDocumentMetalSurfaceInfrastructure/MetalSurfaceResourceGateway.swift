@@ -1,5 +1,4 @@
 import Foundation
-import PrimoDocumentContracts
 import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 

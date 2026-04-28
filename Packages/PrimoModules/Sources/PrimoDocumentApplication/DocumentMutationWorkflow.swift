@@ -1,6 +1,6 @@
 import Foundation
 import PrimoBrushDomain
-import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
 import PrimoDocumentDomain
 
 public enum DocumentCanvasMutationIntent<Selection: Equatable & Sendable>: Equatable, Sendable {

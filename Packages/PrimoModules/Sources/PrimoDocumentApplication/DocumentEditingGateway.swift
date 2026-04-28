@@ -1,5 +1,5 @@
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentMutationContracts
 
 public typealias DocumentEditingRequest = DocumentEditorRequest
 public typealias DocumentEditingResult = DocumentEditorResult

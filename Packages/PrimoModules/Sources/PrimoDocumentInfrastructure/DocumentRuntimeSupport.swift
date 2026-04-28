@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
 
 public struct DocumentProjectPreview: Equatable, Sendable {
     public let canvasSize: CGSize

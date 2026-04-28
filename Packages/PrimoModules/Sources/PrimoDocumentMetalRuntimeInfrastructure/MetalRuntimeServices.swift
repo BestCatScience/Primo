@@ -2,7 +2,9 @@ import CoreGraphics
 import Foundation
 import Metal
 import PrimoBrushDomain
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 public struct MetalResourceStore: Sendable {

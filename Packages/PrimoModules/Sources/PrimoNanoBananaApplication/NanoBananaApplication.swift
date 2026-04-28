@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
-import PrimoDocumentContracts
+import PrimoDocumentPresentationContracts
 import PrimoNanoBananaDomain
 
 public enum NanoBananaCommandBuilderFailure: Error, Equatable, Sendable {

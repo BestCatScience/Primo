@@ -1,7 +1,10 @@
 import CoreGraphics
 import Foundation
 import Metal
-import PrimoDocumentContracts
+import PrimoBrushRuntimeContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 private struct PrimoMetalLayerProcessingDescriptor {
