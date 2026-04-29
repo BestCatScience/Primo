@@ -4,6 +4,16 @@
 
 Apple Pencil での入力、マルチレイヤー編集、選択・変形・塗りつぶし・テキスト・タイムラプス・AI 画像編集補助を、UI から描画エンジンまで一通りつなぐことを目的にしています。完成品というより、描画体験と内部アーキテクチャを同時に育てるための実験場です。
 
+## 現在の状態
+
+2026-04-29 時点では、Primo はホーム画面、workspace tab、document runtime、Metal canvas presentation、project persistence までを接続した iPad simulator / 実機向けの開発版です。
+
+- ホーム画面には保存済み project catalog を表示し、サムネイルから `.atelier` project を開けます。
+- 保存済み project のロードは full render snapshot 付きの presentation を返し、再起動後のディスクロードでも canvas へ適用できるようにしています。
+- 連続ストロークでは、正式な presentation refresh を待つ間も直前の GPU commit surface を `pendingCommittedSnapshot` として次ストロークの base に使います。
+- canvas thumbnail / project preview は表示専用 view として扱い、SwiftUI の card / button gesture を妨げないようにしています。
+- `CanvasStrokeWorkflowTests`、`PrimoRootFeatureIntegrationTests`、`PrimoCanvasPresentationInfrastructureTests`、`scripts/codex-build.sh` で直近の修正を確認しています。
+
 ## 目的
 
 - iPad 上で軽快に動くマルチレイヤーのラスター描画体験を試作する
@@ -25,6 +35,8 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   ファイル I/O、日時、UUID、保存、読み込み、エクスポート、AI 編集、GPU backend は reducer の外側に置き、テストでは差し替えられる境界を用意します。
 - **描画は snapshot と incremental update で扱う**
   runtime は document snapshot と dirty update を管理し、表示側は render snapshot / incremental update / preview surface を受け取って Metal 表示へ反映します。
+- **workspace は catalog / load / persistence を分ける**
+  ホーム一覧は catalog、プロジェクト読み込みは load、保存・autosave・tab backing store は persistence として分け、TCA reducer から use case 越しに呼び出します。
 
 ## 実装の全体像
 
@@ -38,6 +50,14 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 6. `SwiftDocumentRuntime` が document store、undo / redo、timelapse、dirty update、layer buffer handle を管理する
 7. `DocumentRuntimeGpuServices` と `DocumentGpuOperationGateway` が Metal stroke、layer mutation、selection、preview composite、export surface を実行する
 8. canvas presentation infrastructure が render snapshot と incremental update を Metal view に反映する
+
+保存済み project を開く流れは次のとおりです。
+
+1. ホーム画面の project card が `WorkspaceFeature.Action.homeProjectSelected` を送る
+2. `WorkspaceFeature` が active tab の保存準備を必要に応じて行い、`WorkspaceProjectLoadingService` へ load command を渡す
+3. `DocumentEngineLive` が `SwiftDocumentRuntime.loadProject` で `.atelier` package を読み、full `presentation()` と paper style を持つ `LoadedPaintProject` を返す
+4. `DocumentFeature` が loaded presentation を canvas / layer sidebar / interaction state に適用する
+5. workspace が tab reservation を確定し、application state がホームを閉じて編集画面へ戻る
 
 ## 主な機能
 
@@ -66,8 +86,6 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   package 化された domain / application / infrastructure のテストです。
 - `project.yml`
   XcodeGen 用のプロジェクト定義です。チェックイン済みの `Primo.xcodeproj` もあります。
-- `docs/`
-  設計メモや大きめのリファクタリング記録を置きます。
 
 ## Package 分割
 
@@ -114,12 +132,18 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   SwiftUI と UIKit canvas presentation の接続点です。
 - [Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift](Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift)
   canvas surface、入力、selection overlay、transform preview、text overlay、eyedropper loupe を束ねる UIKit view です。
+- [Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasMetalSurfaceViews.swift](Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasMetalSurfaceViews.swift)
+  Metal surface を SwiftUI / UIKit から表示する view 群です。ホームや tab preview では表示専用として hit testing を無効化します。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift)
   runtime、stroke use case、GPU operation gateway を app 向けに組み合わせる composition root です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift)
   `SwiftDocumentRuntime` を gateway 群として公開する live engine です。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift)
   document store、undo / redo、dirty update、stroke commit、save / load、timelapse を扱う runtime 本体です。
+- [App/Features/Document/WorkspaceFeature+Workflow.swift](App/Features/Document/WorkspaceFeature+Workflow.swift)
+  home project selection、tab reservation、autosave、save history、project load / persistence の workflow を扱います。
+- [App/Features/Canvas/CanvasFeature.swift](App/Features/Canvas/CanvasFeature.swift)
+  canvas state、render snapshot、stroke preview、pending committed snapshot、selection / transform preview を保持します。
 - [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift)
   runtime から Metal 処理を呼び出すための GPU service 集約です。
 - [Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift](Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift)
@@ -137,6 +161,8 @@ project save は単一ファイルではなくディレクトリ構成です。�
   フレームベースのタイムラプス保存に使います。
 - `TimelapseData/`
   操作ベースのタイムラプス補助データに使います。
+
+保存済み project はアプリの Documents 配下の `primo-projects/` に配置されます。作業中 tab の backing store は一時領域の `primo-tabs/` に置かれ、保存時やホームへ戻るときに `.atelier` package として project catalog 側へ反映されます。
 
 ## はじめ方
 
@@ -161,8 +187,11 @@ swift test
 scripts/codex-build.sh
 ```
 
-## 現状の注意点
+よく使う focused test は次のとおりです。
 
-- これはプロトタイプであり、機能ごとの完成度には差があります。
-- UI に先に露出している操作でも、内部実装や GPU path は継続的に整理中です。
-- document runtime は package 側へ移っていますが、app 側にはまだ workflow / reducer helper が多く残っています。
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+xcodebuild test -scheme Primo -destination 'platform=iOS Simulator,id=<SIMULATOR_ID>' -only-testing:PrimoTests/CanvasStrokeWorkflowTests
+xcodebuild test -scheme Primo -destination 'platform=iOS Simulator,id=<SIMULATOR_ID>' -only-testing:PrimoTests/PrimoRootFeatureIntegrationTests
+cd Packages/PrimoModules && swift test --filter PrimoCanvasPresentationInfrastructureTests
+```

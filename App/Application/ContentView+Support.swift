@@ -1033,6 +1033,7 @@ extension ContentView {
                         )
                         .padding(6)
                 }
+                .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -1056,6 +1057,7 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(Color(red: 0.22, green: 0.22, blue: 0.22))
             )
+            .contentShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         }
         .buttonStyle(.plain)
     }

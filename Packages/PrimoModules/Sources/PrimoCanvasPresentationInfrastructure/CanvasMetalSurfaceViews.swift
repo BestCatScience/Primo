@@ -57,6 +57,7 @@ public final class CanvasPixelSurfaceView: UIView {
 
     public override init(frame: CGRect) {
         super.init(frame: frame)
+        isUserInteractionEnabled = false
         backend.isUserInteractionEnabled = false
         addSubview(backend)
     }

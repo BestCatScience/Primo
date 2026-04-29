@@ -3,6 +3,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentGPUContracts
 import PrimoDocumentStrokeApplication
 import simd
 
@@ -203,6 +204,41 @@ struct CanvasFeature {
 
         mutating func stagePendingCommittedSnapshot(_ snapshot: MetalDocumentSnapshot?) {
             pendingCommittedSnapshot = snapshot
+        }
+
+        mutating func stagePendingCommittedStrokeSnapshot(
+            baseSnapshot: MetalDocumentSnapshot,
+            surface: GpuLayerSurface
+        ) {
+            guard surface.width == baseSnapshot.width,
+                  surface.height == baseSnapshot.height
+            else {
+                return
+            }
+            let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) ?? baseSnapshot.compositePixelData
+            let layers = baseSnapshot.layers.map { layer in
+                guard layer.index == surface.layerIndex else { return layer }
+                return MetalLayerSnapshot(
+                    index: layer.index,
+                    opacity: layer.opacity,
+                    visible: layer.visible,
+                    isClipped: layer.isClipped,
+                    blendMode: layer.blendMode,
+                    thumbnailSurface: layer.thumbnailSurface,
+                    thumbnailData: layer.thumbnailData,
+                    gpuBufferHandle: surface.handle.buffer,
+                    pixelData: layer.pixelData
+                )
+            }
+            pendingCommittedSnapshot = MetalDocumentSnapshot(
+                width: baseSnapshot.width,
+                height: baseSnapshot.height,
+                revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
+                transferKind: baseSnapshot.transferKind,
+                compositeBufferHandle: baseSnapshot.compositeBufferHandle,
+                compositePixelData: compositePixelData,
+                layers: layers
+            )
         }
 
         mutating func setActiveStrokeRenderState(_ renderState: StrokeSessionRenderState?) {

@@ -5,6 +5,7 @@ import PrimoNanoBananaDomain
 import PrimoNanoBananaInfrastructure
 import XCTest
 
+@MainActor
 final class NanoBananaFeatureTests: XCTestCase {
     func testTaskLoadsSettingsAndCommerceSnapshot() async {
         let snapshot = NanoBananaCommerceSnapshot(

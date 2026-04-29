@@ -72,7 +72,8 @@ extension PaintDocumentPresentation {
     static func testValue(
         canvasSize: CGSize = CanvasFeature.defaultCanvasSize,
         activeLayerIndex: Int = 0,
-        layerRows: [LayerRowModel]? = nil
+        layerRows: [LayerRowModel]? = nil,
+        renderSnapshot: MetalDocumentSnapshot? = nil
     ) -> Self {
         let resolvedLayerRows = layerRows ?? [LayerRowModel.testValue(index: activeLayerIndex)]
         return Self(
@@ -80,7 +81,35 @@ extension PaintDocumentPresentation {
             activeLayerIndex: activeLayerIndex,
             layerRows: resolvedLayerRows,
             layerSidebarRows: resolvedLayerRows.map { .layer($0, depth: 0) },
-            renderSnapshot: nil
+            renderSnapshot: renderSnapshot
+        )
+    }
+
+    static func renderedTestValue(
+        width: Int = 4,
+        height: Int = 4,
+        activeLayerIndex: Int = 0
+    ) -> Self {
+        testValue(
+            canvasSize: CGSize(width: width, height: height),
+            activeLayerIndex: activeLayerIndex,
+            renderSnapshot: MetalDocumentSnapshot(
+                width: width,
+                height: height,
+                revision: 1,
+                compositePixelData: Data(repeating: 0, count: width * height * 4),
+                layers: [
+                    MetalLayerSnapshot(
+                        index: activeLayerIndex,
+                        opacity: 1,
+                        visible: true,
+                        isClipped: false,
+                        blendMode: .normal,
+                        thumbnailData: nil,
+                        pixelData: Data(repeating: 0, count: width * height * 4)
+                    )
+                ]
+            )
         )
     }
 }

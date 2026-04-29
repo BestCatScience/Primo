@@ -93,6 +93,7 @@ extension DocumentFeature {
 
             switch outcome {
             case let .commit(mutation):
+                let commitBaseSnapshot = state.canvas.strokeSession.baseSnapshot ?? state.canvas.renderSnapshot
                 let result = layerCommands.applyLayerSurfaceMutation(
                     mutation.surface.layerIndex,
                     GpuLayerMutationPayload(
@@ -104,6 +105,12 @@ extension DocumentFeature {
                 )
                 switch result {
                 case .success:
+                    if let commitBaseSnapshot {
+                        state.canvas.stagePendingCommittedStrokeSnapshot(
+                            baseSnapshot: commitBaseSnapshot,
+                            surface: mutation.surface
+                        )
+                    }
                     return .committed(
                         DocumentMutationContract(
                             canvasMutation: keepsSelectionCleared ? .clearSelection : .none,

@@ -143,7 +143,7 @@ public enum DocumentEngineFactory {
                     gpuServices: gpuServices
                 )
                 let loadedProject = LoadedPaintProject(
-                    presentation: runtime.lightweightPresentation(),
+                    presentation: runtime.presentation(),
                     paperStyle: runtime.currentPaperStyle
                 )
                 runtimeBox.replaceRuntime(with: runtime)

@@ -10,6 +10,7 @@ import PrimoDocumentStrokeApplication
 import XCTest
 @testable import Primo
 
+@MainActor
 final class CanvasStrokeWorkflowTests: XCTestCase {
     func testDocumentGpuGatewayOverrideRefreshesDerivedGpuDependencies() {
         let oldGateway = markedGateway(1)
@@ -333,6 +334,134 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         }
         XCTAssertEqual(surfaceCalls.values.first?.gpuBufferHandle, handle)
         XCTAssertEqual(surfaceCalls.values.first?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
+    }
+
+    func testGpuCommitStagesPendingCommittedSnapshotForNextStrokeBase() {
+        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let baseComposite = Data(repeating: 0x11, count: 64)
+        let baseSnapshot = MetalDocumentSnapshot(
+            width: 4,
+            height: 4,
+            revision: 12,
+            compositePixelData: baseComposite,
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    pixelData: Data(repeating: 0x22, count: 64)
+                )
+            ]
+        )
+
+        let runtime = DocumentRuntimeComposition.stub(
+            mutationGateway: .stub(
+                applyLayerSurfaceMutation: { _, _ in .success(()) }
+            ),
+            strokeSessionUseCase: .stub { _ in
+                .commit(
+                    GpuCommitMutation(
+                        surface: GpuLayerSurface(
+                            layerIndex: 0,
+                            width: 4,
+                            height: 4,
+                            handle: GpuSurfaceHandle(buffer: handle)
+                        ),
+                        dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 1, height: 1),
+                        refreshViaDirtyPresentation: true
+                    )
+                )
+            }
+        )
+        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
+            strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
+        )
+        var state = DocumentFeature.State()
+        state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
+        state.canvas.applyIncrementalRenderUpdate(
+            IncrementalLayerUpdate(
+                layerIndex: -1,
+                originX: 1,
+                originY: 1,
+                width: 1,
+                height: 1,
+                pixelData: Data([0x99, 0x98, 0x97, 0x96])
+            )
+        )
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+
+        let result = coordinator.resolveStrokeCommit(
+            state: &state,
+            samples: [.testValue()],
+            context: DocumentFeature.CanvasStrokeContext(
+                activeLayer: .testValue(),
+                activeLayerIndex: 0,
+                brush: brush,
+                previewBrush: brush
+            ),
+            keepsSelectionCleared: false,
+            refreshViaDirtyPresentation: true
+        )
+
+        guard case .committed = result else {
+            XCTFail("Expected committed GPU surface mutation")
+            return
+        }
+        guard let pendingSnapshot = state.canvas.pendingCommittedSnapshot else {
+            XCTFail("Expected pending committed snapshot")
+            return
+        }
+        XCTAssertEqual(pendingSnapshot.revision, 13)
+        XCTAssertEqual(pendingSnapshot.layers.first?.gpuBufferHandle, handle)
+        XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, baseSnapshot.layers.first?.pixelData)
+        let replacedOffset = ((1 * 4) + 1) * 4
+        XCTAssertEqual(
+            Array(pendingSnapshot.compositePixelData[replacedOffset..<replacedOffset + 4]),
+            [0x99, 0x98, 0x97, 0x96]
+        )
+    }
+
+    func testNextStrokeCapturesPendingCommittedSnapshotBeforePresentationRefresh() {
+        let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
+        )
+        let pendingSnapshot = MetalDocumentSnapshot(
+            width: 4,
+            height: 4,
+            revision: 21,
+            compositePixelData: Data(repeating: 0x33, count: 64),
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    pixelData: Data(repeating: 0x44, count: 64)
+                )
+            ]
+        )
+        var state = DocumentFeature.State()
+        state.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
+        var loadedCurrentPresentation = false
+
+        coordinator.captureBaseSnapshotIfNeeded(
+            state: &state,
+            ensureCurrentPresentationLoaded: { _ in
+                loadedCurrentPresentation = true
+            }
+        )
+
+        XCTAssertEqual(state.canvas.strokeSession.baseSnapshot, pendingSnapshot)
+        XCTAssertFalse(loadedCurrentPresentation)
     }
 
     func testPreviewReplacementReleasesPreviousSurfaceHandle() {
