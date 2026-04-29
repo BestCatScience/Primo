@@ -16,7 +16,7 @@ extension NanoBananaFeature {
         var editScope: NanoBananaEditScope = .wholeLayer
         var outputMode: NanoBananaOutputMode = .replaceCurrentLayer
         var maskSettings = NanoBananaMaskSettings()
-        var model: NanoBananaModel = .flashImage25
+        var model: NanoBananaModel = .flashImage31Preview
     }
 
     struct ExecutionState: Equatable {
@@ -37,7 +37,7 @@ extension NanoBananaFeature {
     @ObservableState
     struct State: Equatable {
         var composer = ComposerState()
-        var settings = NanoBananaSettings()
+        var settings = NanoBananaSettings(accessMode: .appManaged)
         var commerce = NanoBananaCommerceSnapshot()
         var execution = ExecutionState()
         var presentation = PresentationState()
@@ -97,6 +97,11 @@ extension NanoBananaFeature {
             set { settings.apiKey = newValue }
         }
 
+        var openAIAPIKey: String {
+            get { settings.openAIAPIKey }
+            set { settings.openAIAPIKey = newValue }
+        }
+
         var accessMode: NanoBananaAccessMode {
             get { settings.accessMode }
             set { settings.accessMode = newValue }
@@ -104,12 +109,11 @@ extension NanoBananaFeature {
 
         var generateDisabled: Bool {
             isGenerating ||
-            composer.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            (
-                accessMode == .userAPIKey
-                ? apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                : commerce.proxyEndpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            )
+            composer.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+
+        var selectedAPIKey: String {
+            composer.model.provider == .openAI ? openAIAPIKey : apiKey
         }
 
         mutating func prepareComposer(
@@ -121,7 +125,7 @@ extension NanoBananaFeature {
             composer.editScope = hasSelection ? .selectedArea : .wholeLayer
             composer.outputMode = .replaceCurrentLayer
             composer.maskSettings = .init()
-            composer.model = .flashImage25
+            composer.model = .flashImage31Preview
             workspaceBottomPanelSection = .nanoBanana
             workspaceBottomPanelCollapsed = false
         }
@@ -133,7 +137,7 @@ extension NanoBananaFeature {
             composer.outputMode = descriptor.outputMode
             composer.maskSettings = descriptor.maskSettings
             composer.model = descriptor.model
-            accessMode = descriptor.accessMode == .appManaged ? .userAPIKey : descriptor.accessMode
+            accessMode = .appManaged
             workspaceBottomPanelSection = .nanoBanana
         }
 
@@ -155,6 +159,7 @@ extension NanoBananaFeature {
             builder.build(
                 draft: buildDraft(),
                 apiKey: apiKey,
+                openAIAPIKey: openAIAPIKey,
                 commerce: commerce
             )
         }
@@ -166,7 +171,7 @@ extension NanoBananaFeature {
             builder.build(
                 draft: NanoBananaDraft(
                     prompt: descriptor.prompt.rawValue,
-                    accessMode: descriptor.accessMode == .appManaged ? .userAPIKey : descriptor.accessMode,
+                    accessMode: .appManaged,
                     model: descriptor.model,
                     inputLayerIndex: descriptor.inputLayerIndex,
                     editScope: descriptor.editScope,
@@ -174,6 +179,7 @@ extension NanoBananaFeature {
                     maskSettings: descriptor.maskSettings
                 ),
                 apiKey: apiKey,
+                openAIAPIKey: openAIAPIKey,
                 commerce: commerce
             )
         }

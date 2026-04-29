@@ -16,6 +16,7 @@ extension NanoBananaFeature {
         case modelChanged(NanoBananaModel)
         case accessModeChanged(NanoBananaAccessMode)
         case apiKeyChanged(String)
+        case openAIAPIKeyChanged(String)
         case sheetPresentationChanged(Bool)
         case paywallPresentationChanged(Bool)
         case workspaceBottomPanelSectionChanged(WorkspaceBottomPanelSection)

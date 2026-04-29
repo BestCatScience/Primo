@@ -19,9 +19,7 @@ extension NanoBananaFeature {
 
         case let .settingsLoaded(settings):
             var sanitizedSettings = settings
-            if sanitizedSettings.accessMode == .appManaged {
-                sanitizedSettings.accessMode = .userAPIKey
-            }
+            sanitizedSettings.accessMode = .appManaged
             state.settings = sanitizedSettings
             return .none
 
@@ -61,8 +59,8 @@ extension NanoBananaFeature {
             state.composer.model = model
             return .none
 
-        case let .accessModeChanged(accessMode):
-            state.accessMode = accessMode == .appManaged ? .userAPIKey : accessMode
+        case .accessModeChanged:
+            state.accessMode = .appManaged
             let updatedSettings = state.settings
             return .run { [nanoBananaSettingsClient] _ in
                 nanoBananaSettingsClient.persist(updatedSettings)
@@ -70,6 +68,13 @@ extension NanoBananaFeature {
 
         case let .apiKeyChanged(apiKey):
             state.apiKey = apiKey
+            let updatedSettings = state.settings
+            return .run { [nanoBananaSettingsClient] _ in
+                nanoBananaSettingsClient.persist(updatedSettings)
+            }
+
+        case let .openAIAPIKeyChanged(apiKey):
+            state.openAIAPIKey = apiKey
             let updatedSettings = state.settings
             return .run { [nanoBananaSettingsClient] _ in
                 nanoBananaSettingsClient.persist(updatedSettings)

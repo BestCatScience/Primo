@@ -21,6 +21,7 @@ enum StudioStrings {
         "Active Layer": "アクティブレイヤー",
         "Add": "加算",
         "Add Glow": "加算(発光)",
+        "AI Image Settings": "AI画像設定",
         "Airbrush": "エアブラシ",
         "Angle": "角度",
         "Angle Amount": "角度量",
@@ -78,6 +79,7 @@ enum StudioStrings {
         "Darker": "暗い方",
         "Darker Color": "カラー比較(暗)",
         "Difference": "差の絶対値",
+        "Done": "完了",
         "Duplicate Layer": "レイヤーを複製",
         "Direction": "線方向",
         "Directional": "方向散布",
@@ -179,21 +181,21 @@ enum StudioStrings {
         "Rotation": "回転",
         "Move the active layer with Pencil. Nothing is committed until you apply.": "Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。",
         "Move the selected area with Pencil. Nothing is committed until you apply.": "Apple Pencil で選択範囲を移動します。適用するまで確定されません。",
-        "Nano Banana": "Nano Banana",
-        "Nano Banana Edit": "Nano Banana で編集",
-        "Edit the active layer with Nano Banana": "Nano Banana でアクティブレイヤーを編集",
+        "Nano Banana": "AI画像",
+        "Nano Banana Edit": "AI画像で編集",
+        "Edit the active layer with Nano Banana": "AI画像でアクティブレイヤーを編集",
         "Prompt": "プロンプト",
-        "Describe how Nano Banana should edit the active layer": "Nano Banana にどう編集させたいか入力してください",
+        "Describe how Nano Banana should edit the active layer": "AI画像にどう編集させたいか入力してください",
         "Gemini API Key": "Gemini API キー",
         "Saved locally on this device": "この端末内に保存されます",
         "Generate": "生成",
-        "Generating with Nano Banana": "Nano Banana で生成中",
+        "Generating with Nano Banana": "AI画像で生成中",
         "Selection Modify Amount": "選択変更量",
         "Pixels": "ピクセル",
         "Invert Selection": "選択を反転",
         "Expand Selection": "選択を拡張",
         "Contract Selection": "選択を縮小",
-        "Nano Banana generation canceled": "Nano Banana の生成をキャンセルしました",
+        "Nano Banana generation canceled": "AI画像の生成をキャンセルしました",
         "Access": "接続方式",
         "User API Key": "ユーザー API キー",
         "App Subscription": "アプリ課金プラン",
@@ -205,10 +207,10 @@ enum StudioStrings {
         "Restore Purchases": "購入を復元",
         "Manage Subscription": "サブスクリプションを管理",
         "Subscription Required": "サブスクリプションが必要です",
-        "Unlock Nano Banana": "Nano Banana を有効化",
-        "Use Primo subscription to run Nano Banana without your own API key": "Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます",
+        "Unlock Nano Banana": "AI画像を有効化",
+        "Use Primo subscription to run Nano Banana without your own API key": "Primo のサブスクリプションで、自分の API キーなしにAI画像を利用できます",
         "Included": "含まれる内容",
-        "Unlimited app-managed Nano Banana edits": "アプリ管理の Nano Banana 編集を利用可能",
+        "Unlimited app-managed Nano Banana edits": "アプリ管理のAI画像編集を利用可能",
         "Purchase state syncs automatically": "購入状態を自動で同期",
         "Restore purchases on a new device": "新しい端末でも購入を復元可能",
         "Loading subscription details…": "サブスクリプション情報を読み込み中…",
@@ -243,7 +245,7 @@ enum StudioStrings {
         "Retry": "再試行",
         "Discard": "破棄",
         "Regenerate": "再生成",
-        "Review Nano Banana Result": "Nano Banana の結果を確認",
+        "Review Nano Banana Result": "AI画像の結果を確認",
         "Retouch": "整える",
         "Relight": "ライティング変更",
         "Cleanup": "ノイズ除去",
@@ -267,17 +269,17 @@ enum StudioStrings {
         "Model": "モデル",
         "Merge Down": "下のレイヤーと結合",
         "Use your own backend to inject the provider API key and verify entitlements": "自社バックエンドでプロバイダ API キー注入と購入権限チェックを行う想定です",
-        "Enter a prompt for Nano Banana": "Nano Banana 用のプロンプトを入力してください",
+        "Enter a prompt for Nano Banana": "AI画像用のプロンプトを入力してください",
         "Enter your Gemini API key": "Gemini API キーを入力してください",
         "Enter your app server endpoint": "アプリサーバーのエンドポイントを入力してください",
-        "Could not prepare the active layer for Nano Banana": "Nano Banana 用にアクティブレイヤーを準備できませんでした",
-        "Could not apply Nano Banana edit": "Nano Banana の編集結果を適用できませんでした",
-        "Nano Banana edit applied": "Nano Banana の編集結果を適用しました",
-        "Nano Banana edit failed": "Nano Banana の編集に失敗しました",
-        "Nano Banana returned an invalid response": "Nano Banana から不正な応答が返されました",
-        "Nano Banana endpoint is invalid": "Nano Banana のエンドポイントが不正です",
-        "Nano Banana did not return an image": "Nano Banana が画像を返しませんでした",
-        "Nano Banana returned an unsupported image": "Nano Banana が未対応の画像を返しました",
+        "Could not prepare the active layer for Nano Banana": "AI画像用にアクティブレイヤーを準備できませんでした",
+        "Could not apply Nano Banana edit": "AI画像の編集結果を適用できませんでした",
+        "Nano Banana edit applied": "AI画像の編集結果を適用しました",
+        "Nano Banana edit failed": "AI画像の編集に失敗しました",
+        "Nano Banana returned an invalid response": "AI画像から不正な応答が返されました",
+        "Nano Banana endpoint is invalid": "AI画像のエンドポイントが不正です",
+        "Nano Banana did not return an image": "AI画像が画像を返しませんでした",
+        "Nano Banana returned an unsupported image": "AI画像が未対応の画像を返しました",
         "Moving": "移動",
         "Multiply": "乗算",
         "No presets yet.": "まだプリセットがありません。",
@@ -388,6 +390,7 @@ enum StudioStrings {
         "New Canvas": "新規キャンバス",
         "Custom Size...": "カスタムサイズ...",
         "Open": "開く",
+        "Open Settings": "設定を開く",
         "Open Source Licenses": "オープンソースライセンス",
         "Open Source Packages": "オープンソースパッケージ",
         "Package URL": "パッケージ URL",
@@ -492,8 +495,13 @@ enum StudioStrings {
     static func thresholdAdjustment(_ language: AppLanguage) -> String { language.localized("2値化") }
     static func posterize(_ language: AppLanguage) -> String { language.localized("階調化") }
     static func gradientMap(_ language: AppLanguage) -> String { language.localized("グラデーションマップ") }
-    static func nanoBanana(_ language: AppLanguage) -> String { language.localized("Nano Banana") }
-    static func nanoBananaEdit(_ language: AppLanguage) -> String { language.localized("Nano Banana で編集") }
+    static func nanoBanana(_ language: AppLanguage) -> String {
+        localized(language, japanese: "AI画像", english: "AI Image")
+    }
+
+    static func nanoBananaEdit(_ language: AppLanguage) -> String {
+        localized(language, japanese: "AI画像で編集", english: "AI Image Edit")
+    }
     static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
     static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
     static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }

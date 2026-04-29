@@ -37,7 +37,7 @@ final class NanoBananaFeatureTests: XCTestCase {
 
         await store.send(.task)
         await store.receive(.settingsLoaded(NanoBananaSettings(accessMode: .appManaged, apiKey: "persisted-key"))) {
-            $0.settings = NanoBananaSettings(accessMode: .userAPIKey, apiKey: "persisted-key")
+            $0.settings = NanoBananaSettings(accessMode: .appManaged, apiKey: "persisted-key")
         }
         await store.receive(.commerceUpdated(snapshot)) {
             $0.commerce = snapshot
@@ -101,11 +101,61 @@ final class NanoBananaFeatureTests: XCTestCase {
         await store.receive(.delegate(.requestEdit(expectedRequest)))
     }
 
+    func testGenerateDelegatesGPTImage2RequestWithOpenAIKey() async {
+        var initialState = NanoBananaFeature.State(
+            settings: NanoBananaSettings(
+                accessMode: .userAPIKey,
+                apiKey: "gemini-key",
+                openAIAPIKey: "openai-key"
+            ),
+            commerce: NanoBananaCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+        )
+        initialState.composer.prompt = "Improve lettering"
+        initialState.composer.model = .gptImage2
+
+        let expectedRequest = SubmitNanoBananaEditCommand(
+            descriptor: NanoBananaEditDescriptor(
+                prompt: NonEmptyPrompt("Improve lettering")!,
+                accessMode: .userAPIKey,
+                model: .gptImage2,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("openai-key")!)
+        )
+
+        let store = TestStore(initialState: initialState) {
+            NanoBananaFeature()
+        } withDependencies: {
+            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
+        }
+
+        await store.send(.generateButtonTapped(closeSheet: false))
+        await store.receive(.delegate(.requestEdit(expectedRequest)))
+    }
+
+    func testGenerateDisabledUsesSelectedProviderAPIKey() {
+        var state = NanoBananaFeature.State(
+            settings: NanoBananaSettings(
+                accessMode: .userAPIKey,
+                apiKey: "gemini-key",
+                openAIAPIKey: ""
+            )
+        )
+        state.composer.prompt = "Improve lettering"
+        state.composer.model = .gptImage2
+        XCTAssertTrue(state.generateDisabled)
+
+        state.openAIAPIKey = "openai-key"
+        XCTAssertFalse(state.generateDisabled)
+    }
+
     func testRetryRegenerateAndCancelDelegateActions() async {
         let descriptor = NanoBananaEditDescriptor(
             prompt: NonEmptyPrompt("Retry me")!,
             accessMode: .userAPIKey,
-            model: .flashImage25,
+            model: .flashImage31Preview,
             inputLayerIndex: 0,
             editScope: .wholeLayer,
             outputMode: .replaceCurrentLayer

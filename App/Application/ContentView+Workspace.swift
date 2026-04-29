@@ -4,6 +4,9 @@ import SwiftUI
 import UIKit
 
 extension ContentView {
+    private var workspaceBottomGestureClearance: CGFloat { 36 }
+    private var workspaceNanoBananaPickerMaximumHeight: CGFloat { 144 }
+
     func dismissBrushSettingsPopover() {
         if store.document.brushPalette.ui.showsBrushSettingsPopover {
             store.send(.document(.brushPalette(.binding(.set(\.ui.showsBrushSettingsPopover, false)))))
@@ -51,11 +54,11 @@ extension ContentView {
                 if !nanoBananaState.workspaceBottomPanelCollapsed {
                     workspaceBottomPanel
                         .padding(.horizontal, 18)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, workspaceBottomGestureClearance)
                 } else {
                     collapsedWorkspaceBottomBar
                         .padding(.horizontal, 18)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, workspaceBottomGestureClearance)
                 }
             }
         }
@@ -359,7 +362,7 @@ extension ContentView {
     var workspaceBottomPanel: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                workspaceBottomTab(title: "NANO BANANA", section: .nanoBanana)
+                workspaceBottomTab(title: "AI IMAGE", section: .nanoBanana)
                 workspaceBottomTab(title: "HISTORY", section: .history)
                 workspaceBottomTab(title: "OUTPUT", section: .output)
                 Spacer(minLength: 0)
@@ -398,7 +401,7 @@ extension ContentView {
         HStack {
             Text(
                 nanoBananaState.workspaceBottomPanelSection == .nanoBanana
-                ? "NANO BANANA"
+                ? "AI IMAGE"
                 : nanoBananaState.workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT"
             )
                 .font(StudioTheme.Typography.mono(10))
@@ -421,33 +424,40 @@ extension ContentView {
     }
 
     func workspaceBottomTab(title: String, section: NanoBananaFeature.WorkspaceBottomPanelSection) -> some View {
-        Button {
+        let isSelected = nanoBananaState.workspaceBottomPanelSection == section
+        return Button {
             store.send(.nanoBanana(.workspaceBottomPanelSectionChanged(section)))
         } label: {
-            Text(title)
-                .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(nanoBananaState.workspaceBottomPanelSection == section ? .white.opacity(0.9) : .white.opacity(0.45))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(nanoBananaState.workspaceBottomPanelSection == section ? Color.white.opacity(0.10) : Color.clear)
-                )
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(isSelected ? .white.opacity(0.9) : .white.opacity(0.46))
+                Rectangle()
+                    .fill(isSelected ? Color.white.opacity(0.82) : Color.clear)
+                    .frame(height: 1)
+            }
+            .fixedSize()
+            .padding(.horizontal, 4)
+            .padding(.top, 2)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(WorkspaceFlatButtonStyle())
     }
 
     var workspaceNanoBananaPanel: some View {
         GeometryReader { geometry in
             let usesCompactStack = geometry.size.width < 980
-            let promptWidth = usesCompactStack ? geometry.size.width : max(geometry.size.width * 0.56, 360)
+            let promptWidth = usesCompactStack ? geometry.size.width : max(geometry.size.width * 0.62, 420)
 
             Group {
                 if usesCompactStack {
                     VStack(alignment: .leading, spacing: 12) {
                         workspaceNanoBananaPromptEditor
-                        workspaceNanoBananaMetaColumn
-                        workspaceNanoBananaActions
+                        HStack(alignment: .top, spacing: 10) {
+                            workspaceNanoBananaMetaColumn
+                            workspaceNanoBananaActions
+                                .frame(width: 128, alignment: .topTrailing)
+                        }
                     }
                 } else {
                     HStack(alignment: .top, spacing: 14) {
@@ -457,7 +467,7 @@ extension ContentView {
                             workspaceNanoBananaMetaColumn
                             workspaceNanoBananaActions
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
                 }
             }
@@ -469,10 +479,10 @@ extension ContentView {
     func workspaceNanoBananaStat(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
-                .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(.white.opacity(0.42))
+                .font(StudioTheme.Typography.mono(9))
+                .foregroundStyle(.white.opacity(0.38))
             Text(value)
-                .font(StudioTheme.Typography.label(12))
+                .font(StudioTheme.Typography.label(11))
                 .foregroundStyle(.white.opacity(0.88))
                 .lineLimit(1)
         }
@@ -489,7 +499,7 @@ extension ContentView {
                     .fill(Color.white)
 
                 if nanoBananaState.composer.prompt.isEmpty {
-                    Text(language.localized("Nano Banana にどう編集させたいか入力してください"))
+                    Text(language.localized("AI画像にどう編集させたいか入力してください"))
                         .font(StudioTheme.Typography.body(13))
                         .foregroundStyle(Color.black.opacity(0.38))
                         .padding(.horizontal, 10)
@@ -507,117 +517,395 @@ extension ContentView {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
             }
-            .frame(maxWidth: .infinity, minHeight: 82, maxHeight: 110, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 74, maxHeight: 96, alignment: .topLeading)
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(Color.black.opacity(0.14), lineWidth: 1)
             )
         }
     }
 
     var workspaceNanoBananaMetaColumn: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(minimum: 110), spacing: 10),
-                    GridItem(.flexible(minimum: 110), spacing: 10)
-                ],
-                alignment: .leading,
-                spacing: 10
-            ) {
-                workspaceNanoBananaStatCard(label: language.localized("入力"), value: resolvedNanoBananaInputLayerName)
-                workspaceNanoBananaStatCard(label: language.localized("対象"), value: nanoBananaState.composer.editScope.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("出力"), value: nanoBananaState.composer.outputMode.title(language))
-                workspaceNanoBananaStatCard(label: language.localized("モデル"), value: nanoBananaState.composer.model.title(language))
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 8) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 110), spacing: 8),
+                        GridItem(.flexible(minimum: 110), spacing: 8)
+                    ],
+                    alignment: .leading,
+                    spacing: 8
+                ) {
+                    workspaceNanoBananaInputLayerMenu
+                    workspaceNanoBananaEditScopeMenu
+                    workspaceNanoBananaOutputModeMenu
+                    workspaceNanoBananaModelMenu
+                }
             }
 
-            if nanoBananaState.accessMode == .appManaged && !nanoBananaState.commerce.isSubscriptionActive {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(language.localized("サブスクリプションが必要です"))
-                        .font(StudioTheme.Typography.label(12))
-                        .foregroundStyle(.white.opacity(0.92))
-                    Text(language.localized("Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます"))
-                        .font(StudioTheme.Typography.body(11))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Button(language.localized("Nano Banana を有効化")) {
-                        store.send(.nanoBanana(.paywallPresentationChanged(true)))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white.opacity(0.94))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
-                    )
-                }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.white.opacity(0.04))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
+            if let activeNanoBananaWorkspacePicker {
+                workspaceNanoBananaPickerPopup(activeNanoBananaWorkspacePicker)
+                    .padding(.top, 68)
+                    .zIndex(20)
             }
         }
+    }
+
+    @ViewBuilder
+    func workspaceNanoBananaPickerPopup(_ picker: NanoBananaWorkspacePicker) -> some View {
+        let rowCount = workspaceNanoBananaPickerRowCount(for: picker)
+        let popupHeight = min(CGFloat(rowCount) * 33 + 12, workspaceNanoBananaPickerMaximumHeight)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 3) {
+                switch picker {
+                case .inputLayer:
+                    ForEach(store.document.layerSidebar.layers) { layer in
+                        workspaceNanoBananaPickerPopupRow(
+                            title: layer.name,
+                            isSelected: layer.index == resolvedNanoBananaInputLayerIndex
+                        ) {
+                            store.send(.nanoBanana(.inputLayerIndexChanged(layer.index)))
+                        }
+                    }
+                case .editScope:
+                    let hasSelection = store.document.canvas.selection?.isEmpty == false
+                    ForEach(NanoBananaEditScope.allCases) { scope in
+                        workspaceNanoBananaPickerPopupRow(
+                            title: scope.title(language),
+                            isSelected: scope == nanoBananaState.composer.editScope,
+                            isDisabled: scope == .selectedArea && !hasSelection
+                        ) {
+                            store.send(.nanoBanana(.editScopeChanged(scope)))
+                        }
+                    }
+                case .outputMode:
+                    ForEach(NanoBananaOutputMode.allCases) { mode in
+                        workspaceNanoBananaPickerPopupRow(
+                            title: mode.title(language),
+                            isSelected: mode == nanoBananaState.composer.outputMode
+                        ) {
+                            store.send(.nanoBanana(.outputModeChanged(mode)))
+                        }
+                    }
+                case .model:
+                    ForEach(NanoBananaModel.allCases) { model in
+                        workspaceNanoBananaPickerPopupRow(
+                            title: model.title(language),
+                            isSelected: model == nanoBananaState.composer.model
+                        ) {
+                            store.send(.nanoBanana(.modelChanged(model)))
+                        }
+                    }
+                }
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .scrollDisabled(rowCount <= 4)
+        .scrollIndicators(.visible)
+        .frame(maxWidth: .infinity, minHeight: popupHeight, maxHeight: popupHeight, alignment: .topLeading)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.15, green: 0.16, blue: 0.19).opacity(0.98),
+                            Color(red: 0.08, green: 0.09, blue: 0.11).opacity(0.98)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            StudioTheme.Palette.accentBright.opacity(0.34),
+                            Color.white.opacity(0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+                .padding(.horizontal, 1)
+        }
+        .shadow(color: .black.opacity(0.34), radius: 18, y: 10)
+    }
+
+    func workspaceNanoBananaPickerRowCount(for picker: NanoBananaWorkspacePicker) -> Int {
+        switch picker {
+        case .inputLayer:
+            return max(store.document.layerSidebar.layers.count, 1)
+        case .editScope:
+            return NanoBananaEditScope.allCases.count
+        case .outputMode:
+            return NanoBananaOutputMode.allCases.count
+        case .model:
+            return NanoBananaModel.allCases.count
+        }
+    }
+
+    func workspaceNanoBananaPickerPopupRow(
+        title: String,
+        isSelected: Bool,
+        isDisabled: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            action()
+            activeNanoBananaWorkspacePicker = nil
+        } label: {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(isSelected ? StudioTheme.Palette.accentBright.opacity(0.92) : Color.white.opacity(0.12))
+                    .frame(width: 3, height: 18)
+                Text(title)
+                    .font(StudioTheme.Typography.label(12))
+                    .foregroundStyle(.white.opacity(isDisabled ? 0.28 : (isSelected ? 0.96 : 0.82)))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(StudioTheme.Palette.accentBright.opacity(0.9))
+                }
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(isSelected ? StudioTheme.Palette.accentBright.opacity(0.10) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(WorkspaceFlatButtonStyle())
+        .disabled(isDisabled)
+    }
+
+    @ViewBuilder
+    var workspaceNanoBananaAccessNotice: some View {
+        if !nanoBananaState.commerce.isSubscriptionActive {
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(.top, 1)
+                Text(nanoBananaGeminiPlanSoftHint)
+                    .font(StudioTheme.Typography.body(11))
+                    .foregroundStyle(.white.opacity(0.52))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                workspaceNoticeLink(title: language.localized("プランを見る"), isSecondary: true) {
+                    store.send(.nanoBanana(.paywallPresentationChanged(true)))
+                }
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
+        }
+    }
+
+    func workspaceNoticeLink(
+        title: String,
+        isSecondary: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(StudioTheme.Typography.mono(10))
+                    .foregroundStyle(
+                        isSecondary
+                        ? .white.opacity(0.58)
+                        : StudioTheme.Palette.accentBright.opacity(0.92)
+                    )
+                Rectangle()
+                    .fill(
+                        isSecondary
+                        ? Color.white.opacity(0.22)
+                        : StudioTheme.Palette.accentBright.opacity(0.75)
+                    )
+                    .frame(height: 1)
+            }
+            .padding(.vertical, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(WorkspaceFlatButtonStyle())
     }
 
     func workspaceNanoBananaStatCard(label: String, value: String) -> some View {
         workspaceNanoBananaStat(label: label, value: value)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(Color.white.opacity(0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
     }
 
-    var workspaceNanoBananaActions: some View {
-        HStack(spacing: 8) {
-            Button(language.localized("実行")) {
-                requestNanoBananaGeneration(closeSheet: false)
+    func workspaceNanoBananaMenuCard(
+        label: String,
+        value: String,
+        picker: NanoBananaWorkspacePicker
+    ) -> some View {
+        let isActive = activeNanoBananaWorkspacePicker == picker
+        return Button {
+            activeNanoBananaWorkspacePicker = isActive ? nil : picker
+        } label: {
+            HStack(alignment: .center, spacing: 8) {
+                workspaceNanoBananaStat(label: label, value: value)
+                Spacer(minLength: 0)
+                Image(systemName: isActive ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(isActive ? StudioTheme.Palette.accentBright.opacity(0.92) : .white.opacity(0.42))
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white.opacity(0.94))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(
-                        (nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty)
-                        ? StudioTheme.Palette.accentBright.opacity(0.34)
-                        : StudioTheme.Palette.accentBright.opacity(0.8)
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isActive ? 0.085 : 0.052),
+                                Color.white.opacity(isActive ? 0.035 : 0.025)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
             )
-            .disabled(nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty)
-
-            Button(language.localized("フルパネルを開く")) {
-                store.send(.nanoBanana(.sheetPresentationChanged(true)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(
+                        isActive
+                        ? StudioTheme.Palette.accentBright.opacity(0.42)
+                        : Color.white.opacity(0.08),
+                        lineWidth: 1
+                    )
+            )
+            .overlay(alignment: .top) {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(Color.white.opacity(isActive ? 0.10 : 0.045), lineWidth: 1)
+                    .padding(1)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white.opacity(0.72))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
+        }
+        .buttonStyle(WorkspaceFlatButtonStyle())
+    }
+
+    var workspaceNanoBananaInputLayerMenu: some View {
+        workspaceNanoBananaMenuCard(
+            label: language.localized("入力"),
+            value: resolvedNanoBananaInputLayerName,
+            picker: .inputLayer
+        )
+    }
+
+    var workspaceNanoBananaEditScopeMenu: some View {
+        workspaceNanoBananaMenuCard(
+            label: language.localized("対象"),
+            value: nanoBananaState.composer.editScope.title(language),
+            picker: .editScope
+        )
+    }
+
+    var workspaceNanoBananaOutputModeMenu: some View {
+        workspaceNanoBananaMenuCard(
+            label: language.localized("出力"),
+            value: nanoBananaState.composer.outputMode.title(language),
+            picker: .outputMode
+        )
+    }
+
+    var workspaceNanoBananaModelMenu: some View {
+        workspaceNanoBananaMenuCard(
+            label: language.localized("モデル"),
+            value: nanoBananaState.composer.model.title(language),
+            picker: .model
+        )
+    }
+
+    var workspaceNanoBananaActions: some View {
+        let requiresSubscription = !nanoBananaState.commerce.isSubscriptionActive
+        let isDimmed = nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty || nanoBananaState.commerce.isLoading
+        return HStack(spacing: 8) {
+            Button {
+                handleNanoBananaPrimaryAction(closeSheet: false)
+            } label: {
+                Label(
+                    nanoBananaPrimaryActionTitle(fallback: language.localized("実行")),
+                    systemImage: requiresSubscription ? "lock.fill" : "sparkles"
+                )
+                    .font(StudioTheme.Typography.label(12))
+                    .labelStyle(.titleAndIcon)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+            }
+            .buttonStyle(WorkspaceFlatButtonStyle())
+            .foregroundStyle(.white.opacity(0.94))
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                (isDimmed
+                                 ? StudioTheme.Palette.accentBright.opacity(0.30)
+                                 : StudioTheme.Palette.accentBright.opacity(requiresSubscription ? 0.72 : 0.86)),
+                                (isDimmed
+                                 ? StudioTheme.Palette.accentBright.opacity(0.20)
+                                 : StudioTheme.Palette.accentBright.opacity(requiresSubscription ? 0.48 : 0.62))
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .disabled(nanoBananaPrimaryActionDisabled)
+
+            Button {
+                store.send(.nanoBanana(.sheetPresentationChanged(true)))
+            } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.74))
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(WorkspaceFlatButtonStyle())
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(Color.white.opacity(0.04))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
-
-            Spacer(minLength: 0)
+            .accessibilityLabel(language.localized("フルパネルを開く"))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     var workspaceHistoryPanel: some View {
@@ -1003,5 +1291,13 @@ extension ContentView {
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             }
         }
+    }
+}
+
+private struct WorkspaceFlatButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .animation(.linear(duration: 0.06), value: configuration.isPressed)
     }
 }

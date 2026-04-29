@@ -14,7 +14,13 @@ struct ContentView: View {
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     enum NanoBananaFocusedField: Hashable {
         case prompt
-        case apiKey
+    }
+
+    enum NanoBananaWorkspacePicker: Hashable {
+        case inputLayer
+        case editScope
+        case outputMode
+        case model
     }
 
     let store: StoreOf<PrimoRootFeature>
@@ -39,6 +45,7 @@ struct ContentView: View {
     @State var showsColorRangeSelectionSheet = false
     @State var showsTransformNumericSheet = false
     @State var showsLicensesSheet = false
+    @State var showsNanoBananaSettingsSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var resizeCanvasWidthText = ""
@@ -72,6 +79,7 @@ struct ContentView: View {
     @State var selectedPhotoLayerItem: PhotosPickerItem?
     @State var selectedNewCanvasPhotoItem: PhotosPickerItem?
     @State var selectedToolMetricEditor: ToolMetricEditor?
+    @State var activeNanoBananaWorkspacePicker: NanoBananaWorkspacePicker?
     @State var toolMetricSizeText = ""
     @State var toolMetricOpacityText = ""
     @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
@@ -158,6 +166,9 @@ struct ContentView: View {
             ThirdPartyLicensesView(language: language) {
                 showsLicensesSheet = false
             }
+        }
+        .sheet(isPresented: $showsNanoBananaSettingsSheet) {
+            nanoBananaSettingsSheet
         }
         .sheet(
             isPresented: Binding(
@@ -306,7 +317,6 @@ struct ContentView: View {
                     menuBar
                     undoRedoBar
                 }
-                .background(WindowGestureShield())
                 .contentShape(Rectangle())
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)

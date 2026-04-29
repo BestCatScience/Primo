@@ -9,6 +9,7 @@ public struct NanoBananaSettingsClient: Sendable {
 
     public static let accessModeStorageKey = "primo.nanobanana.accessMode"
     public static let apiKeyStorageKey = "primo.nanobanana.apiKey"
+    public static let openAIAPIKeyStorageKey = "primo.aiImage.openAIAPIKey"
 
     public init(
         load: @escaping @Sendable () -> NanoBananaSettings,
@@ -22,16 +23,19 @@ public struct NanoBananaSettingsClient: Sendable {
         NanoBananaSettingsClient(
             load: {
                 let rawAccessMode = keyValueStoreClient.stringForKey(Self.accessModeStorageKey)
-                let accessMode = rawAccessMode.flatMap(NanoBananaAccessMode.init(rawValue:)) ?? .userAPIKey
+                let accessMode = rawAccessMode.flatMap(NanoBananaAccessMode.init(rawValue:)) ?? .appManaged
                 let apiKey = keyValueStoreClient.stringForKey(Self.apiKeyStorageKey) ?? ""
+                let openAIAPIKey = keyValueStoreClient.stringForKey(Self.openAIAPIKeyStorageKey) ?? ""
                 return NanoBananaSettings(
                     accessMode: accessMode,
-                    apiKey: apiKey
+                    apiKey: apiKey,
+                    openAIAPIKey: openAIAPIKey
                 )
             },
             persist: { settings in
                 keyValueStoreClient.setString(settings.accessMode.rawValue, Self.accessModeStorageKey)
                 keyValueStoreClient.setString(settings.apiKey, Self.apiKeyStorageKey)
+                keyValueStoreClient.setString(settings.openAIAPIKey, Self.openAIAPIKeyStorageKey)
             }
         )
     }

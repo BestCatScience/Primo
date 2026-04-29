@@ -29,11 +29,25 @@ public struct NanoBananaMaskSettings: Equatable, Sendable {
 }
 
 public enum NanoBananaModel: String, CaseIterable, Equatable, Sendable, Identifiable {
-    case flashImage25 = "gemini-2.5-flash-image"
     case flashImage31Preview = "gemini-3.1-flash-image-preview"
     case proImagePreview = "gemini-3-pro-image-preview"
+    case gptImage2 = "gpt-image-2"
 
     public var id: String { rawValue }
+
+    public var provider: NanoBananaModelProvider {
+        switch self {
+        case .flashImage31Preview, .proImagePreview:
+            return .gemini
+        case .gptImage2:
+            return .openAI
+        }
+    }
+}
+
+public enum NanoBananaModelProvider: String, Equatable, Sendable {
+    case gemini
+    case openAI
 }
 
 public enum NanoBananaAccessMode: String, CaseIterable, Equatable, Sendable, Identifiable {
@@ -247,13 +261,16 @@ public struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
 public struct NanoBananaSettings: Equatable, Sendable {
     public var accessMode: NanoBananaAccessMode
     public var apiKey: String
+    public var openAIAPIKey: String
 
     public init(
-        accessMode: NanoBananaAccessMode = .userAPIKey,
-        apiKey: String = ""
+        accessMode: NanoBananaAccessMode = .appManaged,
+        apiKey: String = "",
+        openAIAPIKey: String = ""
     ) {
         self.accessMode = accessMode
         self.apiKey = apiKey
+        self.openAIAPIKey = openAIAPIKey
     }
 }
 

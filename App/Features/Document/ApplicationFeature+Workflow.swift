@@ -110,7 +110,7 @@ extension ApplicationFeature.Feedback {
         case .nanoBananaPromptRequired:
             return language.localized("Nano Banana 用のプロンプトを入力してください")
         case .nanoBananaAPIKeyRequired:
-            return language.localized("Gemini API キーを入力してください")
+            return language.localized("AI画像編集にはサブスクリプションが必要です")
         case .nanoBananaEndpointRequired:
             return language.localized("アプリサーバーのエンドポイントを入力してください")
         case .nanoBananaPrepareLayerFailed:

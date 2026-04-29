@@ -36,6 +36,30 @@ public extension NanoBananaRemoteEditClient {
     ) async throws -> Data? {
         switch config {
         case let .userAPIKey(apiKey):
+            if model.provider == .openAI {
+                let request = try makeOpenAIImageEditRequest(
+                    inputPNGData: inputPNGData,
+                    prompt: prompt,
+                    apiKey: apiKey.rawValue,
+                    model: model
+                )
+                let (data, response) = try await httpClient.data(request)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NanoBananaEditFailure.invalidResponse
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    if let apiError = decodeAPIErrorEnvelope(from: data) {
+                        throw NanoBananaEditFailure.apiError(apiError.error.message)
+                    }
+                    throw NanoBananaEditFailure.apiError(
+                        String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                    )
+                }
+
+                return try decodeImageData(from: data)
+            }
+
             var lastError: NanoBananaEditFailure?
             for request in makeGeminiRequests(
                 inputPNGData: inputPNGData,
@@ -106,6 +130,7 @@ public extension NanoBananaRemoteEditClient {
         apiKey: String,
         model: NanoBananaModel
     ) -> [URLRequest] {
+        guard model.provider == .gemini else { return [] }
         guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model.rawValue):generateContent") else {
             return []
         }
@@ -166,6 +191,73 @@ public extension NanoBananaRemoteEditClient {
         }
     }
 
+    private static func makeOpenAIImageEditRequest(
+        inputPNGData: Data,
+        prompt: String,
+        apiKey: String,
+        model: NanoBananaModel
+    ) throws -> URLRequest {
+        guard model.provider == .openAI else {
+            throw NanoBananaEditFailure.invalidEndpoint
+        }
+        guard let url = URL(string: "https://api.openai.com/v1/images/edits") else {
+            throw NanoBananaEditFailure.invalidEndpoint
+        }
+
+        let boundary = "PrimoBoundary-\(UUID().uuidString)"
+        var body = Data()
+        appendMultipartField(name: "model", value: model.rawValue, boundary: boundary, to: &body)
+        appendMultipartField(name: "prompt", value: prompt, boundary: boundary, to: &body)
+        appendMultipartField(name: "output_format", value: "png", boundary: boundary, to: &body)
+        appendMultipartFile(
+            name: "image[]",
+            filename: "input.png",
+            mimeType: "image/png",
+            data: inputPNGData,
+            boundary: boundary,
+            to: &body
+        )
+        appendString("--\(boundary)--\r\n", to: &body)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = body
+        return request
+    }
+
+    private static func appendMultipartField(
+        name: String,
+        value: String,
+        boundary: String,
+        to body: inout Data
+    ) {
+        appendString("--\(boundary)\r\n", to: &body)
+        appendString("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n", to: &body)
+        appendString("\(value)\r\n", to: &body)
+    }
+
+    private static func appendMultipartFile(
+        name: String,
+        filename: String,
+        mimeType: String,
+        data: Data,
+        boundary: String,
+        to body: inout Data
+    ) {
+        appendString("--\(boundary)\r\n", to: &body)
+        appendString("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(filename)\"\r\n", to: &body)
+        appendString("Content-Type: \(mimeType)\r\n\r\n", to: &body)
+        body.append(data)
+        appendString("\r\n", to: &body)
+    }
+
+    private static func appendString(_ value: String, to body: inout Data) {
+        body.append(Data(value.utf8))
+    }
+
     private static func makeProxyRequest(
         inputPNGData: Data,
         prompt: String,
@@ -196,14 +288,22 @@ public extension NanoBananaRemoteEditClient {
 
     private static func imageConfig(for model: NanoBananaModel) -> ImageConfig? {
         switch model {
-        case .flashImage25:
-            return ImageConfig(aspectRatio: nil, imageSize: nil)
         case .flashImage31Preview, .proImagePreview:
             return ImageConfig(aspectRatio: "1:1", imageSize: "2K")
+        case .gptImage2:
+            return nil
         }
     }
 
     private static func decodeImageData(from data: Data) throws -> Data? {
+        if let decoded = decodeOpenAIImageEditResponse(from: data) {
+            for image in decoded.data {
+                if let imageBase64 = image.b64JSON, let decodedImage = decodeBase64ImageData(imageBase64) {
+                    return decodedImage
+                }
+            }
+        }
+
         if let decoded = decodeGenerateContentResponse(from: data) {
             if let topLevelParts = decoded.parts {
                 for part in topLevelParts {
@@ -273,6 +373,14 @@ public extension NanoBananaRemoteEditClient {
     private static func decodeProxyEditResponse(from data: Data) -> ProxyEditResponse? {
         do {
             return try JSONDecoder().decode(ProxyEditResponse.self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func decodeOpenAIImageEditResponse(from data: Data) -> OpenAIImageEditResponse? {
+        do {
+            return try JSONDecoder().decode(OpenAIImageEditResponse.self, from: data)
         } catch {
             return nil
         }
@@ -441,5 +549,19 @@ private struct ProxyEditResponse: Decodable {
     enum CodingKeys: String, CodingKey {
         case imageBase64 = "image_base64"
         case inlineData = "inline_data"
+    }
+}
+
+private struct OpenAIImageEditResponse: Decodable {
+    let data: [OpenAIImageEditResult]
+}
+
+private struct OpenAIImageEditResult: Decodable {
+    let b64JSON: String?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case b64JSON = "b64_json"
+        case url
     }
 }

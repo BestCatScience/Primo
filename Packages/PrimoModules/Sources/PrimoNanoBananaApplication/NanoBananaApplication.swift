@@ -18,6 +18,7 @@ public struct NanoBananaCommandBuilder: Sendable {
     public func build(
         draft: NanoBananaDraft,
         apiKey: String,
+        openAIAPIKey: String,
         commerce: NanoBananaCommerceSnapshot
     ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
         let trimmedPrompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -37,7 +38,8 @@ public struct NanoBananaCommandBuilder: Sendable {
 
         switch draft.accessMode {
         case .userAPIKey:
-            guard let validAPIKey = NanoBananaAPIKey(apiKey) else {
+            let selectedAPIKey = draft.model.provider == .openAI ? openAIAPIKey : apiKey
+            guard let validAPIKey = NanoBananaAPIKey(selectedAPIKey) else {
                 return .failure(.apiKeyRequired)
             }
             return .success(
@@ -214,7 +216,12 @@ public struct NanoBananaEditUseCase: Sendable {
     }
 
     private static func retryModels(startingWith initialModel: NanoBananaModel) -> [NanoBananaModel] {
-        [initialModel] + NanoBananaModel.allCases.filter { $0 != initialModel }
+        guard initialModel.provider == .gemini else {
+            return [initialModel]
+        }
+        return [initialModel] + NanoBananaModel.allCases.filter {
+            $0 != initialModel && $0.provider == initialModel.provider
+        }
     }
 
     private static func shouldRetryWithAnotherModel(after error: NanoBananaEditFailure) -> Bool {

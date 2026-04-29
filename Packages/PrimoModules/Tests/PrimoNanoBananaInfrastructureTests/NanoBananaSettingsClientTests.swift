@@ -16,7 +16,8 @@ struct NanoBananaSettingsClientTests {
     func loadReturnsPersistedSettings() {
         let storage = TestStorage([
             NanoBananaSettingsClient.accessModeStorageKey: NanoBananaAccessMode.appManaged.rawValue,
-            NanoBananaSettingsClient.apiKeyStorageKey: "secret"
+            NanoBananaSettingsClient.apiKeyStorageKey: "gemini-secret",
+            NanoBananaSettingsClient.openAIAPIKeyStorageKey: "openai-secret"
         ])
         let client = NanoBananaSettingsClient.live(
             keyValueStoreClient: KeyValueStoreClient(
@@ -28,7 +29,8 @@ struct NanoBananaSettingsClientTests {
         #expect(
             client.load() == NanoBananaSettings(
                 accessMode: .appManaged,
-                apiKey: "secret"
+                apiKey: "gemini-secret",
+                openAIAPIKey: "openai-secret"
             )
         )
     }
@@ -46,11 +48,13 @@ struct NanoBananaSettingsClientTests {
         client.persist(
             NanoBananaSettings(
                 accessMode: .appManaged,
-                apiKey: "persisted-key"
+                apiKey: "persisted-gemini-key",
+                openAIAPIKey: "persisted-openai-key"
             )
         )
 
         #expect(storage.values[NanoBananaSettingsClient.accessModeStorageKey] == NanoBananaAccessMode.appManaged.rawValue)
-        #expect(storage.values[NanoBananaSettingsClient.apiKeyStorageKey] == "persisted-key")
+        #expect(storage.values[NanoBananaSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
+        #expect(storage.values[NanoBananaSettingsClient.openAIAPIKeyStorageKey] == "persisted-openai-key")
     }
 }

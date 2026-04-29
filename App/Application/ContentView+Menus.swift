@@ -65,20 +65,6 @@ extension ContentView {
         )
     }
 
-    var nanoBananaAccessModeBinding: Binding<NanoBananaAccessMode> {
-        Binding(
-            get: { nanoBananaState.accessMode },
-            set: { store.send(.nanoBanana(.accessModeChanged($0))) }
-        )
-    }
-
-    var nanoBananaAPIKeyBinding: Binding<String> {
-        Binding(
-            get: { nanoBananaState.apiKey },
-            set: { store.send(.nanoBanana(.apiKeyChanged($0))) }
-        )
-    }
-
     func prepareNanoBananaComposer() {
         store.send(
             .nanoBanana(
@@ -94,10 +80,51 @@ extension ContentView {
         nanoBananaState.generateDisabled || store.document.layerSidebar.layers.isEmpty
     }
 
+    var nanoBananaPrimaryActionDisabled: Bool {
+        if !nanoBananaState.commerce.isSubscriptionActive {
+            return nanoBananaState.commerce.isLoading
+        }
+        return nanoBananaGenerateDisabled
+    }
+
+    func nanoBananaPrimaryActionTitle(fallback: String) -> String {
+        if !nanoBananaState.commerce.isSubscriptionActive {
+            return language.localized("サブスクリプションが必要です")
+        }
+        return fallback
+    }
+
+    var nanoBananaGeminiPlanHint: String {
+        switch language {
+        case .english:
+            return "AI image editing is available with the Primo subscription."
+        case .japanese:
+            return "AI画像編集は Primo のサブスクリプションで利用できます"
+        }
+    }
+
+    var nanoBananaGeminiPlanSoftHint: String {
+        switch language {
+        case .english:
+            return "AI image editing is available with the Primo subscription."
+        case .japanese:
+            return "AI画像編集は Primo のサブスクリプションで利用できます"
+        }
+    }
+
     func requestNanoBananaGeneration(closeSheet: Bool) {
         nanoBananaFocusedField = nil
         store.send(.nanoBanana(.inputLayerIndexChanged(resolvedNanoBananaInputLayerIndex)))
         store.send(.nanoBanana(.generateButtonTapped(closeSheet: closeSheet)))
+    }
+
+    func handleNanoBananaPrimaryAction(closeSheet: Bool) {
+        guard nanoBananaState.commerce.isSubscriptionActive else {
+            nanoBananaFocusedField = nil
+            store.send(.nanoBanana(.paywallPresentationChanged(true)))
+            return
+        }
+        requestNanoBananaGeneration(closeSheet: closeSheet)
     }
 
     @ViewBuilder
@@ -150,9 +177,37 @@ extension ContentView {
             .buttonStyle(.borderless)
         }
 
-        Text(language.localized("自社バックエンドでプロバイダ API キー注入と購入権限チェックを行う想定です"))
+        Text(language.localized("Primo のサブスクリプションでAI画像編集を利用できます"))
             .font(.footnote)
             .foregroundStyle(.secondary)
+    }
+
+    var nanoBananaSettingsSheet: some View {
+        NavigationStack {
+            Form {
+                Section(language.localized("AI画像設定")) {
+                    Picker(language.localized("モデル"), selection: nanoBananaModelBinding) {
+                        ForEach(NanoBananaModel.allCases) { model in
+                            Text(model.title(language)).tag(model)
+                        }
+                    }
+
+                    nanoBananaSubscriptionControls
+                }
+            }
+            .navigationTitle(language.localized("AI画像設定"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(language.localized("完了")) {
+                        nanoBananaFocusedField = nil
+                        showsNanoBananaSettingsSheet = false
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 
     var nanoBananaPaywallSheet: some View {
@@ -160,9 +215,9 @@ extension ContentView {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(language.localized("Nano Banana を有効化"))
+                        Text(language.localized("AI画像を有効化"))
                             .font(.title3.weight(.semibold))
-                        Text(language.localized("Primo のサブスクリプションで、自分の API キーなしに Nano Banana を利用できます"))
+                        Text(language.localized("Primo のサブスクリプションでAI画像編集を利用できます"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -170,7 +225,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("含まれる内容")) {
-                    Label(language.localized("アプリ管理の Nano Banana 編集を利用可能"), systemImage: "sparkles")
+                    Label(language.localized("アプリ管理のAI画像編集を利用可能"), systemImage: "sparkles")
                     Label(language.localized("購入状態を自動で同期"), systemImage: "arrow.triangle.2.circlepath")
                     Label(language.localized("新しい端末でも購入を復元可能"), systemImage: "icloud")
                 }
@@ -1104,7 +1159,7 @@ extension ContentView {
                 Section(StudioStrings.nanoBanana(language)) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(StudioStrings.nanoBananaEdit(language))
-                        Text(language.localized("Nano Banana にどう編集させたいか入力してください"))
+                        Text(language.localized("AI画像にどう編集させたいか入力してください"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -1157,12 +1212,6 @@ extension ContentView {
                 }
 
                 Section(language.localized("入力")) {
-                    Picker(language.localized("接続方式"), selection: nanoBananaAccessModeBinding) {
-                        ForEach([NanoBananaAccessMode.userAPIKey]) { mode in
-                            Text(mode.title(language)).tag(mode)
-                        }
-                    }
-
                     Picker(language.localized("入力レイヤー"), selection: nanoBananaInputLayerIndexBinding) {
                         ForEach(store.document.layerSidebar.layers) { layer in
                             Text(layer.name).tag(layer.index)
@@ -1198,15 +1247,7 @@ extension ContentView {
                         }
                     }
 
-                    if nanoBananaState.accessMode == .userAPIKey {
-                        SecureField(language.localized("Gemini API キー"), text: nanoBananaAPIKeyBinding)
-                            .focused($nanoBananaFocusedField, equals: .apiKey)
-                        Text(language.localized("この端末内に保存されます"))
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        nanoBananaSubscriptionControls
-                    }
+                    nanoBananaSubscriptionControls
                 }
 
                 Section(language.localized("出力")) {
@@ -1272,10 +1313,10 @@ extension ContentView {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(language.localized("生成")) {
-                        requestNanoBananaGeneration(closeSheet: true)
+                    Button(nanoBananaPrimaryActionTitle(fallback: language.localized("生成"))) {
+                        handleNanoBananaPrimaryAction(closeSheet: true)
                     }
-                    .disabled(nanoBananaGenerateDisabled)
+                    .disabled(nanoBananaPrimaryActionDisabled)
                 }
             }
         }

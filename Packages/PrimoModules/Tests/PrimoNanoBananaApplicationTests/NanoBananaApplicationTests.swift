@@ -10,7 +10,7 @@ struct NanoBananaApplicationTests {
         let draft = NanoBananaDraft(
             prompt: "  refine shadows  ",
             accessMode: .userAPIKey,
-            model: .flashImage25,
+            model: .flashImage31Preview,
             inputLayerIndex: 4,
             editScope: .selectedArea,
             outputMode: .newLayer,
@@ -21,10 +21,11 @@ struct NanoBananaApplicationTests {
         let result = NanoBananaCommandBuilder().build(
             draft: draft,
             apiKey: "  secret-key  ",
+            openAIAPIKey: "",
             commerce: snapshot
         )
 
-        let command = try #require(try result.get())
+        let command = try result.get()
         #expect(command.descriptor.prompt.rawValue == "refine shadows")
         #expect(command.descriptor.inputLayerIndex == 4)
         #expect(command.descriptor.maskSettings.expansion == 6)
@@ -33,12 +34,57 @@ struct NanoBananaApplicationTests {
     }
 
     @Test
+    func commandBuilderBuildsOpenAIUserKeyCommand() throws {
+        let draft = NanoBananaDraft(
+            prompt: "  refine text  ",
+            accessMode: .userAPIKey,
+            model: .gptImage2,
+            inputLayerIndex: 1,
+            editScope: .wholeLayer,
+            outputMode: .replaceCurrentLayer
+        )
+
+        let result = NanoBananaCommandBuilder().build(
+            draft: draft,
+            apiKey: "",
+            openAIAPIKey: "  openai-key  ",
+            commerce: NanoBananaCommerceSnapshot()
+        )
+
+        let command = try result.get()
+        #expect(command.descriptor.model == .gptImage2)
+        #expect(command.descriptor.model.provider == .openAI)
+        #expect(command.executionConfig == .userAPIKey(apiKey: NanoBananaAPIKey("openai-key")!))
+    }
+
+    @Test
+    func commandBuilderRequiresOpenAIKeyForGPTImage2() {
+        let draft = NanoBananaDraft(
+            prompt: "refine text",
+            accessMode: .userAPIKey,
+            model: .gptImage2,
+            inputLayerIndex: 1,
+            editScope: .wholeLayer,
+            outputMode: .replaceCurrentLayer
+        )
+
+        let result = NanoBananaCommandBuilder().build(
+            draft: draft,
+            apiKey: "gemini-key",
+            openAIAPIKey: "",
+            commerce: NanoBananaCommerceSnapshot()
+        )
+
+        #expect(result == .failure(.apiKeyRequired))
+    }
+
+    @Test
     func editUseCaseRetriesAcrossPromptsAndModels() async throws {
         let command = SubmitNanoBananaEditCommand(
             descriptor: NanoBananaEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch it")!,
                 accessMode: .userAPIKey,
-                model: .flashImage25,
+                model: .flashImage31Preview,
                 inputLayerIndex: 0,
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
@@ -56,17 +102,17 @@ struct NanoBananaApplicationTests {
         let recorder = Recorder()
         let remoteClient = NanoBananaRemoteEditClient { _, prompt, model in
             recorder.calls.append((prompt, model))
-            if model == .flashImage31Preview {
+            if model == .proImagePreview {
                 return .success(Data([0x01]))
             }
             return .failure(.apiError("service unavailable"))
         }
 
         let result = await NanoBananaEditUseCase.live(remoteClient: remoteClient).execute(request)
-        let data = try #require(try result.get())
+        let data = try result.get()
         #expect(data == Data([0x01]))
         #expect(recorder.calls.count >= 3)
-        #expect(recorder.calls.contains { $0.1 == .flashImage31Preview })
+        #expect(recorder.calls.contains { $0.1 == .proImagePreview })
     }
 
     @Test
@@ -75,7 +121,7 @@ struct NanoBananaApplicationTests {
             descriptor: NanoBananaEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch it")!,
                 accessMode: .userAPIKey,
-                model: .flashImage25,
+                model: .flashImage31Preview,
                 inputLayerIndex: 0,
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
@@ -105,7 +151,7 @@ struct NanoBananaApplicationTests {
             )
         )
 
-        let preview = try #require(try result.get())
+        let preview = try result.get()
         #expect(preview.outputLayerIndex == 0)
         #expect(preview.outputSurface.width == 2)
         #expect(preview.outputSurface.height == 2)
@@ -120,7 +166,7 @@ struct NanoBananaApplicationTests {
             descriptor: NanoBananaEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch selection")!,
                 accessMode: .userAPIKey,
-                model: .flashImage25,
+                model: .flashImage31Preview,
                 inputLayerIndex: 0,
                 editScope: .selectedArea,
                 outputMode: .replaceCurrentLayer
@@ -153,7 +199,7 @@ struct NanoBananaApplicationTests {
             )
         )
 
-        let preview = try #require(try result.get())
+        let preview = try result.get()
         #expect(preview.outputSurface.width == 4)
         #expect(preview.outputSurface.height == 4)
         #expect(preview.beforePreviewImageData != nil)
