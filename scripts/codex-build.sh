@@ -12,8 +12,6 @@ xcodebuild \
   -scheme Primo \
   -clonedSourcePackagesDirPath build/SourcePackages
 
-scripts/patch-swift-navigation-package.sh
-
 xcodebuild \
   -project Primo.xcodeproj \
   -scheme Primo \
@@ -21,5 +19,7 @@ xcodebuild \
   -configuration Debug \
   -derivedDataPath build/DerivedData \
   -clonedSourcePackagesDirPath build/SourcePackages \
+  -skipMacroValidation \
+  -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build

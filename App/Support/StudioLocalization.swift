@@ -143,6 +143,8 @@ enum StudioStrings {
         "Layer Lock": "レイヤーロック",
         "Layer Opacity": "レイヤー不透明度",
         "Layers": "レイヤー",
+        "Licenses": "ライセンス",
+        "License Type": "ライセンス種別",
         "Alpha Lock": "アルファロック",
         "Lighten": "比較(明)",
         "Lighter Color": "カラー比較(明)",
@@ -386,6 +388,10 @@ enum StudioStrings {
         "New Canvas": "新規キャンバス",
         "Custom Size...": "カスタムサイズ...",
         "Open": "開く",
+        "Open Source Licenses": "オープンソースライセンス",
+        "Open Source Packages": "オープンソースパッケージ",
+        "Package URL": "パッケージ URL",
+        "Package Version": "バージョン",
         "Export": "書き出し",
         "Export Timelapse": "タイムラプスを書き出し",
         "Refresh View": "表示を更新",
@@ -453,6 +459,26 @@ enum StudioStrings {
     static func pageMenu(_ language: AppLanguage) -> String { language.localized("ページ管理") }
     static func layerMenu(_ language: AppLanguage) -> String { language.localized("レイヤー") }
     static func languageMenu(_ language: AppLanguage) -> String { language.localized("言語") }
+    static func licenses(_ language: AppLanguage) -> String { language.localized("ライセンス") }
+    static func openSourceLicenses(_ language: AppLanguage) -> String { language.localized("オープンソースライセンス") }
+    static func openSourcePackages(_ language: AppLanguage) -> String { language.localized("オープンソースパッケージ") }
+    static func packageURL(_ language: AppLanguage) -> String { language.localized("パッケージ URL") }
+    static func packageVersion(_ language: AppLanguage) -> String { language.localized("バージョン") }
+    static func licenseType(_ language: AppLanguage) -> String { language.localized("ライセンス種別") }
+    static func openSourceLicensesSummary(_ language: AppLanguage, _ count: Int) -> String {
+        localized(
+            language,
+            japanese: "Primo が利用している \(count) 件のオープンソースパッケージのライセンスを表示しています。",
+            english: "Licenses for \(count) open source packages used by Primo."
+        )
+    }
+    static func openSourceLicensesHomeDetail(_ language: AppLanguage) -> String {
+        localized(
+            language,
+            japanese: "利用している OSS パッケージの著作権表示とライセンス全文を確認できます。",
+            english: "Review copyright notices and full license texts for the OSS packages used by the app."
+        )
+    }
     static func newCanvas(_ language: AppLanguage) -> String { language.localized("新規キャンバス") }
     static func customSize(_ language: AppLanguage) -> String { language.localized("カスタムサイズ...") }
     static func open(_ language: AppLanguage) -> String { language.localized("開く") }

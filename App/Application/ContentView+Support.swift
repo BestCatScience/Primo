@@ -915,6 +915,16 @@ extension ContentView {
                     detail: "\(language.title) / \(StudioStrings.storageSummary(applicationState.homeProjects.count, language))"
                 )
 
+                Button {
+                    showsLicensesSheet = true
+                } label: {
+                    learnPanel(
+                        title: StudioStrings.openSourceLicenses(language),
+                        detail: StudioStrings.openSourceLicensesHomeDetail(language)
+                    )
+                }
+                .buttonStyle(.plain)
+
                 Picker(StudioStrings.appLanguageTitle(language), selection: Binding(
                     get: { applicationState.appLanguage },
                     set: { store.send(.application(.languageChanged($0))) }

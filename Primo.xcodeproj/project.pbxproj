@@ -50,6 +50,8 @@
 		A0000000000000000000004A /* StudioLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004B /* StudioLocalization.swift */; };
 		A0000000000000000000004C /* BrushTipFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004D /* BrushTipFile.swift */; };
 		A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000004F /* PhotoshopBrushFile.swift */; };
+		L10000000000000000000001 /* ThirdPartyLicensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = L10000000000000000000003 /* ThirdPartyLicensesView.swift */; };
+		L10000000000000000000002 /* ThirdPartyNotices.json in Resources */ = {isa = PBXBuildFile; fileRef = L10000000000000000000004 /* ThirdPartyNotices.json */; };
 		A00000000000000000000094 /* BrushPresetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000095 /* BrushPresetStore.swift */; };
 		A00000000000000000000096 /* ContentView+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000097 /* ContentView+Support.swift */; };
 		A0000000000000000000009A /* BrushPaletteSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009B /* BrushPaletteSupport.swift */; };
@@ -231,6 +233,8 @@
 		A0000000000000000000004B /* StudioLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLocalization.swift; sourceTree = "<group>"; };
 		A0000000000000000000004D /* BrushTipFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushTipFile.swift; sourceTree = "<group>"; };
 		A0000000000000000000004F /* PhotoshopBrushFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoshopBrushFile.swift; sourceTree = "<group>"; };
+		L10000000000000000000003 /* ThirdPartyLicensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThirdPartyLicensesView.swift; sourceTree = "<group>"; };
+		L10000000000000000000004 /* ThirdPartyNotices.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ThirdPartyNotices.json; sourceTree = "<group>"; };
 		A00000000000000000000095 /* BrushPresetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPresetStore.swift; sourceTree = "<group>"; };
 		A00000000000000000000097 /* ContentView+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Support.swift"; sourceTree = "<group>"; };
 		A0000000000000000000009B /* BrushPaletteSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPaletteSupport.swift; sourceTree = "<group>"; };
@@ -483,6 +487,8 @@
 				A0000000000000000000004F /* PhotoshopBrushFile.swift */,
 				A0000000000000000000004B /* StudioLocalization.swift */,
 				A00000000000000000000047 /* StudioTheme.swift */,
+				L10000000000000000000003 /* ThirdPartyLicensesView.swift */,
+				L10000000000000000000004 /* ThirdPartyNotices.json */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -751,6 +757,7 @@
 				C10000000000000000000009 /* XCRemoteSwiftPackageReference "swift-perception" */,
 				C1000000000000000000000A /* XCRemoteSwiftPackageReference "swift-sharing" */,
 				C1000000000000000000000B /* XCRemoteSwiftPackageReference "xctest-dynamic-overlay" */,
+				C1000000000000000000000C /* XCRemoteSwiftPackageReference "swift-navigation" */,
 				B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */,
 			);
 			productRefGroup = A00000000000000000000055 /* Products */;
@@ -769,6 +776,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000048 /* Assets.xcassets in Resources */,
+				L10000000000000000000002 /* ThirdPartyNotices.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -838,6 +846,7 @@
 				A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */,
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
+				L10000000000000000000001 /* ThirdPartyLicensesView.swift in Sources */,
 				A0000000000000000000003D /* PaintDocumentClient.swift in Sources */,
 				A000000000000000000000BE /* DocumentWorkspaceClient.swift in Sources */,
 				A000000000000000000000B6 /* NanoBananaClient.swift in Sources */,
@@ -1147,10 +1156,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		A00000000000000000000092 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
+			repositoryURL = "https://github.com/BestCatScience/swift-composable-architecture";
 			requirement = {
-				kind = exactVersion;
-				version = 1.25.2;
+				kind = revision;
+				revision = 8970b5088dbcde3c4e8d2c88e52f46a74f2f6071;
 			};
 		};
 		C10000000000000000000001 /* XCRemoteSwiftPackageReference "combine-schedulers" */ = {
@@ -1231,6 +1240,14 @@
 			requirement = {
 				kind = exactVersion;
 				version = 1.9.0;
+			};
+		};
+		C1000000000000000000000C /* XCRemoteSwiftPackageReference "swift-navigation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/BestCatScience/swift-navigation";
+			requirement = {
+				kind = revision;
+				revision = 86539f79492bd7188da219a96dc0053a6e3a327b;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

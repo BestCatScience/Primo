@@ -4,8 +4,8 @@ options:
     iOS: 26.0
 packages:
   ComposableArchitecture:
-    url: https://github.com/pointfreeco/swift-composable-architecture
-    exactVersion: 1.25.2
+    url: https://github.com/BestCatScience/swift-composable-architecture
+    revision: 8970b5088dbcde3c4e8d2c88e52f46a74f2f6071
   CasePaths:
     url: https://github.com/pointfreeco/swift-case-paths
     exactVersion: 1.7.2
@@ -36,6 +36,9 @@ packages:
   Sharing:
     url: https://github.com/pointfreeco/swift-sharing
     exactVersion: 2.7.4
+  SwiftNavigation:
+    url: https://github.com/BestCatScience/swift-navigation
+    revision: 86539f79492bd7188da219a96dc0053a6e3a327b
   PrimoModules:
     path: Packages/PrimoModules
 settings:
@@ -48,6 +51,10 @@ targets:
     platform: iOS
     sources:
       - path: App
+        excludes:
+          - Support/ThirdPartyNotices.json
+      - path: App/Support/ThirdPartyNotices.json
+        buildPhase: resources
     settings:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
@@ -104,10 +111,6 @@ targets:
       - sdk: MetalKit.framework
       - sdk: UIKit.framework
     scheme:
-      preActions:
-        - name: Patch SwiftNavigation package manifest
-          script: '"${PROJECT_DIR}/scripts/patch-swift-navigation-package.sh"'
-          settingsTarget: Primo
       testTargets:
         - PrimoTests
   PrimoTests:

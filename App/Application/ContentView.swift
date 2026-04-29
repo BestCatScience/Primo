@@ -38,6 +38,7 @@ struct ContentView: View {
     @State var showsFeatherSelectionSheet = false
     @State var showsColorRangeSelectionSheet = false
     @State var showsTransformNumericSheet = false
+    @State var showsLicensesSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var resizeCanvasWidthText = ""
@@ -152,6 +153,11 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showsTransformNumericSheet) {
             transformNumericSheet
+        }
+        .sheet(isPresented: $showsLicensesSheet) {
+            ThirdPartyLicensesView(language: language) {
+                showsLicensesSheet = false
+            }
         }
         .sheet(
             isPresented: Binding(

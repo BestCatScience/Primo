@@ -1840,6 +1840,12 @@ extension ContentView {
                 Button(store.document.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
                     store.send(.document(.editing(.panelCollapseToggled(.layers))))
                 }
+
+                Divider()
+
+                Button(StudioStrings.licenses(language)) {
+                    showsLicensesSheet = true
+                }
             }
 
             Spacer(minLength: 8)
