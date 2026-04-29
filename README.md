@@ -117,8 +117,8 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   workspace catalog、autosave、load、reservation、persistence
 - `PrimoBrushDomain` / `PrimoBrushFileFormats` / `PrimoBrushInfrastructure`
   brush settings、Photoshop brush / tip formats、brush import
-- `PrimoNanoBananaDomain` / `PrimoNanoBananaApplication` / `PrimoNanoBananaInfrastructure`
-  AI 画像編集 backend。旧称 NanoBanana module として残しつつ、Gemini 系 image model と OpenAI Image model の command、preview preparation、commerce / remote client を扱います。
+- `PrimoAIImageDomain` / `PrimoAIImageApplication` / `PrimoAIImageInfrastructure`
+  AI 画像編集 backend。Gemini 系 image model と OpenAI Image model の command、preview preparation、commerce / remote client を扱います。
 - `PrimoLocalization`
   共通ローカライズ型
 

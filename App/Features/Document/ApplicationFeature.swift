@@ -22,7 +22,6 @@ struct ApplicationFeature {
         case workspaceProjectLoad
         case timelapseExport
         case aiImageEdit
-        case nanoBananaEdit
     }
 
     enum Feedback: Equatable, Sendable {
@@ -52,19 +51,19 @@ struct ApplicationFeature {
         case exportFailed
         case timelapseHistoryUnavailable
         case timelapseExportFailed(String?)
-        case nanoBananaPromptRequired
-        case nanoBananaAPIKeyRequired
-        case nanoBananaEndpointRequired
-        case nanoBananaPrepareLayerFailed
-        case nanoBananaSelectionRequired
-        case nanoBananaApplyFailed
-        case nanoBananaInvalidResponse
-        case nanoBananaInvalidEndpoint
-        case nanoBananaMissingImage
-        case nanoBananaUnsupportedImage
-        case nanoBananaEditFailed(String?)
-        case nanoBananaGenerationCanceled
-        case nanoBananaEditApplied
+        case aiImagePromptRequired
+        case aiImageAPIKeyRequired
+        case aiImageEndpointRequired
+        case aiImagePrepareLayerFailed
+        case aiImageSelectionRequired
+        case aiImageApplyFailed
+        case aiImageInvalidResponse
+        case aiImageInvalidEndpoint
+        case aiImageMissingImage
+        case aiImageUnsupportedImage
+        case aiImageEditFailed(String?)
+        case aiImageGenerationCanceled
+        case aiImageEditApplied
         case couldNotCreateTab
         case canvasSizeUnsupported
         case imageResolutionUpdated

@@ -31,6 +31,7 @@
 		A0000000000000000000002B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000032 /* Foundation.framework */; };
 		A0000000000000000000002C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000033 /* CoreGraphics.framework */; };
 		A0000000000000000000002D /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000034 /* AVFoundation.framework */; };
+		A0000000000000000000002E /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A0000000000000000000003C /* AppIntents.framework */; };
 		A00000000000000000000035 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000036 /* Metal.framework */; };
 		A00000000000000000000037 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A00000000000000000000038 /* MetalKit.framework */; };
 		A00000000000000000000039 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000093 /* ComposableArchitecture */; };
@@ -84,7 +85,7 @@
 		AA100000000000000000000C /* PrimoDocumentEngineInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */; };
 		AA100000000000000000000D /* PrimoDocumentGPUContracts in Frameworks */ = {isa = PBXBuildFile; productRef = AA9000000000000000000001 /* PrimoDocumentGPUContracts */; };
 		AA100000000000000000000E /* PrimoDocumentStrokeApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B91000000000000000000012 /* PrimoDocumentStrokeApplication */; };
-		AA100000000000000000000F /* PrimoNanoBananaApplication in Frameworks */ = {isa = PBXBuildFile; productRef = AA9000000000000000000002 /* PrimoNanoBananaApplication */; };
+		AA100000000000000000000F /* PrimoAIImageApplication in Frameworks */ = {isa = PBXBuildFile; productRef = AA9000000000000000000002 /* PrimoAIImageApplication */; };
 		B90000000000000000000001 /* PrimoCoreTypes in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000011 /* PrimoCoreTypes */; };
 		B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000012 /* PrimoDocumentDomain */; };
 		B90000000000000000000003 /* PrimoDocumentContracts in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000013 /* PrimoDocumentContracts */; };
@@ -103,10 +104,10 @@
 		B90000000000000000000020 /* PrimoBrushFileFormats in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000001F /* PrimoBrushFileFormats */; };
 		B90000000000000000000021 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
 		B90000000000000000000023 /* PrimoBrushDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000022 /* PrimoBrushDomain */; };
-		B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
-		B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
-		B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoNanoBananaDomain */; };
-		B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoNanoBananaInfrastructure */; };
+		B90000000000000000000024 /* PrimoAIImageDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoAIImageDomain */; };
+		B90000000000000000000025 /* PrimoAIImageInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoAIImageInfrastructure */; };
+		B90000000000000000000026 /* PrimoAIImageDomain in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000028 /* PrimoAIImageDomain */; };
+		B90000000000000000000027 /* PrimoAIImageInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000029 /* PrimoAIImageInfrastructure */; };
 		B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
 		B9000000000000000000002C /* PrimoDocumentApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000002A /* PrimoDocumentApplication */; };
 		B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000032 /* PrimoDocumentInfrastructure */; };
@@ -169,8 +170,8 @@
 		E70000000000000000000016 /* AIImageFeature+Reducer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000006 /* AIImageFeature+Reducer.swift */; };
 		E70000000000000000000017 /* AIImageDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000007 /* AIImageDependencies.swift */; };
 		E70000000000000000000018 /* AIImageDomain+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000008 /* AIImageDomain+Presentation.swift */; };
-		E70000000000000000000019 /* PrimoNanoBananaModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000009 /* PrimoNanoBananaModules.swift */; };
-		E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7000000000000000000000A /* NanoBananaFeatureTests.swift */; };
+		E70000000000000000000019 /* PrimoAIImageModules.swift in Sources */ = {isa = PBXBuildFile; fileRef = E70000000000000000000009 /* PrimoAIImageModules.swift */; };
+		E7000000000000000000001A /* AIImageFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7000000000000000000000A /* AIImageFeatureTests.swift */; };
 		F10000000000000000000003 /* TextFontLibraryClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000004 /* TextFontLibraryClient.swift */; };
 		F10000000000000000000005 /* BrushImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000006 /* BrushImportClient.swift */; };
 		F10000000000000000000007 /* DocumentImportClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000008 /* DocumentImportClient.swift */; };
@@ -226,6 +227,7 @@
 		A00000000000000000000032 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		A00000000000000000000033 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		A00000000000000000000034 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		A0000000000000000000003C /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
 		A00000000000000000000036 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		A00000000000000000000038 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		A00000000000000000000045 /* InputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputHandler.swift; sourceTree = "<group>"; };
@@ -281,8 +283,8 @@
 		E70000000000000000000006 /* AIImageFeature+Reducer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIImageFeature+Reducer.swift"; sourceTree = "<group>"; };
 		E70000000000000000000007 /* AIImageDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIImageDependencies.swift; sourceTree = "<group>"; };
 		E70000000000000000000008 /* AIImageDomain+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIImageDomain+Presentation.swift"; sourceTree = "<group>"; };
-		E70000000000000000000009 /* PrimoNanoBananaModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoNanoBananaModules.swift; sourceTree = "<group>"; };
-		E7000000000000000000000A /* NanoBananaFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NanoBananaFeatureTests.swift; sourceTree = "<group>"; };
+		E70000000000000000000009 /* PrimoAIImageModules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimoAIImageModules.swift; sourceTree = "<group>"; };
+		E7000000000000000000000A /* AIImageFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIImageFeatureTests.swift; sourceTree = "<group>"; };
 		F10000000000000000000004 /* TextFontLibraryClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFontLibraryClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000006 /* BrushImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushImportClient.swift; sourceTree = "<group>"; };
 		F10000000000000000000008 /* DocumentImportClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentImportClient.swift; sourceTree = "<group>"; };
@@ -321,8 +323,8 @@
 				B92000000000000000000005 /* PrimoDocumentRenderingContracts in Frameworks */,
 				B90000000000000000000002 /* PrimoDocumentDomain in Frameworks */,
 				B9000000000000000000002B /* PrimoDocumentApplication in Frameworks */,
-				B90000000000000000000025 /* PrimoNanoBananaInfrastructure in Frameworks */,
-				B90000000000000000000024 /* PrimoNanoBananaDomain in Frameworks */,
+				B90000000000000000000025 /* PrimoAIImageInfrastructure in Frameworks */,
+				B90000000000000000000024 /* PrimoAIImageDomain in Frameworks */,
 				B90000000000000000000015 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000001 /* PrimoCoreTypes in Frameworks */,
 				A00000000000000000000039 /* ComposableArchitecture in Frameworks */,
@@ -340,8 +342,9 @@
 				C3000000000000000000000F /* Sharing in Frameworks */,
 				C30000000000000000000010 /* IssueReporting in Frameworks */,
 				A00000000000000000000037 /* MetalKit.framework in Frameworks */,
-				A00000000000000000000035 /* Metal.framework in Frameworks */,
-				A0000000000000000000002D /* AVFoundation.framework in Frameworks */,
+					A00000000000000000000035 /* Metal.framework in Frameworks */,
+					A0000000000000000000002E /* AppIntents.framework in Frameworks */,
+					A0000000000000000000002D /* AVFoundation.framework in Frameworks */,
 				A0000000000000000000002C /* CoreGraphics.framework in Frameworks */,
 				A0000000000000000000002B /* Foundation.framework in Frameworks */,
 				A0000000000000000000002A /* UIKit.framework in Frameworks */,
@@ -352,7 +355,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA100000000000000000000F /* PrimoNanoBananaApplication in Frameworks */,
+				AA100000000000000000000F /* PrimoAIImageApplication in Frameworks */,
 				AA100000000000000000000E /* PrimoDocumentStrokeApplication in Frameworks */,
 				AA100000000000000000000D /* PrimoDocumentGPUContracts in Frameworks */,
 				AA100000000000000000000C /* PrimoDocumentEngineInfrastructure in Frameworks */,
@@ -371,8 +374,8 @@
 				B9200000000000000000000A /* PrimoDocumentRenderingContracts in Frameworks */,
 				B90000000000000000000006 /* PrimoDocumentDomain in Frameworks */,
 				B9000000000000000000002C /* PrimoDocumentApplication in Frameworks */,
-				B90000000000000000000027 /* PrimoNanoBananaInfrastructure in Frameworks */,
-				B90000000000000000000026 /* PrimoNanoBananaDomain in Frameworks */,
+				B90000000000000000000027 /* PrimoAIImageInfrastructure in Frameworks */,
+				B90000000000000000000026 /* PrimoAIImageDomain in Frameworks */,
 				B90000000000000000000017 /* PrimoLocalization in Frameworks */,
 				B90000000000000000000005 /* PrimoCoreTypes in Frameworks */,
 				AA1000000000000000000002 /* ComposableArchitecture in Frameworks */,
@@ -422,8 +425,9 @@
 			children = (
 				A00000000000000000000038 /* MetalKit.framework */,
 				A00000000000000000000036 /* Metal.framework */,
-				A00000000000000000000034 /* AVFoundation.framework */,
-				A00000000000000000000033 /* CoreGraphics.framework */,
+					A00000000000000000000034 /* AVFoundation.framework */,
+					A0000000000000000000003C /* AppIntents.framework */,
+					A00000000000000000000033 /* CoreGraphics.framework */,
 				A00000000000000000000032 /* Foundation.framework */,
 				A00000000000000000000031 /* UIKit.framework */,
 			);
@@ -476,7 +480,7 @@
 				A0000000000000000000000B /* Info.plist */,
 				A000000000000000000000C9 /* SystemClients.swift */,
 				A000000000000000000000CB /* SystemClients+Dependencies.swift */,
-				E70000000000000000000009 /* PrimoNanoBananaModules.swift */,
+				E70000000000000000000009 /* PrimoAIImageModules.swift */,
 				F10000000000000000000004 /* TextFontLibraryClient.swift */,
 				F10000000000000000000006 /* BrushImportClient.swift */,
 				F10000000000000000000008 /* DocumentImportClient.swift */,
@@ -591,7 +595,7 @@
 				AA2000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift */,
 				AA200000000000000000000A /* WorkspacePersistenceCoordinatorTests.swift */,
 				AA200000000000000000000B /* ImageImportOpsTests.swift */,
-				E7000000000000000000000A /* NanoBananaFeatureTests.swift */,
+				E7000000000000000000000A /* AIImageFeatureTests.swift */,
 			);
 			path = PrimoTests;
 			sourceTree = "<group>";
@@ -630,8 +634,8 @@
 				B90000000000000000000011 /* PrimoCoreTypes */,
 				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000022 /* PrimoBrushDomain */,
-				B90000000000000000000028 /* PrimoNanoBananaDomain */,
-				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
+				B90000000000000000000028 /* PrimoAIImageDomain */,
+				B90000000000000000000029 /* PrimoAIImageInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
 				B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */,
@@ -689,9 +693,9 @@
 				B90000000000000000000011 /* PrimoCoreTypes */,
 				B90000000000000000000016 /* PrimoLocalization */,
 				B90000000000000000000022 /* PrimoBrushDomain */,
-				B90000000000000000000028 /* PrimoNanoBananaDomain */,
-				AA9000000000000000000002 /* PrimoNanoBananaApplication */,
-				B90000000000000000000029 /* PrimoNanoBananaInfrastructure */,
+				B90000000000000000000028 /* PrimoAIImageDomain */,
+				AA9000000000000000000002 /* PrimoAIImageApplication */,
+				B90000000000000000000029 /* PrimoAIImageInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
 				B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */,
@@ -839,7 +843,7 @@
 				A0000000000000000000004C /* BrushTipFile.swift in Sources */,
 				A000000000000000000000C8 /* SystemClients.swift in Sources */,
 				A000000000000000000000CA /* SystemClients+Dependencies.swift in Sources */,
-				E70000000000000000000019 /* PrimoNanoBananaModules.swift in Sources */,
+				E70000000000000000000019 /* PrimoAIImageModules.swift in Sources */,
 				A0000000000000000000004E /* PhotoshopBrushFile.swift in Sources */,
 				A0000000000000000000004A /* StudioLocalization.swift in Sources */,
 				A00000000000000000000046 /* StudioTheme.swift in Sources */,
@@ -873,7 +877,7 @@
 				AA1000000000000000000006 /* CanvasStrokeWorkflowTests.swift in Sources */,
 				AA1000000000000000000007 /* DocumentMutationFeedbackMapperTests.swift in Sources */,
 				AA100000000000000000000B /* ImageImportOpsTests.swift in Sources */,
-				E7000000000000000000001A /* NanoBananaFeatureTests.swift in Sources */,
+				E7000000000000000000001A /* AIImageFeatureTests.swift in Sources */,
 				AA1000000000000000000003 /* TestSupport.swift in Sources */,
 				AA1000000000000000000009 /* WorkspaceCatalogUseCaseTests.swift in Sources */,
 				AA100000000000000000000A /* WorkspacePersistenceCoordinatorTests.swift in Sources */,
@@ -896,8 +900,9 @@
 		A00000000000000000000080 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ENABLE_MODULES = YES;
+					ALWAYS_SEARCH_USER_PATHS = NO;
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
@@ -917,9 +922,10 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_TESTABILITY = YES;
+					DEBUG_INFORMATION_FORMAT = dwarf;
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					ENABLE_STRICT_OBJC_MSGSEND = YES;
+					ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -932,8 +938,9 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_VERSION = 6.0;
+					STRING_CATALOG_GENERATE_SYMBOLS = YES;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Debug;
@@ -941,8 +948,9 @@
 		A00000000000000000000081 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ENABLE_MODULES = YES;
+					ALWAYS_SEARCH_USER_PATHS = NO;
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
 				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
@@ -962,9 +970,10 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
+					DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					ENABLE_NS_ASSERTIONS = NO;
+					ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -976,9 +985,10 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_VERSION = 6.0;
+					STRING_CATALOG_GENERATE_SYMBOLS = YES;
+					SWIFT_COMPILATION_MODE = wholemodule;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
@@ -986,14 +996,16 @@
 		A00000000000000000000082 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_ENABLE_MODULES = YES;
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 2RZR3M2YPU;
-				ENABLE_MODULE_VERIFIER = YES;
+					DEFINES_MODULE = YES;
+					DEVELOPMENT_TEAM = 2RZR3M2YPU;
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
@@ -1011,9 +1023,10 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+					SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_EMIT_LOC_STRINGS = YES;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Debug;
@@ -1021,14 +1034,16 @@
 		A00000000000000000000083 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_ENABLE_MODULES = YES;
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 2RZR3M2YPU;
-				ENABLE_MODULE_VERIFIER = YES;
+					DEFINES_MODULE = YES;
+					DEVELOPMENT_TEAM = 2RZR3M2YPU;
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
@@ -1046,9 +1061,10 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 6.0;
+					SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_EMIT_LOC_STRINGS = YES;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
@@ -1056,13 +1072,15 @@
 		AA8000000000000000000002 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_MODULES = YES;
+					BUNDLE_LOADER = "$(TEST_HOST)";
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 2RZR3M2YPU;
-				ENABLE_TESTABILITY = YES;
+					CURRENT_PROJECT_VERSION = 1;
+					DEFINES_MODULE = YES;
+					DEVELOPMENT_TEAM = 2RZR3M2YPU;
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1075,8 +1093,9 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_VERSION = 6.0;
+					SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Primo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Primo";
 			};
@@ -1085,13 +1104,15 @@
 		AA8000000000000000000003 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 2RZR3M2YPU;
-				GENERATE_INFOPLIST_FILE = YES;
+					BUNDLE_LOADER = "$(TEST_HOST)";
+					APP_INTENTS_METADATA_PROCESSOR_FLAGS = "--quiet-warnings";
+					CLANG_ENABLE_MODULES = YES;
+					CODE_SIGN_STYLE = Automatic;
+					CURRENT_PROJECT_VERSION = 1;
+					DEFINES_MODULE = YES;
+					DEVELOPMENT_TEAM = 2RZR3M2YPU;
+					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
+					GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1103,8 +1124,9 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SWIFT_VERSION = 6.0;
+					SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+					SWIFT_ENABLE_EXPLICIT_MODULES = NO;
+					SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 2;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Primo.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Primo";
 			};
@@ -1259,10 +1281,10 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoDocumentGPUContracts;
 		};
-		AA9000000000000000000002 /* PrimoNanoBananaApplication */ = {
+		AA9000000000000000000002 /* PrimoAIImageApplication */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoNanoBananaApplication;
+			productName = PrimoAIImageApplication;
 		};
 		B90000000000000000000011 /* PrimoCoreTypes */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1309,15 +1331,15 @@
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoBrushDomain;
 		};
-		B90000000000000000000028 /* PrimoNanoBananaDomain */ = {
+		B90000000000000000000028 /* PrimoAIImageDomain */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoNanoBananaDomain;
+			productName = PrimoAIImageDomain;
 		};
-		B90000000000000000000029 /* PrimoNanoBananaInfrastructure */ = {
+		B90000000000000000000029 /* PrimoAIImageInfrastructure */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
-			productName = PrimoNanoBananaInfrastructure;
+			productName = PrimoAIImageInfrastructure;
 		};
 		B9000000000000000000002A /* PrimoDocumentApplication */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -1,21 +1,21 @@
 import Foundation
 import PrimoDocumentPresentationContracts
 
-public enum NanoBananaEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
+public enum AIImageEditScope: String, CaseIterable, Equatable, Sendable, Identifiable {
     case wholeLayer
     case selectedArea
 
     public var id: String { rawValue }
 }
 
-public enum NanoBananaOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+public enum AIImageOutputMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case replaceCurrentLayer
     case newLayer
 
     public var id: String { rawValue }
 }
 
-public struct NanoBananaMaskSettings: Equatable, Sendable {
+public struct AIImageMaskSettings: Equatable, Sendable {
     public var expansion: Int
     public var isInverted: Bool
 
@@ -28,14 +28,14 @@ public struct NanoBananaMaskSettings: Equatable, Sendable {
     }
 }
 
-public enum NanoBananaModel: String, CaseIterable, Equatable, Sendable, Identifiable {
+public enum AIImageModel: String, CaseIterable, Equatable, Sendable, Identifiable {
     case flashImage31Preview = "gemini-3.1-flash-image-preview"
     case proImagePreview = "gemini-3-pro-image-preview"
     case gptImage2 = "gpt-image-2"
 
     public var id: String { rawValue }
 
-    public var provider: NanoBananaModelProvider {
+    public var provider: AIImageModelProvider {
         switch self {
         case .flashImage31Preview, .proImagePreview:
             return .gemini
@@ -45,12 +45,12 @@ public enum NanoBananaModel: String, CaseIterable, Equatable, Sendable, Identifi
     }
 }
 
-public enum NanoBananaModelProvider: String, Equatable, Sendable {
+public enum AIImageModelProvider: String, Equatable, Sendable {
     case gemini
     case openAI
 }
 
-public enum NanoBananaAccessMode: String, CaseIterable, Equatable, Sendable, Identifiable {
+public enum AIImageAccessMode: String, CaseIterable, Equatable, Sendable, Identifiable {
     case userAPIKey
     case appManaged
 
@@ -67,7 +67,7 @@ public struct NonEmptyPrompt: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaAPIKey: Equatable, Sendable {
+public struct AIImageAPIKey: Equatable, Sendable {
     public let rawValue: String
 
     public init?(_ rawValue: String) {
@@ -77,7 +77,7 @@ public struct NanoBananaAPIKey: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaEntitlementToken: Equatable, Sendable {
+public struct AIImageEntitlementToken: Equatable, Sendable {
     public let rawValue: String
 
     public init?(_ rawValue: String) {
@@ -101,11 +101,11 @@ public struct ProxyEndpoint: Equatable, Sendable {
     }
 }
 
-public enum NanoBananaExecutionConfig: Equatable, Sendable {
-    case userAPIKey(apiKey: NanoBananaAPIKey)
-    case appManaged(entitlement: NanoBananaEntitlementToken, endpoint: ProxyEndpoint)
+public enum AIImageExecutionConfig: Equatable, Sendable {
+    case userAPIKey(apiKey: AIImageAPIKey)
+    case appManaged(entitlement: AIImageEntitlementToken, endpoint: ProxyEndpoint)
 
-    public var accessMode: NanoBananaAccessMode {
+    public var accessMode: AIImageAccessMode {
         switch self {
         case .userAPIKey:
             return .userAPIKey
@@ -115,23 +115,23 @@ public enum NanoBananaExecutionConfig: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaDraft: Equatable, Sendable {
+public struct AIImageDraft: Equatable, Sendable {
     public var prompt: String
-    public var accessMode: NanoBananaAccessMode
-    public var model: NanoBananaModel
+    public var accessMode: AIImageAccessMode
+    public var model: AIImageModel
     public var inputLayerIndex: Int
-    public var editScope: NanoBananaEditScope
-    public var outputMode: NanoBananaOutputMode
-    public var maskSettings: NanoBananaMaskSettings
+    public var editScope: AIImageEditScope
+    public var outputMode: AIImageOutputMode
+    public var maskSettings: AIImageMaskSettings
 
     public init(
         prompt: String,
-        accessMode: NanoBananaAccessMode,
-        model: NanoBananaModel,
+        accessMode: AIImageAccessMode,
+        model: AIImageModel,
         inputLayerIndex: Int,
-        editScope: NanoBananaEditScope,
-        outputMode: NanoBananaOutputMode,
-        maskSettings: NanoBananaMaskSettings = .init()
+        editScope: AIImageEditScope,
+        outputMode: AIImageOutputMode,
+        maskSettings: AIImageMaskSettings = .init()
     ) {
         self.prompt = prompt
         self.accessMode = accessMode
@@ -143,23 +143,23 @@ public struct NanoBananaDraft: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaEditDescriptor: Equatable, Sendable {
+public struct AIImageEditDescriptor: Equatable, Sendable {
     public var prompt: NonEmptyPrompt
-    public var accessMode: NanoBananaAccessMode
-    public var model: NanoBananaModel
+    public var accessMode: AIImageAccessMode
+    public var model: AIImageModel
     public var inputLayerIndex: Int
-    public var editScope: NanoBananaEditScope
-    public var outputMode: NanoBananaOutputMode
-    public var maskSettings: NanoBananaMaskSettings
+    public var editScope: AIImageEditScope
+    public var outputMode: AIImageOutputMode
+    public var maskSettings: AIImageMaskSettings
 
     public init(
         prompt: NonEmptyPrompt,
-        accessMode: NanoBananaAccessMode,
-        model: NanoBananaModel,
+        accessMode: AIImageAccessMode,
+        model: AIImageModel,
         inputLayerIndex: Int,
-        editScope: NanoBananaEditScope,
-        outputMode: NanoBananaOutputMode,
-        maskSettings: NanoBananaMaskSettings = .init()
+        editScope: AIImageEditScope,
+        outputMode: AIImageOutputMode,
+        maskSettings: AIImageMaskSettings = .init()
     ) {
         self.prompt = prompt
         self.accessMode = accessMode
@@ -171,21 +171,21 @@ public struct NanoBananaEditDescriptor: Equatable, Sendable {
     }
 }
 
-public struct SubmitNanoBananaEditCommand: Equatable, Sendable {
-    public var descriptor: NanoBananaEditDescriptor
-    public var executionConfig: NanoBananaExecutionConfig
+public struct SubmitAIImageEditCommand: Equatable, Sendable {
+    public var descriptor: AIImageEditDescriptor
+    public var executionConfig: AIImageExecutionConfig
 
     public init(
-        descriptor: NanoBananaEditDescriptor,
-        executionConfig: NanoBananaExecutionConfig
+        descriptor: AIImageEditDescriptor,
+        executionConfig: AIImageExecutionConfig
     ) {
         self.descriptor = descriptor
         self.executionConfig = executionConfig
     }
 }
 
-public struct NanoBananaPreviewState: Equatable, Sendable {
-    public var descriptor: NanoBananaEditDescriptor
+public struct AIImagePreviewState: Equatable, Sendable {
+    public var descriptor: AIImageEditDescriptor
     public var outputLayerIndex: Int
     public var outputSurface: DocumentCompositeSurface
     public var beforePreviewImageData: Data?
@@ -196,7 +196,7 @@ public struct NanoBananaPreviewState: Equatable, Sendable {
     }
 
     public init(
-        descriptor: NanoBananaEditDescriptor,
+        descriptor: AIImageEditDescriptor,
         outputLayerIndex: Int,
         outputSurface: DocumentCompositeSurface,
         beforePreviewImageData: Data?,
@@ -210,25 +210,25 @@ public struct NanoBananaPreviewState: Equatable, Sendable {
     }
 }
 
-public enum NanoBananaJobStatus: String, Equatable, Sendable {
+public enum AIImageJobStatus: String, Equatable, Sendable {
     case running
     case succeeded
     case failed
     case canceled
 }
 
-public struct NanoBananaJob: Equatable, Sendable, Identifiable {
+public struct AIImageJob: Equatable, Sendable, Identifiable {
     public var id: UUID
-    public var descriptor: NanoBananaEditDescriptor
+    public var descriptor: AIImageEditDescriptor
     public var createdAt: Date
-    public var status: NanoBananaJobStatus
+    public var status: AIImageJobStatus
     public var message: String?
 
     public init(
         id: UUID,
-        descriptor: NanoBananaEditDescriptor,
+        descriptor: AIImageEditDescriptor,
         createdAt: Date,
-        status: NanoBananaJobStatus,
+        status: AIImageJobStatus,
         message: String?
     ) {
         self.id = id
@@ -239,15 +239,15 @@ public struct NanoBananaJob: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
+public struct AIImageHistoryItem: Equatable, Sendable, Identifiable {
     public var id: UUID
-    public var descriptor: NanoBananaEditDescriptor
+    public var descriptor: AIImageEditDescriptor
     public var createdAt: Date
     public var previewImageData: Data?
 
     public init(
         id: UUID,
-        descriptor: NanoBananaEditDescriptor,
+        descriptor: AIImageEditDescriptor,
         createdAt: Date,
         previewImageData: Data?
     ) {
@@ -258,13 +258,13 @@ public struct NanoBananaHistoryItem: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct NanoBananaSettings: Equatable, Sendable {
-    public var accessMode: NanoBananaAccessMode
+public struct AIImageSettings: Equatable, Sendable {
+    public var accessMode: AIImageAccessMode
     public var apiKey: String
     public var openAIAPIKey: String
 
     public init(
-        accessMode: NanoBananaAccessMode = .appManaged,
+        accessMode: AIImageAccessMode = .appManaged,
         apiKey: String = "",
         openAIAPIKey: String = ""
     ) {
@@ -274,7 +274,7 @@ public struct NanoBananaSettings: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaCommerceSnapshot: Equatable, Sendable {
+public struct AIImageCommerceSnapshot: Equatable, Sendable {
     public struct ProductSummary: Equatable, Sendable {
         public var id: String
         public var displayName: String
@@ -318,7 +318,7 @@ public struct NanoBananaCommerceSnapshot: Equatable, Sendable {
     }
 }
 
-public enum NanoBananaEditFailure: LocalizedError, Equatable, Sendable {
+public enum AIImageEditFailure: LocalizedError, Equatable, Sendable {
     case invalidEndpoint
     case invalidResponse
     case missingImageData(String)
@@ -328,9 +328,9 @@ public enum NanoBananaEditFailure: LocalizedError, Equatable, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidEndpoint:
-            return "Nano Banana endpoint must be a valid HTTPS URL."
+            return "AI image editing endpoint must be a valid HTTPS URL."
         case .invalidResponse:
-            return "Nano Banana returned an invalid response."
+            return "AI image editing returned an invalid response."
         case let .missingImageData(message):
             return message
         case let .apiError(message):

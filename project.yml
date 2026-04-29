@@ -43,7 +43,10 @@ packages:
     path: Packages/PrimoModules
 settings:
   base:
+    APP_INTENTS_METADATA_PROCESSOR_FLAGS: --quiet-warnings
+    ENABLE_APP_INTENTS_METADATA_GENERATION: NO
     PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo
+    SWIFT_ENABLE_EXPLICIT_MODULES: NO
     SWIFT_VERSION: 6.0
 targets:
   Primo:
@@ -105,6 +108,7 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentInfrastructure
       - sdk: AVFoundation.framework
+      - sdk: AppIntents.framework
       - sdk: CoreGraphics.framework
       - sdk: Foundation.framework
       - sdk: Metal.framework
@@ -174,11 +178,11 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
-        product: PrimoNanoBananaApplication
+        product: PrimoAIImageApplication
       - package: PrimoModules
-        product: PrimoNanoBananaDomain
+        product: PrimoAIImageDomain
       - package: PrimoModules
-        product: PrimoNanoBananaInfrastructure
+        product: PrimoAIImageInfrastructure
       - package: PrimoModules
         product: PrimoWorkspaceApplication
       - package: PrimoModules

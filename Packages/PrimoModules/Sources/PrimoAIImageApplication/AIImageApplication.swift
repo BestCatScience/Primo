@@ -3,30 +3,30 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentPresentationContracts
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 
-public enum NanoBananaCommandBuilderFailure: Error, Equatable, Sendable {
+public enum AIImageCommandBuilderFailure: Error, Equatable, Sendable {
     case promptRequired
     case apiKeyRequired
     case endpointRequired
     case entitlementRequired
 }
 
-public struct NanoBananaCommandBuilder: Sendable {
+public struct AIImageCommandBuilder: Sendable {
     public init() {}
 
     public func build(
-        draft: NanoBananaDraft,
+        draft: AIImageDraft,
         apiKey: String,
         openAIAPIKey: String,
-        commerce: NanoBananaCommerceSnapshot
-    ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
+        commerce: AIImageCommerceSnapshot
+    ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure> {
         let trimmedPrompt = draft.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let prompt = NonEmptyPrompt(trimmedPrompt) else {
             return .failure(.promptRequired)
         }
 
-        let descriptor = NanoBananaEditDescriptor(
+        let descriptor = AIImageEditDescriptor(
             prompt: prompt,
             accessMode: draft.accessMode,
             model: draft.model,
@@ -39,11 +39,11 @@ public struct NanoBananaCommandBuilder: Sendable {
         switch draft.accessMode {
         case .userAPIKey:
             let selectedAPIKey = draft.model.provider == .openAI ? openAIAPIKey : apiKey
-            guard let validAPIKey = NanoBananaAPIKey(selectedAPIKey) else {
+            guard let validAPIKey = AIImageAPIKey(selectedAPIKey) else {
                 return .failure(.apiKeyRequired)
             }
             return .success(
-                SubmitNanoBananaEditCommand(
+                SubmitAIImageEditCommand(
                     descriptor: descriptor,
                     executionConfig: .userAPIKey(apiKey: validAPIKey)
                 )
@@ -53,11 +53,11 @@ public struct NanoBananaCommandBuilder: Sendable {
             guard let endpoint = ProxyEndpoint(commerce.proxyEndpoint) else {
                 return .failure(.endpointRequired)
             }
-            guard let entitlement = NanoBananaEntitlementToken(commerce.latestEntitlementJWS) else {
+            guard let entitlement = AIImageEntitlementToken(commerce.latestEntitlementJWS) else {
                 return .failure(.entitlementRequired)
             }
             return .success(
-                SubmitNanoBananaEditCommand(
+                SubmitAIImageEditCommand(
                     descriptor: descriptor,
                     executionConfig: .appManaged(
                         entitlement: entitlement,
@@ -69,17 +69,17 @@ public struct NanoBananaCommandBuilder: Sendable {
     }
 }
 
-public struct NanoBananaEditExecutionRequest: Equatable, Sendable {
+public struct AIImageEditExecutionRequest: Equatable, Sendable {
     public let inputPNGData: Data
-    public let command: SubmitNanoBananaEditCommand
+    public let command: SubmitAIImageEditCommand
 
-    public init(inputPNGData: Data, command: SubmitNanoBananaEditCommand) {
+    public init(inputPNGData: Data, command: SubmitAIImageEditCommand) {
         self.inputPNGData = inputPNGData
         self.command = command
     }
 }
 
-public struct NanoBananaSelectionRegion: Equatable, Sendable {
+public struct AIImageSelectionRegion: Equatable, Sendable {
     public let selectionBounds: CGRect
     public let expandedMask: [UInt8]
 
@@ -92,15 +92,15 @@ public struct NanoBananaSelectionRegion: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaPreviewPreparationRequest: Equatable, Sendable {
-    public let command: SubmitNanoBananaEditCommand
-    public let selectionRegion: NanoBananaSelectionRegion?
+public struct AIImagePreviewPreparationRequest: Equatable, Sendable {
+    public let command: SubmitAIImageEditCommand
+    public let selectionRegion: AIImageSelectionRegion?
     public let outputLayerIndex: Int
     public let sourceSurface: DocumentCompositeSurface
 
     public init(
-        command: SubmitNanoBananaEditCommand,
-        selectionRegion: NanoBananaSelectionRegion?,
+        command: SubmitAIImageEditCommand,
+        selectionRegion: AIImageSelectionRegion?,
         outputLayerIndex: Int,
         sourceSurface: DocumentCompositeSurface
     ) {
@@ -111,36 +111,36 @@ public struct NanoBananaPreviewPreparationRequest: Equatable, Sendable {
     }
 }
 
-public enum NanoBananaPreviewPreparationFailure: Error, Equatable, Sendable {
+public enum AIImagePreviewPreparationFailure: Error, Equatable, Sendable {
     case unsupportedImage
-    case editFailed(NanoBananaEditFailure)
+    case editFailed(AIImageEditFailure)
 }
 
-public struct NanoBananaRemoteEditClient: Sendable {
-    public var execute: @Sendable (NanoBananaEditExecutionRequest, String, NanoBananaModel) async -> Result<Data, NanoBananaEditFailure>
+public struct AIImageRemoteEditClient: Sendable {
+    public var execute: @Sendable (AIImageEditExecutionRequest, String, AIImageModel) async -> Result<Data, AIImageEditFailure>
 
     public init(
-        execute: @escaping @Sendable (NanoBananaEditExecutionRequest, String, NanoBananaModel) async -> Result<Data, NanoBananaEditFailure>
+        execute: @escaping @Sendable (AIImageEditExecutionRequest, String, AIImageModel) async -> Result<Data, AIImageEditFailure>
     ) {
         self.execute = execute
     }
 }
 
-public struct NanoBananaEditUseCase: Sendable {
-    public var execute: @Sendable (NanoBananaEditExecutionRequest) async -> Result<Data, NanoBananaEditFailure>
+public struct AIImageEditUseCase: Sendable {
+    public var execute: @Sendable (AIImageEditExecutionRequest) async -> Result<Data, AIImageEditFailure>
 
     public init(
-        execute: @escaping @Sendable (NanoBananaEditExecutionRequest) async -> Result<Data, NanoBananaEditFailure>
+        execute: @escaping @Sendable (AIImageEditExecutionRequest) async -> Result<Data, AIImageEditFailure>
     ) {
         self.execute = execute
     }
 
     @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-    public static func live(remoteClient: NanoBananaRemoteEditClient) -> NanoBananaEditUseCase {
-        NanoBananaEditUseCase { request in
+    public static func live(remoteClient: AIImageRemoteEditClient) -> AIImageEditUseCase {
+        AIImageEditUseCase { request in
             let primaryPrompt = enforcedImageEditingPrompt(from: request.command.descriptor.prompt.rawValue)
             let retryPrompt = strictRetryImageEditingPrompt(from: request.command.descriptor.prompt.rawValue)
-            var lastError: NanoBananaEditFailure?
+            var lastError: AIImageEditFailure?
 
             let candidateModels = retryModels(startingWith: request.command.descriptor.model)
             for round in 0..<3 {
@@ -149,7 +149,7 @@ public struct NanoBananaEditUseCase: Sendable {
                     do {
                         try await Task.sleep(nanoseconds: delayNanoseconds)
                     } catch is CancellationError {
-                        return .failure(.transport("Nano Banana generation was canceled."))
+                        return .failure(.transport("AI image editing generation was canceled."))
                     } catch {
                         return .failure(.transport(error.localizedDescription))
                     }
@@ -183,7 +183,7 @@ public struct NanoBananaEditUseCase: Sendable {
             if let lastError {
                 return .failure(lastError)
             }
-            return .failure(.missingImageData("Nano Banana did not return decodable image bytes."))
+            return .failure(.missingImageData("AI image editing did not return decodable image bytes."))
         }
     }
 
@@ -215,16 +215,16 @@ public struct NanoBananaEditUseCase: Sendable {
         """
     }
 
-    private static func retryModels(startingWith initialModel: NanoBananaModel) -> [NanoBananaModel] {
+    private static func retryModels(startingWith initialModel: AIImageModel) -> [AIImageModel] {
         guard initialModel.provider == .gemini else {
             return [initialModel]
         }
-        return [initialModel] + NanoBananaModel.allCases.filter {
+        return [initialModel] + AIImageModel.allCases.filter {
             $0 != initialModel && $0.provider == initialModel.provider
         }
     }
 
-    private static func shouldRetryWithAnotherModel(after error: NanoBananaEditFailure) -> Bool {
+    private static func shouldRetryWithAnotherModel(after error: AIImageEditFailure) -> Bool {
         switch error {
         case let .apiError(message):
             let normalized = message.lowercased()
@@ -239,16 +239,16 @@ public struct NanoBananaEditUseCase: Sendable {
 }
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-public struct NanoBananaPreviewPreparationService: Sendable {
-    public let editUseCase: NanoBananaEditUseCase
+public struct AIImagePreviewPreparationService: Sendable {
+    public let editUseCase: AIImageEditUseCase
 
-    public init(editUseCase: NanoBananaEditUseCase) {
+    public init(editUseCase: AIImageEditUseCase) {
         self.editUseCase = editUseCase
     }
 
     public func preparePreview(
-        _ request: NanoBananaPreviewPreparationRequest
-    ) async -> Result<NanoBananaPreviewState, NanoBananaPreviewPreparationFailure> {
+        _ request: AIImagePreviewPreparationRequest
+    ) async -> Result<AIImagePreviewState, AIImagePreviewPreparationFailure> {
         let blankSurface = DocumentCompositeSurface(
             width: request.sourceSurface.width,
             height: request.sourceSurface.height,
@@ -341,7 +341,7 @@ public struct NanoBananaPreviewPreparationService: Sendable {
         }
 
         return .success(
-            NanoBananaPreviewState(
+            AIImagePreviewState(
                 descriptor: request.command.descriptor,
                 outputLayerIndex: request.outputLayerIndex,
                 outputSurface: finalSurface,
@@ -369,10 +369,10 @@ public struct NanoBananaPreviewPreparationService: Sendable {
     }
 
     private func executeEdit(
-        _ command: SubmitNanoBananaEditCommand,
+        _ command: SubmitAIImageEditCommand,
         inputPNGData: Data,
         cropScoped: Bool
-    ) async -> Result<Data, NanoBananaEditFailure> {
+    ) async -> Result<Data, AIImageEditFailure> {
         var adjustedCommand = command
         if cropScoped {
             let prompt = "Only edit the selected region. Keep everything outside the selected region unchanged.\n\n\(adjustedCommand.descriptor.prompt.rawValue)"
@@ -383,7 +383,7 @@ public struct NanoBananaPreviewPreparationService: Sendable {
         }
 
         return await editUseCase.execute(
-            NanoBananaEditExecutionRequest(
+            AIImageEditExecutionRequest(
                 inputPNGData: inputPNGData,
                 command: adjustedCommand
             )

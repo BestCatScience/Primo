@@ -21,5 +21,8 @@ xcodebuild \
   -clonedSourcePackagesDirPath build/SourcePackages \
   -skipMacroValidation \
   -skipPackagePluginValidation \
+  APP_INTENTS_METADATA_PROCESSOR_FLAGS=--quiet-warnings \
   CODE_SIGNING_ALLOWED=NO \
+  ENABLE_APP_INTENTS_METADATA_GENERATION=NO \
+  SWIFT_ENABLE_EXPLICIT_MODULES=NO \
   build

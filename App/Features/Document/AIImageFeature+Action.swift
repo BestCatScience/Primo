@@ -1,20 +1,20 @@
 import Foundation
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 
 extension AIImageFeature {
     enum Action: Equatable {
         case task
-        case settingsLoaded(NanoBananaSettings)
-        case commerceUpdated(NanoBananaCommerceSnapshot)
+        case settingsLoaded(AIImageSettings)
+        case commerceUpdated(AIImageCommerceSnapshot)
         case prepareComposer(activeLayerIndex: Int, hasSelection: Bool)
         case promptChanged(String)
         case inputLayerIndexChanged(Int)
-        case editScopeChanged(NanoBananaEditScope)
-        case outputModeChanged(NanoBananaOutputMode)
+        case editScopeChanged(AIImageEditScope)
+        case outputModeChanged(AIImageOutputMode)
         case maskExpansionChanged(Int)
         case maskInversionChanged(Bool)
-        case modelChanged(NanoBananaModel)
-        case accessModeChanged(NanoBananaAccessMode)
+        case modelChanged(AIImageModel)
+        case accessModeChanged(AIImageAccessMode)
         case apiKeyChanged(String)
         case openAIAPIKeyChanged(String)
         case sheetPresentationChanged(Bool)
@@ -28,17 +28,17 @@ extension AIImageFeature {
         case purchasePrimaryProductTapped
         case restorePurchasesTapped
         case purchaseErrorDismissed
-        case historyItemSelected(NanoBananaEditDescriptor)
+        case historyItemSelected(AIImageEditDescriptor)
         case generationStarted(DocumentFeature.AIImageGenerationStart)
         case generationApplied(DocumentFeature.AIImageAppliedEdit)
         case generationFailedFeedback(ApplicationFeature.Feedback, AppLanguage)
-        case generationSucceeded(NanoBananaPreviewState)
+        case generationSucceeded(AIImagePreviewState)
         case generationFailed(ApplicationFeature.Feedback)
         case delegate(Delegate)
     }
 
     enum Delegate: Equatable {
-        case requestEdit(SubmitNanoBananaEditCommand)
+        case requestEdit(SubmitAIImageEditCommand)
         case cancelEdit
     }
 }

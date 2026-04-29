@@ -28,9 +28,9 @@ let package = Package(
         .library(name: "PrimoDocumentStrokeInfrastructure", targets: ["PrimoDocumentStrokeInfrastructure"]),
         .library(name: "PrimoDocumentTimelapseInfrastructure", targets: ["PrimoDocumentTimelapseInfrastructure"]),
         .library(name: "PrimoBrushDomain", targets: ["PrimoBrushDomain"]),
-        .library(name: "PrimoNanoBananaDomain", targets: ["PrimoNanoBananaDomain"]),
-        .library(name: "PrimoNanoBananaApplication", targets: ["PrimoNanoBananaApplication"]),
-        .library(name: "PrimoNanoBananaInfrastructure", targets: ["PrimoNanoBananaInfrastructure"]),
+        .library(name: "PrimoAIImageDomain", targets: ["PrimoAIImageDomain"]),
+        .library(name: "PrimoAIImageApplication", targets: ["PrimoAIImageApplication"]),
+        .library(name: "PrimoAIImageInfrastructure", targets: ["PrimoAIImageInfrastructure"]),
         .library(name: "PrimoBrushRuntimeContracts", targets: ["PrimoBrushRuntimeContracts"]),
         .library(name: "PrimoDocumentMutationContracts", targets: ["PrimoDocumentMutationContracts"]),
         .library(name: "PrimoDocumentPersistenceContracts", targets: ["PrimoDocumentPersistenceContracts"]),
@@ -76,8 +76,10 @@ let package = Package(
             name: "PrimoDocumentGPUContracts",
             dependencies: [
                 "PrimoBrushDomain",
-                "PrimoDocumentDomain",
                 "PrimoBrushRuntimeContracts",
+                "PrimoBrushFileFormats",
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
                 "PrimoDocumentMutationContracts",
                 "PrimoDocumentPresentationContracts",
             ]
@@ -85,7 +87,10 @@ let package = Package(
         .target(
             name: "PrimoDocumentApplication",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
+                "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMutationContracts",
                 "PrimoDocumentPersistenceContracts",
@@ -96,22 +101,31 @@ let package = Package(
         .target(
             name: "PrimoDocumentStrokeApplication",
             dependencies: [
-                "PrimoDocumentApplication",
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
+                "PrimoCoreTypes",
+                "PrimoDocumentApplication",
                 "PrimoDocumentDomain",
                 "PrimoDocumentGPUContracts",
                 "PrimoDocumentMutationContracts",
+                "PrimoDocumentPersistenceContracts",
                 "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRenderingContracts",
             ]
         ),
         .target(
             name: "PrimoDocumentInfrastructure",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+                "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentApplication",
                 "PrimoDocumentMutationContracts",
                 "PrimoDocumentPersistenceContracts",
+                "PrimoDocumentPresentationContracts",
             ]
         ),
         .target(
@@ -239,24 +253,30 @@ let package = Package(
             name: "PrimoBrushDomain"
         ),
         .target(
-            name: "PrimoNanoBananaDomain",
-            dependencies: ["PrimoDocumentPresentationContracts"]
+            name: "PrimoAIImageDomain",
+            dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
+                "PrimoDocumentPresentationContracts",
+            ]
         ),
         .target(
-            name: "PrimoNanoBananaApplication",
+            name: "PrimoAIImageApplication",
             dependencies: [
                 "PrimoCoreTypes",
                 "PrimoDocumentApplication",
                 "PrimoDocumentPresentationContracts",
-                "PrimoNanoBananaDomain",
+                "PrimoAIImageDomain",
             ]
         ),
         .target(
-            name: "PrimoNanoBananaInfrastructure",
+            name: "PrimoAIImageInfrastructure",
             dependencies: [
                 "PrimoCoreTypes",
-                "PrimoNanoBananaApplication",
-                "PrimoNanoBananaDomain",
+                "PrimoAIImageApplication",
+                "PrimoAIImageDomain",
             ]
         ),
         .target(
@@ -264,6 +284,7 @@ let package = Package(
             dependencies: [
                 "PrimoBrushDomain",
                 "PrimoBrushFileFormats",
+                "PrimoCoreTypes",
             ]
         ),
         .target(
@@ -271,12 +292,15 @@ let package = Package(
             dependencies: [
                 "PrimoBrushDomain",
                 "PrimoBrushFileFormats",
+                "PrimoCoreTypes",
                 "PrimoDocumentDomain",
             ]
         ),
         .target(
             name: "PrimoDocumentMutationContracts",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentDomain",
@@ -286,7 +310,10 @@ let package = Package(
         .target(
             name: "PrimoDocumentRenderingContracts",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
+                "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentMutationContracts",
                 "PrimoDocumentPresentationContracts",
@@ -295,7 +322,10 @@ let package = Package(
         .target(
             name: "PrimoDocumentPersistenceContracts",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
                 "PrimoBrushRuntimeContracts",
+                "PrimoCoreTypes",
                 "PrimoDocumentDomain",
                 "PrimoDocumentPresentationContracts",
             ]
@@ -317,18 +347,31 @@ let package = Package(
         .target(
             name: "PrimoWorkspaceDomain",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+                "PrimoBrushRuntimeContracts",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoDocumentMutationContracts",
+                "PrimoDocumentPersistenceContracts",
                 "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRenderingContracts",
                 "PrimoCoreTypes",
             ]
         ),
         .target(
             name: "PrimoWorkspaceApplication",
             dependencies: [
+                "PrimoBrushDomain",
+                "PrimoBrushFileFormats",
+                "PrimoBrushRuntimeContracts",
                 "PrimoCoreTypes",
                 "PrimoDocumentContracts",
                 "PrimoDocumentDomain",
+                "PrimoDocumentMutationContracts",
+                "PrimoDocumentPersistenceContracts",
+                "PrimoDocumentPresentationContracts",
+                "PrimoDocumentRenderingContracts",
                 "PrimoWorkspaceDomain",
             ]
         ),
@@ -432,16 +475,16 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "PrimoNanoBananaDomainTests",
-            dependencies: ["PrimoNanoBananaDomain"]
+            name: "PrimoAIImageDomainTests",
+            dependencies: ["PrimoAIImageDomain"]
         ),
         .testTarget(
-            name: "PrimoNanoBananaApplicationTests",
-            dependencies: ["PrimoNanoBananaApplication", "PrimoDocumentContracts"]
+            name: "PrimoAIImageApplicationTests",
+            dependencies: ["PrimoAIImageApplication", "PrimoDocumentContracts"]
         ),
         .testTarget(
-            name: "PrimoNanoBananaInfrastructureTests",
-            dependencies: ["PrimoNanoBananaInfrastructure"]
+            name: "PrimoAIImageInfrastructureTests",
+            dependencies: ["PrimoAIImageInfrastructure"]
         ),
         .testTarget(
             name: "PrimoBrushFileFormatsTests",

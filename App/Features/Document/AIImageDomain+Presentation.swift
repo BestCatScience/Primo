@@ -1,7 +1,7 @@
 import Foundation
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 
-extension NanoBananaEditScope {
+extension AIImageEditScope {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .wholeLayer:
@@ -12,7 +12,7 @@ extension NanoBananaEditScope {
     }
 }
 
-extension NanoBananaOutputMode {
+extension AIImageOutputMode {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .replaceCurrentLayer:
@@ -23,7 +23,7 @@ extension NanoBananaOutputMode {
     }
 }
 
-extension NanoBananaModel {
+extension AIImageModel {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .flashImage31Preview:
@@ -36,7 +36,7 @@ extension NanoBananaModel {
     }
 }
 
-extension NanoBananaAccessMode {
+extension AIImageAccessMode {
     func title(_ language: AppLanguage) -> String {
         switch self {
         case .userAPIKey:

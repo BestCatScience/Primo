@@ -1,11 +1,11 @@
 import Foundation
 import PrimoCoreTypes
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
-import PrimoNanoBananaInfrastructure
+import PrimoAIImageApplication
+import PrimoAIImageDomain
+import PrimoAIImageInfrastructure
 import Testing
 
-struct NanoBananaRemoteEditClientTests {
+struct AIImageRemoteEditClientTests {
     @Test
     func gptImage2UsesOpenAIImageEditMultipartRequest() async throws {
         final class Recorder: @unchecked Sendable {
@@ -36,9 +36,9 @@ struct NanoBananaRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = NanoBananaRemoteEditClient.live(httpClient: httpClient)
-        let command = SubmitNanoBananaEditCommand(
-            descriptor: NanoBananaEditDescriptor(
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
                 accessMode: .userAPIKey,
                 model: .gptImage2,
@@ -46,11 +46,11 @@ struct NanoBananaRemoteEditClientTests {
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
             ),
-            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("openai-key")!)
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("openai-key")!)
         )
 
         let result = await client.execute(
-            NanoBananaEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: command),
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: command),
             "Edit the supplied image",
             .gptImage2
         )
@@ -90,9 +90,9 @@ struct NanoBananaRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = NanoBananaRemoteEditClient.live(httpClient: httpClient)
-        let command = SubmitNanoBananaEditCommand(
-            descriptor: NanoBananaEditDescriptor(
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
                 accessMode: .userAPIKey,
                 model: .gptImage2,
@@ -100,11 +100,11 @@ struct NanoBananaRemoteEditClientTests {
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
             ),
-            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("openai-key")!)
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("openai-key")!)
         )
 
         let result = await client.execute(
-            NanoBananaEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: command),
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: command),
             "Edit the supplied image",
             .gptImage2
         )

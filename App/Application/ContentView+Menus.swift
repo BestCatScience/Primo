@@ -2,7 +2,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import SwiftUI
 import UIKit
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 
 extension ContentView {
     var resolvedAIImageInputLayerIndex: Int {
@@ -30,14 +30,14 @@ extension ContentView {
         )
     }
 
-    var aiImageEditScopeBinding: Binding<NanoBananaEditScope> {
+    var aiImageEditScopeBinding: Binding<AIImageEditScope> {
         Binding(
             get: { aiImageState.composer.editScope },
             set: { store.send(.aiImage(.editScopeChanged($0))) }
         )
     }
 
-    var aiImageOutputModeBinding: Binding<NanoBananaOutputMode> {
+    var aiImageOutputModeBinding: Binding<AIImageOutputMode> {
         Binding(
             get: { aiImageState.composer.outputMode },
             set: { store.send(.aiImage(.outputModeChanged($0))) }
@@ -58,7 +58,7 @@ extension ContentView {
         )
     }
 
-    var aiImageModelBinding: Binding<NanoBananaModel> {
+    var aiImageModelBinding: Binding<AIImageModel> {
         Binding(
             get: { aiImageState.composer.model },
             set: { store.send(.aiImage(.modelChanged($0))) }
@@ -187,7 +187,7 @@ extension ContentView {
             Form {
                 Section(language.localized("AI画像設定")) {
                     Picker(language.localized("モデル"), selection: aiImageModelBinding) {
-                        ForEach(NanoBananaModel.allCases) { model in
+                        ForEach(AIImageModel.allCases) { model in
                             Text(model.title(language)).tag(model)
                         }
                     }
@@ -1219,7 +1219,7 @@ extension ContentView {
                     }
 
                     Picker(language.localized("編集範囲"), selection: aiImageEditScopeBinding) {
-                        ForEach(NanoBananaEditScope.allCases) { scope in
+                        ForEach(AIImageEditScope.allCases) { scope in
                             Text(scope.title(language)).tag(scope)
                         }
                     }
@@ -1242,7 +1242,7 @@ extension ContentView {
                     }
 
                     Picker(language.localized("モデル"), selection: aiImageModelBinding) {
-                        ForEach(NanoBananaModel.allCases) { model in
+                        ForEach(AIImageModel.allCases) { model in
                             Text(model.title(language)).tag(model)
                         }
                     }
@@ -1252,7 +1252,7 @@ extension ContentView {
 
                 Section(language.localized("出力")) {
                     Picker(language.localized("出力先"), selection: aiImageOutputModeBinding) {
-                        ForEach(NanoBananaOutputMode.allCases) { mode in
+                        ForEach(AIImageOutputMode.allCases) { mode in
                             Text(mode.title(language)).tag(mode)
                         }
                     }

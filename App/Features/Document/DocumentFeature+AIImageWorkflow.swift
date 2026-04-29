@@ -3,13 +3,13 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
+import PrimoAIImageApplication
+import PrimoAIImageDomain
 
 extension DocumentFeature {
     private struct AIImageValidatedEdit {
-        let command: SubmitNanoBananaEditCommand
-        let selectionRegion: NanoBananaSelectionRegion?
+        let command: SubmitAIImageEditCommand
+        let selectionRegion: AIImageSelectionRegion?
         let outputLayerIndex: Int
         let sourceSurface: DocumentCompositeSurface
     }
@@ -20,7 +20,7 @@ extension DocumentFeature {
 
     private struct AIImageRequestContract {
         func validate(
-            command: SubmitNanoBananaEditCommand,
+            command: SubmitAIImageEditCommand,
             state: DocumentFeature.State,
             gpuOperations: DocumentGpuOperationGateway
         ) -> Result<AIImageValidatedEdit, AIImageValidationFailure> {
@@ -29,7 +29,7 @@ extension DocumentFeature {
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == command.descriptor.inputLayerIndex })
             else {
-                return .failure(AIImageValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
+                return .failure(AIImageValidationFailure(feedback: .aiImagePrepareLayerFailed))
             }
 
             let adjustedSelection = command.descriptor.editScope == .selectedArea
@@ -41,7 +41,7 @@ extension DocumentFeature {
                 )
                 : nil
             if command.descriptor.editScope == .selectedArea, adjustedSelection?.isEmpty != false {
-                return .failure(AIImageValidationFailure(feedback: .nanoBananaSelectionRequired))
+                return .failure(AIImageValidationFailure(feedback: .aiImageSelectionRequired))
             }
 
             let outputLayerIndex = command.descriptor.outputMode == .replaceCurrentLayer
@@ -52,16 +52,16 @@ extension DocumentFeature {
                 height: snapshot.height,
                 pixelData: layer.pixelData
             )
-            let selectionRegion: NanoBananaSelectionRegion?
+            let selectionRegion: AIImageSelectionRegion?
             if let adjustedSelection {
                 guard let expandedMask = selectionWorkflow.expandedMask(
                     from: adjustedSelection,
                     canvasWidth: snapshot.width,
                     canvasHeight: snapshot.height
                 ) else {
-                    return .failure(AIImageValidationFailure(feedback: .nanoBananaPrepareLayerFailed))
+                    return .failure(AIImageValidationFailure(feedback: .aiImagePrepareLayerFailed))
                 }
-                selectionRegion = NanoBananaSelectionRegion(
+                selectionRegion = AIImageSelectionRegion(
                     selectionBounds: adjustedSelection.bounds,
                     expandedMask: expandedMask
                 )
@@ -81,20 +81,20 @@ extension DocumentFeature {
     }
 
     private struct AIImagePreviewApplicationPlan {
-        let preview: NanoBananaPreviewState
+        let preview: AIImagePreviewState
         let target: LayerContentMutationTarget
     }
 
     private struct AIImagePreviewApplicationContract {
         func validate(
-            preview: NanoBananaPreviewState,
+            preview: AIImagePreviewState,
             state: DocumentFeature.State,
             namingPolicy: DocumentNamingPolicy
         ) -> Result<AIImagePreviewApplicationPlan, AIImageValidationFailure> {
             switch preview.descriptor.outputMode {
             case .replaceCurrentLayer:
                 guard state.layerSidebar.layer(withIndex: preview.outputLayerIndex) != nil else {
-                    return .failure(AIImageValidationFailure(feedback: .nanoBananaApplyFailed))
+                    return .failure(AIImageValidationFailure(feedback: .aiImageApplyFailed))
                 }
                 return .success(
                     AIImagePreviewApplicationPlan(
@@ -138,8 +138,8 @@ extension DocumentFeature {
         AIImagePreviewApplicationContract()
     }
 
-    private var aiImagePreviewPreparationService: NanoBananaPreviewPreparationService {
-        NanoBananaPreviewPreparationService(editUseCase: aiImageEditUseCase)
+    private var aiImagePreviewPreparationService: AIImagePreviewPreparationService {
+        AIImagePreviewPreparationService(editUseCase: aiImageEditUseCase)
     }
 
     private var aiImageLayerContentService: DocumentContentService {
@@ -156,7 +156,7 @@ extension DocumentFeature {
 
     func handleAIImageEditRequest(
         state: inout State,
-        request: SubmitNanoBananaEditCommand
+        request: SubmitAIImageEditCommand
     ) -> Effect<Action> {
         let validatedEdit: AIImageValidatedEdit
         switch aiImageRequestContract.validate(
@@ -179,7 +179,7 @@ extension DocumentFeature {
             .send(.delegate(.aiImageGenerationStarted(generationStart))),
             .run { [aiImagePreviewPreparationService] send in
                 switch await aiImagePreviewPreparationService.preparePreview(
-                    NanoBananaPreviewPreparationRequest(
+                    AIImagePreviewPreparationRequest(
                         command: validatedEdit.command,
                         selectionRegion: validatedEdit.selectionRegion,
                         outputLayerIndex: validatedEdit.outputLayerIndex,
@@ -191,7 +191,7 @@ extension DocumentFeature {
                 case let .failure(.editFailed(failure)):
                     await send(.aiImagePreviewPreparationFailed(Self.aiImageFailureFeedback(failure)))
                 case .failure(.unsupportedImage):
-                    await send(.aiImagePreviewPreparationFailed(.nanoBananaUnsupportedImage))
+                    await send(.aiImagePreviewPreparationFailed(.aiImageUnsupportedImage))
                 }
             }
             .cancellable(id: ApplicationFeature.CancelID.aiImageEdit, cancelInFlight: true)
@@ -200,7 +200,7 @@ extension DocumentFeature {
 
     func handleAIImageEditSucceeded(
         state: inout State,
-        preview: NanoBananaPreviewState
+        preview: AIImagePreviewState
     ) -> Effect<Action> {
         let language = appLanguageClient.load()
         let applicationPlan: AIImagePreviewApplicationPlan
@@ -224,8 +224,8 @@ extension DocumentFeature {
                 state: &state,
                 feedback: DocumentMutationFeedbackMapper().feedback(
                     for: failure,
-                    default: .nanoBananaApplyFailed
-                ) ?? .nanoBananaApplyFailed
+                    default: .aiImageApplyFailed
+                ) ?? .aiImageApplyFailed
             )
         }
 
@@ -250,7 +250,7 @@ extension DocumentFeature {
                             incrementsRevision: true
                         )
                     ),
-                    successFeedback: .nanoBananaEditApplied
+                    successFeedback: .aiImageEditApplied
                 )
             )
         )
@@ -265,7 +265,7 @@ extension DocumentFeature {
 
     func handleAIImageCancelRequested(state: inout State) -> Effect<Action> {
         .merge(
-            .send(.delegate(.aiImageGenerationFailed(.nanoBananaGenerationCanceled, appLanguageClient.load()))),
+            .send(.delegate(.aiImageGenerationFailed(.aiImageGenerationCanceled, appLanguageClient.load()))),
             .cancel(id: ApplicationFeature.CancelID.aiImageEdit)
         )
     }

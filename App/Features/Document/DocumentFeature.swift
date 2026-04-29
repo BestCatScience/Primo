@@ -6,8 +6,8 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentEngineInfrastructure
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
+import PrimoAIImageApplication
+import PrimoAIImageDomain
 import PrimoWorkspaceApplication
 
 @Reducer
@@ -148,13 +148,13 @@ struct DocumentFeature {
     }
 
     struct AIImageGenerationStart: Equatable, Sendable {
-        let descriptor: NanoBananaEditDescriptor
+        let descriptor: AIImageEditDescriptor
         let jobID: UUID
         let createdAt: Date
     }
 
     struct AIImageAppliedEdit: Equatable, Sendable {
-        let preview: NanoBananaPreviewState
+        let preview: AIImagePreviewState
         let historyID: UUID
         let createdAt: Date
     }
@@ -232,8 +232,8 @@ struct DocumentFeature {
         case newCanvasRequested(width: Int, height: Int)
         case newCanvasPreparationCompleted(CanvasDimensions)
         case newCanvasFromImagePreparationCompleted(ImportExportFeature.ImportedCanvasPlan)
-        case aiImageEditRequested(SubmitNanoBananaEditCommand)
-        case aiImagePreviewPrepared(NanoBananaPreviewState)
+        case aiImageEditRequested(SubmitAIImageEditCommand)
+        case aiImagePreviewPrepared(AIImagePreviewState)
         case aiImagePreviewPreparationFailed(ApplicationFeature.Feedback)
         case aiImageCancelRequested
         case undoRequested

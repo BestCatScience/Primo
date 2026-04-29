@@ -503,8 +503,6 @@ enum StudioStrings {
         localized(language, japanese: "AI画像で編集", english: "AI Image Edit")
     }
 
-    static func nanoBanana(_ language: AppLanguage) -> String { aiImage(language) }
-    static func nanoBananaEdit(_ language: AppLanguage) -> String { aiImageEdit(language) }
     static func export(_ language: AppLanguage) -> String { language.localized("書き出し") }
     static func exportTimelapse(_ language: AppLanguage) -> String { language.localized("タイムラプスを書き出し") }
     static func refreshView(_ language: AppLanguage) -> String { language.localized("表示を更新") }

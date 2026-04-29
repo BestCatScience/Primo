@@ -1,12 +1,12 @@
 import Foundation
 import PrimoCoreTypes
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
+import PrimoAIImageApplication
+import PrimoAIImageDomain
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
-public extension NanoBananaRemoteEditClient {
-    static func live(httpClient: HTTPClient) -> NanoBananaRemoteEditClient {
-        NanoBananaRemoteEditClient { request, prompt, model in
+public extension AIImageRemoteEditClient {
+    static func live(httpClient: HTTPClient) -> AIImageRemoteEditClient {
+        AIImageRemoteEditClient { request, prompt, model in
             do {
                 let imageData = try await performEditRequest(
                     inputPNGData: request.inputPNGData,
@@ -16,10 +16,10 @@ public extension NanoBananaRemoteEditClient {
                     httpClient: httpClient
                 )
                 guard let imageData else {
-                    return .failure(.missingImageData("Nano Banana did not return decodable image bytes."))
+                    return .failure(.missingImageData("AI image editing did not return decodable image bytes."))
                 }
                 return .success(imageData)
-            } catch let failure as NanoBananaEditFailure {
+            } catch let failure as AIImageEditFailure {
                 return .failure(failure)
             } catch {
                 return .failure(.transport(error.localizedDescription))
@@ -30,8 +30,8 @@ public extension NanoBananaRemoteEditClient {
     private static func performEditRequest(
         inputPNGData: Data,
         prompt: String,
-        config: NanoBananaExecutionConfig,
-        model: NanoBananaModel,
+        config: AIImageExecutionConfig,
+        model: AIImageModel,
         httpClient: HTTPClient
     ) async throws -> Data? {
         switch config {
@@ -45,14 +45,14 @@ public extension NanoBananaRemoteEditClient {
                 )
                 let (data, response) = try await httpClient.data(request)
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NanoBananaEditFailure.invalidResponse
+                    throw AIImageEditFailure.invalidResponse
                 }
 
                 guard (200...299).contains(httpResponse.statusCode) else {
                     if let apiError = decodeAPIErrorEnvelope(from: data) {
-                        throw NanoBananaEditFailure.apiError(apiError.error.message)
+                        throw AIImageEditFailure.apiError(apiError.error.message)
                     }
-                    throw NanoBananaEditFailure.apiError(
+                    throw AIImageEditFailure.apiError(
                         String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
                     )
                 }
@@ -60,7 +60,7 @@ public extension NanoBananaRemoteEditClient {
                 return try decodeImageData(from: data)
             }
 
-            var lastError: NanoBananaEditFailure?
+            var lastError: AIImageEditFailure?
             for request in makeGeminiRequests(
                 inputPNGData: inputPNGData,
                 prompt: prompt,
@@ -70,14 +70,14 @@ public extension NanoBananaRemoteEditClient {
                 do {
                     let (data, response) = try await httpClient.data(request)
                     guard let httpResponse = response as? HTTPURLResponse else {
-                        throw NanoBananaEditFailure.invalidResponse
+                        throw AIImageEditFailure.invalidResponse
                     }
 
                     guard (200...299).contains(httpResponse.statusCode) else {
                         if let apiError = decodeAPIErrorEnvelope(from: data) {
-                            throw NanoBananaEditFailure.apiError(apiError.error.message)
+                            throw AIImageEditFailure.apiError(apiError.error.message)
                         }
-                        throw NanoBananaEditFailure.apiError(
+                        throw AIImageEditFailure.apiError(
                             String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
                         )
                     }
@@ -86,7 +86,7 @@ public extension NanoBananaRemoteEditClient {
                         return imageData
                     }
                 } catch {
-                    if let failure = error as? NanoBananaEditFailure {
+                    if let failure = error as? AIImageEditFailure {
                         lastError = failure
                     } else {
                         lastError = .transport(error.localizedDescription)
@@ -108,14 +108,14 @@ public extension NanoBananaRemoteEditClient {
             )
             let (data, response) = try await httpClient.data(request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw NanoBananaEditFailure.invalidResponse
+                throw AIImageEditFailure.invalidResponse
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 if let apiError = decodeAPIErrorEnvelope(from: data) {
-                    throw NanoBananaEditFailure.apiError(apiError.error.message)
+                    throw AIImageEditFailure.apiError(apiError.error.message)
                 }
-                throw NanoBananaEditFailure.apiError(
+                throw AIImageEditFailure.apiError(
                     String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
                 )
             }
@@ -128,7 +128,7 @@ public extension NanoBananaRemoteEditClient {
         inputPNGData: Data,
         prompt: String,
         apiKey: String,
-        model: NanoBananaModel
+        model: AIImageModel
     ) -> [URLRequest] {
         guard model.provider == .gemini else { return [] }
         guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model.rawValue):generateContent") else {
@@ -195,13 +195,13 @@ public extension NanoBananaRemoteEditClient {
         inputPNGData: Data,
         prompt: String,
         apiKey: String,
-        model: NanoBananaModel
+        model: AIImageModel
     ) throws -> URLRequest {
         guard model.provider == .openAI else {
-            throw NanoBananaEditFailure.invalidEndpoint
+            throw AIImageEditFailure.invalidEndpoint
         }
         guard let url = URL(string: "https://api.openai.com/v1/images/edits") else {
-            throw NanoBananaEditFailure.invalidEndpoint
+            throw AIImageEditFailure.invalidEndpoint
         }
 
         let boundary = "PrimoBoundary-\(UUID().uuidString)"
@@ -263,10 +263,10 @@ public extension NanoBananaRemoteEditClient {
         prompt: String,
         accessToken: String,
         endpoint: String,
-        model: NanoBananaModel
+        model: AIImageModel
     ) throws -> URLRequest {
         guard let url = URL(string: endpoint), !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw NanoBananaEditFailure.invalidEndpoint
+            throw AIImageEditFailure.invalidEndpoint
         }
 
         let requestBody = ProxyEditRequest(
@@ -286,7 +286,7 @@ public extension NanoBananaRemoteEditClient {
         return request
     }
 
-    private static func imageConfig(for model: NanoBananaModel) -> ImageConfig? {
+    private static func imageConfig(for model: AIImageModel) -> ImageConfig? {
         switch model {
         case .flashImage31Preview, .proImagePreview:
             return ImageConfig(aspectRatio: "1:1", imageSize: "2K")
@@ -327,8 +327,8 @@ public extension NanoBananaRemoteEditClient {
                 .joined(separator: "\n")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             if !joinedText.isEmpty {
-                throw NanoBananaEditFailure.missingImageData(
-                    "Nano Banana returned text instead of an image: \(joinedText.prefix(240))"
+                throw AIImageEditFailure.missingImageData(
+                    "AI image editing returned text instead of an image: \(joinedText.prefix(240))"
                 )
             }
         }

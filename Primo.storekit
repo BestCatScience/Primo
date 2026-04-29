@@ -40,19 +40,19 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Monthly subscription for app-managed Nano Banana access in Primo.",
-              "displayName" : "Primo Nano Banana Monthly",
+              "description" : "Monthly subscription for app-managed AI image editing access in Primo.",
+              "displayName" : "Primo AI Image Monthly",
               "locale" : "en_US"
             },
             {
-              "description" : "Primo でアプリ管理の Nano Banana を利用するための月額サブスクリプションです。",
-              "displayName" : "Primo Nano Banana Monthly",
+              "description" : "Primo でアプリ管理の AI画像編集を利用するための月額サブスクリプションです。",
+              "displayName" : "Primo AI Image Monthly",
               "locale" : "ja_JP"
             }
           ],
-          "productID" : "com.bestcatscience.primo.nanobanana.monthly",
+          "productID" : "com.bestcatscience.primo.aiimage.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Primo Nano Banana Monthly",
+          "referenceName" : "Primo AI Image Monthly",
           "subscriptionGroupID" : "21482014",
           "type" : "Auto-Renewable Subscription"
         }

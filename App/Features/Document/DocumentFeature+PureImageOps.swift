@@ -25,18 +25,18 @@ extension DocumentFeature {
         )
     }
 
-    static func aiImageFailureFeedback(_ failure: NanoBananaEditFailure) -> ApplicationFeature.Feedback {
+    static func aiImageFailureFeedback(_ failure: AIImageEditFailure) -> ApplicationFeature.Feedback {
         switch failure {
         case .invalidResponse:
-            return .nanoBananaInvalidResponse
+            return .aiImageInvalidResponse
         case .invalidEndpoint:
-            return .nanoBananaInvalidEndpoint
+            return .aiImageInvalidEndpoint
         case .missingImageData:
-            return .nanoBananaMissingImage
+            return .aiImageMissingImage
         case let .apiError(message),
              let .transport(message):
             let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? .nanoBananaEditFailed(nil) : .nanoBananaEditFailed(trimmed)
+            return trimmed.isEmpty ? .aiImageEditFailed(nil) : .aiImageEditFailed(trimmed)
         }
     }
 }

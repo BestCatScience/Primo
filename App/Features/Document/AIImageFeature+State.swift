@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
+import PrimoAIImageApplication
+import PrimoAIImageDomain
 
 extension AIImageFeature {
     enum WorkspaceBottomPanelSection: Hashable, Equatable {
@@ -13,17 +13,17 @@ extension AIImageFeature {
     struct ComposerState: Equatable {
         var prompt = ""
         var inputLayerIndex = 0
-        var editScope: NanoBananaEditScope = .wholeLayer
-        var outputMode: NanoBananaOutputMode = .replaceCurrentLayer
-        var maskSettings = NanoBananaMaskSettings()
-        var model: NanoBananaModel = .flashImage31Preview
+        var editScope: AIImageEditScope = .wholeLayer
+        var outputMode: AIImageOutputMode = .replaceCurrentLayer
+        var maskSettings = AIImageMaskSettings()
+        var model: AIImageModel = .flashImage31Preview
     }
 
     struct ExecutionState: Equatable {
         var isGenerating = false
-        var jobs: [NanoBananaJob] = []
-        var history: [NanoBananaHistoryItem] = []
-        var pendingDescriptor: NanoBananaEditDescriptor?
+        var jobs: [AIImageJob] = []
+        var history: [AIImageHistoryItem] = []
+        var pendingDescriptor: AIImageEditDescriptor?
         var activeJobID: UUID?
     }
 
@@ -37,8 +37,8 @@ extension AIImageFeature {
     @ObservableState
     struct State: Equatable {
         var composer = ComposerState()
-        var settings = NanoBananaSettings(accessMode: .appManaged)
-        var commerce = NanoBananaCommerceSnapshot()
+        var settings = AIImageSettings(accessMode: .appManaged)
+        var commerce = AIImageCommerceSnapshot()
         var execution = ExecutionState()
         var presentation = PresentationState()
 
@@ -47,17 +47,17 @@ extension AIImageFeature {
             set { execution.isGenerating = newValue }
         }
 
-        var jobs: [NanoBananaJob] {
+        var jobs: [AIImageJob] {
             get { execution.jobs }
             set { execution.jobs = newValue }
         }
 
-        var history: [NanoBananaHistoryItem] {
+        var history: [AIImageHistoryItem] {
             get { execution.history }
             set { execution.history = newValue }
         }
 
-        var pendingRequest: NanoBananaEditDescriptor? {
+        var pendingRequest: AIImageEditDescriptor? {
             get { execution.pendingDescriptor }
             set { execution.pendingDescriptor = newValue }
         }
@@ -102,7 +102,7 @@ extension AIImageFeature {
             set { settings.openAIAPIKey = newValue }
         }
 
-        var accessMode: NanoBananaAccessMode {
+        var accessMode: AIImageAccessMode {
             get { settings.accessMode }
             set { settings.accessMode = newValue }
         }
@@ -131,7 +131,7 @@ extension AIImageFeature {
             workspaceBottomPanelCollapsed = false
         }
 
-        mutating func applyHistoryItem(_ descriptor: NanoBananaEditDescriptor) {
+        mutating func applyHistoryItem(_ descriptor: AIImageEditDescriptor) {
             composer.prompt = descriptor.prompt.rawValue
             composer.inputLayerIndex = descriptor.inputLayerIndex
             composer.editScope = descriptor.editScope
@@ -142,8 +142,8 @@ extension AIImageFeature {
             workspaceBottomPanelSection = .aiImage
         }
 
-        func buildDraft() -> NanoBananaDraft {
-            NanoBananaDraft(
+        func buildDraft() -> AIImageDraft {
+            AIImageDraft(
                 prompt: composer.prompt,
                 accessMode: accessMode,
                 model: composer.model,
@@ -155,8 +155,8 @@ extension AIImageFeature {
         }
 
         func buildCommand(
-            using builder: NanoBananaCommandBuilder
-        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
+            using builder: AIImageCommandBuilder
+        ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure> {
             builder.build(
                 draft: buildDraft(),
                 apiKey: apiKey,
@@ -166,11 +166,11 @@ extension AIImageFeature {
         }
 
         func buildCommand(
-            for descriptor: NanoBananaEditDescriptor,
-            using builder: NanoBananaCommandBuilder
-        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure> {
+            for descriptor: AIImageEditDescriptor,
+            using builder: AIImageCommandBuilder
+        ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure> {
             builder.build(
-                draft: NanoBananaDraft(
+                draft: AIImageDraft(
                     prompt: descriptor.prompt.rawValue,
                     accessMode: descriptor.accessMode,
                     model: descriptor.model,
@@ -186,22 +186,22 @@ extension AIImageFeature {
         }
 
         func regenerationCommand(
-            using builder: NanoBananaCommandBuilder
-        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure>? {
+            using builder: AIImageCommandBuilder
+        ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure>? {
             guard let descriptor = regenerationRequest() else { return nil }
             return buildCommand(for: descriptor, using: builder)
         }
 
         func retryCommand(
             for jobID: UUID,
-            using builder: NanoBananaCommandBuilder
-        ) -> Result<SubmitNanoBananaEditCommand, NanoBananaCommandBuilderFailure>? {
+            using builder: AIImageCommandBuilder
+        ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure>? {
             guard let descriptor = retryRequest(for: jobID) else { return nil }
             return buildCommand(for: descriptor, using: builder)
         }
 
         mutating func beginGeneration(
-            descriptor: NanoBananaEditDescriptor,
+            descriptor: AIImageEditDescriptor,
             jobID: UUID,
             createdAt: Date
         ) {
@@ -209,7 +209,7 @@ extension AIImageFeature {
             execution.pendingDescriptor = descriptor
             execution.activeJobID = jobID
             execution.jobs.insert(
-                NanoBananaJob(
+                AIImageJob(
                     id: jobID,
                     descriptor: descriptor,
                     createdAt: createdAt,
@@ -221,22 +221,22 @@ extension AIImageFeature {
             execution.jobs = Array(execution.jobs.prefix(12))
         }
 
-        func regenerationRequest() -> NanoBananaEditDescriptor? {
+        func regenerationRequest() -> AIImageEditDescriptor? {
             execution.pendingDescriptor
         }
 
-        func retryRequest(for jobID: UUID) -> NanoBananaEditDescriptor? {
+        func retryRequest(for jobID: UUID) -> AIImageEditDescriptor? {
             execution.jobs.first(where: { $0.id == jobID })?.descriptor
         }
 
         mutating func recordSucceededGeneration(
-            preview: NanoBananaPreviewState,
+            preview: AIImagePreviewState,
             historyID: UUID,
             createdAt: Date
         ) {
             execution.isGenerating = false
             execution.history.insert(
-                NanoBananaHistoryItem(
+                AIImageHistoryItem(
                     id: historyID,
                     descriptor: preview.descriptor,
                     createdAt: createdAt,
@@ -252,7 +252,7 @@ extension AIImageFeature {
             }
         }
 
-        mutating func completeAppliedEdit(request: NanoBananaEditDescriptor) {
+        mutating func completeAppliedEdit(request: AIImageEditDescriptor) {
             execution.pendingDescriptor = request
             execution.activeJobID = nil
         }

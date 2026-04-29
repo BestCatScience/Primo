@@ -107,31 +107,31 @@ extension ApplicationFeature.Feedback {
             return language.localized("タイムラプス用の描画履歴がまだ足りません")
         case let .timelapseExportFailed(message):
             return (message?.isEmpty == false) ? message! : language.localized("タイムラプスの書き出しに失敗しました")
-        case .nanoBananaPromptRequired:
+        case .aiImagePromptRequired:
             return language.localized("AI画像編集用のプロンプトを入力してください")
-        case .nanoBananaAPIKeyRequired:
+        case .aiImageAPIKeyRequired:
             return language.localized("AI画像編集にはサブスクリプションが必要です")
-        case .nanoBananaEndpointRequired:
+        case .aiImageEndpointRequired:
             return language.localized("アプリサーバーのエンドポイントを入力してください")
-        case .nanoBananaPrepareLayerFailed:
+        case .aiImagePrepareLayerFailed:
             return language.localized("AI画像編集用にアクティブレイヤーを準備できませんでした")
-        case .nanoBananaSelectionRequired:
+        case .aiImageSelectionRequired:
             return language.localized("インペイント用の選択範囲を作成してください")
-        case .nanoBananaApplyFailed:
+        case .aiImageApplyFailed:
             return language.localized("AI画像編集の結果を適用できませんでした")
-        case .nanoBananaInvalidResponse:
+        case .aiImageInvalidResponse:
             return language.localized("AI画像編集から不正な応答が返されました")
-        case .nanoBananaInvalidEndpoint:
+        case .aiImageInvalidEndpoint:
             return language.localized("AI画像編集のエンドポイントが不正です")
-        case .nanoBananaMissingImage:
+        case .aiImageMissingImage:
             return language.localized("AI画像編集が画像を返しませんでした")
-        case .nanoBananaUnsupportedImage:
+        case .aiImageUnsupportedImage:
             return language.localized("AI画像編集が未対応の画像を返しました")
-        case let .nanoBananaEditFailed(message):
+        case let .aiImageEditFailed(message):
             return (message?.isEmpty == false) ? message! : language.localized("AI画像編集に失敗しました")
-        case .nanoBananaGenerationCanceled:
+        case .aiImageGenerationCanceled:
             return language.localized("AI画像編集の生成をキャンセルしました")
-        case .nanoBananaEditApplied:
+        case .aiImageEditApplied:
             return language.localized("AI画像編集の結果を適用しました")
         case .couldNotCreateTab:
             return language.localized("タブを作成できませんでした")

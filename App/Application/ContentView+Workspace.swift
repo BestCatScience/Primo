@@ -570,7 +570,7 @@ extension ContentView {
                     }
                 case .editScope:
                     let hasSelection = store.document.canvas.selection?.isEmpty == false
-                    ForEach(NanoBananaEditScope.allCases) { scope in
+                    ForEach(AIImageEditScope.allCases) { scope in
                         workspaceAIImagePickerPopupRow(
                             title: scope.title(language),
                             isSelected: scope == aiImageState.composer.editScope,
@@ -580,7 +580,7 @@ extension ContentView {
                         }
                     }
                 case .outputMode:
-                    ForEach(NanoBananaOutputMode.allCases) { mode in
+                    ForEach(AIImageOutputMode.allCases) { mode in
                         workspaceAIImagePickerPopupRow(
                             title: mode.title(language),
                             isSelected: mode == aiImageState.composer.outputMode
@@ -589,7 +589,7 @@ extension ContentView {
                         }
                     }
                 case .model:
-                    ForEach(NanoBananaModel.allCases) { model in
+                    ForEach(AIImageModel.allCases) { model in
                         workspaceAIImagePickerPopupRow(
                             title: model.title(language),
                             isSelected: model == aiImageState.composer.model
@@ -647,11 +647,11 @@ extension ContentView {
         case .inputLayer:
             return max(store.document.layerSidebar.layers.count, 1)
         case .editScope:
-            return NanoBananaEditScope.allCases.count
+            return AIImageEditScope.allCases.count
         case .outputMode:
-            return NanoBananaOutputMode.allCases.count
+            return AIImageOutputMode.allCases.count
         case .model:
-            return NanoBananaModel.allCases.count
+            return AIImageModel.allCases.count
         }
     }
 

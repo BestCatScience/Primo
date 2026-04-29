@@ -1,32 +1,32 @@
 import Foundation
 import PrimoCoreTypes
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 import StoreKit
 
-public struct NanoBananaSettingsClient: Sendable {
-    public var load: @Sendable () -> NanoBananaSettings
-    public var persist: @Sendable (NanoBananaSettings) -> Void
+public struct AIImageSettingsClient: Sendable {
+    public var load: @Sendable () -> AIImageSettings
+    public var persist: @Sendable (AIImageSettings) -> Void
 
-    public static let accessModeStorageKey = "primo.nanobanana.accessMode"
-    public static let apiKeyStorageKey = "primo.nanobanana.apiKey"
-    public static let openAIAPIKeyStorageKey = "primo.aiImage.openAIAPIKey"
+    public static let accessModeStorageKey = "primo.aiimage.accessMode"
+    public static let apiKeyStorageKey = "primo.aiimage.apiKey"
+    public static let openAIAPIKeyStorageKey = "primo.aiimage.openAIAPIKey"
 
     public init(
-        load: @escaping @Sendable () -> NanoBananaSettings,
-        persist: @escaping @Sendable (NanoBananaSettings) -> Void
+        load: @escaping @Sendable () -> AIImageSettings,
+        persist: @escaping @Sendable (AIImageSettings) -> Void
     ) {
         self.load = load
         self.persist = persist
     }
 
-    public static func live(keyValueStoreClient: KeyValueStoreClient) -> NanoBananaSettingsClient {
-        NanoBananaSettingsClient(
+    public static func live(keyValueStoreClient: KeyValueStoreClient) -> AIImageSettingsClient {
+        AIImageSettingsClient(
             load: {
                 let rawAccessMode = keyValueStoreClient.stringForKey(Self.accessModeStorageKey)
-                let accessMode = rawAccessMode.flatMap(NanoBananaAccessMode.init(rawValue:)) ?? .appManaged
+                let accessMode = rawAccessMode.flatMap(AIImageAccessMode.init(rawValue:)) ?? .appManaged
                 let apiKey = keyValueStoreClient.stringForKey(Self.apiKeyStorageKey) ?? ""
                 let openAIAPIKey = keyValueStoreClient.stringForKey(Self.openAIAPIKeyStorageKey) ?? ""
-                return NanoBananaSettings(
+                return AIImageSettings(
                     accessMode: accessMode,
                     apiKey: apiKey,
                     openAIAPIKey: openAIAPIKey
@@ -41,8 +41,8 @@ public struct NanoBananaSettingsClient: Sendable {
     }
 }
 
-public struct NanoBananaCommerceState: Equatable, Sendable {
-    public var primaryProduct: NanoBananaCommerceSnapshot.ProductSummary?
+public struct AIImageCommerceState: Equatable, Sendable {
+    public var primaryProduct: AIImageCommerceSnapshot.ProductSummary?
     public var isLoading: Bool
     public var isSubscriptionActive: Bool
     public var latestEntitlementJWS: String
@@ -50,7 +50,7 @@ public struct NanoBananaCommerceState: Equatable, Sendable {
     public var proxyEndpoint: String
 
     public init(
-        primaryProduct: NanoBananaCommerceSnapshot.ProductSummary? = nil,
+        primaryProduct: AIImageCommerceSnapshot.ProductSummary? = nil,
         isLoading: Bool = false,
         isSubscriptionActive: Bool = false,
         latestEntitlementJWS: String = "",
@@ -65,8 +65,8 @@ public struct NanoBananaCommerceState: Equatable, Sendable {
         self.proxyEndpoint = proxyEndpoint
     }
 
-    public func snapshot() -> NanoBananaCommerceSnapshot {
-        NanoBananaCommerceSnapshot(
+    public func snapshot() -> AIImageCommerceSnapshot {
+        AIImageCommerceSnapshot(
             primaryProduct: primaryProduct,
             isLoading: isLoading,
             isSubscriptionActive: isSubscriptionActive,
@@ -78,17 +78,17 @@ public struct NanoBananaCommerceState: Equatable, Sendable {
     }
 }
 
-public struct NanoBananaCommerceClient: Sendable {
-    public var prepare: @Sendable () async -> NanoBananaCommerceSnapshot
-    public var purchasePrimaryProduct: @Sendable () async -> NanoBananaCommerceSnapshot
-    public var restorePurchases: @Sendable () async -> NanoBananaCommerceSnapshot
-    public var clearPurchaseError: @Sendable () async -> NanoBananaCommerceSnapshot
+public struct AIImageCommerceClient: Sendable {
+    public var prepare: @Sendable () async -> AIImageCommerceSnapshot
+    public var purchasePrimaryProduct: @Sendable () async -> AIImageCommerceSnapshot
+    public var restorePurchases: @Sendable () async -> AIImageCommerceSnapshot
+    public var clearPurchaseError: @Sendable () async -> AIImageCommerceSnapshot
 
     public init(
-        prepare: @escaping @Sendable () async -> NanoBananaCommerceSnapshot,
-        purchasePrimaryProduct: @escaping @Sendable () async -> NanoBananaCommerceSnapshot,
-        restorePurchases: @escaping @Sendable () async -> NanoBananaCommerceSnapshot,
-        clearPurchaseError: @escaping @Sendable () async -> NanoBananaCommerceSnapshot
+        prepare: @escaping @Sendable () async -> AIImageCommerceSnapshot,
+        purchasePrimaryProduct: @escaping @Sendable () async -> AIImageCommerceSnapshot,
+        restorePurchases: @escaping @Sendable () async -> AIImageCommerceSnapshot,
+        clearPurchaseError: @escaping @Sendable () async -> AIImageCommerceSnapshot
     ) {
         self.prepare = prepare
         self.purchasePrimaryProduct = purchasePrimaryProduct
@@ -97,9 +97,9 @@ public struct NanoBananaCommerceClient: Sendable {
     }
 
     @available(macOS 12.0, iOS 15.0, *)
-    public static func live(bundle: Bundle = .main) -> NanoBananaCommerceClient {
-        let store = NanoBananaCommerceStore(bundle: bundle)
-        return NanoBananaCommerceClient(
+    public static func live(bundle: Bundle = .main) -> AIImageCommerceClient {
+        let store = AIImageCommerceStore(bundle: bundle)
+        return AIImageCommerceClient(
             prepare: {
                 await store.prepare()
             },
@@ -117,16 +117,16 @@ public struct NanoBananaCommerceClient: Sendable {
 }
 
 @available(macOS 12.0, iOS 15.0, *)
-private actor NanoBananaCommerceStore {
-    static let monthlyProductID = "com.bestcatscience.primo.nanobanana.monthly"
+private actor AIImageCommerceStore {
+    static let monthlyProductID = "com.bestcatscience.primo.aiimage.monthly"
 
     private var products: [Product] = []
-    private var state: NanoBananaCommerceState
+    private var state: AIImageCommerceState
     private var transactionUpdatesTask: Task<Void, Never>?
 
     init(bundle: Bundle = .main) {
-        state = NanoBananaCommerceState(
-            proxyEndpoint: (bundle.object(forInfoDictionaryKey: "NanoBananaProxyEndpoint") as? String) ?? ""
+        state = AIImageCommerceState(
+            proxyEndpoint: (bundle.object(forInfoDictionaryKey: "AIImageProxyEndpoint") as? String) ?? ""
         )
     }
 
@@ -134,7 +134,7 @@ private actor NanoBananaCommerceStore {
         transactionUpdatesTask?.cancel()
     }
 
-    func prepare() async -> NanoBananaCommerceSnapshot {
+    func prepare() async -> AIImageCommerceSnapshot {
         startObservingTransactionsIfNeeded()
         if products.isEmpty {
             await loadProducts()
@@ -143,7 +143,7 @@ private actor NanoBananaCommerceStore {
         return state.snapshot()
     }
 
-    func purchasePrimaryProduct() async -> NanoBananaCommerceSnapshot {
+    func purchasePrimaryProduct() async -> AIImageCommerceSnapshot {
         guard let product = products.first else {
             state.purchaseErrorMessage = "Subscription product is unavailable."
             return state.snapshot()
@@ -175,7 +175,7 @@ private actor NanoBananaCommerceStore {
         return state.snapshot()
     }
 
-    func restorePurchases() async -> NanoBananaCommerceSnapshot {
+    func restorePurchases() async -> AIImageCommerceSnapshot {
         state.isLoading = true
         state.purchaseErrorMessage = nil
         defer { state.isLoading = false }
@@ -190,7 +190,7 @@ private actor NanoBananaCommerceStore {
         return state.snapshot()
     }
 
-    func clearPurchaseError() -> NanoBananaCommerceSnapshot {
+    func clearPurchaseError() -> AIImageCommerceSnapshot {
         state.purchaseErrorMessage = nil
         return state.snapshot()
     }
@@ -204,7 +204,7 @@ private actor NanoBananaCommerceStore {
             products = try await Product.products(for: [Self.monthlyProductID])
                 .sorted { $0.displayName < $1.displayName }
             state.primaryProduct = products.first.map {
-                NanoBananaCommerceSnapshot.ProductSummary(
+                AIImageCommerceSnapshot.ProductSummary(
                     id: $0.id,
                     displayName: $0.displayName,
                     displayPrice: $0.displayPrice

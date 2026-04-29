@@ -1,3 +1,0 @@
-@_exported import PrimoNanoBananaDomain
-@_exported import PrimoNanoBananaApplication
-@_exported import PrimoNanoBananaInfrastructure

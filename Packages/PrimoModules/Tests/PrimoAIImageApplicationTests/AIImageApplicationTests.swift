@@ -1,13 +1,13 @@
 import Foundation
 import PrimoDocumentContracts
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
+import PrimoAIImageApplication
+import PrimoAIImageDomain
 import Testing
 
-struct NanoBananaApplicationTests {
+struct AIImageApplicationTests {
     @Test
     func commandBuilderBuildsUserKeyCommand() throws {
-        let draft = NanoBananaDraft(
+        let draft = AIImageDraft(
             prompt: "  refine shadows  ",
             accessMode: .userAPIKey,
             model: .flashImage31Preview,
@@ -16,9 +16,9 @@ struct NanoBananaApplicationTests {
             outputMode: .newLayer,
             maskSettings: .init(expansion: 6, isInverted: true)
         )
-        let snapshot = NanoBananaCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+        let snapshot = AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
 
-        let result = NanoBananaCommandBuilder().build(
+        let result = AIImageCommandBuilder().build(
             draft: draft,
             apiKey: "  secret-key  ",
             openAIAPIKey: "",
@@ -30,12 +30,12 @@ struct NanoBananaApplicationTests {
         #expect(command.descriptor.inputLayerIndex == 4)
         #expect(command.descriptor.maskSettings.expansion == 6)
         #expect(command.descriptor.maskSettings.isInverted)
-        #expect(command.executionConfig == .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!))
+        #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("secret-key")!))
     }
 
     @Test
     func commandBuilderBuildsOpenAIUserKeyCommand() throws {
-        let draft = NanoBananaDraft(
+        let draft = AIImageDraft(
             prompt: "  refine text  ",
             accessMode: .userAPIKey,
             model: .gptImage2,
@@ -44,22 +44,22 @@ struct NanoBananaApplicationTests {
             outputMode: .replaceCurrentLayer
         )
 
-        let result = NanoBananaCommandBuilder().build(
+        let result = AIImageCommandBuilder().build(
             draft: draft,
             apiKey: "",
             openAIAPIKey: "  openai-key  ",
-            commerce: NanoBananaCommerceSnapshot()
+            commerce: AIImageCommerceSnapshot()
         )
 
         let command = try result.get()
         #expect(command.descriptor.model == .gptImage2)
         #expect(command.descriptor.model.provider == .openAI)
-        #expect(command.executionConfig == .userAPIKey(apiKey: NanoBananaAPIKey("openai-key")!))
+        #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("openai-key")!))
     }
 
     @Test
     func commandBuilderRequiresOpenAIKeyForGPTImage2() {
-        let draft = NanoBananaDraft(
+        let draft = AIImageDraft(
             prompt: "refine text",
             accessMode: .userAPIKey,
             model: .gptImage2,
@@ -68,11 +68,11 @@ struct NanoBananaApplicationTests {
             outputMode: .replaceCurrentLayer
         )
 
-        let result = NanoBananaCommandBuilder().build(
+        let result = AIImageCommandBuilder().build(
             draft: draft,
             apiKey: "gemini-key",
             openAIAPIKey: "",
-            commerce: NanoBananaCommerceSnapshot()
+            commerce: AIImageCommerceSnapshot()
         )
 
         #expect(result == .failure(.apiKeyRequired))
@@ -80,8 +80,8 @@ struct NanoBananaApplicationTests {
 
     @Test
     func editUseCaseRetriesAcrossPromptsAndModels() async throws {
-        let command = SubmitNanoBananaEditCommand(
-            descriptor: NanoBananaEditDescriptor(
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch it")!,
                 accessMode: .userAPIKey,
                 model: .flashImage31Preview,
@@ -89,18 +89,18 @@ struct NanoBananaApplicationTests {
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
             ),
-            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
         )
-        let request = NanoBananaEditExecutionRequest(
+        let request = AIImageEditExecutionRequest(
             inputPNGData: Data([0x00]),
             command: command
         )
 
         final class Recorder: @unchecked Sendable {
-            var calls: [(String, NanoBananaModel)] = []
+            var calls: [(String, AIImageModel)] = []
         }
         let recorder = Recorder()
-        let remoteClient = NanoBananaRemoteEditClient { _, prompt, model in
+        let remoteClient = AIImageRemoteEditClient { _, prompt, model in
             recorder.calls.append((prompt, model))
             if model == .proImagePreview {
                 return .success(Data([0x01]))
@@ -108,7 +108,7 @@ struct NanoBananaApplicationTests {
             return .failure(.apiError("service unavailable"))
         }
 
-        let result = await NanoBananaEditUseCase.live(remoteClient: remoteClient).execute(request)
+        let result = await AIImageEditUseCase.live(remoteClient: remoteClient).execute(request)
         let data = try result.get()
         #expect(data == Data([0x01]))
         #expect(recorder.calls.count >= 3)
@@ -117,8 +117,8 @@ struct NanoBananaApplicationTests {
 
     @Test
     func previewPreparationServiceBuildsWholeLayerPreview() async throws {
-        let command = SubmitNanoBananaEditCommand(
-            descriptor: NanoBananaEditDescriptor(
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch it")!,
                 accessMode: .userAPIKey,
                 model: .flashImage31Preview,
@@ -126,7 +126,7 @@ struct NanoBananaApplicationTests {
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
             ),
-            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
         )
         let surface = DocumentCompositeSurface(
             width: 2,
@@ -138,12 +138,12 @@ struct NanoBananaApplicationTests {
             255, 255, 255, 255,
             ])
         )
-        let useCase = NanoBananaEditUseCase { request in
+        let useCase = AIImageEditUseCase { request in
             .success(request.inputPNGData)
         }
 
-        let result = await NanoBananaPreviewPreparationService(editUseCase: useCase).preparePreview(
-            NanoBananaPreviewPreparationRequest(
+        let result = await AIImagePreviewPreparationService(editUseCase: useCase).preparePreview(
+            AIImagePreviewPreparationRequest(
                 command: command,
                 selectionRegion: nil,
                 outputLayerIndex: 0,
@@ -162,8 +162,8 @@ struct NanoBananaApplicationTests {
 
     @Test
     func previewPreparationServiceBuildsSelectedAreaPreviewFromSurface() async throws {
-        let command = SubmitNanoBananaEditCommand(
-            descriptor: NanoBananaEditDescriptor(
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Retouch selection")!,
                 accessMode: .userAPIKey,
                 model: .flashImage31Preview,
@@ -171,21 +171,21 @@ struct NanoBananaApplicationTests {
                 editScope: .selectedArea,
                 outputMode: .replaceCurrentLayer
             ),
-            executionConfig: .userAPIKey(apiKey: NanoBananaAPIKey("secret-key")!)
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
         )
         let surface = DocumentCompositeSurface(
             width: 4,
             height: 4,
             pixelData: Data(repeating: 0xFF, count: 4 * 4 * 4)
         )
-        let useCase = NanoBananaEditUseCase { request in
+        let useCase = AIImageEditUseCase { request in
             .success(request.inputPNGData)
         }
 
-        let result = await NanoBananaPreviewPreparationService(editUseCase: useCase).preparePreview(
-            NanoBananaPreviewPreparationRequest(
+        let result = await AIImagePreviewPreparationService(editUseCase: useCase).preparePreview(
+            AIImagePreviewPreparationRequest(
                 command: command,
-                selectionRegion: NanoBananaSelectionRegion(
+                selectionRegion: AIImageSelectionRegion(
                     selectionBounds: CGRect(x: 1, y: 1, width: 2, height: 2),
                     expandedMask: [
                         0, 0, 0, 0,

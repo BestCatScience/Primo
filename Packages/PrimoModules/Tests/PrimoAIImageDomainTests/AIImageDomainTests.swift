@@ -1,17 +1,17 @@
-import PrimoNanoBananaDomain
+import PrimoAIImageDomain
 import Testing
 
-struct NanoBananaDomainTests {
+struct AIImageDomainTests {
     @Test
     func descriptorRetainsMaskAndOutputConfiguration() {
-        let request = NanoBananaEditDescriptor(
+        let request = AIImageEditDescriptor(
             prompt: NonEmptyPrompt("Refine the lighting")!,
             accessMode: .appManaged,
             model: .flashImage31Preview,
             inputLayerIndex: 2,
             editScope: .selectedArea,
             outputMode: .newLayer,
-            maskSettings: NanoBananaMaskSettings(
+            maskSettings: AIImageMaskSettings(
                 expansion: 12,
                 isInverted: true
             )
@@ -29,7 +29,7 @@ struct NanoBananaDomainTests {
 
     @Test
     func proxyEndpointRequiresHTTPS() {
-        #expect(ProxyEndpoint("https://proxy.example.com/nanobanana/edit")?.rawValue == "https://proxy.example.com/nanobanana/edit")
-        #expect(ProxyEndpoint("http://127.0.0.1:8787/nanobanana/edit") == nil)
+        #expect(ProxyEndpoint("https://proxy.example.com/aiimage/edit")?.rawValue == "https://proxy.example.com/aiimage/edit")
+        #expect(ProxyEndpoint("http://127.0.0.1:8787/aiimage/edit") == nil)
     }
 }

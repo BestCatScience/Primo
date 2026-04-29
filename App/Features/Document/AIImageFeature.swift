@@ -1,8 +1,8 @@
 import ComposableArchitecture
 import Foundation
-import PrimoNanoBananaApplication
-import PrimoNanoBananaDomain
-import PrimoNanoBananaInfrastructure
+import PrimoAIImageApplication
+import PrimoAIImageDomain
+import PrimoAIImageInfrastructure
 
 @Reducer
 struct AIImageFeature {

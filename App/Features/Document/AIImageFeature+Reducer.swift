@@ -1,5 +1,5 @@
 import ComposableArchitecture
-import PrimoNanoBananaApplication
+import PrimoAIImageApplication
 
 extension AIImageFeature {
     func coreReduce(
@@ -182,7 +182,7 @@ extension AIImageFeature {
             return .none
 
         case let .generationFailedFeedback(feedback, language):
-            if feedback == .nanoBananaGenerationCanceled {
+            if feedback == .aiImageGenerationCanceled {
                 state.markCanceled(feedback: feedback, language: language)
             } else {
                 state.markFailed(feedback: feedback, language: language)

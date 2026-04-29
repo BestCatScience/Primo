@@ -1,14 +1,14 @@
 import Foundation
-import PrimoNanoBananaDomain
-import PrimoNanoBananaInfrastructure
+import PrimoAIImageDomain
+import PrimoAIImageInfrastructure
 import Testing
 
-struct NanoBananaCommerceStateTests {
+struct AIImageCommerceStateTests {
     @Test
     func snapshotReflectsEntitlementAndErrors() {
-        let state = NanoBananaCommerceState(
+        let state = AIImageCommerceState(
             primaryProduct: .init(
-                id: "com.bestcatscience.primo.nanobanana.monthly",
+                id: "com.bestcatscience.primo.aiimage.monthly",
                 displayName: "Monthly",
                 displayPrice: "$4.99"
             ),
@@ -21,7 +21,7 @@ struct NanoBananaCommerceStateTests {
 
         let snapshot = state.snapshot()
 
-        #expect(snapshot.primaryProduct?.id == "com.bestcatscience.primo.nanobanana.monthly")
+        #expect(snapshot.primaryProduct?.id == "com.bestcatscience.primo.aiimage.monthly")
         #expect(snapshot.isLoading)
         #expect(snapshot.isSubscriptionActive)
         #expect(snapshot.latestEntitlementJWS == "signed-jws")

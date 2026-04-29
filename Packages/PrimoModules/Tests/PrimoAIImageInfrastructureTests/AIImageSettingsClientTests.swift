@@ -1,9 +1,9 @@
 import PrimoCoreTypes
-import PrimoNanoBananaDomain
-import PrimoNanoBananaInfrastructure
+import PrimoAIImageDomain
+import PrimoAIImageInfrastructure
 import Testing
 
-struct NanoBananaSettingsClientTests {
+struct AIImageSettingsClientTests {
     private final class TestStorage: @unchecked Sendable {
         var values: [String: String]
 
@@ -15,11 +15,11 @@ struct NanoBananaSettingsClientTests {
     @Test
     func loadReturnsPersistedSettings() {
         let storage = TestStorage([
-            NanoBananaSettingsClient.accessModeStorageKey: NanoBananaAccessMode.appManaged.rawValue,
-            NanoBananaSettingsClient.apiKeyStorageKey: "gemini-secret",
-            NanoBananaSettingsClient.openAIAPIKeyStorageKey: "openai-secret"
+            AIImageSettingsClient.accessModeStorageKey: AIImageAccessMode.appManaged.rawValue,
+            AIImageSettingsClient.apiKeyStorageKey: "gemini-secret",
+            AIImageSettingsClient.openAIAPIKeyStorageKey: "openai-secret"
         ])
-        let client = NanoBananaSettingsClient.live(
+        let client = AIImageSettingsClient.live(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { storage.values[$0] },
                 setString: { value, key in storage.values[key] = value }
@@ -27,7 +27,7 @@ struct NanoBananaSettingsClientTests {
         )
 
         #expect(
-            client.load() == NanoBananaSettings(
+            client.load() == AIImageSettings(
                 accessMode: .appManaged,
                 apiKey: "gemini-secret",
                 openAIAPIKey: "openai-secret"
@@ -38,7 +38,7 @@ struct NanoBananaSettingsClientTests {
     @Test
     func persistWritesBothFields() {
         let storage = TestStorage([:])
-        let client = NanoBananaSettingsClient.live(
+        let client = AIImageSettingsClient.live(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { storage.values[$0] },
                 setString: { value, key in storage.values[key] = value }
@@ -46,15 +46,15 @@ struct NanoBananaSettingsClientTests {
         )
 
         client.persist(
-            NanoBananaSettings(
+            AIImageSettings(
                 accessMode: .appManaged,
                 apiKey: "persisted-gemini-key",
                 openAIAPIKey: "persisted-openai-key"
             )
         )
 
-        #expect(storage.values[NanoBananaSettingsClient.accessModeStorageKey] == NanoBananaAccessMode.appManaged.rawValue)
-        #expect(storage.values[NanoBananaSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
-        #expect(storage.values[NanoBananaSettingsClient.openAIAPIKeyStorageKey] == "persisted-openai-key")
+        #expect(storage.values[AIImageSettingsClient.accessModeStorageKey] == AIImageAccessMode.appManaged.rawValue)
+        #expect(storage.values[AIImageSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
+        #expect(storage.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "persisted-openai-key")
     }
 }
