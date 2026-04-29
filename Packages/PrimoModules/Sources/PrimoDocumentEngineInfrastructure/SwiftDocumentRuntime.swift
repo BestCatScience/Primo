@@ -294,11 +294,19 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func undoSnapshot() -> SwiftDocumentStoreSnapshot {
-        materializedSnapshot()
+        gpuBackedMaterializedSnapshot()
+    }
+
+    private func gpuBackedMaterializedSnapshot() -> SwiftDocumentStoreSnapshot {
+        var snapshot = store.snapshot
+        for index in gpuLayerHandles.keys where snapshot.layers.indices.contains(index) {
+            snapshot.layers[index].pixelData = currentPixelData(for: index)
+        }
+        return snapshot
     }
 
     private func materializeGpuBackedLayerPixels() {
-        for index in store.snapshot.layers.indices {
+        for index in gpuLayerHandles.keys where store.snapshot.layers.indices.contains(index) {
             store.snapshot.layers[index].pixelData = currentPixelData(for: index)
         }
     }

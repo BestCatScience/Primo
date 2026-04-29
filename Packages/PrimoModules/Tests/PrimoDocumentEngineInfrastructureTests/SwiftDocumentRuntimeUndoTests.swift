@@ -148,6 +148,37 @@ struct SwiftDocumentRuntimeUndoTests {
         #expect(gpu.blurSourceBufferHandleValues == [nil])
     }
 
+    @Test
+    func metadataUndoSnapshotMaterializesGpuBackedLayers() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+        let gpuPixels = Data(repeating: 0x66, count: 16)
+        let handle = gpu.makeHandle(width: 2, height: 2, pixelData: gpuPixels)
+
+        _ = try runtime.addLayer(name: "CPU").get()
+        _ = try runtime.applyLayerSurfaceMutation(
+            index: 0,
+            payload: GpuLayerMutationPayload(
+                canvasWidth: 2,
+                canvasHeight: 2,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                gpuBufferHandle: handle,
+                fallbackPixelData: nil
+            )
+        ).get()
+        gpu.clearMaterializedHandles()
+
+        _ = try runtime.setLayerName(index: 1, name: "Renamed").get()
+
+        #expect(gpu.materializedHandleValues == [handle])
+
+        gpu.clearMaterializedHandles()
+        _ = try runtime.undo().get()
+
+        #expect(gpu.materializedHandleValues == [handle])
+        #expect(runtime.pixelDataForLayer(index: 0) == gpuPixels)
+    }
+
     private func sample() -> StylusSample {
         StylusSample(
             point: CGPoint(x: 1, y: 1),
@@ -193,6 +224,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private var strokeBaseBufferHandles: [MetalBufferHandle?] = []
     private var fillSourceBufferHandles: [MetalBufferHandle?] = []
     private var blurSourceBufferHandles: [MetalBufferHandle?] = []
+    private var materializedHandles: [MetalBufferHandle] = []
     private var retainSucceeds = true
 
     init(strokeOutputs: [Data]) {
@@ -223,9 +255,19 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
         lock.withLock { blurSourceBufferHandles }
     }
 
+    var materializedHandleValues: [MetalBufferHandle] {
+        lock.withLock { materializedHandles }
+    }
+
     func setRetainSucceeds(_ value: Bool) {
         lock.withLock {
             retainSucceeds = value
+        }
+    }
+
+    func clearMaterializedHandles() {
+        lock.withLock {
+            materializedHandles.removeAll(keepingCapacity: true)
         }
     }
 
@@ -247,7 +289,8 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             },
             _materializedPixelData: { handle in
                 self.lock.withLock {
-                    self.pixelDataByHandle[handle]
+                    self.materializedHandles.append(handle)
+                    return self.pixelDataByHandle[handle]
                 }
             },
             _scaledPixelData: { data, _, _, _, _ in data },
