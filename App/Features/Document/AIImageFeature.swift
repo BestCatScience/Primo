@@ -5,10 +5,10 @@ import PrimoNanoBananaDomain
 import PrimoNanoBananaInfrastructure
 
 @Reducer
-struct NanoBananaFeature {
-    @Dependency(\.nanoBananaSettingsClient) var nanoBananaSettingsClient
-    @Dependency(\.nanoBananaCommerceClient) var nanoBananaCommerceClient
-    @Dependency(\.nanoBananaCommandBuilder) var nanoBananaCommandBuilder
+struct AIImageFeature {
+    @Dependency(\.aiImageSettingsClient) var aiImageSettingsClient
+    @Dependency(\.aiImageCommerceClient) var aiImageCommerceClient
+    @Dependency(\.aiImageCommandBuilder) var aiImageCommandBuilder
 
     var body: some ReducerOf<Self> {
         Reduce { state, action in

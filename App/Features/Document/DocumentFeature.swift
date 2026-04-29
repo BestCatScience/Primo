@@ -30,7 +30,7 @@ struct DocumentFeature {
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
     @Dependency(\.layerTransformProcessor) var layerTransformProcessor
-    @Dependency(\.nanoBananaEditUseCase) var nanoBananaEditUseCase
+    @Dependency(\.aiImageEditUseCase) var aiImageEditUseCase
     @Dependency(\.processEnvironmentClient) var processEnvironmentClient
     @Dependency(\.selectionWorkflowService) var selectionWorkflowService
     @Dependency(\.textLayerGateway) var textLayerGateway
@@ -87,8 +87,8 @@ struct DocumentFeature {
             return language == .japanese ? "画像 1" : "Image 1"
         }
 
-        func nanoBananaLayerName(for layerSidebar: LayerSidebarFeature.State) -> String {
-            layerSidebar.numberedLayerName(prefix: "Nano Banana")
+        func aiImageLayerName(for layerSidebar: LayerSidebarFeature.State) -> String {
+            layerSidebar.numberedLayerName(prefix: "AI Image")
         }
     }
 
@@ -147,13 +147,13 @@ struct DocumentFeature {
         let previewBrush: BrushRuntimeSettings
     }
 
-    struct NanoBananaGenerationStart: Equatable, Sendable {
+    struct AIImageGenerationStart: Equatable, Sendable {
         let descriptor: NanoBananaEditDescriptor
         let jobID: UUID
         let createdAt: Date
     }
 
-    struct NanoBananaAppliedEdit: Equatable, Sendable {
+    struct AIImageAppliedEdit: Equatable, Sendable {
         let preview: NanoBananaPreviewState
         let historyID: UUID
         let createdAt: Date
@@ -214,9 +214,9 @@ struct DocumentFeature {
             case freshDocumentMutationSucceeded(WorkspaceFeature.PreparedWorkspaceTab, FreshDocumentReplacementContract, WorkspaceDocumentSnapshot)
             case freshDocumentMutationFailed(ApplicationFeature.Feedback?)
             case freshDocumentRequested(FreshDocumentReplacementContract, FreshDocumentMutationOperation)
-            case nanoBananaGenerationStarted(NanoBananaGenerationStart)
-            case nanoBananaGenerationFailed(ApplicationFeature.Feedback, AppLanguage)
-            case nanoBananaEditApplied(NanoBananaAppliedEdit)
+            case aiImageGenerationStarted(AIImageGenerationStart)
+            case aiImageGenerationFailed(ApplicationFeature.Feedback, AppLanguage)
+            case aiImageEditApplied(AIImageAppliedEdit)
         }
 
         case startupPresentationBootstrapRequested
@@ -232,10 +232,10 @@ struct DocumentFeature {
         case newCanvasRequested(width: Int, height: Int)
         case newCanvasPreparationCompleted(CanvasDimensions)
         case newCanvasFromImagePreparationCompleted(ImportExportFeature.ImportedCanvasPlan)
-        case nanoBananaEditRequested(SubmitNanoBananaEditCommand)
-        case nanoBananaPreviewPrepared(NanoBananaPreviewState)
-        case nanoBananaPreviewPreparationFailed(ApplicationFeature.Feedback)
-        case nanoBananaCancelRequested
+        case aiImageEditRequested(SubmitNanoBananaEditCommand)
+        case aiImagePreviewPrepared(NanoBananaPreviewState)
+        case aiImagePreviewPreparationFailed(ApplicationFeature.Feedback)
+        case aiImageCancelRequested
         case undoRequested
         case redoRequested
         case resizeCanvasRequested(width: Int, height: Int)
@@ -357,17 +357,17 @@ struct DocumentFeature {
                         )
                     )
 
-                case let .nanoBananaEditRequested(request):
-                    return handleNanoBananaEditRequest(state: &state, request: request)
+                case let .aiImageEditRequested(request):
+                    return handleAIImageEditRequest(state: &state, request: request)
 
-                case let .nanoBananaPreviewPrepared(preview):
-                    return handleNanoBananaEditSucceeded(state: &state, preview: preview)
+                case let .aiImagePreviewPrepared(preview):
+                    return handleAIImageEditSucceeded(state: &state, preview: preview)
 
-                case let .nanoBananaPreviewPreparationFailed(feedback):
-                    return handleNanoBananaEditFailed(state: &state, feedback: feedback)
+                case let .aiImagePreviewPreparationFailed(feedback):
+                    return handleAIImageEditFailed(state: &state, feedback: feedback)
 
-                case .nanoBananaCancelRequested:
-                    return handleNanoBananaCancelRequested(state: &state)
+                case .aiImageCancelRequested:
+                    return handleAIImageCancelRequested(state: &state)
 
                 case let .resizeCanvasRequested(width, height):
                     return handleResizeCanvasRequest(state: &state, width: width, height: height)

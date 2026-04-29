@@ -1,7 +1,7 @@
 import Foundation
 import PrimoNanoBananaDomain
 
-extension NanoBananaFeature {
+extension AIImageFeature {
     enum Action: Equatable {
         case task
         case settingsLoaded(NanoBananaSettings)
@@ -29,8 +29,8 @@ extension NanoBananaFeature {
         case restorePurchasesTapped
         case purchaseErrorDismissed
         case historyItemSelected(NanoBananaEditDescriptor)
-        case generationStarted(DocumentFeature.NanoBananaGenerationStart)
-        case generationApplied(DocumentFeature.NanoBananaAppliedEdit)
+        case generationStarted(DocumentFeature.AIImageGenerationStart)
+        case generationApplied(DocumentFeature.AIImageAppliedEdit)
         case generationFailedFeedback(ApplicationFeature.Feedback, AppLanguage)
         case generationSucceeded(NanoBananaPreviewState)
         case generationFailed(ApplicationFeature.Feedback)

@@ -8,7 +8,7 @@ extension PrimoRootFeature {
     @ObservableState
     struct State: Equatable {
         var application = ApplicationFeature.State()
-        var nanoBanana = NanoBananaFeature.State()
+        var aiImage = AIImageFeature.State()
         var workspace = WorkspaceFeature.State()
         var document = DocumentFeature.State()
         var importExport = ImportExportFeature.State()

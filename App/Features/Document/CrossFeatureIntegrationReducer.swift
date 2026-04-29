@@ -164,23 +164,23 @@ struct CrossFeatureIntegrationReducer: Reducer {
         case let .document(.delegate(.freshDocumentMutationFailed(feedback))):
             return .send(.workspace(.freshDocumentMutationFailed(feedback)))
 
-        case let .document(.delegate(.nanoBananaGenerationStarted(start))):
-            return .send(.nanoBanana(.generationStarted(start)))
+        case let .document(.delegate(.aiImageGenerationStarted(start))):
+            return .send(.aiImage(.generationStarted(start)))
 
-        case let .document(.delegate(.nanoBananaGenerationFailed(feedback, language))):
+        case let .document(.delegate(.aiImageGenerationFailed(feedback, language))):
             return .merge(
-                .send(.nanoBanana(.generationFailedFeedback(feedback, language))),
+                .send(.aiImage(.generationFailedFeedback(feedback, language))),
                 .send(.application(.feedbackPresented(feedback)))
             )
 
-        case let .document(.delegate(.nanoBananaEditApplied(applied))):
-            return .send(.nanoBanana(.generationApplied(applied)))
+        case let .document(.delegate(.aiImageEditApplied(applied))):
+            return .send(.aiImage(.generationApplied(applied)))
 
-        case let .nanoBanana(.delegate(.requestEdit(request))):
-            return .send(.document(.nanoBananaEditRequested(request)))
+        case let .aiImage(.delegate(.requestEdit(request))):
+            return .send(.document(.aiImageEditRequested(request)))
 
-        case .nanoBanana(.delegate(.cancelEdit)):
-            return .send(.document(.nanoBananaCancelRequested))
+        case .aiImage(.delegate(.cancelEdit)):
+            return .send(.document(.aiImageCancelRequested))
 
         case let .document(.delegate(.paperStyleSyncRequested(paperStyle))):
             return .send(.document(.paperStyleSyncRequested(paperStyle)))

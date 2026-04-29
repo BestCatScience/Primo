@@ -821,7 +821,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
     }
 
-    func testNanoBananaApplyRollsBackCreatedLayerOnFailure() {
+    func testAIImageApplyRollsBackCreatedLayerOnFailure() {
         let addLayerCalls = TestRecorder<String>()
         let deleteLayerCalls = TestRecorder<Int>()
         let setActiveLayerCalls = TestRecorder<Int>()
@@ -851,7 +851,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
         _ = service.applyPixels(
             Data([0x00, 0x00, 0x00, 0x00]),
-            to: .newLayer(name: "Nano Banana")
+            to: .newLayer(name: "AI Image")
         )
 
         XCTAssertEqual(addLayerCalls.values.count, 1)

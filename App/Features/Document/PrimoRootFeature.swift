@@ -24,8 +24,8 @@ struct PrimoRootFeature {
                 ImportExportFeature()
             }
 
-            Scope(state: \.nanoBanana, action: \.nanoBanana) {
-                NanoBananaFeature()
+            Scope(state: \.aiImage, action: \.aiImage) {
+                AIImageFeature()
             }
 
             CrossFeatureIntegrationReducer()

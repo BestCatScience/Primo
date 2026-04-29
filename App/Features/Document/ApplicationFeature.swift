@@ -21,6 +21,7 @@ struct ApplicationFeature {
         case startupPresentationLoad
         case workspaceProjectLoad
         case timelapseExport
+        case aiImageEdit
         case nanoBananaEdit
     }
 

@@ -90,7 +90,7 @@ struct TimelapseExportHUD: View {
     }
 }
 
-struct NanoBananaProgressHUD: View {
+struct AIImageProgressHUD: View {
     let previewSurface: DocumentCompositeSurface?
     let previewImageData: Data?
     let progress: Double
@@ -469,7 +469,7 @@ extension ContentView {
     var recoveryState: ApplicationFeature.RecoveryState { store.application.recovery }
     var saveHistoryState: ImportExportFeature.SaveHistoryState { store.importExport.saveHistory }
     var exportState: ImportExportFeature.ExportState { store.importExport.export }
-    var nanoBananaState: NanoBananaFeature.State { store.nanoBanana }
+    var aiImageState: AIImageFeature.State { store.aiImage }
 
     func workspaceTabs(in pane: WorkspacePane) -> [OpenDocumentTab] {
         workspaceState.openTabs.filter { $0.pane == pane }

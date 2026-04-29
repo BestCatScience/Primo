@@ -1,6 +1,6 @@
 import Foundation
 
-enum NanoBananaPromptPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
+enum AIImagePromptPreset: String, CaseIterable, Equatable, Sendable, Identifiable {
     case retouch
     case relight
     case cleanup

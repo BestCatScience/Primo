@@ -19,20 +19,20 @@ final class NanoBananaFeatureTests: XCTestCase {
             proxyEndpoint: "https://proxy.example.com/edit"
         )
 
-        let store = TestStore(initialState: NanoBananaFeature.State()) {
-            NanoBananaFeature()
+        let store = TestStore(initialState: AIImageFeature.State()) {
+            AIImageFeature()
         } withDependencies: {
-            $0.nanoBananaSettingsClient = NanoBananaSettingsClient(
+            $0.aiImageSettingsClient = NanoBananaSettingsClient(
                 load: { NanoBananaSettings(accessMode: .appManaged, apiKey: "persisted-key") },
                 persist: { _ in }
             )
-            $0.nanoBananaCommerceClient = NanoBananaCommerceClient(
+            $0.aiImageCommerceClient = NanoBananaCommerceClient(
                 prepare: { snapshot },
                 purchasePrimaryProduct: { snapshot },
                 restorePurchases: { snapshot },
                 clearPurchaseError: { snapshot }
             )
-            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
+            $0.aiImageCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.task)
@@ -45,7 +45,7 @@ final class NanoBananaFeatureTests: XCTestCase {
     }
 
     func testGenerateShowsPaywallWhenAppManagedIsInactive() async {
-        var initialState = NanoBananaFeature.State()
+        var initialState = AIImageFeature.State()
         initialState.settings = NanoBananaSettings(accessMode: .appManaged, apiKey: "")
         initialState.commerce = NanoBananaCommerceSnapshot(
             isSubscriptionActive: false,
@@ -53,7 +53,7 @@ final class NanoBananaFeatureTests: XCTestCase {
         )
 
         let store = TestStore(initialState: initialState) {
-            NanoBananaFeature()
+            AIImageFeature()
         }
 
         store.exhaustivity = .off
@@ -64,7 +64,7 @@ final class NanoBananaFeatureTests: XCTestCase {
     }
 
     func testGenerateDelegatesRequestWhenConfigured() async {
-        var initialState = NanoBananaFeature.State(
+        var initialState = AIImageFeature.State(
             settings: NanoBananaSettings(accessMode: .userAPIKey, apiKey: "user-key"),
             commerce: NanoBananaCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
         )
@@ -90,9 +90,9 @@ final class NanoBananaFeatureTests: XCTestCase {
         )
 
         let store = TestStore(initialState: initialState) {
-            NanoBananaFeature()
+            AIImageFeature()
         } withDependencies: {
-            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
+            $0.aiImageCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.generateButtonTapped(closeSheet: true)) {
@@ -101,8 +101,8 @@ final class NanoBananaFeatureTests: XCTestCase {
         await store.receive(.delegate(.requestEdit(expectedRequest)))
     }
 
-    func testGenerateDelegatesGPTImage2RequestWithOpenAIKey() async {
-        var initialState = NanoBananaFeature.State(
+    func testAIImageGenerateDelegatesOpenAIGPTImage2RequestWithOpenAIKey() async {
+        var initialState = AIImageFeature.State(
             settings: NanoBananaSettings(
                 accessMode: .userAPIKey,
                 apiKey: "gemini-key",
@@ -126,9 +126,9 @@ final class NanoBananaFeatureTests: XCTestCase {
         )
 
         let store = TestStore(initialState: initialState) {
-            NanoBananaFeature()
+            AIImageFeature()
         } withDependencies: {
-            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
+            $0.aiImageCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.generateButtonTapped(closeSheet: false))
@@ -136,7 +136,7 @@ final class NanoBananaFeatureTests: XCTestCase {
     }
 
     func testGenerateDisabledUsesSelectedProviderAPIKey() {
-        var state = NanoBananaFeature.State(
+        var state = AIImageFeature.State(
             settings: NanoBananaSettings(
                 accessMode: .userAPIKey,
                 apiKey: "gemini-key",
@@ -167,7 +167,7 @@ final class NanoBananaFeatureTests: XCTestCase {
         let jobID = UUID()
         let createdAt = Date(timeIntervalSince1970: 1_234)
 
-        var initialState = NanoBananaFeature.State()
+        var initialState = AIImageFeature.State()
         initialState.settings = NanoBananaSettings(accessMode: .userAPIKey, apiKey: "user-key")
         initialState.jobs = [
             NanoBananaJob(
@@ -181,9 +181,9 @@ final class NanoBananaFeatureTests: XCTestCase {
         initialState.pendingRequest = descriptor
 
         let store = TestStore(initialState: initialState) {
-            NanoBananaFeature()
+            AIImageFeature()
         } withDependencies: {
-            $0.nanoBananaCommandBuilder = NanoBananaCommandBuilder()
+            $0.aiImageCommandBuilder = NanoBananaCommandBuilder()
         }
 
         await store.send(.retryJobTapped(jobID))

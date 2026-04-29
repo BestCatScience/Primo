@@ -27,23 +27,43 @@ private enum NanoBananaEditUseCaseKey: DependencyKey {
 }
 
 extension DependencyValues {
-    var nanoBananaSettingsClient: NanoBananaSettingsClient {
+    var aiImageSettingsClient: NanoBananaSettingsClient {
         get { self[NanoBananaSettingsClientKey.self] }
         set { self[NanoBananaSettingsClientKey.self] = newValue }
     }
 
-    var nanoBananaCommerceClient: NanoBananaCommerceClient {
+    var aiImageCommerceClient: NanoBananaCommerceClient {
         get { self[NanoBananaCommerceClientKey.self] }
         set { self[NanoBananaCommerceClientKey.self] = newValue }
     }
 
-    var nanoBananaCommandBuilder: NanoBananaCommandBuilder {
+    var aiImageCommandBuilder: NanoBananaCommandBuilder {
         get { self[NanoBananaCommandBuilderKey.self] }
         set { self[NanoBananaCommandBuilderKey.self] = newValue }
     }
 
-    var nanoBananaEditUseCase: NanoBananaEditUseCase {
+    var aiImageEditUseCase: NanoBananaEditUseCase {
         get { self[NanoBananaEditUseCaseKey.self] }
         set { self[NanoBananaEditUseCaseKey.self] = newValue }
+    }
+
+    var nanoBananaSettingsClient: NanoBananaSettingsClient {
+        get { aiImageSettingsClient }
+        set { aiImageSettingsClient = newValue }
+    }
+
+    var nanoBananaCommerceClient: NanoBananaCommerceClient {
+        get { aiImageCommerceClient }
+        set { aiImageCommerceClient = newValue }
+    }
+
+    var nanoBananaCommandBuilder: NanoBananaCommandBuilder {
+        get { aiImageCommandBuilder }
+        set { aiImageCommandBuilder = newValue }
+    }
+
+    var nanoBananaEditUseCase: NanoBananaEditUseCase {
+        get { aiImageEditUseCase }
+        set { aiImageEditUseCase = newValue }
     }
 }

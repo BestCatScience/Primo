@@ -5,7 +5,7 @@ import UIKit
 
 extension ContentView {
     private var workspaceBottomGestureClearance: CGFloat { 36 }
-    private var workspaceNanoBananaPickerMaximumHeight: CGFloat { 144 }
+    private var workspaceAIImagePickerMaximumHeight: CGFloat { 144 }
 
     func dismissBrushSettingsPopover() {
         if store.document.brushPalette.ui.showsBrushSettingsPopover {
@@ -51,7 +51,7 @@ extension ContentView {
                         .padding(.top, 16)
                 }
 
-                if !nanoBananaState.workspaceBottomPanelCollapsed {
+                if !aiImageState.workspaceBottomPanelCollapsed {
                     workspaceBottomPanel
                         .padding(.horizontal, 18)
                         .padding(.bottom, workspaceBottomGestureClearance)
@@ -363,12 +363,12 @@ extension ContentView {
     var workspaceBottomPanel: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                workspaceBottomTab(title: "AI IMAGE", section: .nanoBanana)
+                workspaceBottomTab(title: "AI IMAGE", section: .aiImage)
                 workspaceBottomTab(title: "HISTORY", section: .history)
                 workspaceBottomTab(title: "OUTPUT", section: .output)
                 Spacer(minLength: 0)
                 workspaceTabChromeButton(symbol: "chevron.down") {
-                    store.send(.nanoBanana(.workspaceBottomPanelCollapsedChanged(true)))
+                    store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(true)))
                 }
             }
             .padding(.horizontal, 12)
@@ -376,9 +376,9 @@ extension ContentView {
             .background(Color.white.opacity(0.03))
 
             Group {
-                switch nanoBananaState.workspaceBottomPanelSection {
-                case .nanoBanana:
-                    workspaceNanoBananaPanel
+                switch aiImageState.workspaceBottomPanelSection {
+                case .aiImage:
+                    workspaceAIImagePanel
                 case .history:
                     workspaceHistoryPanel
                 case .output:
@@ -401,15 +401,15 @@ extension ContentView {
     var collapsedWorkspaceBottomBar: some View {
         HStack {
             Text(
-                nanoBananaState.workspaceBottomPanelSection == .nanoBanana
+                aiImageState.workspaceBottomPanelSection == .aiImage
                 ? "AI IMAGE"
-                : nanoBananaState.workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT"
+                : aiImageState.workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT"
             )
                 .font(StudioTheme.Typography.mono(10))
                 .foregroundStyle(.white.opacity(0.55))
             Spacer(minLength: 0)
             workspaceTabChromeButton(symbol: "chevron.up") {
-                store.send(.nanoBanana(.workspaceBottomPanelCollapsedChanged(false)))
+                store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(false)))
             }
         }
         .padding(.horizontal, 12)
@@ -424,10 +424,10 @@ extension ContentView {
         )
     }
 
-    func workspaceBottomTab(title: String, section: NanoBananaFeature.WorkspaceBottomPanelSection) -> some View {
-        let isSelected = nanoBananaState.workspaceBottomPanelSection == section
+    func workspaceBottomTab(title: String, section: AIImageFeature.WorkspaceBottomPanelSection) -> some View {
+        let isSelected = aiImageState.workspaceBottomPanelSection == section
         return Button {
-            store.send(.nanoBanana(.workspaceBottomPanelSectionChanged(section)))
+            store.send(.aiImage(.workspaceBottomPanelSectionChanged(section)))
         } label: {
             VStack(spacing: 6) {
                 Text(title)
@@ -445,7 +445,7 @@ extension ContentView {
         .buttonStyle(WorkspaceFlatButtonStyle())
     }
 
-    var workspaceNanoBananaPanel: some View {
+    var workspaceAIImagePanel: some View {
         GeometryReader { geometry in
             let usesCompactStack = geometry.size.width < 980
             let promptWidth = usesCompactStack ? geometry.size.width : max(geometry.size.width * 0.62, 420)
@@ -453,20 +453,20 @@ extension ContentView {
             Group {
                 if usesCompactStack {
                     VStack(alignment: .leading, spacing: 12) {
-                        workspaceNanoBananaPromptEditor
+                        workspaceAIImagePromptEditor
                         HStack(alignment: .top, spacing: 10) {
-                            workspaceNanoBananaMetaColumn
-                            workspaceNanoBananaActions
+                            workspaceAIImageMetaColumn
+                            workspaceAIImageActions
                                 .frame(width: 128, alignment: .topTrailing)
                         }
                     }
                 } else {
                     HStack(alignment: .top, spacing: 14) {
-                        workspaceNanoBananaPromptEditor
+                        workspaceAIImagePromptEditor
                             .frame(width: promptWidth, alignment: .leading)
                         VStack(alignment: .leading, spacing: 12) {
-                            workspaceNanoBananaMetaColumn
-                            workspaceNanoBananaActions
+                            workspaceAIImageMetaColumn
+                            workspaceAIImageActions
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
@@ -477,7 +477,7 @@ extension ContentView {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    func workspaceNanoBananaStat(label: String, value: String) -> some View {
+    func workspaceAIImageStat(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label.uppercased())
                 .font(StudioTheme.Typography.mono(9))
@@ -489,7 +489,7 @@ extension ContentView {
         }
     }
 
-    var workspaceNanoBananaPromptEditor: some View {
+    var workspaceAIImagePromptEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(language.localized("プロンプト"))
                 .font(StudioTheme.Typography.label(12))
@@ -499,7 +499,7 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.white)
 
-                if nanoBananaState.composer.prompt.isEmpty {
+                if aiImageState.composer.prompt.isEmpty {
                     Text(language.localized("AI画像にどう編集させたいか入力してください"))
                         .font(StudioTheme.Typography.body(13))
                         .foregroundStyle(Color.black.opacity(0.38))
@@ -509,7 +509,7 @@ extension ContentView {
                 }
 
                 StudioPlainTextView(
-                    text: nanoBananaPromptBinding,
+                    text: aiImagePromptBinding,
                     textColor: .black,
                     tintColor: .black,
                     font: .systemFont(ofSize: 13, weight: .medium),
@@ -526,7 +526,7 @@ extension ContentView {
         }
     }
 
-    var workspaceNanoBananaMetaColumn: some View {
+    var workspaceAIImageMetaColumn: some View {
         ZStack(alignment: .topLeading) {
             VStack(alignment: .leading, spacing: 8) {
                 LazyVGrid(
@@ -537,15 +537,15 @@ extension ContentView {
                     alignment: .leading,
                     spacing: 8
                 ) {
-                    workspaceNanoBananaInputLayerMenu
-                    workspaceNanoBananaEditScopeMenu
-                    workspaceNanoBananaOutputModeMenu
-                    workspaceNanoBananaModelMenu
+                    workspaceAIImageInputLayerMenu
+                    workspaceAIImageEditScopeMenu
+                    workspaceAIImageOutputModeMenu
+                    workspaceAIImageModelMenu
                 }
             }
 
-            if let activeNanoBananaWorkspacePicker {
-                workspaceNanoBananaPickerPopup(activeNanoBananaWorkspacePicker)
+            if let activeAIImageWorkspacePicker {
+                workspaceAIImagePickerPopup(activeAIImageWorkspacePicker)
                     .padding(.top, 68)
                     .zIndex(20)
             }
@@ -553,48 +553,48 @@ extension ContentView {
     }
 
     @ViewBuilder
-    func workspaceNanoBananaPickerPopup(_ picker: NanoBananaWorkspacePicker) -> some View {
-        let rowCount = workspaceNanoBananaPickerRowCount(for: picker)
-        let popupHeight = min(CGFloat(rowCount) * 33 + 12, workspaceNanoBananaPickerMaximumHeight)
+    func workspaceAIImagePickerPopup(_ picker: AIImageWorkspacePicker) -> some View {
+        let rowCount = workspaceAIImagePickerRowCount(for: picker)
+        let popupHeight = min(CGFloat(rowCount) * 33 + 12, workspaceAIImagePickerMaximumHeight)
         ScrollView {
             VStack(alignment: .leading, spacing: 3) {
                 switch picker {
                 case .inputLayer:
                     ForEach(store.document.layerSidebar.layers) { layer in
-                        workspaceNanoBananaPickerPopupRow(
+                        workspaceAIImagePickerPopupRow(
                             title: layer.name,
-                            isSelected: layer.index == resolvedNanoBananaInputLayerIndex
+                            isSelected: layer.index == resolvedAIImageInputLayerIndex
                         ) {
-                            store.send(.nanoBanana(.inputLayerIndexChanged(layer.index)))
+                            store.send(.aiImage(.inputLayerIndexChanged(layer.index)))
                         }
                     }
                 case .editScope:
                     let hasSelection = store.document.canvas.selection?.isEmpty == false
                     ForEach(NanoBananaEditScope.allCases) { scope in
-                        workspaceNanoBananaPickerPopupRow(
+                        workspaceAIImagePickerPopupRow(
                             title: scope.title(language),
-                            isSelected: scope == nanoBananaState.composer.editScope,
+                            isSelected: scope == aiImageState.composer.editScope,
                             isDisabled: scope == .selectedArea && !hasSelection
                         ) {
-                            store.send(.nanoBanana(.editScopeChanged(scope)))
+                            store.send(.aiImage(.editScopeChanged(scope)))
                         }
                     }
                 case .outputMode:
                     ForEach(NanoBananaOutputMode.allCases) { mode in
-                        workspaceNanoBananaPickerPopupRow(
+                        workspaceAIImagePickerPopupRow(
                             title: mode.title(language),
-                            isSelected: mode == nanoBananaState.composer.outputMode
+                            isSelected: mode == aiImageState.composer.outputMode
                         ) {
-                            store.send(.nanoBanana(.outputModeChanged(mode)))
+                            store.send(.aiImage(.outputModeChanged(mode)))
                         }
                     }
                 case .model:
                     ForEach(NanoBananaModel.allCases) { model in
-                        workspaceNanoBananaPickerPopupRow(
+                        workspaceAIImagePickerPopupRow(
                             title: model.title(language),
-                            isSelected: model == nanoBananaState.composer.model
+                            isSelected: model == aiImageState.composer.model
                         ) {
-                            store.send(.nanoBanana(.modelChanged(model)))
+                            store.send(.aiImage(.modelChanged(model)))
                         }
                     }
                 }
@@ -642,7 +642,7 @@ extension ContentView {
         .shadow(color: .black.opacity(0.34), radius: 18, y: 10)
     }
 
-    func workspaceNanoBananaPickerRowCount(for picker: NanoBananaWorkspacePicker) -> Int {
+    func workspaceAIImagePickerRowCount(for picker: AIImageWorkspacePicker) -> Int {
         switch picker {
         case .inputLayer:
             return max(store.document.layerSidebar.layers.count, 1)
@@ -655,7 +655,7 @@ extension ContentView {
         }
     }
 
-    func workspaceNanoBananaPickerPopupRow(
+    func workspaceAIImagePickerPopupRow(
         title: String,
         isSelected: Bool,
         isDisabled: Bool = false,
@@ -663,7 +663,7 @@ extension ContentView {
     ) -> some View {
         Button {
             action()
-            activeNanoBananaWorkspacePicker = nil
+            activeAIImageWorkspacePicker = nil
         } label: {
             HStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
@@ -693,20 +693,20 @@ extension ContentView {
     }
 
     @ViewBuilder
-    var workspaceNanoBananaAccessNotice: some View {
-        if !nanoBananaState.commerce.isSubscriptionActive {
+    var workspaceAIImageAccessNotice: some View {
+        if !aiImageState.commerce.isSubscriptionActive {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.45))
                     .padding(.top, 1)
-                Text(nanoBananaGeminiPlanSoftHint)
+                Text(aiImageGeminiPlanSoftHint)
                     .font(StudioTheme.Typography.body(11))
                     .foregroundStyle(.white.opacity(0.52))
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 workspaceNoticeLink(title: language.localized("プランを見る"), isSecondary: true) {
-                    store.send(.nanoBanana(.paywallPresentationChanged(true)))
+                    store.send(.aiImage(.paywallPresentationChanged(true)))
                 }
             }
             .padding(10)
@@ -749,8 +749,8 @@ extension ContentView {
         .buttonStyle(WorkspaceFlatButtonStyle())
     }
 
-    func workspaceNanoBananaStatCard(label: String, value: String) -> some View {
-        workspaceNanoBananaStat(label: label, value: value)
+    func workspaceAIImageStatCard(label: String, value: String) -> some View {
+        workspaceAIImageStat(label: label, value: value)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
@@ -764,17 +764,17 @@ extension ContentView {
             )
     }
 
-    func workspaceNanoBananaMenuCard(
+    func workspaceAIImageMenuCard(
         label: String,
         value: String,
-        picker: NanoBananaWorkspacePicker
+        picker: AIImageWorkspacePicker
     ) -> some View {
-        let isActive = activeNanoBananaWorkspacePicker == picker
+        let isActive = activeAIImageWorkspacePicker == picker
         return Button {
-            activeNanoBananaWorkspacePicker = isActive ? nil : picker
+            activeAIImageWorkspacePicker = isActive ? nil : picker
         } label: {
             HStack(alignment: .center, spacing: 8) {
-                workspaceNanoBananaStat(label: label, value: value)
+                workspaceAIImageStat(label: label, value: value)
                 Spacer(minLength: 0)
                 Image(systemName: isActive ? "chevron.up" : "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
@@ -814,47 +814,47 @@ extension ContentView {
         .buttonStyle(WorkspaceFlatButtonStyle())
     }
 
-    var workspaceNanoBananaInputLayerMenu: some View {
-        workspaceNanoBananaMenuCard(
+    var workspaceAIImageInputLayerMenu: some View {
+        workspaceAIImageMenuCard(
             label: language.localized("入力"),
-            value: resolvedNanoBananaInputLayerName,
+            value: resolvedAIImageInputLayerName,
             picker: .inputLayer
         )
     }
 
-    var workspaceNanoBananaEditScopeMenu: some View {
-        workspaceNanoBananaMenuCard(
+    var workspaceAIImageEditScopeMenu: some View {
+        workspaceAIImageMenuCard(
             label: language.localized("対象"),
-            value: nanoBananaState.composer.editScope.title(language),
+            value: aiImageState.composer.editScope.title(language),
             picker: .editScope
         )
     }
 
-    var workspaceNanoBananaOutputModeMenu: some View {
-        workspaceNanoBananaMenuCard(
+    var workspaceAIImageOutputModeMenu: some View {
+        workspaceAIImageMenuCard(
             label: language.localized("出力"),
-            value: nanoBananaState.composer.outputMode.title(language),
+            value: aiImageState.composer.outputMode.title(language),
             picker: .outputMode
         )
     }
 
-    var workspaceNanoBananaModelMenu: some View {
-        workspaceNanoBananaMenuCard(
+    var workspaceAIImageModelMenu: some View {
+        workspaceAIImageMenuCard(
             label: language.localized("モデル"),
-            value: nanoBananaState.composer.model.title(language),
+            value: aiImageState.composer.model.title(language),
             picker: .model
         )
     }
 
-    var workspaceNanoBananaActions: some View {
-        let requiresSubscription = !nanoBananaState.commerce.isSubscriptionActive
-        let isDimmed = nanoBananaState.isGenerating || store.document.layerSidebar.layers.isEmpty || nanoBananaState.commerce.isLoading
+    var workspaceAIImageActions: some View {
+        let requiresSubscription = !aiImageState.commerce.isSubscriptionActive
+        let isDimmed = aiImageState.isGenerating || store.document.layerSidebar.layers.isEmpty || aiImageState.commerce.isLoading
         return HStack(spacing: 8) {
             Button {
-                handleNanoBananaPrimaryAction(closeSheet: false)
+                handleAIImagePrimaryAction(closeSheet: false)
             } label: {
                 Label(
-                    nanoBananaPrimaryActionTitle(fallback: language.localized("実行")),
+                    aiImagePrimaryActionTitle(fallback: language.localized("実行")),
                     systemImage: requiresSubscription ? "lock.fill" : "sparkles"
                 )
                     .font(StudioTheme.Typography.label(12))
@@ -885,10 +885,10 @@ extension ContentView {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             )
-            .disabled(nanoBananaPrimaryActionDisabled)
+            .disabled(aiImagePrimaryActionDisabled)
 
             Button {
-                store.send(.nanoBanana(.sheetPresentationChanged(true)))
+                store.send(.aiImage(.sheetPresentationChanged(true)))
             } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 12, weight: .semibold))
@@ -912,9 +912,9 @@ extension ContentView {
     var workspaceHistoryPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(nanoBananaState.history.prefix(8)) { item in
+                ForEach(aiImageState.history.prefix(8)) { item in
                     Button {
-                        store.send(.nanoBanana(.historyItemSelected(item.descriptor)))
+                        store.send(.aiImage(.historyItemSelected(item.descriptor)))
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.descriptor.prompt.rawValue)
@@ -941,7 +941,7 @@ extension ContentView {
     var workspaceOutputPanel: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(nanoBananaState.jobs.prefix(8)) { job in
+                ForEach(aiImageState.jobs.prefix(8)) { job in
                     HStack(alignment: .top, spacing: 10) {
                         Circle()
                             .fill(job.status == .succeeded ? Color.green.opacity(0.8) : job.status == .failed ? Color.red.opacity(0.8) : StudioTheme.Palette.accentBright)

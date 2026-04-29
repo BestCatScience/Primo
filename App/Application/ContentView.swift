@@ -12,11 +12,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Dependency(\.mainQueueClient) private var mainQueueClient
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    enum NanoBananaFocusedField: Hashable {
+    enum AIImageFocusedField: Hashable {
         case prompt
     }
 
-    enum NanoBananaWorkspacePicker: Hashable {
+    enum AIImageWorkspacePicker: Hashable {
         case inputLayer
         case editScope
         case outputMode
@@ -45,7 +45,7 @@ struct ContentView: View {
     @State var showsColorRangeSelectionSheet = false
     @State var showsTransformNumericSheet = false
     @State var showsLicensesSheet = false
-    @State var showsNanoBananaSettingsSheet = false
+    @State var showsAIImageSettingsSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
     @State var resizeCanvasWidthText = ""
@@ -79,10 +79,10 @@ struct ContentView: View {
     @State var selectedPhotoLayerItem: PhotosPickerItem?
     @State var selectedNewCanvasPhotoItem: PhotosPickerItem?
     @State var selectedToolMetricEditor: ToolMetricEditor?
-    @State var activeNanoBananaWorkspacePicker: NanoBananaWorkspacePicker?
+    @State var activeAIImageWorkspacePicker: AIImageWorkspacePicker?
     @State var toolMetricSizeText = ""
     @State var toolMetricOpacityText = ""
-    @FocusState var nanoBananaFocusedField: NanoBananaFocusedField?
+    @FocusState var aiImageFocusedField: AIImageFocusedField?
     var language: AppLanguage { applicationState.appLanguage }
 
     enum ToolMetricEditor: Hashable {
@@ -103,7 +103,7 @@ struct ContentView: View {
             store.send(.application(.task))
         }
         .task {
-            store.send(.nanoBanana(.task))
+            store.send(.aiImage(.task))
         }
         .onChange(of: scenePhase) { _, newPhase in
             store.send(.application(.scenePhaseChanged(ApplicationFeature.ScenePhase(newPhase))))
@@ -167,24 +167,24 @@ struct ContentView: View {
                 showsLicensesSheet = false
             }
         }
-        .sheet(isPresented: $showsNanoBananaSettingsSheet) {
-            nanoBananaSettingsSheet
+        .sheet(isPresented: $showsAIImageSettingsSheet) {
+            aiImageSettingsSheet
         }
         .sheet(
             isPresented: Binding(
-                get: { nanoBananaState.isSheetPresented },
-                set: { store.send(.nanoBanana(.sheetPresentationChanged($0))) }
+                get: { aiImageState.isSheetPresented },
+                set: { store.send(.aiImage(.sheetPresentationChanged($0))) }
             )
         ) {
-            nanoBananaSheet
+            aiImageSheet
         }
         .sheet(
             isPresented: Binding(
-                get: { nanoBananaState.isPaywallPresented },
-                set: { store.send(.nanoBanana(.paywallPresentationChanged($0))) }
+                get: { aiImageState.isPaywallPresented },
+                set: { store.send(.aiImage(.paywallPresentationChanged($0))) }
             )
         ) {
-            nanoBananaPaywallSheet
+            aiImagePaywallSheet
         }
         .sheet(
             isPresented: Binding(
@@ -404,18 +404,18 @@ struct ContentView: View {
                     progress: preview.progress,
                     language: language
                 )
-            } else if let progress = nanoBananaState.progress {
+            } else if let progress = aiImageState.progress {
                 ZStack {
                     Color.black.opacity(0.24)
                         .ignoresSafeArea()
 
-                    NanoBananaProgressHUD(
-                        previewSurface: nanoBananaInputPreviewSurface,
-                        previewImageData: nanoBananaInputPreviewImageData,
+                    AIImageProgressHUD(
+                        previewSurface: aiImageInputPreviewSurface,
+                        previewImageData: aiImageInputPreviewImageData,
                         progress: progress,
                         language: language,
                         onCancel: {
-                            store.send(.nanoBanana(.cancelGenerationTapped))
+                            store.send(.aiImage(.cancelGenerationTapped))
                         }
                     )
                 }
@@ -423,10 +423,10 @@ struct ContentView: View {
         }
     }
 
-    private var nanoBananaInputPreviewSurface: DocumentCompositeSurface? {
+    private var aiImageInputPreviewSurface: DocumentCompositeSurface? {
         guard
             let snapshot = store.document.canvas.renderSnapshot,
-            let layer = snapshot.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })
+            let layer = snapshot.layers.first(where: { $0.index == resolvedAIImageInputLayerIndex })
         else {
             return nil
         }
@@ -437,8 +437,8 @@ struct ContentView: View {
         )
     }
 
-    private var nanoBananaInputPreviewImageData: Data? {
-        guard let surface = nanoBananaInputPreviewSurface else {
+    private var aiImageInputPreviewImageData: Data? {
+        guard let surface = aiImageInputPreviewSurface else {
             return nil
         }
         return DocumentFeature.pngData(

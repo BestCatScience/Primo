@@ -25,7 +25,7 @@ extension DocumentFeature {
         )
     }
 
-    static func nanoBananaFailureFeedback(_ failure: NanoBananaEditFailure) -> ApplicationFeature.Feedback {
+    static func aiImageFailureFeedback(_ failure: NanoBananaEditFailure) -> ApplicationFeature.Feedback {
         switch failure {
         case .invalidResponse:
             return .nanoBananaInvalidResponse

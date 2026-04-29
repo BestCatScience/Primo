@@ -5,69 +5,69 @@ import UIKit
 import PrimoNanoBananaDomain
 
 extension ContentView {
-    var resolvedNanoBananaInputLayerIndex: Int {
-        if store.document.layerSidebar.layers.contains(where: { $0.index == nanoBananaState.composer.inputLayerIndex }) {
-            return nanoBananaState.composer.inputLayerIndex
+    var resolvedAIImageInputLayerIndex: Int {
+        if store.document.layerSidebar.layers.contains(where: { $0.index == aiImageState.composer.inputLayerIndex }) {
+            return aiImageState.composer.inputLayerIndex
         }
         return store.document.layerSidebar.activeLayerIndex
     }
 
-    var resolvedNanoBananaInputLayerName: String {
-        store.document.layerSidebar.layers.first(where: { $0.index == resolvedNanoBananaInputLayerIndex })?.name ?? "-"
+    var resolvedAIImageInputLayerName: String {
+        store.document.layerSidebar.layers.first(where: { $0.index == resolvedAIImageInputLayerIndex })?.name ?? "-"
     }
 
-    var nanoBananaPromptBinding: Binding<String> {
+    var aiImagePromptBinding: Binding<String> {
         Binding(
-            get: { nanoBananaState.composer.prompt },
-            set: { store.send(.nanoBanana(.promptChanged($0))) }
+            get: { aiImageState.composer.prompt },
+            set: { store.send(.aiImage(.promptChanged($0))) }
         )
     }
 
-    var nanoBananaInputLayerIndexBinding: Binding<Int> {
+    var aiImageInputLayerIndexBinding: Binding<Int> {
         Binding(
-            get: { nanoBananaState.composer.inputLayerIndex },
-            set: { store.send(.nanoBanana(.inputLayerIndexChanged($0))) }
+            get: { aiImageState.composer.inputLayerIndex },
+            set: { store.send(.aiImage(.inputLayerIndexChanged($0))) }
         )
     }
 
-    var nanoBananaEditScopeBinding: Binding<NanoBananaEditScope> {
+    var aiImageEditScopeBinding: Binding<NanoBananaEditScope> {
         Binding(
-            get: { nanoBananaState.composer.editScope },
-            set: { store.send(.nanoBanana(.editScopeChanged($0))) }
+            get: { aiImageState.composer.editScope },
+            set: { store.send(.aiImage(.editScopeChanged($0))) }
         )
     }
 
-    var nanoBananaOutputModeBinding: Binding<NanoBananaOutputMode> {
+    var aiImageOutputModeBinding: Binding<NanoBananaOutputMode> {
         Binding(
-            get: { nanoBananaState.composer.outputMode },
-            set: { store.send(.nanoBanana(.outputModeChanged($0))) }
+            get: { aiImageState.composer.outputMode },
+            set: { store.send(.aiImage(.outputModeChanged($0))) }
         )
     }
 
-    var nanoBananaMaskExpansionBinding: Binding<Int> {
+    var aiImageMaskExpansionBinding: Binding<Int> {
         Binding(
-            get: { nanoBananaState.composer.maskSettings.expansion },
-            set: { store.send(.nanoBanana(.maskExpansionChanged($0))) }
+            get: { aiImageState.composer.maskSettings.expansion },
+            set: { store.send(.aiImage(.maskExpansionChanged($0))) }
         )
     }
 
-    var nanoBananaMaskInversionBinding: Binding<Bool> {
+    var aiImageMaskInversionBinding: Binding<Bool> {
         Binding(
-            get: { nanoBananaState.composer.maskSettings.isInverted },
-            set: { store.send(.nanoBanana(.maskInversionChanged($0))) }
+            get: { aiImageState.composer.maskSettings.isInverted },
+            set: { store.send(.aiImage(.maskInversionChanged($0))) }
         )
     }
 
-    var nanoBananaModelBinding: Binding<NanoBananaModel> {
+    var aiImageModelBinding: Binding<NanoBananaModel> {
         Binding(
-            get: { nanoBananaState.composer.model },
-            set: { store.send(.nanoBanana(.modelChanged($0))) }
+            get: { aiImageState.composer.model },
+            set: { store.send(.aiImage(.modelChanged($0))) }
         )
     }
 
-    func prepareNanoBananaComposer() {
+    func prepareAIImageComposer() {
         store.send(
-            .nanoBanana(
+            .aiImage(
                 .prepareComposer(
                     activeLayerIndex: store.document.layerSidebar.activeLayerIndex,
                     hasSelection: store.document.canvas.selection?.isEmpty == false
@@ -76,25 +76,25 @@ extension ContentView {
         )
     }
 
-    var nanoBananaGenerateDisabled: Bool {
-        nanoBananaState.generateDisabled || store.document.layerSidebar.layers.isEmpty
+    var aiImageGenerateDisabled: Bool {
+        aiImageState.generateDisabled || store.document.layerSidebar.layers.isEmpty
     }
 
-    var nanoBananaPrimaryActionDisabled: Bool {
-        if !nanoBananaState.commerce.isSubscriptionActive {
-            return nanoBananaState.commerce.isLoading
+    var aiImagePrimaryActionDisabled: Bool {
+        if !aiImageState.commerce.isSubscriptionActive {
+            return aiImageState.commerce.isLoading
         }
-        return nanoBananaGenerateDisabled
+        return aiImageGenerateDisabled
     }
 
-    func nanoBananaPrimaryActionTitle(fallback: String) -> String {
-        if !nanoBananaState.commerce.isSubscriptionActive {
+    func aiImagePrimaryActionTitle(fallback: String) -> String {
+        if !aiImageState.commerce.isSubscriptionActive {
             return language.localized("サブスクリプションが必要です")
         }
         return fallback
     }
 
-    var nanoBananaGeminiPlanHint: String {
+    var aiImageGeminiPlanHint: String {
         switch language {
         case .english:
             return "AI image editing is available with the Primo subscription."
@@ -103,7 +103,7 @@ extension ContentView {
         }
     }
 
-    var nanoBananaGeminiPlanSoftHint: String {
+    var aiImageGeminiPlanSoftHint: String {
         switch language {
         case .english:
             return "AI image editing is available with the Primo subscription."
@@ -112,33 +112,33 @@ extension ContentView {
         }
     }
 
-    func requestNanoBananaGeneration(closeSheet: Bool) {
-        nanoBananaFocusedField = nil
-        store.send(.nanoBanana(.inputLayerIndexChanged(resolvedNanoBananaInputLayerIndex)))
-        store.send(.nanoBanana(.generateButtonTapped(closeSheet: closeSheet)))
+    func requestAIImageGeneration(closeSheet: Bool) {
+        aiImageFocusedField = nil
+        store.send(.aiImage(.inputLayerIndexChanged(resolvedAIImageInputLayerIndex)))
+        store.send(.aiImage(.generateButtonTapped(closeSheet: closeSheet)))
     }
 
-    func handleNanoBananaPrimaryAction(closeSheet: Bool) {
-        guard nanoBananaState.commerce.isSubscriptionActive else {
-            nanoBananaFocusedField = nil
-            store.send(.nanoBanana(.paywallPresentationChanged(true)))
+    func handleAIImagePrimaryAction(closeSheet: Bool) {
+        guard aiImageState.commerce.isSubscriptionActive else {
+            aiImageFocusedField = nil
+            store.send(.aiImage(.paywallPresentationChanged(true)))
             return
         }
-        requestNanoBananaGeneration(closeSheet: closeSheet)
+        requestAIImageGeneration(closeSheet: closeSheet)
     }
 
     @ViewBuilder
-    var nanoBananaSubscriptionControls: some View {
+    var aiImageSubscriptionControls: some View {
         LabeledContent(language.localized("状態")) {
             Text(
-                nanoBananaState.commerce.isSubscriptionActive
+                aiImageState.commerce.isSubscriptionActive
                 ? language.localized("有効")
                 : language.localized("未購入")
             )
-            .foregroundStyle(nanoBananaState.commerce.isSubscriptionActive ? .green : .secondary)
+            .foregroundStyle(aiImageState.commerce.isSubscriptionActive ? .green : .secondary)
         }
 
-        if let product = nanoBananaState.commerce.primaryProduct {
+        if let product = aiImageState.commerce.primaryProduct {
             LabeledContent(language.localized("プラン")) {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(product.displayName)
@@ -146,33 +146,33 @@ extension ContentView {
                         .foregroundStyle(.secondary)
                 }
             }
-        } else if nanoBananaState.commerce.isLoading {
+        } else if aiImageState.commerce.isLoading {
             Text(language.localized("サブスクリプション情報を読み込み中…"))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
 
         Button(language.localized("サブスクリプションを購入")) {
-            store.send(.nanoBanana(.purchasePrimaryProductTapped))
+            store.send(.aiImage(.purchasePrimaryProductTapped))
         }
-        .disabled(nanoBananaState.commerce.isLoading || nanoBananaState.commerce.isSubscriptionActive)
+        .disabled(aiImageState.commerce.isLoading || aiImageState.commerce.isSubscriptionActive)
 
         Button(language.localized("購入を復元")) {
-            store.send(.nanoBanana(.restorePurchasesTapped))
+            store.send(.aiImage(.restorePurchasesTapped))
         }
-        .disabled(nanoBananaState.commerce.isLoading)
+        .disabled(aiImageState.commerce.isLoading)
 
-        if let manageURL = nanoBananaState.commerce.manageSubscriptionsURL {
+        if let manageURL = aiImageState.commerce.manageSubscriptionsURL {
             Link(language.localized("サブスクリプションを管理"), destination: manageURL)
         }
 
-        if let purchaseErrorMessage = nanoBananaState.commerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
+        if let purchaseErrorMessage = aiImageState.commerce.purchaseErrorMessage, !purchaseErrorMessage.isEmpty {
             Text(purchaseErrorMessage)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             Button(language.localized("メッセージを閉じる")) {
-                store.send(.nanoBanana(.purchaseErrorDismissed))
+                store.send(.aiImage(.purchaseErrorDismissed))
             }
             .buttonStyle(.borderless)
         }
@@ -182,17 +182,17 @@ extension ContentView {
             .foregroundStyle(.secondary)
     }
 
-    var nanoBananaSettingsSheet: some View {
+    var aiImageSettingsSheet: some View {
         NavigationStack {
             Form {
                 Section(language.localized("AI画像設定")) {
-                    Picker(language.localized("モデル"), selection: nanoBananaModelBinding) {
+                    Picker(language.localized("モデル"), selection: aiImageModelBinding) {
                         ForEach(NanoBananaModel.allCases) { model in
                             Text(model.title(language)).tag(model)
                         }
                     }
 
-                    nanoBananaSubscriptionControls
+                    aiImageSubscriptionControls
                 }
             }
             .navigationTitle(language.localized("AI画像設定"))
@@ -200,8 +200,8 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("完了")) {
-                        nanoBananaFocusedField = nil
-                        showsNanoBananaSettingsSheet = false
+                        aiImageFocusedField = nil
+                        showsAIImageSettingsSheet = false
                     }
                 }
             }
@@ -210,7 +210,7 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
-    var nanoBananaPaywallSheet: some View {
+    var aiImagePaywallSheet: some View {
         NavigationStack {
             Form {
                 Section {
@@ -231,13 +231,13 @@ extension ContentView {
                 }
 
                 Section(language.localized("プラン")) {
-                    if let product = nanoBananaState.commerce.primaryProduct {
+                    if let product = aiImageState.commerce.primaryProduct {
                         LabeledContent(product.displayName) {
                             Text(product.displayPrice)
                         }
                     } else {
                         Text(
-                            nanoBananaState.commerce.isLoading
+                            aiImageState.commerce.isLoading
                             ? language.localized("サブスクリプション情報を読み込み中…")
                             : language.localized("サブスクリプション商品は利用できません")
                         )
@@ -246,7 +246,7 @@ extension ContentView {
                 }
 
                 Section(language.localized("アプリ課金プラン")) {
-                    nanoBananaSubscriptionControls
+                    aiImageSubscriptionControls
                 }
             }
             .navigationTitle(language.localized("サブスクリプションが必要です"))
@@ -254,7 +254,7 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.nanoBanana(.paywallPresentationChanged(false)))
+                        store.send(.aiImage(.paywallPresentationChanged(false)))
                     }
                 }
             }
@@ -1153,12 +1153,12 @@ extension ContentView {
         .presentationDragIndicator(.visible)
     }
 
-    var nanoBananaSheet: some View {
+    var aiImageSheet: some View {
         NavigationStack {
             Form {
-                Section(StudioStrings.nanoBanana(language)) {
+                Section(StudioStrings.aiImage(language)) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(StudioStrings.nanoBananaEdit(language))
+                        Text(StudioStrings.aiImageEdit(language))
                         Text(language.localized("AI画像にどう編集させたいか入力してください"))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -1169,7 +1169,7 @@ extension ContentView {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
 
-                        TextEditor(text: nanoBananaPromptBinding)
+                        TextEditor(text: aiImagePromptBinding)
                             .frame(minHeight: 110)
                             .foregroundStyle(.black)
                             .tint(.black)
@@ -1184,14 +1184,14 @@ extension ContentView {
                                     .stroke(Color.black.opacity(0.14), lineWidth: 1)
                             )
                             .textInputAutocapitalization(.sentences)
-                            .focused($nanoBananaFocusedField, equals: .prompt)
+                            .focused($aiImageFocusedField, equals: .prompt)
                     }
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(NanoBananaPromptPreset.allCases) { preset in
+                            ForEach(AIImagePromptPreset.allCases) { preset in
                                 Button(preset.title(language)) {
-                                    store.send(.nanoBanana(.promptChanged(preset.prompt(language))))
+                                    store.send(.aiImage(.promptChanged(preset.prompt(language))))
                                 }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.black.opacity(0.92))
@@ -1212,13 +1212,13 @@ extension ContentView {
                 }
 
                 Section(language.localized("入力")) {
-                    Picker(language.localized("入力レイヤー"), selection: nanoBananaInputLayerIndexBinding) {
+                    Picker(language.localized("入力レイヤー"), selection: aiImageInputLayerIndexBinding) {
                         ForEach(store.document.layerSidebar.layers) { layer in
                             Text(layer.name).tag(layer.index)
                         }
                     }
 
-                    Picker(language.localized("編集範囲"), selection: nanoBananaEditScopeBinding) {
+                    Picker(language.localized("編集範囲"), selection: aiImageEditScopeBinding) {
                         ForEach(NanoBananaEditScope.allCases) { scope in
                             Text(scope.title(language)).tag(scope)
                         }
@@ -1231,36 +1231,36 @@ extension ContentView {
                             .foregroundStyle(.secondary)
                     }
 
-                    if nanoBananaState.composer.editScope == .selectedArea {
+                    if aiImageState.composer.editScope == .selectedArea {
                         Stepper(
-                            "\(language.localized("マスク拡張")): \(nanoBananaState.composer.maskSettings.expansion)",
-                            value: nanoBananaMaskExpansionBinding,
+                            "\(language.localized("マスク拡張")): \(aiImageState.composer.maskSettings.expansion)",
+                            value: aiImageMaskExpansionBinding,
                             in: -24...48
                         )
 
-                        Toggle(language.localized("マスクを反転"), isOn: nanoBananaMaskInversionBinding)
+                        Toggle(language.localized("マスクを反転"), isOn: aiImageMaskInversionBinding)
                     }
 
-                    Picker(language.localized("モデル"), selection: nanoBananaModelBinding) {
+                    Picker(language.localized("モデル"), selection: aiImageModelBinding) {
                         ForEach(NanoBananaModel.allCases) { model in
                             Text(model.title(language)).tag(model)
                         }
                     }
 
-                    nanoBananaSubscriptionControls
+                    aiImageSubscriptionControls
                 }
 
                 Section(language.localized("出力")) {
-                    Picker(language.localized("出力先"), selection: nanoBananaOutputModeBinding) {
+                    Picker(language.localized("出力先"), selection: aiImageOutputModeBinding) {
                         ForEach(NanoBananaOutputMode.allCases) { mode in
                             Text(mode.title(language)).tag(mode)
                         }
                     }
                 }
 
-                if !nanoBananaState.jobs.isEmpty {
+                if !aiImageState.jobs.isEmpty {
                     Section(language.localized("ジョブ")) {
-                        ForEach(nanoBananaState.jobs.prefix(4)) { job in
+                        ForEach(aiImageState.jobs.prefix(4)) { job in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack {
                                     Text(job.descriptor.model.title(language))
@@ -1274,7 +1274,7 @@ extension ContentView {
                                     .lineLimit(2)
                                 if job.status == .failed || job.status == .canceled {
                                     Button(language.localized("再試行")) {
-                                        store.send(.nanoBanana(.retryJobTapped(job.id)))
+                                        store.send(.aiImage(.retryJobTapped(job.id)))
                                     }
                                     .buttonStyle(.borderless)
                                 }
@@ -1283,11 +1283,11 @@ extension ContentView {
                     }
                 }
 
-                if !nanoBananaState.history.isEmpty {
+                if !aiImageState.history.isEmpty {
                     Section(language.localized("履歴")) {
-                        ForEach(nanoBananaState.history.prefix(4)) { item in
+                        ForEach(aiImageState.history.prefix(4)) { item in
                             Button {
-                                store.send(.nanoBanana(.historyItemSelected(item.descriptor)))
+                                store.send(.aiImage(.historyItemSelected(item.descriptor)))
                             } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(item.descriptor.prompt.rawValue)
@@ -1302,21 +1302,21 @@ extension ContentView {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle(StudioStrings.nanoBanana(language))
+            .navigationTitle(StudioStrings.aiImage(language))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        nanoBananaFocusedField = nil
-                        store.send(.nanoBanana(.sheetPresentationChanged(false)))
+                        aiImageFocusedField = nil
+                        store.send(.aiImage(.sheetPresentationChanged(false)))
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(nanoBananaPrimaryActionTitle(fallback: language.localized("生成"))) {
-                        handleNanoBananaPrimaryAction(closeSheet: true)
+                    Button(aiImagePrimaryActionTitle(fallback: language.localized("生成"))) {
+                        handleAIImagePrimaryAction(closeSheet: true)
                     }
-                    .disabled(nanoBananaPrimaryActionDisabled)
+                    .disabled(aiImagePrimaryActionDisabled)
                 }
             }
         }
@@ -1776,11 +1776,11 @@ extension ContentView {
                 }
                 .disabled(activeLayer == nil || store.document.canvas.renderSnapshot == nil)
 
-                Button(StudioStrings.nanoBananaEdit(language)) {
-                    prepareNanoBananaComposer()
-                    store.send(.nanoBanana(.sheetPresentationChanged(true)))
+                Button(StudioStrings.aiImageEdit(language)) {
+                    prepareAIImageComposer()
+                    store.send(.aiImage(.sheetPresentationChanged(true)))
                 }
-                .disabled(activeLayer == nil || store.document.canvas.renderSnapshot == nil || nanoBananaState.isGenerating)
+                .disabled(activeLayer == nil || store.document.canvas.renderSnapshot == nil || aiImageState.isGenerating)
 
                 Divider()
 

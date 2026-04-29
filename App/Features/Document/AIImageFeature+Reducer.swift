@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import PrimoNanoBananaApplication
 
-extension NanoBananaFeature {
+extension AIImageFeature {
     func coreReduce(
         into state: inout State,
         action: Action
@@ -9,11 +9,11 @@ extension NanoBananaFeature {
         switch action {
         case .task:
             return .merge(
-                .run { [nanoBananaSettingsClient] send in
-                    await send(.settingsLoaded(nanoBananaSettingsClient.load()))
+                .run { [aiImageSettingsClient] send in
+                    await send(.settingsLoaded(aiImageSettingsClient.load()))
                 },
-                .run { [nanoBananaCommerceClient] send in
-                    await send(.commerceUpdated(await nanoBananaCommerceClient.prepare()))
+                .run { [aiImageCommerceClient] send in
+                    await send(.commerceUpdated(await aiImageCommerceClient.prepare()))
                 }
             )
 
@@ -62,22 +62,22 @@ extension NanoBananaFeature {
         case .accessModeChanged:
             state.accessMode = .appManaged
             let updatedSettings = state.settings
-            return .run { [nanoBananaSettingsClient] _ in
-                nanoBananaSettingsClient.persist(updatedSettings)
+            return .run { [aiImageSettingsClient] _ in
+                aiImageSettingsClient.persist(updatedSettings)
             }
 
         case let .apiKeyChanged(apiKey):
             state.apiKey = apiKey
             let updatedSettings = state.settings
-            return .run { [nanoBananaSettingsClient] _ in
-                nanoBananaSettingsClient.persist(updatedSettings)
+            return .run { [aiImageSettingsClient] _ in
+                aiImageSettingsClient.persist(updatedSettings)
             }
 
         case let .openAIAPIKeyChanged(apiKey):
             state.openAIAPIKey = apiKey
             let updatedSettings = state.settings
-            return .run { [nanoBananaSettingsClient] _ in
-                nanoBananaSettingsClient.persist(updatedSettings)
+            return .run { [aiImageSettingsClient] _ in
+                aiImageSettingsClient.persist(updatedSettings)
             }
 
         case let .sheetPresentationChanged(isPresented):
@@ -104,7 +104,7 @@ extension NanoBananaFeature {
             if closeSheet {
                 state.isSheetPresented = false
             }
-            switch state.buildCommand(using: nanoBananaCommandBuilder) {
+            switch state.buildCommand(using: aiImageCommandBuilder) {
             case let .success(command):
                 return .send(.delegate(.requestEdit(command)))
             case .failure(.promptRequired):
@@ -124,7 +124,7 @@ extension NanoBananaFeature {
             return .send(.delegate(.cancelEdit))
 
         case let .retryJobTapped(jobID):
-            guard let commandResult = state.retryCommand(for: jobID, using: nanoBananaCommandBuilder) else {
+            guard let commandResult = state.retryCommand(for: jobID, using: aiImageCommandBuilder) else {
                 return .none
             }
             switch commandResult {
@@ -135,7 +135,7 @@ extension NanoBananaFeature {
             }
 
         case .regenerateTapped:
-            guard let commandResult = state.regenerationCommand(using: nanoBananaCommandBuilder) else {
+            guard let commandResult = state.regenerationCommand(using: aiImageCommandBuilder) else {
                 return .none
             }
             switch commandResult {
@@ -146,18 +146,18 @@ extension NanoBananaFeature {
             }
 
         case .purchasePrimaryProductTapped:
-            return .run { [nanoBananaCommerceClient] send in
-                await send(.commerceUpdated(await nanoBananaCommerceClient.purchasePrimaryProduct()))
+            return .run { [aiImageCommerceClient] send in
+                await send(.commerceUpdated(await aiImageCommerceClient.purchasePrimaryProduct()))
             }
 
         case .restorePurchasesTapped:
-            return .run { [nanoBananaCommerceClient] send in
-                await send(.commerceUpdated(await nanoBananaCommerceClient.restorePurchases()))
+            return .run { [aiImageCommerceClient] send in
+                await send(.commerceUpdated(await aiImageCommerceClient.restorePurchases()))
             }
 
         case .purchaseErrorDismissed:
-            return .run { [nanoBananaCommerceClient] send in
-                await send(.commerceUpdated(await nanoBananaCommerceClient.clearPurchaseError()))
+            return .run { [aiImageCommerceClient] send in
+                await send(.commerceUpdated(await aiImageCommerceClient.clearPurchaseError()))
             }
 
         case let .historyItemSelected(descriptor):

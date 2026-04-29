@@ -30,7 +30,7 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 - **document runtime は contract の後ろに隠す**
   query、mutation、stroke、history、persistence、export、text layer、GPU operation は `PrimoDocumentContracts` の gateway として表現し、app から runtime 実装へ直接依存しない形にしています。
 - **domain / application / infrastructure を分ける**
-  document、workspace、brush、NanoBanana などは、値やルールを置く domain、操作の意味を定義する application、Metal / file I/O / network などを扱う infrastructure に分けています。
+  document、workspace、brush、AI 画像編集などは、値やルールを置く domain、操作の意味を定義する application、Metal / file I/O / network などを扱う infrastructure に分けています。
 - **副作用は dependency と gateway に閉じ込める**
   ファイル I/O、日時、UUID、保存、読み込み、エクスポート、AI 編集、GPU backend は reducer の外側に置き、テストでは差し替えられる境界を用意します。
 - **描画は snapshot と incremental update で扱う**
@@ -71,7 +71,7 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 - paper style、透明背景 preview、PNG export
 - project save / load、workspace autosave、復元、タブ管理
 - timelapse capture / export
-- NanoBanana 連携による画像編集補助
+- Gemini / OpenAI Image を扱う AI 画像編集補助
 - Photoshop brush / brush tip import 周辺の file format と brush runtime settings
 
 ## プロジェクト構成
@@ -79,7 +79,7 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 - `App/`
   SwiftUI / TCA のアプリ本体です。画面、reducer、workflow、dependency wiring、menus、workspace UI、canvas wrapper を持ちます。
 - `Packages/PrimoModules/`
-  domain、application、contracts、runtime、Metal infrastructure、workspace、brush、NanoBanana、localization をまとめたローカル Swift package です。
+  domain、application、contracts、runtime、Metal infrastructure、workspace、brush、AI 画像編集、localization をまとめたローカル Swift package です。
 - `PrimoTests/`
   app 側 workflow と reducer まわりのテストです。
 - `Packages/PrimoModules/Tests/`
@@ -118,14 +118,14 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 - `PrimoBrushDomain` / `PrimoBrushFileFormats` / `PrimoBrushInfrastructure`
   brush settings、Photoshop brush / tip formats、brush import
 - `PrimoNanoBananaDomain` / `PrimoNanoBananaApplication` / `PrimoNanoBananaInfrastructure`
-  AI edit command、preview preparation、commerce / remote client
+  AI 画像編集 backend。旧称 NanoBanana module として残しつつ、Gemini 系 image model と OpenAI Image model の command、preview preparation、commerce / remote client を扱います。
 - `PrimoLocalization`
   共通ローカライズ型
 
 ## 重要なファイル
 
 - [App/Features/Document/DocumentFeature.swift](App/Features/Document/DocumentFeature.swift)
-  document editor の TCA reducer 本体です。canvas interaction、document mutation、import / export、NanoBanana feature への workflow を束ねます。
+  document editor の TCA reducer 本体です。canvas interaction、document mutation、import / export、AI 画像編集 workflow を束ねます。
 - [App/Features/Document/PaintDocumentClient.swift](App/Features/Document/PaintDocumentClient.swift)
   app 側 dependency wiring です。`DocumentRuntimeComposition` から各 command service / gateway を組み立てます。
 - [App/Features/Canvas/CanvasView.swift](App/Features/Canvas/CanvasView.swift)

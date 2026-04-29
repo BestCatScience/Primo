@@ -8,6 +8,6 @@ extension PrimoRootFeature {
         case workspace(WorkspaceFeature.Action)
         case document(DocumentFeature.Action)
         case importExport(ImportExportFeature.Action)
-        case nanoBanana(NanoBananaFeature.Action)
+        case aiImage(AIImageFeature.Action)
     }
 }

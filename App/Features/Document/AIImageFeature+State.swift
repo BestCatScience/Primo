@@ -3,9 +3,9 @@ import Foundation
 import PrimoNanoBananaApplication
 import PrimoNanoBananaDomain
 
-extension NanoBananaFeature {
+extension AIImageFeature {
     enum WorkspaceBottomPanelSection: Hashable, Equatable {
-        case nanoBanana
+        case aiImage
         case history
         case output
     }
@@ -30,7 +30,7 @@ extension NanoBananaFeature {
     struct PresentationState: Equatable {
         var isSheetPresented = false
         var isPaywallPresented = false
-        var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .nanoBanana
+        var workspaceBottomPanelSection: WorkspaceBottomPanelSection = .aiImage
         var workspaceBottomPanelCollapsed = false
     }
 
@@ -109,7 +109,8 @@ extension NanoBananaFeature {
 
         var generateDisabled: Bool {
             isGenerating ||
-            composer.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            composer.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            (accessMode == .userAPIKey && selectedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
 
         var selectedAPIKey: String {
@@ -126,7 +127,7 @@ extension NanoBananaFeature {
             composer.outputMode = .replaceCurrentLayer
             composer.maskSettings = .init()
             composer.model = .flashImage31Preview
-            workspaceBottomPanelSection = .nanoBanana
+            workspaceBottomPanelSection = .aiImage
             workspaceBottomPanelCollapsed = false
         }
 
@@ -138,7 +139,7 @@ extension NanoBananaFeature {
             composer.maskSettings = descriptor.maskSettings
             composer.model = descriptor.model
             accessMode = .appManaged
-            workspaceBottomPanelSection = .nanoBanana
+            workspaceBottomPanelSection = .aiImage
         }
 
         func buildDraft() -> NanoBananaDraft {
@@ -171,7 +172,7 @@ extension NanoBananaFeature {
             builder.build(
                 draft: NanoBananaDraft(
                     prompt: descriptor.prompt.rawValue,
-                    accessMode: .appManaged,
+                    accessMode: descriptor.accessMode,
                     model: descriptor.model,
                     inputLayerIndex: descriptor.inputLayerIndex,
                     editScope: descriptor.editScope,
