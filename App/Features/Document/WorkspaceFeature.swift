@@ -218,6 +218,9 @@ struct WorkspaceFeature {
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case let .tabSelected(tabID):
+                return handleTabSelection(state: &state, tabID: tabID)
+
             case let .tabCloseRequested(tabID):
                 return requestCloseOperation(state: &state, operation: .tab(tabID))
 
@@ -398,6 +401,13 @@ struct WorkspaceFeature {
                     replacementRequest: replacementRequest
                 )
 
+            case let .tabSelectionLoaded(tabID, loaded):
+                return handleTabSelectionLoaded(
+                    state: &state,
+                    tabID: tabID,
+                    loaded: loaded
+                )
+
             case let .projectLoadRequested(url, removesStagedWorkspaceItem, replacementRequest):
                 return handleProjectLoadRequested(
                     url: url,
@@ -440,8 +450,6 @@ struct WorkspaceFeature {
                 )
 
             case .delegate:
-                return .none
-            default:
                 return .none
             }
         }

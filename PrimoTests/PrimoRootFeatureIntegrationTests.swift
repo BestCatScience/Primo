@@ -54,6 +54,85 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         }
     }
 
+    func testSelectingActiveTabFromHomeShowsWorkspace() async {
+        let activeTab = OpenDocumentTab.testValue()
+        let store = makeRootStore(
+            initialState: {
+                var state = PrimoRootFeature.State()
+                state.application.showsHome = true
+                state.application.isHydrating = false
+                state.workspace.openTabs = [activeTab]
+                state.workspace.activeTabID = activeTab.id
+                state.workspace.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        )
+
+        await store.send(.workspace(.tabSelected(activeTab.id)))
+        await store.receive(.workspace(.delegate(.workspaceProjectLoadCompleted(nil))))
+        await store.receive(.application(.workspaceProjectLoadCompleted(nil))) {
+            $0.application.showsHome = false
+        }
+    }
+
+    func testLoadedTabSelectionAppliesSelectedTab() async {
+        let activeTab = OpenDocumentTab.testValue(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!,
+            title: "Active",
+            backingStoreURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/active.atelier")),
+            sourceProjectURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/active-source.atelier"))
+        )
+        let targetTab = OpenDocumentTab.testValue(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
+            title: "Target",
+            backingStoreURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/target.atelier")),
+            sourceProjectURL: DocumentProjectPath(URL(fileURLWithPath: "/tmp/target-source.atelier"))
+        )
+        let loaded = LoadedPaintProject.testValue()
+        let store = TestStore(
+            initialState: {
+                var state = WorkspaceFeature.State()
+                state.openTabs = [activeTab, targetTab]
+                state.activeTabID = activeTab.id
+                state.primarySelectedTabID = activeTab.id
+                return state
+            }()
+        ) {
+            WorkspaceFeature()
+        } withDependencies: {
+            $0.documentRuntimeComposition = .stub()
+            $0.documentWorkspaceClient = .stub()
+            $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
+            $0.uuidClient = UUIDClient(generate: {
+                UUID(uuidString: "00000000-0000-0000-0000-00000000BEEF")!
+            })
+            $0.fileClient = .stub()
+        }
+
+        await store.send(.tabSelectionLoaded(targetTab.id, loaded)) {
+            $0.pendingLoadedWorkspaceApplication = WorkspaceFeature.PendingLoadedWorkspaceApplication(
+                loaded: loaded,
+                plan: WorkspaceFeature.LoadedWorkspaceProjectPlan(
+                    destination: .selectedTab(tabID: targetTab.id, pane: targetTab.pane),
+                    successEffects: .init(
+                        completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+                    )
+                ),
+                presentation: WorkspaceFeature.LoadedWorkspacePresentation(
+                    completion: .openedDocument(layerCount: loaded.presentation.layerRows.count)
+                ),
+                preparedTab: nil
+            )
+        }
+        await store.receive(.delegate(.applyLoadedProject(loaded)))
+        await store.send(.loadedProjectApplied) {
+            $0.pendingLoadedWorkspaceApplication = nil
+            $0.activeTabID = targetTab.id
+            $0.primarySelectedTabID = targetTab.id
+        }
+        await store.receive(.delegate(.workspaceProjectLoadCompleted(nil)))
+    }
+
     func testHomeReturnRequestedEmitsWorkspacePersistenceRequest() async {
         let previewSurface = previewSurface()
         let activeTab = OpenDocumentTab.testValue()
