@@ -42,6 +42,9 @@ jobs:
 
   app-tests:
     name: Swift 6 Xcode App Tests (iOS 26)
+    # The app target deploys to iOS 26.0, so keep this on macos-26 for matching
+    # Xcode and simulator runtimes. Do not relax to macos-latest without
+    # confirming that image still includes an iOS 26+ simulator.
     runs-on: macos-26
     timeout-minutes: 35
     env:
