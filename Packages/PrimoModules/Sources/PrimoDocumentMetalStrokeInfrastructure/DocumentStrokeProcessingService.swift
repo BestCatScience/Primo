@@ -213,10 +213,10 @@ public struct DocumentStrokeProcessingService: Sendable {
         preserveAlphaLockedPixels: Bool,
         usesResponsivePreview: Bool = false
     ) -> DocumentInteractiveStrokePreviewResult? {
-        let usesApproximatePreview = usesResponsivePreview
         let previewBrush = usesResponsivePreview
             ? GpuRenderingSupport.responsivePreviewBrush(from: brush)
             : brush
+        let usesApproximatePreview = previewBrush != brush
 
         if !preserveAlphaLockedPixels,
            GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush),

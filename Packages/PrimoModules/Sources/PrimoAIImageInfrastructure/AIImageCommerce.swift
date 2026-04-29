@@ -45,10 +45,12 @@ public struct AIImageSettingsClient: Sendable {
             },
             persist: { settings in
                 keyValueStoreClient.setString(settings.accessMode.rawValue, Self.accessModeStorageKey)
-                try? secretStoreClient.writeSecret(secretOrNil(settings.apiKey), Self.apiKeyStorageKey)
-                try? secretStoreClient.writeSecret(secretOrNil(settings.openAIAPIKey), Self.openAIAPIKeyStorageKey)
-                keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
-                keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
+                if Self.writeSecret(secretOrNil(settings.apiKey), key: Self.apiKeyStorageKey, secretStoreClient: secretStoreClient) {
+                    keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
+                }
+                if Self.writeSecret(secretOrNil(settings.openAIAPIKey), key: Self.openAIAPIKeyStorageKey, secretStoreClient: secretStoreClient) {
+                    keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
+                }
             }
         )
     }
@@ -64,9 +66,23 @@ public struct AIImageSettingsClient: Sendable {
         guard let legacySecret = keyValueStoreClient.stringForKey(key), !legacySecret.isEmpty else {
             return ""
         }
-        try? secretStoreClient.writeSecret(legacySecret, key)
-        keyValueStoreClient.setString(nil, key)
+        if writeSecret(legacySecret, key: key, secretStoreClient: secretStoreClient) {
+            keyValueStoreClient.setString(nil, key)
+        }
         return legacySecret
+    }
+
+    private static func writeSecret(
+        _ secret: String?,
+        key: String,
+        secretStoreClient: SecretStoreClient
+    ) -> Bool {
+        do {
+            try secretStoreClient.writeSecret(secret, key)
+            return true
+        } catch {
+            return false
+        }
     }
 
     private static func secretOrNil(_ value: String) -> String? {

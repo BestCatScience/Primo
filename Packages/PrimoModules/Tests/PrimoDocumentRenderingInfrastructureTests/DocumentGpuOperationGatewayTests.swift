@@ -427,7 +427,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test(.enabled(if: metalRuntimeAvailable))
-    func responsiveOilPreviewIsMarkedApproximate() throws {
+    func responsiveOilPreviewWithoutSmudgeStaysExact() throws {
         let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
         let snapshot = MetalDocumentSnapshot(
@@ -504,7 +504,7 @@ struct DocumentGpuOperationGatewayTests {
         ))
 
         let dirtyRegion = try #require(preview.dirtyRegion)
-        #expect(preview.isApproximatePreview == true)
+        #expect(preview.isApproximatePreview == false)
         #expect(preview.incrementalUpdate?.gpuBufferHandle != nil)
         #expect(dirtyRegion.width > 0)
         #expect(dirtyRegion.height > 0)
@@ -588,7 +588,7 @@ struct DocumentGpuOperationGatewayTests {
         ))
 
         let liveUpdate = try #require(preview.incrementalUpdate)
-        #expect(preview.isApproximatePreview)
+        #expect(!preview.isApproximatePreview)
         #expect(!liveUpdate.isEmpty)
         #expect(liveUpdate.width > 0)
         #expect(liveUpdate.height > 0)
@@ -639,7 +639,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
-    func responsivePreviewBrushDisablesSmudgeOnlyForLiveSmudgePreview() {
+    func responsivePreviewBrushPreservesSmudgeForLiveSmudgePreview() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([64, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -676,18 +676,7 @@ struct DocumentGpuOperationGatewayTests {
 
         let preview = GpuRenderingSupport.responsivePreviewBrush(from: original)
 
-        #expect(!preview.smudgeEngineEnabled)
-        #expect(preview.tipKind == original.tipKind)
-        #expect(preview.radius == original.radius)
-        #expect(preview.opacity == original.opacity)
-        #expect(preview.hardness == original.hardness)
-        #expect(preview.roundness == original.roundness)
-        #expect(preview.textureMode == original.textureMode)
-        #expect(preview.textureStrength == original.textureStrength)
-        #expect(preview.wetness == original.wetness)
-        #expect(preview.colorMixStrength == original.colorMixStrength)
-        #expect(preview.smudgeRadius == original.smudgeRadius)
-        #expect(preview.paintLoad == original.paintLoad)
+        #expect(preview == original)
         #expect(preview.customTip == original.customTip)
         #expect(preview.red == original.red)
         #expect(preview.green == original.green)

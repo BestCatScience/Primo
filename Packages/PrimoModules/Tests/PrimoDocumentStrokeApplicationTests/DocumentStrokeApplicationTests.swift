@@ -178,7 +178,10 @@ struct DocumentStrokeApplicationTests {
             layerIndex: 0,
             surfaceHandle: previousHandle,
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
-            isApproximatePreview: true
+            isApproximatePreview: false,
+            previewBrush: makeContext(layerIndex: 0, brush: oilBrushSettings()).previewBrush,
+            sampleCount: 2,
+            supportsIncrementalContinuation: true
         )
         let previous = stylusSample(x: 2, y: 2)
         let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
@@ -215,7 +218,8 @@ struct DocumentStrokeApplicationTests {
             layerIndex: 0,
             surfaceHandle: previousHandle,
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
-            isApproximatePreview: true,
+            isApproximatePreview: false,
+            previewBrush: context.previewBrush,
             sampleCount: 2,
             supportsIncrementalContinuation: false
         )
@@ -234,7 +238,7 @@ struct DocumentStrokeApplicationTests {
         #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == previousHandle)
         #expect(planner.requests[0].samples == [previous] + appended)
         #expect(planner.requests[0].usesResponsivePreview)
-        #expect(resolution.result.isApproximatePreview)
+        #expect(!resolution.result.isApproximatePreview)
         #expect(!resolution.supportsIncrementalContinuation)
     }
 
@@ -274,60 +278,16 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 21)
+        let context = makeContext(layerIndex: 0, brush: oilBrushSettings())
         var renderState = StrokeSessionRenderState(
             baseRevision: 21,
             layerIndex: 0,
             surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
-            isApproximatePreview: true
-        )
-        var fullSamples: [StylusSample] = []
-        let batchSize = 8
-
-        for index in 0..<128 {
-            let appended = (0..<batchSize).map { offset -> StylusSample in
-                let sampleIndex = index * batchSize + offset
-                let angle = Double(sampleIndex) * 0.08
-                return stylusSample(
-                    x: CGFloat(cos(angle) + 1),
-                    y: CGFloat(sin(angle) + 1)
-                )
-            }
-            fullSamples.append(contentsOf: appended)
-            let resolution = try #require(useCase.resolveAppended(
-                activeStrokeBaseSnapshot: baseSnapshot,
-                renderSnapshot: nil,
-                renderState: renderState,
-                samples: appended,
-                fullSamples: fullSamples,
-                context: makeContext(layerIndex: 0, brush: oilBrushSettings()),
-                usesResponsivePreview: true
-            ))
-            renderState = StrokeSessionRenderState(
-                baseRevision: resolution.result.baseSnapshot.revision,
-                layerIndex: resolution.result.surface?.layerIndex ?? 0,
-                surfaceHandle: try #require(resolution.result.surface?.handle.buffer),
-                dirtyRect: try #require(resolution.result.dirtyRect),
-                isApproximatePreview: resolution.result.isApproximatePreview
-            )
-        }
-
-        #expect(fullSamples.count > 1_000)
-        #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
-    }
-
-    @Test
-    func responsiveSmudgeOilPreviewRequestSizeDoesNotGrowWithLongCircularStroke() throws {
-        let planner = RecordingPreviewPlanner()
-        let useCase = DocumentStrokePreviewUseCase(planner: planner)
-        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 21)
-        let context = makeContext(layerIndex: 0, brush: smudgeBrushSettings())
-        var renderState = StrokeSessionRenderState(
-            baseRevision: 21,
-            layerIndex: 0,
-            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
-            isApproximatePreview: true
+            isApproximatePreview: false,
+            previewBrush: context.previewBrush,
+            sampleCount: 0,
+            supportsIncrementalContinuation: true
         )
         var fullSamples: [StylusSample] = []
         let batchSize = 8
@@ -356,7 +316,64 @@ struct DocumentStrokeApplicationTests {
                 layerIndex: resolution.result.surface?.layerIndex ?? 0,
                 surfaceHandle: try #require(resolution.result.surface?.handle.buffer),
                 dirtyRect: try #require(resolution.result.dirtyRect),
-                isApproximatePreview: resolution.result.isApproximatePreview
+                isApproximatePreview: resolution.result.isApproximatePreview,
+                previewBrush: resolution.previewBrush,
+                sampleCount: resolution.sampleCount,
+                supportsIncrementalContinuation: resolution.supportsIncrementalContinuation
+            )
+        }
+
+        #expect(fullSamples.count > 1_000)
+        #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
+    }
+
+    @Test
+    func responsiveSmudgeOilPreviewRequestSizeDoesNotGrowWithLongCircularStroke() throws {
+        let planner = RecordingPreviewPlanner()
+        let useCase = DocumentStrokePreviewUseCase(planner: planner)
+        let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 21)
+        let context = makeContext(layerIndex: 0, brush: smudgeBrushSettings())
+        var renderState = StrokeSessionRenderState(
+            baseRevision: 21,
+            layerIndex: 0,
+            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            isApproximatePreview: false,
+            previewBrush: context.previewBrush,
+            sampleCount: 0,
+            supportsIncrementalContinuation: false
+        )
+        var fullSamples: [StylusSample] = []
+        let batchSize = 8
+
+        for index in 0..<128 {
+            let appended = (0..<batchSize).map { offset -> StylusSample in
+                let sampleIndex = index * batchSize + offset
+                let angle = Double(sampleIndex) * 0.08
+                return stylusSample(
+                    x: CGFloat(cos(angle) + 1),
+                    y: CGFloat(sin(angle) + 1)
+                )
+            }
+            fullSamples.append(contentsOf: appended)
+            let resolution = try #require(useCase.resolveAppended(
+                activeStrokeBaseSnapshot: baseSnapshot,
+                renderSnapshot: nil,
+                renderState: renderState,
+                samples: appended,
+                fullSamples: fullSamples,
+                context: context,
+                usesResponsivePreview: true
+            ))
+            renderState = StrokeSessionRenderState(
+                baseRevision: resolution.result.baseSnapshot.revision,
+                layerIndex: resolution.result.surface?.layerIndex ?? 0,
+                surfaceHandle: try #require(resolution.result.surface?.handle.buffer),
+                dirtyRect: try #require(resolution.result.dirtyRect),
+                isApproximatePreview: resolution.result.isApproximatePreview,
+                previewBrush: resolution.previewBrush,
+                sampleCount: resolution.sampleCount,
+                supportsIncrementalContinuation: resolution.supportsIncrementalContinuation
             )
         }
 
@@ -742,7 +759,10 @@ struct DocumentStrokeApplicationTests {
             layerIndex: preview.surface.layerIndex,
             surfaceHandle: preview.surface.handle.buffer,
             dirtyRect: preview.dirtyRegion.layerPixelRect,
-            isApproximatePreview: true
+            isApproximatePreview: true,
+            previewBrush: makeContext(layerIndex: 0).previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: false
         )
         let commit = try #require(useCase.execute(
             .finish(
@@ -762,7 +782,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func strokeSessionUseCaseCommitsMatchingSmudgePreviewSurface() throws {
+    func strokeSessionUseCaseCommitsResponsiveSmudgePreviewSurfaceWhenSamplesMatch() throws {
         let planner = RecordingPreviewPlanner()
         let renderer = RecordingCommitRenderer()
         let useCase = DocumentStrokeSessionUseCase(
@@ -777,7 +797,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsivePreview: false
+                usesResponsivePreview: true
             )
         ).previewMutation)
 
@@ -879,7 +899,7 @@ struct DocumentStrokeApplicationTests {
             )
         ).previewMutation)
 
-        #expect(preview.isApproximatePreview)
+        #expect(!preview.isApproximatePreview)
 
         let renderState = StrokeSessionRenderState(
             baseRevision: preview.baseSnapshot.revision,
@@ -896,7 +916,7 @@ struct DocumentStrokeApplicationTests {
                 renderState: renderState,
                 baseSnapshot: snapshot,
                 renderSnapshot: nil,
-                samples: [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)],
+                samples: [stylusSample(x: 1, y: 1)],
                 context: context,
                 allowsApproximatePreviewCommit: true,
                 refreshViaDirtyPresentation: true
@@ -905,6 +925,53 @@ struct DocumentStrokeApplicationTests {
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
         #expect(renderer.requests.isEmpty)
+    }
+
+    @Test
+    func strokeSessionUseCaseRerendersResponsivePreviewWhenSampleCountDiffers() throws {
+        let renderer = RecordingCommitRenderer()
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let context = makeContext(layerIndex: 0, brush: brushSettings())
+        let preview = try #require(useCase.execute(
+            .begin(
+                sample: stylusSample(x: 1, y: 1),
+                baseSnapshot: snapshot,
+                context: context,
+                usesResponsivePreview: true
+            )
+        ).previewMutation)
+
+        let renderState = StrokeSessionRenderState(
+            baseRevision: preview.baseSnapshot.revision,
+            layerIndex: preview.surface.layerIndex,
+            surfaceHandle: preview.surface.handle.buffer,
+            dirtyRect: preview.dirtyRegion.layerPixelRect,
+            isApproximatePreview: preview.isApproximatePreview,
+            previewBrush: context.previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: false
+        )
+        let finalSamples = [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)]
+        let commit = try #require(useCase.execute(
+            .finish(
+                renderState: renderState,
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: finalSamples,
+                context: context,
+                allowsApproximatePreviewCommit: true,
+                refreshViaDirtyPresentation: true
+            )
+        ).commitMutation)
+
+        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
+        #expect(renderer.requests.count == 1)
+        #expect(renderer.requests[0].samples == finalSamples)
     }
 
     @Test
@@ -951,8 +1018,10 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer == previewHandle)
-        #expect(renderer.requests.isEmpty)
+        #expect(commit.surface.handle.buffer != previewHandle)
+        #expect(renderer.requests.count == 1)
+        #expect(renderer.requests[0].samples == finalSamples)
+        #expect(renderer.requests[0].brush == eraserBrush)
     }
 
     @Test
@@ -1311,7 +1380,7 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
             ),
             dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
             incrementalUpdate: nil,
-            isApproximatePreview: request.usesResponsivePreview
+            isApproximatePreview: false
         )
     }
 }

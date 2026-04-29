@@ -174,12 +174,7 @@ public enum GpuRenderingSupport {
     }
 
     public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
-        guard brush.tipKind == .oil, brush.smudgeEngineEnabled else {
-            return brush
-        }
-        var preview = brush
-        preview.smudgeEngineEnabled = false
-        return preview
+        brush
     }
 
     public static func strokePreviewDirtyRect(

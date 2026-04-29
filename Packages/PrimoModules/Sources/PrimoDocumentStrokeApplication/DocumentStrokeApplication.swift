@@ -404,11 +404,12 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             usesResponsivePreview,
             !context.activeLayer.isAlphaLocked,
             let renderState,
-            renderState.isApproximatePreview,
+            renderState.previewBrush == context.previewBrush,
             renderState.baseRevision == baseSnapshot.revision,
             renderState.layerIndex == context.activeLayerIndex,
             renderState.surfaceHandle.width == baseSnapshot.width,
-            renderState.surfaceHandle.height == baseSnapshot.height
+            renderState.surfaceHandle.height == baseSnapshot.height,
+            renderState.sampleCount + samples.count == fullSamples.count
         else {
             return nil
         }
@@ -576,6 +577,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 renderState.previewBrush == commitContext.previewBrush,
                 renderState.surfaceHandle.width == snapshot.width,
                 renderState.surfaceHandle.height == snapshot.height,
+                renderState.sampleCount == samples.count,
                 renderState.previewBrush != nil
             {
                 let surface = GpuLayerSurface(
@@ -593,8 +595,16 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             }
             if
                 let renderState,
+                let snapshot,
                 renderState.isApproximatePreview,
                 allowsApproximatePreviewCommit,
+                renderState.baseRevision == snapshot.revision,
+                renderState.layerIndex == commitContext.activeLayerIndex,
+                renderState.previewBrush == commitContext.previewBrush,
+                renderState.surfaceHandle.width == snapshot.width,
+                renderState.surfaceHandle.height == snapshot.height,
+                renderState.sampleCount == samples.count,
+                renderState.previewBrush != nil,
                 !commitContext.previewBrush.smudgeEngineEnabled
             {
                 let surface = GpuLayerSurface(

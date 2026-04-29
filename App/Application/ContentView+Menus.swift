@@ -177,7 +177,11 @@ extension ContentView {
             .buttonStyle(.borderless)
         }
 
-        Text(language.localized("Primo のサブスクリプションでAI画像編集を利用できます"))
+        Text(
+            aiImageState.appManagedProxyEndpointConfigured
+            ? language.localized("Primo のサブスクリプションでAI画像編集を利用できます")
+            : language.localized("このビルドではアプリ管理のAI画像編集は無効です")
+        )
             .font(.footnote)
             .foregroundStyle(.secondary)
     }
