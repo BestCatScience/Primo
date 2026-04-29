@@ -812,7 +812,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func strokeSessionUseCaseCommitsSmudgePreviewSurfaceWhenFinalSamplesDiffer() throws {
+    func strokeSessionUseCaseRerendersSmudgeWhenPreviewSamplesDoNotMatchFinalStroke() throws {
         let planner = RecordingPreviewPlanner()
         let renderer = RecordingCommitRenderer()
         let useCase = DocumentStrokeSessionUseCase(
@@ -854,10 +854,10 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
-        #expect(commit.dirtyRegion == preview.dirtyRegion)
-        #expect(commit.surface.pixelData != nil)
-        #expect(renderer.requests.isEmpty)
+        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
+        #expect(renderer.requests.count == 1)
+        #expect(renderer.requests[0].samples == finalSamples)
+        #expect(renderer.requests[0].brush.smudgeEngineEnabled)
     }
 
     @Test

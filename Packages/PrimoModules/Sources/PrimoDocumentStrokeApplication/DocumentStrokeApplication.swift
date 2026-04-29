@@ -594,7 +594,8 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             if
                 let renderState,
                 renderState.isApproximatePreview,
-                allowsApproximatePreviewCommit
+                allowsApproximatePreviewCommit,
+                !commitContext.previewBrush.smudgeEngineEnabled
             {
                 let surface = GpuLayerSurface(
                     layerIndex: renderState.layerIndex,
