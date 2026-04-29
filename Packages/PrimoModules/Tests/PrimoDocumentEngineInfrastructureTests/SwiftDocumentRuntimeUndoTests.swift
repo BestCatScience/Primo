@@ -60,6 +60,7 @@ struct SwiftDocumentRuntimeUndoTests {
         }
 
         #expect(!data.isEmpty)
+        #expect(data != Data(count: 16))
         #expect(data == runtime.pixelDataForLayer(index: 0))
     }
 
@@ -102,6 +103,49 @@ struct SwiftDocumentRuntimeUndoTests {
         #expect(gpu.strokeBaseBufferHandleValues == [handle])
         #expect(gpu.fillSourceBufferHandleValues == [handle])
         #expect(gpu.blurSourceBufferHandleValues == [handle])
+    }
+
+    @Test
+    func gpuPlanFallsBackToPixelDataWhenRetainFails() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x55, count: 16)])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+        let handle = gpu.makeHandle(width: 2, height: 2, pixelData: Data(repeating: 0x33, count: 16))
+
+        _ = try runtime.applyLayerSurfaceMutation(
+            index: 0,
+            payload: GpuLayerMutationPayload(
+                canvasWidth: 2,
+                canvasHeight: 2,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                gpuBufferHandle: handle,
+                fallbackPixelData: nil
+            )
+        ).get()
+
+        gpu.setRetainSucceeds(false)
+
+        let strokePlan = try runtime.makeStrokeCommitPlan(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0
+        ).get()
+        _ = runtime.strokeCommitResult(for: strokePlan)
+
+        let fillPlan = try runtime.makeFillPlan(sample: sample(), brush: brush()).get()
+        _ = runtime.fillPayload(for: fillPlan)
+
+        let blurPlan = try runtime.makeBlurPlan(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0,
+            captureTimelapse: false
+        ).get()
+        _ = runtime.blurPayload(for: blurPlan)
+
+        #expect(gpu.retainedHandleValues.isEmpty)
+        #expect(gpu.strokeBaseBufferHandleValues == [nil])
+        #expect(gpu.fillSourceBufferHandleValues == [nil])
+        #expect(gpu.blurSourceBufferHandleValues == [nil])
     }
 
     private func sample() -> StylusSample {
@@ -149,6 +193,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private var strokeBaseBufferHandles: [MetalBufferHandle?] = []
     private var fillSourceBufferHandles: [MetalBufferHandle?] = []
     private var blurSourceBufferHandles: [MetalBufferHandle?] = []
+    private var retainSucceeds = true
 
     init(strokeOutputs: [Data]) {
         self.strokeOutputs = strokeOutputs
@@ -178,6 +223,12 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
         lock.withLock { blurSourceBufferHandles }
     }
 
+    func setRetainSucceeds(_ value: Bool) {
+        lock.withLock {
+            retainSucceeds = value
+        }
+    }
+
     func services() -> DocumentRuntimeGpuServices {
         DocumentRuntimeGpuServices(
             release: { handle in
@@ -187,9 +238,11 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 }
             },
             retain: { handle in
-                guard let handle else { return }
-                self.lock.withLock {
+                guard let handle else { return false }
+                return self.lock.withLock {
+                    guard self.retainSucceeds else { return false }
                     self.retainedHandles.append(handle)
+                    return true
                 }
             },
             _materializedPixelData: { handle in

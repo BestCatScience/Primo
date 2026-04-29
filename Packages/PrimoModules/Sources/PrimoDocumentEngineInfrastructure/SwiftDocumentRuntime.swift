@@ -195,10 +195,10 @@ final class GpuResourceLease: @unchecked Sendable {
     private let handle: MetalBufferHandle?
     private let releaseHandle: @Sendable (MetalBufferHandle?) -> Void
 
-    init(handle: MetalBufferHandle?, services: DocumentRuntimeGpuServices) {
+    init?(handle: MetalBufferHandle?, services: DocumentRuntimeGpuServices) {
+        guard let handle, services.retain(handle) else { return nil }
         self.handle = handle
         self.releaseHandle = services.release
-        services.retain(handle)
     }
 
     deinit {
@@ -547,7 +547,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return applyLayerMutationPayload(
                 index: index,
                 payload: fallbackPayload,
-                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: currentPixelData(for: index)) : nil
+                timelapseEvent: nil,
+                recordsFinalLayerPixels: layer.alphaLocked
             )
         }
         return .failure(failure)
@@ -558,7 +559,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return applyLayerMutationPayload(
                 index: index,
                 payload: payload,
-                timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? currentPixelData(for: index))
+                timelapseEvent: nil,
+                recordsFinalLayerPixels: true
             )
         }
         return .failure(failure)
@@ -679,7 +681,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return applyLayerMutationPayload(
             index: plan.index,
             payload: payload,
-            timelapseEvent: .replaceLayerPixels(index: .unchecked(plan.index), data: payload.fullPixelData ?? currentPixelData(for: plan.index))
+            timelapseEvent: nil,
+            recordsFinalLayerPixels: true
         )
     }
 
@@ -947,17 +950,17 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(())
     }
 
-    func takeCurrentStrokeCommitPlan() -> RuntimeStrokeCommitPlan? {
-        guard let currentStroke else { return nil }
-        self.currentStroke = nil
-        guard case let .success(plan) = makeStrokeCommitPlan(
+    func currentStrokeCommitPlan() -> Result<RuntimeStrokeCommitPlan?, DocumentMutationFailure> {
+        guard let currentStroke else { return .success(nil) }
+        return makeStrokeCommitPlan(
             samples: currentStroke.samples,
             brush: currentStroke.brush,
             layerIndex: currentStroke.layerIndex
-        ) else {
-            return nil
-        }
-        return plan
+        ).map(Optional.some)
+    }
+
+    func clearCurrentStroke() {
+        currentStroke = nil
     }
 
     func release(_ handle: MetalBufferHandle?) {
@@ -1189,10 +1192,22 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         currentStroke?.samples.append(sample)
     }
 
-    func endStroke() {
-        guard let plan = takeCurrentStrokeCommitPlan(),
-              let result = strokeCommitResult(for: plan) else { return }
-        _ = applyStrokeCommitPlan(plan, gpuResult: result)
+    func endStroke() -> DocumentMutationResult {
+        switch currentStrokeCommitPlan() {
+        case let .failure(failure):
+            return .failure(failure)
+        case .success(nil):
+            return .success(())
+        case let .success(plan?):
+            guard let result = strokeCommitResult(for: plan) else {
+                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+            }
+            let mutationResult = applyStrokeCommitPlan(plan, gpuResult: result)
+            if case .success = mutationResult {
+                clearCurrentStroke()
+            }
+            return mutationResult
+        }
     }
 
     func cancelStroke() {
@@ -1740,7 +1755,8 @@ extension SwiftDocumentRuntime {
     private func applyLayerMutationPayload(
         index: Int,
         payload: DocumentLayerMutationPayload,
-        timelapseEvent: TimelapseOperation?
+        timelapseEvent: TimelapseOperation?,
+        recordsFinalLayerPixels: Bool = false
     ) -> DocumentMutationResult {
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
@@ -1748,7 +1764,7 @@ extension SwiftDocumentRuntime {
         }
         let before = undoSnapshot()
         let existing = currentPixelData(for: index)
-        let shouldMaterialize = store.snapshot.layers[index].alphaLocked || timelapseEvent?.requiresLayerPixelData == true
+        let shouldMaterialize = store.snapshot.layers[index].alphaLocked || recordsFinalLayerPixels
         let adjusted: Data
         let nextHandle: MetalBufferHandle?
         if shouldMaterialize {
@@ -1772,9 +1788,12 @@ extension SwiftDocumentRuntime {
         }
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
+        let finalTimelapseEvent = recordsFinalLayerPixels
+            ? TimelapseOperation.replaceLayerPixels(index: .unchecked(index), data: adjusted)
+            : timelapseEvent
         recordMutation(
             before: before,
-            timelapseEvent: timelapseEvent?.replacingLayerPixelData(with: adjusted),
+            timelapseEvent: finalTimelapseEvent,
             dirtyRect: payload.dirtyRect
         )
         return .success(())
@@ -1875,10 +1894,13 @@ extension SwiftDocumentRuntime {
         guard let handle = gpuLayerHandles[index] else {
             return (store.snapshot.layers[index].pixelData, nil, nil)
         }
+        guard let lease = GpuResourceLease(handle: handle, services: gpuServices) else {
+            return (currentPixelData(for: index), nil, nil)
+        }
         return (
             store.snapshot.layers[index].pixelData,
             handle,
-            GpuResourceLease(handle: handle, services: gpuServices)
+            lease
         )
     }
 
@@ -2221,23 +2243,5 @@ extension SwiftDocumentRuntime {
             }
         }
         return Data(output)
-    }
-}
-
-private extension TimelapseOperation {
-    var requiresLayerPixelData: Bool {
-        if case .replaceLayerPixels = self {
-            return true
-        }
-        return false
-    }
-
-    func replacingLayerPixelData(with data: Data) -> TimelapseOperation {
-        switch self {
-        case let .replaceLayerPixels(index, _):
-            return .replaceLayerPixels(index: index, data: data)
-        default:
-            return self
-        }
     }
 }

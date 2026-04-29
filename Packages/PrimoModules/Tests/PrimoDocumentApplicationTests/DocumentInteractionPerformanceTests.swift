@@ -20,7 +20,7 @@ final class DocumentCommandPerformanceTests: XCTestCase {
             strokeGateway: StrokeInputGateway(
                 beginStroke: { _, _ in },
                 appendStroke: { _ in },
-                endStroke: {},
+                endStroke: { .success(()) },
                 cancelStroke: {},
                 blurStroke: { _, _, _, _ in .success(()) },
                 endBlurStroke: {},

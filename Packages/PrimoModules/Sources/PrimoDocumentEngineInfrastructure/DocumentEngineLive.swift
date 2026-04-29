@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import os
 import PrimoCoreTypes
 import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
@@ -34,6 +35,8 @@ public struct DocumentEngineLive: Sendable {
 }
 
 public enum DocumentEngineFactory {
+    private static let logger = Logger(subsystem: "com.primo.app", category: "DocumentEngineFactory")
+
     public static func live(
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
@@ -357,9 +360,16 @@ public enum DocumentEngineFactory {
 
     private static func performCurrentStrokeCommit(
         runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
-    ) {
-        guard let plan = runtimeBox.withRuntime({ $0.takeCurrentStrokeCommitPlan() }),
-              let result = plan.gpuServices.commitStrokeMutation(
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime { $0.currentStrokeCommitPlan() }
+        switch planResult {
+        case let .failure(failure):
+            Self.logger.error("Current stroke commit plan failed: \(String(describing: failure), privacy: .public)")
+            return .failure(failure)
+        case .success(nil):
+            return .success(())
+        case let .success(plan?):
+            guard let result = plan.gpuServices.commitStrokeMutation(
                 basePixelData: plan.pixelData,
                 baseBufferHandle: plan.baseBufferHandle,
                 canvasWidth: plan.canvasWidth,
@@ -368,8 +378,20 @@ public enum DocumentEngineFactory {
                 brush: plan.brush,
                 snapshotRevision: plan.revision,
                 activeLayerIndex: plan.layerIndex
-              ) else { return }
-        _ = runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            ) else {
+                let failure = DocumentMutationFailure.bridgeMutationFailed("applyCommittedStroke")
+                Self.logger.error("Current stroke GPU commit failed: \(String(describing: failure), privacy: .public)")
+                return .failure(failure)
+            }
+            let mutationResult = runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+            switch mutationResult {
+            case .success:
+                runtimeBox.withRuntime { $0.clearCurrentStroke() }
+            case let .failure(failure):
+                Self.logger.error("Current stroke apply failed: \(String(describing: failure), privacy: .public)")
+            }
+            return mutationResult
+        }
     }
 
     private static func performBlur(

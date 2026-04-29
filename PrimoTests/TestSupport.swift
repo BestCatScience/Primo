@@ -239,7 +239,7 @@ extension StrokeInputGateway {
         Self(
             beginStroke: { _, _ in },
             appendStroke: { _ in },
-            endStroke: {},
+            endStroke: { .success(()) },
             cancelStroke: {},
             blurStroke: blurStroke,
             endBlurStroke: {},

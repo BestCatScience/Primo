@@ -22,7 +22,7 @@ public struct MetalResourceStore: Sendable {
         client.releaseBufferHandle(handle)
     }
 
-    public func retain(_ handle: MetalBufferHandle?) {
+    public func retain(_ handle: MetalBufferHandle?) -> Bool {
         client.retainBufferHandle(handle)
     }
 

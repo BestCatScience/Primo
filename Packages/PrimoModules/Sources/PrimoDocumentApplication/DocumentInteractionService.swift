@@ -113,7 +113,7 @@ public struct DocumentLayerCommandService: Sendable {
 public struct DocumentStrokeCommandService: Sendable {
     public var beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void
     public var appendStroke: @Sendable (StylusSample) -> Void
-    public var endStroke: @Sendable () -> Void
+    public var endStroke: @Sendable () -> DocumentMutationResult
     public var cancelStroke: @Sendable () -> Void
     public var applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
     public var blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
@@ -123,7 +123,7 @@ public struct DocumentStrokeCommandService: Sendable {
     public init(
         beginStroke: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void,
         appendStroke: @escaping @Sendable (StylusSample) -> Void,
-        endStroke: @escaping @Sendable () -> Void,
+        endStroke: @escaping @Sendable () -> DocumentMutationResult,
         cancelStroke: @escaping @Sendable () -> Void,
         applyGpuStrokeSurface: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult,
         blurStroke: @escaping @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult,

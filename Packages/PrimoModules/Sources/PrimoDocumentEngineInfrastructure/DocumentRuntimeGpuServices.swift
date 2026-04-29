@@ -10,7 +10,7 @@ typealias DocumentRuntimeStrokeMutationResult = PrimoMetalStrokeMutationResult
 
 struct DocumentRuntimeGpuServices: Sendable {
     var release: @Sendable (MetalBufferHandle?) -> Void
-    var retain: @Sendable (MetalBufferHandle?) -> Void
+    var retain: @Sendable (MetalBufferHandle?) -> Bool
     var _materializedPixelData: @Sendable (MetalBufferHandle) -> Data?
     var _scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
     var _scaledMaskData: @Sendable (Data, Int, Int, Int, Int) -> Data?

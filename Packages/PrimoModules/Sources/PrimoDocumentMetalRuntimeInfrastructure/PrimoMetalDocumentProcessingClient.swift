@@ -748,12 +748,13 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         }
     }
 
-    public func retainBufferHandle(_ handle: MetalBufferHandle?) {
-        guard let handle else { return }
-        withCacheLock {
-            guard var resource = cachedBuffers[handle.id] else { return }
+    public func retainBufferHandle(_ handle: MetalBufferHandle?) -> Bool {
+        guard let handle else { return false }
+        return withCacheLock {
+            guard var resource = cachedBuffers[handle.id] else { return false }
             resource.referenceCount += 1
             cachedBuffers[handle.id] = resource
+            return true
         }
     }
 

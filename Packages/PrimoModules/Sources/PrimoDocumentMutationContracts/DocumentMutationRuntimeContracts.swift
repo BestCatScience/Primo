@@ -220,7 +220,7 @@ public struct DocumentMutationGateway: Sendable {
 public struct StrokeInputGateway: Sendable {
     public var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
     public var appendStroke: @Sendable (StylusSample) -> Void
-    public var endStroke: @Sendable () -> Void
+    public var endStroke: @Sendable () -> DocumentMutationResult
     public var cancelStroke: @Sendable () -> Void
     public var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
     public var endBlurStroke: @Sendable () -> Void
@@ -230,7 +230,7 @@ public struct StrokeInputGateway: Sendable {
     public init(
         beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> Void,
         appendStroke: @escaping @Sendable (StylusSample) -> Void,
-        endStroke: @escaping @Sendable () -> Void,
+        endStroke: @escaping @Sendable () -> DocumentMutationResult,
         cancelStroke: @escaping @Sendable () -> Void,
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult,
         endBlurStroke: @escaping @Sendable () -> Void,
