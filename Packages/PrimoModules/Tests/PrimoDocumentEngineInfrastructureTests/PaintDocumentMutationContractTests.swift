@@ -92,6 +92,7 @@ struct PaintDocumentMutationContractTests {
             .setLayerName(index: .unchecked(0), name: "Ink"),
             .setFolderName(folderID: .unchecked(2), name: "References"),
             .setFolderExpanded(folderID: .unchecked(2), isExpanded: false),
+            .mergeLayerDown(index: .unchecked(1)),
         ]
 
         let decoded = try operations.enumerated().map { index, operation in
@@ -219,6 +220,42 @@ struct PaintDocumentMutationContractTests {
         case let .failure(failure):
             Issue.record("Expected addLayer success, got \(String(describing: failure))")
         }
+    }
+
+    @Test
+    func mergeLayerDownRecordsSingleTimelapseOperation() {
+        guard PrimoMetalDocumentProcessingClient.shared.isAvailable else { return }
+        let runtime = DocumentEngineFactory.live()
+        let presentation = runtime.queryGateway.lightweightPresentation()
+        let width = max(Int(presentation.canvasSize.width.rounded()), 1)
+        let height = max(Int(presentation.canvasSize.height.rounded()), 1)
+        let lower = Data(repeating: 0x20, count: width * height * 4)
+        let upper = Data(repeating: 0x80, count: width * height * 4)
+
+        expectSuccess(runtime.mutationGateway.replaceLayerPixels(0, lower))
+        let upperIndex: Int
+        switch runtime.mutationGateway.addLayer("Upper") {
+        case let .success(index):
+            upperIndex = index
+        case let .failure(failure):
+            Issue.record("Expected addLayer success, got \(String(describing: failure))")
+            return
+        }
+        expectSuccess(runtime.mutationGateway.replaceLayerPixels(upperIndex, upper))
+        guard case let .operations(beforeOperations) = runtime.exportGateway.timelapseCapture()?.source else {
+            Issue.record("Expected operation-backed timelapse capture")
+            return
+        }
+
+        expectSuccess(runtime.mergeLayerDown(upperIndex))
+
+        guard case let .operations(afterOperations) = runtime.exportGateway.timelapseCapture()?.source else {
+            Issue.record("Expected operation-backed timelapse capture")
+            return
+        }
+        let mergeOperations = Array(afterOperations.dropFirst(beforeOperations.count))
+        #expect(mergeOperations == [.mergeLayerDown(index: .unchecked(upperIndex))])
+        #expect(runtime.queryGateway.lightweightPresentation().layerRows.count == 1)
     }
 
     @Test

@@ -24,6 +24,10 @@ public struct DocumentStrokeProcessingService: Sendable {
         strokeService.resetExecutionSession()
     }
 
+    public func materializedPixelData(for handle: MetalBufferHandle) -> Data? {
+        materializationService.materializedPixelData(for: handle)
+    }
+
     public func makePreviewSurface(
         snapshot: MetalDocumentSnapshot,
         activeLayerIndex: Int,

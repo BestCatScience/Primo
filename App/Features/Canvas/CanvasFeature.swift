@@ -31,6 +31,7 @@ struct CanvasFeature {
         var localBufferRevision: Int = 0
         var lastRenderedLocalBufferRevision: Int = -1
         var pendingCommittedSnapshot: MetalDocumentSnapshot?
+        var pendingPreviewIncrementalUpdates: [IncrementalLayerUpdate] = []
         var activeLayerIndex = 0
         var strokeSession = StrokeSessionState()
         var layerBuffers: [LayerCanvasBuffer] = [
@@ -191,6 +192,7 @@ struct CanvasFeature {
             clearAdjustmentPreview()
             activeStroke = nil
             pendingCommittedSnapshot = nil
+            pendingPreviewIncrementalUpdates = []
             strokeSession.committedPointCount = 0
             shapePreviewIsLive = false
             isStrokeActive = false
@@ -215,6 +217,9 @@ struct CanvasFeature {
             else {
                 return
             }
+            guard let committedLayerPixelData = surface.pixelData else {
+                return
+            }
             let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) ?? baseSnapshot.compositePixelData
             let layers = baseSnapshot.layers.map { layer in
                 guard layer.index == surface.layerIndex else { return layer }
@@ -226,16 +231,16 @@ struct CanvasFeature {
                     blendMode: layer.blendMode,
                     thumbnailSurface: layer.thumbnailSurface,
                     thumbnailData: layer.thumbnailData,
-                    gpuBufferHandle: surface.handle.buffer,
-                    pixelData: layer.pixelData
+                    gpuBufferHandle: nil,
+                    pixelData: committedLayerPixelData
                 )
             }
             pendingCommittedSnapshot = MetalDocumentSnapshot(
                 width: baseSnapshot.width,
                 height: baseSnapshot.height,
                 revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
-                transferKind: baseSnapshot.transferKind,
-                compositeBufferHandle: baseSnapshot.compositeBufferHandle,
+                transferKind: .fullSnapshot,
+                compositeBufferHandle: nil,
                 compositePixelData: compositePixelData,
                 layers: layers
             )
@@ -247,24 +252,58 @@ struct CanvasFeature {
 
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
             strokeSession.pendingIncrementalUpdate = update
+            pendingPreviewIncrementalUpdates = update.map { [$0] } ?? []
         }
 
         mutating func clearPendingIncrementalUpdate() {
             strokeSession.pendingIncrementalUpdate = nil
+            pendingPreviewIncrementalUpdates = []
         }
 
         mutating func applyIncrementalRenderUpdate(_ update: IncrementalLayerUpdate) {
             setPendingIncrementalUpdate(update)
         }
 
+        mutating func recordPreviewIncrementalUpdate(
+            _ update: IncrementalLayerUpdate?,
+            previousRenderState: StrokeSessionRenderState?,
+            baseSnapshot: MetalDocumentSnapshot,
+            surface: GpuLayerSurface,
+            previewBrush: BrushRuntimeSettings?,
+            sampleCount: Int
+        ) {
+            guard let update else {
+                pendingPreviewIncrementalUpdates = []
+                return
+            }
+            if canAccumulatePreviewIncrementalUpdate(
+                previousRenderState: previousRenderState,
+                baseSnapshot: baseSnapshot,
+                surface: surface,
+                previewBrush: previewBrush,
+                sampleCount: sampleCount
+            ) {
+                pendingPreviewIncrementalUpdates.append(update)
+            } else {
+                pendingPreviewIncrementalUpdates = [update]
+            }
+        }
+
         func stagedPreviewCompositePixelData(baseSnapshot: MetalDocumentSnapshot) -> Data? {
-            guard let pendingIncrementalUpdate = strokeSession.pendingIncrementalUpdate else { return nil }
-            return Self.replacingCompositeRegion(
-                in: baseSnapshot.compositePixelData,
-                canvasWidth: baseSnapshot.width,
-                canvasHeight: baseSnapshot.height,
-                update: pendingIncrementalUpdate
-            )
+            guard !pendingPreviewIncrementalUpdates.isEmpty else { return nil }
+            var compositePixelData = baseSnapshot.compositePixelData
+            for update in pendingPreviewIncrementalUpdates {
+                guard let nextCompositePixelData = Self.replacingCompositeRegion(
+                    in: compositePixelData,
+                    canvasWidth: baseSnapshot.width,
+                    canvasHeight: baseSnapshot.height,
+                    update: update
+                ) else {
+                    return nil
+                }
+                compositePixelData = nextCompositePixelData
+            }
+            return compositePixelData
         }
 
         mutating func applyCommittedRenderSnapshot(
@@ -285,10 +324,7 @@ struct CanvasFeature {
             }
         }
 
-        mutating func applyPreviewRenderSnapshot(
-            _ renderSnapshot: MetalDocumentSnapshot,
-            previewLayerPixelData: Data? = nil
-        ) {
+        mutating func applyPreviewRenderSnapshot(_ renderSnapshot: MetalDocumentSnapshot) {
             applyIncrementalRenderUpdate(
                 IncrementalLayerUpdate(
                     layerIndex: -1,
@@ -407,6 +443,20 @@ struct CanvasFeature {
                 }
             }
             return nextComposite
+        }
+
+        private func canAccumulatePreviewIncrementalUpdate(
+            previousRenderState: StrokeSessionRenderState?,
+            baseSnapshot: MetalDocumentSnapshot,
+            surface: GpuLayerSurface,
+            previewBrush: BrushRuntimeSettings?,
+            sampleCount: Int
+        ) -> Bool {
+            guard let previousRenderState else { return false }
+            return previousRenderState.baseRevision == baseSnapshot.revision &&
+                previousRenderState.layerIndex == surface.layerIndex &&
+                previousRenderState.previewBrush == previewBrush &&
+                previousRenderState.sampleCount <= sampleCount
         }
     }
 

@@ -6,6 +6,18 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 
+private extension GpuLayerSurface {
+    func materialized(with pixelData: Data?) -> GpuLayerSurface {
+        GpuLayerSurface(
+            layerIndex: layerIndex,
+            width: width,
+            height: height,
+            handle: handle,
+            pixelData: pixelData
+        )
+    }
+}
+
 public struct DocumentStrokeContext: Equatable, Sendable {
     public let activeLayer: LayerRowModel
     public let activeLayerIndex: Int
@@ -310,6 +322,10 @@ public struct DocumentStrokeCommitUseCase: Sendable {
             )
         )
     }
+
+    public func materializedPixelData(for surface: GpuLayerSurface) -> Data? {
+        renderer.materializedPixelData(for: surface)
+    }
 }
 
 public enum GpuStrokeSessionCommand: Sendable {
@@ -408,14 +424,15 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 renderState.surfaceHandle.width == snapshot.width,
                 renderState.surfaceHandle.height == snapshot.height
             {
+                let surface = GpuLayerSurface(
+                    layerIndex: renderState.layerIndex,
+                    width: renderState.surfaceHandle.width,
+                    height: renderState.surfaceHandle.height,
+                    handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+                )
                 return .commit(
                     GpuCommitMutation(
-                        surface: GpuLayerSurface(
-                            layerIndex: renderState.layerIndex,
-                            width: renderState.surfaceHandle.width,
-                            height: renderState.surfaceHandle.height,
-                            handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
-                        ),
+                        surface: surface.materialized(with: commit.materializedPixelData(for: surface)),
                         dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
                         refreshViaDirtyPresentation: refreshViaDirtyPresentation
                     )
@@ -427,14 +444,15 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 allowsApproximatePreviewCommit,
                 !context.previewBrush.smudgeEngineEnabled
             {
+                let surface = GpuLayerSurface(
+                    layerIndex: renderState.layerIndex,
+                    width: renderState.surfaceHandle.width,
+                    height: renderState.surfaceHandle.height,
+                    handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
+                )
                 return .commit(
                     GpuCommitMutation(
-                        surface: GpuLayerSurface(
-                            layerIndex: renderState.layerIndex,
-                            width: renderState.surfaceHandle.width,
-                            height: renderState.surfaceHandle.height,
-                            handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
-                        ),
+                        surface: surface.materialized(with: commit.materializedPixelData(for: surface)),
                         dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
                         refreshViaDirtyPresentation: refreshViaDirtyPresentation
                     )

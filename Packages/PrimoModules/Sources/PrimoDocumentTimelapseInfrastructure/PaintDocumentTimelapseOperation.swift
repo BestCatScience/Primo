@@ -57,6 +57,8 @@ extension TimelapseOperation {
             return StoredTimelapseOperation(kind: .deleteLayer, layerIndex: index)
         case let .moveLayer(index, destinationIndex):
             return StoredTimelapseOperation(kind: .moveLayer, layerIndex: index, destinationIndex: destinationIndex)
+        case let .mergeLayerDown(index):
+            return StoredTimelapseOperation(kind: .mergeLayerDown, layerIndex: index)
         case let .createFolder(folderID, name, anchorLayerIndex):
             return StoredTimelapseOperation(
                 kind: .createFolder,
@@ -151,6 +153,9 @@ extension TimelapseOperation {
                 throw PrimoDocumentError.invalidDocument
             }
             self = .moveLayer(index: layerIndex, destinationIndex: destinationIndex)
+        case .mergeLayerDown:
+            guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
+            self = .mergeLayerDown(index: layerIndex)
         case .createFolder:
             guard let folderID = stored.folderID, let name = stored.name else { throw PrimoDocumentError.invalidDocument }
             self = .createFolder(folderID: folderID, name: name, anchorLayerIndex: stored.anchorLayerIndex)

@@ -65,8 +65,7 @@ extension DocumentFeature {
                     revision: nextRevision,
                     compositePixelData: composite,
                     layers: nextLayers
-                ),
-                previewLayerPixelData: adjustedActiveLayerPixels
+                )
             )
             return true
         }

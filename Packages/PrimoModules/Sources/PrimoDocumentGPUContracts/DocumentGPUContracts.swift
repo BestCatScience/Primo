@@ -61,12 +61,14 @@ public struct GpuLayerSurface: Equatable, Sendable {
     public let width: Int
     public let height: Int
     public let handle: GpuSurfaceHandle
+    public let pixelData: Data?
 
-    public init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle) {
+    public init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle, pixelData: Data? = nil) {
         self.layerIndex = layerIndex
         self.width = width
         self.height = height
         self.handle = handle
+        self.pixelData = pixelData
     }
 }
 
@@ -334,6 +336,13 @@ public protocol StrokePreviewPlanning: Sendable {
 
 public protocol StrokeCommitRendering: Sendable {
     func makeCommittedSurface(_ request: StrokeCommitRequest) -> StrokeCommitResult?
+    func materializedPixelData(for surface: GpuLayerSurface) -> Data?
+}
+
+public extension StrokeCommitRendering {
+    func materializedPixelData(for surface: GpuLayerSurface) -> Data? {
+        surface.pixelData
+    }
 }
 
 public extension MetalLayerSnapshot {

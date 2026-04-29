@@ -13,6 +13,178 @@ import PrimoDocumentPersistenceInfrastructure
 import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentTimelapseInfrastructure
 
+struct RuntimeResizeCanvasPlan: Sendable {
+    enum Mode: Sendable {
+        case scale
+        case extent
+    }
+
+    let mode: Mode
+    let before: SwiftDocumentStoreSnapshot
+    let sourceWidth: Int
+    let sourceHeight: Int
+    let targetWidth: Int
+    let targetHeight: Int
+    let layers: [SwiftDocumentLayerRecord]
+    let gpuServices: DocumentRuntimeGpuServices
+
+    func resizedLayers() -> [SwiftDocumentLayerRecord]? {
+        switch mode {
+        case .scale:
+            return scaledLayers()
+        case .extent:
+            return extentAdjustedLayers()
+        }
+    }
+
+    private func scaledLayers() -> [SwiftDocumentLayerRecord]? {
+        let widthScale = Double(targetWidth) / Double(sourceWidth)
+        let heightScale = Double(targetHeight) / Double(sourceHeight)
+        let textScale = min(widthScale, heightScale)
+        var output: [SwiftDocumentLayerRecord] = []
+        output.reserveCapacity(layers.count)
+        for var layer in layers {
+            guard let scaled = gpuServices.scaledPixelData(
+                layer.pixelData,
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight
+            ) else {
+                return nil
+            }
+            layer.pixelData = scaled
+            if let mask = layer.maskData {
+                guard let scaledMask = gpuServices.scaledMaskData(
+                    mask,
+                    sourceWidth: sourceWidth,
+                    sourceHeight: sourceHeight,
+                    targetWidth: targetWidth,
+                    targetHeight: targetHeight
+                ) else {
+                    return nil
+                }
+                layer.maskData = scaledMask
+            }
+            if let textLayer = layer.textLayer {
+                layer.textLayer = TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX * widthScale,
+                    positionY: textLayer.positionY * heightScale,
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: max(1, textLayer.fontSize * textScale),
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            }
+            output.append(layer)
+        }
+        return output
+    }
+
+    private func extentAdjustedLayers() -> [SwiftDocumentLayerRecord]? {
+        let offsetX = (targetWidth - sourceWidth) / 2
+        let offsetY = (targetHeight - sourceHeight) / 2
+        var output: [SwiftDocumentLayerRecord] = []
+        output.reserveCapacity(layers.count)
+        for var layer in layers {
+            guard let translated = gpuServices.translatedPixelData(
+                layer.pixelData,
+                sourceWidth: sourceWidth,
+                sourceHeight: sourceHeight,
+                targetWidth: targetWidth,
+                targetHeight: targetHeight,
+                offsetX: offsetX,
+                offsetY: offsetY
+            ) else {
+                return nil
+            }
+            layer.pixelData = translated
+            if let mask = layer.maskData {
+                guard let translatedMask = gpuServices.translatedMaskData(
+                    mask,
+                    sourceWidth: sourceWidth,
+                    sourceHeight: sourceHeight,
+                    targetWidth: targetWidth,
+                    targetHeight: targetHeight,
+                    offsetX: offsetX,
+                    offsetY: offsetY
+                ) else {
+                    return nil
+                }
+                layer.maskData = translatedMask
+            }
+            if let textLayer = layer.textLayer {
+                layer.textLayer = TextLayerData(
+                    text: textLayer.text,
+                    positionX: textLayer.positionX + Double(offsetX),
+                    positionY: textLayer.positionY + Double(offsetY),
+                    fontPostScriptName: textLayer.fontPostScriptName,
+                    fontDisplayName: textLayer.fontDisplayName,
+                    fontSize: textLayer.fontSize,
+                    scale: textLayer.scale,
+                    rotationDegrees: textLayer.rotationDegrees,
+                    red: textLayer.red,
+                    green: textLayer.green,
+                    blue: textLayer.blue,
+                    alpha: textLayer.alpha
+                )
+            }
+            output.append(layer)
+        }
+        return output
+    }
+}
+
+struct RuntimeLayerProcessingPlan: Sendable {
+    let index: Int
+    let request: LayerProcessingRequest
+    let revision: Int
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let pixelData: Data
+    let gpuServices: DocumentRuntimeGpuServices
+}
+
+struct RuntimeFillPlan: Sendable {
+    let layerIndex: Int
+    let revision: Int
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let pixelData: Data
+    let sample: StylusSample
+    let brush: BrushRuntimeSettings
+    let gpuServices: DocumentRuntimeGpuServices
+}
+
+struct RuntimeStrokeCommitPlan: Sendable {
+    let layerIndex: Int
+    let revision: Int
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let pixelData: Data
+    let samples: [StylusSample]
+    let brush: BrushRuntimeSettings
+    let gpuServices: DocumentRuntimeGpuServices
+}
+
+struct RuntimeBlurPlan: Sendable {
+    let layerIndex: Int
+    let revision: Int
+    let canvasWidth: Int
+    let canvasHeight: Int
+    let pixelData: Data
+    let samples: [StylusSample]
+    let brush: BrushRuntimeSettings
+    let captureTimelapse: Bool
+    let gpuServices: DocumentRuntimeGpuServices
+}
+
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
@@ -137,129 +309,86 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func resizeCanvas(width: Int, height: Int) -> DocumentMutationResult {
-        guard width > 0 && height > 0 else {
-            return .failure(.invalidCanvasSize(width: width, height: height))
-        }
-        let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
-        let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        guard sourceSize != targetSize else { return .success(()) }
-        let before = store.snapshot
-        let widthScale = Double(targetSize.width) / Double(sourceSize.width)
-        let heightScale = Double(targetSize.height) / Double(sourceSize.height)
-        let textScale = min(widthScale, heightScale)
-        for index in store.snapshot.layers.indices {
-            var layer = store.snapshot.layers[index]
-            guard let scaled = gpuServices.scaledPixelData(
-                layer.pixelData,
-                sourceWidth: sourceSize.width,
-                sourceHeight: sourceSize.height,
-                targetWidth: targetSize.width,
-                targetHeight: targetSize.height
-            ) else {
+        switch makeResizeCanvasPlan(width: width, height: height) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let plan else { return .success(()) }
+            guard let layers = plan.resizedLayers() else {
                 return .failure(.bridgeMutationFailed("resizeCanvas"))
             }
-            layer.pixelData = scaled
-            if let mask = layer.maskData {
-                guard let scaledMask = gpuServices.scaledMaskData(
-                    mask,
-                    sourceWidth: sourceSize.width,
-                    sourceHeight: sourceSize.height,
-                    targetWidth: targetSize.width,
-                    targetHeight: targetSize.height
-                ) else {
-                    return .failure(.bridgeMutationFailed("resizeCanvas"))
-                }
-                layer.maskData = scaledMask
-            }
-            if let textLayer = layer.textLayer {
-                layer.textLayer = TextLayerData(
-                    text: textLayer.text,
-                    positionX: textLayer.positionX * widthScale,
-                    positionY: textLayer.positionY * heightScale,
-                    fontPostScriptName: textLayer.fontPostScriptName,
-                    fontDisplayName: textLayer.fontDisplayName,
-                    fontSize: max(1, textLayer.fontSize * textScale),
-                    scale: textLayer.scale,
-                    rotationDegrees: textLayer.rotationDegrees,
-                    red: textLayer.red,
-                    green: textLayer.green,
-                    blue: textLayer.blue,
-                    alpha: textLayer.alpha
-                )
-            }
-            store.snapshot.layers[index] = layer
+            return applyResizeCanvasPlan(plan, layers: layers)
         }
-        store.snapshot.canvasWidth = targetSize.width
-        store.snapshot.canvasHeight = targetSize.height
-        store.snapshot.thumbnailCache.removeAll()
-        thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        releaseLayerBufferHandles()
-        recordMutation(before: before, timelapseEvent: nil)
-        return .success(())
     }
 
     func resizeCanvasExtent(width: Int, height: Int) -> DocumentMutationResult {
+        switch makeResizeCanvasExtentPlan(width: width, height: height) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let plan else { return .success(()) }
+            guard let layers = plan.resizedLayers() else {
+                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+            }
+            return applyResizeCanvasPlan(plan, layers: layers)
+        }
+    }
+
+    func makeResizeCanvasPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+        makeResizeCanvasPlan(width: width, height: height, mode: .scale)
+    }
+
+    func makeResizeCanvasExtentPlan(width: Int, height: Int) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
+        makeResizeCanvasPlan(width: width, height: height, mode: .extent)
+    }
+
+    private func makeResizeCanvasPlan(
+        width: Int,
+        height: Int,
+        mode: RuntimeResizeCanvasPlan.Mode
+    ) -> Result<RuntimeResizeCanvasPlan?, DocumentMutationFailure> {
         guard width > 0 && height > 0 else {
             return .failure(.invalidCanvasSize(width: width, height: height))
         }
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
-        guard sourceSize != targetSize else { return .success(()) }
-        let before = store.snapshot
-        let offsetX = (targetSize.width - sourceSize.width) / 2
-        let offsetY = (targetSize.height - sourceSize.height) / 2
-        for index in store.snapshot.layers.indices {
-            var layer = store.snapshot.layers[index]
-            guard let translated = gpuServices.translatedPixelData(
-                layer.pixelData,
+        guard sourceSize != targetSize else { return .success(nil) }
+        var layers = store.snapshot.layers
+        for index in layers.indices {
+            layers[index].pixelData = currentPixelData(for: index)
+        }
+        return .success(
+            RuntimeResizeCanvasPlan(
+                mode: mode,
+                before: store.snapshot,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
                 targetWidth: targetSize.width,
                 targetHeight: targetSize.height,
-                offsetX: offsetX,
-                offsetY: offsetY
-            ) else {
-                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
-            }
-            layer.pixelData = translated
-            if let mask = layer.maskData {
-                guard let translatedMask = gpuServices.translatedMaskData(
-                    mask,
-                    sourceWidth: sourceSize.width,
-                    sourceHeight: sourceSize.height,
-                    targetWidth: targetSize.width,
-                    targetHeight: targetSize.height,
-                    offsetX: offsetX,
-                    offsetY: offsetY
-                ) else {
-                    return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
-                }
-                layer.maskData = translatedMask
-            }
-            if let textLayer = layer.textLayer {
-                layer.textLayer = TextLayerData(
-                    text: textLayer.text,
-                    positionX: textLayer.positionX + Double(offsetX),
-                    positionY: textLayer.positionY + Double(offsetY),
-                    fontPostScriptName: textLayer.fontPostScriptName,
-                    fontDisplayName: textLayer.fontDisplayName,
-                    fontSize: textLayer.fontSize,
-                    scale: textLayer.scale,
-                    rotationDegrees: textLayer.rotationDegrees,
-                    red: textLayer.red,
-                    green: textLayer.green,
-                    blue: textLayer.blue,
-                    alpha: textLayer.alpha
-                )
-            }
-            store.snapshot.layers[index] = layer
+                layers: layers,
+                gpuServices: gpuServices
+            )
+        )
+    }
+
+    func applyResizeCanvasPlan(
+        _ plan: RuntimeResizeCanvasPlan,
+        layers: [SwiftDocumentLayerRecord]
+    ) -> DocumentMutationResult {
+        guard store.snapshot.revision == plan.before.revision,
+              store.snapshot.canvasWidth == plan.sourceWidth,
+              store.snapshot.canvasHeight == plan.sourceHeight,
+              store.snapshot.layers.count == plan.before.layers.count,
+              layers.count == plan.before.layers.count else {
+            return .failure(.bridgeMutationFailed("resizeCanvasStaleSnapshot"))
         }
-        store.snapshot.canvasWidth = targetSize.width
-        store.snapshot.canvasHeight = targetSize.height
+        store.snapshot.layers = layers
+        store.snapshot.canvasWidth = plan.targetWidth
+        store.snapshot.canvasHeight = plan.targetHeight
         store.snapshot.thumbnailCache.removeAll()
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
-        recordMutation(before: before, timelapseEvent: nil)
+        recordMutation(before: plan.before, timelapseEvent: nil)
         return .success(())
     }
 
@@ -387,7 +516,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return applyLayerMutationPayload(
                 index: index,
                 payload: fallbackPayload,
-                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: currentPixelData(for: index)) : nil
+                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: Data()) : nil
             )
         }
         return .failure(failure)
@@ -468,20 +597,331 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
+        switch makeLayerProcessingPlan(index: index, request: request) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = plan.gpuServices.processLayer(
+                pixelData: plan.pixelData,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                request: plan.request
+            ) else {
+                return .failure(.bridgeMutationFailed("applyLayerProcessing"))
+            }
+            return applyLayerProcessingPlan(plan, payload: payload)
+        }
+    }
+
+    func makeLayerProcessingPlan(
+        index: Int,
+        request: LayerProcessingRequest
+    ) -> Result<RuntimeLayerProcessingPlan, DocumentMutationFailure> {
         if let failure = validateEditableLayer(index) { return .failure(failure) }
-        guard let payload = gpuServices.processLayer(
-            pixelData: store.snapshot.layers[index].pixelData,
-            canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight,
-            request: request
-        ) else {
-            return .failure(.bridgeMutationFailed("applyLayerProcessing"))
+        return .success(
+            RuntimeLayerProcessingPlan(
+                index: index,
+                request: request,
+                revision: store.snapshot.revision,
+                canvasWidth: store.snapshot.canvasWidth,
+                canvasHeight: store.snapshot.canvasHeight,
+                pixelData: currentPixelData(for: index),
+                gpuServices: gpuServices
+            )
+        )
+    }
+
+    func applyLayerProcessingPlan(
+        _ plan: RuntimeLayerProcessingPlan,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        guard store.snapshot.revision == plan.revision,
+              store.snapshot.canvasWidth == plan.canvasWidth,
+              store.snapshot.canvasHeight == plan.canvasHeight else {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(.bridgeMutationFailed("applyLayerProcessingStaleSnapshot"))
+        }
+        if let failure = validateEditableLayer(plan.index) {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(failure)
         }
         return applyLayerMutationPayload(
-            index: index,
+            index: plan.index,
             payload: payload,
-            timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData)
+            timelapseEvent: .replaceLayerPixels(index: .unchecked(plan.index), data: payload.fullPixelData ?? store.snapshot.layers[plan.index].pixelData)
         )
+    }
+
+    func processedLayerPayload(for plan: RuntimeLayerProcessingPlan) -> DocumentLayerMutationPayload? {
+        plan.gpuServices.processLayer(
+            pixelData: plan.pixelData,
+            canvasWidth: plan.canvasWidth,
+            canvasHeight: plan.canvasHeight,
+            request: plan.request
+        )
+    }
+
+    func makeFillPlan(
+        sample: StylusSample,
+        brush: BrushRuntimeSettings
+    ) -> Result<RuntimeFillPlan, DocumentMutationFailure> {
+        let layerIndex = store.snapshot.activeLayerIndex
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        return .success(
+            RuntimeFillPlan(
+                layerIndex: layerIndex,
+                revision: store.snapshot.revision,
+                canvasWidth: store.snapshot.canvasWidth,
+                canvasHeight: store.snapshot.canvasHeight,
+                pixelData: currentPixelData(for: layerIndex),
+                sample: sample,
+                brush: brush,
+                gpuServices: gpuServices
+            )
+        )
+    }
+
+    func fillPayload(for plan: RuntimeFillPlan) -> DocumentLayerMutationPayload? {
+        plan.gpuServices.fillPixels(
+            pixelData: plan.pixelData,
+            sourceBufferHandle: nil,
+            canvasWidth: plan.canvasWidth,
+            canvasHeight: plan.canvasHeight,
+            sample: plan.sample,
+            brush: plan.brush
+        )
+    }
+
+    func applyFillPlan(
+        _ plan: RuntimeFillPlan,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        guard store.snapshot.revision == plan.revision,
+              store.snapshot.canvasWidth == plan.canvasWidth,
+              store.snapshot.canvasHeight == plan.canvasHeight else {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(.bridgeMutationFailed("fillStaleSnapshot"))
+        }
+        if let failure = validateEditableLayer(plan.layerIndex) {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(failure)
+        }
+        return applyLayerMutationPayload(
+            index: plan.layerIndex,
+            payload: payload,
+            timelapseEvent: .fill(layerIndex: .unchecked(plan.layerIndex), brush: plan.brush, sample: plan.sample)
+        )
+    }
+
+    func makeStrokeCommitPlan(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int
+    ) -> Result<RuntimeStrokeCommitPlan, DocumentMutationFailure> {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        return .success(
+            RuntimeStrokeCommitPlan(
+                layerIndex: layerIndex,
+                revision: store.snapshot.revision,
+                canvasWidth: store.snapshot.canvasWidth,
+                canvasHeight: store.snapshot.canvasHeight,
+                pixelData: currentPixelData(for: layerIndex),
+                samples: samples,
+                brush: brush,
+                gpuServices: gpuServices
+            )
+        )
+    }
+
+    func strokeCommitResult(for plan: RuntimeStrokeCommitPlan) -> DocumentRuntimeStrokeMutationResult? {
+        plan.gpuServices.commitStrokeMutation(
+            basePixelData: plan.pixelData,
+            baseBufferHandle: nil,
+            canvasWidth: plan.canvasWidth,
+            canvasHeight: plan.canvasHeight,
+            samples: plan.samples,
+            brush: plan.brush,
+            snapshotRevision: plan.revision,
+            activeLayerIndex: plan.layerIndex
+        )
+    }
+
+    func applyStrokeCommitPlan(
+        _ plan: RuntimeStrokeCommitPlan,
+        gpuResult: DocumentRuntimeStrokeMutationResult
+    ) -> DocumentMutationResult {
+        guard store.snapshot.revision == plan.revision,
+              store.snapshot.canvasWidth == plan.canvasWidth,
+              store.snapshot.canvasHeight == plan.canvasHeight else {
+            gpuServices.release(gpuResult.gpuBufferHandle)
+            return .failure(.bridgeMutationFailed("applyCommittedStrokeStaleSnapshot"))
+        }
+        if let failure = validateEditableLayer(plan.layerIndex) {
+            gpuServices.release(gpuResult.gpuBufferHandle)
+            return .failure(failure)
+        }
+        let dirtyRect = LayerPixelRect(
+            originX: gpuResult.dirtyRect.originX,
+            originY: gpuResult.dirtyRect.originY,
+            width: gpuResult.dirtyRect.width,
+            height: gpuResult.dirtyRect.height
+        )
+        let before = store.snapshot
+        let existing = store.snapshot.layers[plan.layerIndex].pixelData
+        let adjustedOutput: Data
+        let nextHandle: MetalBufferHandle?
+        if store.snapshot.layers[plan.layerIndex].alphaLocked {
+            if let sourceHandle = gpuResult.gpuBufferHandle {
+                guard let alphaPreservedHandle = gpuServices.preservingExistingAlphaBufferHandle(
+                    sourceHandle: sourceHandle,
+                    existingHandle: nil,
+                    existingPixelData: existing,
+                    width: store.snapshot.canvasWidth,
+                    height: store.snapshot.canvasHeight
+                ) else {
+                    gpuServices.release(sourceHandle)
+                    return .failure(.bridgeMutationFailed("applyCommittedStrokeAlphaPreserve"))
+                }
+                adjustedOutput = existing
+                nextHandle = alphaPreservedHandle
+                gpuServices.release(sourceHandle)
+            } else {
+                let committedOutput = gpuResult.rectPixelData ?? Data()
+                guard committedOutput.count == rgbaByteCount else {
+                    return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+                }
+                adjustedOutput = preserveExistingAlphaIfNeeded(
+                    committedOutput,
+                    existing: existing,
+                    isAlphaLocked: true
+                )
+                nextHandle = nil
+            }
+        } else if let handle = gpuResult.gpuBufferHandle {
+            adjustedOutput = existing
+            nextHandle = handle
+        } else {
+            let committedOutput = gpuResult.rectPixelData ?? Data()
+            guard committedOutput.count == rgbaByteCount else {
+                return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
+            }
+            adjustedOutput = committedOutput
+            nextHandle = nil
+        }
+        store.snapshot.layers[plan.layerIndex].textLayer = nil
+        setLayerPixelState(index: plan.layerIndex, pixelData: adjustedOutput, gpuBufferHandle: nextHandle)
+        invalidateThumbnail(for: plan.layerIndex)
+        recordMutation(
+            before: before,
+            timelapseEvent: .stroke(layerIndex: .unchecked(plan.layerIndex), brush: plan.brush, samples: plan.samples),
+            dirtyRect: dirtyRect
+        )
+        return .success(())
+    }
+
+    func makeBlurPlan(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int,
+        captureTimelapse: Bool
+    ) -> Result<RuntimeBlurPlan, DocumentMutationFailure> {
+        guard !samples.isEmpty else { return .failure(.emptyInput) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        let baseline = currentBlurStroke?.baseline ?? store.snapshot
+        currentBlurStroke = (
+            baseline: baseline,
+            layerIndex: layerIndex,
+            brush: brush,
+            samples: (currentBlurStroke?.samples ?? []) + samples
+        )
+        return .success(
+            RuntimeBlurPlan(
+                layerIndex: layerIndex,
+                revision: store.snapshot.revision,
+                canvasWidth: store.snapshot.canvasWidth,
+                canvasHeight: store.snapshot.canvasHeight,
+                pixelData: currentPixelData(for: layerIndex),
+                samples: samples,
+                brush: brush,
+                captureTimelapse: captureTimelapse,
+                gpuServices: gpuServices
+            )
+        )
+    }
+
+    func blurPayload(for plan: RuntimeBlurPlan) -> DocumentLayerMutationPayload? {
+        plan.gpuServices.blurPixels(
+            pixelData: plan.pixelData,
+            sourceBufferHandle: nil,
+            canvasWidth: plan.canvasWidth,
+            canvasHeight: plan.canvasHeight,
+            samples: plan.samples,
+            brush: plan.brush
+        )
+    }
+
+    func applyBlurPlan(
+        _ plan: RuntimeBlurPlan,
+        payload: DocumentLayerMutationPayload
+    ) -> DocumentMutationResult {
+        guard store.snapshot.revision == plan.revision,
+              store.snapshot.canvasWidth == plan.canvasWidth,
+              store.snapshot.canvasHeight == plan.canvasHeight else {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(.bridgeMutationFailed("blurStrokeStaleSnapshot"))
+        }
+        if let failure = validateEditableLayer(plan.layerIndex) {
+            gpuServices.release(payload.gpuBufferHandle)
+            return .failure(failure)
+        }
+        let current = store.snapshot.layers[plan.layerIndex].pixelData
+        let nextPixelData: Data
+        let nextHandle: MetalBufferHandle?
+        if store.snapshot.layers[plan.layerIndex].alphaLocked {
+            nextPixelData = preserveExistingAlphaIfNeeded(
+                materializedPixelData(from: payload, existing: current),
+                existing: current,
+                isAlphaLocked: true
+            )
+            nextHandle = nil
+            gpuServices.release(payload.gpuBufferHandle)
+        } else if let handle = payload.gpuBufferHandle {
+            nextPixelData = current
+            nextHandle = handle
+        } else {
+            nextPixelData = materializedPixelData(from: payload, existing: current)
+            nextHandle = nil
+        }
+        setLayerPixelState(
+            index: plan.layerIndex,
+            pixelData: nextPixelData,
+            gpuBufferHandle: nextHandle
+        )
+        store.snapshot.layers[plan.layerIndex].textLayer = nil
+        invalidateThumbnail(for: plan.layerIndex)
+        captureDirtyUpdate(rect: payload.dirtyRect)
+        if plan.captureTimelapse {
+            captureTimelapseFrame()
+        }
+        return .success(())
+    }
+
+    func takeCurrentStrokeCommitPlan() -> RuntimeStrokeCommitPlan? {
+        guard let currentStroke else { return nil }
+        self.currentStroke = nil
+        guard case let .success(plan) = makeStrokeCommitPlan(
+            samples: currentStroke.samples,
+            brush: currentStroke.brush,
+            layerIndex: currentStroke.layerIndex
+        ) else {
+            return nil
+        }
+        return plan
+    }
+
+    func release(_ handle: MetalBufferHandle?) {
+        gpuServices.release(handle)
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
@@ -502,11 +942,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
         let before = store.snapshot
-        store.snapshot.layers.remove(at: index)
-        remapFoldersAfterDeletion(of: index)
-        store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
-        invalidateAllThumbnails()
-        releaseLayerBufferHandles()
+        deleteLayerUnchecked(index: index)
         recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
         return .success(())
     }
@@ -674,9 +1110,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             gpuBufferHandle: nil
         )
         store.snapshot.layers[index - 1].textLayer = nil
-        _ = deleteLayer(index: index)
-        invalidateThumbnail(for: index - 1)
-        recordMutation(before: before, timelapseEvent: .replaceLayerPixels(index: .unchecked(index - 1), data: merged))
+        deleteLayerUnchecked(index: index)
+        recordMutation(before: before, timelapseEvent: .mergeLayerDown(index: .unchecked(index)))
         return .success(())
     }
 
@@ -710,9 +1145,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func endStroke() {
-        guard let currentStroke else { return }
-        _ = applyGpuStrokeSurface(samples: currentStroke.samples, brush: currentStroke.brush, layerIndex: currentStroke.layerIndex)
-        self.currentStroke = nil
+        guard let plan = takeCurrentStrokeCommitPlan(),
+              let result = strokeCommitResult(for: plan) else { return }
+        _ = applyStrokeCommitPlan(plan, gpuResult: result)
     }
 
     func cancelStroke() {
@@ -720,55 +1155,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
-        guard !samples.isEmpty else { return .failure(.emptyInput) }
-        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        let baseline = currentBlurStroke?.baseline ?? store.snapshot
-        currentBlurStroke = (
-            baseline: baseline,
-            layerIndex: layerIndex,
-            brush: brush,
-            samples: (currentBlurStroke?.samples ?? []) + samples
-        )
-        guard let payload = gpuServices.blurPixels(
-            pixelData: store.snapshot.layers[layerIndex].pixelData,
-            sourceBufferHandle: gpuLayerHandles[layerIndex],
-            canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight,
-            samples: samples,
-            brush: brush
-        ) else {
-            return .failure(.bridgeMutationFailed("blurStroke"))
+        switch makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = blurPayload(for: plan) else {
+                return .failure(.bridgeMutationFailed("blurStroke"))
+            }
+            return applyBlurPlan(plan, payload: payload)
         }
-        let current = store.snapshot.layers[layerIndex].pixelData
-        let nextPixelData: Data
-        let nextHandle: MetalBufferHandle?
-        if store.snapshot.layers[layerIndex].alphaLocked {
-            nextPixelData = preserveExistingAlphaIfNeeded(
-                materializedPixelData(from: payload, existing: current),
-                existing: current,
-                isAlphaLocked: true
-            )
-            nextHandle = nil
-            gpuServices.release(payload.gpuBufferHandle)
-        } else if let handle = payload.gpuBufferHandle {
-            nextPixelData = current
-            nextHandle = handle
-        } else {
-            nextPixelData = materializedPixelData(from: payload, existing: current)
-            nextHandle = nil
-        }
-        setLayerPixelState(
-            index: layerIndex,
-            pixelData: nextPixelData,
-            gpuBufferHandle: nextHandle
-        )
-        store.snapshot.layers[layerIndex].textLayer = nil
-        invalidateThumbnail(for: layerIndex)
-        captureDirtyUpdate(rect: payload.dirtyRect)
-        if captureTimelapse {
-            captureTimelapseFrame()
-        }
-        return .success(())
     }
 
     func endBlurStroke() {
@@ -790,98 +1185,27 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
-        let layerIndex = store.snapshot.activeLayerIndex
-        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        guard let payload = gpuServices.fillPixels(
-            pixelData: store.snapshot.layers[layerIndex].pixelData,
-            sourceBufferHandle: gpuLayerHandles[layerIndex],
-            canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight,
-            sample: sample,
-            brush: brush
-        ) else {
-            return .failure(.bridgeMutationFailed("fill"))
+        switch makeFillPlan(sample: sample, brush: brush) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = fillPayload(for: plan) else {
+                return .failure(.bridgeMutationFailed("fill"))
+            }
+            return applyFillPlan(plan, payload: payload)
         }
-        return applyLayerMutationPayload(
-            index: layerIndex,
-            payload: payload,
-            timelapseEvent: .fill(layerIndex: .unchecked(layerIndex), brush: brush, sample: sample)
-        )
     }
 
     func applyGpuStrokeSurface(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
-        guard !samples.isEmpty else { return .failure(.emptyInput) }
-        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        let gpuResult = gpuServices.commitStrokeMutation(
-            basePixelData: store.snapshot.layers[layerIndex].pixelData,
-            baseBufferHandle: gpuLayerHandles[layerIndex],
-            canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight,
-            samples: samples,
-            brush: brush,
-            snapshotRevision: store.snapshot.revision,
-            activeLayerIndex: layerIndex
-        )
-        guard let gpuResult else {
-            return .failure(.bridgeMutationFailed("applyCommittedStroke"))
-        }
-        let dirtyRect = LayerPixelRect(
-            originX: gpuResult.dirtyRect.originX,
-            originY: gpuResult.dirtyRect.originY,
-            width: gpuResult.dirtyRect.width,
-            height: gpuResult.dirtyRect.height
-        )
-        let before = store.snapshot
-        let existing = store.snapshot.layers[layerIndex].pixelData
-        let adjustedOutput: Data
-        let nextHandle: MetalBufferHandle?
-        if store.snapshot.layers[layerIndex].alphaLocked {
-            if let sourceHandle = gpuResult.gpuBufferHandle {
-                guard let alphaPreservedHandle = gpuServices.preservingExistingAlphaBufferHandle(
-                    sourceHandle: sourceHandle,
-                    existingHandle: gpuLayerHandles[layerIndex],
-                    existingPixelData: existing,
-                    width: store.snapshot.canvasWidth,
-                    height: store.snapshot.canvasHeight
-                ) else {
-                    gpuServices.release(sourceHandle)
-                    return .failure(.bridgeMutationFailed("applyCommittedStrokeAlphaPreserve"))
-                }
-                adjustedOutput = existing
-                nextHandle = alphaPreservedHandle
-                gpuServices.release(sourceHandle)
-            } else {
-                let committedOutput = gpuResult.rectPixelData ?? Data()
-                guard committedOutput.count == rgbaByteCount else {
-                    return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
-                }
-                adjustedOutput = preserveExistingAlphaIfNeeded(
-                    committedOutput,
-                    existing: existing,
-                    isAlphaLocked: true
-                )
-                nextHandle = nil
+        switch makeStrokeCommitPlan(samples: samples, brush: brush, layerIndex: layerIndex) {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let result = strokeCommitResult(for: plan) else {
+                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
             }
-        } else if let handle = gpuResult.gpuBufferHandle {
-            adjustedOutput = existing
-            nextHandle = handle
-        } else {
-            let committedOutput = gpuResult.rectPixelData ?? Data()
-            guard committedOutput.count == rgbaByteCount else {
-                return .failure(.bridgeMutationFailed("applyCommittedStrokeMaterialization"))
-            }
-            adjustedOutput = committedOutput
-            nextHandle = nil
+            return applyStrokeCommitPlan(plan, gpuResult: result)
         }
-        store.snapshot.layers[layerIndex].textLayer = nil
-        setLayerPixelState(index: layerIndex, pixelData: adjustedOutput, gpuBufferHandle: nextHandle)
-        invalidateThumbnail(for: layerIndex)
-        recordMutation(
-            before: before,
-            timelapseEvent: .stroke(layerIndex: .unchecked(layerIndex), brush: brush, samples: samples),
-            dirtyRect: dirtyRect
-        )
-        return .success(())
     }
 
     func saveProject(to url: URL, paperStyle: CanvasPaperStyle) throws {
@@ -1280,6 +1604,8 @@ extension SwiftDocumentRuntime {
             _ = deleteLayer(index: index.rawValue)
         case let .moveLayer(index, destinationIndex):
             _ = moveLayer(from: index.rawValue, to: destinationIndex.rawValue)
+        case let .mergeLayerDown(index):
+            _ = mergeLayerDown(index: index.rawValue)
         case let .createFolder(folderID, name, anchorLayerIndex):
             let resolved = (try? createFolder(name: name, layerIndex: anchorLayerIndex?.rawValue ?? -1).get()) ?? -1
             folderIDMap[folderID] = resolved
@@ -1338,6 +1664,14 @@ extension SwiftDocumentRuntime {
     private func validateEditableLayer(_ index: Int) -> DocumentMutationFailure? {
         if let failure = validateLayer(index) { return failure }
         return store.snapshot.layers[index].locked ? .layerLocked(index) : nil
+    }
+
+    private func deleteLayerUnchecked(index: Int) {
+        store.snapshot.layers.remove(at: index)
+        remapFoldersAfterDeletion(of: index)
+        store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
+        invalidateAllThumbnails()
+        releaseLayerBufferHandles()
     }
 
     private func replaceLayerPixelsUnchecked(index: Int, data: Data, timelapseEvent: TimelapseOperation?) -> DocumentMutationResult {

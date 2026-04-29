@@ -24,6 +24,7 @@ public enum TimelapseOperation: Equatable, Sendable {
     case duplicateLayer(index: DocumentLayerIndex, name: String)
     case deleteLayer(index: DocumentLayerIndex)
     case moveLayer(index: DocumentLayerIndex, destinationIndex: DocumentLayerIndex)
+    case mergeLayerDown(index: DocumentLayerIndex)
     case createFolder(folderID: DocumentFolderID, name: String, anchorLayerIndex: DocumentLayerIndex?)
     case deleteFolder(folderID: DocumentFolderID)
     case setFolderVisibility(folderID: DocumentFolderID, isVisible: Bool)

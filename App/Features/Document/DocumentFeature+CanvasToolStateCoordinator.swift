@@ -100,7 +100,8 @@ extension DocumentFeature {
                         canvasWidth: mutation.surface.width,
                         canvasHeight: mutation.surface.height,
                         dirtyRect: mutation.dirtyRegion.layerPixelRect,
-                        gpuBufferHandle: mutation.surface.handle.buffer
+                        gpuBufferHandle: mutation.surface.handle.buffer,
+                        fallbackPixelData: mutation.surface.pixelData
                     )
                 )
                 switch result {
@@ -215,6 +216,7 @@ extension DocumentFeature {
             releaseSurfaceHandle: (MetalBufferHandle?) -> Void
         ) {
             let previousSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
+            let previousRenderState = state.canvas.strokeSession.renderState
             if let baseSnapshotToCapture = mutation.baseSnapshotToCapture {
                 state.canvas.captureStrokeBaseSnapshot(baseSnapshotToCapture)
             }
@@ -227,6 +229,14 @@ extension DocumentFeature {
                 previewBrush: mutation.previewBrush,
                 sampleCount: mutation.sampleCount,
                 supportsIncrementalContinuation: mutation.supportsIncrementalContinuation
+            )
+            state.canvas.recordPreviewIncrementalUpdate(
+                mutation.incrementalUpdate,
+                previousRenderState: previousRenderState,
+                baseSnapshot: mutation.baseSnapshot,
+                surface: mutation.surface,
+                previewBrush: mutation.previewBrush,
+                sampleCount: mutation.sampleCount
             )
             let nextSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
             if previousSurfaceHandle != nextSurfaceHandle {

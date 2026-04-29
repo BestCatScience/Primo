@@ -36,7 +36,8 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
                 layerIndex: request.activeLayerIndex,
                 width: request.snapshot.width,
                 height: request.snapshot.height,
-                handle: GpuSurfaceHandle(buffer: committed.handle)
+                handle: GpuSurfaceHandle(buffer: committed.handle),
+                pixelData: committed.fallbackPixelData ?? processingService.materializedPixelData(for: committed.handle)
             ),
             dirtyRegion: GpuSurfaceRegion(
                 originX: committed.dirtyRect.originX,
@@ -45,5 +46,9 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
                 height: committed.dirtyRect.height
             )
         )
+    }
+
+    public func materializedPixelData(for surface: GpuLayerSurface) -> Data? {
+        surface.pixelData ?? processingService.materializedPixelData(for: surface.handle.buffer)
     }
 }

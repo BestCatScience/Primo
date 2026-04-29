@@ -339,10 +339,13 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testGpuCommitStagesPendingCommittedSnapshotForNextStrokeBase() {
         let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
         let baseComposite = Data(repeating: 0x11, count: 64)
+        let committedLayerPixels = Data(repeating: 0x44, count: 64)
         let baseSnapshot = MetalDocumentSnapshot(
             width: 4,
             height: 4,
             revision: 12,
+            transferKind: .dirtyRect,
+            compositeBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
             compositePixelData: baseComposite,
             layers: [
                 MetalLayerSnapshot(
@@ -369,7 +372,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                             layerIndex: 0,
                             width: 4,
                             height: 4,
-                            handle: GpuSurfaceHandle(buffer: handle)
+                            handle: GpuSurfaceHandle(buffer: handle),
+                            pixelData: committedLayerPixels
                         ),
                         dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 1, height: 1),
                         refreshViaDirtyPresentation: true
@@ -417,13 +421,151 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             return
         }
         XCTAssertEqual(pendingSnapshot.revision, 13)
-        XCTAssertEqual(pendingSnapshot.layers.first?.gpuBufferHandle, handle)
-        XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, baseSnapshot.layers.first?.pixelData)
+        XCTAssertEqual(pendingSnapshot.transferKind, .fullSnapshot)
+        XCTAssertNil(pendingSnapshot.compositeBufferHandle)
+        XCTAssertNil(pendingSnapshot.layers.first?.gpuBufferHandle)
+        XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, committedLayerPixels)
         let replacedOffset = ((1 * 4) + 1) * 4
         XCTAssertEqual(
             Array(pendingSnapshot.compositePixelData[replacedOffset..<replacedOffset + 4]),
             [0x99, 0x98, 0x97, 0x96]
         )
+    }
+
+    func testGpuCommitStagesPendingCommittedSnapshotWithAccumulatedPreviewUpdates() {
+        let previewHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let commitHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let committedLayerPixels = Data(repeating: 0x55, count: 64)
+        let baseSnapshot = MetalDocumentSnapshot(
+            width: 4,
+            height: 4,
+            revision: 12,
+            compositePixelData: Data(repeating: 0x11, count: 64),
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    pixelData: Data(repeating: 0x22, count: 64)
+                )
+            ]
+        )
+        let runtime = DocumentRuntimeComposition.stub(
+            mutationGateway: .stub(
+                applyLayerSurfaceMutation: { _, _ in .success(()) }
+            ),
+            strokeSessionUseCase: .stub { _ in
+                .commit(
+                    GpuCommitMutation(
+                        surface: GpuLayerSurface(
+                            layerIndex: 0,
+                            width: 4,
+                            height: 4,
+                            handle: GpuSurfaceHandle(buffer: commitHandle),
+                            pixelData: committedLayerPixels
+                        ),
+                        dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: 4, height: 4),
+                        refreshViaDirtyPresentation: true
+                    )
+                )
+            }
+        )
+        let stateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
+            strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
+        )
+        let sessionCoordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
+            strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
+        )
+        var state = DocumentFeature.State()
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+
+        stateCoordinator.applyPreviewMutation(
+            GpuPreviewMutation(
+                baseSnapshot: baseSnapshot,
+                surface: GpuLayerSurface(
+                    layerIndex: 0,
+                    width: 4,
+                    height: 4,
+                    handle: GpuSurfaceHandle(buffer: previewHandle)
+                ),
+                dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: 1, height: 1),
+                incrementalUpdate: IncrementalLayerUpdate(
+                    layerIndex: -1,
+                    originX: 0,
+                    originY: 0,
+                    width: 1,
+                    height: 1,
+                    pixelData: Data([0x01, 0x02, 0x03, 0x04])
+                ),
+                isApproximatePreview: false,
+                previewBrush: brush,
+                sampleCount: 1,
+                supportsIncrementalContinuation: true
+            ),
+            state: &state,
+            releaseSurfaceHandle: { _ in }
+        )
+        stateCoordinator.applyPreviewMutation(
+            GpuPreviewMutation(
+                baseSnapshot: baseSnapshot,
+                surface: GpuLayerSurface(
+                    layerIndex: 0,
+                    width: 4,
+                    height: 4,
+                    handle: GpuSurfaceHandle(buffer: previewHandle)
+                ),
+                dirtyRegion: GpuSurfaceRegion(originX: 3, originY: 3, width: 1, height: 1),
+                incrementalUpdate: IncrementalLayerUpdate(
+                    layerIndex: -1,
+                    originX: 3,
+                    originY: 3,
+                    width: 1,
+                    height: 1,
+                    pixelData: Data([0x91, 0x92, 0x93, 0x94])
+                ),
+                isApproximatePreview: false,
+                previewBrush: brush,
+                sampleCount: 2,
+                supportsIncrementalContinuation: true
+            ),
+            state: &state,
+            releaseSurfaceHandle: { _ in }
+        )
+
+        XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4))
+        let result = sessionCoordinator.resolveStrokeCommit(
+            state: &state,
+            samples: [.testValue()],
+            context: DocumentFeature.CanvasStrokeContext(
+                activeLayer: .testValue(),
+                activeLayerIndex: 0,
+                brush: brush,
+                previewBrush: brush
+            ),
+            keepsSelectionCleared: false,
+            refreshViaDirtyPresentation: true
+        )
+
+        guard case .committed = result else {
+            XCTFail("Expected committed GPU surface mutation")
+            return
+        }
+        guard let pendingSnapshot = state.canvas.pendingCommittedSnapshot else {
+            XCTFail("Expected pending committed snapshot")
+            return
+        }
+        XCTAssertNil(pendingSnapshot.compositeBufferHandle)
+        XCTAssertNil(pendingSnapshot.layers.first?.gpuBufferHandle)
+        XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, committedLayerPixels)
+        XCTAssertEqual(Array(pendingSnapshot.compositePixelData[0..<4]), [0x01, 0x02, 0x03, 0x04])
+        let secondOffset = ((3 * 4) + 3) * 4
+        XCTAssertEqual(Array(pendingSnapshot.compositePixelData[secondOffset..<secondOffset + 4]), [0x91, 0x92, 0x93, 0x94])
     }
 
     func testNextStrokeCapturesPendingCommittedSnapshotBeforePresentationRefresh() {

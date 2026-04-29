@@ -6,6 +6,8 @@ import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
 
+typealias DocumentRuntimeStrokeMutationResult = PrimoMetalStrokeMutationResult
+
 struct DocumentRuntimeGpuServices: Sendable {
     var release: @Sendable (MetalBufferHandle?) -> Void
     var _materializedPixelData: @Sendable (MetalBufferHandle) -> Data?

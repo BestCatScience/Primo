@@ -70,9 +70,11 @@ public enum DocumentEngineFactory {
         )
 
         let mutationGateway = DocumentMutationGateway(
-            resizeCanvas: { width, height in runtimeBox.withRuntime { $0.resizeCanvas(width: width, height: height) } },
+            resizeCanvas: { width, height in
+                performResizeCanvas(width: width, height: height, runtimeBox: runtimeBox)
+            },
             resizeCanvasExtent: { width, height in
-                runtimeBox.withRuntime { $0.resizeCanvasExtent(width: width, height: height) }
+                performResizeCanvasExtent(width: width, height: height, runtimeBox: runtimeBox)
             },
             addLayer: { name in runtimeBox.withRuntime { $0.addLayer(name: name) } },
             deleteLayer: { index in runtimeBox.withRuntime { $0.deleteLayer(index: index) } },
@@ -100,24 +102,26 @@ public enum DocumentEngineFactory {
             applyLayerMask: { index in runtimeBox.withRuntime { $0.applyLayerMask(index: index) } },
             clearLayer: { index in runtimeBox.withRuntime { $0.clearLayer(index: index) } },
             applyLayerProcessing: { index, request in
-                runtimeBox.withRuntime { $0.applyLayerProcessing(index: index, request: request) }
+                performLayerProcessing(index: index, request: request, runtimeBox: runtimeBox)
             }
         )
 
         let strokeGateway = StrokeInputGateway(
             beginStroke: { sample, brush in runtimeBox.withRuntime { $0.beginStroke(sample: sample, brush: brush) } },
             appendStroke: { sample in runtimeBox.withRuntime { $0.appendStroke(sample: sample) } },
-            endStroke: { runtimeBox.withRuntime { $0.endStroke() } },
+            endStroke: {
+                performCurrentStrokeCommit(runtimeBox: runtimeBox)
+            },
             cancelStroke: { runtimeBox.withRuntime { $0.cancelStroke() } },
             blurStroke: { samples, brush, layerIndex, captureTimelapse in
-                runtimeBox.withRuntime {
-                    $0.blur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
-                }
+                performBlur(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse, runtimeBox: runtimeBox)
             },
             endBlurStroke: { runtimeBox.withRuntime { $0.endBlurStroke() } },
-            fill: { sample, brush in runtimeBox.withRuntime { $0.fill(sample: sample, brush: brush) } },
+            fill: { sample, brush in
+                performFill(sample: sample, brush: brush, runtimeBox: runtimeBox)
+            },
             applyGpuStrokeSurface: { samples, brush, layerIndex in
-                runtimeBox.withRuntime { $0.applyGpuStrokeSurface(samples: samples, brush: brush, layerIndex: layerIndex) }
+                performStrokeCommit(samples: samples, brush: brush, layerIndex: layerIndex, runtimeBox: runtimeBox)
             }
         )
 
@@ -238,6 +242,162 @@ public enum DocumentEngineFactory {
             },
             mergeLayerDown: { index in runtimeBox.withRuntime { $0.mergeLayerDown(index: index) } }
         )
+    }
+
+    private static func performResizeCanvas(
+        width: Int,
+        height: Int,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime { $0.makeResizeCanvasPlan(width: width, height: height) }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let plan else { return .success(()) }
+            guard let layers = plan.resizedLayers() else {
+                return .failure(.bridgeMutationFailed("resizeCanvas"))
+            }
+            return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
+        }
+    }
+
+    private static func performResizeCanvasExtent(
+        width: Int,
+        height: Int,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime { $0.makeResizeCanvasExtentPlan(width: width, height: height) }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let plan else { return .success(()) }
+            guard let layers = plan.resizedLayers() else {
+                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+            }
+            return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
+        }
+    }
+
+    private static func performLayerProcessing(
+        index: Int,
+        request: LayerProcessingRequest,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime { $0.makeLayerProcessingPlan(index: index, request: request) }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = plan.gpuServices.processLayer(
+                pixelData: plan.pixelData,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                request: plan.request
+            ) else {
+                return .failure(.bridgeMutationFailed("applyLayerProcessing"))
+            }
+            return runtimeBox.withRuntime { $0.applyLayerProcessingPlan(plan, payload: payload) }
+        }
+    }
+
+    private static func performFill(
+        sample: StylusSample,
+        brush: BrushRuntimeSettings,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime { $0.makeFillPlan(sample: sample, brush: brush) }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = plan.gpuServices.fillPixels(
+                pixelData: plan.pixelData,
+                sourceBufferHandle: nil,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                sample: plan.sample,
+                brush: plan.brush
+            ) else {
+                return .failure(.bridgeMutationFailed("fill"))
+            }
+            return runtimeBox.withRuntime { $0.applyFillPlan(plan, payload: payload) }
+        }
+    }
+
+    private static func performStrokeCommit(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime {
+            $0.makeStrokeCommitPlan(samples: samples, brush: brush, layerIndex: layerIndex)
+        }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let result = plan.gpuServices.commitStrokeMutation(
+                basePixelData: plan.pixelData,
+                baseBufferHandle: nil,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                samples: plan.samples,
+                brush: plan.brush,
+                snapshotRevision: plan.revision,
+                activeLayerIndex: plan.layerIndex
+            ) else {
+                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+            }
+            return runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+        }
+    }
+
+    private static func performCurrentStrokeCommit(
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) {
+        guard let plan = runtimeBox.withRuntime({ $0.takeCurrentStrokeCommitPlan() }),
+              let result = plan.gpuServices.commitStrokeMutation(
+                basePixelData: plan.pixelData,
+                baseBufferHandle: nil,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                samples: plan.samples,
+                brush: plan.brush,
+                snapshotRevision: plan.revision,
+                activeLayerIndex: plan.layerIndex
+              ) else { return }
+        _ = runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
+    }
+
+    private static func performBlur(
+        samples: [StylusSample],
+        brush: BrushRuntimeSettings,
+        layerIndex: Int,
+        captureTimelapse: Bool,
+        runtimeBox: LockedDocumentRuntimeBox<SwiftDocumentRuntime>
+    ) -> DocumentMutationResult {
+        let planResult = runtimeBox.withRuntime {
+            $0.makeBlurPlan(samples: samples, brush: brush, layerIndex: layerIndex, captureTimelapse: captureTimelapse)
+        }
+        switch planResult {
+        case let .failure(failure):
+            return .failure(failure)
+        case let .success(plan):
+            guard let payload = plan.gpuServices.blurPixels(
+                pixelData: plan.pixelData,
+                sourceBufferHandle: nil,
+                canvasWidth: plan.canvasWidth,
+                canvasHeight: plan.canvasHeight,
+                samples: plan.samples,
+                brush: plan.brush
+            ) else {
+                return .failure(.bridgeMutationFailed("blurStroke"))
+            }
+            return runtimeBox.withRuntime { $0.applyBlurPlan(plan, payload: payload) }
+        }
     }
 }
 

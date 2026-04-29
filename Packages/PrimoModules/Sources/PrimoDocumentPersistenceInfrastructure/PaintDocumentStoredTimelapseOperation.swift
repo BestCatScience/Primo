@@ -13,6 +13,7 @@ public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case duplicateLayer
         case deleteLayer
         case moveLayer
+        case mergeLayerDown
         case createFolder
         case deleteFolder
         case setFolderVisibility
