@@ -18,6 +18,26 @@ private extension GpuLayerSurface {
     }
 }
 
+private extension GpuCommitMutation {
+    static func materializedPreviewSurface(
+        _ surface: GpuLayerSurface,
+        dirtyRegion: GpuSurfaceRegion,
+        refreshViaDirtyPresentation: Bool,
+        commit: DocumentStrokeCommitUseCase
+    ) -> GpuStrokeSessionOutcome {
+        guard let pixelData = commit.materializedPixelData(for: surface) else {
+            return .failure(.bridgeMutationFailed("GPU stroke commit materialization failed"))
+        }
+        return .commit(
+            GpuCommitMutation(
+                surface: surface.materialized(with: pixelData),
+                dirtyRegion: dirtyRegion,
+                refreshViaDirtyPresentation: refreshViaDirtyPresentation
+            )
+        )
+    }
+}
+
 public struct DocumentStrokeContext: Equatable, Sendable {
     public let activeLayer: LayerRowModel
     public let activeLayerIndex: Int
@@ -430,12 +450,11 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                     height: renderState.surfaceHandle.height,
                     handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
                 )
-                return .commit(
-                    GpuCommitMutation(
-                        surface: surface.materialized(with: commit.materializedPixelData(for: surface)),
-                        dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
-                        refreshViaDirtyPresentation: refreshViaDirtyPresentation
-                    )
+                return GpuCommitMutation.materializedPreviewSurface(
+                    surface,
+                    dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
+                    refreshViaDirtyPresentation: refreshViaDirtyPresentation,
+                    commit: commit
                 )
             }
             if
@@ -450,12 +469,11 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                     height: renderState.surfaceHandle.height,
                     handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
                 )
-                return .commit(
-                    GpuCommitMutation(
-                        surface: surface.materialized(with: commit.materializedPixelData(for: surface)),
-                        dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
-                        refreshViaDirtyPresentation: refreshViaDirtyPresentation
-                    )
+                return GpuCommitMutation.materializedPreviewSurface(
+                    surface,
+                    dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
+                    refreshViaDirtyPresentation: refreshViaDirtyPresentation,
+                    commit: commit
                 )
             }
 

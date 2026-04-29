@@ -314,7 +314,7 @@ public enum DocumentEngineFactory {
         case let .success(plan):
             guard let payload = plan.gpuServices.fillPixels(
                 pixelData: plan.pixelData,
-                sourceBufferHandle: nil,
+                sourceBufferHandle: plan.sourceBufferHandle,
                 canvasWidth: plan.canvasWidth,
                 canvasHeight: plan.canvasHeight,
                 sample: plan.sample,
@@ -341,7 +341,7 @@ public enum DocumentEngineFactory {
         case let .success(plan):
             guard let result = plan.gpuServices.commitStrokeMutation(
                 basePixelData: plan.pixelData,
-                baseBufferHandle: nil,
+                baseBufferHandle: plan.baseBufferHandle,
                 canvasWidth: plan.canvasWidth,
                 canvasHeight: plan.canvasHeight,
                 samples: plan.samples,
@@ -361,7 +361,7 @@ public enum DocumentEngineFactory {
         guard let plan = runtimeBox.withRuntime({ $0.takeCurrentStrokeCommitPlan() }),
               let result = plan.gpuServices.commitStrokeMutation(
                 basePixelData: plan.pixelData,
-                baseBufferHandle: nil,
+                baseBufferHandle: plan.baseBufferHandle,
                 canvasWidth: plan.canvasWidth,
                 canvasHeight: plan.canvasHeight,
                 samples: plan.samples,
@@ -388,7 +388,7 @@ public enum DocumentEngineFactory {
         case let .success(plan):
             guard let payload = plan.gpuServices.blurPixels(
                 pixelData: plan.pixelData,
-                sourceBufferHandle: nil,
+                sourceBufferHandle: plan.sourceBufferHandle,
                 canvasWidth: plan.canvasWidth,
                 canvasHeight: plan.canvasHeight,
                 samples: plan.samples,

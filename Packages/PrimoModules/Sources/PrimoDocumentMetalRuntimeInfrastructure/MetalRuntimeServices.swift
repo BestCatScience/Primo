@@ -22,6 +22,10 @@ public struct MetalResourceStore: Sendable {
         client.releaseBufferHandle(handle)
     }
 
+    public func retain(_ handle: MetalBufferHandle?) {
+        client.retainBufferHandle(handle)
+    }
+
     public func materializedPixelData(for handle: MetalBufferHandle) -> Data? {
         client.materializedPixelData(for: handle)
     }

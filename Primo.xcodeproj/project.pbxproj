@@ -53,7 +53,6 @@
 		A0000000000000000000009E /* BrushPaletteView+Bindings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000009F /* BrushPaletteView+Bindings.swift */; };
 		A000000000000000000000A0 /* BrushPaletteView+Sections.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A1 /* BrushPaletteView+Sections.swift */; };
 		A000000000000000000000A4 /* DocumentFeature+PureImageOps.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A5 /* DocumentFeature+PureImageOps.swift */; };
-		A000000000000000000000A6 /* TimelapseExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A7 /* TimelapseExporter.swift */; };
 		A000000000000000000000A8 /* ContentView+Menus.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000A9 /* ContentView+Menus.swift */; };
 		A000000000000000000000AA /* ContentView+Workspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AB /* ContentView+Workspace.swift */; };
 		A000000000000000000000AC /* BrushPaletteView+Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = A000000000000000000000AD /* BrushPaletteView+Controls.swift */; };
@@ -242,7 +241,6 @@
 		A0000000000000000000009F /* BrushPaletteView+Bindings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Bindings.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A1 /* BrushPaletteView+Sections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Sections.swift"; sourceTree = "<group>"; };
 		A000000000000000000000A5 /* DocumentFeature+PureImageOps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DocumentFeature+PureImageOps.swift"; sourceTree = "<group>"; };
-		A000000000000000000000A7 /* TimelapseExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelapseExporter.swift; sourceTree = "<group>"; };
 		A000000000000000000000A9 /* ContentView+Menus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Menus.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AB /* ContentView+Workspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ContentView+Workspace.swift"; sourceTree = "<group>"; };
 		A000000000000000000000AD /* BrushPaletteView+Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "BrushPaletteView+Controls.swift"; sourceTree = "<group>"; };
@@ -564,7 +562,6 @@
 				E70000000000000000000002 /* PrimoRootFeature+Action.swift */,
 				E70000000000000000000001 /* PrimoRootFeature+State.swift */,
 				A000000000000000000000D5 /* PrimoRootFeatureModels.swift */,
-				A000000000000000000000A7 /* TimelapseExporter.swift */,
 				F20000000000000000000004 /* WorkspaceFeature.swift */,
 				77EBC82C12B64F77B9A28170 /* WorkspaceFeature+StateCoordinator.swift */,
 				A00000000000000000000103 /* WorkspaceFeature+Workflow.swift */,
@@ -862,7 +859,6 @@
 				F10000000000000000000007 /* DocumentImportClient.swift in Sources */,
 				A00000000000000000000023 /* PrimoRootFeature.swift in Sources */,
 				A00000000000000000000024 /* PaintModels.swift in Sources */,
-				A000000000000000000000A6 /* TimelapseExporter.swift in Sources */,
 				A000000000000000000000A8 /* ContentView+Menus.swift in Sources */,
 				A000000000000000000000AA /* ContentView+Workspace.swift in Sources */,
 				A00000000000000000000021 /* PrimoApp.swift in Sources */,

@@ -503,6 +503,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let height: Int
         let bytesPerRow: Int
         let buffer: MTLBuffer
+        var referenceCount: Int = 1
     }
 
     private struct BrushTipCacheKey: Hashable {
@@ -736,8 +737,23 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
 
     public func releaseBufferHandle(_ handle: MetalBufferHandle?) {
         guard let handle else { return }
-        _ = withCacheLock {
-            cachedBuffers.removeValue(forKey: handle.id)
+        withCacheLock {
+            guard var resource = cachedBuffers[handle.id] else { return }
+            resource.referenceCount -= 1
+            if resource.referenceCount <= 0 {
+                cachedBuffers.removeValue(forKey: handle.id)
+            } else {
+                cachedBuffers[handle.id] = resource
+            }
+        }
+    }
+
+    public func retainBufferHandle(_ handle: MetalBufferHandle?) {
+        guard let handle else { return }
+        withCacheLock {
+            guard var resource = cachedBuffers[handle.id] else { return }
+            resource.referenceCount += 1
+            cachedBuffers[handle.id] = resource
         }
     }
 

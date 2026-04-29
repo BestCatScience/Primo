@@ -81,15 +81,27 @@ jobs:
           xcrun simctl list devices available
           simulator_id="$(
             xcrun simctl list devices available -j | ruby -rjson -e '
-              devices = JSON.parse(STDIN.read).fetch("devices").values.flatten
-              destinations = devices.select do |device|
+              target = ENV.fetch("APP_IOS_DEPLOYMENT_TARGET").split(".").map(&:to_i)
+              target_major = target.fetch(0)
+              target_minor = target.fetch(1, 0)
+              devices_by_runtime = JSON.parse(STDIN.read).fetch("devices")
+              destinations = devices_by_runtime.flat_map do |runtime, devices|
+                runtime_match = runtime.match(/com\.apple\.CoreSimulator\.SimRuntime\.iOS-(\d+)-(\d+)/)
+                next [] unless runtime_match
+                runtime_major = runtime_match[1].to_i
+                runtime_minor = runtime_match[2].to_i
+                next [] if runtime_major < target_major ||
+                  (runtime_major == target_major && runtime_minor < target_minor)
+                devices.map { |device| device.merge("runtime" => runtime) }
+              end.select do |device|
                 device["isAvailable"] &&
                   device["udid"] &&
                   (device["name"].start_with?("iPad") || device["name"].start_with?("iPhone"))
               end
               preferred = destinations.find { |device| device["name"].start_with?("iPad") } ||
                 destinations.find { |device| device["name"].start_with?("iPhone") }
-              abort("No available iOS simulator destination found") unless preferred
+              abort("No available iOS simulator destination found for deployment target #{ENV.fetch("APP_IOS_DEPLOYMENT_TARGET")}") unless preferred
+              warn("Selected " + preferred.fetch("name") + " on " + preferred.fetch("runtime"))
               puts preferred["udid"]
             '
           )"

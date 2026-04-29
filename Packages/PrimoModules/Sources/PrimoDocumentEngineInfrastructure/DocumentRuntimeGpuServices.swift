@@ -10,6 +10,7 @@ typealias DocumentRuntimeStrokeMutationResult = PrimoMetalStrokeMutationResult
 
 struct DocumentRuntimeGpuServices: Sendable {
     var release: @Sendable (MetalBufferHandle?) -> Void
+    var retain: @Sendable (MetalBufferHandle?) -> Void
     var _materializedPixelData: @Sendable (MetalBufferHandle) -> Data?
     var _scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
     var _scaledMaskData: @Sendable (Data, Int, Int, Int, Int) -> Data?
@@ -68,6 +69,7 @@ enum DocumentRuntimeGpuServicesFactory {
 
         return DocumentRuntimeGpuServices(
             release: { resources.release($0) },
+            retain: { resources.retain($0) },
             _materializedPixelData: { resources.materializedPixelData(for: $0) },
             _scaledPixelData: { layers.scaledPixelData($0, sourceWidth: $1, sourceHeight: $2, targetWidth: $3, targetHeight: $4) },
             _scaledMaskData: { layers.scaledMaskData($0, sourceWidth: $1, sourceHeight: $2, targetWidth: $3, targetHeight: $4) },

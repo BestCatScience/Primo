@@ -157,6 +157,8 @@ struct RuntimeFillPlan: Sendable {
     let canvasWidth: Int
     let canvasHeight: Int
     let pixelData: Data
+    let sourceBufferHandle: MetalBufferHandle?
+    let retainedResource: GpuResourceLease?
     let sample: StylusSample
     let brush: BrushRuntimeSettings
     let gpuServices: DocumentRuntimeGpuServices
@@ -168,6 +170,8 @@ struct RuntimeStrokeCommitPlan: Sendable {
     let canvasWidth: Int
     let canvasHeight: Int
     let pixelData: Data
+    let baseBufferHandle: MetalBufferHandle?
+    let retainedResource: GpuResourceLease?
     let samples: [StylusSample]
     let brush: BrushRuntimeSettings
     let gpuServices: DocumentRuntimeGpuServices
@@ -179,10 +183,27 @@ struct RuntimeBlurPlan: Sendable {
     let canvasWidth: Int
     let canvasHeight: Int
     let pixelData: Data
+    let sourceBufferHandle: MetalBufferHandle?
+    let retainedResource: GpuResourceLease?
     let samples: [StylusSample]
     let brush: BrushRuntimeSettings
     let captureTimelapse: Bool
     let gpuServices: DocumentRuntimeGpuServices
+}
+
+final class GpuResourceLease: @unchecked Sendable {
+    private let handle: MetalBufferHandle?
+    private let releaseHandle: @Sendable (MetalBufferHandle?) -> Void
+
+    init(handle: MetalBufferHandle?, services: DocumentRuntimeGpuServices) {
+        self.handle = handle
+        self.releaseHandle = services.release
+        services.retain(handle)
+    }
+
+    deinit {
+        releaseHandle(handle)
+    }
 }
 
 final class SwiftDocumentRuntime: @unchecked Sendable {
@@ -272,6 +293,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return snapshot
     }
 
+    private func undoSnapshot() -> SwiftDocumentStoreSnapshot {
+        materializedSnapshot()
+    }
+
+    private func materializeGpuBackedLayerPixels() {
+        for index in store.snapshot.layers.indices {
+            store.snapshot.layers[index].pixelData = currentPixelData(for: index)
+        }
+    }
+
     func canUndo() -> Bool {
         !undoStack.isEmpty
     }
@@ -284,7 +315,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let previous = undoStack.popLast() else {
             return .failure(.noUndoState)
         }
-        redoStack.append(store.snapshot)
+        redoStack.append(undoSnapshot())
         store.restore(previous)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
@@ -298,7 +329,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let next = redoStack.popLast() else {
             return .failure(.noRedoState)
         }
-        undoStack.append(store.snapshot)
+        undoStack.append(undoSnapshot())
         store.restore(next)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
@@ -353,14 +384,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let sourceSize = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let targetSize = PaintDocumentCanvasSize(width: width, height: height)
         guard sourceSize != targetSize else { return .success(nil) }
-        var layers = store.snapshot.layers
-        for index in layers.indices {
-            layers[index].pixelData = currentPixelData(for: index)
-        }
+        let before = undoSnapshot()
+        let layers = before.layers
         return .success(
             RuntimeResizeCanvasPlan(
                 mode: mode,
-                before: store.snapshot,
+                before: before,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
                 targetWidth: targetSize.width,
@@ -393,7 +422,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func addLayer(name: String) -> DocumentIndexedMutationResult {
-        let before = store.snapshot
+        let before = undoSnapshot()
         let size = PaintDocumentCanvasSize(width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let layer = SwiftDocumentLayerRecord(
             name: name,
@@ -411,6 +440,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.layers.append(layer)
         let index = store.snapshot.layers.count - 1
         store.snapshot.activeLayerIndex = index
+        materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .addLayer(name: name))
         return .success(index)
@@ -426,7 +456,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].name = name
         recordMutation(before: before, timelapseEvent: .setLayerName(index: .unchecked(index), name: name))
         return .success(())
@@ -434,7 +464,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].visible = isVisible
         recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
         return .success(())
@@ -468,8 +498,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return .failure(.bridgeMutationFailed("replaceLayerPixelsInRect"))
         }
         guard let failure = validateEditableLayer(index) else {
-            let before = store.snapshot
-            var output = store.snapshot.layers[index].pixelData
+            let before = undoSnapshot()
+            let existing = currentPixelData(for: index)
+            var output = existing
             output.withUnsafeMutableBytes { destinationBytes in
                 data.withUnsafeBytes { sourceBytes in
                     guard let destination = destinationBytes.bindMemory(to: UInt8.self).baseAddress,
@@ -484,7 +515,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
             output = preserveExistingAlphaIfNeeded(
                 output,
-                existing: store.snapshot.layers[index].pixelData,
+                existing: existing,
                 isAlphaLocked: store.snapshot.layers[index].alphaLocked
             )
             setLayerPixelState(index: index, pixelData: output, gpuBufferHandle: nil)
@@ -516,7 +547,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return applyLayerMutationPayload(
                 index: index,
                 payload: fallbackPayload,
-                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: Data()) : nil
+                timelapseEvent: layer.alphaLocked ? .replaceLayerPixels(index: .unchecked(index), data: currentPixelData(for: index)) : nil
             )
         }
         return .failure(failure)
@@ -527,7 +558,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             return applyLayerMutationPayload(
                 index: index,
                 payload: payload,
-                timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData)
+                timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? currentPixelData(for: index))
             )
         }
         return .failure(failure)
@@ -544,7 +575,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard data.count == store.snapshot.canvasWidth * store.snapshot.canvasHeight else {
             return .failure(.bridgeMutationFailed("replaceLayerMask"))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].maskData = data
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .replaceLayerMask(index: .unchecked(index), data: data))
@@ -554,7 +585,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func clearLayerMask(index: Int) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers[index].maskData != nil else { return .success(()) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].maskData = nil
         invalidateThumbnail(for: index)
         recordMutation(before: before, timelapseEvent: .clearLayerMask(index: .unchecked(index)))
@@ -565,14 +596,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let failure = validateLayer(index) else {
             guard let mask = store.snapshot.layers[index].maskData else { return .success(()) }
             guard let maskedPixels = gpuServices.applyLayerMask(
-                pixelData: store.snapshot.layers[index].pixelData,
+                pixelData: currentPixelData(for: index),
                 maskData: mask,
                 width: store.snapshot.canvasWidth,
                 height: store.snapshot.canvasHeight
             ) else {
                 return .failure(.bridgeMutationFailed("applyLayerMask"))
             }
-            let before = store.snapshot
+            let before = undoSnapshot()
             setLayerPixelState(index: index, pixelData: maskedPixels, gpuBufferHandle: nil)
             store.snapshot.layers[index].maskData = nil
             invalidateThumbnail(for: index)
@@ -587,7 +618,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func clearLayer(index: Int) -> DocumentMutationResult {
         guard let failure = validateEditableLayer(index) else {
-            let before = store.snapshot
+            let before = undoSnapshot()
             setLayerPixelState(index: index, pixelData: Data(count: rgbaByteCount), gpuBufferHandle: nil)
             invalidateThumbnail(for: index)
             recordMutation(before: before, timelapseEvent: .clearLayer(index: .unchecked(index)))
@@ -648,7 +679,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return applyLayerMutationPayload(
             index: plan.index,
             payload: payload,
-            timelapseEvent: .replaceLayerPixels(index: .unchecked(plan.index), data: payload.fullPixelData ?? store.snapshot.layers[plan.index].pixelData)
+            timelapseEvent: .replaceLayerPixels(index: .unchecked(plan.index), data: payload.fullPixelData ?? currentPixelData(for: plan.index))
         )
     }
 
@@ -667,13 +698,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     ) -> Result<RuntimeFillPlan, DocumentMutationFailure> {
         let layerIndex = store.snapshot.activeLayerIndex
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        let source = layerSourceForGpuPlan(index: layerIndex)
         return .success(
             RuntimeFillPlan(
                 layerIndex: layerIndex,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
-                pixelData: currentPixelData(for: layerIndex),
+                pixelData: source.pixelData,
+                sourceBufferHandle: source.bufferHandle,
+                retainedResource: source.retainedResource,
                 sample: sample,
                 brush: brush,
                 gpuServices: gpuServices
@@ -684,7 +718,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func fillPayload(for plan: RuntimeFillPlan) -> DocumentLayerMutationPayload? {
         plan.gpuServices.fillPixels(
             pixelData: plan.pixelData,
-            sourceBufferHandle: nil,
+            sourceBufferHandle: plan.sourceBufferHandle,
             canvasWidth: plan.canvasWidth,
             canvasHeight: plan.canvasHeight,
             sample: plan.sample,
@@ -720,13 +754,16 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     ) -> Result<RuntimeStrokeCommitPlan, DocumentMutationFailure> {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
+        let source = layerSourceForGpuPlan(index: layerIndex)
         return .success(
             RuntimeStrokeCommitPlan(
                 layerIndex: layerIndex,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
-                pixelData: currentPixelData(for: layerIndex),
+                pixelData: source.pixelData,
+                baseBufferHandle: source.bufferHandle,
+                retainedResource: source.retainedResource,
                 samples: samples,
                 brush: brush,
                 gpuServices: gpuServices
@@ -737,7 +774,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func strokeCommitResult(for plan: RuntimeStrokeCommitPlan) -> DocumentRuntimeStrokeMutationResult? {
         plan.gpuServices.commitStrokeMutation(
             basePixelData: plan.pixelData,
-            baseBufferHandle: nil,
+            baseBufferHandle: plan.baseBufferHandle,
             canvasWidth: plan.canvasWidth,
             canvasHeight: plan.canvasHeight,
             samples: plan.samples,
@@ -767,8 +804,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             width: gpuResult.dirtyRect.width,
             height: gpuResult.dirtyRect.height
         )
-        let before = store.snapshot
-        let existing = store.snapshot.layers[plan.layerIndex].pixelData
+        let before = undoSnapshot()
+        let existing = currentPixelData(for: plan.layerIndex)
         let adjustedOutput: Data
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[plan.layerIndex].alphaLocked {
@@ -828,7 +865,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     ) -> Result<RuntimeBlurPlan, DocumentMutationFailure> {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
         if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
-        let baseline = currentBlurStroke?.baseline ?? store.snapshot
+        let baseline = currentBlurStroke?.baseline ?? undoSnapshot()
+        let source = layerSourceForGpuPlan(index: layerIndex)
         currentBlurStroke = (
             baseline: baseline,
             layerIndex: layerIndex,
@@ -841,7 +879,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
-                pixelData: currentPixelData(for: layerIndex),
+                pixelData: source.pixelData,
+                sourceBufferHandle: source.bufferHandle,
+                retainedResource: source.retainedResource,
                 samples: samples,
                 brush: brush,
                 captureTimelapse: captureTimelapse,
@@ -853,7 +893,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func blurPayload(for plan: RuntimeBlurPlan) -> DocumentLayerMutationPayload? {
         plan.gpuServices.blurPixels(
             pixelData: plan.pixelData,
-            sourceBufferHandle: nil,
+            sourceBufferHandle: plan.sourceBufferHandle,
             canvasWidth: plan.canvasWidth,
             canvasHeight: plan.canvasHeight,
             samples: plan.samples,
@@ -875,7 +915,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             gpuServices.release(payload.gpuBufferHandle)
             return .failure(failure)
         }
-        let current = store.snapshot.layers[plan.layerIndex].pixelData
+        let current = currentPixelData(for: plan.layerIndex)
         let nextPixelData: Data
         let nextHandle: MetalBufferHandle?
         if store.snapshot.layers[plan.layerIndex].alphaLocked {
@@ -926,13 +966,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         var layer = store.snapshot.layers[index]
+        layer.pixelData = currentPixelData(for: index)
         layer.name = name
         let duplicatedIndex = index + 1
         store.snapshot.layers.insert(layer, at: duplicatedIndex)
         remapFoldersAfterInsertion(at: duplicatedIndex)
         store.snapshot.activeLayerIndex = duplicatedIndex
+        materializeGpuBackedLayerPixels()
         releaseLayerBufferHandles()
         recordMutation(before: before, timelapseEvent: .duplicateLayer(index: .unchecked(index), name: name))
         return .success(duplicatedIndex)
@@ -941,7 +983,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func deleteLayer(index: Int) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         deleteLayerUnchecked(index: index)
         recordMutation(before: before, timelapseEvent: .deleteLayer(index: .unchecked(index)))
         return .success(())
@@ -951,7 +993,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if let failure = validateLayer(index) { return .failure(failure) }
         if let failure = validateLayer(destinationIndex) { return .failure(failure) }
         guard index != destinationIndex else { return .success(()) }
-        let before = store.snapshot
+        let before = undoSnapshot()
+        materializeGpuBackedLayerPixels()
         let layer = store.snapshot.layers.remove(at: index)
         store.snapshot.layers.insert(layer, at: destinationIndex)
         remapFoldersAfterMove(from: index, to: destinationIndex)
@@ -968,7 +1011,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard layerIndex < 0 || store.snapshot.layers.indices.contains(layerIndex) else {
             return .failure(.invalidLayerIndex(layerIndex))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         let id = store.snapshot.nextFolderID
         store.snapshot.nextFolderID += 1
         store.snapshot.folders.append(
@@ -991,7 +1034,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.folders.remove(at: folderIndex)
         for index in store.snapshot.layers.indices where store.snapshot.layers[index].folderID == folderID {
             store.snapshot.layers[index].folderID = nil
@@ -1004,7 +1047,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.folders[folderIndex].visible = isVisible
         recordMutation(before: before, timelapseEvent: .setFolderVisibility(folderID: .unchecked(folderID), isVisible: isVisible))
         return .success(())
@@ -1014,7 +1057,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.folders[folderIndex].name = name
         recordMutation(before: before, timelapseEvent: .setFolderName(folderID: .unchecked(folderID), name: name))
         return .success(())
@@ -1024,7 +1067,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.folders[folderIndex].expanded = isExpanded
         recordMutation(before: before, timelapseEvent: .setFolderExpanded(folderID: .unchecked(folderID), isExpanded: isExpanded))
         return .success(())
@@ -1035,7 +1078,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         if folderID >= 0, !store.snapshot.folders.contains(where: { $0.id == folderID }) {
             return .failure(.invalidFolderID(folderID))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].folderID = folderID >= 0 ? folderID : nil
         recordMutation(before: before, timelapseEvent: .assignLayerToFolder(index: .unchecked(index), folderID: folderID >= 0 ? .unchecked(folderID) : nil))
         return .success(())
@@ -1043,7 +1086,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].locked = isLocked
         recordMutation(before: before, timelapseEvent: .setLayerLocked(index: .unchecked(index), isLocked: isLocked))
         return .success(())
@@ -1051,7 +1094,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].alphaLocked = isAlphaLocked
         recordMutation(before: before, timelapseEvent: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked))
         return .success(())
@@ -1059,7 +1102,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].clipped = isClipped
         recordMutation(before: before, timelapseEvent: .setLayerClipped(index: .unchecked(index), isClipped: isClipped))
         return .success(())
@@ -1068,7 +1111,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
         guard (0...1).contains(opacity) else { return .failure(.invalidOpacity(opacity)) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].opacity = opacity
         recordMutation(before: before, timelapseEvent: .setLayerOpacity(index: .unchecked(index), opacity: opacity))
         return .success(())
@@ -1076,7 +1119,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.layers[index].blendMode = blendMode
         recordMutation(before: before, timelapseEvent: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode))
         return .success(())
@@ -1086,8 +1129,10 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard index > 0 else { return .failure(.invalidLayerIndex(index)) }
         if let failure = validateEditableLayer(index) { return .failure(failure) }
         if let failure = validateEditableLayer(index - 1) { return .failure(failure) }
-        let upper = store.snapshot.layers[index]
-        let lower = store.snapshot.layers[index - 1]
+        var upper = store.snapshot.layers[index]
+        upper.pixelData = currentPixelData(for: index)
+        var lower = store.snapshot.layers[index - 1]
+        lower.pixelData = currentPixelData(for: index - 1)
         guard let merged = gpuServices.mergeLayers(
             lowerPixelData: lower.pixelData,
             upperPixelData: upper.pixelData,
@@ -1099,13 +1144,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         ) else {
             return .failure(.bridgeMutationFailed("mergeLayerDown"))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         setLayerPixelState(
             index: index - 1,
             pixelData: preserveExistingAlphaIfNeeded(
-            merged,
-            existing: lower.pixelData,
-            isAlphaLocked: lower.alphaLocked
+                merged,
+                existing: lower.pixelData,
+                isAlphaLocked: lower.alphaLocked
             ),
             gpuBufferHandle: nil
         )
@@ -1513,7 +1558,7 @@ extension SwiftDocumentRuntime {
     }
 
     func setPaperStyle(_ style: CanvasPaperStyle) {
-        let before = store.snapshot
+        let before = undoSnapshot()
         store.snapshot.paperStyle = style
         recordMutation(before: before, timelapseEvent: TimelapseOperation.setPaperStyle(style))
     }
@@ -1667,6 +1712,7 @@ extension SwiftDocumentRuntime {
     }
 
     private func deleteLayerUnchecked(index: Int) {
+        materializeGpuBackedLayerPixels()
         store.snapshot.layers.remove(at: index)
         remapFoldersAfterDeletion(of: index)
         store.snapshot.activeLayerIndex = min(store.snapshot.activeLayerIndex, store.snapshot.layers.count - 1)
@@ -1678,10 +1724,10 @@ extension SwiftDocumentRuntime {
         guard data.count == rgbaByteCount else {
             return .failure(.bridgeMutationFailed("replaceLayerPixels"))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         let adjusted = preserveExistingAlphaIfNeeded(
             data,
-            existing: store.snapshot.layers[index].pixelData,
+            existing: currentPixelData(for: index),
             isAlphaLocked: store.snapshot.layers[index].alphaLocked
         )
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil)
@@ -1700,8 +1746,8 @@ extension SwiftDocumentRuntime {
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.bridgeMutationFailed("applyLayerMutation"))
         }
-        let before = store.snapshot
-        let existing = store.snapshot.layers[index].pixelData
+        let before = undoSnapshot()
+        let existing = currentPixelData(for: index)
         let shouldMaterialize = store.snapshot.layers[index].alphaLocked || timelapseEvent?.requiresLayerPixelData == true
         let adjusted: Data
         let nextHandle: MetalBufferHandle?
@@ -1743,17 +1789,17 @@ extension SwiftDocumentRuntime {
               payload.canvasHeight == store.snapshot.canvasHeight else {
             return .failure(.bridgeMutationFailed("applyTextLayerMutation"))
         }
-        let before = store.snapshot
+        let before = undoSnapshot()
         setLayerPixelState(
             index: index,
-            pixelData: materializedPixelData(from: payload, existing: store.snapshot.layers[index].pixelData),
+            pixelData: materializedPixelData(from: payload, existing: currentPixelData(for: index)),
             gpuBufferHandle: payload.gpuBufferHandle
         )
         store.snapshot.layers[index].textLayer = textLayer
         invalidateThumbnail(for: index)
         recordMutation(
             before: before,
-            timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? store.snapshot.layers[index].pixelData),
+            timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? currentPixelData(for: index)),
             dirtyRect: payload.dirtyRect
         )
         return .success(())
@@ -1816,6 +1862,24 @@ extension SwiftDocumentRuntime {
             return pixelData
         }
         return store.snapshot.layers[index].pixelData
+    }
+
+    private func layerSourceForGpuPlan(index: Int) -> (
+        pixelData: Data,
+        bufferHandle: MetalBufferHandle?,
+        retainedResource: GpuResourceLease?
+    ) {
+        guard store.snapshot.layers.indices.contains(index) else {
+            return (Data(), nil, nil)
+        }
+        guard let handle = gpuLayerHandles[index] else {
+            return (store.snapshot.layers[index].pixelData, nil, nil)
+        }
+        return (
+            store.snapshot.layers[index].pixelData,
+            handle,
+            GpuResourceLease(handle: handle, services: gpuServices)
+        )
     }
 
     private func recordMutation(
@@ -2020,7 +2084,7 @@ extension SwiftDocumentRuntime {
         let targetWidth = max(Int(targetSize.width.rounded()), 1)
         let targetHeight = max(Int(targetSize.height.rounded()), 1)
         guard let scaled = gpuServices.scaledPixelData(
-            store.snapshot.layers[index].pixelData,
+            currentPixelData(for: index),
             sourceWidth: store.snapshot.canvasWidth,
             sourceHeight: store.snapshot.canvasHeight,
             targetWidth: targetWidth,

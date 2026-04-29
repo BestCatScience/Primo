@@ -666,7 +666,54 @@ struct DocumentStrokeApplicationTests {
         ).commitMutation)
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(commit.surface.pixelData != nil)
         #expect(commit.dirtyRegion == preview.dirtyRegion)
+        #expect(renderer.requests.isEmpty)
+    }
+
+    @Test
+    func testCommitWithMissingMaterializedPixelsDoesNotSilentlySkipPendingSnapshot() throws {
+        let planner = RecordingPreviewPlanner()
+        let renderer = RecordingCommitRenderer(materializedPixelData: nil)
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: planner),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let context = makeContext(layerIndex: 0)
+        let preview = try #require(useCase.execute(
+            .begin(
+                sample: stylusSample(x: 1, y: 1),
+                baseSnapshot: snapshot,
+                context: context,
+                usesResponsiveOilPreview: false
+            )
+        ).previewMutation)
+
+        let renderState = StrokeSessionRenderState(
+            baseRevision: preview.baseSnapshot.revision,
+            layerIndex: preview.surface.layerIndex,
+            surfaceHandle: preview.surface.handle.buffer,
+            dirtyRect: preview.dirtyRegion.layerPixelRect,
+            isApproximatePreview: false,
+            previewBrush: context.previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: true
+        )
+        let outcome = useCase.execute(
+            .finish(
+                renderState: renderState,
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: [stylusSample(x: 1, y: 1)],
+                context: context,
+                allowsApproximatePreviewCommit: false,
+                refreshViaDirtyPresentation: true
+            )
+        )
+
+        #expect(outcome.failure == .bridgeMutationFailed("GPU stroke commit materialization failed"))
         #expect(renderer.requests.isEmpty)
     }
 
@@ -709,6 +756,7 @@ struct DocumentStrokeApplicationTests {
         ).commitMutation)
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(commit.surface.pixelData != nil)
         #expect(renderer.requests.isEmpty)
     }
 
@@ -758,6 +806,7 @@ struct DocumentStrokeApplicationTests {
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
         #expect(commit.dirtyRegion == preview.dirtyRegion)
+        #expect(commit.surface.pixelData != nil)
         #expect(renderer.requests.isEmpty)
     }
 
@@ -997,6 +1046,11 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
 private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [StrokeCommitRequest] = []
+    private let materializedPixelData: Data?
+
+    init(materializedPixelData: Data? = Data(repeating: 0x7F, count: 16)) {
+        self.materializedPixelData = materializedPixelData
+    }
 
     var requests: [StrokeCommitRequest] {
         lock.withLock { storage }
@@ -1016,6 +1070,10 @@ private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked S
             dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: request.snapshot.width, height: request.snapshot.height)
         )
     }
+
+    func materializedPixelData(for surface: GpuLayerSurface) -> Data? {
+        materializedPixelData
+    }
 }
 
 private extension GpuStrokeSessionOutcome {
@@ -1027,5 +1085,10 @@ private extension GpuStrokeSessionOutcome {
     var commitMutation: GpuCommitMutation? {
         guard case let .commit(mutation) = self else { return nil }
         return mutation
+    }
+
+    var failure: DocumentMutationFailure? {
+        guard case let .failure(failure) = self else { return nil }
+        return failure
     }
 }
