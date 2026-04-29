@@ -8,8 +8,15 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case invalidLayerIndex(Int)
     case invalidFolderID(Int)
     case layerLocked(Int)
+    case alphaLocked(Int)
+    case invalidCanvasSize(width: Int, height: Int)
     case invalidOpacity(Double)
+    case emptyInput
+    case noUndoState
+    case noRedoState
     case bridgeMutationFailed(String)
+    case incompatibleLayerType(Int)
+    indirect case transactionFailure(primary: DocumentLayerMutationFailure, rollback: DocumentLayerMutationFailure)
 }
 
 public struct DocumentLayerMutationContext: Sendable {

@@ -92,6 +92,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return currentPixelData(for: index)
     }
 
+    func materializedSnapshot() -> SwiftDocumentStoreSnapshot {
+        var snapshot = store.snapshot
+        for index in snapshot.layers.indices {
+            snapshot.layers[index].pixelData = currentPixelData(for: index)
+        }
+        return snapshot
+    }
+
     func canUndo() -> Bool {
         !undoStack.isEmpty
     }
@@ -288,13 +296,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerName(index: Int, name: String) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
+        let before = store.snapshot
         store.snapshot.layers[index].name = name
+        recordMutation(before: before, timelapseEvent: .setLayerName(index: .unchecked(index), name: name))
         return .success(())
     }
 
     func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         store.snapshot.layers[index].visible = isVisible
         recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
@@ -395,12 +405,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func applyTextLayerMutation(index: Int, textLayer: TextLayerData, payload: DocumentLayerMutationPayload) -> DocumentMutationResult {
-        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        if let failure = validateEditableLayer(index) { return .failure(failure) }
         return applyTextLayerMutationPayload(index: index, textLayer: textLayer, payload: payload)
     }
 
     func replaceLayerMask(index: Int, data: Data) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         guard !data.isEmpty else { return .failure(.emptyInput) }
         guard data.count == store.snapshot.canvasWidth * store.snapshot.canvasHeight else {
             return .failure(.bridgeMutationFailed("replaceLayerMask"))
@@ -413,7 +423,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func clearLayerMask(index: Int) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers[index].maskData != nil else { return .success(()) }
         let before = store.snapshot
         store.snapshot.layers[index].maskData = nil
@@ -458,7 +468,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func applyLayerProcessing(index: Int, request: LayerProcessingRequest) -> DocumentMutationResult {
-        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        if let failure = validateEditableLayer(index) { return .failure(failure) }
         guard let payload = gpuServices.processLayer(
             pixelData: store.snapshot.layers[index].pixelData,
             canvasWidth: store.snapshot.canvasWidth,
@@ -475,7 +485,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func duplicateLayer(index: Int, name: String) -> DocumentIndexedMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         var layer = store.snapshot.layers[index]
         layer.name = name
@@ -489,7 +499,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func deleteLayer(index: Int) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         guard store.snapshot.layers.count > 1 else { return .failure(.bridgeMutationFailed("deleteLayer")) }
         let before = store.snapshot
         store.snapshot.layers.remove(at: index)
@@ -502,8 +512,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
-        guard validateLayer(destinationIndex) == nil else { return .failure(validateLayer(destinationIndex)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
+        if let failure = validateLayer(destinationIndex) { return .failure(failure) }
         guard index != destinationIndex else { return .success(()) }
         let before = store.snapshot
         let layer = store.snapshot.layers.remove(at: index)
@@ -568,7 +578,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
+        let before = store.snapshot
         store.snapshot.folders[folderIndex].name = name
+        recordMutation(before: before, timelapseEvent: .setFolderName(folderID: .unchecked(folderID), name: name))
         return .success(())
     }
 
@@ -576,12 +588,14 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard let folderIndex = store.snapshot.folders.firstIndex(where: { $0.id == folderID }) else {
             return .failure(.invalidFolderID(folderID))
         }
+        let before = store.snapshot
         store.snapshot.folders[folderIndex].expanded = isExpanded
+        recordMutation(before: before, timelapseEvent: .setFolderExpanded(folderID: .unchecked(folderID), isExpanded: isExpanded))
         return .success(())
     }
 
     func assignLayerToFolder(index: Int, folderID: Int) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         if folderID >= 0, !store.snapshot.folders.contains(where: { $0.id == folderID }) {
             return .failure(.invalidFolderID(folderID))
         }
@@ -592,7 +606,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerLocked(index: Int, isLocked: Bool) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         store.snapshot.layers[index].locked = isLocked
         recordMutation(before: before, timelapseEvent: .setLayerLocked(index: .unchecked(index), isLocked: isLocked))
@@ -600,7 +614,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerAlphaLocked(index: Int, isAlphaLocked: Bool) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         store.snapshot.layers[index].alphaLocked = isAlphaLocked
         recordMutation(before: before, timelapseEvent: .setLayerAlphaLocked(index: .unchecked(index), isAlphaLocked: isAlphaLocked))
@@ -608,7 +622,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerClipped(index: Int, isClipped: Bool) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         store.snapshot.layers[index].clipped = isClipped
         recordMutation(before: before, timelapseEvent: .setLayerClipped(index: .unchecked(index), isClipped: isClipped))
@@ -616,7 +630,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerOpacity(index: Int, opacity: Double) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         guard (0...1).contains(opacity) else { return .failure(.invalidOpacity(opacity)) }
         let before = store.snapshot
         store.snapshot.layers[index].opacity = opacity
@@ -625,7 +639,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func setLayerBlendMode(index: Int, blendMode: LayerBlendMode) -> DocumentMutationResult {
-        guard validateLayer(index) == nil else { return .failure(validateLayer(index)!) }
+        if let failure = validateLayer(index) { return .failure(failure) }
         let before = store.snapshot
         store.snapshot.layers[index].blendMode = blendMode
         recordMutation(before: before, timelapseEvent: .setLayerBlendMode(index: .unchecked(index), blendMode: blendMode))
@@ -634,8 +648,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func mergeLayerDown(index: Int) -> DocumentMutationResult {
         guard index > 0 else { return .failure(.invalidLayerIndex(index)) }
-        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
-        guard validateEditableLayer(index - 1) == nil else { return .failure(validateEditableLayer(index - 1)!) }
+        if let failure = validateEditableLayer(index) { return .failure(failure) }
+        if let failure = validateEditableLayer(index - 1) { return .failure(failure) }
         let upper = store.snapshot.layers[index]
         let lower = store.snapshot.layers[index - 1]
         guard let merged = gpuServices.mergeLayers(
@@ -675,7 +689,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard !textLayer.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .failure(.emptyInput)
         }
-        guard validateEditableLayer(index) == nil else { return .failure(validateEditableLayer(index)!) }
+        if let failure = validateEditableLayer(index) { return .failure(failure) }
         guard let payload = gpuServices.rasterizeTextLayer(textLayer, canvasSize: canvasSize) else {
             return .failure(.bridgeMutationFailed("setTextLayer"))
         }
@@ -707,7 +721,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func blur(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int, captureTimelapse: Bool) -> DocumentMutationResult {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
-        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
         let baseline = currentBlurStroke?.baseline ?? store.snapshot
         currentBlurStroke = (
             baseline: baseline,
@@ -777,7 +791,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
         let layerIndex = store.snapshot.activeLayerIndex
-        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
         guard let payload = gpuServices.fillPixels(
             pixelData: store.snapshot.layers[layerIndex].pixelData,
             sourceBufferHandle: gpuLayerHandles[layerIndex],
@@ -797,7 +811,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func applyGpuStrokeSurface(samples: [StylusSample], brush: BrushRuntimeSettings, layerIndex: Int) -> DocumentMutationResult {
         guard !samples.isEmpty else { return .failure(.emptyInput) }
-        guard validateEditableLayer(layerIndex) == nil else { return .failure(validateEditableLayer(layerIndex)!) }
+        if let failure = validateEditableLayer(layerIndex) { return .failure(failure) }
         let gpuResult = gpuServices.commitStrokeMutation(
             basePixelData: store.snapshot.layers[layerIndex].pixelData,
             baseBufferHandle: gpuLayerHandles[layerIndex],
@@ -871,33 +885,122 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func saveProject(to url: URL, paperStyle: CanvasPaperStyle) throws {
-        let persistenceService = services.persistence.projectStore
+        try projectSaveSnapshot(paperStyle: paperStyle).write(
+            to: url,
+            fileClient: services.fileIO,
+            uuidClient: services.ids
+        )
+    }
+
+    func projectSaveSnapshot(paperStyle: CanvasPaperStyle) -> SwiftDocumentProjectSaveSnapshot {
+        SwiftDocumentProjectSaveSnapshot(snapshot: materializedSnapshot(), paperStyle: paperStyle)
+    }
+
+    static func compositeSurface(
+        forMaterializedSnapshot snapshot: SwiftDocumentStoreSnapshot,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentCompositeSurface {
+        let metalSnapshot = materializedMetalSnapshot(for: snapshot)
+        if let gpuComposite = gpuServices.compositeDocumentSurface(snapshot: metalSnapshot) {
+            return gpuComposite
+        }
+        logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
+        return DocumentCompositeSurface(
+            width: snapshot.canvasWidth,
+            height: snapshot.canvasHeight,
+            pixelData: Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
+        )
+    }
+
+    static func compositeExportSurface(
+        forMaterializedSnapshot snapshot: SwiftDocumentStoreSnapshot,
+        paperStyle: CanvasPaperStyle,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentCompositeSurface? {
+        let surface = compositeSurface(forMaterializedSnapshot: snapshot, gpuServices: gpuServices)
+        guard let pixelData = gpuServices.compositedPaperPreviewRGBA(
+            pixelData: surface.pixelData,
+            width: surface.width,
+            height: surface.height,
+            paperStyle: paperStyle
+        ) else {
+            return nil
+        }
+        return DocumentCompositeSurface(width: surface.width, height: surface.height, pixelData: pixelData)
+    }
+
+    static func compositePNGData(
+        forMaterializedSnapshot snapshot: SwiftDocumentStoreSnapshot,
+        paperStyle: CanvasPaperStyle,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> Data? {
+        compositeExportSurface(
+            forMaterializedSnapshot: snapshot,
+            paperStyle: paperStyle,
+            gpuServices: gpuServices
+        ).flatMap(DocumentRasterImageService.pngData(from:))
+    }
+
+    private static func materializedMetalSnapshot(
+        for snapshot: SwiftDocumentStoreSnapshot
+    ) -> MetalDocumentSnapshot {
+        MetalDocumentSnapshot(
+            width: snapshot.canvasWidth,
+            height: snapshot.canvasHeight,
+            revision: snapshot.revision,
+            compositePixelData: Data(),
+            layers: snapshot.layers.enumerated().map { index, layer in
+                MetalLayerSnapshot(
+                    index: index,
+                    opacity: Float(layer.opacity),
+                    visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
+                    isClipped: layer.clipped,
+                    blendMode: layer.blendMode,
+                    thumbnailSurface: nil,
+                    thumbnailData: nil,
+                    gpuBufferHandle: nil,
+                    pixelData: layer.pixelData
+                )
+            }
+        )
+    }
+}
+
+struct SwiftDocumentProjectSaveSnapshot: Sendable {
+    var snapshot: SwiftDocumentStoreSnapshot
+    var paperStyle: CanvasPaperStyle
+
+    func write(to url: URL, fileClient: FileClient, uuidClient: UUIDClient) throws {
+        let persistenceService = PaintDocumentPersistenceService(fileClient: fileClient)
         let stagedURL = try persistenceService.createStagedProjectDirectory(
             for: url,
-            id: services.ids.generate()
+            id: uuidClient.generate()
         )
         defer {
             try? persistenceService.cleanupStagedProjectDirectory(stagedURL)
         }
-        try writeProjectContents(to: stagedURL, paperStyle: paperStyle)
+        try writeProjectContents(to: stagedURL, persistenceService: persistenceService, fileClient: fileClient)
         try persistenceService.validateProjectPackage(at: stagedURL)
         try persistenceService.publishStagedProjectDirectory(stagedURL, to: url)
     }
 
-    private func writeProjectContents(to url: URL, paperStyle: CanvasPaperStyle) throws {
-        let persistenceService = services.persistence.projectStore
+    private func writeProjectContents(
+        to url: URL,
+        persistenceService: PaintDocumentPersistenceService,
+        fileClient: FileClient
+    ) throws {
         let directories = try persistenceService.createProjectSubdirectories(
             in: url,
-            usesOperationTimelapsePersistence: store.snapshot.timelapseUsesOperationPersistence
+            usesOperationTimelapsePersistence: snapshot.timelapseUsesOperationPersistence
         )
 
-        for index in store.snapshot.layers.indices {
+        for index in snapshot.layers.indices {
             let filename = String(format: "layer-%04d.rgba", index)
             try persistenceService.writeAtomic(
-                currentPixelData(for: index),
+                snapshot.layers[index].pixelData,
                 to: directories.layersDirectory.appendingPathComponent(filename, isDirectory: false)
             )
-            if let maskData = store.snapshot.layers[index].maskData {
+            if let maskData = snapshot.layers[index].maskData {
                 let maskFilename = String(format: "layer-mask-%04d.mask", index)
                 try persistenceService.writeAtomic(
                     maskData,
@@ -906,8 +1009,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
         }
 
-        if !store.snapshot.timelapseUsesOperationPersistence {
-            for (index, frame) in store.snapshot.timelapseFrames.enumerated() {
+        if !snapshot.timelapseUsesOperationPersistence {
+            for (index, frame) in snapshot.timelapseFrames.enumerated() {
                 let relativeFilename = String(format: "frame-%06d.jpg", index)
                 try persistenceService.replaceItemIfNeeded(
                     at: directories.timelapseDirectory.appendingPathComponent(relativeFilename, isDirectory: false),
@@ -916,21 +1019,21 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             }
         }
 
-        let storedOperations = store.snapshot.timelapseUsesOperationPersistence
-            ? try store.snapshot.timelapseEvents.enumerated().map {
+        let storedOperations = snapshot.timelapseUsesOperationPersistence
+            ? try snapshot.timelapseEvents.enumerated().map {
                 try $0.element.storedRepresentation(
                     index: $0.offset,
                     dataDirectory: directories.timelapseDataDirectory,
-                    fileClient: services.fileIO
+                    fileClient: fileClient
                 )
             }
             : []
 
         let document = StoredPrimoDocument(
             version: 5,
-            canvasWidth: store.snapshot.canvasWidth,
-            canvasHeight: store.snapshot.canvasHeight,
-            activeLayerIndex: DocumentLayerIndex.unchecked(store.snapshot.activeLayerIndex),
+            canvasWidth: snapshot.canvasWidth,
+            canvasHeight: snapshot.canvasHeight,
+            activeLayerIndex: DocumentLayerIndex.unchecked(snapshot.activeLayerIndex),
             paperStyle: StoredPrimoDocument.PaperStyle(
                 red: Double(paperStyle.red),
                 green: Double(paperStyle.green),
@@ -938,7 +1041,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 alpha: Double(paperStyle.alpha),
                 isTransparent: paperStyle.isTransparent
             ),
-            layers: store.snapshot.layers.enumerated().map { index, layer in
+            layers: snapshot.layers.enumerated().map { index, layer in
                 StoredPrimoDocument.Layer(
                     index: DocumentLayerIndex.unchecked(index),
                     name: layer.name,
@@ -954,7 +1057,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                     maskFilename: layer.maskData == nil ? nil : String(format: "Layers/layer-mask-%04d.mask", index)
                 )
             },
-            folders: store.snapshot.folders.map {
+            folders: snapshot.folders.map {
                 StoredPrimoDocument.Folder(
                     id: DocumentFolderID.unchecked($0.id),
                     name: $0.name,
@@ -963,7 +1066,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                     anchorLayerIndex: $0.anchorLayerIndex.map { DocumentLayerIndex.unchecked($0) }
                 )
             },
-            timelapseFrames: store.snapshot.timelapseUsesOperationPersistence ? [] : store.snapshot.timelapseFrames.map {
+            timelapseFrames: snapshot.timelapseUsesOperationPersistence ? [] : snapshot.timelapseFrames.map {
                 StoredPrimoDocument.TimelapseFrame(
                     filename: "Timelapse/\($0.imageURL.lastPathComponent)",
                     width: Double($0.size.width),
@@ -978,7 +1081,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         let manifest = try encoder.encode(document)
         try persistenceService.writeAtomic(manifest, to: url.appendingPathComponent("manifest.json", isDirectory: false))
     }
+}
 
+extension SwiftDocumentRuntime {
     static func loadProject(
         from url: URL,
         fileClient: FileClient = .live,
@@ -1182,9 +1287,15 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             if let resolved = folderIDMap[folderID] { _ = deleteFolder(folderID: resolved) }
         case let .setFolderVisibility(folderID, isVisible):
             if let resolved = folderIDMap[folderID] { _ = setFolderVisibility(folderID: resolved, isVisible: isVisible) }
+        case let .setFolderName(folderID, name):
+            if let resolved = folderIDMap[folderID] { _ = setFolderName(folderID: resolved, name: name) }
+        case let .setFolderExpanded(folderID, isExpanded):
+            if let resolved = folderIDMap[folderID] { _ = setFolderExpanded(folderID: resolved, isExpanded: isExpanded) }
         case let .assignLayerToFolder(index, folderID):
             let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
             _ = assignLayerToFolder(index: index.rawValue, folderID: resolvedFolderID)
+        case let .setLayerName(index, name):
+            _ = setLayerName(index: index.rawValue, name: name)
         case let .setLayerVisibility(index, isVisible):
             _ = setLayerVisibility(index: index.rawValue, isVisible: isVisible)
         case let .setLayerLocked(index, isLocked):

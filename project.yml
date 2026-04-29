@@ -44,7 +44,7 @@ packages:
 settings:
   base:
     PRODUCT_BUNDLE_IDENTIFIER: com.bestcatscience.primo
-    SWIFT_VERSION: 5.10
+    SWIFT_VERSION: 6.0
 targets:
   Primo:
     type: application

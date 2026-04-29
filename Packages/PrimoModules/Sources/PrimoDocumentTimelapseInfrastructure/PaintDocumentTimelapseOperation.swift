@@ -68,8 +68,14 @@ extension TimelapseOperation {
             return StoredTimelapseOperation(kind: .deleteFolder, folderID: folderID)
         case let .setFolderVisibility(folderID, isVisible):
             return StoredTimelapseOperation(kind: .setFolderVisibility, folderID: folderID, isVisible: isVisible)
+        case let .setFolderName(folderID, name):
+            return StoredTimelapseOperation(kind: .setFolderName, folderID: folderID, name: name)
+        case let .setFolderExpanded(folderID, isExpanded):
+            return StoredTimelapseOperation(kind: .setFolderExpanded, folderID: folderID, isExpanded: isExpanded)
         case let .assignLayerToFolder(index, folderID):
             return StoredTimelapseOperation(kind: .assignLayerToFolder, layerIndex: index, folderID: folderID)
+        case let .setLayerName(index, name):
+            return StoredTimelapseOperation(kind: .setLayerName, layerIndex: index, name: name)
         case let .setLayerVisibility(index, isVisible):
             return StoredTimelapseOperation(kind: .setLayerVisibility, layerIndex: index, isVisible: isVisible)
         case let .setLayerLocked(index, isLocked):
@@ -154,9 +160,18 @@ extension TimelapseOperation {
         case .setFolderVisibility:
             guard let folderID = stored.folderID, let isVisible = stored.isVisible else { throw PrimoDocumentError.invalidDocument }
             self = .setFolderVisibility(folderID: folderID, isVisible: isVisible)
+        case .setFolderName:
+            guard let folderID = stored.folderID, let name = stored.name else { throw PrimoDocumentError.invalidDocument }
+            self = .setFolderName(folderID: folderID, name: name)
+        case .setFolderExpanded:
+            guard let folderID = stored.folderID, let isExpanded = stored.isExpanded else { throw PrimoDocumentError.invalidDocument }
+            self = .setFolderExpanded(folderID: folderID, isExpanded: isExpanded)
         case .assignLayerToFolder:
             guard let layerIndex = stored.layerIndex else { throw PrimoDocumentError.invalidDocument }
             self = .assignLayerToFolder(index: layerIndex, folderID: stored.folderID)
+        case .setLayerName:
+            guard let layerIndex = stored.layerIndex, let name = stored.name else { throw PrimoDocumentError.invalidDocument }
+            self = .setLayerName(index: layerIndex, name: name)
         case .setLayerVisibility:
             guard let layerIndex = stored.layerIndex, let isVisible = stored.isVisible else { throw PrimoDocumentError.invalidDocument }
             self = .setLayerVisibility(index: layerIndex, isVisible: isVisible)

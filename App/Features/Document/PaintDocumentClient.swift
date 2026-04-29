@@ -128,6 +128,26 @@ private enum CanvasPresentationEnvironmentKey: DependencyKey {
 }
 
 private extension DependencyValues {
+    mutating func setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(
+        _ gpuOperationGateway: DocumentGpuOperationGateway
+    ) {
+        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
+        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
+        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: gpuOperationGateway)
+        self[CanvasPreviewRendererKey.self] = canvasPreviewRenderer
+        self[SelectionMaskProcessorKey.self] = selectionMaskProcessor
+        self[LayerTransformProcessorKey.self] = layerTransformProcessor
+        self[CanvasPresentationEnvironmentKey.self] = CanvasPresentationEnvironment(
+            previewRenderer: canvasPreviewRenderer,
+            eyedropperSampler: self[CanvasEyedropperSamplerKey.self],
+            selectionProcessor: selectionMaskProcessor,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        self[SelectionWorkflowServiceKey.self] = SelectionWorkflowService(
+            gpuOperations: gpuOperationGateway
+        )
+    }
+
     mutating func setDocumentRuntimeCompositionAndRefreshCommandServices(
         _ composition: DocumentRuntimeComposition
     ) {
@@ -155,9 +175,7 @@ private extension DependencyValues {
             documentMutationGateway: composition.mutationGateway,
             textLayerGateway: composition.textLayerGateway
         )
-        self[SelectionWorkflowServiceKey.self] = SelectionWorkflowService(
-            gpuOperations: composition.gpuOperationGateway
-        )
+        setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(composition.gpuOperationGateway)
     }
 }
 
@@ -267,7 +285,8 @@ extension DependencyValues {
         set {
             var composition = documentRuntimeComposition
             composition.gpuOperationGateway = newValue
-            documentRuntimeComposition = composition
+            self[DocumentRuntimeCompositionKey.self] = composition
+            setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(newValue)
         }
     }
 

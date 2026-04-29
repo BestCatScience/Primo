@@ -16,7 +16,10 @@ public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         case createFolder
         case deleteFolder
         case setFolderVisibility
+        case setFolderName
+        case setFolderExpanded
         case assignLayerToFolder
+        case setLayerName
         case setLayerVisibility
         case setLayerLocked
         case setLayerAlphaLocked
@@ -38,6 +41,7 @@ public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
     public var anchorLayerIndex: DocumentLayerIndex?
     public var name: String?
     public var isVisible: Bool?
+    public var isExpanded: Bool?
     public var isLocked: Bool?
     public var isAlphaLocked: Bool?
     public var isClipped: Bool?
@@ -57,6 +61,7 @@ public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         anchorLayerIndex: DocumentLayerIndex? = nil,
         name: String? = nil,
         isVisible: Bool? = nil,
+        isExpanded: Bool? = nil,
         isLocked: Bool? = nil,
         isAlphaLocked: Bool? = nil,
         isClipped: Bool? = nil,
@@ -75,6 +80,7 @@ public struct StoredTimelapseOperation: Codable, Equatable, Sendable {
         self.anchorLayerIndex = anchorLayerIndex
         self.name = name
         self.isVisible = isVisible
+        self.isExpanded = isExpanded
         self.isLocked = isLocked
         self.isAlphaLocked = isAlphaLocked
         self.isClipped = isClipped

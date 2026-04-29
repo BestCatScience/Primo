@@ -200,6 +200,7 @@ struct WindowGestureShield: UIViewRepresentable {
 
     func updateUIView(_ uiView: ShieldView, context: Context) {}
 
+    @MainActor
     final class Coordinator: NSObject {
         lazy var panRecognizer: UIPanGestureRecognizer = {
             let recognizer = UIPanGestureRecognizer(target: self, action: #selector(handlePan))

@@ -2,14 +2,109 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMetalRuntimeInfrastructure
+import PrimoDocumentPersistenceContracts
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
+
 struct PaintDocumentMutationContractTests {
     @Test
     func redoRejectsMissingHistory() {
         let runtime = DocumentEngineFactory.live()
         #expect(runtime.historyGateway.canRedo() == false)
         expectFailure(runtime.historyGateway.redo(), .noRedoState)
+    }
+
+    @Test
+    func layerRenameIsUndoable() throws {
+        let runtime = DocumentEngineFactory.live()
+
+        expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
+        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+
+        expectSuccess(runtime.historyGateway.undo())
+        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Layer 1")
+
+        expectSuccess(runtime.historyGateway.redo())
+        #expect(runtime.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+    }
+
+    @Test
+    func folderRenameAndExpandedStateAreUndoable() throws {
+        let runtime = DocumentEngineFactory.live()
+        let folderID = try #require(createdFolderID(in: runtime, name: "Group"))
+
+        expectSuccess(runtime.setFolderName(folderID, "References"))
+        #expect(folder(in: runtime, id: folderID)?.name == "References")
+
+        expectSuccess(runtime.historyGateway.undo())
+        #expect(folder(in: runtime, id: folderID)?.name == "Group")
+
+        expectSuccess(runtime.historyGateway.redo())
+        #expect(folder(in: runtime, id: folderID)?.name == "References")
+
+        expectSuccess(runtime.setFolderExpanded(folderID, false))
+        #expect(folder(in: runtime, id: folderID)?.isExpanded == false)
+
+        expectSuccess(runtime.historyGateway.undo())
+        #expect(folder(in: runtime, id: folderID)?.isExpanded == true)
+    }
+
+    @Test
+    func renameStatePersistsAcrossSaveAndLoad() throws {
+        let runtime = DocumentEngineFactory.live()
+        let folderID = try #require(createdFolderID(in: runtime, name: "Group"))
+        let projectURL = temporaryProjectURL()
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+
+        expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
+        expectSuccess(runtime.setFolderName(folderID, "References"))
+        try runtime.persistenceGateway.saveProject(projectURL, .default)
+
+        let loaded = DocumentEngineFactory.live()
+        _ = try loaded.persistenceGateway.loadProject(projectURL)
+
+        #expect(loaded.queryGateway.lightweightPresentation().layerRows.first?.name == "Ink")
+        #expect(folder(in: loaded, id: folderID)?.name == "References")
+    }
+
+    @Test
+    func renameAndFolderExpandedAreCapturedAsTimelapseOperations() throws {
+        let runtime = DocumentEngineFactory.live()
+        let folderID = try #require(createdFolderID(in: runtime, name: "Group"))
+
+        expectSuccess(runtime.mutationGateway.setLayerName(0, "Ink"))
+        expectSuccess(runtime.setFolderName(folderID, "References"))
+        expectSuccess(runtime.setFolderExpanded(folderID, false))
+
+        guard case let .operations(operations) = runtime.exportGateway.timelapseCapture()?.source else {
+            Issue.record("Expected operation-backed timelapse capture")
+            return
+        }
+
+        #expect(operations.contains(.setLayerName(index: .unchecked(0), name: "Ink")))
+        #expect(operations.contains(.setFolderName(folderID: .unchecked(folderID), name: "References")))
+        #expect(operations.contains(.setFolderExpanded(folderID: .unchecked(folderID), isExpanded: false)))
+    }
+
+    @Test
+    func renameTimelapseOperationsRoundTripThroughStoredRepresentation() throws {
+        let operations: [TimelapseOperation] = [
+            .setLayerName(index: .unchecked(0), name: "Ink"),
+            .setFolderName(folderID: .unchecked(2), name: "References"),
+            .setFolderExpanded(folderID: .unchecked(2), isExpanded: false),
+        ]
+
+        let decoded = try operations.enumerated().map { index, operation in
+            try TimelapseOperation(
+                stored: operation.storedRepresentation(
+                    index: index,
+                    dataDirectory: temporaryProjectURL()
+                ),
+                baseURL: URL(fileURLWithPath: "/tmp")
+            )
+        }
+
+        #expect(decoded == operations)
     }
 
     @Test
@@ -408,6 +503,30 @@ struct PaintDocumentMutationContractTests {
         } else {
             #expect(translated == nil)
         }
+    }
+
+    private func createdFolderID(in runtime: DocumentEngineLive, name: String) -> Int? {
+        switch runtime.createFolder(name, 0) {
+        case let .success(folderID):
+            return folderID
+        case let .failure(failure):
+            Issue.record("Expected folder creation success, got \(String(describing: failure))")
+            return nil
+        }
+    }
+
+    private func folder(in runtime: DocumentEngineLive, id: Int) -> LayerFolderModel? {
+        runtime.queryGateway.lightweightPresentation().layerSidebarRows.compactMap { row in
+            if case let .folder(folder) = row, folder.id == id {
+                return folder
+            }
+            return nil
+        }.first
+    }
+
+    private func temporaryProjectURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("PrimoMutationContractTests-\(UUID().uuidString)", isDirectory: true)
     }
 
     private func expectSuccess(_ result: DocumentMutationResult) {

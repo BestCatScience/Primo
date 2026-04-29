@@ -83,6 +83,7 @@ private extension CanvasFeature.Action {
 }
 
 private extension CanvasPresentationState {
+    @MainActor
     init(canvas store: StoreOf<CanvasFeature>) {
         self.init(
             documentSize: store.canvasSize,

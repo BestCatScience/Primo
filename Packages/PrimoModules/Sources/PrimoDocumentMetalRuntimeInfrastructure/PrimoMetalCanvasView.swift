@@ -129,6 +129,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
     private let nearestLayerPipeline: MTLRenderPipelineState?
     private let paperPipeline: MTLRenderPipelineState?
     private let vertexBuffer: MTLBuffer?
+    private let resourceStore: MetalResourceStore
     private var compositeTexture: MTLTexture?
     private var pendingSnapshot: MetalDocumentSnapshot?
     private var pendingSurface: DocumentCompositeSurface?
@@ -147,11 +148,12 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
     public private(set) var currentSnapshot: MetalDocumentSnapshot?
     public var currentActiveLayerIndex: Int = 0
 
-    public init() {
+    public init(resourceStore: MetalResourceStore = MetalResourceStore()) {
         let clock = ContinuousClock()
         let start = clock.now
         let resources = PrimoMetalCanvasRendererCache.shared
         let metalDevice = resources.device
+        self.resourceStore = resourceStore
         self.commandQueue = resources.commandQueue
         self.vertexBuffer = resources.vertexBuffer
         self.paperPipeline = resources.paperPipeline
@@ -217,7 +219,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         guard copyWidth > 0, copyHeight > 0 else { return }
 
         if let handle = update.gpuBufferHandle,
-           MetalResourceStore().populateTexture(
+           resourceStore.populateTexture(
                texture,
                from: handle,
                sourceOriginX: 0,
@@ -227,7 +229,6 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
                width: copyWidth,
                height: copyHeight
            ) {
-            MetalResourceStore().release(handle)
             lastAppliedIncrementalUpdateID = update.id
             scheduleRedraw()
             return
@@ -395,7 +396,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         let texture = ensureCompositeTexture(device: device)
         if let handle = snapshot.compositeBufferHandle,
            let texture,
-           MetalResourceStore().populateTexture(texture, from: handle) {
+           resourceStore.populateTexture(texture, from: handle) {
             // GPU-backed snapshot upload completed directly from cached buffer.
         } else {
             snapshot.compositePixelData.withUnsafeBytes { bytes in

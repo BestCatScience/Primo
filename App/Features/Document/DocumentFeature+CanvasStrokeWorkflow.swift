@@ -25,9 +25,6 @@ extension DocumentFeature {
         case let .canvas(.delegate(.previewShapeStroke(samples))):
             return handlePreviewShapeStroke(state: &state, samples: samples)
 
-        case .canvas(.delegate(.commitPreviewShapeStroke)):
-            return handleCommitPreviewShapeStroke(state: &state)
-
         case let .canvas(.delegate(.endStroke(samples))):
             return handleFinishStroke(
                 state: &state,
@@ -544,26 +541,32 @@ extension DocumentFeature {
         state: inout DocumentFeature.State,
         samples: [StylusSample]
     ) -> Effect<DocumentFeature.Action> {
-        guard let first = samples.first else { return .none }
+        guard !samples.isEmpty else { return .none }
+        guard let context = canvasStrokeContext(in: state) else {
+            return .none
+        }
         switch prepareCanvasStrokeEditing(state: &state) {
         case .success:
             break
         case let .failure(failure):
             return applyCanvasStrokeFailure(failure, state: &state)
         }
-        documentStrokeCommandService.beginStroke(first, DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state))
-        for sample in samples.dropFirst() {
-            documentStrokeCommandService.appendStroke(sample)
-        }
-        return .merge(
-            applyLiveCompositeSurface(documentCanvasCommandService.compositeSurface(), state: &state),
-            .none
+        canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
+            state: &state,
+            ensureCurrentPresentationLoaded: { state in
+                ensureCurrentCanvasPresentationLoaded(state: &state)
+            }
         )
-    }
-
-    func handleCommitPreviewShapeStroke(state: inout DocumentFeature.State) -> Effect<DocumentFeature.Action> {
-        documentStrokeCommandService.endStroke()
-        return completeCanvasStrokeMutation(state: &state)
+        let previewOutcome = documentCanvasStrokeSessionCoordinator.resolveShapeStrokePreview(
+            state: state,
+            samples: samples,
+            context: context
+        )
+        return applyStrokePreviewOutcome(
+            previewOutcome,
+            activeLayerIndex: context.activeLayerIndex,
+            state: &state
+        )
     }
 
     func handleFinishStroke(

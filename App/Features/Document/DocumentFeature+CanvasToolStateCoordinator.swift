@@ -39,6 +39,27 @@ extension DocumentFeature {
             )
         }
 
+        func resolveShapeStrokePreview(
+            state: DocumentFeature.State,
+            samples: [StylusSample],
+            context: CanvasStrokeContext
+        ) -> GpuStrokeSessionOutcome {
+            strokeInteraction.appendPreview(
+                baseSnapshot: state.canvas.strokeSession.baseSnapshot,
+                renderSnapshot: state.canvas.renderSnapshot,
+                renderState: state.canvas.strokeSession.renderState,
+                samples: samples,
+                fullSamples: samples,
+                context: DocumentStrokeContext(
+                    activeLayer: context.activeLayer,
+                    activeLayerIndex: context.activeLayerIndex,
+                    brush: context.brush,
+                    previewBrush: context.previewBrush
+                ),
+                usesResponsiveOilPreview: usesResponsiveOilPreview(state: state, brush: context.previewBrush)
+            )
+        }
+
         func resolveStrokeCommit(
             state: inout DocumentFeature.State,
             samples: [StylusSample],

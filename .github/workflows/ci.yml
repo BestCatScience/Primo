@@ -12,9 +12,13 @@ concurrency:
 
 jobs:
   package-tests:
-    name: Swift Package Tests
+    name: Swift 6 Package Tests (iOS 17/macOS 13)
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      SWIFT_TOOLS_VERSION: "6.0"
+      PACKAGE_IOS_DEPLOYMENT_TARGET: "17"
+      PACKAGE_MACOS_DEPLOYMENT_TARGET: "13"
 
     steps:
       - name: Checkout
@@ -26,14 +30,23 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Validate package toolchain and platforms
+        run: |
+          grep -q "// swift-tools-version: ${SWIFT_TOOLS_VERSION}" Packages/PrimoModules/Package.swift
+          grep -q ".iOS(.v${PACKAGE_IOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
+          grep -q ".macOS(.v${PACKAGE_MACOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
+
       - name: Run package tests
         working-directory: Packages/PrimoModules
         run: swift test
 
   app-tests:
-    name: Xcode App Tests
+    name: Swift 6 Xcode App Tests (iOS 26)
     runs-on: macos-latest
     timeout-minutes: 35
+    env:
+      APP_SWIFT_VERSION: "6.0"
+      APP_IOS_DEPLOYMENT_TARGET: "26.0"
 
     steps:
       - name: Checkout
@@ -43,6 +56,13 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
+
+      - name: Validate app toolchain and deployment target
+        run: |
+          grep -q "SWIFT_VERSION: ${APP_SWIFT_VERSION}" project.yml
+          grep -q "iOS: ${APP_IOS_DEPLOYMENT_TARGET}" project.yml
+          grep -q "SWIFT_VERSION = ${APP_SWIFT_VERSION};" Primo.xcodeproj/project.pbxproj
+          grep -q "IPHONEOS_DEPLOYMENT_TARGET = ${APP_IOS_DEPLOYMENT_TARGET};" Primo.xcodeproj/project.pbxproj
 
       - name: Resolve package dependencies
         run: |

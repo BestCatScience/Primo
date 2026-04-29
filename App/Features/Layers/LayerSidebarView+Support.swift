@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 
 struct LayerSidebarDragTargetPreferenceKey: PreferenceKey {
-    static var defaultValue: [LayerSidebarView.DragTarget: CGRect] = [:]
+    static let defaultValue: [LayerSidebarView.DragTarget: CGRect] = [:]
 
     static func reduce(value: inout [LayerSidebarView.DragTarget: CGRect], nextValue: () -> [LayerSidebarView.DragTarget: CGRect]) {
         value.merge(nextValue(), uniquingKeysWith: { _, new in new })

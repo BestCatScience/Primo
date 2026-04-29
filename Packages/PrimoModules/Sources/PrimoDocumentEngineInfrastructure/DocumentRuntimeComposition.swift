@@ -223,10 +223,27 @@ private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> Docum
         return .invalidFolderID(folderID)
     case let .layerLocked(index):
         return .layerLocked(index)
+    case let .alphaLocked(index):
+        return .alphaLocked(index)
+    case let .invalidCanvasSize(width, height):
+        return .invalidCanvasSize(width: width, height: height)
     case let .invalidOpacity(opacity):
         return .invalidOpacity(opacity)
+    case .emptyInput:
+        return .emptyInput
+    case .noUndoState:
+        return .noUndoState
+    case .noRedoState:
+        return .noRedoState
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
+    case let .incompatibleLayerType(index):
+        return .incompatibleLayerType(index)
+    case let .transactionFailure(primary, rollback):
+        return .transactionFailure(
+            primary: mapEditingFailure(primary),
+            rollback: mapEditingFailure(rollback)
+        )
     }
 }
 
@@ -238,23 +255,26 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
         return .invalidFolderID(folderID)
     case let .layerLocked(index):
         return .layerLocked(index)
+    case let .alphaLocked(index):
+        return .alphaLocked(index)
+    case let .invalidCanvasSize(width, height):
+        return .invalidCanvasSize(width: width, height: height)
     case let .invalidOpacity(opacity):
         return .invalidOpacity(opacity)
+    case .emptyInput:
+        return .emptyInput
+    case .noUndoState:
+        return .noUndoState
+    case .noRedoState:
+        return .noRedoState
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
-    case .alphaLocked:
-        return .bridgeMutationFailed("alphaLocked")
-    case .invalidCanvasSize:
-        return .bridgeMutationFailed("invalidCanvasSize")
-    case .emptyInput:
-        return .bridgeMutationFailed("emptyInput")
-    case .noUndoState:
-        return .bridgeMutationFailed("noUndoState")
-    case .noRedoState:
-        return .bridgeMutationFailed("noRedoState")
-    case .incompatibleLayerType:
-        return .bridgeMutationFailed("incompatibleLayerType")
+    case let .incompatibleLayerType(index):
+        return .incompatibleLayerType(index)
     case let .transactionFailure(primary, rollback):
-        return .bridgeMutationFailed("transactionFailure(\(primary),\(rollback))")
+        return .transactionFailure(
+            primary: mapRuntimeFailure(primary),
+            rollback: mapRuntimeFailure(rollback)
+        )
     }
 }

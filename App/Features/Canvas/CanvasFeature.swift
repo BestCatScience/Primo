@@ -414,7 +414,6 @@ struct CanvasFeature {
         case beginStroke(StylusSample)
         case appendSamples([StylusSample])
         case previewShapeStroke([StylusSample])
-        case commitPreviewShapeStroke
         case endStroke([StylusSample])
         case cancelStroke
         case commitStroke([StylusSample])
@@ -614,7 +613,7 @@ struct CanvasFeature {
                     state.strokeSession.committedPointCount = 0
                     state.shapePreviewIsLive = false
                     if hadLivePreview {
-                        return .send(.delegate(.commitPreviewShapeStroke))
+                        return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
                     }
                     return .send(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
                 }

@@ -18,9 +18,11 @@ extension BrushPaletteView {
         Binding(
             get: { store.brush.activeOpaqueColor },
             set: { newColor in
-                let keyPath: WritableKeyPath<BrushPaletteFeature.State, Color> =
-                    store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color
-                store.send(.binding(.set(keyPath, newColor)))
+                if store.brush.selectedColorSlot == .secondary {
+                    store.send(.binding(.set(\.brush.secondaryColor, newColor)))
+                } else {
+                    store.send(.binding(.set(\.brush.color, newColor)))
+                }
             }
         )
     }
@@ -64,14 +66,11 @@ extension BrushPaletteView {
             isTransparentSelected: isTransparentBrushColorSelected,
             transparentTitle: language.localized("透明色で描画")
         ) { swatchColor in
-            store.send(
-                .binding(
-                    .set(
-                        store.brush.selectedColorSlot == .secondary ? \.brush.secondaryColor : \.brush.color,
-                        swatchColor
-                    )
-                )
-            )
+            if store.brush.selectedColorSlot == .secondary {
+                store.send(.binding(.set(\.brush.secondaryColor, swatchColor)))
+            } else {
+                store.send(.binding(.set(\.brush.color, swatchColor)))
+            }
         }
     }
 

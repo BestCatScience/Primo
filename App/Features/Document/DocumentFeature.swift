@@ -658,7 +658,6 @@ struct DocumentFeature {
                 case .canvas(.delegate(.beginStroke)),
                      .canvas(.delegate(.appendSamples)),
                      .canvas(.delegate(.previewShapeStroke)),
-                     .canvas(.delegate(.commitPreviewShapeStroke)),
                      .canvas(.delegate(.endStroke)),
                      .canvas(.delegate(.cancelStroke)),
                      .canvas(.delegate(.commitStroke)),

@@ -51,8 +51,20 @@ public enum DocumentEngineFactory {
         let queryGateway = DocumentQueryGateway(
             lightweightPresentation: { runtimeBox.withRuntime { $0.lightweightPresentation() } },
             presentation: { runtimeBox.withRuntime { $0.presentation() } },
-            compositePixelData: { runtimeBox.withRuntime { $0.compositeSurface().pixelData } },
-            compositeSurface: { runtimeBox.withRuntime { $0.compositeSurface() } },
+            compositePixelData: {
+                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                return SwiftDocumentRuntime.compositeSurface(
+                    forMaterializedSnapshot: snapshot,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                ).pixelData
+            },
+            compositeSurface: {
+                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                return SwiftDocumentRuntime.compositeSurface(
+                    forMaterializedSnapshot: snapshot,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                )
+            },
             pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } },
             consumeDirtyUpdate: { runtimeBox.withRuntime { $0.consumeDirtyUpdate() } }
         )
@@ -118,9 +130,8 @@ public enum DocumentEngineFactory {
 
         let persistenceGateway = DocumentPersistenceGateway(
             saveProject: { url, paperStyle in
-                try runtimeBox.withRuntime { session in
-                    try session.saveProject(to: url, paperStyle: paperStyle)
-                }
+                let snapshot = runtimeBox.withRuntime { $0.projectSaveSnapshot(paperStyle: paperStyle) }
+                try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
             },
             loadProject: { url in
                 let gpuServices = DocumentRuntimeGpuServicesFactory.live()
@@ -151,12 +162,32 @@ public enum DocumentEngineFactory {
                     )
                 )
             },
-            prewarmDrawingResources: { runtimeBox.withRuntime { $0.prewarmDrawingResources() } }
+            prewarmDrawingResources: {
+                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                _ = SwiftDocumentRuntime.compositeSurface(
+                    forMaterializedSnapshot: snapshot,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                )
+            }
         )
 
         let exportGateway = DocumentExportGateway(
-            compositeSurface: { style in runtimeBox.withRuntime { $0.compositeExportSurface(paperStyle: style) } },
-            compositePNGData: { style in runtimeBox.withRuntime { $0.compositePNGData(paperStyle: style) } },
+            compositeSurface: { style in
+                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                return SwiftDocumentRuntime.compositeExportSurface(
+                    forMaterializedSnapshot: snapshot,
+                    paperStyle: style,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                )
+            },
+            compositePNGData: { style in
+                let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
+                return SwiftDocumentRuntime.compositePNGData(
+                    forMaterializedSnapshot: snapshot,
+                    paperStyle: style,
+                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                )
+            },
             timelapseCapture: { runtimeBox.withRuntime { $0.timelapseCapture() } }
         )
 

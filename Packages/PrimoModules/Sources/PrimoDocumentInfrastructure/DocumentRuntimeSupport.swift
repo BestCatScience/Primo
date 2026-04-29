@@ -35,8 +35,8 @@ public final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
 
     public func replaceRuntime(with newRuntime: Runtime) {
         lock.lock()
+        defer { lock.unlock() }
         runtime = newRuntime
-        lock.unlock()
     }
 }
 

@@ -1,13 +1,49 @@
 import Foundation
+import ComposableArchitecture
+import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
+import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 import XCTest
 @testable import Primo
 
 final class CanvasStrokeWorkflowTests: XCTestCase {
+    func testDocumentGpuGatewayOverrideRefreshesDerivedGpuDependencies() {
+        let oldGateway = markedGateway(1)
+        let newGateway = markedGateway(9)
+
+        let outputs = withDependencies {
+            $0.documentRuntimeComposition = .stub(gpuOperationGateway: oldGateway)
+            let oldPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: oldGateway)
+            let oldLayerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: oldGateway)
+            $0.canvasPreviewRenderer = oldPreviewRenderer
+            $0.selectionMaskProcessor = oldPreviewRenderer
+            $0.layerTransformProcessor = oldLayerTransformProcessor
+            $0.canvasPresentationEnvironment = CanvasPresentationEnvironment(
+                previewRenderer: oldPreviewRenderer,
+                eyedropperSampler: $0.canvasEyedropperSampler,
+                selectionProcessor: oldPreviewRenderer,
+                layerTransformProcessor: oldLayerTransformProcessor
+            )
+
+            $0.documentGpuOperationGateway = newGateway
+        } operation: {
+            DerivedGpuDependencyProbe().outputs()
+        }
+
+        XCTAssertEqual(outputs, [
+            Data([9]),
+            Data(repeating: 9, count: 4),
+            Data([9]),
+            Data([9]),
+            Data(repeating: 9, count: 4),
+            Data([9]),
+        ])
+    }
+
     func testPrepareCanvasStrokeEditingReturnsTypedFailure() {
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(
@@ -149,6 +185,98 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.sampleCount, 32)
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.supportsIncrementalContinuation, true)
+    }
+
+    func testShapeStrokePreviewUsesStrokeSessionPreviewWithFullSamples() {
+        let recordedCommands = TestRecorder<GpuStrokeSessionCommand>()
+        let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: .stub { command in
+                    recordedCommands.record(command)
+                    return .failure(.bridgeMutationFailed("recorded"))
+                }
+            )
+        )
+        let samples = [
+            StylusSample.testValue(point: CGPoint(x: 1, y: 1)),
+            StylusSample.testValue(point: CGPoint(x: 3, y: 3)),
+        ]
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentFeature.State())
+        var state = DocumentFeature.State()
+        state.canvas.strokeSession.renderState = StrokeSessionRenderState(
+            baseRevision: 12,
+            layerIndex: 0,
+            surfaceHandle: expectedHandle,
+            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+            isApproximatePreview: false,
+            previewBrush: brush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: true
+        )
+
+        let result = coordinator.resolveShapeStrokePreview(
+            state: state,
+            samples: samples,
+            context: DocumentFeature.CanvasStrokeContext(
+                activeLayer: .testValue(),
+                activeLayerIndex: 0,
+                brush: brush,
+                previewBrush: brush
+            )
+        )
+
+        guard case .failure = result else {
+            XCTFail("Expected stubbed failure")
+            return
+        }
+        guard let command = recordedCommands.values.first,
+              case let .append(_, _, renderState, previewSamples, fullSamples, _, _) = command
+        else {
+            XCTFail("Expected shape preview to use stroke session append preview")
+            return
+        }
+        XCTAssertEqual(renderState?.surfaceHandle, expectedHandle)
+        XCTAssertEqual(previewSamples, samples)
+        XCTAssertEqual(fullSamples, samples)
+    }
+
+    func testShapeStrokeEndCommitsFinalSamplesAfterLivePreview() async {
+        let first = StrokePoint(
+            position: SIMD2<Float>(1, 1),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 0,
+            isPredicted: false
+        )
+        let second = StrokePoint(
+            position: SIMD2<Float>(4, 4),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 1,
+            isPredicted: false
+        )
+        let stroke = Stroke(points: [first, second])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .shape
+            state.shapePreviewIsLive = true
+            state.isStrokeActive = true
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeEnded(stroke)) {
+            $0.isStrokeActive = false
+            $0.isAwaitingCommittedRender = true
+            $0.strokeSession.committedPointCount = 0
+            $0.shapePreviewIsLive = false
+        }
+        await store.receive(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
     }
 
     func testGpuCommitOutcomeAppliesLayerSurfaceMutation() {
@@ -459,4 +587,90 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(deleteLayerCalls.values, [9])
         XCTAssertEqual(setActiveLayerCalls.values, [2])
     }
+}
+
+private struct DerivedGpuDependencyProbe {
+    @Dependency(\.canvasPreviewRenderer) var previewRenderer
+    @Dependency(\.selectionMaskProcessor) var selectionMaskProcessor
+    @Dependency(\.layerTransformProcessor) var layerTransformProcessor
+    @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
+
+    func outputs() -> [Data?] {
+        let snapshot = MetalDocumentSnapshot(
+            width: 1,
+            height: 1,
+            revision: 0,
+            compositePixelData: Data(count: 4),
+            layers: []
+        )
+        let selection = CanvasSelection(
+            bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+            maskWidth: 1,
+            maskHeight: 1,
+            maskData: Data([255]),
+            mode: .lasso
+        )
+
+        return [
+            previewRenderer.compositePreviewImageData(
+                snapshot: snapshot,
+                activeLayerIndex: 0,
+                adjustedActiveLayerPixels: Data(count: 4)
+            ),
+            selectionMaskProcessor.selectionOverlaySurface(
+                maskData: Data([255]),
+                width: 1,
+                height: 1
+            )?.pixelData,
+            layerTransformProcessor.transformedLayerPixels(
+                source: Data(repeating: 255, count: 4),
+                canvasWidth: 1,
+                canvasHeight: 1,
+                selection: selection,
+                translation: CGSize(width: 1, height: 0),
+                scaleX: 1,
+                scaleY: 1,
+                rotationDegrees: 0,
+                pivot: nil,
+                mode: .standard,
+                quadOffsets: .zero
+            ),
+            canvasPresentationEnvironment.previewRenderer.compositePreviewImageData(
+                snapshot: snapshot,
+                activeLayerIndex: 0,
+                adjustedActiveLayerPixels: Data(count: 4)
+            ),
+            canvasPresentationEnvironment.selectionProcessor.selectionOverlaySurface(
+                maskData: Data([255]),
+                width: 1,
+                height: 1
+            )?.pixelData,
+            canvasPresentationEnvironment.layerTransformProcessor.transformedLayerPixels(
+                source: Data(repeating: 255, count: 4),
+                canvasWidth: 1,
+                canvasHeight: 1,
+                selection: selection,
+                translation: CGSize(width: 1, height: 0),
+                scaleX: 1,
+                scaleY: 1,
+                rotationDegrees: 0,
+                pivot: nil,
+                mode: .standard,
+                quadOffsets: .zero
+            ),
+        ]
+    }
+}
+
+private func markedGateway(_ marker: UInt8) -> DocumentGpuOperationGateway {
+    var gateway = DocumentGpuOperationGateway.stub()
+    gateway.compositedPreviewPixelData = { _, _, _ in Data([marker]) }
+    gateway.selectionOverlayRGBA = { _, width, height in
+        Data(repeating: marker, count: width * height * 4)
+    }
+    gateway.expandedSelectionMask = { request in
+        [UInt8](repeating: marker, count: request.canvasWidth * request.canvasHeight)
+    }
+    gateway.transformedLayerPixelData = { _ in Data([marker]) }
+    return gateway
 }

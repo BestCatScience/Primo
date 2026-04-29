@@ -106,23 +106,23 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
 
 ## 重要なファイル
 
-- [App/Features/Document/AppFeature.swift](/Users/goldstein/git/Primo/App/Features/Document/AppFeature.swift)
-  TCA reducer の入口です。workspace、document editor、canvas interaction、import / export、NanoBanana feature を束ねます。
-- [App/Features/Document/PaintDocumentClient.swift](/Users/goldstein/git/Primo/App/Features/Document/PaintDocumentClient.swift)
+- [App/Features/Document/DocumentFeature.swift](App/Features/Document/DocumentFeature.swift)
+  document editor の TCA reducer 本体です。canvas interaction、document mutation、import / export、NanoBanana feature への workflow を束ねます。
+- [App/Features/Document/PaintDocumentClient.swift](App/Features/Document/PaintDocumentClient.swift)
   app 側 dependency wiring です。`DocumentRuntimeComposition` から各 command service / gateway を組み立てます。
-- [App/Features/Canvas/CanvasView.swift](/Users/goldstein/git/Primo/App/Features/Canvas/CanvasView.swift)
+- [App/Features/Canvas/CanvasView.swift](App/Features/Canvas/CanvasView.swift)
   SwiftUI と UIKit canvas presentation の接続点です。
-- [Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift)
+- [Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift](Packages/PrimoModules/Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift)
   canvas surface、入力、selection overlay、transform preview、text overlay、eyedropper loupe を束ねる UIKit view です。
-- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift)
   runtime、stroke use case、GPU operation gateway を app 向けに組み合わせる composition root です。
-- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentEngineLive.swift)
   `SwiftDocumentRuntime` を gateway 群として公開する live engine です。
-- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/SwiftDocumentRuntime.swift)
   document store、undo / redo、dirty update、stroke commit、save / load、timelapse を扱う runtime 本体です。
-- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift](Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeGpuServices.swift)
   runtime から Metal 処理を呼び出すための GPU service 集約です。
-- [Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift](/Users/goldstein/git/Primo/Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift)
+- [Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift](Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/DocumentGpuOperationBackend.swift)
   preview、selection、transform、layer processing など表示・編集補助向け GPU operation の境界です。
 
 ## ドキュメント保存形式
