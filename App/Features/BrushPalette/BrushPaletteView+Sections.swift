@@ -7,6 +7,18 @@ extension BrushPaletteView {
         currentTool == .brush || currentTool == .erase
     }
 
+    var inputDeviceSummary: String {
+        store.ui.allowsFingerTouchInput
+            ? language.localized("ペン / 指 / トラックパッド")
+            : language.localized("ペン / トラックパッド")
+    }
+
+    var inputPointerDescription: String {
+        store.ui.allowsFingerTouchInput
+            ? language.localized("ペンや指")
+            : language.localized("ペンやトラックパッド")
+    }
+
     func settingsPanelContent(proxy: GeometryProxy, showHeaderTitle: Bool) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 16) {
@@ -110,7 +122,7 @@ extension BrushPaletteView {
                         VStack(alignment: .leading, spacing: 6) {
                             metricRow(language.localized("取得元"), value: store.sampling.eyedropperSource.localizedTitle(language))
                             metricRow(language.localized("現在色"), value: colorHexLabel)
-                            metricRow(language.localized("入力"), value: "Apple Pencil")
+                            metricRow(language.localized("入力"), value: inputDeviceSummary)
                             metricRow(language.localized("動作"), value: language.localized("ドラッグで連続取得"))
                         }
                     }
@@ -354,7 +366,7 @@ extension BrushPaletteView {
                             Text(language.localized("ぼかし"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(panelStrongTextStyle)
-                            Text(language.localized("Apple Pencil でなぞった部分にだけ局所的なぼかしを適用します。"))
+                            Text(language.localized("\(inputPointerDescription)でなぞった部分にだけ局所的なぼかしを適用します。"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(panelSecondaryTextStyle)
                         }
@@ -453,7 +465,7 @@ extension BrushPaletteView {
                             Text(language.localized("選択設定"))
                                 .font(StudioTheme.Typography.title(14))
                                 .foregroundStyle(panelStrongTextStyle)
-                            Text(store.selection.toolMode == .lasso ? language.localized("Apple Pencil で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
+                            Text(store.selection.toolMode == .lasso ? language.localized("\(inputPointerDescription)で囲んだあと、移動ツールで変形します") : language.localized("タップで選択したあと、移動ツールで変形します"))
                                 .font(StudioTheme.Typography.body(11))
                                 .foregroundStyle(panelSecondaryTextStyle)
                         }

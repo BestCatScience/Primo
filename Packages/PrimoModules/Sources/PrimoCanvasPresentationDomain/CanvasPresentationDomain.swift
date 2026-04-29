@@ -59,6 +59,7 @@ public struct CanvasPresentationState: Sendable {
     public var paperStyle: CanvasPaperStyle
     public var previewStyle: PreviewStrokeStyle
     public var currentTool: StudioToolKind
+    public var allowsFingerTouchInput: Bool
     public var selectionMode: SelectionToolMode
     public var shapeMode: ShapeToolMode
     public var eyedropperSamplingSource: EyedropperSamplingSource
@@ -87,6 +88,7 @@ public struct CanvasPresentationState: Sendable {
         paperStyle: CanvasPaperStyle,
         previewStyle: PreviewStrokeStyle,
         currentTool: StudioToolKind,
+        allowsFingerTouchInput: Bool = false,
         selectionMode: SelectionToolMode,
         shapeMode: ShapeToolMode,
         eyedropperSamplingSource: EyedropperSamplingSource,
@@ -114,6 +116,7 @@ public struct CanvasPresentationState: Sendable {
         self.paperStyle = paperStyle
         self.previewStyle = previewStyle
         self.currentTool = currentTool
+        self.allowsFingerTouchInput = allowsFingerTouchInput
         self.selectionMode = selectionMode
         self.shapeMode = shapeMode
         self.eyedropperSamplingSource = eyedropperSamplingSource

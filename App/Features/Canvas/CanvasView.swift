@@ -9,6 +9,7 @@ struct CanvasView: UIViewRepresentable {
     @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
 
     let store: StoreOf<CanvasFeature>
+    var allowsFingerTouchInput = false
 
     func makeUIView(context: Context) -> CanvasPresentationContainerView {
         let view = CanvasPresentationContainerView(environment: canvasPresentationEnvironment)
@@ -19,7 +20,7 @@ struct CanvasView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: CanvasPresentationContainerView, context: Context) {
-        uiView.update(CanvasPresentationState(canvas: store))
+        uiView.update(CanvasPresentationState(canvas: store, allowsFingerTouchInput: allowsFingerTouchInput))
     }
 }
 
@@ -84,7 +85,7 @@ private extension CanvasFeature.Action {
 
 private extension CanvasPresentationState {
     @MainActor
-    init(canvas store: StoreOf<CanvasFeature>) {
+    init(canvas store: StoreOf<CanvasFeature>, allowsFingerTouchInput: Bool) {
         self.init(
             documentSize: store.canvasSize,
             snapshot: store.renderSnapshot,
@@ -95,6 +96,7 @@ private extension CanvasPresentationState {
             paperStyle: store.paperStyle,
             previewStyle: store.previewStyle,
             currentTool: store.currentTool,
+            allowsFingerTouchInput: allowsFingerTouchInput,
             selectionMode: store.selectionMode,
             shapeMode: store.shapeMode,
             eyedropperSamplingSource: store.eyedropperSamplingSource,

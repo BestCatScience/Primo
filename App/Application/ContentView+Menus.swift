@@ -1874,6 +1874,29 @@ extension ContentView {
 
                 Divider()
 
+                Button {
+                    store.send(
+                        .document(
+                            .brushPalette(
+                                .binding(
+                                    .set(
+                                        \.ui.allowsFingerTouchInput,
+                                         !store.document.brushPalette.allowsFingerTouchInput
+                                    )
+                                )
+                            )
+                        )
+                    )
+                } label: {
+                    if store.document.brushPalette.allowsFingerTouchInput {
+                        Label(language.localized("指入力"), systemImage: "checkmark")
+                    } else {
+                        Text(language.localized("指入力"))
+                    }
+                }
+
+                Divider()
+
                 Button(store.document.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
                     store.send(.document(.editing(.panelCollapseToggled(.brush))))
                 }

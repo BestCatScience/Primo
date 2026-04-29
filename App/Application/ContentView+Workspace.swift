@@ -83,7 +83,8 @@ extension ContentView {
                     store: store.scope(
                         state: \.document.canvas,
                         action: \.document.canvas
-                    )
+                    ),
+                    allowsFingerTouchInput: store.document.brushPalette.allowsFingerTouchInput
                 )
                 .padding(10)
             } else {

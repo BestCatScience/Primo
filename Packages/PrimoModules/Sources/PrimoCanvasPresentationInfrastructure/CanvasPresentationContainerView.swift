@@ -139,6 +139,7 @@ public final class CanvasPresentationContainerView: UIView, CanvasInputHandlingD
         )
 
         inputHandler.tool = state.currentTool
+        inputHandler.allowsFingerTouchInput = state.allowsFingerTouchInput
         inputHandler.selectionMode = state.selectionMode
         inputHandler.shapeMode = state.shapeMode
         inputHandler.eyedropperSamplingSource = state.eyedropperSamplingSource

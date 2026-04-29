@@ -36,17 +36,32 @@ public final class CanvasInputHandler {
     public var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     public var brushSize: Float = 4.0
     public var strokeStabilization: Float = 0.0
+    public var allowsFingerTouchInput = false
     public var pointMapper: ((CGPoint, UIView) -> SIMD2<Float>)?
 
     private let inputReducer = CanvasInputReducer()
     private var inputState = CanvasInputReducer.State()
+    private var activeTouch: UITouch?
 
     public init() {}
 
     public func handleTouches(_ touches: Set<UITouch>, with event: UIEvent?, in view: UIView) {
-        guard let touch = touches.first,
-              (touch.type == .pencil || tool == .text) else { return }
+        guard let touch = touchForCurrentInput(from: touches) else { return }
         guard let phase = CanvasInputTouchPhase(touch.phase) else { return }
+
+        if !isAllowedInputTouch(touch) {
+            cancelActiveInput(with: touch, in: view)
+            return
+        }
+
+        if shouldDeferToNavigationGesture(for: touch, touches: touches, event: event) {
+            cancelActiveInput(with: touch, in: view)
+            return
+        }
+
+        if phase == .began {
+            activeTouch = touch
+        }
 
         let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
         let commands = inputReducer.reduce(
@@ -64,6 +79,49 @@ public final class CanvasInputHandler {
                 strokeStabilization: strokeStabilization
             )
         )
+        dispatch(commands)
+
+        if phase == .ended || phase == .cancelled {
+            activeTouch = nil
+        }
+    }
+
+    private func touchForCurrentInput(from touches: Set<UITouch>) -> UITouch? {
+        if let activeTouch, touches.contains(where: { $0 === activeTouch }) {
+            return activeTouch
+        }
+        guard activeTouch == nil else { return nil }
+        return touches.first(where: isAllowedInputTouch)
+    }
+
+    private func isAllowedInputTouch(_ touch: UITouch) -> Bool {
+        allowsFingerTouchInput || touch.type != .direct
+    }
+
+    private func shouldDeferToNavigationGesture(for touch: UITouch, touches: Set<UITouch>, event: UIEvent?) -> Bool {
+        guard touch.type != .pencil else { return false }
+        let touchCount = event?.allTouches?.count ?? touches.count
+        return touchCount > 1
+    }
+
+    private func cancelActiveInput(with touch: UITouch, in view: UIView) {
+        guard activeTouch != nil else { return }
+        let commands = inputReducer.reduce(
+            phase: .cancelled,
+            sample: makeInputSample(touch, in: view),
+            coalescedSamples: [makeInputSample(touch, in: view)],
+            state: &inputState,
+            configuration: CanvasInputConfiguration(
+                tool: CanvasInputToolKind(tool),
+                selectionMode: selectionMode,
+                shapeMode: shapeMode,
+                brushTipKind: brushTipKind,
+                brushColor: brushColor,
+                brushSize: brushSize,
+                strokeStabilization: strokeStabilization
+            )
+        )
+        activeTouch = nil
         dispatch(commands)
     }
 

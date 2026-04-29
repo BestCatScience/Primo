@@ -8,6 +8,13 @@ extension BrushPaletteView {
     func controlsCard(proxy: GeometryProxy, showsChrome: Bool, showsCategoryPicker: Bool = true) -> some View {
         cardContainer(showsChrome: showsChrome) {
             VStack(alignment: .leading, spacing: 10) {
+                Toggle(isOn: $store.ui.allowsFingerTouchInput) {
+                    Label(language.localized("指入力"), systemImage: "hand.point.up.left")
+                        .font(StudioTheme.Typography.label(12))
+                        .foregroundStyle(panelPrimaryTextStyle)
+                }
+                .toggleStyle(.switch)
+
                 if currentTool == .text {
                     segmentedModeRow(
                         title: language.localized("フォント"),
@@ -143,7 +150,7 @@ extension BrushPaletteView {
                         .pickerStyle(.segmented)
                     }
 
-                    Text(language.localized("Apple Pencil でタップまたはドラッグすると色を取得して現在色に反映します。"))
+                    Text(language.localized("\(inputPointerDescription)でタップまたはドラッグすると色を取得して現在色に反映します。"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .blur {
@@ -169,7 +176,7 @@ extension BrushPaletteView {
                         slider: Slider(value: $store.brush.flow, in: 0.1...1.0)
                     )
 
-                    Text(language.localized("Apple Pencil でなぞった部分だけをぼかします。サイズは半径、強さはぼかしの効き方です。"))
+                    Text(language.localized("\(inputPointerDescription)でなぞった部分だけをぼかします。サイズは半径、強さはぼかしの効き方です。"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .select {
@@ -326,12 +333,12 @@ extension BrushPaletteView {
                         slider: Slider(value: $store.brush.stabilization, in: 0.0...1.0)
                     )
 
-                    Text(language.localized("Apple Pencil をドラッグすると、始点から現在位置までの範囲で図形の輪郭を描きます。"))
+                    Text(language.localized("\(inputPointerDescription)でドラッグすると、始点から現在位置までの範囲で図形の輪郭を描きます。"))
                         .font(StudioTheme.Typography.body(11))
                         .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
                 } else if currentTool == .move {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(hasSelection ? language.localized("Apple Pencil で選択範囲を移動します。適用するまで確定されません。") : language.localized("Apple Pencil でアクティブレイヤーを移動します。適用するまで確定されません。"))
+                        Text(hasSelection ? language.localized("\(inputPointerDescription)で選択範囲を移動します。適用するまで確定されません。") : language.localized("\(inputPointerDescription)でアクティブレイヤーを移動します。適用するまで確定されません。"))
                             .font(StudioTheme.Typography.body(11))
                             .foregroundStyle(usesLightPanelTheme ? Color.black.opacity(0.56) : .white.opacity(0.62))
 
