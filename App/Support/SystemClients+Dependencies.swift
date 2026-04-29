@@ -25,6 +25,10 @@ private enum KeyValueStoreClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.KeyValueStoreClient.live
 }
 
+private enum SecretStoreClientKey: DependencyKey {
+    static let liveValue = PrimoCoreTypes.SecretStoreClient.live
+}
+
 private enum SecurityScopedResourceClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.SecurityScopedResourceClient.live
 }
@@ -69,6 +73,11 @@ extension DependencyValues {
     var keyValueStoreClient: PrimoCoreTypes.KeyValueStoreClient {
         get { self[KeyValueStoreClientKey.self] }
         set { self[KeyValueStoreClientKey.self] = newValue }
+    }
+
+    var secretStoreClient: PrimoCoreTypes.SecretStoreClient {
+        get { self[SecretStoreClientKey.self] }
+        set { self[SecretStoreClientKey.self] = newValue }
     }
 
     var securityScopedResourceClient: PrimoCoreTypes.SecurityScopedResourceClient {

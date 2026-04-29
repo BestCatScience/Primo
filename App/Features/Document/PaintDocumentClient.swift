@@ -188,90 +188,80 @@ extension DependencyValues {
     var documentQueryGateway: DocumentQueryGateway {
         get { documentRuntimeComposition.queryGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.queryGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(queryGateway: newValue)
+            )
         }
     }
 
     var documentMutationGateway: DocumentMutationGateway {
         get { documentRuntimeComposition.mutationGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.mutationGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(mutationGateway: newValue)
+            )
         }
     }
 
     var strokeInputGateway: StrokeInputGateway {
         get { documentRuntimeComposition.strokeGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.strokeGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(strokeGateway: newValue)
+            )
         }
     }
 
     var documentHistoryGateway: DocumentHistoryGateway {
         get { documentRuntimeComposition.historyGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.historyGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(historyGateway: newValue)
+            )
         }
     }
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
         get { documentRuntimeComposition.persistenceGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.persistenceGateway = newValue
-            setDocumentRuntimeCompositionAndRefreshCommandServices(composition)
+            setDocumentRuntimeCompositionAndRefreshCommandServices(
+                documentRuntimeComposition.withOverrides(persistenceGateway: newValue)
+            )
         }
     }
 
     var documentExportGateway: DocumentExportGateway {
         get { documentRuntimeComposition.exportGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.exportGateway = newValue
-            documentRuntimeComposition = composition
+            documentRuntimeComposition = documentRuntimeComposition.withOverrides(exportGateway: newValue)
         }
     }
 
     var textLayerGateway: TextLayerGateway {
         get { documentRuntimeComposition.textLayerGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.textLayerGateway = newValue
-            documentRuntimeComposition = composition
+            documentRuntimeComposition = documentRuntimeComposition.withOverrides(textLayerGateway: newValue)
         }
     }
 
     var documentLayerEffectsGateway: DocumentLayerEffectsGateway {
         get { documentRuntimeComposition.layerEffectsGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.layerEffectsGateway = newValue
-            documentRuntimeComposition = composition
+            documentRuntimeComposition = documentRuntimeComposition.withOverrides(layerEffectsGateway: newValue)
         }
     }
 
     var documentEditingGateway: DocumentEditingGateway {
         get { documentRuntimeComposition.editingGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.editingGateway = newValue
-            documentRuntimeComposition = composition
+            documentRuntimeComposition = documentRuntimeComposition.withOverrides(editingGateway: newValue)
         }
     }
 
     var documentStrokeSessionUseCase: DocumentStrokeSessionUseCase {
         get { documentRuntimeComposition.strokeSessionUseCase }
         set {
-            var composition = documentRuntimeComposition
-            composition.strokeSessionUseCase = newValue
-            documentRuntimeComposition = composition
+            documentRuntimeComposition = documentRuntimeComposition.withOverrides(strokeSessionUseCase: newValue)
         }
     }
 
@@ -283,9 +273,7 @@ extension DependencyValues {
     var documentGpuOperationGateway: DocumentGpuOperationGateway {
         get { documentRuntimeComposition.gpuOperationGateway }
         set {
-            var composition = documentRuntimeComposition
-            composition.gpuOperationGateway = newValue
-            self[DocumentRuntimeCompositionKey.self] = composition
+            self[DocumentRuntimeCompositionKey.self] = documentRuntimeComposition.withOverrides(gpuOperationGateway: newValue)
             setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(newValue)
         }
     }

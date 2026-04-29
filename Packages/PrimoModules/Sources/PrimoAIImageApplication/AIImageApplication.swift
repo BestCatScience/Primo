@@ -10,6 +10,7 @@ public enum AIImageCommandBuilderFailure: Error, Equatable, Sendable {
     case apiKeyRequired
     case endpointRequired
     case entitlementRequired
+    case unsupportedDirectOpenAIModel
 }
 
 public struct AIImageCommandBuilder: Sendable {
@@ -39,6 +40,9 @@ public struct AIImageCommandBuilder: Sendable {
         switch draft.accessMode {
         case .userAPIKey:
             let selectedAPIKey = draft.model.provider == .openAI ? openAIAPIKey : apiKey
+            if draft.model.provider == .openAI, !draft.model.supportsOpenAIDirectImageEdit {
+                return .failure(.unsupportedDirectOpenAIModel)
+            }
             guard let validAPIKey = AIImageAPIKey(selectedAPIKey) else {
                 return .failure(.apiKeyRequired)
             }
@@ -358,13 +362,24 @@ public struct AIImagePreviewPreparationService: Sendable {
         guard let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: encodedData) else {
             return nil
         }
-        guard decoded.width == fallbackSize.width, decoded.height == fallbackSize.height else {
+        if decoded.width == fallbackSize.width, decoded.height == fallbackSize.height {
+            return DocumentCompositeSurface(
+                width: decoded.width,
+                height: decoded.height,
+                pixelData: decoded.pixelData
+            )
+        }
+        guard let resampledPixelData = DocumentRasterImageService.rawLayerPixelData(
+            fromPNGData: encodedData,
+            width: fallbackSize.width,
+            height: fallbackSize.height
+        ) else {
             return nil
         }
         return DocumentCompositeSurface(
-            width: decoded.width,
-            height: decoded.height,
-            pixelData: decoded.pixelData
+            width: fallbackSize.width,
+            height: fallbackSize.height,
+            pixelData: resampledPixelData
         )
     }
 

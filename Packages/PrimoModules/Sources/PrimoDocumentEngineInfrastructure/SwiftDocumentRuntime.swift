@@ -206,19 +206,170 @@ final class GpuResourceLease: @unchecked Sendable {
     }
 }
 
+private struct GpuLayerStoragePolicy: Sendable {
+    private var handles: [Int: MetalBufferHandle] = [:]
+
+    func handle(for index: Int) -> MetalBufferHandle? {
+        handles[index]
+    }
+
+    func materializedSnapshot(
+        from snapshot: SwiftDocumentStoreSnapshot,
+        rgbaByteCount: Int,
+        services: DocumentRuntimeGpuServices
+    ) -> SwiftDocumentStoreSnapshot {
+        var snapshot = snapshot
+        for index in handles.keys where snapshot.layers.indices.contains(index) {
+            snapshot.layers[index].pixelData = currentPixelData(
+                for: index,
+                in: snapshot,
+                rgbaByteCount: rgbaByteCount,
+                services: services
+            )
+        }
+        return snapshot
+    }
+
+    func currentPixelData(
+        for index: Int,
+        in snapshot: SwiftDocumentStoreSnapshot,
+        rgbaByteCount: Int,
+        services: DocumentRuntimeGpuServices
+    ) -> Data {
+        guard snapshot.layers.indices.contains(index) else { return Data() }
+        if let handle = handles[index],
+           let pixelData = services.materializedPixelData(for: handle),
+           pixelData.count == rgbaByteCount {
+            return pixelData
+        }
+        return snapshot.layers[index].pixelData
+    }
+
+    mutating func materializeGpuBackedLayerPixels(
+        in store: SwiftDocumentStore,
+        rgbaByteCount: Int,
+        services: DocumentRuntimeGpuServices
+    ) {
+        for index in handles.keys where store.snapshot.layers.indices.contains(index) {
+            store.snapshot.layers[index].pixelData = currentPixelData(
+                for: index,
+                in: store.snapshot,
+                rgbaByteCount: rgbaByteCount,
+                services: services
+            )
+        }
+    }
+
+    mutating func setLayerPixelState(
+        index: Int,
+        pixelData: Data,
+        gpuBufferHandle: MetalBufferHandle?,
+        in store: SwiftDocumentStore,
+        services: DocumentRuntimeGpuServices
+    ) {
+        let previousHandle = handles[index]
+        store.snapshot.layers[index].pixelData = pixelData
+        if let gpuBufferHandle {
+            handles[index] = gpuBufferHandle
+        } else {
+            handles.removeValue(forKey: index)
+        }
+        if previousHandle != gpuBufferHandle {
+            services.release(previousHandle)
+        }
+    }
+
+    mutating func releaseLayerBufferHandles(services: DocumentRuntimeGpuServices) {
+        for handle in handles.values {
+            services.release(handle)
+        }
+        handles.removeAll(keepingCapacity: true)
+    }
+
+    func layerSourceForGpuPlan(
+        index: Int,
+        snapshot: SwiftDocumentStoreSnapshot,
+        services: DocumentRuntimeGpuServices
+    ) -> (
+        pixelData: Data,
+        bufferHandle: MetalBufferHandle?,
+        retainedResource: GpuResourceLease?
+    ) {
+        guard snapshot.layers.indices.contains(index) else {
+            return (Data(), nil, nil)
+        }
+        guard let handle = handles[index] else {
+            return (snapshot.layers[index].pixelData, nil, nil)
+        }
+        guard let lease = GpuResourceLease(handle: handle, services: services) else {
+            return (snapshot.layers[index].pixelData, nil, nil)
+        }
+        return (snapshot.layers[index].pixelData, handle, lease)
+    }
+}
+
+private struct TimelapseRecorder: Sendable {
+    func record(
+        _ event: TimelapseOperation?,
+        marksOperationPersistence: Bool = false,
+        in store: SwiftDocumentStore
+    ) {
+        if let event {
+            if marksOperationPersistence {
+                store.snapshot.timelapseUsesOperationPersistence = true
+            }
+            store.snapshot.timelapseEvents.append(event)
+        }
+    }
+}
+
+private struct UndoSnapshotPolicy: Sendable {
+    private var undoStack: [SwiftDocumentStoreSnapshot] = []
+    private var redoStack: [SwiftDocumentStoreSnapshot] = []
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    mutating func recordMutation(before: SwiftDocumentStoreSnapshot) {
+        undoStack.append(before)
+        redoStack.removeAll(keepingCapacity: true)
+    }
+
+    mutating func restoreUndo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
+        guard let previous = undoStack.popLast() else {
+            return .failure(.noUndoState)
+        }
+        redoStack.append(current)
+        return .success(previous)
+    }
+
+    mutating func restoreRedo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
+        guard let next = redoStack.popLast() else {
+            return .failure(.noRedoState)
+        }
+        undoStack.append(current)
+        return .success(next)
+    }
+
+    mutating func clear() {
+        undoStack.removeAll(keepingCapacity: true)
+        redoStack.removeAll(keepingCapacity: true)
+    }
+}
+
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
     private let services: DocumentEngineServices
     private let gpuServices: DocumentRuntimeGpuServices
     private let store: SwiftDocumentStore
-    private var undoStack: [SwiftDocumentStoreSnapshot] = []
-    private var redoStack: [SwiftDocumentStoreSnapshot] = []
+    private var undoPolicy = UndoSnapshotPolicy()
     private var pendingDirtyUpdate: IncrementalLayerUpdate?
     private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
     private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
     private var thumbnailSurfaceCache: [Int: DocumentCompositeSurface] = [:]
-    private var gpuLayerHandles: [Int: MetalBufferHandle] = [:]
+    private var gpuLayerStorage = GpuLayerStoragePolicy()
+    private let timelapseRecorder = TimelapseRecorder()
 
     init(
         width: Int = 1152,
@@ -298,50 +449,58 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     private func gpuBackedMaterializedSnapshot() -> SwiftDocumentStoreSnapshot {
-        var snapshot = store.snapshot
-        for index in gpuLayerHandles.keys where snapshot.layers.indices.contains(index) {
-            snapshot.layers[index].pixelData = currentPixelData(for: index)
-        }
-        return snapshot
+        gpuLayerStorage.materializedSnapshot(
+            from: store.snapshot,
+            rgbaByteCount: rgbaByteCount,
+            services: gpuServices
+        )
     }
 
     private func materializeGpuBackedLayerPixels() {
-        for index in gpuLayerHandles.keys where store.snapshot.layers.indices.contains(index) {
-            store.snapshot.layers[index].pixelData = currentPixelData(for: index)
-        }
+        gpuLayerStorage.materializeGpuBackedLayerPixels(
+            in: store,
+            rgbaByteCount: rgbaByteCount,
+            services: gpuServices
+        )
     }
 
     func canUndo() -> Bool {
-        !undoStack.isEmpty
+        undoPolicy.canUndo
     }
 
     func canRedo() -> Bool {
-        !redoStack.isEmpty
+        undoPolicy.canRedo
     }
 
     func undo() -> DocumentMutationResult {
-        guard let previous = undoStack.popLast() else {
-            return .failure(.noUndoState)
+        let previous: SwiftDocumentStoreSnapshot
+        switch undoPolicy.restoreUndo(current: undoSnapshot()) {
+        case let .success(snapshot):
+            previous = snapshot
+        case let .failure(failure):
+            return .failure(failure)
         }
-        redoStack.append(undoSnapshot())
         store.restore(previous)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
-        store.snapshot.timelapseEvents.append(.undo)
+        timelapseRecorder.record(.undo, in: store)
         store.snapshot.revision += 1
         captureDirtyUpdate()
         return .success(())
     }
 
     func redo() -> DocumentMutationResult {
-        guard let next = redoStack.popLast() else {
-            return .failure(.noRedoState)
+        let next: SwiftDocumentStoreSnapshot
+        switch undoPolicy.restoreRedo(current: undoSnapshot()) {
+        case let .success(snapshot):
+            next = snapshot
+        case let .failure(failure):
+            return .failure(failure)
         }
-        undoStack.append(undoSnapshot())
         store.restore(next)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
-        store.snapshot.timelapseEvents.append(.redo)
+        timelapseRecorder.record(.redo, in: store)
         store.snapshot.revision += 1
         captureDirtyUpdate()
         return .success(())
@@ -1234,22 +1393,28 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
     }
 
-    func endBlurStroke() {
+    func endBlurStroke() -> DocumentMutationResult {
         guard let currentBlurStroke,
               let baseline = currentBlurStroke.baseline
-        else { return }
-        undoStack.append(baseline)
-        redoStack.removeAll(keepingCapacity: true)
-        store.snapshot.timelapseEvents.append(
+        else {
+            return .failure(.bridgeMutationFailed("endBlurStrokeMissingBaseline"))
+        }
+        guard store.snapshot.layers.indices.contains(currentBlurStroke.layerIndex) else {
+            return .failure(.invalidLayerIndex(currentBlurStroke.layerIndex))
+        }
+        undoPolicy.recordMutation(before: baseline)
+        timelapseRecorder.record(
             .blurStroke(
                 layerIndex: .unchecked(currentBlurStroke.layerIndex),
                 brush: currentBlurStroke.brush,
                 samples: currentBlurStroke.samples
-            )
+            ),
+            in: store
         )
         store.snapshot.revision += 1
         captureDirtyUpdate()
         self.currentBlurStroke = nil
+        return .success(())
     }
 
     func fill(sample: StylusSample, brush: BrushRuntimeSettings) -> DocumentMutationResult {
@@ -1597,8 +1762,7 @@ extension SwiftDocumentRuntime {
         )
         store.restore(newRuntime.store.snapshot)
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
-        undoStack.removeAll(keepingCapacity: true)
-        redoStack.removeAll(keepingCapacity: true)
+        undoPolicy.clear()
         currentStroke = nil
         currentBlurStroke = nil
         captureDirtyUpdate()
@@ -1656,7 +1820,7 @@ extension SwiftDocumentRuntime {
             _ = applyGpuStrokeSurface(samples: samples, brush: brush, layerIndex: layerIndex.rawValue)
         case let .blurStroke(layerIndex, brush, samples):
             _ = blur(samples: samples, brush: brush, layerIndex: layerIndex.rawValue, captureTimelapse: false)
-            endBlurStroke()
+            _ = endBlurStroke()
         case let .fill(layerIndex, brush, sample):
             _ = setActiveLayer(index: layerIndex.rawValue)
             _ = fill(sample: sample, brush: brush)
@@ -1862,33 +2026,26 @@ extension SwiftDocumentRuntime {
     }
 
     private func setLayerPixelState(index: Int, pixelData: Data, gpuBufferHandle: MetalBufferHandle?) {
-        let previousHandle = gpuLayerHandles[index]
-        store.snapshot.layers[index].pixelData = pixelData
-        if let gpuBufferHandle {
-            gpuLayerHandles[index] = gpuBufferHandle
-        } else {
-            gpuLayerHandles.removeValue(forKey: index)
-        }
-        if previousHandle != gpuBufferHandle {
-            gpuServices.release(previousHandle)
-        }
+        gpuLayerStorage.setLayerPixelState(
+            index: index,
+            pixelData: pixelData,
+            gpuBufferHandle: gpuBufferHandle,
+            in: store,
+            services: gpuServices
+        )
     }
 
     private func releaseLayerBufferHandles() {
-        for handle in gpuLayerHandles.values {
-            gpuServices.release(handle)
-        }
-        gpuLayerHandles.removeAll(keepingCapacity: true)
+        gpuLayerStorage.releaseLayerBufferHandles(services: gpuServices)
     }
 
     private func currentPixelData(for index: Int) -> Data {
-        guard store.snapshot.layers.indices.contains(index) else { return Data() }
-        if let handle = gpuLayerHandles[index],
-           let pixelData = gpuServices.materializedPixelData(for: handle),
-           pixelData.count == rgbaByteCount {
-            return pixelData
-        }
-        return store.snapshot.layers[index].pixelData
+        gpuLayerStorage.currentPixelData(
+            for: index,
+            in: store.snapshot,
+            rgbaByteCount: rgbaByteCount,
+            services: gpuServices
+        )
     }
 
     private func layerSourceForGpuPlan(index: Int) -> (
@@ -1896,19 +2053,10 @@ extension SwiftDocumentRuntime {
         bufferHandle: MetalBufferHandle?,
         retainedResource: GpuResourceLease?
     ) {
-        guard store.snapshot.layers.indices.contains(index) else {
-            return (Data(), nil, nil)
-        }
-        guard let handle = gpuLayerHandles[index] else {
-            return (store.snapshot.layers[index].pixelData, nil, nil)
-        }
-        guard let lease = GpuResourceLease(handle: handle, services: gpuServices) else {
-            return (currentPixelData(for: index), nil, nil)
-        }
-        return (
-            store.snapshot.layers[index].pixelData,
-            handle,
-            lease
+        gpuLayerStorage.layerSourceForGpuPlan(
+            index: index,
+            snapshot: store.snapshot,
+            services: gpuServices
         )
     }
 
@@ -1917,12 +2065,8 @@ extension SwiftDocumentRuntime {
         timelapseEvent: TimelapseOperation?,
         dirtyRect: LayerPixelRect? = nil
     ) {
-        undoStack.append(before)
-        redoStack.removeAll(keepingCapacity: true)
-        if let timelapseEvent {
-            store.snapshot.timelapseUsesOperationPersistence = true
-            store.snapshot.timelapseEvents.append(timelapseEvent)
-        }
+        undoPolicy.recordMutation(before: before)
+        timelapseRecorder.record(timelapseEvent, marksOperationPersistence: true, in: store)
         store.snapshot.revision += 1
         captureDirtyUpdate(rect: dirtyRect)
     }
@@ -2036,7 +2180,7 @@ extension SwiftDocumentRuntime {
                     blendMode: layer.blendMode,
                     thumbnailSurface: nil,
                     thumbnailData: nil,
-                    gpuBufferHandle: gpuLayerHandles[index],
+                    gpuBufferHandle: gpuLayerStorage.handle(for: index),
                     pixelData: layer.pixelData
                 )
             }

@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentApplication
+import PrimoDocumentMutationContracts
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
@@ -27,6 +28,48 @@ struct DocumentRuntimeCompositionTests {
         #expect(presentation.activeLayerIndex == 1)
         #expect(presentation.layerRows.count == 2)
         #expect(presentation.layerRows.first(where: { $0.index == 1 })?.name == "Ink")
+    }
+
+    @Test
+    func compositionOverridesReturnNewBoundaryWhilePreservingSharedRuntime() throws {
+        let runtime = DocumentRuntimeCompositionFactory.live()
+        let overridden = runtime.withOverrides(
+            historyGateway: DocumentHistoryGateway(
+                canUndo: { false },
+                canRedo: { false },
+                undo: { .failure(.noUndoState) },
+                redo: { .failure(.noRedoState) }
+            )
+        )
+
+        _ = try overridden.editingGateway.execute(
+            .structure(.addLayer(name: "Foreground"))
+        ).get()
+
+        let presentation = runtime.queryGateway.lightweightPresentation()
+        #expect(presentation.layerRows.count == 2)
+        #expect(overridden.historyGateway.canUndo() == false)
+        #expect(runtime.historyGateway.canUndo())
+    }
+
+    @Test
+    func compositionStoresGatewaysAsImmutablePublicBoundary() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let compositionURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        )
+        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+
+        #expect(body.contains("public let queryGateway: DocumentQueryGateway"))
+        #expect(body.contains("public let mutationGateway: DocumentMutationGateway"))
+        #expect(body.contains("public let strokeGateway: StrokeInputGateway"))
+        #expect(body.contains("public func withOverrides("))
+        #expect(!body.contains("public var queryGateway: DocumentQueryGateway"))
     }
 
     @Test

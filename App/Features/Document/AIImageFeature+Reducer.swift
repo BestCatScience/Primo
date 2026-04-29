@@ -18,13 +18,12 @@ extension AIImageFeature {
             )
 
         case let .settingsLoaded(settings):
-            var sanitizedSettings = settings
-            sanitizedSettings.accessMode = .appManaged
-            state.settings = sanitizedSettings
+            state.settings = settings
             return .none
 
         case let .commerceUpdated(snapshot):
             state.commerce = snapshot
+            state.fallBackToUserAPIKeyIfAppManagedUnavailable()
             return .none
 
         case let .prepareComposer(activeLayerIndex, hasSelection):
@@ -59,8 +58,9 @@ extension AIImageFeature {
             state.composer.model = model
             return .none
 
-        case .accessModeChanged:
-            state.accessMode = .appManaged
+        case let .accessModeChanged(accessMode):
+            state.accessMode = accessMode
+            state.fallBackToUserAPIKeyIfAppManagedUnavailable()
             let updatedSettings = state.settings
             return .run { [aiImageSettingsClient] _ in
                 aiImageSettingsClient.persist(updatedSettings)
@@ -117,6 +117,8 @@ extension AIImageFeature {
                 if state.accessMode == .appManaged {
                     state.isPaywallPresented = true
                 }
+                return .none
+            case .failure(.unsupportedDirectOpenAIModel):
                 return .none
             }
 

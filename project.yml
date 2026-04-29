@@ -62,6 +62,7 @@ targets:
       base:
         INFOPLIST_FILE: App/Support/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: Primo
+        AIIMAGE_PROXY_ENDPOINT: ""
         PRODUCT_NAME: Primo
         TARGETED_DEVICE_FAMILY: 2
         IPHONEOS_DEPLOYMENT_TARGET: 26.0
@@ -97,6 +98,12 @@ targets:
         product: PrimoDocumentEngineInfrastructure
       - package: PrimoModules
         product: PrimoDocumentStrokeApplication
+      - package: PrimoModules
+        product: PrimoAIImageDomain
+      - package: PrimoModules
+        product: PrimoAIImageApplication
+      - package: PrimoModules
+        product: PrimoAIImageInfrastructure
       - package: PrimoModules
         product: PrimoDocumentStrokeInfrastructure
       - package: PrimoModules

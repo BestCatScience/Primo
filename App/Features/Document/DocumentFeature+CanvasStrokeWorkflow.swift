@@ -239,9 +239,14 @@ extension DocumentFeature {
     }
 
     var documentCanvasStrokeSessionCoordinator: DocumentFeature.CanvasStrokeSessionCoordinator {
-        DocumentFeature.CanvasStrokeSessionCoordinator(
+        let strokeInteraction = canvasStrokeInteractionService
+        return DocumentFeature.CanvasStrokeSessionCoordinator(
             layerCommands: documentLayerCommandService,
-            strokeInteraction: canvasStrokeInteractionService
+            strokeInteraction: strokeInteraction,
+            commitWorkflow: DocumentStrokeCommitWorkflowService(
+                layerCommands: documentLayerCommandService,
+                strokeInteraction: strokeInteraction
+            )
         )
     }
 
@@ -393,37 +398,12 @@ extension DocumentFeature {
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
     ) -> StrokeCommitResolution {
-        let resolvesSelectionClear = keepsSelectionCleared
-        if keepsSelectionCleared {
-            switch documentLayerCommandService.ensureLayerVisible(context.activeLayerIndex) {
-            case .success:
-                clearCanvasSelectionWithoutRefresh(state: &state)
-            case let .failure(failure):
-                return .failed(failure)
-            }
-        }
-
-        let resolution = documentCanvasStrokeSessionCoordinator.resolveStrokeCommit(
+        documentCanvasStrokeSessionCoordinator.resolveStrokeCommit(
             state: &state,
             samples: samples,
             context: context,
-            keepsSelectionCleared: false,
+            keepsSelectionCleared: keepsSelectionCleared,
             refreshViaDirtyPresentation: refreshViaDirtyPresentation
-        )
-
-        guard resolvesSelectionClear,
-              case let .committed(contract, transferredSurfaceHandle) = resolution
-        else {
-            return resolution
-        }
-        return .committed(
-            DocumentMutationContract(
-                canvasMutation: .clearSelection,
-                refresh: contract.refresh,
-                feedback: contract.feedback,
-                updatesWorkspaceArtifacts: contract.updatesWorkspaceArtifacts
-            ),
-            transferredSurfaceHandle: transferredSurfaceHandle
         )
     }
 
@@ -657,8 +637,11 @@ extension DocumentFeature {
     }
 
     func handleEndBlurStroke(state: inout DocumentFeature.State) -> Effect<DocumentFeature.Action> {
-        documentStrokeCommandService.endBlurStroke()
-        return completeCanvasStrokeMutation(state: &state)
+        performDocumentMutation(
+            state: &state,
+            contract: .currentPresentation,
+            mutation: documentStrokeCommandService.endBlurStroke
+        )
     }
 
     func handleFill(

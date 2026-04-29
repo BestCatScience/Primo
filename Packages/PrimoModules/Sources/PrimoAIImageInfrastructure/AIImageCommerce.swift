@@ -19,13 +19,24 @@ public struct AIImageSettingsClient: Sendable {
         self.persist = persist
     }
 
-    public static func live(keyValueStoreClient: KeyValueStoreClient) -> AIImageSettingsClient {
+    public static func live(
+        keyValueStoreClient: KeyValueStoreClient,
+        secretStoreClient: SecretStoreClient
+    ) -> AIImageSettingsClient {
         AIImageSettingsClient(
             load: {
                 let rawAccessMode = keyValueStoreClient.stringForKey(Self.accessModeStorageKey)
                 let accessMode = rawAccessMode.flatMap(AIImageAccessMode.init(rawValue:)) ?? .appManaged
-                let apiKey = keyValueStoreClient.stringForKey(Self.apiKeyStorageKey) ?? ""
-                let openAIAPIKey = keyValueStoreClient.stringForKey(Self.openAIAPIKeyStorageKey) ?? ""
+                let apiKey = migratedSecret(
+                    key: Self.apiKeyStorageKey,
+                    keyValueStoreClient: keyValueStoreClient,
+                    secretStoreClient: secretStoreClient
+                )
+                let openAIAPIKey = migratedSecret(
+                    key: Self.openAIAPIKeyStorageKey,
+                    keyValueStoreClient: keyValueStoreClient,
+                    secretStoreClient: secretStoreClient
+                )
                 return AIImageSettings(
                     accessMode: accessMode,
                     apiKey: apiKey,
@@ -34,10 +45,32 @@ public struct AIImageSettingsClient: Sendable {
             },
             persist: { settings in
                 keyValueStoreClient.setString(settings.accessMode.rawValue, Self.accessModeStorageKey)
-                keyValueStoreClient.setString(settings.apiKey, Self.apiKeyStorageKey)
-                keyValueStoreClient.setString(settings.openAIAPIKey, Self.openAIAPIKeyStorageKey)
+                try? secretStoreClient.writeSecret(secretOrNil(settings.apiKey), Self.apiKeyStorageKey)
+                try? secretStoreClient.writeSecret(secretOrNil(settings.openAIAPIKey), Self.openAIAPIKeyStorageKey)
+                keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
+                keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
             }
         )
+    }
+
+    private static func migratedSecret(
+        key: String,
+        keyValueStoreClient: KeyValueStoreClient,
+        secretStoreClient: SecretStoreClient
+    ) -> String {
+        if let secret = (try? secretStoreClient.readSecret(key)) ?? nil {
+            return secret
+        }
+        guard let legacySecret = keyValueStoreClient.stringForKey(key), !legacySecret.isEmpty else {
+            return ""
+        }
+        try? secretStoreClient.writeSecret(legacySecret, key)
+        keyValueStoreClient.setString(nil, key)
+        return legacySecret
+    }
+
+    private static func secretOrNil(_ value: String) -> String? {
+        value.isEmpty ? nil : value
     }
 }
 

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
@@ -884,6 +885,161 @@ struct DocumentStrokeApplicationTests {
         #expect(renderer.requests[0].brush.smudgeEngineEnabled)
     }
 
+    @Test
+    func commitWorkflowReusesMatchingPreviewAndStagesPendingSnapshot() throws {
+        let renderer = RecordingCommitRenderer()
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let appliedPayloads = LockedValues<GpuLayerMutationPayload>()
+        let service = DocumentStrokeCommitWorkflowService(
+            layerCommands: layerCommands(
+                applyLayerSurfaceMutation: { _, payload in
+                    appliedPayloads.append(payload)
+                    return .success(())
+                }
+            ),
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: DocumentStrokeSessionUseCase(
+                    preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+                    commit: DocumentStrokeCommitUseCase(renderer: renderer),
+                    resetInteractiveStrokeState: {}
+                )
+            )
+        )
+
+        let result: StrokeCommitWorkflowResult<Int, String> = try service.resolveCommit(
+            StrokeCommitWorkflowRequest(
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                renderState: StrokeSessionRenderState(
+                    baseRevision: snapshot.revision,
+                    layerIndex: 0,
+                    surfaceHandle: handle,
+                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                    isApproximatePreview: false,
+                    previewBrush: brushSettings(),
+                    sampleCount: 1,
+                    supportsIncrementalContinuation: true
+                ),
+                samples: [stylusSample(x: 1, y: 1)],
+                context: makeContext(layerIndex: 0),
+                selectionClearPolicy: .none,
+                refreshViaDirtyPresentation: true
+            ),
+            usesResponsivePreviewCommit: false
+        ).get()
+
+        #expect(renderer.requests.isEmpty)
+        #expect(appliedPayloads.values.count == 1)
+        #expect(appliedPayloads.values[0].gpuBufferHandle == handle)
+        #expect(result.contract.refresh == .dirty)
+        #expect(result.transferredSurfaceHandle == handle)
+        #expect(result.pendingCommittedSnapshot?.baseSnapshot == snapshot)
+    }
+
+    @Test
+    func commitWorkflowFallsBackToRenderedCommitWhenPreviewDoesNotMatch() throws {
+        let renderer = RecordingCommitRenderer()
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let service = DocumentStrokeCommitWorkflowService(
+            layerCommands: layerCommands(),
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: DocumentStrokeSessionUseCase(
+                    preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+                    commit: DocumentStrokeCommitUseCase(renderer: renderer),
+                    resetInteractiveStrokeState: {}
+                )
+            )
+        )
+
+        let result: StrokeCommitWorkflowResult<Int, String> = try service.resolveCommit(
+            StrokeCommitWorkflowRequest(
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                renderState: nil,
+                samples: [stylusSample(x: 1, y: 1), stylusSample(x: 2, y: 2)],
+                context: makeContext(layerIndex: 0),
+                selectionClearPolicy: .none,
+                refreshViaDirtyPresentation: false
+            ),
+            usesResponsivePreviewCommit: false
+        ).get()
+
+        #expect(renderer.requests.count == 1)
+        #expect(renderer.requests[0].samples.count == 2)
+        #expect(result.contract.refresh == .current)
+        #expect(result.pendingCommittedSnapshot?.baseSnapshot == snapshot)
+    }
+
+    @Test
+    func commitWorkflowSelectionClearEnsuresLayerAndMarksContract() throws {
+        let ensuredLayerIndexes = LockedValues<Int>()
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let service = DocumentStrokeCommitWorkflowService(
+            layerCommands: layerCommands(
+                ensureLayerVisible: { index in
+                    ensuredLayerIndexes.append(index)
+                    return .success(())
+                }
+            ),
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: DocumentStrokeSessionUseCase(
+                    preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+                    commit: DocumentStrokeCommitUseCase(renderer: RecordingCommitRenderer()),
+                    resetInteractiveStrokeState: {}
+                )
+            )
+        )
+
+        let result: StrokeCommitWorkflowResult<Int, String> = try service.resolveCommit(
+            StrokeCommitWorkflowRequest(
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                renderState: nil,
+                samples: [stylusSample(x: 1, y: 1)],
+                context: makeContext(layerIndex: 0),
+                selectionClearPolicy: .clearSelection,
+                refreshViaDirtyPresentation: true
+            ),
+            usesResponsivePreviewCommit: false
+        ).get()
+
+        #expect(ensuredLayerIndexes.values == [0])
+        #expect(result.contract.canvasMutation == .clearSelection)
+    }
+
+    @Test
+    func commitWorkflowPropagatesSurfaceMutationFailure() throws {
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let service = DocumentStrokeCommitWorkflowService(
+            layerCommands: layerCommands(
+                applyLayerSurfaceMutation: { _, _ in .failure(.alphaLocked(0)) }
+            ),
+            strokeInteraction: CanvasStrokeInteractionService(
+                sessionUseCase: DocumentStrokeSessionUseCase(
+                    preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+                    commit: DocumentStrokeCommitUseCase(renderer: RecordingCommitRenderer()),
+                    resetInteractiveStrokeState: {}
+                )
+            )
+        )
+
+        let result: Result<StrokeCommitWorkflowResult<Int, String>, DocumentMutationFailure> = service.resolveCommit(
+            StrokeCommitWorkflowRequest(
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                renderState: nil,
+                samples: [stylusSample(x: 1, y: 1)],
+                context: makeContext(layerIndex: 0),
+                selectionClearPolicy: .none,
+                refreshViaDirtyPresentation: true
+            ),
+            usesResponsivePreviewCommit: false
+        )
+
+        #expect(result.failure == .alphaLocked(0))
+    }
+
     private func makeSnapshot(layerIndex: Int, revision: Int = 7) -> MetalDocumentSnapshot {
         MetalDocumentSnapshot(
             width: 2,
@@ -1014,6 +1170,28 @@ struct DocumentStrokeApplicationTests {
             blue: 50
         )
     }
+
+    private func layerCommands(
+        ensureLayerVisible: @escaping @Sendable (Int) -> DocumentMutationResult = { _ in .success(()) },
+        applyLayerSurfaceMutation: @escaping @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult = { _, _ in .success(()) }
+    ) -> DocumentLayerCommandService {
+        DocumentLayerCommandService(
+            ensureLayerVisible: ensureLayerVisible,
+            replaceLayerPixels: { _, _ in .success(()) },
+            replaceLayerPixelsInRect: { _, _, _ in .success(()) },
+            applyLayerSurfaceMutation: applyLayerSurfaceMutation,
+            applyLayerMutation: { _, _ in .success(()) },
+            applyTextLayerMutation: { _, _, _ in .success(()) },
+            revealLayerForEditing: { _ in .success(()) }
+        )
+    }
+}
+
+private extension Result where Failure == DocumentMutationFailure {
+    var failure: DocumentMutationFailure? {
+        guard case let .failure(failure) = self else { return nil }
+        return failure
+    }
 }
 
 private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked Sendable {
@@ -1040,6 +1218,21 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
             incrementalUpdate: nil,
             isApproximatePreview: request.usesResponsiveOilPreview
         )
+    }
+}
+
+private final class LockedValues<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Value] = []
+
+    var values: [Value] {
+        lock.withLock { storage }
+    }
+
+    func append(_ value: Value) {
+        lock.withLock {
+            storage.append(value)
+        }
     }
 }
 

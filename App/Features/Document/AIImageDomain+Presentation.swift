@@ -30,6 +30,14 @@ extension AIImageModel {
             return "Nano Banana 2"
         case .proImagePreview:
             return "Nano Banana Pro"
+        case .gptImage15:
+            return "GPT Image 1.5"
+        case .gptImage1:
+            return "GPT Image 1"
+        case .gptImage1Mini:
+            return "GPT Image 1 Mini"
+        case .chatGPTImageLatest:
+            return "ChatGPT Image Latest"
         case .gptImage2:
             return "GPT Image 2"
         }

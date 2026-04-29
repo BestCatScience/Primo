@@ -223,7 +223,7 @@ public struct StrokeInputGateway: Sendable {
     public var endStroke: @Sendable () -> DocumentMutationResult
     public var cancelStroke: @Sendable () -> Void
     public var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
-    public var endBlurStroke: @Sendable () -> Void
+    public var endBlurStroke: @Sendable () -> DocumentMutationResult
     public var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
     public var applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
@@ -233,7 +233,7 @@ public struct StrokeInputGateway: Sendable {
         endStroke: @escaping @Sendable () -> DocumentMutationResult,
         cancelStroke: @escaping @Sendable () -> Void,
         blurStroke: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult,
-        endBlurStroke: @escaping @Sendable () -> Void,
+        endBlurStroke: @escaping @Sendable () -> DocumentMutationResult,
         fill: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult,
         applyGpuStrokeSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
     ) {

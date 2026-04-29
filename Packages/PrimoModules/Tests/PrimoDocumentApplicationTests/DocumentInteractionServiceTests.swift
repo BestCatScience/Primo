@@ -91,6 +91,19 @@ struct DocumentCommandServiceTests {
         }
         #expect(recorder.values == ["undo", "redo"])
     }
+
+    @Test
+    func endBlurStrokePropagatesGatewayFailure() {
+        let service = DocumentStrokeCommandService(
+            strokeGateway: strokeGateway(endBlurStroke: { .failure(.bridgeMutationFailed("endBlurStroke")) })
+        )
+
+        if case let .failure(failure) = service.endBlurStroke() {
+            #expect(failure == .bridgeMutationFailed("endBlurStroke"))
+        } else {
+            Issue.record("Expected endBlurStroke failure to propagate")
+        }
+    }
 }
 
 private final class CallRecorder: @unchecked Sendable {
@@ -151,14 +164,16 @@ private func mutationGateway(recorder: CallRecorder) -> DocumentMutationGateway 
     )
 }
 
-private func strokeGateway() -> StrokeInputGateway {
+private func strokeGateway(
+    endBlurStroke: @escaping @Sendable () -> DocumentMutationResult = { .success(()) }
+) -> StrokeInputGateway {
     StrokeInputGateway(
         beginStroke: { _, _ in },
         appendStroke: { _ in },
         endStroke: { .success(()) },
         cancelStroke: {},
         blurStroke: { _, _, _, _ in .success(()) },
-        endBlurStroke: {},
+        endBlurStroke: endBlurStroke,
         fill: { _, _ in .success(()) },
         applyGpuStrokeSurface: { _, _, _ in .success(()) }
     )

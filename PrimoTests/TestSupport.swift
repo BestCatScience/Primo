@@ -242,7 +242,7 @@ extension StrokeInputGateway {
             endStroke: { .success(()) },
             cancelStroke: {},
             blurStroke: blurStroke,
-            endBlurStroke: {},
+            endBlurStroke: { .success(()) },
             fill: fill,
             applyGpuStrokeSurface: applyGpuStrokeSurface
         )

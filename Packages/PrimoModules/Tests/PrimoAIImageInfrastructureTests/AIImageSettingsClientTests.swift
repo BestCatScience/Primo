@@ -13,16 +13,22 @@ struct AIImageSettingsClientTests {
     }
 
     @Test
-    func loadReturnsPersistedSettings() {
-        let storage = TestStorage([
+    func loadReturnsAccessModeFromDefaultsAndSecretsFromSecretStore() {
+        let defaults = TestStorage([
             AIImageSettingsClient.accessModeStorageKey: AIImageAccessMode.appManaged.rawValue,
+        ])
+        let secrets = TestStorage([
             AIImageSettingsClient.apiKeyStorageKey: "gemini-secret",
-            AIImageSettingsClient.openAIAPIKeyStorageKey: "openai-secret"
+            AIImageSettingsClient.openAIAPIKeyStorageKey: "openai-secret",
         ])
         let client = AIImageSettingsClient.live(
             keyValueStoreClient: KeyValueStoreClient(
-                stringForKey: { storage.values[$0] },
-                setString: { value, key in storage.values[key] = value }
+                stringForKey: { defaults.values[$0] },
+                setString: { value, key in defaults.values[key] = value }
+            ),
+            secretStoreClient: SecretStoreClient(
+                readSecret: { secrets.values[$0] },
+                writeSecret: { value, key in secrets.values[key] = value }
             )
         )
 
@@ -36,12 +42,17 @@ struct AIImageSettingsClientTests {
     }
 
     @Test
-    func persistWritesBothFields() {
-        let storage = TestStorage([:])
+    func persistWritesAccessModeToDefaultsAndSecretsToSecretStore() {
+        let defaults = TestStorage([:])
+        let secrets = TestStorage([:])
         let client = AIImageSettingsClient.live(
             keyValueStoreClient: KeyValueStoreClient(
-                stringForKey: { storage.values[$0] },
-                setString: { value, key in storage.values[key] = value }
+                stringForKey: { defaults.values[$0] },
+                setString: { value, key in defaults.values[key] = value }
+            ),
+            secretStoreClient: SecretStoreClient(
+                readSecret: { secrets.values[$0] },
+                writeSecret: { value, key in secrets.values[key] = value }
             )
         )
 
@@ -53,8 +64,76 @@ struct AIImageSettingsClientTests {
             )
         )
 
-        #expect(storage.values[AIImageSettingsClient.accessModeStorageKey] == AIImageAccessMode.appManaged.rawValue)
-        #expect(storage.values[AIImageSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
-        #expect(storage.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "persisted-openai-key")
+        #expect(defaults.values[AIImageSettingsClient.accessModeStorageKey] == AIImageAccessMode.appManaged.rawValue)
+        #expect(defaults.values[AIImageSettingsClient.apiKeyStorageKey] == nil)
+        #expect(defaults.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == nil)
+        #expect(secrets.values[AIImageSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
+        #expect(secrets.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "persisted-openai-key")
+    }
+
+    @Test
+    func loadMigratesLegacyDefaultsSecretsToSecretStore() {
+        let defaults = TestStorage([
+            AIImageSettingsClient.accessModeStorageKey: AIImageAccessMode.userAPIKey.rawValue,
+            AIImageSettingsClient.apiKeyStorageKey: "legacy-gemini-key",
+            AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
+        ])
+        let secrets = TestStorage([:])
+        let client = AIImageSettingsClient.live(
+            keyValueStoreClient: KeyValueStoreClient(
+                stringForKey: { defaults.values[$0] },
+                setString: { value, key in
+                    if let value {
+                        defaults.values[key] = value
+                    } else {
+                        defaults.values.removeValue(forKey: key)
+                    }
+                }
+            ),
+            secretStoreClient: SecretStoreClient(
+                readSecret: { secrets.values[$0] },
+                writeSecret: { value, key in secrets.values[key] = value }
+            )
+        )
+
+        let settings = client.load()
+
+        #expect(settings.accessMode == .userAPIKey)
+        #expect(settings.apiKey == "legacy-gemini-key")
+        #expect(settings.openAIAPIKey == "legacy-openai-key")
+        #expect(defaults.values[AIImageSettingsClient.apiKeyStorageKey] == nil)
+        #expect(defaults.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == nil)
+        #expect(secrets.values[AIImageSettingsClient.apiKeyStorageKey] == "legacy-gemini-key")
+        #expect(secrets.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "legacy-openai-key")
+    }
+
+    @Test
+    func persistEmptyAPIKeysRemovesSecrets() {
+        let defaults = TestStorage([:])
+        let secrets = TestStorage([
+            AIImageSettingsClient.apiKeyStorageKey: "old-gemini-key",
+            AIImageSettingsClient.openAIAPIKeyStorageKey: "old-openai-key",
+        ])
+        let client = AIImageSettingsClient.live(
+            keyValueStoreClient: KeyValueStoreClient(
+                stringForKey: { defaults.values[$0] },
+                setString: { value, key in defaults.values[key] = value }
+            ),
+            secretStoreClient: SecretStoreClient(
+                readSecret: { secrets.values[$0] },
+                writeSecret: { value, key in
+                    if let value {
+                        secrets.values[key] = value
+                    } else {
+                        secrets.values.removeValue(forKey: key)
+                    }
+                }
+            )
+        )
+
+        client.persist(AIImageSettings(accessMode: .appManaged))
+
+        #expect(secrets.values[AIImageSettingsClient.apiKeyStorageKey] == nil)
+        #expect(secrets.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == nil)
     }
 }

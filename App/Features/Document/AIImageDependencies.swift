@@ -6,7 +6,11 @@ import PrimoAIImageInfrastructure
 private enum AIImageSettingsClientKey: DependencyKey {
     static var liveValue: AIImageSettingsClient {
         @Dependency(\.keyValueStoreClient) var keyValueStoreClient
-        return AIImageSettingsClient.live(keyValueStoreClient: keyValueStoreClient)
+        @Dependency(\.secretStoreClient) var secretStoreClient
+        return AIImageSettingsClient.live(
+            keyValueStoreClient: keyValueStoreClient,
+            secretStoreClient: secretStoreClient
+        )
     }
 }
 

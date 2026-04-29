@@ -1007,6 +1007,7 @@
 					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 					ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				AIIMAGE_PROXY_ENDPOINT = "";
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
@@ -1045,6 +1046,7 @@
 					ENABLE_APP_INTENTS_METADATA_GENERATION = NO;
 					ENABLE_MODULE_VERIFIER = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				AIIMAGE_PROXY_ENDPOINT = "";
 				INFOPLIST_FILE = App/Support/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Primo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";

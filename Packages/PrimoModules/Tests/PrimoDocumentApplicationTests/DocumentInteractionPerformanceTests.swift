@@ -23,7 +23,7 @@ final class DocumentCommandPerformanceTests: XCTestCase {
                 endStroke: { .success(()) },
                 cancelStroke: {},
                 blurStroke: { _, _, _, _ in .success(()) },
-                endBlurStroke: {},
+                endBlurStroke: { .success(()) },
                 fill: { _, _ in .success(()) },
                 applyGpuStrokeSurface: { _, _, _ in .success(()) }
             )

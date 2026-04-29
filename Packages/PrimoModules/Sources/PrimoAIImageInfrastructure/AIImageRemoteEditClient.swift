@@ -2,6 +2,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoAIImageApplication
 import PrimoAIImageDomain
+import PrimoDocumentApplication
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public extension AIImageRemoteEditClient {
@@ -150,7 +151,10 @@ public extension AIImageRemoteEditClient {
                 ],
                 generationConfig: GenerationConfig(
                     responseModalities: ["TEXT", "IMAGE"],
-                    imageConfig: imageConfig(for: model)
+                    imageConfig: imageConfig(
+                        for: model,
+                        sourceSize: sourceSize(fromPNGData: inputPNGData)
+                    )
                 )
             ),
             GenerateContentRequest(
@@ -159,7 +163,10 @@ public extension AIImageRemoteEditClient {
                 ],
                 generationConfig: GenerationConfig(
                     responseModalities: ["TEXT", "IMAGE"],
-                    imageConfig: imageConfig(for: model)
+                    imageConfig: imageConfig(
+                        for: model,
+                        sourceSize: sourceSize(fromPNGData: inputPNGData)
+                    )
                 )
             ),
             GenerateContentRequest(
@@ -197,7 +204,7 @@ public extension AIImageRemoteEditClient {
         apiKey: String,
         model: AIImageModel
     ) throws -> URLRequest {
-        guard model.provider == .openAI else {
+        guard model.provider == .openAI, model.supportsOpenAIDirectImageEdit else {
             throw AIImageEditFailure.invalidEndpoint
         }
         guard let url = URL(string: "https://api.openai.com/v1/images/edits") else {
@@ -286,13 +293,42 @@ public extension AIImageRemoteEditClient {
         return request
     }
 
-    private static func imageConfig(for model: AIImageModel) -> ImageConfig? {
+    private static func imageConfig(
+        for model: AIImageModel,
+        sourceSize: (width: Int, height: Int)?
+    ) -> ImageConfig? {
         switch model {
         case .flashImage31Preview, .proImagePreview:
-            return ImageConfig(aspectRatio: "1:1", imageSize: "2K")
-        case .gptImage2:
+            guard let sourceSize else { return nil }
+            return ImageConfig(
+                aspectRatio: nearestGeminiAspectRatio(width: sourceSize.width, height: sourceSize.height),
+                imageSize: nil
+            )
+        case .gptImage2, .gptImage15, .gptImage1, .gptImage1Mini, .chatGPTImageLatest:
             return nil
         }
+    }
+
+    private static func sourceSize(fromPNGData pngData: Data) -> (width: Int, height: Int)? {
+        guard let decoded = DocumentRasterImageService.decodedImage(fromEncodedData: pngData) else {
+            return nil
+        }
+        return (decoded.width, decoded.height)
+    }
+
+    private static func nearestGeminiAspectRatio(width: Int, height: Int) -> String {
+        guard width > 0, height > 0 else { return "1:1" }
+        let sourceRatio = Double(width) / Double(height)
+        let supported: [(value: String, ratio: Double)] = [
+            ("1:1", 1.0),
+            ("3:4", 3.0 / 4.0),
+            ("4:3", 4.0 / 3.0),
+            ("9:16", 9.0 / 16.0),
+            ("16:9", 16.0 / 9.0),
+        ]
+        return supported.min { lhs, rhs in
+            abs(lhs.ratio - sourceRatio) < abs(rhs.ratio - sourceRatio)
+        }?.value ?? "1:1"
     }
 
     private static func decodeImageData(from data: Data) throws -> Data? {

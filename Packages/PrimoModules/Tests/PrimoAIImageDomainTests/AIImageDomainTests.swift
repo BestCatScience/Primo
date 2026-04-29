@@ -32,4 +32,19 @@ struct AIImageDomainTests {
         #expect(ProxyEndpoint("https://proxy.example.com/aiimage/edit")?.rawValue == "https://proxy.example.com/aiimage/edit")
         #expect(ProxyEndpoint("http://127.0.0.1:8787/aiimage/edit") == nil)
     }
+
+    @Test
+    func openAIDirectEditModelsAreConfigDrivenAndDocsAligned() {
+        #expect(AIImageModel.defaultOpenAIDirectEditModel == .gptImage15)
+        #expect(AIImageModel.openAIDirectEditModels == [
+            .gptImage2,
+            .gptImage15,
+            .gptImage1,
+            .gptImage1Mini,
+            .chatGPTImageLatest,
+        ])
+        #expect(AIImageModel.openAIDirectEditModels.contains(.gptImage2))
+        #expect(AIImageModel.allCases.contains(.gptImage2))
+        #expect(AIImageModel.gptImage2.provider == .openAI)
+    }
 }

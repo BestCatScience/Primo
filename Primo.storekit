@@ -14,17 +14,17 @@
       "id" : "21482014",
       "localizations" : [
         {
-          "description" : "Monthly subscription for app-managed Nano Banana access inside Primo.",
-          "displayName" : "Primo Nano Banana",
+          "description" : "Monthly subscription for app-managed AI image editing access inside Primo.",
+          "displayName" : "Primo AI Image",
           "locale" : "en_US"
         },
         {
-          "description" : "Primo でアプリ管理の Nano Banana を利用するための月額サブスクリプションです。",
-          "displayName" : "Primo Nano Banana",
+          "description" : "Primo でアプリ管理の AI画像編集を利用するための月額サブスクリプションです。",
+          "displayName" : "Primo AI Image",
           "locale" : "ja_JP"
         }
       ],
-      "name" : "Primo Nano Banana",
+      "name" : "Primo AI Image",
       "subscriptions" : [
         {
           "adHocOffers" : [

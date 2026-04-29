@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 public struct ProcessEnvironmentClient: Sendable {
     public var stringValue: @Sendable (String) -> String?
@@ -156,24 +157,7 @@ public struct HTTPClient: Sendable {
     }
 
     public static let live = HTTPClient { request in
-        try await withCheckedThrowingContinuation { continuation in
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                guard let data, let response else {
-                    continuation.resume(
-                        throwing: URLError(.badServerResponse)
-                    )
-                    return
-                }
-
-                continuation.resume(returning: (data, response))
-            }
-            task.resume()
-        }
+        try await URLSession.shared.data(for: request)
     }
 }
 
@@ -201,6 +185,84 @@ public struct KeyValueStoreClient: Sendable {
             }
         }
     )
+}
+
+public enum SecretStoreError: Error, Equatable, Sendable {
+    case unhandledStatus(OSStatus)
+    case invalidData
+}
+
+public struct SecretStoreClient: Sendable {
+    public var readSecret: @Sendable (String) throws -> String?
+    public var writeSecret: @Sendable (String?, String) throws -> Void
+
+    public init(
+        readSecret: @escaping @Sendable (String) throws -> String?,
+        writeSecret: @escaping @Sendable (String?, String) throws -> Void
+    ) {
+        self.readSecret = readSecret
+        self.writeSecret = writeSecret
+    }
+
+    public static let live = SecretStoreClient(
+        readSecret: { key in
+            var query = keychainQuery(for: key)
+            query[kSecReturnData as String] = true
+            query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+            var item: CFTypeRef?
+            let status = SecItemCopyMatching(query as CFDictionary, &item)
+            if status == errSecItemNotFound {
+                return nil
+            }
+            guard status == errSecSuccess else {
+                throw SecretStoreError.unhandledStatus(status)
+            }
+            guard
+                let data = item as? Data,
+                let secret = String(data: data, encoding: .utf8)
+            else {
+                throw SecretStoreError.invalidData
+            }
+            return secret
+        },
+        writeSecret: { secret, key in
+            let query = keychainQuery(for: key)
+            guard let secret else {
+                let status = SecItemDelete(query as CFDictionary)
+                guard status == errSecSuccess || status == errSecItemNotFound else {
+                    throw SecretStoreError.unhandledStatus(status)
+                }
+                return
+            }
+
+            let data = Data(secret.utf8)
+            let update = [kSecValueData as String: data]
+            let updateStatus = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+            if updateStatus == errSecSuccess {
+                return
+            }
+            guard updateStatus == errSecItemNotFound else {
+                throw SecretStoreError.unhandledStatus(updateStatus)
+            }
+
+            var addQuery = query
+            addQuery[kSecValueData as String] = data
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw SecretStoreError.unhandledStatus(addStatus)
+            }
+        }
+    )
+}
+
+private func keychainQuery(for key: String) -> [String: Any] {
+    [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrService as String: "com.bestcatscience.primo.secrets",
+        kSecAttrAccount as String: key,
+    ]
 }
 
 public struct SecurityScopedResourceClient: Sendable {

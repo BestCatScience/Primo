@@ -110,7 +110,13 @@ extension AIImageFeature {
         var generateDisabled: Bool {
             isGenerating ||
             composer.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            (accessMode == .appManaged && !appManagedProxyEndpointConfigured) ||
+            (accessMode == .userAPIKey && composer.model.provider == .openAI && !composer.model.supportsOpenAIDirectImageEdit) ||
             (accessMode == .userAPIKey && selectedAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+
+        var appManagedProxyEndpointConfigured: Bool {
+            ProxyEndpoint(commerce.proxyEndpoint) != nil
         }
 
         var selectedAPIKey: String {
@@ -139,7 +145,14 @@ extension AIImageFeature {
             composer.maskSettings = descriptor.maskSettings
             composer.model = descriptor.model
             accessMode = .appManaged
+            fallBackToUserAPIKeyIfAppManagedUnavailable()
             workspaceBottomPanelSection = .aiImage
+        }
+
+        mutating func fallBackToUserAPIKeyIfAppManagedUnavailable() {
+            if accessMode == .appManaged, !appManagedProxyEndpointConfigured {
+                accessMode = .userAPIKey
+            }
         }
 
         func buildDraft() -> AIImageDraft {

@@ -1,4 +1,5 @@
 import Foundation
+import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoAIImageApplication
 import PrimoAIImageDomain
@@ -38,7 +39,7 @@ struct AIImageApplicationTests {
         let draft = AIImageDraft(
             prompt: "  refine text  ",
             accessMode: .userAPIKey,
-            model: .gptImage2,
+            model: AIImageModel.defaultOpenAIDirectEditModel,
             inputLayerIndex: 1,
             editScope: .wholeLayer,
             outputMode: .replaceCurrentLayer
@@ -52,17 +53,17 @@ struct AIImageApplicationTests {
         )
 
         let command = try result.get()
-        #expect(command.descriptor.model == .gptImage2)
+        #expect(command.descriptor.model == AIImageModel.defaultOpenAIDirectEditModel)
         #expect(command.descriptor.model.provider == .openAI)
         #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("openai-key")!))
     }
 
     @Test
-    func commandBuilderRequiresOpenAIKeyForGPTImage2() {
+    func commandBuilderRequiresOpenAIKeyForDirectOpenAIModel() {
         let draft = AIImageDraft(
             prompt: "refine text",
             accessMode: .userAPIKey,
-            model: .gptImage2,
+            model: AIImageModel.defaultOpenAIDirectEditModel,
             inputLayerIndex: 1,
             editScope: .wholeLayer,
             outputMode: .replaceCurrentLayer
@@ -76,6 +77,30 @@ struct AIImageApplicationTests {
         )
 
         #expect(result == .failure(.apiKeyRequired))
+    }
+
+    @Test
+    func commandBuilderBuildsGPTImage2DirectOpenAICommandFromConfiguredModelList() throws {
+        let draft = AIImageDraft(
+            prompt: "refine text",
+            accessMode: .userAPIKey,
+            model: .gptImage2,
+            inputLayerIndex: 1,
+            editScope: .wholeLayer,
+            outputMode: .replaceCurrentLayer
+        )
+
+        let result = AIImageCommandBuilder().build(
+            draft: draft,
+            apiKey: "",
+            openAIAPIKey: "openai-key",
+            commerce: AIImageCommerceSnapshot()
+        )
+
+        let command = try result.get()
+        #expect(command.descriptor.model == .gptImage2)
+        #expect(AIImageModel.openAIDirectEditModels.contains(command.descriptor.model))
+        #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("openai-key")!))
     }
 
     @Test
@@ -161,6 +186,43 @@ struct AIImageApplicationTests {
     }
 
     @Test
+    func previewPreparationResamplesPortraitWholeLayerOutputToSourceSize() async throws {
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
+                prompt: NonEmptyPrompt("Retouch portrait canvas")!,
+                accessMode: .userAPIKey,
+                model: .flashImage31Preview,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
+        )
+        let sourceSurface = solidSurface(width: 1152, height: 1536)
+        let remoteOutput = try #require(DocumentRasterImageService.pngData(
+            from: solidSurface(width: 3, height: 4)
+        ))
+        let useCase = AIImageEditUseCase { _ in
+            .success(remoteOutput)
+        }
+
+        let result = await AIImagePreviewPreparationService(editUseCase: useCase).preparePreview(
+            AIImagePreviewPreparationRequest(
+                command: command,
+                selectionRegion: nil,
+                outputLayerIndex: 0,
+                sourceSurface: sourceSurface
+            )
+        )
+
+        let preview = try result.get()
+        #expect(preview.outputSurface.width == 1152)
+        #expect(preview.outputSurface.height == 1536)
+        #expect(preview.pixelData.count == sourceSurface.pixelData.count)
+        #expect(preview.afterPreviewImageData != nil)
+    }
+
+    @Test
     func previewPreparationServiceBuildsSelectedAreaPreviewFromSurface() async throws {
         let command = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(
@@ -204,5 +266,54 @@ struct AIImageApplicationTests {
         #expect(preview.outputSurface.height == 4)
         #expect(preview.beforePreviewImageData != nil)
         #expect(preview.afterPreviewImageData != nil)
+    }
+
+    @Test
+    func previewPreparationResamplesWideSelectedAreaOutputToCropSize() async throws {
+        let command = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
+                prompt: NonEmptyPrompt("Retouch selection")!,
+                accessMode: .userAPIKey,
+                model: .flashImage31Preview,
+                inputLayerIndex: 0,
+                editScope: .selectedArea,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
+        )
+        let sourceSurface = solidSurface(width: 320, height: 180)
+        let remoteOutput = try #require(DocumentRasterImageService.pngData(
+            from: solidSurface(width: 16, height: 9)
+        ))
+        let useCase = AIImageEditUseCase { _ in
+            .success(remoteOutput)
+        }
+
+        let result = await AIImagePreviewPreparationService(editUseCase: useCase).preparePreview(
+            AIImagePreviewPreparationRequest(
+                command: command,
+                selectionRegion: AIImageSelectionRegion(
+                    selectionBounds: CGRect(x: 0, y: 0, width: 320, height: 180),
+                    expandedMask: [UInt8](repeating: 255, count: 320 * 180)
+                ),
+                outputLayerIndex: 0,
+                sourceSurface: sourceSurface
+            )
+        )
+
+        let preview = try result.get()
+        #expect(preview.outputSurface.width == 320)
+        #expect(preview.outputSurface.height == 180)
+        #expect(preview.pixelData.count == sourceSurface.pixelData.count)
+        #expect(preview.beforePreviewImageData != nil)
+        #expect(preview.afterPreviewImageData != nil)
+    }
+
+    private func solidSurface(width: Int, height: Int) -> DocumentCompositeSurface {
+        DocumentCompositeSurface(
+            width: width,
+            height: height,
+            pixelData: Data(repeating: 0x7F, count: width * height * 4)
+        )
     }
 }

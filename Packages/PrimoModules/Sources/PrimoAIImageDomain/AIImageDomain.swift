@@ -32,6 +32,22 @@ public enum AIImageModel: String, CaseIterable, Equatable, Sendable, Identifiabl
     case flashImage31Preview = "gemini-3.1-flash-image-preview"
     case proImagePreview = "gemini-3-pro-image-preview"
     case gptImage2 = "gpt-image-2"
+    case gptImage15 = "gpt-image-1.5"
+    case gptImage1 = "gpt-image-1"
+    case gptImage1Mini = "gpt-image-1-mini"
+    case chatGPTImageLatest = "chatgpt-image-latest"
+
+    public static var allCases: [AIImageModel] {
+        [
+            .flashImage31Preview,
+            .proImagePreview,
+            .gptImage2,
+            .gptImage15,
+            .gptImage1,
+            .gptImage1Mini,
+            .chatGPTImageLatest,
+        ]
+    }
 
     public var id: String { rawValue }
 
@@ -39,9 +55,23 @@ public enum AIImageModel: String, CaseIterable, Equatable, Sendable, Identifiabl
         switch self {
         case .flashImage31Preview, .proImagePreview:
             return .gemini
-        case .gptImage2:
+        case .gptImage2, .gptImage15, .gptImage1, .gptImage1Mini, .chatGPTImageLatest:
             return .openAI
         }
+    }
+
+    public static let defaultOpenAIDirectEditModel: AIImageModel = .gptImage15
+
+    public static let openAIDirectEditModels: [AIImageModel] = [
+        .gptImage2,
+        .gptImage15,
+        .gptImage1,
+        .gptImage1Mini,
+        .chatGPTImageLatest,
+    ]
+
+    public var supportsOpenAIDirectImageEdit: Bool {
+        Self.openAIDirectEditModels.contains(self)
     }
 }
 

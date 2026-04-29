@@ -277,6 +277,7 @@ let package = Package(
                 "PrimoCoreTypes",
                 "PrimoAIImageApplication",
                 "PrimoAIImageDomain",
+                "PrimoDocumentApplication",
             ]
         ),
         .target(
@@ -480,11 +481,19 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoAIImageApplicationTests",
-            dependencies: ["PrimoAIImageApplication", "PrimoDocumentContracts"]
+            dependencies: [
+                "PrimoAIImageApplication",
+                "PrimoDocumentApplication",
+                "PrimoDocumentContracts",
+            ]
         ),
         .testTarget(
             name: "PrimoAIImageInfrastructureTests",
-            dependencies: ["PrimoAIImageInfrastructure"]
+            dependencies: [
+                "PrimoAIImageInfrastructure",
+                "PrimoDocumentApplication",
+                "PrimoDocumentContracts",
+            ]
         ),
         .testTarget(
             name: "PrimoBrushFileFormatsTests",

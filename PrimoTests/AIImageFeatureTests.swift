@@ -44,6 +44,82 @@ final class AIImageFeatureTests: XCTestCase {
         }
     }
 
+    func testTaskFallsBackToUserAPIKeyWhenProxyEndpointIsMissing() async {
+        let snapshot = AIImageCommerceSnapshot(
+            isSubscriptionActive: true,
+            latestEntitlementJWS: "signed-jws",
+            proxyEndpoint: ""
+        )
+
+        let store = TestStore(initialState: AIImageFeature.State()) {
+            AIImageFeature()
+        } withDependencies: {
+            $0.aiImageSettingsClient = AIImageSettingsClient(
+                load: { AIImageSettings(accessMode: .appManaged, apiKey: "persisted-key") },
+                persist: { _ in }
+            )
+            $0.aiImageCommerceClient = AIImageCommerceClient(
+                prepare: { snapshot },
+                purchasePrimaryProduct: { snapshot },
+                restorePurchases: { snapshot },
+                clearPurchaseError: { snapshot }
+            )
+        }
+
+        await store.send(.task)
+        await store.receive(.settingsLoaded(AIImageSettings(accessMode: .appManaged, apiKey: "persisted-key"))) {
+            $0.settings = AIImageSettings(accessMode: .appManaged, apiKey: "persisted-key")
+        }
+        await store.receive(.commerceUpdated(snapshot)) {
+            $0.commerce = snapshot
+            $0.accessMode = .userAPIKey
+        }
+    }
+
+    func testAccessModeChangedFallsBackWhenProxyEndpointIsMissing() async {
+        var initialState = AIImageFeature.State(
+            settings: AIImageSettings(accessMode: .userAPIKey, apiKey: "user-key"),
+            commerce: AIImageCommerceSnapshot(proxyEndpoint: "")
+        )
+        initialState.composer.prompt = "Enhance linework"
+
+        let store = TestStore(initialState: initialState) {
+            AIImageFeature()
+        } withDependencies: {
+            $0.aiImageSettingsClient = AIImageSettingsClient(
+                load: { AIImageSettings() },
+                persist: { settings in
+                    XCTAssertEqual(settings.accessMode, .userAPIKey)
+                }
+            )
+        }
+
+        await store.send(.accessModeChanged(.appManaged))
+    }
+
+    func testAccessModeChangedAllowsAppManagedWhenProxyEndpointIsConfigured() async {
+        var initialState = AIImageFeature.State(
+            settings: AIImageSettings(accessMode: .userAPIKey, apiKey: "user-key"),
+            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+        )
+        initialState.composer.prompt = "Enhance linework"
+
+        let store = TestStore(initialState: initialState) {
+            AIImageFeature()
+        } withDependencies: {
+            $0.aiImageSettingsClient = AIImageSettingsClient(
+                load: { AIImageSettings() },
+                persist: { settings in
+                    XCTAssertEqual(settings.accessMode, .appManaged)
+                }
+            )
+        }
+
+        await store.send(.accessModeChanged(.appManaged)) {
+            $0.accessMode = .appManaged
+        }
+    }
+
     func testGenerateShowsPaywallWhenAppManagedIsInactive() async {
         var initialState = AIImageFeature.State()
         initialState.settings = AIImageSettings(accessMode: .appManaged, apiKey: "")
@@ -101,7 +177,7 @@ final class AIImageFeatureTests: XCTestCase {
         await store.receive(.delegate(.requestEdit(expectedRequest)))
     }
 
-    func testAIImageGenerateDelegatesOpenAIGPTImage2RequestWithOpenAIKey() async {
+    func testAIImageGenerateDelegatesOpenAIRequestWithOpenAIKey() async {
         var initialState = AIImageFeature.State(
             settings: AIImageSettings(
                 accessMode: .userAPIKey,
@@ -111,13 +187,13 @@ final class AIImageFeatureTests: XCTestCase {
             commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
         )
         initialState.composer.prompt = "Improve lettering"
-        initialState.composer.model = .gptImage2
+        initialState.composer.model = AIImageModel.defaultOpenAIDirectEditModel
 
         let expectedRequest = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
                 accessMode: .userAPIKey,
-                model: .gptImage2,
+                model: AIImageModel.defaultOpenAIDirectEditModel,
                 inputLayerIndex: 0,
                 editScope: .wholeLayer,
                 outputMode: .replaceCurrentLayer
@@ -144,10 +220,23 @@ final class AIImageFeatureTests: XCTestCase {
             )
         )
         state.composer.prompt = "Improve lettering"
-        state.composer.model = .gptImage2
+        state.composer.model = AIImageModel.defaultOpenAIDirectEditModel
         XCTAssertTrue(state.generateDisabled)
 
         state.openAIAPIKey = "openai-key"
+        XCTAssertFalse(state.generateDisabled)
+    }
+
+    func testGenerateAllowsConfiguredGPTImage2ForDirectOpenAI() {
+        var state = AIImageFeature.State(
+            settings: AIImageSettings(
+                accessMode: .userAPIKey,
+                openAIAPIKey: "openai-key"
+            )
+        )
+        state.composer.prompt = "Improve lettering"
+        state.composer.model = .gptImage2
+
         XCTAssertFalse(state.generateDisabled)
     }
 

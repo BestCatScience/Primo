@@ -57,6 +57,139 @@ public struct DocumentStrokeContext: Equatable, Sendable {
     }
 }
 
+public enum StrokeCommitSelectionClearPolicy: Equatable, Sendable {
+    case none
+    case clearSelection
+}
+
+public struct StrokeCommitWorkflowRequest: Sendable {
+    public let baseSnapshot: MetalDocumentSnapshot?
+    public let renderSnapshot: MetalDocumentSnapshot?
+    public let renderState: StrokeSessionRenderState?
+    public let samples: [StylusSample]
+    public let context: DocumentStrokeContext
+    public let selectionClearPolicy: StrokeCommitSelectionClearPolicy
+    public let refreshViaDirtyPresentation: Bool
+
+    public init(
+        baseSnapshot: MetalDocumentSnapshot?,
+        renderSnapshot: MetalDocumentSnapshot?,
+        renderState: StrokeSessionRenderState?,
+        samples: [StylusSample],
+        context: DocumentStrokeContext,
+        selectionClearPolicy: StrokeCommitSelectionClearPolicy,
+        refreshViaDirtyPresentation: Bool
+    ) {
+        self.baseSnapshot = baseSnapshot
+        self.renderSnapshot = renderSnapshot
+        self.renderState = renderState
+        self.samples = samples
+        self.context = context
+        self.selectionClearPolicy = selectionClearPolicy
+        self.refreshViaDirtyPresentation = refreshViaDirtyPresentation
+    }
+}
+
+public struct StrokeCommitPendingSnapshot: Sendable {
+    public let baseSnapshot: MetalDocumentSnapshot
+    public let surface: GpuLayerSurface
+
+    public init(baseSnapshot: MetalDocumentSnapshot, surface: GpuLayerSurface) {
+        self.baseSnapshot = baseSnapshot
+        self.surface = surface
+    }
+}
+
+public struct StrokeCommitWorkflowResult<Selection: Equatable & Sendable, Feedback: Equatable & Sendable>: Sendable {
+    public let contract: DocumentMutationWorkflowOutcome<Selection, Feedback>
+    public let transferredSurfaceHandle: MetalBufferHandle?
+    public let pendingCommittedSnapshot: StrokeCommitPendingSnapshot?
+
+    public init(
+        contract: DocumentMutationWorkflowOutcome<Selection, Feedback>,
+        transferredSurfaceHandle: MetalBufferHandle?,
+        pendingCommittedSnapshot: StrokeCommitPendingSnapshot?
+    ) {
+        self.contract = contract
+        self.transferredSurfaceHandle = transferredSurfaceHandle
+        self.pendingCommittedSnapshot = pendingCommittedSnapshot
+    }
+}
+
+public struct DocumentStrokeCommitWorkflowService: Sendable {
+    public let layerCommands: DocumentLayerCommandService
+    public let strokeInteraction: CanvasStrokeInteractionService
+
+    public init(
+        layerCommands: DocumentLayerCommandService,
+        strokeInteraction: CanvasStrokeInteractionService
+    ) {
+        self.layerCommands = layerCommands
+        self.strokeInteraction = strokeInteraction
+    }
+
+    public func resolveCommit<Selection: Equatable & Sendable, Feedback: Equatable & Sendable>(
+        _ request: StrokeCommitWorkflowRequest,
+        usesResponsivePreviewCommit: Bool
+    ) -> Result<StrokeCommitWorkflowResult<Selection, Feedback>, DocumentMutationFailure> {
+        if request.selectionClearPolicy == .clearSelection {
+            switch layerCommands.ensureLayerVisible(request.context.activeLayerIndex) {
+            case .success:
+                break
+            case let .failure(failure):
+                return .failure(failure)
+            }
+        }
+
+        let outcome = strokeInteraction.finish(
+            renderState: request.renderState,
+            baseSnapshot: request.baseSnapshot,
+            renderSnapshot: request.renderSnapshot,
+            samples: request.samples,
+            context: request.context,
+            allowsApproximatePreviewCommit: usesResponsivePreviewCommit,
+            refreshViaDirtyPresentation: request.refreshViaDirtyPresentation
+        )
+
+        switch outcome {
+        case let .commit(mutation):
+            let result = layerCommands.applyLayerSurfaceMutation(
+                mutation.surface.layerIndex,
+                GpuLayerMutationPayload(
+                    canvasWidth: mutation.surface.width,
+                    canvasHeight: mutation.surface.height,
+                    dirtyRect: mutation.dirtyRegion.layerPixelRect,
+                    gpuBufferHandle: mutation.surface.handle.buffer,
+                    fallbackPixelData: mutation.surface.pixelData
+                )
+            )
+            switch result {
+            case .success:
+                let commitBaseSnapshot = request.baseSnapshot ?? request.renderSnapshot
+                return .success(
+                    StrokeCommitWorkflowResult(
+                        contract: DocumentMutationWorkflowOutcome<Selection, Feedback>(
+                            canvasMutation: request.selectionClearPolicy == .clearSelection ? .clearSelection : .none,
+                            refresh: mutation.refreshViaDirtyPresentation ? .dirty : .current,
+                            updatesWorkspaceArtifacts: false
+                        ),
+                        transferredSurfaceHandle: mutation.surface.handle.buffer,
+                        pendingCommittedSnapshot: commitBaseSnapshot.map {
+                            StrokeCommitPendingSnapshot(baseSnapshot: $0, surface: mutation.surface)
+                        }
+                    )
+                )
+            case let .failure(failure):
+                return .failure(failure)
+            }
+        case let .failure(failure):
+            return .failure(failure)
+        case .preview, .reset:
+            return .failure(.bridgeMutationFailed("GPU stroke commit failed: unexpected session outcome"))
+        }
+    }
+}
+
 public struct DocumentStrokePreviewResolution: Sendable {
     public let result: StrokePreviewResult
     public let baseSnapshotToCapture: MetalDocumentSnapshot?

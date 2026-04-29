@@ -9,17 +9,17 @@ import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
 public struct DocumentRuntimeComposition: Sendable {
-    public var queryGateway: DocumentQueryGateway
-    public var mutationGateway: DocumentMutationGateway
-    public var strokeGateway: StrokeInputGateway
-    public var historyGateway: DocumentHistoryGateway
-    public var persistenceGateway: DocumentPersistenceGateway
-    public var exportGateway: DocumentExportGateway
-    public var textLayerGateway: TextLayerGateway
-    public var layerEffectsGateway: DocumentLayerEffectsGateway
-    public var editingGateway: DocumentEditingGateway
-    public var strokeSessionUseCase: DocumentStrokeSessionUseCase
-    public var gpuOperationGateway: DocumentGpuOperationGateway
+    public let queryGateway: DocumentQueryGateway
+    public let mutationGateway: DocumentMutationGateway
+    public let strokeGateway: StrokeInputGateway
+    public let historyGateway: DocumentHistoryGateway
+    public let persistenceGateway: DocumentPersistenceGateway
+    public let exportGateway: DocumentExportGateway
+    public let textLayerGateway: TextLayerGateway
+    public let layerEffectsGateway: DocumentLayerEffectsGateway
+    public let editingGateway: DocumentEditingGateway
+    public let strokeSessionUseCase: DocumentStrokeSessionUseCase
+    public let gpuOperationGateway: DocumentGpuOperationGateway
 
     public init(
         queryGateway: DocumentQueryGateway,
@@ -45,6 +45,34 @@ public struct DocumentRuntimeComposition: Sendable {
         self.editingGateway = editingGateway
         self.strokeSessionUseCase = strokeSessionUseCase
         self.gpuOperationGateway = gpuOperationGateway
+    }
+
+    public func withOverrides(
+        queryGateway: DocumentQueryGateway? = nil,
+        mutationGateway: DocumentMutationGateway? = nil,
+        strokeGateway: StrokeInputGateway? = nil,
+        historyGateway: DocumentHistoryGateway? = nil,
+        persistenceGateway: DocumentPersistenceGateway? = nil,
+        exportGateway: DocumentExportGateway? = nil,
+        textLayerGateway: TextLayerGateway? = nil,
+        layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
+        editingGateway: DocumentEditingGateway? = nil,
+        strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
+        gpuOperationGateway: DocumentGpuOperationGateway? = nil
+    ) -> DocumentRuntimeComposition {
+        DocumentRuntimeComposition(
+            queryGateway: queryGateway ?? self.queryGateway,
+            mutationGateway: mutationGateway ?? self.mutationGateway,
+            strokeGateway: strokeGateway ?? self.strokeGateway,
+            historyGateway: historyGateway ?? self.historyGateway,
+            persistenceGateway: persistenceGateway ?? self.persistenceGateway,
+            exportGateway: exportGateway ?? self.exportGateway,
+            textLayerGateway: textLayerGateway ?? self.textLayerGateway,
+            layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
+            editingGateway: editingGateway ?? self.editingGateway,
+            strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
+            gpuOperationGateway: gpuOperationGateway ?? self.gpuOperationGateway
+        )
     }
 }
 
