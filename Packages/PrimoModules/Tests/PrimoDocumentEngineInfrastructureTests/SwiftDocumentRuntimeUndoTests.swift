@@ -179,6 +179,35 @@ struct SwiftDocumentRuntimeUndoTests {
         #expect(runtime.pixelDataForLayer(index: 0) == gpuPixels)
     }
 
+    @Test
+    func planLeaseKeepsSourceBufferAliveDuringGpuMutation() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+        let handle = gpu.makeHandle(width: 2, height: 2, pixelData: Data(repeating: 0x77, count: 16))
+
+        _ = try runtime.applyLayerSurfaceMutation(
+            index: 0,
+            payload: GpuLayerMutationPayload(
+                canvasWidth: 2,
+                canvasHeight: 2,
+                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                gpuBufferHandle: handle,
+                fallbackPixelData: nil
+            )
+        ).get()
+
+        var plan: RuntimeFillPlan? = try runtime.makeFillPlan(sample: sample(), brush: brush()).get()
+        runtime.release(handle)
+
+        #expect(gpu.hasCachedPixelData(for: handle))
+        _ = runtime.fillPayload(for: try #require(plan))
+        #expect(gpu.fillSourceBufferHandleValues == [handle])
+
+        plan = nil
+
+        #expect(!gpu.hasCachedPixelData(for: handle))
+    }
+
     private func sample() -> StylusSample {
         StylusSample(
             point: CGPoint(x: 1, y: 1),
@@ -220,6 +249,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
     private let lock = NSLock()
     private var strokeOutputs: [Data]
     private var pixelDataByHandle: [MetalBufferHandle: Data] = [:]
+    private var referenceCountByHandle: [MetalBufferHandle: Int] = [:]
     private var retainedHandles: [MetalBufferHandle] = []
     private var strokeBaseBufferHandles: [MetalBufferHandle?] = []
     private var fillSourceBufferHandles: [MetalBufferHandle?] = []
@@ -235,6 +265,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
         lock.withLock {
             let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: width * 4)
             pixelDataByHandle[handle] = pixelData
+            referenceCountByHandle[handle] = 1
             return handle
         }
     }
@@ -271,19 +302,36 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
         }
     }
 
+    func hasCachedPixelData(for handle: MetalBufferHandle) -> Bool {
+        lock.withLock {
+            pixelDataByHandle[handle] != nil
+        }
+    }
+
     func services() -> DocumentRuntimeGpuServices {
         DocumentRuntimeGpuServices(
             release: { handle in
                 guard let handle else { return }
                 self.lock.withLock {
-                    _ = self.pixelDataByHandle.removeValue(forKey: handle)
+                    let nextCount = (self.referenceCountByHandle[handle] ?? 0) - 1
+                    if nextCount <= 0 {
+                        self.referenceCountByHandle.removeValue(forKey: handle)
+                        self.pixelDataByHandle.removeValue(forKey: handle)
+                    } else {
+                        self.referenceCountByHandle[handle] = nextCount
+                    }
                 }
             },
             retain: { handle in
                 guard let handle else { return false }
                 return self.lock.withLock {
-                    guard self.retainSucceeds else { return false }
+                    guard self.retainSucceeds,
+                          let count = self.referenceCountByHandle[handle]
+                    else {
+                        return false
+                    }
                     self.retainedHandles.append(handle)
+                    self.referenceCountByHandle[handle] = count + 1
                     return true
                 }
             },
@@ -383,6 +431,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             let pixelData = strokeOutputs.removeFirst()
             let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: width * 4)
             pixelDataByHandle[handle] = pixelData
+            referenceCountByHandle[handle] = 1
             return PrimoMetalStrokeMutationResult(
                 dirtyRect: (originX: 0, originY: 0, width: width, height: height),
                 gpuBufferHandle: handle,
