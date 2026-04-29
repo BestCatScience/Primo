@@ -21,7 +21,7 @@ struct DocumentStrokeApplicationTests {
             baseSnapshot: snapshot,
             sample: sample,
             context: context,
-            usesResponsiveOilPreview: true
+            usesResponsivePreview: true
         ))
 
         #expect(resolution.baseSnapshotToCapture == nil)
@@ -31,7 +31,7 @@ struct DocumentStrokeApplicationTests {
         #expect(planner.requests[0].baseLayer.layerIndex == 2)
         #expect(planner.requests[0].samples == [sample])
         #expect(planner.requests[0].preserveAlphaLockedPixels)
-        #expect(!planner.requests[0].usesResponsiveOilPreview)
+        #expect(planner.requests[0].usesResponsivePreview)
     }
 
     @Test
@@ -50,7 +50,7 @@ struct DocumentStrokeApplicationTests {
             samples: samples,
             fullSamples: fullSamples,
             context: makeContext(layerIndex: 0),
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(resolution.baseSnapshotToCapture == nil)
@@ -87,7 +87,7 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: context,
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(planner.requests.count == 1)
@@ -124,7 +124,7 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: context,
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(planner.requests.count == 1)
@@ -159,7 +159,7 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: context,
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(planner.requests.count == 1)
@@ -191,13 +191,13 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: makeContext(layerIndex: 0, brush: oilBrushSettings()),
-            usesResponsiveOilPreview: true
+            usesResponsivePreview: true
         ))
 
         #expect(planner.requests.count == 1)
         #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == previousHandle)
         #expect(planner.requests[0].samples == [previous] + appended)
-        #expect(planner.requests[0].usesResponsiveOilPreview)
+        #expect(planner.requests[0].usesResponsivePreview)
     }
 
     @Test
@@ -227,13 +227,13 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: context,
-            usesResponsiveOilPreview: true
+            usesResponsivePreview: true
         ))
 
         #expect(planner.requests.count == 1)
         #expect(planner.requests[0].baseLayer.gpuHandle?.buffer == previousHandle)
         #expect(planner.requests[0].samples == [previous] + appended)
-        #expect(planner.requests[0].usesResponsiveOilPreview)
+        #expect(planner.requests[0].usesResponsivePreview)
         #expect(resolution.result.isApproximatePreview)
         #expect(!resolution.supportsIncrementalContinuation)
     }
@@ -261,7 +261,7 @@ struct DocumentStrokeApplicationTests {
             samples: appended,
             fullSamples: fullSamples,
             context: makeContext(layerIndex: 0),
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(planner.requests.count == 1)
@@ -301,7 +301,7 @@ struct DocumentStrokeApplicationTests {
                 samples: appended,
                 fullSamples: fullSamples,
                 context: makeContext(layerIndex: 0, brush: oilBrushSettings()),
-                usesResponsiveOilPreview: true
+                usesResponsivePreview: true
             ))
             renderState = StrokeSessionRenderState(
                 baseRevision: resolution.result.baseSnapshot.revision,
@@ -349,7 +349,7 @@ struct DocumentStrokeApplicationTests {
                 samples: appended,
                 fullSamples: fullSamples,
                 context: context,
-                usesResponsiveOilPreview: true
+                usesResponsivePreview: true
             ))
             renderState = StrokeSessionRenderState(
                 baseRevision: resolution.result.baseSnapshot.revision,
@@ -362,7 +362,7 @@ struct DocumentStrokeApplicationTests {
 
         #expect(fullSamples.count > 1_000)
         #expect(planner.requests.allSatisfy { $0.samples.count <= batchSize + 1 })
-        #expect(planner.requests.allSatisfy { $0.usesResponsiveOilPreview })
+        #expect(planner.requests.allSatisfy { $0.usesResponsivePreview })
     }
 
     @Test
@@ -401,7 +401,7 @@ struct DocumentStrokeApplicationTests {
                 samples: appended,
                 fullSamples: fullSamples,
                 context: context,
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             ))
             renderState = StrokeSessionRenderState(
                 baseRevision: resolution.result.baseSnapshot.revision,
@@ -432,7 +432,7 @@ struct DocumentStrokeApplicationTests {
             samples: [stylusSample(x: 1, y: 1)],
             fullSamples: [],
             context: makeContext(layerIndex: 0),
-            usesResponsiveOilPreview: false
+            usesResponsivePreview: false
         ))
 
         #expect(resolution.baseSnapshotToCapture == renderSnapshot)
@@ -596,7 +596,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: makeContext(layerIndex: 0),
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             )
         ).previewMutation)
 
@@ -640,7 +640,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             )
         ).previewMutation)
 
@@ -688,7 +688,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             )
         ).previewMutation)
 
@@ -733,7 +733,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: makeContext(layerIndex: 0),
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             )
         ).previewMutation)
 
@@ -777,7 +777,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsiveOilPreview: false
+                usesResponsivePreview: false
             )
         ).previewMutation)
 
@@ -812,7 +812,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func strokeSessionUseCaseRerendersSmudgeWhenPreviewSamplesDoNotMatchFinalStroke() throws {
+    func strokeSessionUseCaseCommitsSmudgePreviewSurfaceWhenFinalSamplesDiffer() throws {
         let planner = RecordingPreviewPlanner()
         let renderer = RecordingCommitRenderer()
         let useCase = DocumentStrokeSessionUseCase(
@@ -827,7 +827,7 @@ struct DocumentStrokeApplicationTests {
                 sample: stylusSample(x: 1, y: 1),
                 baseSnapshot: snapshot,
                 context: context,
-                usesResponsiveOilPreview: true
+                usesResponsivePreview: true
             )
         ).previewMutation)
 
@@ -854,10 +854,105 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
-        #expect(renderer.requests.count == 1)
-        #expect(renderer.requests[0].samples == finalSamples)
-        #expect(renderer.requests[0].brush.smudgeEngineEnabled)
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(commit.dirtyRegion == preview.dirtyRegion)
+        #expect(commit.surface.pixelData != nil)
+        #expect(renderer.requests.isEmpty)
+    }
+
+    @Test
+    func strokeSessionUseCaseCommitsResponsivePreviewSurfaceForNonOilBrush() throws {
+        let renderer = RecordingCommitRenderer()
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let context = makeContext(layerIndex: 0, brush: brushSettings())
+        let preview = try #require(useCase.execute(
+            .begin(
+                sample: stylusSample(x: 1, y: 1),
+                baseSnapshot: snapshot,
+                context: context,
+                usesResponsivePreview: true
+            )
+        ).previewMutation)
+
+        #expect(preview.isApproximatePreview)
+
+        let renderState = StrokeSessionRenderState(
+            baseRevision: preview.baseSnapshot.revision,
+            layerIndex: preview.surface.layerIndex,
+            surfaceHandle: preview.surface.handle.buffer,
+            dirtyRect: preview.dirtyRegion.layerPixelRect,
+            isApproximatePreview: preview.isApproximatePreview,
+            previewBrush: context.previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: false
+        )
+        let commit = try #require(useCase.execute(
+            .finish(
+                renderState: renderState,
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)],
+                context: context,
+                allowsApproximatePreviewCommit: true,
+                refreshViaDirtyPresentation: true
+            )
+        ).commitMutation)
+
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(renderer.requests.isEmpty)
+    }
+
+    @Test
+    func strokeSessionUseCaseCommitsWithPreviewBrushWhenCurrentBrushChangesBeforeFinish() throws {
+        let renderer = RecordingCommitRenderer()
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        var eraserBrush = brushSettings()
+        eraserBrush.isEraser = true
+        eraserBrush.red = 255
+        eraserBrush.green = 255
+        eraserBrush.blue = 255
+        var currentBrush = brushSettings()
+        currentBrush.isEraser = false
+        currentBrush.red = 255
+        currentBrush.green = 0
+        currentBrush.blue = 0
+        let changedContext = makeContext(layerIndex: 0, brush: currentBrush)
+        let finalSamples = [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)]
+
+        let previewHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let commit = try #require(useCase.execute(
+            .finish(
+                renderState: StrokeSessionRenderState(
+                    baseRevision: snapshot.revision,
+                    layerIndex: 0,
+                    surfaceHandle: previewHandle,
+                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                    isApproximatePreview: false,
+                    previewBrush: eraserBrush,
+                    sampleCount: 1,
+                    supportsIncrementalContinuation: true
+                ),
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: finalSamples,
+                context: changedContext,
+                allowsApproximatePreviewCommit: false,
+                refreshViaDirtyPresentation: true
+            )
+        ).commitMutation)
+
+        #expect(commit.surface.handle.buffer == previewHandle)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test
@@ -1216,7 +1311,7 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
             ),
             dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
             incrementalUpdate: nil,
-            isApproximatePreview: request.usesResponsiveOilPreview
+            isApproximatePreview: request.usesResponsivePreview
         )
     }
 }

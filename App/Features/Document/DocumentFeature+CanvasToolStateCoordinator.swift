@@ -36,7 +36,7 @@ extension DocumentFeature {
                     brush: context.brush,
                     previewBrush: context.previewBrush
                 ),
-                usesResponsiveOilPreview: usesResponsiveOilPreview(state: state, brush: context.previewBrush)
+                usesResponsivePreview: usesResponsivePreview(state: state, brush: context.previewBrush)
             )
         }
 
@@ -57,7 +57,7 @@ extension DocumentFeature {
                     brush: context.brush,
                     previewBrush: context.previewBrush
                 ),
-                usesResponsiveOilPreview: usesResponsiveOilPreview(state: state, brush: context.previewBrush)
+                usesResponsivePreview: usesResponsivePreview(state: state, brush: context.previewBrush)
             )
         }
 
@@ -84,7 +84,7 @@ extension DocumentFeature {
                     selectionClearPolicy: keepsSelectionCleared ? .clearSelection : .none,
                     refreshViaDirtyPresentation: refreshViaDirtyPresentation
                 ),
-                usesResponsivePreviewCommit: usesResponsiveOilPreview(state: state, brush: context.previewBrush)
+                usesResponsivePreviewCommit: usesResponsivePreview(state: state, brush: context.previewBrush)
             )
 
             switch result {
@@ -107,12 +107,11 @@ extension DocumentFeature {
             }
         }
 
-        private func usesResponsiveOilPreview(
+        private func usesResponsivePreview(
             state: DocumentFeature.State,
             brush: BrushRuntimeSettings
         ) -> Bool {
-            state.brushPalette.ui.oilLivePreviewQuality == .responsive &&
-            brush.tipKind == .oil
+            true
         }
     }
 
@@ -130,6 +129,7 @@ extension DocumentFeature {
             releaseSurfaceHandle: (MetalBufferHandle?) -> Void
         ) {
             let previewSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
+            state.canvas.activeStroke = nil
             resetPreview(state: &state)
             if previewSurfaceHandle != transferredSurfaceHandle {
                 releaseSurfaceHandle(previewSurfaceHandle)

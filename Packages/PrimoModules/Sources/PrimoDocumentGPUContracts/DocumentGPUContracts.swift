@@ -157,7 +157,7 @@ public struct StrokePreviewRequest: Sendable {
     public let samples: [StylusSample]
     public let brush: BrushRuntimeSettings
     public let preserveAlphaLockedPixels: Bool
-    public let usesResponsiveOilPreview: Bool
+    public let usesResponsivePreview: Bool
 
     public init(
         snapshot: MetalDocumentSnapshot,
@@ -166,7 +166,7 @@ public struct StrokePreviewRequest: Sendable {
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool,
-        usesResponsiveOilPreview: Bool = false
+        usesResponsivePreview: Bool = false
     ) {
         self.snapshot = snapshot
         self.activeLayerIndex = activeLayerIndex
@@ -174,7 +174,7 @@ public struct StrokePreviewRequest: Sendable {
         self.samples = samples
         self.brush = brush
         self.preserveAlphaLockedPixels = preserveAlphaLockedPixels
-        self.usesResponsiveOilPreview = usesResponsiveOilPreview
+        self.usesResponsivePreview = usesResponsivePreview
     }
 }
 

@@ -15,7 +15,6 @@ struct BrushPaletteFeature {
     fileprivate struct LibraryBootstrap {
         let savedPresets: [BrushPreset]
         let availableFonts: [TextFontOption]
-        let oilLivePreviewQuality: OilLivePreviewQuality
         let paletteSwatches: [PaletteSwatch]
         let allowsFingerTouchInput: Bool
     }
@@ -349,7 +348,6 @@ struct BrushPaletteFeature {
             var allowsFingerTouchInput = false
             var brushLibraryErrorMessage: String?
             var textFontImportErrorMessage: String?
-            var oilLivePreviewQuality: OilLivePreviewQuality = .responsive
             var paletteSwatches: [PaletteSwatch] = PaletteSwatch.defaults
         }
 
@@ -383,7 +381,6 @@ struct BrushPaletteFeature {
         case bootstrapLoaded(
             savedPresets: [BrushPreset],
             availableFonts: [TextFontOption],
-            oilLivePreviewQuality: OilLivePreviewQuality,
             paletteSwatches: [PaletteSwatch],
             allowsFingerTouchInput: Bool
         )
@@ -428,7 +425,6 @@ struct BrushPaletteFeature {
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.keyValueStoreClient) var keyValueStoreClient
 
-    private static let oilLivePreviewQualityStorageKey = "primo.oilLivePreviewQuality"
     private static let paletteSwatchesStorageKey = "primo.paletteSwatches"
     private static let allowsFingerTouchInputStorageKey = "primo.allowsFingerTouchInput"
 
@@ -486,26 +482,23 @@ struct BrushPaletteFeature {
                 guard !state.ui.hasLoadedLibrary else { return .none }
                 state.ui.hasLoadedLibrary = true
                 return .run { [brushPresetLibraryClient, textFontLibraryClient, keyValueStoreClient] send in
-                    let rawQuality = keyValueStoreClient.stringForKey(Self.oilLivePreviewQualityStorageKey)
                     let rawPalette = keyValueStoreClient.stringForKey(Self.paletteSwatchesStorageKey)
                     let rawAllowsFingerTouchInput = keyValueStoreClient.stringForKey(Self.allowsFingerTouchInputStorageKey)
                     await send(
                         .bootstrapLoaded(
                             savedPresets: brushPresetLibraryClient.loadSavedPresets(),
                             availableFonts: textFontLibraryClient.loadAvailableFonts(),
-                            oilLivePreviewQuality: rawQuality.flatMap(OilLivePreviewQuality.init(rawValue:)) ?? .responsive,
                             paletteSwatches: Self.decodePaletteSwatches(rawPalette),
                             allowsFingerTouchInput: rawAllowsFingerTouchInput == "true"
                         )
                     )
                 }
 
-            case let .bootstrapLoaded(savedPresets, availableFonts, oilLivePreviewQuality, paletteSwatches, allowsFingerTouchInput):
+            case let .bootstrapLoaded(savedPresets, availableFonts, paletteSwatches, allowsFingerTouchInput):
                 state.applyLibraryBootstrap(
                     LibraryBootstrap(
                         savedPresets: savedPresets,
                         availableFonts: availableFonts,
-                        oilLivePreviewQuality: oilLivePreviewQuality,
                         paletteSwatches: paletteSwatches,
                         allowsFingerTouchInput: allowsFingerTouchInput
                     )
@@ -610,13 +603,6 @@ struct BrushPaletteFeature {
                  .binding(\.text.selectedFontDisplayName):
                 return .none
 
-            case .binding(\.ui.oilLivePreviewQuality):
-                keyValueStoreClient.setString(
-                    state.ui.oilLivePreviewQuality.rawValue,
-                    Self.oilLivePreviewQualityStorageKey
-                )
-                return .none
-
             case .binding(\.ui.paletteSwatches):
                 keyValueStoreClient.setString(
                     Self.encodePaletteSwatches(state.ui.paletteSwatches),
@@ -647,7 +633,6 @@ struct BrushPaletteFeature {
 
             case let .importBrushesRequested(urls):
                 let existingNames = state.library.savedPresets.map(\.name) + state.library.presets.map(\.name)
-                let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
                 let paletteSwatches = state.ui.paletteSwatches
                 let allowsFingerTouchInput = state.ui.allowsFingerTouchInput
                 return .run { [appLanguageClient, brushImportClient, brushPresetLibraryClient] send in
@@ -686,7 +671,6 @@ struct BrushPaletteFeature {
                     await send(.bootstrapLoaded(
                         savedPresets: workingSaved,
                         availableFonts: [],
-                        oilLivePreviewQuality: oilLivePreviewQuality,
                         paletteSwatches: paletteSwatches,
                         allowsFingerTouchInput: allowsFingerTouchInput
                     ))
@@ -700,7 +684,6 @@ struct BrushPaletteFeature {
 
             case let .importTextFontsRequested(urls):
                 let savedPresets = state.library.savedPresets
-                let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
                 let paletteSwatches = state.ui.paletteSwatches
                 let allowsFingerTouchInput = state.ui.allowsFingerTouchInput
                 return .run { [brushImportClient, textFontLibraryClient] send in
@@ -711,7 +694,6 @@ struct BrushPaletteFeature {
                         .bootstrapLoaded(
                             savedPresets: savedPresets,
                             availableFonts: textFontLibraryClient.loadAvailableFonts(),
-                            oilLivePreviewQuality: oilLivePreviewQuality,
                             paletteSwatches: paletteSwatches,
                             allowsFingerTouchInput: allowsFingerTouchInput
                         )
@@ -804,7 +786,6 @@ struct BrushPaletteFeature {
 
             case .saveCurrentBrushButtonTapped:
                 let savedNames = state.library.savedPresets.map(\.name)
-                let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
                 let paletteSwatches = state.ui.paletteSwatches
                 let allowsFingerTouchInput = state.ui.allowsFingerTouchInput
                 let isOverwritingSavedPreset = state.library.selectedBrush.map { selected in
@@ -824,7 +805,6 @@ struct BrushPaletteFeature {
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality,
                             paletteSwatches: paletteSwatches,
                             allowsFingerTouchInput: allowsFingerTouchInput
                         ))
@@ -843,7 +823,6 @@ struct BrushPaletteFeature {
                 return .none
 
             case let .deleteSavedPresetButtonTapped(name):
-                let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
                 let paletteSwatches = state.ui.paletteSwatches
                 let allowsFingerTouchInput = state.ui.allowsFingerTouchInput
                 return .run { [brushPresetLibraryClient] send in
@@ -852,7 +831,6 @@ struct BrushPaletteFeature {
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality,
                             paletteSwatches: paletteSwatches,
                             allowsFingerTouchInput: allowsFingerTouchInput
                         ))
@@ -866,7 +844,6 @@ struct BrushPaletteFeature {
                 guard !trimmed.isEmpty else { return .none }
                 let selectedBrushName = state.library.selectedBrush?.name
                 let selectedCustomTip = state.brush.customTip
-                let oilLivePreviewQuality = state.ui.oilLivePreviewQuality
                 let paletteSwatches = state.ui.paletteSwatches
                 let allowsFingerTouchInput = state.ui.allowsFingerTouchInput
                 return .run { [brushPresetLibraryClient] send in
@@ -875,7 +852,6 @@ struct BrushPaletteFeature {
                         await send(.bootstrapLoaded(
                             savedPresets: saved,
                             availableFonts: [],
-                            oilLivePreviewQuality: oilLivePreviewQuality,
                             paletteSwatches: paletteSwatches,
                             allowsFingerTouchInput: allowsFingerTouchInput
                         ))
@@ -1006,7 +982,6 @@ private extension Color {
 extension BrushPaletteFeature.State {
     fileprivate mutating func applyLibraryBootstrap(_ bootstrap: BrushPaletteFeature.LibraryBootstrap) {
         library.savedPresets = bootstrap.savedPresets
-        ui.oilLivePreviewQuality = bootstrap.oilLivePreviewQuality
         ui.paletteSwatches = bootstrap.paletteSwatches
         ui.allowsFingerTouchInput = bootstrap.allowsFingerTouchInput
         if !bootstrap.availableFonts.isEmpty {

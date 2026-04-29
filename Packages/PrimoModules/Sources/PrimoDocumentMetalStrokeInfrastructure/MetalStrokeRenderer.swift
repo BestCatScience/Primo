@@ -17,7 +17,7 @@ public struct MetalStrokeRenderer: StrokePreviewPlanning, StrokeCommitRendering 
             samples: request.samples,
             brush: request.brush,
             preserveAlphaLockedPixels: request.preserveAlphaLockedPixels,
-            usesResponsiveOilPreview: request.usesResponsiveOilPreview
+            usesResponsivePreview: request.usesResponsivePreview
         )
     }
 

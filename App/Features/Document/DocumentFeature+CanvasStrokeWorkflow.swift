@@ -340,7 +340,7 @@ extension DocumentFeature {
             sample: sample,
             baseSnapshot: state.canvas.strokeSession.baseSnapshot,
             context: DocumentStrokeContext(context),
-            usesResponsiveOilPreview: state.usesResponsiveOilPreview(for: context.previewBrush)
+            usesResponsivePreview: state.usesResponsivePreview(for: context.previewBrush)
         )
     }
 
@@ -683,8 +683,7 @@ private extension DocumentStrokeContext {
 }
 
 private extension DocumentFeature.State {
-    func usesResponsiveOilPreview(for brush: BrushRuntimeSettings) -> Bool {
-        brushPalette.ui.oilLivePreviewQuality == .responsive &&
-        brush.tipKind == .oil
+    func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        true
     }
 }

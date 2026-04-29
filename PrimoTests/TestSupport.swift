@@ -410,7 +410,7 @@ private final class StubStrokeSessionAdapter: StrokePreviewPlanning, StrokeCommi
                     brush: request.brush,
                     previewBrush: request.brush
                 ),
-                usesResponsiveOilPreview: request.usesResponsiveOilPreview
+                usesResponsivePreview: request.usesResponsivePreview
             )
         ) else {
             return nil

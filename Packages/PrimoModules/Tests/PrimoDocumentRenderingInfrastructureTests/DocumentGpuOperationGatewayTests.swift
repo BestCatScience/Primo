@@ -357,6 +357,76 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test(.enabled(if: metalRuntimeAvailable))
+    func committedEraserStrokePreservesLayerColorChannels() throws {
+        let strokeService = DocumentStrokeProcessingService()
+        let basePixel: [UInt8] = [28, 42, 56, 255]
+        let basePixels = Data((0..<32 * 32).flatMap { _ in basePixel })
+        let snapshot = MetalDocumentSnapshot(
+            width: 32,
+            height: 32,
+            revision: 4,
+            compositePixelData: basePixels,
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: basePixels
+                )
+            ]
+        )
+
+        let committed = try #require(strokeService.makeCommittedSurface(
+            snapshot: snapshot,
+            activeLayerIndex: 0,
+            samples: [
+                StylusSample(
+                    point: CGPoint(x: 16, y: 16),
+                    pressure: 1,
+                    altitude: .pi / 2,
+                    azimuth: 0,
+                    timestamp: 0
+                )
+            ],
+            brush: .init(
+                tipKind: .ink,
+                radius: 8,
+                opacity: 1,
+                hardness: 1,
+                roundness: 1,
+                angle: 0,
+                angleMode: .fixed,
+                stampSpacing: 0.15,
+                spacingJitter: 0,
+                scatterLateral: 0,
+                scatterLinear: 0,
+                count: 1,
+                countJitter: 0,
+                angleJitter: 0,
+                roundnessJitter: 0,
+                textureMode: .off,
+                textureStrength: 0,
+                pressureSensitivity: 1,
+                red: 255,
+                green: 0,
+                blue: 0,
+                isEraser: true
+            ),
+            preserveAlphaLockedPixels: false
+        ))
+        let pixels = try #require(committed.fallbackPixelData ?? strokeService.materializedPixelData(for: committed.handle))
+        let centerOffset = ((16 * 32) + 16) * 4
+
+        #expect(pixels[centerOffset] == basePixel[0])
+        #expect(pixels[centerOffset + 1] == basePixel[1])
+        #expect(pixels[centerOffset + 2] == basePixel[2])
+        #expect(pixels[centerOffset + 3] < basePixel[3])
+    }
+
+    @Test(.enabled(if: metalRuntimeAvailable))
     func responsiveOilPreviewIsMarkedApproximate() throws {
         let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
@@ -430,7 +500,7 @@ struct DocumentGpuOperationGatewayTests {
                 blue: 58
             ),
             preserveAlphaLockedPixels: false,
-            usesResponsiveOilPreview: true
+            usesResponsivePreview: true
         ))
 
         let dirtyRegion = try #require(preview.dirtyRegion)
@@ -514,7 +584,7 @@ struct DocumentGpuOperationGatewayTests {
                 blue: 40
             ),
             preserveAlphaLockedPixels: false,
-            usesResponsiveOilPreview: true
+            usesResponsivePreview: true
         ))
 
         let liveUpdate = try #require(preview.incrementalUpdate)
@@ -525,7 +595,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
-    func responsiveOilPreviewBrushPreservesToneAndTipSettings() {
+    func responsivePreviewBrushPreservesToneAndTipSettings() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([0, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -563,13 +633,13 @@ struct DocumentGpuOperationGatewayTests {
             blue: 58
         )
 
-        let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
+        let preview = GpuRenderingSupport.responsivePreviewBrush(from: original)
 
         #expect(preview == original)
     }
 
     @Test
-    func responsiveOilPreviewBrushDisablesSmudgeOnlyForLiveSmudgePreview() {
+    func responsivePreviewBrushDisablesSmudgeOnlyForLiveSmudgePreview() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([64, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -604,7 +674,7 @@ struct DocumentGpuOperationGatewayTests {
             blue: 50
         )
 
-        let preview = GpuRenderingSupport.responsiveOilPreviewBrush(from: original)
+        let preview = GpuRenderingSupport.responsivePreviewBrush(from: original)
 
         #expect(!preview.smudgeEngineEnabled)
         #expect(preview.tipKind == original.tipKind)

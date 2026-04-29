@@ -17,14 +17,14 @@ public struct CanvasStrokeInteractionService: Sendable {
         sample: StylusSample,
         baseSnapshot: MetalDocumentSnapshot?,
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     ) -> GpuStrokeSessionOutcome {
         sessionUseCase.execute(
             .begin(
                 sample: sample,
                 baseSnapshot: baseSnapshot,
                 context: context,
-                usesResponsiveOilPreview: usesResponsiveOilPreview
+                usesResponsivePreview: usesResponsivePreview
             )
         )
     }
@@ -36,7 +36,7 @@ public struct CanvasStrokeInteractionService: Sendable {
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     ) -> GpuStrokeSessionOutcome {
         sessionUseCase.execute(
             .append(
@@ -46,7 +46,7 @@ public struct CanvasStrokeInteractionService: Sendable {
                 samples: samples,
                 fullSamples: fullSamples,
                 context: context,
-                usesResponsiveOilPreview: usesResponsiveOilPreview
+                usesResponsivePreview: usesResponsivePreview
             )
         )
     }

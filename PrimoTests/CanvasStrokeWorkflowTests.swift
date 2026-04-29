@@ -12,6 +12,20 @@ import XCTest
 
 @MainActor
 final class CanvasStrokeWorkflowTests: XCTestCase {
+    private func makeStrokeSessionCoordinator(
+        layerCommands: DocumentLayerCommandService = DocumentLayerCommandService(mutationGateway: .stub()),
+        strokeInteraction: CanvasStrokeInteractionService
+    ) -> DocumentFeature.CanvasStrokeSessionCoordinator {
+        DocumentFeature.CanvasStrokeSessionCoordinator(
+            layerCommands: layerCommands,
+            strokeInteraction: strokeInteraction,
+            commitWorkflow: DocumentStrokeCommitWorkflowService(
+                layerCommands: layerCommands,
+                strokeInteraction: strokeInteraction
+            )
+        )
+    }
+
     func testDocumentGpuGatewayOverrideRefreshesDerivedGpuDependencies() {
         let oldGateway = markedGateway(1)
         let newGateway = markedGateway(9)
@@ -69,8 +83,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testGpuStrokeCommitSurfacesSessionFailure() {
-        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+        let coordinator = makeStrokeSessionCoordinator(
             strokeInteraction: CanvasStrokeInteractionService(
                 sessionUseCase: .stub { _ in
                     .failure(.bridgeMutationFailed("GPU stroke commit failed: missing base snapshot"))
@@ -141,8 +154,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testAppendStrokePreviewPassesCurrentRenderStateToSessionUseCase() {
         let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
         let recordedRenderStates = TestRecorder<StrokeSessionRenderState?>()
-        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+        let coordinator = makeStrokeSessionCoordinator(
             strokeInteraction: CanvasStrokeInteractionService(
                 sessionUseCase: .stub { command in
                     if case let .append(_, _, renderState, _, _, _, _) = command {
@@ -191,8 +203,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testShapeStrokePreviewUsesStrokeSessionPreviewWithFullSamples() {
         let recordedCommands = TestRecorder<GpuStrokeSessionCommand>()
         let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
-        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+        let coordinator = makeStrokeSessionCoordinator(
             strokeInteraction: CanvasStrokeInteractionService(
                 sessionUseCase: .stub { command in
                     recordedCommands.record(command)
@@ -280,6 +291,54 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         await store.receive(.delegate(.commitStroke(stroke.points.map(\.stylusSample))))
     }
 
+    func testBrushStrokeEndKeepsFullStrokeAvailableForFinalAppendPreview() async {
+        let first = StrokePoint(
+            position: SIMD2<Float>(1, 1),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 0,
+            isPredicted: false
+        )
+        let second = StrokePoint(
+            position: SIMD2<Float>(4, 4),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 1,
+            isPredicted: false
+        )
+        let third = StrokePoint(
+            position: SIMD2<Float>(8, 8),
+            pressure: 1,
+            altitude: 0,
+            azimuth: 0,
+            timestamp: 2,
+            isPredicted: false
+        )
+        let previousStroke = Stroke(points: [first, second])
+        let endedStroke = Stroke(points: [first, second, third])
+        let store = TestStore(initialState: {
+            var state = CanvasFeature.State()
+            state.currentTool = .brush
+            state.activeStroke = previousStroke
+            state.isStrokeActive = true
+            state.strokeSession.committedPointCount = previousStroke.points.count
+            return state
+        }()) {
+            CanvasFeature()
+        }
+
+        await store.send(.strokeEnded(endedStroke)) {
+            $0.isStrokeActive = false
+            $0.isAwaitingCommittedRender = true
+            $0.activeStroke = endedStroke
+            $0.strokeSession.committedPointCount = 0
+        }
+        await store.receive(.delegate(.appendSamples([third.stylusSample])))
+        await store.receive(.delegate(.endStroke(endedStroke.points.map(\.stylusSample))))
+    }
+
     func testGpuCommitOutcomeAppliesLayerSurfaceMutation() {
         let surfaceCalls = TestRecorder<GpuLayerMutationPayload>()
         let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
@@ -306,7 +365,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
-        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+        let coordinator = makeStrokeSessionCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )
@@ -381,7 +440,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             }
         )
-        let coordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+        let coordinator = makeStrokeSessionCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )
@@ -478,7 +537,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        let sessionCoordinator = DocumentFeature.CanvasStrokeSessionCoordinator(
+        let sessionCoordinator = makeStrokeSessionCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )

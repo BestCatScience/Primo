@@ -173,7 +173,7 @@ public enum GpuRenderingSupport {
         StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
 
-    public static func responsiveOilPreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
+    public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
         guard brush.tipKind == .oil, brush.smudgeEngineEnabled else {
             return brush
         }

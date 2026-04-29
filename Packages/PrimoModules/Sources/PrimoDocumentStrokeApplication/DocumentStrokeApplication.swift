@@ -223,10 +223,10 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         baseSnapshot: MetalDocumentSnapshot?,
         sample: StylusSample,
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     ) -> DocumentStrokePreviewResolution? {
-        let usesResponsiveOilPreview = Self.effectiveResponsiveOilPreview(
-            requested: usesResponsiveOilPreview,
+        let usesResponsivePreview = Self.effectiveResponsivePreview(
+            requested: usesResponsivePreview,
             brush: context.previewBrush
         )
         guard
@@ -240,7 +240,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
                     samples: [sample],
                     brush: context.previewBrush,
                     preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked,
-                    usesResponsiveOilPreview: usesResponsiveOilPreview
+                    usesResponsivePreview: usesResponsivePreview
                 )
             )
         else {
@@ -261,11 +261,11 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     ) -> DocumentStrokePreviewResolution? {
         guard !samples.isEmpty else { return nil }
-        let usesResponsiveOilPreview = Self.effectiveResponsiveOilPreview(
-            requested: usesResponsiveOilPreview,
+        let usesResponsivePreview = Self.effectiveResponsivePreview(
+            requested: usesResponsivePreview,
             brush: context.previewBrush
         )
 
@@ -289,14 +289,14 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             ) {
                 baseLayerRef = incremental.baseLayer
                 previewSamples = incremental.samples
-            } else if let incremental = responsiveOilIncrementalPreview(
+            } else if let incremental = responsiveIncrementalPreview(
                 baseSnapshot: baseSnapshot,
                 baseLayer: baseLayer,
                 renderState: renderState,
                 samples: samples,
                 fullSamples: fullSamples,
                 context: context,
-                usesResponsiveOilPreview: usesResponsiveOilPreview
+                usesResponsivePreview: usesResponsivePreview
             ) {
                 baseLayerRef = incremental.baseLayer
                 previewSamples = incremental.samples
@@ -312,7 +312,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
                     samples: previewSamples,
                     brush: context.previewBrush,
                     preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked,
-                    usesResponsiveOilPreview: usesResponsiveOilPreview
+                    usesResponsivePreview: usesResponsivePreview
                 )
             ) else {
                 return nil
@@ -336,7 +336,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
                     samples: samples,
                     brush: context.previewBrush,
                     preserveAlphaLockedPixels: context.activeLayer.isAlphaLocked,
-                    usesResponsiveOilPreview: usesResponsiveOilPreview
+                    usesResponsivePreview: usesResponsivePreview
                 )
             )
         else {
@@ -391,17 +391,17 @@ public struct DocumentStrokePreviewUseCase: Sendable {
         )
     }
 
-    private func responsiveOilIncrementalPreview(
+    private func responsiveIncrementalPreview(
         baseSnapshot: MetalDocumentSnapshot,
         baseLayer: MetalLayerSnapshot,
         renderState: StrokeSessionRenderState?,
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     ) -> (baseLayer: LayerSurfaceRef, samples: [StylusSample])? {
         guard
-            usesResponsiveOilPreview,
+            usesResponsivePreview,
             !context.activeLayer.isAlphaLocked,
             let renderState,
             renderState.isApproximatePreview,
@@ -445,11 +445,11 @@ public struct DocumentStrokePreviewUseCase: Sendable {
             StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
 
-    private static func effectiveResponsiveOilPreview(
+    private static func effectiveResponsivePreview(
         requested: Bool,
         brush: BrushRuntimeSettings
     ) -> Bool {
-        requested && brush.tipKind == .oil
+        requested
     }
 }
 
@@ -486,7 +486,7 @@ public enum GpuStrokeSessionCommand: Sendable {
         sample: StylusSample,
         baseSnapshot: MetalDocumentSnapshot?,
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     )
     case append(
         baseSnapshot: MetalDocumentSnapshot?,
@@ -495,7 +495,7 @@ public enum GpuStrokeSessionCommand: Sendable {
         samples: [StylusSample],
         fullSamples: [StylusSample],
         context: DocumentStrokeContext,
-        usesResponsiveOilPreview: Bool
+        usesResponsivePreview: Bool
     )
     case finish(
         renderState: StrokeSessionRenderState?,
@@ -539,18 +539,18 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             return executeOverride(command)
         }
         switch command {
-        case let .begin(sample, baseSnapshot, context, usesResponsiveOilPreview):
+        case let .begin(sample, baseSnapshot, context, usesResponsivePreview):
             guard let resolution = preview.resolveInitial(
                 baseSnapshot: baseSnapshot,
                 sample: sample,
                 context: context,
-                usesResponsiveOilPreview: usesResponsiveOilPreview
+                usesResponsivePreview: usesResponsivePreview
             ) else {
                 return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing base snapshot or surface"))
             }
             return previewOutcome(from: resolution)
 
-        case let .append(baseSnapshot, renderSnapshot, renderState, samples, fullSamples, context, usesResponsiveOilPreview):
+        case let .append(baseSnapshot, renderSnapshot, renderState, samples, fullSamples, context, usesResponsivePreview):
             guard let resolution = preview.resolveAppended(
                 activeStrokeBaseSnapshot: baseSnapshot,
                 renderSnapshot: renderSnapshot,
@@ -558,7 +558,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                 samples: samples,
                 fullSamples: fullSamples,
                 context: context,
-                usesResponsiveOilPreview: usesResponsiveOilPreview
+                usesResponsivePreview: usesResponsivePreview
             ) else {
                 return .failure(.bridgeMutationFailed("GPU stroke preview failed: missing render snapshot or surface"))
             }
@@ -566,16 +566,17 @@ public struct DocumentStrokeSessionUseCase: Sendable {
 
         case let .finish(renderState, baseSnapshot, renderSnapshot, samples, context, allowsApproximatePreviewCommit, refreshViaDirtyPresentation):
             let snapshot = baseSnapshot ?? renderSnapshot
+            let commitContext = Self.commitContext(renderState: renderState, fallback: context)
             if
                 let renderState,
                 let snapshot,
                 !renderState.isApproximatePreview,
                 renderState.baseRevision == snapshot.revision,
-                renderState.layerIndex == context.activeLayerIndex,
-                renderState.previewBrush == context.previewBrush,
-                renderState.sampleCount == samples.count,
+                renderState.layerIndex == commitContext.activeLayerIndex,
+                renderState.previewBrush == commitContext.previewBrush,
                 renderState.surfaceHandle.width == snapshot.width,
-                renderState.surfaceHandle.height == snapshot.height
+                renderState.surfaceHandle.height == snapshot.height,
+                renderState.previewBrush != nil
             {
                 let surface = GpuLayerSurface(
                     layerIndex: renderState.layerIndex,
@@ -593,8 +594,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             if
                 let renderState,
                 renderState.isApproximatePreview,
-                allowsApproximatePreviewCommit,
-                !context.previewBrush.smudgeEngineEnabled
+                allowsApproximatePreviewCommit
             {
                 let surface = GpuLayerSurface(
                     layerIndex: renderState.layerIndex,
@@ -616,7 +616,7 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             guard let result = commit.makeCommittedSurface(
                 snapshot: snapshot,
                 samples: samples,
-                context: context
+                context: commitContext
             ) else {
                 return .failure(.bridgeMutationFailed("GPU stroke commit failed: missing committed surface"))
             }
@@ -632,6 +632,21 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             resetInteractiveStrokeState()
             return .reset
         }
+    }
+
+    private static func commitContext(
+        renderState: StrokeSessionRenderState?,
+        fallback context: DocumentStrokeContext
+    ) -> DocumentStrokeContext {
+        guard let previewBrush = renderState?.previewBrush else {
+            return context
+        }
+        return DocumentStrokeContext(
+            activeLayer: context.activeLayer,
+            activeLayerIndex: context.activeLayerIndex,
+            brush: previewBrush,
+            previewBrush: previewBrush
+        )
     }
 
     private func previewOutcome(from resolution: DocumentStrokePreviewResolution) -> GpuStrokeSessionOutcome {

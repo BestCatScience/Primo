@@ -81,22 +81,6 @@ enum ToolInspectorTab: String, CaseIterable, Identifiable {
     }
 }
 
-enum OilLivePreviewQuality: String, CaseIterable, Equatable, Identifiable {
-    case responsive
-    case highFidelity
-
-    var id: String { rawValue }
-
-    func localizedTitle(_ language: AppLanguage) -> String {
-        switch self {
-        case .responsive:
-            return language.localized("高速")
-        case .highFidelity:
-            return language.localized("高品質")
-        }
-    }
-}
-
 struct BrushPreviewStyle {
     let tipKind: BrushTipKind
     let color: Color

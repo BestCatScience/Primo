@@ -36,7 +36,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool,
-        usesResponsiveOilPreview: Bool = false
+        usesResponsivePreview: Bool = false
     ) -> StrokePreviewResult? {
         guard let preview = makeInteractiveStrokePreview(
             snapshot: snapshot,
@@ -46,7 +46,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             samples: samples,
             brush: brush,
             preserveAlphaLockedPixels: preserveAlphaLockedPixels,
-            usesResponsiveOilPreview: usesResponsiveOilPreview
+            usesResponsivePreview: usesResponsivePreview
         ) else {
             return nil
         }
@@ -211,13 +211,11 @@ public struct DocumentStrokeProcessingService: Sendable {
         samples: [StylusSample],
         brush: BrushRuntimeSettings,
         preserveAlphaLockedPixels: Bool,
-        usesResponsiveOilPreview: Bool = false
+        usesResponsivePreview: Bool = false
     ) -> DocumentInteractiveStrokePreviewResult? {
-        let usesApproximateOilPreview =
-            usesResponsiveOilPreview &&
-            brush.tipKind == .oil
-        let previewBrush = usesApproximateOilPreview
-            ? GpuRenderingSupport.responsiveOilPreviewBrush(from: brush)
+        let usesApproximatePreview = usesResponsivePreview
+        let previewBrush = usesResponsivePreview
+            ? GpuRenderingSupport.responsivePreviewBrush(from: brush)
             : brush
 
         if !preserveAlphaLockedPixels,
@@ -246,9 +244,9 @@ public struct DocumentStrokeProcessingService: Sendable {
                     pixelData: nil,
                     gpuBufferHandle: bufferHandle,
                     dirtyRect: gpuResult.dirtyRect,
-                    rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
+                    rectPixelData: usesApproximatePreview ? gpuResult.rectPixelData : nil,
                     incrementalUpdate: incrementalUpdate,
-                    isApproximatePreview: usesApproximateOilPreview
+                    isApproximatePreview: usesApproximatePreview
                 )
             }
             if
@@ -264,9 +262,9 @@ public struct DocumentStrokeProcessingService: Sendable {
                     pixelData: adjustedPixels,
                     gpuBufferHandle: bufferHandle,
                     dirtyRect: gpuResult.dirtyRect,
-                    rectPixelData: usesApproximateOilPreview ? gpuResult.rectPixelData : nil,
+                    rectPixelData: usesApproximatePreview ? gpuResult.rectPixelData : nil,
                     incrementalUpdate: incrementalUpdate,
-                    isApproximatePreview: usesApproximateOilPreview
+                    isApproximatePreview: usesApproximatePreview
                 )
             }
             strokeService.release(bufferHandle)
@@ -326,7 +324,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 dirtyRect: gpuResult.dirtyRect,
                 rectPixelData: nil,
                 incrementalUpdate: incrementalUpdate,
-                isApproximatePreview: usesApproximateOilPreview
+                isApproximatePreview: usesApproximatePreview
             )
         }
 
@@ -351,7 +349,7 @@ public struct DocumentStrokeProcessingService: Sendable {
                 canvasHeight: snapshot.height
             ),
             incrementalUpdate: incrementalUpdate,
-            isApproximatePreview: usesApproximateOilPreview
+            isApproximatePreview: usesApproximatePreview
         )
     }
 

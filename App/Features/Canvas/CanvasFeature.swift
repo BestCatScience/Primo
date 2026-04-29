@@ -718,7 +718,7 @@ struct CanvasFeature {
                 let finalSamples = Self.trimmingDuplicateTrailingSamples(
                     stroke.points.map(\.stylusSample)
                 )
-                state.activeStroke = nil
+                state.activeStroke = stroke
                 let didCommitStroke = state.strokeSession.hasCommittedPoints
                 state.strokeSession.committedPointCount = 0
                 if didCommitStroke {
@@ -732,6 +732,7 @@ struct CanvasFeature {
                 if !finalSamples.isEmpty {
                     return .send(.delegate(.commitStroke(finalSamples)))
                 }
+                state.activeStroke = nil
                 return .none
 
             case .strokeCancelled:
