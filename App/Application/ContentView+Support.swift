@@ -671,16 +671,7 @@ extension ContentView {
 
     private var homeTopBar: some View {
         HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color(red: 0.05, green: 0.11, blue: 0.17))
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(Color(red: 0.23, green: 0.78, blue: 1.0).opacity(0.45), lineWidth: 1)
-                Text("P")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.38, green: 0.84, blue: 1.0))
-            }
-            .frame(width: 34, height: 34)
+            appLogoMark(size: 34)
 
             Text("Primo")
                 .font(StudioTheme.Typography.title(18))
@@ -691,6 +682,16 @@ extension ContentView {
         .padding(.horizontal, 16)
         .frame(height: 56)
         .background(Color(red: 0.20, green: 0.20, blue: 0.20))
+    }
+
+    private func appLogoMark(size: CGFloat) -> some View {
+        Image("AppLogo")
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
     }
 
     private var homeSidebar: some View {
@@ -925,9 +926,8 @@ extension ContentView {
         VStack(spacing: 16) {
             Spacer(minLength: 0)
 
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 42, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.42))
+            appLogoMark(size: 64)
+                .opacity(0.82)
 
             Text(StudioStrings.noProjectsTitle(language))
                 .font(StudioTheme.Typography.title(24))
@@ -966,9 +966,8 @@ extension ContentView {
                         ZStack {
                             Color.white
 
-                            Image(systemName: "scribble")
-                                .font(.system(size: 34, weight: .regular))
-                                .foregroundStyle(Color(red: 0.60, green: 0.63, blue: 0.70))
+                            appLogoMark(size: 72)
+                                .opacity(0.72)
                         }
                     }
                 }

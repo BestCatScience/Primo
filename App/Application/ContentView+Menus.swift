@@ -1601,16 +1601,13 @@ extension ContentView {
                 store.send(.workspace(.homeReturnRequested))
             } label: {
                 HStack(spacing: 6) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(Color.black.opacity(0.4))
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .stroke(StudioTheme.Palette.accentSoft.opacity(0.55), lineWidth: 1)
-                        Image(systemName: "house.fill")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundStyle(StudioTheme.Palette.accentBright)
-                    }
-                    .frame(width: 18, height: 18)
+                    Image("AppLogo")
+                        .resizable()
+                        .interpolation(.high)
+                        .antialiased(true)
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                        .accessibilityHidden(true)
 
                     Text(language.localized("ホーム"))
                         .font(StudioTheme.Typography.label(9))
