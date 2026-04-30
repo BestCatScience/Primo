@@ -12,6 +12,8 @@ xcodebuild \
   -scheme Primo \
   -clonedSourcePackagesDirPath build/SourcePackages
 
+scripts/patch-swift-navigation-package.sh
+
 xcodebuild \
   -project Primo.xcodeproj \
   -scheme Primo \

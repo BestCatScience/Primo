@@ -93,6 +93,43 @@ struct DocumentRasterImageServiceTests {
     }
 
     @Test
+    func applyingInpaintCropFeathersSelectionMask() throws {
+        let base = Data([
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+        ])
+        let edited = Data([
+            255, 0, 0, 255,
+            255, 0, 0, 255,
+            255, 0, 0, 255,
+        ])
+        let crop = InpaintCrop(
+            pixelData: base,
+            width: 3,
+            height: 1,
+            originX: 0,
+            originY: 0,
+            selectionMask: [0, 255, 0]
+        )
+
+        let output = DocumentRasterImageService.applyingInpaintCrop(
+            edited,
+            to: base,
+            canvasWidth: 3,
+            canvasHeight: 1,
+            crop: crop,
+            featherRadius: 1
+        )
+
+        #expect(output == Data([
+            85, 0, 0, 255,
+            85, 0, 0, 255,
+            85, 0, 0, 255,
+        ]))
+    }
+
+    @Test
     func inpaintCropExtractsExpectedBoundsPixelsAndMask() throws {
         let source = Data([
             1, 2, 3, 255, 11, 12, 13, 255, 21, 22, 23, 255,

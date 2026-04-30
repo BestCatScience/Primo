@@ -2018,7 +2018,7 @@ struct SwiftDocumentProjectSaveSnapshot: Sendable {
     var paperStyle: CanvasPaperStyle
 
     func write(to url: URL, fileClient: FileClient, uuidClient: UUIDClient) throws {
-        let persistenceService = PaintDocumentPersistenceService(fileClient: fileClient)
+        let persistenceService = PaintDocumentPersistenceService(fileClient: fileClient, uuidClient: uuidClient)
         let stagedURL = try persistenceService.createStagedProjectDirectory(
             for: url,
             id: uuidClient.generate()

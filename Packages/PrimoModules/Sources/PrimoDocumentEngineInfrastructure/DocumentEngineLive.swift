@@ -42,12 +42,13 @@ public enum DocumentEngineFactory {
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
     ) -> DocumentEngineLive {
+        let gpuServices = DocumentRuntimeGpuServicesFactory.live()
         let runtimeBox = LockedDocumentRuntimeBox(
             runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient,
-                gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                gpuServices: gpuServices
             )
         )
 
@@ -58,14 +59,14 @@ public enum DocumentEngineFactory {
                 let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
-                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                    gpuServices: gpuServices
                 ).pixelData
             },
             compositeSurface: {
                 let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
                 return SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
-                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                    gpuServices: gpuServices
                 )
             },
             pixelDataForLayer: { index in runtimeBox.withRuntime { $0.pixelDataForLayer(index: index) } },
@@ -142,7 +143,6 @@ public enum DocumentEngineFactory {
                 try snapshot.write(to: url, fileClient: fileClient, uuidClient: uuidClient)
             },
             loadProject: { url in
-                let gpuServices = DocumentRuntimeGpuServicesFactory.live()
                 let runtime = try SwiftDocumentRuntime.loadProject(
                     from: url,
                     fileClient: fileClient,
@@ -166,7 +166,7 @@ public enum DocumentEngineFactory {
                         fileClient: fileClient,
                         dateClient: dateClient,
                         uuidClient: uuidClient,
-                        gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                        gpuServices: gpuServices
                     )
                 )
             },
@@ -174,7 +174,7 @@ public enum DocumentEngineFactory {
                 let snapshot = runtimeBox.withRuntime { $0.materializedSnapshot() }
                 _ = SwiftDocumentRuntime.compositeSurface(
                     forMaterializedSnapshot: snapshot,
-                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                    gpuServices: gpuServices
                 )
             }
         )
@@ -185,7 +185,7 @@ public enum DocumentEngineFactory {
                 return SwiftDocumentRuntime.compositeExportSurface(
                     forMaterializedSnapshot: snapshot,
                     paperStyle: style,
-                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                    gpuServices: gpuServices
                 )
             },
             compositePNGData: { style in
@@ -193,7 +193,7 @@ public enum DocumentEngineFactory {
                 return SwiftDocumentRuntime.compositePNGData(
                     forMaterializedSnapshot: snapshot,
                     paperStyle: style,
-                    gpuServices: DocumentRuntimeGpuServicesFactory.live()
+                    gpuServices: gpuServices
                 )
             },
             timelapseCapture: { runtimeBox.withRuntime { $0.timelapseCapture() } }

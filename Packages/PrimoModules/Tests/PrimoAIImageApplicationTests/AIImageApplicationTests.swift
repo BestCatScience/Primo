@@ -105,7 +105,7 @@ struct AIImageApplicationTests {
     }
 
     @Test
-    func commandBuilderBuildsGPTImage2DirectOpenAICommandFromConfiguredModelList() throws {
+    func commandBuilderRejectsOpenAIModelsOutsideDirectEditAllowlist() throws {
         let draft = AIImageDraft(
             prompt: "refine text",
             accessMode: .userAPIKey,
@@ -122,10 +122,7 @@ struct AIImageApplicationTests {
             commerce: AIImageCommerceSnapshot()
         )
 
-        let command = try result.get()
-        #expect(command.descriptor.model == .gptImage2)
-        #expect(AIImageModel.openAIDirectEditModels.contains(command.descriptor.model))
-        #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("openai-key")!))
+        #expect(result == .failure(.unsupportedDirectOpenAIModel))
     }
 
     @Test

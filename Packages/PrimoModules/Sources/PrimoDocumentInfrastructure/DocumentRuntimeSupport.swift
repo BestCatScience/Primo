@@ -17,6 +17,13 @@ public struct DocumentProjectPreview: Equatable, Sendable {
     }
 }
 
+/// Synchronous runtime boundary used by the live document engine.
+///
+/// The engine deliberately uses this lock-backed box instead of the actor box
+/// below because most gateway APIs are synchronous and heavy GPU work is planned
+/// under the lock, executed outside it, then applied under the lock again.
+/// Keep `Runtime` mutations inside `withRuntime` / `replaceRuntime`; move this
+/// boundary to an actor only if the gateway surface becomes async end-to-end.
 public final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
     private let lock = NSLock()
     private var runtime: Runtime

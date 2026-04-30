@@ -23,6 +23,37 @@ private struct TestAutosaveMetadata: Encodable {
 
 struct DocumentWorkspaceClientAutosaveTests {
     @Test
+    func createProjectURLIncludesUUIDToAvoidSameSecondCollisions() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let documents = root.appendingPathComponent("Documents", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let generatedIDs = UUIDSequence([
+            UUID(uuidString: "00000000-0000-0000-0000-000000000111")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000222")!,
+        ])
+        let client = DocumentWorkspaceClient.live(
+            fileClient: fileClient(documentsDirectory: documents),
+            dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
+            uuidClient: UUIDClient(generate: { generatedIDs.next() }),
+            previewGateway: previewGateway()
+        )
+
+        let firstURL = try client.createProjectURL()
+        let secondURL = try client.createProjectURL()
+        let firstName = firstURL.fileURL.lastPathComponent
+        let secondName = secondURL.fileURL.lastPathComponent
+
+        #expect(firstURL.fileURL != secondURL.fileURL)
+        #expect(firstName.hasPrefix("primo-"))
+        #expect(firstName.hasSuffix("-00000000-0000-0000-0000-000000000111.atelier"))
+        #expect(secondName.hasPrefix("primo-"))
+        #expect(secondName.hasSuffix("-00000000-0000-0000-0000-000000000222.atelier"))
+        #expect(firstName.dropLast("-00000000-0000-0000-0000-000000000111.atelier".count) == secondName.dropLast("-00000000-0000-0000-0000-000000000222.atelier".count))
+    }
+
+    @Test
     func loadAutosaveRecoveryItemsUsesPreviewGatewaySurface() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -359,5 +390,17 @@ struct DocumentWorkspaceClientAutosaveTests {
             }
         }
         return fingerprint
+    }
+}
+
+private final class UUIDSequence: @unchecked Sendable {
+    private var ids: [UUID]
+
+    init(_ ids: [UUID]) {
+        self.ids = ids
+    }
+
+    func next() -> UUID {
+        ids.removeFirst()
     }
 }

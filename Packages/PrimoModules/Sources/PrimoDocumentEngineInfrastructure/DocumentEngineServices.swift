@@ -18,7 +18,7 @@ struct DocumentEngineServices {
         self.fileIO = fileClient
         self.clock = dateClient
         self.ids = uuidClient
-        self.persistence = DocumentPersistenceServices(fileClient: fileClient)
+        self.persistence = DocumentPersistenceServices(fileClient: fileClient, uuidClient: uuidClient)
         self.timelapse = DocumentTimelapseServices(fileClient: fileClient, uuidClient: uuidClient)
     }
 }
@@ -26,8 +26,8 @@ struct DocumentEngineServices {
 struct DocumentPersistenceServices {
     let projectStore: PaintDocumentPersistenceService
 
-    init(fileClient: FileClient) {
-        self.projectStore = PaintDocumentPersistenceService(fileClient: fileClient)
+    init(fileClient: FileClient, uuidClient: UUIDClient) {
+        self.projectStore = PaintDocumentPersistenceService(fileClient: fileClient, uuidClient: uuidClient)
     }
 }
 

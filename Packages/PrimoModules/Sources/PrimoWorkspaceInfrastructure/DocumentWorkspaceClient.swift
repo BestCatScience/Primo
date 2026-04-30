@@ -170,7 +170,10 @@ private struct DocumentWorkspaceStorage: Sendable {
 
     func createProjectURL() throws -> DocumentProjectPath {
         DocumentProjectPath(
-            try appProjectsDirectory().appendingPathComponent(projectFilename(for: dateClient.now()), isDirectory: true)
+            try appProjectsDirectory().appendingPathComponent(
+                projectFilename(for: dateClient.now(), id: uuidClient.generate()),
+                isDirectory: true
+            )
         )
     }
 
@@ -620,7 +623,7 @@ private struct DocumentWorkspaceStorage: Sendable {
         guard sourceURL.standardizedFileURL != destinationURL.standardizedFileURL else {
             return
         }
-        let projectStore = PaintDocumentPersistenceService(fileClient: fileClient)
+        let projectStore = PaintDocumentPersistenceService(fileClient: fileClient, uuidClient: uuidClient)
         let stagedURL = try projectStore.createStagedProjectDirectory(
             for: destinationURL,
             id: uuidClient.generate()
@@ -668,8 +671,8 @@ private struct DocumentWorkspaceStorage: Sendable {
         "primo-\(timestampString(for: date)).png"
     }
 
-    private func projectFilename(for date: Date) -> String {
-        "primo-\(timestampString(for: date)).atelier"
+    private func projectFilename(for date: Date, id: UUID) -> String {
+        "primo-\(timestampString(for: date))-\(id.uuidString.lowercased()).atelier"
     }
 
     private func timestampString(for date: Date) -> String {

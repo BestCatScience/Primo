@@ -9,9 +9,11 @@ public struct PaintDocumentPersistenceService {
     private static let maxTimelapsePayloadTotalByteCount = 1024 * 1024 * 1024
 
     let fileClient: FileClient
+    let uuidClient: UUIDClient
 
-    public init(fileClient: FileClient) {
+    public init(fileClient: FileClient, uuidClient: UUIDClient = .live) {
         self.fileClient = fileClient
+        self.uuidClient = uuidClient
     }
 
     public func prepareProjectDirectory(at url: URL) throws {
@@ -76,6 +78,7 @@ public struct PaintDocumentPersistenceService {
               ) else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Project manifest exceeds layer memory budget")
         }
+        try validateManifestSemantics(document)
         let expectedLayerBytes = geometry.rgbaByteCount
         let expectedMaskBytes = geometry.maskByteCount
         for layer in document.layers {
@@ -123,12 +126,202 @@ public struct PaintDocumentPersistenceService {
         }
     }
 
+    private func validateManifestSemantics(_ document: StoredPrimoDocument) throws {
+        guard document.layers.indices.contains(document.activeLayerIndex.rawValue) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid active layer index")
+        }
+        for (expectedIndex, layer) in document.layers.enumerated() {
+            guard layer.index.rawValue == expectedIndex else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid layer index ordering")
+            }
+            guard isUnitInterval(layer.opacity),
+                  LayerBlendMode(rawValue: layer.blendMode) != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid layer attributes")
+            }
+            if let textLayer = layer.textLayer {
+                try validateTextLayer(textLayer)
+            }
+        }
+
+        let folderIDs = Set(document.folders.map(\.id))
+        guard folderIDs.count == document.folders.count else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Duplicate folder identifiers")
+        }
+        for layer in document.layers {
+            if let folderID = layer.folderID, !folderIDs.contains(folderID) {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid layer folder reference")
+            }
+        }
+        for folder in document.folders {
+            if let anchorLayerIndex = folder.anchorLayerIndex,
+               !document.layers.indices.contains(anchorLayerIndex.rawValue) {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid folder anchor layer index")
+            }
+        }
+
+        try validatePaperStyle(document.paperStyle)
+        for frame in document.timelapseFrames {
+            guard frame.width.isFinite,
+                  frame.height.isFinite,
+                  frame.width > 0,
+                  frame.height > 0,
+                  frame.width <= Double(CanvasSizePolicy.maxVideoDimension),
+                  frame.height <= Double(CanvasSizePolicy.maxVideoDimension) else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse frame dimensions")
+            }
+        }
+        for operation in document.timelapseOperations {
+            try validateTimelapseOperationSemantics(operation)
+        }
+    }
+
+    private func validateTextLayer(_ textLayer: TextLayerData) throws {
+        guard textLayer.positionX.isFinite,
+              textLayer.positionY.isFinite,
+              textLayer.fontSize.isFinite,
+              textLayer.fontSize > 0,
+              textLayer.scale.isFinite,
+              textLayer.scale > 0,
+              textLayer.rotationDegrees.isFinite,
+              isUnitInterval(textLayer.red),
+              isUnitInterval(textLayer.green),
+              isUnitInterval(textLayer.blue),
+              isUnitInterval(textLayer.alpha) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid text layer attributes")
+        }
+    }
+
+    private func validatePaperStyle(_ paperStyle: StoredPrimoDocument.PaperStyle) throws {
+        guard isUnitInterval(paperStyle.red),
+              isUnitInterval(paperStyle.green),
+              isUnitInterval(paperStyle.blue),
+              isUnitInterval(paperStyle.alpha) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid paper style")
+        }
+    }
+
+    private func validateTimelapseOperationSemantics(_ operation: StoredTimelapseOperation) throws {
+        switch operation.kind {
+        case .stroke, .blurStroke:
+            guard operation.layerIndex != nil,
+                  operation.brush != nil,
+                  operation.samples != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .fill:
+            guard operation.layerIndex != nil,
+                  operation.brush != nil,
+                  operation.sample != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .undo, .redo:
+            break
+        case .addLayer:
+            try validateOperationName(operation.name)
+        case .duplicateLayer, .setLayerName:
+            guard operation.layerIndex != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+            try validateOperationName(operation.name)
+        case .deleteLayer, .mergeLayerDown, .clearLayerMask, .applyLayerMask, .clearLayer:
+            guard operation.layerIndex != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .moveLayer:
+            guard operation.layerIndex != nil,
+                  operation.destinationIndex != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .createFolder:
+            guard operation.folderID != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+            try validateOperationName(operation.name)
+        case .deleteFolder:
+            guard operation.folderID != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setFolderVisibility:
+            guard operation.folderID != nil,
+                  operation.isVisible != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setFolderName:
+            guard operation.folderID != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+            try validateOperationName(operation.name)
+        case .setFolderExpanded:
+            guard operation.folderID != nil,
+                  operation.isExpanded != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .assignLayerToFolder:
+            guard operation.layerIndex != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerVisibility:
+            guard operation.layerIndex != nil,
+                  operation.isVisible != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerLocked:
+            guard operation.layerIndex != nil,
+                  operation.isLocked != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerAlphaLocked:
+            guard operation.layerIndex != nil,
+                  operation.isAlphaLocked != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerClipped:
+            guard operation.layerIndex != nil,
+                  operation.isClipped != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerOpacity:
+            guard operation.layerIndex != nil,
+                  let opacity = operation.opacity,
+                  isUnitInterval(opacity) else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setLayerBlendMode:
+            guard operation.layerIndex != nil,
+                  let blendMode = operation.blendMode,
+                  LayerBlendMode(rawValue: blendMode) != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .replaceLayerPixels, .replaceLayerMask:
+            guard operation.layerIndex != nil,
+                  operation.dataFilename != nil else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+        case .setPaperStyle:
+            guard let paperStyle = operation.paperStyle else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+            }
+            try validatePaperStyle(paperStyle)
+        }
+    }
+
+    private func validateOperationName(_ name: String?) throws {
+        guard let name,
+              name.count <= CanvasSizePolicy.maxLayerNameLength else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid timelapse operation")
+        }
+    }
+
+    private func isUnitInterval(_ value: Double) -> Bool {
+        value.isFinite && (0...1).contains(value)
+    }
+
     public func publishStagedProjectDirectory(_ stagedProjectURL: URL, to destinationURL: URL) throws {
         try validateProjectPackage(at: stagedProjectURL)
         try fileClient.createDirectory(destinationURL.deletingLastPathComponent(), true)
 
         if fileClient.fileExists(destinationURL.path) {
-            let backupName = ".\(destinationURL.lastPathComponent).backup-\(UUID().uuidString)"
+            let backupName = ".\(destinationURL.lastPathComponent).backup-\(uuidClient.generate().uuidString)"
             let backupURL = destinationURL.deletingLastPathComponent().appendingPathComponent(backupName, isDirectory: true)
             do {
                 try fileClient.replaceItem(destinationURL, stagedProjectURL, backupName)

@@ -99,6 +99,7 @@ final class AIImageFeatureTests: XCTestCase {
         }
 
         await store.send(.accessModeChanged(.appManaged))
+        try? await Task.sleep(nanoseconds: 350_000_000)
     }
 
     func testAccessModeChangedAllowsAppManagedWhenProxyEndpointIsConfigured() async {
@@ -122,6 +123,7 @@ final class AIImageFeatureTests: XCTestCase {
         await store.send(.accessModeChanged(.appManaged)) {
             $0.accessMode = .appManaged
         }
+        try? await Task.sleep(nanoseconds: 350_000_000)
     }
 
     func testSettingsPersistFailurePresentsBanner() async {
@@ -248,7 +250,7 @@ final class AIImageFeatureTests: XCTestCase {
         XCTAssertFalse(state.generateDisabled)
     }
 
-    func testGenerateAllowsConfiguredGPTImage2ForDirectOpenAI() {
+    func testGenerateDisablesUnsupportedDirectOpenAIModel() {
         var state = AIImageFeature.State(
             settings: AIImageSettings(
                 accessMode: .userAPIKey,
@@ -258,7 +260,7 @@ final class AIImageFeatureTests: XCTestCase {
         state.composer.prompt = "Improve lettering"
         state.composer.model = .gptImage2
 
-        XCTAssertFalse(state.generateDisabled)
+        XCTAssertTrue(state.generateDisabled)
     }
 
     func testRetryRegenerateAndCancelDelegateActions() async {

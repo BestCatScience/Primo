@@ -12,12 +12,12 @@ concurrency:
 
 jobs:
   package-tests:
-    name: Swift 6 Package Tests (iOS 17/macOS 13)
+    name: Swift 6 Package Tests (iOS 26.0/macOS 13)
     runs-on: macos-latest
     timeout-minutes: 20
     env:
       SWIFT_TOOLS_VERSION: "6.0"
-      PACKAGE_IOS_DEPLOYMENT_TARGET: "17"
+      PACKAGE_IOS_DEPLOYMENT_TARGET: "26.0"
       PACKAGE_MACOS_DEPLOYMENT_TARGET: "13"
 
     steps:
@@ -32,9 +32,9 @@ jobs:
 
       - name: Validate package toolchain and platforms
         run: |
-          grep -q "// swift-tools-version: ${SWIFT_TOOLS_VERSION}" Packages/PrimoModules/Package.swift
-          grep -q ".iOS(.v${PACKAGE_IOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
-          grep -q ".macOS(.v${PACKAGE_MACOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
+          grep -Fq "// swift-tools-version: ${SWIFT_TOOLS_VERSION}" Packages/PrimoModules/Package.swift
+          grep -Fq ".iOS(\"${PACKAGE_IOS_DEPLOYMENT_TARGET}\")" Packages/PrimoModules/Package.swift
+          grep -Fq ".macOS(.v${PACKAGE_MACOS_DEPLOYMENT_TARGET})" Packages/PrimoModules/Package.swift
 
       - name: Run package tests
         working-directory: Packages/PrimoModules

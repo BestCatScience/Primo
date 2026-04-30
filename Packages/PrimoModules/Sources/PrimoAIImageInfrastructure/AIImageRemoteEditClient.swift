@@ -452,7 +452,11 @@ public extension AIImageRemoteEditClient {
             base64Payload = trimmed
         }
         guard base64Payload.count <= maxBase64ImageCharacters else { return nil }
-        return Data(base64Encoded: base64Payload, options: [.ignoreUnknownCharacters])
+        guard let decoded = Data(base64Encoded: base64Payload, options: [.ignoreUnknownCharacters]),
+              DocumentRasterImageService.imageMetadata(fromEncodedData: decoded) != nil else {
+            return nil
+        }
+        return decoded
     }
 
     private static func displayErrorBody(_ data: Data, statusCode: Int) -> String {

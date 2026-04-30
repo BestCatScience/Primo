@@ -63,11 +63,9 @@ public enum AIImageModel: String, CaseIterable, Equatable, Sendable, Identifiabl
     public static let defaultOpenAIDirectEditModel: AIImageModel = .gptImage15
 
     public static let openAIDirectEditModels: [AIImageModel] = [
-        .gptImage2,
         .gptImage15,
         .gptImage1,
         .gptImage1Mini,
-        .chatGPTImageLatest,
     ]
 
     public var supportsOpenAIDirectImageEdit: Bool {

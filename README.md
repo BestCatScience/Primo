@@ -182,7 +182,7 @@ cd Packages/PrimoModules
 swift test
 ```
 
-リポジトリルートのアプリビルド確認には `scripts/codex-build.sh` を使います。この script は package dependency resolve と app build だけを行い、test は実行しません。
+リポジトリルートのアプリビルド確認には `scripts/codex-build.sh` を使います。この script は package dependency resolve、SwiftNavigation manifest patch、app build を行い、test は実行しません。
 
 ```bash
 scripts/codex-build.sh

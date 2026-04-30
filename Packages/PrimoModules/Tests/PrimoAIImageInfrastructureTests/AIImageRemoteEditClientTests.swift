@@ -15,7 +15,7 @@ struct AIImageRemoteEditClientTests {
             var body: Data?
         }
         let recorder = Recorder()
-        let outputData = Data([0x01, 0x02, 0x03])
+        let outputData = try #require(DocumentRasterImageService.pngData(from: solidSurface(width: 1, height: 1)))
         let httpClient = HTTPClient { request in
             recorder.request = request
             recorder.body = request.httpBody
@@ -116,32 +116,10 @@ struct AIImageRemoteEditClientTests {
     }
 
     @Test
-    func gptImage2DirectOpenAIPathUsesConfiguredModelID() async throws {
-        final class Recorder: @unchecked Sendable {
-            var body: Data?
-        }
-        let recorder = Recorder()
-        let outputData = Data([0x07, 0x08, 0x09])
+    func unsupportedOpenAIModelDoesNotUseDirectOpenAIEditPath() async throws {
         let httpClient = HTTPClient { request in
-            recorder.body = request.httpBody
-            let responseData = """
-            {
-              "created": 0,
-              "data": [
-                {
-                  "b64_json": "\(outputData.base64EncodedString())"
-                }
-              ],
-              "output_format": "png"
-            }
-            """.data(using: .utf8)!
-            let response = HTTPURLResponse(
-                url: request.url!,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: nil
-            )!
-            return (responseData, response)
+            Issue.record("Unsupported direct OpenAI model should fail before sending \(request)")
+            throw AIImageEditFailure.invalidEndpoint
         }
         let client = AIImageRemoteEditClient.live(httpClient: httpClient)
         let command = SubmitAIImageEditCommand(
@@ -162,11 +140,8 @@ struct AIImageRemoteEditClientTests {
             .gptImage2
         )
 
-        let data = try result.get()
-        #expect(data == outputData)
-        let body = String(decoding: try #require(recorder.body), as: UTF8.self)
-        #expect(body.contains("gpt-image-2"))
-        #expect(AIImageModel.openAIDirectEditModels.contains(.gptImage2))
+        #expect(result == .failure(.invalidEndpoint))
+        #expect(!AIImageModel.openAIDirectEditModels.contains(.gptImage2))
     }
 
     @Test
@@ -176,7 +151,7 @@ struct AIImageRemoteEditClientTests {
             var body: Data?
         }
         let recorder = Recorder()
-        let outputData = Data([0x0A, 0x0B, 0x0C])
+        let outputData = try #require(DocumentRasterImageService.pngData(from: solidSurface(width: 1, height: 1)))
         let httpClient = HTTPClient { request in
             recorder.request = request
             recorder.body = request.httpBody
@@ -321,12 +296,47 @@ struct AIImageRemoteEditClientTests {
     }
 
     @Test
+    func remoteImageResponseRejectsBase64ThatIsNotAnImage() async throws {
+        let outputData = Data([0x01, 0x02, 0x03])
+        let httpClient = HTTPClient { request in
+            let responseData = """
+            {
+              "parts": [
+                {
+                  "inlineData": {
+                    "mimeType": "image/png",
+                    "data": "\(outputData.base64EncodedString())"
+                  }
+                }
+              ]
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (responseData, response)
+        }
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
+            "Edit through proxy",
+            .flashImage31Preview
+        )
+
+        #expect(result == .failure(.missingImageData("AI image editing did not return decodable image bytes.")))
+    }
+
+    @Test
     func geminiImageConfigUsesSourceAspectRatioForPortraitCanvas() async throws {
         final class Recorder: @unchecked Sendable {
             var body: Data?
         }
         let recorder = Recorder()
-        let outputData = Data([0x01, 0x02, 0x03])
+        let outputData = try #require(DocumentRasterImageService.pngData(from: solidSurface(width: 1, height: 1)))
         let httpClient = HTTPClient { request in
             recorder.body = request.httpBody
             let responseData = """
@@ -382,7 +392,7 @@ struct AIImageRemoteEditClientTests {
             var body: Data?
         }
         let recorder = Recorder()
-        let outputData = Data([0x04, 0x05, 0x06])
+        let outputData = try #require(DocumentRasterImageService.pngData(from: solidSurface(width: 1, height: 1)))
         let httpClient = HTTPClient { request in
             recorder.body = request.httpBody
             let responseData = """

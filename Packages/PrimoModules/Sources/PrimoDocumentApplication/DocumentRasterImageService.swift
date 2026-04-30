@@ -173,6 +173,12 @@ public enum DocumentRasterImageService {
         guard editedCropPixelData.count == cropGeometry.rgbaByteCount else { return nil }
         guard crop.selectionMask.count == cropGeometry.maskByteCount else { return nil }
         var output = baseLayerPixelData
+        let blendMask = inpaintBlendMask(
+            from: crop.selectionMask,
+            width: crop.width,
+            height: crop.height,
+            featherRadius: featherRadius
+        )
         output.withUnsafeMutableBytes { destinationBytes in
             editedCropPixelData.withUnsafeBytes { sourceBytes in
                 guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
@@ -185,18 +191,76 @@ public enum DocumentRasterImageService {
                         let canvasX = crop.originX + column
                         guard (0..<canvasWidth).contains(canvasX) else { continue }
                         let maskIndex = row * crop.width + column
-                        guard crop.selectionMask[maskIndex] > 0 else { continue }
+                        let alphaByte = blendMask[maskIndex]
+                        guard alphaByte > 0 else { continue }
                         let sourceOffset = maskIndex * 4
                         let destinationOffset = ((canvasY * canvasWidth) + canvasX) * 4
-                        destination[destinationOffset] = source[sourceOffset]
-                        destination[destinationOffset + 1] = source[sourceOffset + 1]
-                        destination[destinationOffset + 2] = source[sourceOffset + 2]
-                        destination[destinationOffset + 3] = source[sourceOffset + 3]
+                        if alphaByte == 255 {
+                            destination[destinationOffset] = source[sourceOffset]
+                            destination[destinationOffset + 1] = source[sourceOffset + 1]
+                            destination[destinationOffset + 2] = source[sourceOffset + 2]
+                            destination[destinationOffset + 3] = source[sourceOffset + 3]
+                        } else {
+                            for channel in 0..<4 {
+                                destination[destinationOffset + channel] = blendedChannel(
+                                    base: destination[destinationOffset + channel],
+                                    edited: source[sourceOffset + channel],
+                                    alpha: alphaByte
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
         return output
+    }
+
+    private static func inpaintBlendMask(
+        from selectionMask: [UInt8],
+        width: Int,
+        height: Int,
+        featherRadius: Int
+    ) -> [UInt8] {
+        let radius = max(0, featherRadius)
+        guard radius > 0 else { return selectionMask }
+
+        let normalization = Float((radius * 2) + 1)
+        var temporary = [Float](repeating: 0, count: selectionMask.count)
+        var output = [UInt8](repeating: 0, count: selectionMask.count)
+
+        for y in 0..<height {
+            for x in 0..<width {
+                var sum: Float = 0
+                for dx in -radius...radius {
+                    let sampleX = min(max(x + dx, 0), width - 1)
+                    sum += Float(selectionMask[(y * width) + sampleX])
+                }
+                temporary[(y * width) + x] = sum / normalization
+            }
+        }
+
+        for y in 0..<height {
+            for x in 0..<width {
+                var sum: Float = 0
+                for dy in -radius...radius {
+                    let sampleY = min(max(y + dy, 0), height - 1)
+                    sum += temporary[(sampleY * width) + x]
+                }
+                let blurred = sum / normalization
+                output[(y * width) + x] = blurred < 2
+                    ? 0
+                    : UInt8(min(max(Int(blurred.rounded()), 0), 255))
+            }
+        }
+
+        return output
+    }
+
+    private static func blendedChannel(base: UInt8, edited: UInt8, alpha: UInt8) -> UInt8 {
+        let alpha = Int(alpha)
+        let inverseAlpha = 255 - alpha
+        return UInt8((Int(base) * inverseAlpha + Int(edited) * alpha + 127) / 255)
     }
 
     public static func rawLayerPixelData(fromPNGData pngData: Data, width: Int, height: Int) -> Data? {

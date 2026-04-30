@@ -39,14 +39,13 @@ struct AIImageDomainTests {
     func openAIDirectEditModelsAreConfigDrivenAndDocsAligned() {
         #expect(AIImageModel.defaultOpenAIDirectEditModel == .gptImage15)
         #expect(AIImageModel.openAIDirectEditModels == [
-            .gptImage2,
             .gptImage15,
             .gptImage1,
             .gptImage1Mini,
-            .chatGPTImageLatest,
         ])
-        #expect(AIImageModel.openAIDirectEditModels.contains(.gptImage2))
-        #expect(AIImageModel.allCases.contains(.gptImage2))
+        #expect(!AIImageModel.openAIDirectEditModels.contains(.gptImage2))
+        #expect(!AIImageModel.openAIDirectEditModels.contains(.chatGPTImageLatest))
+        #expect(AIImageModel.gptImage15.supportsOpenAIDirectImageEdit)
         #expect(AIImageModel.gptImage2.provider == .openAI)
     }
 }

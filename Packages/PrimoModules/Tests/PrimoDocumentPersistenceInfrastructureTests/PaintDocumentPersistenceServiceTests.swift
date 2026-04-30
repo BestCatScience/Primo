@@ -107,6 +107,115 @@ struct PaintDocumentPersistenceServiceTests {
     }
 
     @Test
+    func validateProjectPackageRejectsInvalidManifestLayerReferencesAndAttributes() throws {
+        let invalidPackages = try [
+            makeProjectPackage(activeLayerIndex: .unchecked(1)),
+            makeProjectPackage(layers: [
+                StoredPrimoDocument.Layer(
+                    index: .unchecked(1),
+                    name: "Layer 1",
+                    visible: true,
+                    locked: false,
+                    alphaLocked: false,
+                    clipped: false,
+                    opacity: 1,
+                    blendMode: "normal",
+                    folderID: nil,
+                    textLayer: nil,
+                    pixelFilename: "Layers/layer0.rgba",
+                    maskFilename: nil
+                ),
+            ]),
+            makeProjectPackage(layers: [
+                StoredPrimoDocument.Layer(
+                    index: .unchecked(0),
+                    name: "Layer 1",
+                    visible: true,
+                    locked: false,
+                    alphaLocked: false,
+                    clipped: false,
+                    opacity: 1.5,
+                    blendMode: "normal",
+                    folderID: nil,
+                    textLayer: nil,
+                    pixelFilename: "Layers/layer0.rgba",
+                    maskFilename: nil
+                ),
+            ]),
+            makeProjectPackage(layers: [
+                StoredPrimoDocument.Layer(
+                    index: .unchecked(0),
+                    name: "Layer 1",
+                    visible: true,
+                    locked: false,
+                    alphaLocked: false,
+                    clipped: false,
+                    opacity: 1,
+                    blendMode: "unknown",
+                    folderID: nil,
+                    textLayer: nil,
+                    pixelFilename: "Layers/layer0.rgba",
+                    maskFilename: nil
+                ),
+            ]),
+            makeProjectPackage(layers: [
+                StoredPrimoDocument.Layer(
+                    index: .unchecked(0),
+                    name: "Layer 1",
+                    visible: true,
+                    locked: false,
+                    alphaLocked: false,
+                    clipped: false,
+                    opacity: 1,
+                    blendMode: "normal",
+                    folderID: .unchecked(10),
+                    textLayer: nil,
+                    pixelFilename: "Layers/layer0.rgba",
+                    maskFilename: nil
+                ),
+            ]),
+            makeProjectPackage(folders: [
+                StoredPrimoDocument.Folder(
+                    id: .unchecked(1),
+                    name: "Folder",
+                    visible: true,
+                    expanded: true,
+                    anchorLayerIndex: .unchecked(2)
+                ),
+            ]),
+        ]
+        defer {
+            for projectURL in invalidPackages {
+                try? FileManager.default.removeItem(at: projectURL)
+            }
+        }
+
+        for projectURL in invalidPackages {
+            #expect(throws: PaintDocumentPersistenceError.self) {
+                try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+            }
+        }
+    }
+
+    @Test
+    func validateProjectPackageRejectsInvalidTimelapseOperationSemantics() throws {
+        let projectURL = try makeProjectPackage(
+            timelapseOperations: [
+                StoredTimelapseOperation(
+                    kind: .setLayerBlendMode,
+                    layerIndex: .unchecked(0),
+                    blendMode: "not-a-blend-mode"
+                ),
+            ]
+        )
+        defer { try? FileManager.default.removeItem(at: projectURL) }
+
+        #expect(throws: PaintDocumentPersistenceError.self) {
+            try PaintDocumentPersistenceService(fileClient: .live).validateProjectPackage(at: projectURL)
+        }
+    }
+
+    @Test
     func validateProjectPackageAcceptsRegularTimelapseAssets() throws {
         let projectURL = try makeProjectPackage(
             timelapseFrames: [
@@ -130,7 +239,16 @@ struct PaintDocumentPersistenceServiceTests {
     private func makeProjectPackage(
         canvasWidth: Int = 1,
         canvasHeight: Int = 1,
+        activeLayerIndex: DocumentLayerIndex = .unchecked(0),
         layers: [StoredPrimoDocument.Layer]? = nil,
+        folders: [StoredPrimoDocument.Folder] = [],
+        paperStyle: StoredPrimoDocument.PaperStyle = StoredPrimoDocument.PaperStyle(
+            red: 1,
+            green: 1,
+            blue: 1,
+            alpha: 1,
+            isTransparent: false
+        ),
         timelapseFrames: [StoredPrimoDocument.TimelapseFrame] = [],
         timelapseOperations: [StoredTimelapseOperation] = []
     ) throws -> URL {
@@ -170,16 +288,10 @@ struct PaintDocumentPersistenceServiceTests {
             version: 1,
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
-            activeLayerIndex: .unchecked(0),
-            paperStyle: StoredPrimoDocument.PaperStyle(
-                red: 1,
-                green: 1,
-                blue: 1,
-                alpha: 1,
-                isTransparent: false
-            ),
+            activeLayerIndex: activeLayerIndex,
+            paperStyle: paperStyle,
             layers: storedLayers,
-            folders: [],
+            folders: folders,
             timelapseFrames: timelapseFrames,
             timelapseOperations: timelapseOperations
         )
