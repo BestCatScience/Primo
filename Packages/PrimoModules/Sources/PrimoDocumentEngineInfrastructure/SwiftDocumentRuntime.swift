@@ -336,24 +336,39 @@ private struct UndoSnapshotPolicy: Sendable {
     }
 
     mutating func restoreUndo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
-        guard let previous = undoStack.popLast() else {
-            return .failure(.noUndoState)
+        while let previous = undoStack.popLast() {
+            guard !previous.hasSameDocumentContent(as: current) else { continue }
+            redoStack.append(current)
+            return .success(previous)
         }
-        redoStack.append(current)
-        return .success(previous)
+        return .failure(.noUndoState)
     }
 
     mutating func restoreRedo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
-        guard let next = redoStack.popLast() else {
-            return .failure(.noRedoState)
+        while let next = redoStack.popLast() {
+            guard !next.hasSameDocumentContent(as: current) else { continue }
+            undoStack.append(current)
+            return .success(next)
         }
-        undoStack.append(current)
-        return .success(next)
+        return .failure(.noRedoState)
     }
 
     mutating func clear() {
         undoStack.removeAll(keepingCapacity: true)
         redoStack.removeAll(keepingCapacity: true)
+    }
+}
+
+private extension SwiftDocumentStoreSnapshot {
+    func hasSameDocumentContent(as other: SwiftDocumentStoreSnapshot) -> Bool {
+        canvasWidth == other.canvasWidth &&
+            canvasHeight == other.canvasHeight &&
+            activeLayerIndex == other.activeLayerIndex &&
+            paperStyle == other.paperStyle &&
+            nextFolderID == other.nextFolderID &&
+            layers == other.layers &&
+            folders == other.folders &&
+            thumbnailCache == other.thumbnailCache
     }
 }
 

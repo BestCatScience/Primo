@@ -31,6 +31,32 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func undoSkipsLegacyRevisionOnlyHistoryEntries() throws {
+        let firstStrokePixels = Data(repeating: 0x44, count: 16)
+        let secondStrokePixels = Data(repeating: 0x55, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [firstStrokePixels, secondStrokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0
+        ).get()
+        _ = try runtime.setLayerName(index: 0, name: "Layer 1").get()
+        _ = try runtime.applyGpuStrokeSurface(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0
+        ).get()
+
+        _ = try runtime.undo().get()
+        #expect(runtime.pixelDataForLayer(index: 0) == firstStrokePixels)
+
+        _ = try runtime.undo().get()
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+    }
+
+    @Test
     func undoAfterTwoGpuStrokesRestoresFirstStrokePixels() throws {
         let firstStrokePixels = Data(repeating: 0x11, count: 16)
         let secondStrokePixels = Data(repeating: 0x22, count: 16)
