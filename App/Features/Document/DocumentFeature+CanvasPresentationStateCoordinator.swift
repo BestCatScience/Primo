@@ -29,7 +29,7 @@ extension DocumentFeature {
         @discardableResult
         func applyCanvasPresentation(
             _ presentation: PaintDocumentPresentation,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             state.canvas.setCanvasSize(presentation.canvasSize)
             state.canvas.activateLayer(presentation.activeLayerIndex)
@@ -51,7 +51,7 @@ extension DocumentFeature {
         func applyRenderSnapshotIfAvailable(
             from presentation: PaintDocumentPresentation,
             previousRevision: Int,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             guard let renderSnapshot = presentation.renderSnapshot else { return false }
             state.canvas.applyCommittedRenderSnapshot(
@@ -65,7 +65,7 @@ extension DocumentFeature {
     struct LayerSidebarPresentationCoordinator {
         func applyPresentation(
             _ presentation: PaintDocumentPresentation,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) {
             state.layerSidebar.applyPresentation(
                 layers: presentation.layerRows,
@@ -81,13 +81,13 @@ extension DocumentFeature {
     struct CanvasInteractionStateCoordinator {
         func syncPresentation(
             _ presentation: PaintDocumentPresentation,
-            state: inout DocumentFeature.State
+            state: inout DocumentEditingState
         ) {
             syncCanvasInteractionState(state: &state)
             syncActiveTextLayer(from: presentation, state: &state)
         }
 
-        func syncCanvasInteractionState(state: inout DocumentFeature.State) {
+        func syncCanvasInteractionState(state: inout DocumentEditingState) {
             state.canvas.updateInteractionStyle(
                 previewStyle: DocumentFeature.canvasToolStateCoordinator.previewStrokeStyle(for: state),
                 paperStyle: DocumentFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
@@ -101,7 +101,7 @@ extension DocumentFeature {
 
         func syncActiveTextLayer(
             from presentation: PaintDocumentPresentation,
-            state: inout DocumentFeature.State
+            state: inout DocumentEditingState
         ) {
             state.canvas.setActiveTextLayer(
                 presentation.layerRows.first(where: { $0.index == presentation.activeLayerIndex })?.textLayer
@@ -109,7 +109,7 @@ extension DocumentFeature {
             syncTextEditorWithActiveLayer(state: &state)
         }
 
-        func syncTextEditorWithActiveLayer(state: inout DocumentFeature.State) {
+        func syncTextEditorWithActiveLayer(state: inout DocumentEditingState) {
             state.brushPalette.syncTextEditor(
                 with: state.layerSidebar.layer(withIndex: state.layerSidebar.activeLayerIndex)
             )
@@ -124,7 +124,7 @@ extension DocumentFeature {
         @discardableResult
         func applyPresentation(
             _ presentation: PaintDocumentPresentation,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             let finishedHydration = renderCoordinator.applyCanvasPresentation(presentation, to: &state)
             layerSidebarCoordinator.applyPresentation(presentation, to: &state)
@@ -135,14 +135,14 @@ extension DocumentFeature {
         @discardableResult
         func applyLoadedProject(
             _ loaded: LoadedPaintProject,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             state.brushPalette.applyLoadedPaperStyle(loaded.paperStyle)
             state.canvas.resetTransientEditingState()
             return applyPresentation(loaded.presentation, to: &state)
         }
 
-        func syncTextEditorWithActiveLayer(state: inout DocumentFeature.State) {
+        func syncTextEditorWithActiveLayer(state: inout DocumentEditingState) {
             interactionCoordinator.syncTextEditorWithActiveLayer(state: &state)
         }
     }

@@ -5,7 +5,7 @@ import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 
 struct PresentationRefreshReducer: Reducer {
-    typealias State = DocumentFeature.State
+    typealias State = DocumentEditingState
     typealias WorkspaceDocumentSnapshot = DocumentFeature.WorkspaceDocumentSnapshot
 
     @Dependency(\.documentExportGateway) var documentExportGateway

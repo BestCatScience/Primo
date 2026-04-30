@@ -3,7 +3,7 @@ import Foundation
 import PrimoDocumentApplication
 
 struct LayerWorkflowReducer: Reducer {
-    typealias State = DocumentFeature.State
+    typealias State = DocumentEditingState
     typealias AppliedLayerContentMutation = PrimoDocumentApplication.AppliedLayerContentMutation
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
     typealias DocumentMutationFeedbackMapper = DocumentFeature.DocumentMutationFeedbackMapper
@@ -21,8 +21,18 @@ struct LayerWorkflowReducer: Reducer {
     @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
     @Dependency(\.textLayerGateway) var textLayerGateway
 
+    enum EditingAction: Equatable {
+        case clearActiveLayerButtonTapped
+        case createLayerMaskFromSelectionRequested
+        case clearLayerMaskRequested
+        case applyLayerMaskRequested
+        case activeLayerVisibilityToggled
+        case selectPreviousLayer
+        case selectNextLayer
+    }
+
     enum Action: Equatable {
-        case editing(DocumentFeature.EditingAction)
+        case editing(EditingAction)
         case photoImportReceived(name: String?, data: Data)
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
@@ -85,7 +95,7 @@ struct LayerWorkflowReducer: Reducer {
     }
 
     private func reduceEditingAction(
-        _ action: DocumentFeature.EditingAction,
+        _ action: EditingAction,
         state: inout State
     ) -> Effect<Action> {
         switch action {
@@ -103,8 +113,6 @@ struct LayerWorkflowReducer: Reducer {
             return handleClearLayerMask(state: &state)
         case .applyLayerMaskRequested:
             return handleApplyLayerMask(state: &state)
-        default:
-            return .none
         }
     }
 }

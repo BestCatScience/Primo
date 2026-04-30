@@ -7,6 +7,70 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
 
+struct DocumentCanvasDimensions: Equatable, Sendable {
+    let width: Int
+    let height: Int
+
+    init?(width: Int, height: Int) {
+        guard width > 0, height > 0 else { return nil }
+        self.width = width
+        self.height = height
+    }
+
+    func isWithin(_ supportedRange: ClosedRange<Int>) -> Bool {
+        supportedRange.contains(width) && supportedRange.contains(height)
+    }
+
+    var size: CGSize {
+        CGSize(width: width, height: height)
+    }
+}
+
+struct DocumentFreshDocumentReplacementContract: Equatable, Sendable {
+    let canvasSize: CGSize
+    let tabTitle: String
+    var successFeedback: ApplicationFeature.Feedback? = nil
+    var mutationFailureFeedback: ApplicationFeature.Feedback? = nil
+}
+
+struct DocumentWorkspaceDocumentSnapshot: Equatable, Sendable {
+    let activeTab: OpenDocumentTab?
+    let paperStyle: CanvasPaperStyle
+    let previewSurface: DocumentCompositeSurface?
+    let canvasSize: CGSize
+}
+
+enum DocumentWorkspaceSnapshotPurpose: Equatable, Sendable {
+    case pendingWorkspaceOperation
+}
+
+enum DocumentFreshDocumentMutationOperation: Equatable, Sendable {
+    case newCanvas(DocumentCanvasDimensions)
+    case importedCanvas(ImportExportFeature.ImportedCanvasPlan)
+}
+
+struct DocumentFreshDocumentMutationRequest: Equatable, Sendable {
+    let contract: DocumentFreshDocumentReplacementContract
+    let operation: DocumentFreshDocumentMutationOperation
+    let preparedTab: WorkspaceFeature.PreparedWorkspaceTab
+}
+
+struct DocumentCanvasStrokeContext {
+    let activeLayer: LayerRowModel
+    let activeLayerIndex: Int
+    let brush: BrushRuntimeSettings
+    let previewBrush: BrushRuntimeSettings
+}
+
+@ObservableState
+struct DocumentEditingState: Equatable {
+    var brushPalette = BrushPaletteFeature.State()
+    var layerSidebar = LayerSidebarFeature.State()
+    var canvas = CanvasFeature.State()
+    var brushPanel = StudioPanelLayoutState()
+    var layerPanel = StudioPanelLayoutState()
+}
+
 @Reducer
 struct DocumentFeature {
     static let canvasPresentationStateCoordinator = CanvasPresentationStateCoordinator()
@@ -17,103 +81,18 @@ struct DocumentFeature {
     typealias LayerMutationFinalization = DocumentLayerMutationFinalization
     typealias DocumentMutationContract = DocumentMutationWorkflowOutcome<CanvasSelection, ApplicationFeature.Feedback>
     typealias LayerWorkflowService = DocumentMutationWorkflowService
-
-    struct CanvasDimensions: Equatable, Sendable {
-        let width: Int
-        let height: Int
-
-        init?(width: Int, height: Int) {
-            guard width > 0, height > 0 else { return nil }
-            self.width = width
-            self.height = height
-        }
-
-        func isWithin(_ supportedRange: ClosedRange<Int>) -> Bool {
-            supportedRange.contains(width) && supportedRange.contains(height)
-        }
-
-        var size: CGSize {
-            CGSize(width: width, height: height)
-        }
-    }
-
-    struct FreshDocumentReplacementContract: Equatable, Sendable {
-        let canvasSize: CGSize
-        let tabTitle: String
-        var successFeedback: ApplicationFeature.Feedback? = nil
-        var mutationFailureFeedback: ApplicationFeature.Feedback? = nil
-    }
-
-    struct WorkspaceDocumentSnapshot: Equatable, Sendable {
-        let activeTab: OpenDocumentTab?
-        let paperStyle: CanvasPaperStyle
-        let previewSurface: DocumentCompositeSurface?
-        let canvasSize: CGSize
-    }
-
-    enum WorkspaceSnapshotPurpose: Equatable, Sendable {
-        case pendingWorkspaceOperation
-    }
-
-    enum FreshDocumentMutationOperation: Equatable, Sendable {
-        case newCanvas(CanvasDimensions)
-        case importedCanvas(ImportExportFeature.ImportedCanvasPlan)
-    }
-
-    struct FreshDocumentMutationRequest: Equatable, Sendable {
-        let contract: FreshDocumentReplacementContract
-        let operation: FreshDocumentMutationOperation
-        let preparedTab: WorkspaceFeature.PreparedWorkspaceTab
-    }
-
-    struct CanvasStrokeContext {
-        let activeLayer: LayerRowModel
-        let activeLayerIndex: Int
-        let brush: BrushRuntimeSettings
-        let previewBrush: BrushRuntimeSettings
-    }
+    typealias CanvasDimensions = DocumentCanvasDimensions
+    typealias FreshDocumentReplacementContract = DocumentFreshDocumentReplacementContract
+    typealias WorkspaceDocumentSnapshot = DocumentWorkspaceDocumentSnapshot
+    typealias WorkspaceSnapshotPurpose = DocumentWorkspaceSnapshotPurpose
+    typealias FreshDocumentMutationOperation = DocumentFreshDocumentMutationOperation
+    typealias FreshDocumentMutationRequest = DocumentFreshDocumentMutationRequest
+    typealias CanvasStrokeContext = DocumentCanvasStrokeContext
 
     @ObservableState
     struct State: Equatable {
-        var brushPalette = BrushPaletteFeature.State()
-        var layerSidebar = LayerSidebarFeature.State()
-        var canvas = CanvasFeature.State()
-        var brushPanel = StudioPanelLayoutState()
-        var layerPanel = StudioPanelLayoutState()
+        var editing = DocumentEditingState()
         var activeAIImageJobID: UUID?
-    }
-
-    enum EditingAction: Equatable {
-        case featherSelectionRequested(Int)
-        case colorRangeSelectionRequested(ColorRangeSelectionRequest)
-        case toolSelected(StudioToolKind)
-        case toolLongPressed(StudioToolKind)
-        case clearActiveLayerButtonTapped
-        case createLayerMaskFromSelectionRequested
-        case clearLayerMaskRequested
-        case applyLayerMaskRequested
-        case gradientMapSelected(GradientMapPreset)
-        case gradientMapPreviewChanged(GradientMapSettings?)
-        case gradientMapApplied(GradientMapSettings)
-        case hueSaturationBrightnessPreviewChanged(HueSaturationBrightnessSettings?)
-        case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
-        case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
-        case brightnessContrastApplied(BrightnessContrastSettings)
-        case levelsPreviewChanged(LevelsAdjustmentSettings?)
-        case levelsApplied(LevelsAdjustmentSettings)
-        case toneCurvePreviewChanged(ToneCurveSettings?)
-        case toneCurveApplied(ToneCurveSettings)
-        case colorBalancePreviewChanged(ColorBalanceSettings?)
-        case colorBalanceApplied(ColorBalanceSettings)
-        case thresholdPreviewChanged(ThresholdSettings?)
-        case thresholdApplied(ThresholdSettings)
-        case posterizePreviewChanged(PosterizeSettings?)
-        case posterizeApplied(PosterizeSettings)
-        case luminanceToAlphaRequested
-        case activeLayerVisibilityToggled
-        case selectPreviousLayer
-        case selectNextLayer
-        case panelCollapseToggled(StudioPanelKind)
     }
 
     @CasePathable
@@ -148,35 +127,35 @@ struct DocumentFeature {
 
     var body: some ReducerOf<Self> {
         CombineReducers {
-            Scope(state: \.brushPalette, action: \.brushPalette) {
+            Scope(state: \.editing.brushPalette, action: \.brushPalette) {
                 BrushPaletteFeature()
             }
 
-            Scope(state: \.layerSidebar, action: \.layerSidebar) {
+            Scope(state: \.editing.layerSidebar, action: \.layerSidebar) {
                 LayerSidebarFeature()
             }
 
-            Scope(state: \.canvas, action: \.canvas) {
+            Scope(state: \.editing.canvas, action: \.canvas) {
                 CanvasFeature()
             }
 
-            Scope(state: \.self, action: \.presentation) {
+            Scope(state: \.editing, action: \.presentation) {
                 PresentationRefreshReducer()
             }
 
-            Scope(state: \.self, action: \.lifecycle) {
+            Scope(state: \.editing, action: \.lifecycle) {
                 DocumentLifecycleReducer()
             }
 
-            Scope(state: \.self, action: \.canvasEditing) {
+            Scope(state: \.editing, action: \.canvasEditing) {
                 CanvasEditingWorkflowReducer()
             }
 
-            Scope(state: \.self, action: \.layerWorkflow) {
+            Scope(state: \.editing, action: \.layerWorkflow) {
                 LayerWorkflowReducer()
             }
 
-            Scope(state: \.self, action: \.adjustment) {
+            Scope(state: \.editing, action: \.adjustment) {
                 AdjustmentWorkflowReducer()
             }
 
@@ -187,7 +166,7 @@ struct DocumentFeature {
             Reduce { state, action in
                 switch action {
                 case let .brushPalette(brushPaletteAction):
-                    state.refreshBrushPaletteState()
+                    state.editing.refreshBrushPaletteState()
                     return .merge(
                         .send(.canvasEditing(.brushPalette(brushPaletteAction))),
                         .send(.layerWorkflow(.brushPalette(brushPaletteAction)))

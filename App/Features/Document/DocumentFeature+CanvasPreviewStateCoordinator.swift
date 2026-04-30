@@ -6,7 +6,7 @@ extension DocumentFeature {
         @discardableResult
         func applyLiveCompositeSurface(
             _ compositeSurface: DocumentCompositeSurface,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             guard compositeSurface.width > 0, compositeSurface.height > 0 else {
                 return false
@@ -33,7 +33,7 @@ extension DocumentFeature {
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data,
             gpuOperations: DocumentGpuOperationGateway,
-            to state: inout DocumentFeature.State
+            to state: inout DocumentEditingState
         ) -> Bool {
             guard let composite = gpuOperations.compositedPreviewPixelData(
                 baseSnapshot,

@@ -335,7 +335,7 @@ struct ContentView: View {
             .zIndex(1000)
         }
         .overlay(alignment: .topLeading) {
-            if store.document.brushPalette.ui.showsBrushSettingsPopover {
+            if store.document.editing.brushPalette.ui.showsBrushSettingsPopover {
                 GeometryReader { proxy in
                     let panelWidth = min(max(proxy.size.width * 0.58, 520), 760)
                     let panelHeight = min(max(proxy.size.height - 128, 520), 760)
@@ -351,17 +351,17 @@ struct ContentView: View {
 
                         BrushPaletteView(
                             store: store.scope(
-                                state: \.document.brushPalette,
+                                state: \.document.editing.brushPalette,
                                 action: \.document.brushPalette
                             ),
-                            currentTool: store.document.canvas.currentTool,
-                            hasSelection: store.document.canvas.selection != nil,
-                            transformPreviewOffset: store.document.canvas.transformPreviewOffset,
-                            transformPreviewScaleX: store.document.canvas.transformPreviewScaleX,
-                            transformPreviewScaleY: store.document.canvas.transformPreviewScaleY,
-                            transformPreviewRotationDegrees: store.document.canvas.transformPreviewRotationDegrees,
-                            transformMode: store.document.canvas.transformMode,
-                            transformLocksAspectRatio: store.document.canvas.transformLocksAspectRatio,
+                            currentTool: store.document.editing.canvas.currentTool,
+                            hasSelection: store.document.editing.canvas.selection != nil,
+                            transformPreviewOffset: store.document.editing.canvas.transformPreviewOffset,
+                            transformPreviewScaleX: store.document.editing.canvas.transformPreviewScaleX,
+                            transformPreviewScaleY: store.document.editing.canvas.transformPreviewScaleY,
+                            transformPreviewRotationDegrees: store.document.editing.canvas.transformPreviewRotationDegrees,
+                            transformMode: store.document.editing.canvas.transformMode,
+                            transformLocksAspectRatio: store.document.editing.canvas.transformLocksAspectRatio,
                             language: language,
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
@@ -430,7 +430,7 @@ struct ContentView: View {
 
     private var aiImageInputPreviewSurface: DocumentCompositeSurface? {
         guard
-            let snapshot = store.document.canvas.renderSnapshot,
+            let snapshot = store.document.editing.canvas.renderSnapshot,
             let layer = snapshot.layers.first(where: { $0.index == resolvedAIImageInputLayerIndex })
         else {
             return nil

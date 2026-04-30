@@ -226,18 +226,21 @@ struct GpuSideEffectIsolationArchitectureTests {
             ("DocumentLifecycleReducer", "lifecycle"),
             ("CanvasEditingWorkflowReducer", "canvasEditing"),
             ("LayerWorkflowReducer", "layerWorkflow"),
-            ("AdjustmentWorkflowReducer", "adjustment"),
-            ("AIImageWorkflowReducer", "aiImageWorkflow")
+            ("AdjustmentWorkflowReducer", "adjustment")
         ]
 
         for (reducer, action) in workflowReducers {
             let reducerFile = documentRoot.appendingPathComponent("\(reducer).swift", isDirectory: false)
             #expect(FileManager.default.fileExists(atPath: reducerFile.path), "\(reducer).swift should own a focused document workflow")
             #expect(
-                body.contains("Scope(state: \\.self, action: \\.\(action))") && body.contains("\(reducer)()"),
-                "DocumentFeature should compose \(reducer) through a self-state workflow scope"
+                body.contains("Scope(state: \\.editing, action: \\.\(action))") && body.contains("\(reducer)()"),
+                "DocumentFeature should compose \(reducer) through the shared editing workflow scope"
             )
         }
+        #expect(
+            body.contains("Scope(state: \\.self, action: \\.aiImageWorkflow)") && body.contains("AIImageWorkflowReducer()"),
+            "AIImageWorkflowReducer should remain the only parent-state workflow while it owns job identity"
+        )
 
         #expect(!body.contains("@Dependency"), "DocumentFeature.swift should not own workflow dependencies")
         #expect(!body.contains("DocumentFeature()"), "DocumentFeature.swift should not instantiate itself as a workflow shell")
@@ -246,6 +249,12 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!body.contains("case .editing"), "DocumentFeature.swift should route editing actions through workflow reducers")
         #expect(!body.contains("case .photoImportReceived"), "DocumentFeature.swift should route layer import through LayerWorkflowReducer")
         #expect(!body.contains("case .aiImageEditRequested"), "DocumentFeature.swift should route AI image edits through AIImageWorkflowReducer")
+        #expect(body.contains("var editing = DocumentEditingState()"), "DocumentFeature.State should own editing state through a single aggregate")
+        #expect(!body.contains("var brushPalette:"), "DocumentFeature.State should not re-expose brush palette passthrough state")
+        #expect(!body.contains("var layerSidebar:"), "DocumentFeature.State should not re-expose layer sidebar passthrough state")
+        #expect(!body.contains("var canvas:"), "DocumentFeature.State should not re-expose canvas passthrough state")
+        #expect(!body.contains("var brushPanel:"), "DocumentFeature.State should not re-expose brush panel passthrough state")
+        #expect(!body.contains("var layerPanel:"), "DocumentFeature.State should not re-expose layer panel passthrough state")
 
         let executorFile = documentRoot.appendingPathComponent("DocumentWorkflowExecutor.swift", isDirectory: false)
         #expect(!FileManager.default.fileExists(atPath: executorFile.path), "DocumentWorkflowExecutor.swift should not exist")
@@ -265,7 +274,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             #expect(!FileManager.default.fileExists(atPath: oldFile.path), "\(filename) should be renamed to its workflow reducer owner")
         }
 
-        for (reducer, _) in workflowReducers {
+        for (reducer, _) in workflowReducers + [("AIImageWorkflowReducer", "aiImageWorkflow")] {
             let reducerBody = try String(
                 contentsOf: documentRoot.appendingPathComponent("\(reducer).swift", isDirectory: false),
                 encoding: .utf8

@@ -20,7 +20,7 @@ extension DocumentFeature {
         let commitWorkflow: DocumentStrokeCommitWorkflowService
 
         func resolveAppendedStrokePreview(
-            state: DocumentFeature.State,
+            state: DocumentEditingState,
             samples: [StylusSample],
             context: CanvasStrokeContext
         ) -> GpuStrokeSessionOutcome {
@@ -41,7 +41,7 @@ extension DocumentFeature {
         }
 
         func resolveShapeStrokePreview(
-            state: DocumentFeature.State,
+            state: DocumentEditingState,
             samples: [StylusSample],
             context: CanvasStrokeContext
         ) -> GpuStrokeSessionOutcome {
@@ -62,7 +62,7 @@ extension DocumentFeature {
         }
 
         func resolveStrokeCommit(
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             samples: [StylusSample],
             context: CanvasStrokeContext,
             keepsSelectionCleared: Bool,
@@ -108,7 +108,7 @@ extension DocumentFeature {
         }
 
         private func usesResponsivePreview(
-            state: DocumentFeature.State,
+            state: DocumentEditingState,
             brush: BrushRuntimeSettings
         ) -> Bool {
             true
@@ -119,12 +119,12 @@ extension DocumentFeature {
         let layerCommands: DocumentLayerCommandService
         let strokeCommands: DocumentStrokeCommandService
 
-        func resetPreview(state: inout DocumentFeature.State) {
+        func resetPreview(state: inout DocumentEditingState) {
             state.canvas.resetStrokePreview()
         }
 
         func resetPreviewState(
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             preserving transferredSurfaceHandle: MetalBufferHandle? = nil,
             releaseSurfaceHandle: (MetalBufferHandle?) -> Void
         ) {
@@ -137,8 +137,8 @@ extension DocumentFeature {
         }
 
         func clearSelectionWithoutRefresh(
-            state: inout DocumentFeature.State,
-            performDocumentMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Void
+            state: inout DocumentEditingState,
+            performDocumentMutation: (inout DocumentEditingState, DocumentMutationContract) -> Void
         ) {
             performDocumentMutation(
                 &state,
@@ -150,16 +150,16 @@ extension DocumentFeature {
         }
 
         func ensureCurrentPresentationLoaded(
-            state: inout DocumentFeature.State,
-            performDocumentMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Void
+            state: inout DocumentEditingState,
+            performDocumentMutation: (inout DocumentEditingState, DocumentMutationContract) -> Void
         ) {
             guard state.canvas.renderSnapshot == nil else { return }
             performDocumentMutation(&state, .currentPresentation)
         }
 
         func captureBaseSnapshotIfNeeded(
-            state: inout DocumentFeature.State,
-            ensureCurrentPresentationLoaded: (inout DocumentFeature.State) -> Void
+            state: inout DocumentEditingState,
+            ensureCurrentPresentationLoaded: (inout DocumentEditingState) -> Void
         ) {
             guard state.canvas.strokeSession.baseSnapshot == nil else { return }
             if let pendingCommittedSnapshot = state.canvas.pendingCommittedSnapshot {
@@ -173,8 +173,8 @@ extension DocumentFeature {
         }
 
         func prepareEditing(
-            state: inout DocumentFeature.State,
-            clearSelectionWithoutRefresh: (inout DocumentFeature.State) -> Void
+            state: inout DocumentEditingState,
+            clearSelectionWithoutRefresh: (inout DocumentEditingState) -> Void
         ) -> DocumentMutationResult {
             switch layerCommands.ensureLayerVisible(state.canvas.activeLayerIndex) {
             case .success:
@@ -189,7 +189,7 @@ extension DocumentFeature {
 
         func applyPreviewMutation(
             _ mutation: GpuPreviewMutation,
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             releaseSurfaceHandle: (MetalBufferHandle?) -> Void
         ) {
             let previousSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
@@ -223,7 +223,7 @@ extension DocumentFeature {
     }
 
     struct CanvasToolStateCoordinator {
-        func resolvedBrushSettings(for state: DocumentFeature.State) -> BrushRuntimeSettings {
+        func resolvedBrushSettings(for state: DocumentEditingState) -> BrushRuntimeSettings {
             var settings = state.brushPalette.runtimeSettings
             if settings.tipKind == .oil {
                 settings.stabilization = max(settings.stabilization, 0.34)
@@ -234,7 +234,7 @@ extension DocumentFeature {
             return settings
         }
 
-        func previewStrokeStyle(for state: DocumentFeature.State) -> PreviewStrokeStyle {
+        func previewStrokeStyle(for state: DocumentEditingState) -> PreviewStrokeStyle {
             let resolvedRuntimeSettings: BrushRuntimeSettings = {
                 var settings = state.brushPalette.runtimeSettings
                 if settings.tipKind == .oil {
@@ -288,7 +288,7 @@ extension DocumentFeature {
             )
         }
 
-        func resolvedPaperStyle(for state: DocumentFeature.State) -> CanvasPaperStyle {
+        func resolvedPaperStyle(for state: DocumentEditingState) -> CanvasPaperStyle {
             let resolved = UIColor(state.brushPalette.paper.color)
             var red: CGFloat = 0
             var green: CGFloat = 0

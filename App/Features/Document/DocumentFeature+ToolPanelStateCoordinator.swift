@@ -7,7 +7,7 @@ extension DocumentFeature {
     static let toolPanelStateCoordinator = ToolPanelStateCoordinator()
 
     struct ToolPanelStateCoordinator {
-        func panelState(for panel: StudioPanelKind, in state: DocumentFeature.State) -> StudioPanelLayoutState {
+        func panelState(for panel: StudioPanelKind, in state: DocumentEditingState) -> StudioPanelLayoutState {
             switch panel {
             case .brush:
                 return state.brushPanel
@@ -19,7 +19,7 @@ extension DocumentFeature {
         func setPanelState(
             _ panelState: StudioPanelLayoutState,
             for panel: StudioPanelKind,
-            in state: inout DocumentFeature.State
+            in state: inout DocumentEditingState
         ) {
             switch panel {
             case .brush:
@@ -29,34 +29,34 @@ extension DocumentFeature {
             }
         }
 
-        func toggleCollapse(for panel: StudioPanelKind, in state: inout DocumentFeature.State) {
+        func toggleCollapse(for panel: StudioPanelKind, in state: inout DocumentEditingState) {
             var current = panelState(for: panel, in: state)
             current.isCollapsed.toggle()
             setPanelState(current, for: panel, in: &state)
         }
 
-        func expand(_ panel: StudioPanelKind, in state: inout DocumentFeature.State) {
+        func expand(_ panel: StudioPanelKind, in state: inout DocumentEditingState) {
             var current = panelState(for: panel, in: state)
             current.isCollapsed = false
             setPanelState(current, for: panel, in: &state)
         }
 
-        func resetPanels(in state: inout DocumentFeature.State) {
+        func resetPanels(in state: inout DocumentEditingState) {
             state.brushPanel = StudioPanelLayoutState()
             state.layerPanel = StudioPanelLayoutState()
         }
 
-        func syncToolSpecificBrushSize(state: inout DocumentFeature.State) {
+        func syncToolSpecificBrushSize(state: inout DocumentEditingState) {
             state.brushPalette.brush.storeCurrentRadius(for: state.canvas.currentTool)
         }
 
-        func applyToolSpecificBrushSize(for tool: StudioToolKind, state: inout DocumentFeature.State) {
+        func applyToolSpecificBrushSize(for tool: StudioToolKind, state: inout DocumentEditingState) {
             state.brushPalette.brush.applyStoredRadius(for: tool)
         }
     }
 }
 
-extension DocumentFeature.State {
+extension DocumentEditingState {
     mutating func refreshBrushPaletteState() {
         DocumentFeature.toolPanelStateCoordinator.syncToolSpecificBrushSize(state: &self)
         canvas.updateInteractionModes(

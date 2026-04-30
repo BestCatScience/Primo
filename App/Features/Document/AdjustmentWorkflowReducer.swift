@@ -1,7 +1,8 @@
 import ComposableArchitecture
+import PrimoDocumentMutationContracts
 
 struct AdjustmentWorkflowReducer: Reducer {
-    typealias State = DocumentFeature.State
+    typealias State = DocumentEditingState
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
@@ -9,8 +10,29 @@ struct AdjustmentWorkflowReducer: Reducer {
     @Dependency(\.documentMutationGateway) var documentMutationGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
 
+    enum EditingAction: Equatable {
+        case gradientMapSelected(GradientMapPreset)
+        case gradientMapPreviewChanged(GradientMapSettings?)
+        case gradientMapApplied(GradientMapSettings)
+        case hueSaturationBrightnessPreviewChanged(HueSaturationBrightnessSettings?)
+        case hueSaturationBrightnessApplied(HueSaturationBrightnessSettings)
+        case brightnessContrastPreviewChanged(BrightnessContrastSettings?)
+        case brightnessContrastApplied(BrightnessContrastSettings)
+        case levelsPreviewChanged(LevelsAdjustmentSettings?)
+        case levelsApplied(LevelsAdjustmentSettings)
+        case toneCurvePreviewChanged(ToneCurveSettings?)
+        case toneCurveApplied(ToneCurveSettings)
+        case colorBalancePreviewChanged(ColorBalanceSettings?)
+        case colorBalanceApplied(ColorBalanceSettings)
+        case thresholdPreviewChanged(ThresholdSettings?)
+        case thresholdApplied(ThresholdSettings)
+        case posterizePreviewChanged(PosterizeSettings?)
+        case posterizeApplied(PosterizeSettings)
+        case luminanceToAlphaRequested
+    }
+
     enum Action: Equatable {
-        case editing(DocumentFeature.EditingAction)
+        case editing(EditingAction)
         case delegate(DocumentFeature.Action.Delegate)
     }
 

@@ -68,7 +68,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             ),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let result = coordinator.prepareEditing(
             state: &state,
             clearSelectionWithoutRefresh: { _ in }
@@ -90,12 +90,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
         let result = coordinator.resolveStrokeCommit(
             state: &state,
             samples: [.testValue()],
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: brush,
@@ -118,7 +118,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 4,
             height: 4,
@@ -164,7 +164,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 }
             )
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let previewBrush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
         state.canvas.strokeSession.renderState = StrokeSessionRenderState(
             baseRevision: 12,
@@ -179,7 +179,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let result = coordinator.resolveAppendedStrokePreview(
             state: state,
             samples: [.testValue()],
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: previewBrush,
@@ -194,7 +194,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.surfaceHandle, expectedHandle)
         XCTAssertEqual(
             recordedRenderStates.values.first.flatMap { $0 }?.previewBrush,
-            DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentFeature.State())
+            DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
         )
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.sampleCount, 32)
         XCTAssertEqual(recordedRenderStates.values.first.flatMap { $0 }?.supportsIncrementalContinuation, true)
@@ -215,8 +215,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             StylusSample.testValue(point: CGPoint(x: 1, y: 1)),
             StylusSample.testValue(point: CGPoint(x: 3, y: 3)),
         ]
-        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentFeature.State())
-        var state = DocumentFeature.State()
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
+        var state = DocumentEditingState()
         state.canvas.strokeSession.renderState = StrokeSessionRenderState(
             baseRevision: 12,
             layerIndex: 0,
@@ -231,7 +231,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let result = coordinator.resolveShapeStrokePreview(
             state: state,
             samples: samples,
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: brush,
@@ -369,12 +369,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
         let result = coordinator.resolveStrokeCommit(
             state: &state,
             samples: [.testValue()],
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: brush,
@@ -444,7 +444,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
         state.canvas.applyIncrementalRenderUpdate(
             IncrementalLayerUpdate.unsafeUnchecked(
@@ -461,7 +461,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let result = coordinator.resolveStrokeCommit(
             state: &state,
             samples: [.testValue()],
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: brush,
@@ -541,7 +541,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
             strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
 
         stateCoordinator.applyPreviewMutation(
@@ -601,7 +601,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let result = sessionCoordinator.resolveStrokeCommit(
             state: &state,
             samples: [.testValue()],
-            context: DocumentFeature.CanvasStrokeContext(
+            context: DocumentCanvasStrokeContext(
                 activeLayer: .testValue(),
                 activeLayerIndex: 0,
                 brush: brush,
@@ -650,7 +650,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             ]
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         state.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
         var loadedCurrentPresentation = false
 
@@ -679,7 +679,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
                 strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
             )
-            var state = DocumentFeature.State()
+            var state = DocumentEditingState()
             let previewBrush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
             let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
                 width: 4,
@@ -739,7 +739,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         state.canvas.strokeSession.renderState = StrokeSessionRenderState(
             baseRevision: 11,
             layerIndex: 0,
@@ -767,7 +767,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        var state = DocumentFeature.State()
+        var state = DocumentEditingState()
         state.canvas.strokeSession.renderState = StrokeSessionRenderState(
             baseRevision: 11,
             layerIndex: 0,
@@ -792,7 +792,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
         let result = service.fill(
             sample,
-            DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentFeature.State())
+            DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
         )
 
         switch result {

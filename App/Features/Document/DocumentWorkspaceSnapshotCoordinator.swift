@@ -7,7 +7,7 @@ extension DocumentFeature {
 
     struct WorkspaceSnapshotCoordinator {
         func snapshot(
-            state: State,
+            state: DocumentEditingState,
             documentExportGateway: DocumentExportGateway,
             documentGpuOperationGateway: DocumentGpuOperationGateway
         ) -> WorkspaceDocumentSnapshot {

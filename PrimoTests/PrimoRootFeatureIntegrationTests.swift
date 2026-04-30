@@ -705,9 +705,9 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.document(.lifecycle(.undoRequested))) {
-            $0.document.canvas.canvasSize = CGSize(width: 3, height: 3)
-            $0.document.canvas.renderSnapshot = undoPresentation.renderSnapshot
-            $0.document.canvas.lastCommittedRenderRevision = 1
+            $0.document.editing.canvas.canvasSize = CGSize(width: 3, height: 3)
+            $0.document.editing.canvas.renderSnapshot = undoPresentation.renderSnapshot
+            $0.document.editing.canvas.lastCommittedRenderRevision = 1
         }
         await store.receive(.document(.delegate(.presentationApplied)))
     }
@@ -734,8 +734,8 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             initialState: {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
-                state.document.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
-                state.document.canvas.isStrokeActive = true
+                state.document.editing.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
+                state.document.editing.canvas.isStrokeActive = true
                 return state
             }()
         ) {
@@ -745,10 +745,10 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         store.exhaustivity = .off
 
         await store.send(.document(.lifecycle(.undoRequested))) {
-            $0.document.canvas.pendingCommittedSnapshot = nil
-            $0.document.canvas.isStrokeActive = false
-            $0.document.canvas.renderSnapshot = PaintDocumentPresentation.renderedTestValue(width: 2, height: 2).renderSnapshot
-            $0.document.canvas.lastCommittedRenderRevision = 1
+            $0.document.editing.canvas.pendingCommittedSnapshot = nil
+            $0.document.editing.canvas.isStrokeActive = false
+            $0.document.editing.canvas.renderSnapshot = PaintDocumentPresentation.renderedTestValue(width: 2, height: 2).renderSnapshot
+            $0.document.editing.canvas.lastCommittedRenderRevision = 1
         }
         await store.receive(.document(.delegate(.presentationApplied)))
     }
@@ -779,10 +779,10 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     func testPrimoRootFeatureStateStoresEditorAndImportExportInFeatureSlices() {
         var state = PrimoRootFeature.State()
 
-        state.document.canvas.zoomScale = 2.0
+        state.document.editing.canvas.zoomScale = 2.0
         state.importExport.saveHistory.isPresented = true
 
-        XCTAssertEqual(state.document.canvas.zoomScale, 2.0)
+        XCTAssertEqual(state.document.editing.canvas.zoomScale, 2.0)
         XCTAssertTrue(state.importExport.saveHistory.isPresented)
     }
 
@@ -792,7 +792,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         }
 
         await store.send(.canvas(.zoomScaleChanged(1.75))) {
-            $0.canvas.zoomScale = 1.75
+            $0.editing.canvas.zoomScale = 1.75
         }
         await store.receive(.canvasEditing(.canvas(.zoomScaleChanged(1.75))))
     }

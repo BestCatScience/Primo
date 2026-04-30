@@ -3,7 +3,7 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 
 struct DocumentMutationWorkflowSupport<Action> {
-    typealias State = DocumentFeature.State
+    typealias State = DocumentEditingState
     typealias DocumentCanvasMutation = DocumentFeature.DocumentCanvasMutation
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
 
@@ -260,6 +260,6 @@ extension AIImageWorkflowReducer {
         state: inout State,
         contract: DocumentMutationContract = .dirty
     ) -> Effect<Action> {
-        documentMutationWorkflowSupport.completeDocumentMutation(state: &state, contract: contract)
+        documentMutationWorkflowSupport.completeDocumentMutation(state: &state.editing, contract: contract)
     }
 }

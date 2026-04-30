@@ -1,8 +1,10 @@
 import ComposableArchitecture
+import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 
 struct CanvasEditingWorkflowReducer: Reducer {
-    typealias State = DocumentFeature.State
-    typealias CanvasStrokeContext = DocumentFeature.CanvasStrokeContext
+    typealias State = DocumentEditingState
+    typealias CanvasStrokeContext = DocumentCanvasStrokeContext
     typealias CanvasStrokeSessionCoordinator = DocumentFeature.CanvasStrokeSessionCoordinator
     typealias CanvasStrokeStateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
@@ -22,8 +24,16 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.selectionWorkflowService) var selectionWorkflowService
     @Dependency(\.textLayerGateway) var textLayerGateway
 
+    enum EditingAction: Equatable {
+        case featherSelectionRequested(Int)
+        case colorRangeSelectionRequested(ColorRangeSelectionRequest)
+        case toolSelected(StudioToolKind)
+        case toolLongPressed(StudioToolKind)
+        case panelCollapseToggled(StudioPanelKind)
+    }
+
     enum Action: Equatable {
-        case editing(DocumentFeature.EditingAction)
+        case editing(EditingAction)
         case brushPalette(BrushPaletteFeature.Action)
         case layerSidebar(LayerSidebarFeature.Action)
         case canvas(CanvasFeature.Action)
@@ -111,7 +121,7 @@ struct CanvasEditingWorkflowReducer: Reducer {
     }
 
     private func reduceEditingAction(
-        _ action: DocumentFeature.EditingAction,
+        _ action: EditingAction,
         state: inout State
     ) -> Effect<Action> {
         switch action {
@@ -129,8 +139,6 @@ struct CanvasEditingWorkflowReducer: Reducer {
             return .none
         case let .colorRangeSelectionRequested(request):
             return handleColorRangeSelectionRequest(state: &state, request: request)
-        default:
-            return .none
         }
     }
 }

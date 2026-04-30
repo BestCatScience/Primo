@@ -21,7 +21,7 @@ extension AIImageWorkflowReducer {
     private struct AIImageRequestContract {
         func validate(
             command: SubmitAIImageEditCommand,
-            state: DocumentFeature.State,
+            state: DocumentEditingState,
             gpuOperations: DocumentGpuOperationGateway
         ) -> Result<AIImageValidatedEdit, AIImageValidationFailure> {
             let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
@@ -88,7 +88,7 @@ extension AIImageWorkflowReducer {
     private struct AIImagePreviewApplicationContract {
         func validate(
             preview: AIImagePreviewState,
-            state: DocumentFeature.State,
+            state: DocumentEditingState,
             namingPolicy: DocumentNamingPolicy
         ) -> Result<AIImagePreviewApplicationPlan, AIImageValidationFailure> {
             switch preview.descriptor.outputMode {
@@ -161,7 +161,7 @@ extension AIImageWorkflowReducer {
         let validatedEdit: AIImageValidatedEdit
         switch aiImageRequestContract.validate(
             command: request,
-            state: state,
+            state: state.editing,
             gpuOperations: documentGpuOperationGateway
         ) {
         case let .failure(error):
@@ -209,7 +209,7 @@ extension AIImageWorkflowReducer {
         let applicationPlan: AIImagePreviewApplicationPlan
         switch aiImagePreviewApplicationContract.validate(
             preview: preview,
-            state: state,
+            state: state.editing,
             namingPolicy: DocumentNamingPolicy(language: language)
         ) {
         case let .failure(error):

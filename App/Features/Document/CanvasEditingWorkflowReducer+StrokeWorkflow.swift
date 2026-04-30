@@ -14,7 +14,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func routeDocumentEditorEditingAction(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         action: Action
     ) -> Effect<Action>? {
         switch action {
@@ -67,7 +67,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func routeCanvasInteractionAction(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         action: Action
     ) -> Effect<Action>? {
         routeDocumentEditorEditingAction(state: &state, action: action)
@@ -79,9 +79,9 @@ extension CanvasEditingWorkflowReducer {
         }
 
         func resolve(
-            in state: DocumentFeature.State,
-            resolvedBrushSettings: (DocumentFeature.State) -> BrushRuntimeSettings,
-            activeEditableLayer: (DocumentFeature.State) -> LayerRowModel?
+            in state: DocumentEditingState,
+            resolvedBrushSettings: (DocumentEditingState) -> BrushRuntimeSettings,
+            activeEditableLayer: (DocumentEditingState) -> LayerRowModel?
         ) -> CanvasStrokeContext? {
             guard let activeLayer = activeEditableLayer(state) else {
                 return nil
@@ -99,10 +99,10 @@ extension CanvasEditingWorkflowReducer {
     struct CanvasStrokeEffectCoordinator {
         func complete(
             _ resolution: StrokeCommitResolution,
-            state: inout DocumentFeature.State,
-            resetPreview: (inout DocumentFeature.State, MetalBufferHandle?) -> Void,
-            completeMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Effect<Action>,
-            applyFailureFeedback: (DocumentMutationFailure, inout DocumentFeature.State) -> Effect<Action>,
+            state: inout DocumentEditingState,
+            resetPreview: (inout DocumentEditingState, MetalBufferHandle?) -> Void,
+            completeMutation: (inout DocumentEditingState, DocumentMutationContract) -> Effect<Action>,
+            applyFailureFeedback: (DocumentMutationFailure, inout DocumentEditingState) -> Effect<Action>,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
             let transferredSurfaceHandle: MetalBufferHandle?
@@ -129,14 +129,14 @@ extension CanvasEditingWorkflowReducer {
 
     struct CanvasStrokeInteractionCoordinator {
         func begin(
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             sample: StylusSample,
-            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
-            prepareEditing: (inout DocumentFeature.State) -> DocumentMutationResult,
-            applyFailureFeedback: (DocumentMutationFailure, inout DocumentFeature.State) -> Effect<Action>,
-            captureBaseSnapshot: (inout DocumentFeature.State) -> Void,
-            resolveInitialPreview: (DocumentFeature.State, StylusSample, CanvasStrokeContext) -> GpuStrokeSessionOutcome,
-            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentFeature.State) -> Effect<Action>,
+            resolveContext: (DocumentEditingState) -> CanvasStrokeContext?,
+            prepareEditing: (inout DocumentEditingState) -> DocumentMutationResult,
+            applyFailureFeedback: (DocumentMutationFailure, inout DocumentEditingState) -> Effect<Action>,
+            captureBaseSnapshot: (inout DocumentEditingState) -> Void,
+            resolveInitialPreview: (DocumentEditingState, StylusSample, CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentEditingState) -> Effect<Action>,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
@@ -165,11 +165,11 @@ extension CanvasEditingWorkflowReducer {
         }
 
         func append(
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             samples: [StylusSample],
-            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
-            resolvePreview: (DocumentFeature.State, [StylusSample], CanvasStrokeContext) -> GpuStrokeSessionOutcome,
-            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentFeature.State) -> Effect<Action>
+            resolveContext: (DocumentEditingState) -> CanvasStrokeContext?,
+            resolvePreview: (DocumentEditingState, [StylusSample], CanvasStrokeContext) -> GpuStrokeSessionOutcome,
+            applyPreview: (GpuStrokeSessionOutcome, Int, inout DocumentEditingState) -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
                 return .none
@@ -187,14 +187,14 @@ extension CanvasEditingWorkflowReducer {
         }
 
         func finish(
-            state: inout DocumentFeature.State,
+            state: inout DocumentEditingState,
             samples: [StylusSample],
             keepsSelectionCleared: Bool,
             refreshViaDirtyPresentation: Bool,
-            resolveContext: (DocumentFeature.State) -> CanvasStrokeContext?,
-            resetPreview: (inout DocumentFeature.State, MetalBufferHandle?) -> Void,
-            resolveCommit: (inout DocumentFeature.State, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
-            completeCommit: (StrokeCommitResolution, inout DocumentFeature.State) -> Effect<Action>
+            resolveContext: (DocumentEditingState) -> CanvasStrokeContext?,
+            resetPreview: (inout DocumentEditingState, MetalBufferHandle?) -> Void,
+            resolveCommit: (inout DocumentEditingState, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
+            completeCommit: (StrokeCommitResolution, inout DocumentEditingState) -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
                 resetPreview(&state, nil)
@@ -211,10 +211,10 @@ extension CanvasEditingWorkflowReducer {
         }
 
         func cancel(
-            state: inout DocumentFeature.State,
-            cancelShapeStrokeIfNeeded: (inout DocumentFeature.State) -> Void,
-            resetPreview: (inout DocumentFeature.State) -> Void,
-            completeMutation: (inout DocumentFeature.State, DocumentMutationContract) -> Effect<Action>
+            state: inout DocumentEditingState,
+            cancelShapeStrokeIfNeeded: (inout DocumentEditingState) -> Void,
+            resetPreview: (inout DocumentEditingState) -> Void,
+            completeMutation: (inout DocumentEditingState, DocumentMutationContract) -> Effect<Action>
         ) -> Effect<Action> {
             cancelShapeStrokeIfNeeded(&state)
             resetPreview(&state)
@@ -264,7 +264,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func resetStrokePreviewState(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         preserving transferredSurfaceHandle: MetalBufferHandle? = nil
     ) {
         _ = canvasStrokeInteractionService.cancel()
@@ -276,7 +276,7 @@ extension CanvasEditingWorkflowReducer {
         }
     }
 
-    func clearCanvasSelectionWithoutRefresh(state: inout DocumentFeature.State) {
+    func clearCanvasSelectionWithoutRefresh(state: inout DocumentEditingState) {
         canvasStrokeStateCoordinator.clearSelectionWithoutRefresh(
             state: &state,
             performDocumentMutation: { mutableState, contract in
@@ -285,7 +285,7 @@ extension CanvasEditingWorkflowReducer {
         )
     }
 
-    func ensureCurrentCanvasPresentationLoaded(state: inout DocumentFeature.State) {
+    func ensureCurrentCanvasPresentationLoaded(state: inout DocumentEditingState) {
         canvasStrokeStateCoordinator.ensureCurrentPresentationLoaded(
             state: &state,
             performDocumentMutation: { mutableState, contract in
@@ -294,7 +294,7 @@ extension CanvasEditingWorkflowReducer {
         )
     }
 
-    func captureActiveStrokeBaseSnapshotIfNeeded(state: inout DocumentFeature.State) {
+    func captureActiveStrokeBaseSnapshotIfNeeded(state: inout DocumentEditingState) {
         _ = canvasStrokeInteractionService.cancel()
         canvasStrokeStateCoordinator.captureBaseSnapshotIfNeeded(
             state: &state,
@@ -306,12 +306,12 @@ extension CanvasEditingWorkflowReducer {
 
     func applyCanvasStrokeFailure(
         _ failure: DocumentMutationFailure,
-        state: inout DocumentFeature.State
+        state: inout DocumentEditingState
     ) -> Effect<Action> {
         documentMutationFeedbackEffect(for: DocumentMutationFeedbackMapper().feedback(for: failure))
     }
 
-    func prepareCanvasStrokeEditing(state: inout DocumentFeature.State) -> DocumentMutationResult {
+    func prepareCanvasStrokeEditing(state: inout DocumentEditingState) -> DocumentMutationResult {
         canvasStrokeStateCoordinator.prepareEditing(
             state: &state,
             clearSelectionWithoutRefresh: { state in
@@ -324,7 +324,7 @@ extension CanvasEditingWorkflowReducer {
         canvasStrokeContextResolver.previewBrush(for: brush)
     }
 
-    func canvasStrokeContext(in state: DocumentFeature.State) -> CanvasStrokeContext? {
+    func canvasStrokeContext(in state: DocumentEditingState) -> CanvasStrokeContext? {
         canvasStrokeContextResolver.resolve(
             in: state,
             resolvedBrushSettings: { state in
@@ -337,7 +337,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func resolveInitialStrokePreview(
-        state: DocumentFeature.State,
+        state: DocumentEditingState,
         sample: StylusSample,
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
@@ -350,7 +350,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func resolveAppendedStrokePreview(
-        state: DocumentFeature.State,
+        state: DocumentEditingState,
         samples: [StylusSample],
         context: CanvasStrokeContext
     ) -> GpuStrokeSessionOutcome {
@@ -364,7 +364,7 @@ extension CanvasEditingWorkflowReducer {
     func applyStrokePreviewOutcome(
         _ outcome: GpuStrokeSessionOutcome,
         activeLayerIndex: Int,
-        state: inout DocumentFeature.State
+        state: inout DocumentEditingState
     ) -> Effect<Action> {
         switch outcome {
         case let .preview(mutation):
@@ -385,7 +385,7 @@ extension CanvasEditingWorkflowReducer {
 
     func applyLiveCompositeSurface(
         _ compositeSurface: DocumentCompositeSurface,
-        state: inout DocumentFeature.State
+        state: inout DocumentEditingState
     ) -> Effect<Action> {
         guard DocumentFeature.canvasPreviewStateCoordinator.applyLiveCompositeSurface(
             compositeSurface,
@@ -397,7 +397,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func resolveStrokeCommit(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         samples: [StylusSample],
         context: CanvasStrokeContext,
         keepsSelectionCleared: Bool,
@@ -414,7 +414,7 @@ extension CanvasEditingWorkflowReducer {
 
     func completeResolvedStrokeCommit(
         _ resolution: StrokeCommitResolution,
-        state: inout DocumentFeature.State
+        state: inout DocumentEditingState
     ) -> Effect<Action> {
         canvasStrokeEffectCoordinator.complete(
             resolution,
@@ -440,7 +440,7 @@ extension CanvasEditingWorkflowReducer {
         )
     }
 
-    func activeEditableCanvasLayer(in state: DocumentFeature.State) -> LayerRowModel? {
+    func activeEditableCanvasLayer(in state: DocumentEditingState) -> LayerRowModel? {
         guard let activeLayer = state.layerSidebar.layers.first(where: { $0.index == state.canvas.activeLayerIndex }),
               !activeLayer.isLocked
         else {
@@ -450,14 +450,14 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func completeCanvasStrokeMutation(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         contract: DocumentMutationContract = .dirty
     ) -> Effect<Action> {
         completeDocumentMutation(state: &state, contract: contract)
     }
 
     func handleBeginStroke(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         sample: StylusSample
     ) -> Effect<Action> {
         canvasStrokeInteractionCoordinator.begin(
@@ -496,7 +496,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func handleAppendStrokeSamples(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         samples: [StylusSample]
     ) -> Effect<Action> {
         canvasStrokeInteractionCoordinator.append(
@@ -523,7 +523,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func handlePreviewShapeStroke(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard !samples.isEmpty else { return .none }
@@ -555,7 +555,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func handleFinishStroke(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         samples: [StylusSample],
         keepsSelectionCleared: Bool,
         refreshViaDirtyPresentation: Bool
@@ -592,7 +592,7 @@ extension CanvasEditingWorkflowReducer {
         )
     }
 
-    func handleCancelStroke(state: inout DocumentFeature.State) -> Effect<Action> {
+    func handleCancelStroke(state: inout DocumentEditingState) -> Effect<Action> {
         canvasStrokeInteractionCoordinator.cancel(
             state: &state,
             cancelShapeStrokeIfNeeded: { state in
@@ -613,7 +613,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func handleBlurSamples(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         samples: [StylusSample]
     ) -> Effect<Action> {
         guard !samples.isEmpty else { return .none }
@@ -641,7 +641,7 @@ extension CanvasEditingWorkflowReducer {
         )
     }
 
-    func handleEndBlurStroke(state: inout DocumentFeature.State) -> Effect<Action> {
+    func handleEndBlurStroke(state: inout DocumentEditingState) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
             contract: .currentPresentation,
@@ -650,7 +650,7 @@ extension CanvasEditingWorkflowReducer {
     }
 
     func handleFill(
-        state: inout DocumentFeature.State,
+        state: inout DocumentEditingState,
         sample: StylusSample
     ) -> Effect<Action> {
         guard activeEditableCanvasLayer(in: state) != nil else {
@@ -677,7 +677,7 @@ extension CanvasEditingWorkflowReducer {
 }
 
 private extension DocumentStrokeContext {
-    init(_ context: DocumentFeature.CanvasStrokeContext) {
+    init(_ context: DocumentCanvasStrokeContext) {
         self.init(
             activeLayer: context.activeLayer,
             activeLayerIndex: context.activeLayerIndex,
@@ -687,7 +687,7 @@ private extension DocumentStrokeContext {
     }
 }
 
-private extension DocumentFeature.State {
+private extension DocumentEditingState {
     func usesResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
         true
     }

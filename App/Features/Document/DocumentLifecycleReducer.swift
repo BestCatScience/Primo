@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 
 struct DocumentLifecycleReducer: Reducer {
-    typealias State = DocumentFeature.State
+    typealias State = DocumentEditingState
     typealias CanvasDimensions = DocumentFeature.CanvasDimensions
     typealias FreshDocumentMutationRequest = DocumentFeature.FreshDocumentMutationRequest
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
