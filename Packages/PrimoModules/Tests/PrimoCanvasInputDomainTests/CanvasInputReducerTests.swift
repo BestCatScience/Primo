@@ -214,6 +214,42 @@ struct CanvasInputReducerTests {
     }
 
     @Test
+    func brushStrokeContinuesPastPreviousInteractiveSampleLimit() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            brushSize: 4,
+            strokeStabilization: 0
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 0, y: 0, pressure: 0.6, time: 0),
+            coalescedSamples: [sample(x: 0, y: 0, pressure: 0.6, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        var latestStroke: CanvasInputStroke?
+        for index in 1...17_000 {
+            let position = CGFloat(index) * 0.3
+            let commands = reducer.reduce(
+                phase: .moved,
+                sample: sample(x: position, y: 0, pressure: 0.6, time: TimeInterval(index) * 0.01),
+                coalescedSamples: [sample(x: position, y: 0, pressure: 0.6, time: TimeInterval(index) * 0.01)],
+                state: &state,
+                configuration: configuration
+            )
+            if case let .updateStroke(stroke) = commands.first {
+                latestStroke = stroke
+            }
+        }
+
+        #expect((latestStroke?.points.count ?? 0) > 16_384)
+        #expect(latestStroke?.points.last?.position.x == Float(17_000) * 0.3)
+    }
+
+    @Test
     func shapeStrokeBuildsRectangleWithoutUIKit() {
         let reducer = CanvasInputReducer()
         var state = CanvasInputReducer.State()

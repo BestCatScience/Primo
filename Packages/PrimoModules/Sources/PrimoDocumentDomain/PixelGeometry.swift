@@ -8,7 +8,7 @@ public enum CanvasSizePolicy: Sendable {
     public static let maxLayerNameLength = 256
     public static let maxTimelapseOperationCount = 250_000
     public static let maxLassoPointCount = 4096
-    public static let maxStrokeSampleCount = 16_384
+    public static let maxStrokeSampleCount = 262_144
     public static let maxInterpolatedSamplesPerEvent = 512
     public static let maxVideoDimension = 4096
 
