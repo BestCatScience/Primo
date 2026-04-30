@@ -167,6 +167,8 @@ public struct CanvasInputReducer: Sendable {
     public struct State: Equatable, Sendable {
         public var currentStroke: CanvasInputStroke?
         public var shapeStartPoint: CanvasStrokePoint?
+        public var stabilizerAnchor: CanvasStrokePoint?
+        public var rawStrokePoints: [CanvasStrokePoint] = []
         public var currentSelectionPoints: [CGPoint] = []
         public var transformStartPoint: CGPoint?
 
@@ -189,21 +191,18 @@ public struct CanvasInputReducer: Sendable {
             return reduceTransform(phase: phase, sample: sample, state: &state)
         case .text:
             guard phase == .began else { return [] }
-            state.currentStroke = nil
-            state.shapeStartPoint = nil
+            resetStrokeState(&state)
             return [.requestTextPlacement(sample.point)]
         case .fill:
             guard phase == .began else { return [] }
-            state.currentStroke = nil
-            state.shapeStartPoint = nil
+            resetStrokeState(&state)
             return [.requestFill(sample.stylusSample)]
         case .eyedropper:
             switch phase {
             case .began, .moved, .stationary:
                 return [.requestColorSample(sample.stylusSample)]
             case .ended, .cancelled:
-                state.currentStroke = nil
-                state.shapeStartPoint = nil
+                resetStrokeState(&state)
                 return [.requestColorSample(sample.stylusSample)]
             }
         default:
@@ -222,6 +221,8 @@ public struct CanvasInputReducer: Sendable {
         case .began:
             let firstPoint = sample.strokePoint
             state.shapeStartPoint = firstPoint
+            state.rawStrokePoints = [firstPoint]
+            state.stabilizerAnchor = firstPoint
             let stroke = CanvasInputStroke(points: [firstPoint], predictedPoints: [], color: configuration.brushColor, brushSize: configuration.brushSize)
             state.currentStroke = stroke
             return [.updateStroke(stroke)]
@@ -239,6 +240,7 @@ public struct CanvasInputReducer: Sendable {
                 appendFilteredPoints(
                     coalescedSamples.map(\.strokePoint),
                     to: &stroke,
+                    state: &state,
                     isFinishingStroke: false,
                     brushSize: configuration.brushSize,
                     stabilization: configuration.strokeStabilization
@@ -263,6 +265,7 @@ public struct CanvasInputReducer: Sendable {
                 appendFilteredPoints(
                     coalescedSamples.map(\.strokePoint),
                     to: &stroke,
+                    state: &state,
                     isFinishingStroke: true,
                     brushSize: configuration.brushSize,
                     stabilization: configuration.strokeStabilization
@@ -271,10 +274,11 @@ public struct CanvasInputReducer: Sendable {
             stroke.predictedPoints.removeAll()
             state.currentStroke = nil
             state.shapeStartPoint = nil
+            state.stabilizerAnchor = nil
+            state.rawStrokePoints.removeAll()
             return [.endStroke(stroke)]
         case .cancelled:
-            state.currentStroke = nil
-            state.shapeStartPoint = nil
+            resetStrokeState(&state)
             return [.cancelStroke]
         }
     }
@@ -340,14 +344,17 @@ public struct CanvasInputReducer: Sendable {
     private func appendFilteredPoints(
         _ points: [CanvasStrokePoint],
         to stroke: inout CanvasInputStroke,
+        state: inout State,
         isFinishingStroke: Bool,
         brushSize: Float,
         stabilization: Float
     ) {
         for rawPoint in points {
             var candidate = rawPoint
+            state.rawStrokePoints.append(rawPoint)
             guard let previous = stroke.points.last else {
                 stroke.points.append(candidate)
+                state.stabilizerAnchor = candidate
                 continue
             }
 
@@ -357,7 +364,7 @@ public struct CanvasInputReducer: Sendable {
 
             candidate = stabilizedStrokePoint(
                 candidate,
-                previous: previous,
+                anchor: state.stabilizerAnchor ?? previous,
                 brushSize: brushSize,
                 stabilization: stabilization,
                 isFinishingStroke: isFinishingStroke
@@ -401,12 +408,13 @@ public struct CanvasInputReducer: Sendable {
             } else {
                 stroke.points.append(candidate)
             }
+            state.stabilizerAnchor = candidate
         }
     }
 
     private func stabilizedStrokePoint(
         _ point: CanvasStrokePoint,
-        previous: CanvasStrokePoint,
+        anchor: CanvasStrokePoint,
         brushSize: Float,
         stabilization: Float,
         isFinishingStroke: Bool
@@ -414,14 +422,14 @@ public struct CanvasInputReducer: Sendable {
         let amount = min(max(stabilization, 0), 1)
         guard amount > 0.001 else { return point }
 
-        let delta = point.position - previous.position
+        let delta = point.position - anchor.position
         let distance = simd_length(delta)
         guard distance > 0.001 else { return point }
 
         let lazyRadius = stabilizationLazyRadius(brushSize: brushSize, amount: amount)
         let targetPosition: SIMD2<Float>
         if distance <= lazyRadius && !isFinishingStroke {
-            targetPosition = previous.position
+            targetPosition = anchor.position
         } else if lazyRadius > 0 {
             let trailingRadius = isFinishingStroke ? lazyRadius * 0.45 : lazyRadius
             let direction = delta / distance
@@ -431,12 +439,19 @@ public struct CanvasInputReducer: Sendable {
             targetPosition = point.position
         }
 
-        let targetDelta = targetPosition - previous.position
+        let targetDelta = targetPosition - anchor.position
         let response = max(1.0 - (amount * 0.42), 0.5)
 
         var stabilized = point
-        stabilized.position = previous.position + targetDelta * response
+        stabilized.position = anchor.position + targetDelta * response
         return stabilized
+    }
+
+    private func resetStrokeState(_ state: inout State) {
+        state.currentStroke = nil
+        state.shapeStartPoint = nil
+        state.stabilizerAnchor = nil
+        state.rawStrokePoints.removeAll()
     }
 
     private func stabilizationLazyRadius(brushSize: Float, amount: Float) -> Float {
