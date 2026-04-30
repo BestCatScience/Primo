@@ -4,6 +4,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import XCTest
@@ -694,6 +695,41 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         await store.send(.document(.undoRequested))
         await store.receive(.document(.delegate(.presentationRefreshRequested)))
         await store.receive(.document(.presentationRefreshRequested))
+    }
+
+    func testUndoClearsPendingStrokePresentationState() async {
+        let pendingSnapshot = MetalDocumentSnapshot(
+            width: 2,
+            height: 2,
+            revision: 4,
+            compositePixelData: Data(count: 16),
+            layers: [
+                MetalLayerSnapshot(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: Data(count: 16)
+                )
+            ]
+        )
+        let store = makeRootStore(
+            initialState: {
+                var state = PrimoRootFeature.State()
+                state.application.showsHome = false
+                state.document.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
+                return state
+            }()
+        ) {
+            $0.documentHistoryGateway = .stub(undo: { .success(()) })
+        }
+        store.exhaustivity = .off
+
+        await store.send(.document(.undoRequested)) {
+            $0.document.canvas.pendingCommittedSnapshot = nil
+        }
     }
 
     func testCrossFeatureIntegrationReducerSaveHistoryRoutesToCatalogRequest() async {
