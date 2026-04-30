@@ -418,15 +418,31 @@ public struct CanvasInputReducer: Sendable {
         let distance = simd_length(delta)
         guard distance > 0.001 else { return point }
 
-        let baseResponse = 0.9 - (amount * 0.78)
-        let distanceScale = max(brushSize * 0.35, 6.0)
-        let distanceResponse = min(distance / distanceScale, 1.0) * 0.22 * (1.0 - amount * 0.35)
-        let finishingResponse: Float = isFinishingStroke ? 0.16 : 0.0
-        let response = min(max(baseResponse + distanceResponse + finishingResponse, 0.08), 1.0)
+        let lazyRadius = stabilizationLazyRadius(brushSize: brushSize, amount: amount)
+        let targetPosition: SIMD2<Float>
+        if distance <= lazyRadius && !isFinishingStroke {
+            targetPosition = previous.position
+        } else if lazyRadius > 0 {
+            let trailingRadius = isFinishingStroke ? lazyRadius * 0.45 : lazyRadius
+            let direction = delta / distance
+            let trailingDistance = min(trailingRadius, distance)
+            targetPosition = point.position - (direction * trailingDistance)
+        } else {
+            targetPosition = point.position
+        }
+
+        let targetDelta = targetPosition - previous.position
+        let response = max(1.0 - (amount * 0.42), 0.5)
 
         var stabilized = point
-        stabilized.position = previous.position + delta * response
+        stabilized.position = previous.position + targetDelta * response
         return stabilized
+    }
+
+    private func stabilizationLazyRadius(brushSize: Float, amount: Float) -> Float {
+        let scaledAmount = pow(amount, 1.18)
+        let brushScaledRadius = max(brushSize * 1.6, 18.0)
+        return min(brushScaledRadius * scaledAmount, 96.0)
     }
 
     private func shouldRejectFinishingJump(_ candidate: CanvasStrokePoint, previous: CanvasStrokePoint, distance: Float, brushSize: Float) -> Bool {

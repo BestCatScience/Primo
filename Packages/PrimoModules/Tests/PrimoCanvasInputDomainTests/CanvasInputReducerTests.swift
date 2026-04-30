@@ -98,6 +98,40 @@ struct CanvasInputReducerTests {
     }
 
     @Test
+    func maximumBrushStrokeStabilizationCreatesVisibleLazyFollow() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            brushSize: 8,
+            strokeStabilization: 1.0
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 0, y: 0, pressure: 0.6, time: 0),
+            coalescedSamples: [sample(x: 0, y: 0, pressure: 0.6, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        let commands = reducer.reduce(
+            phase: .moved,
+            sample: sample(x: 80, y: 0, pressure: 0.6, time: 0.1),
+            coalescedSamples: [sample(x: 80, y: 0, pressure: 0.6, time: 0.1)],
+            state: &state,
+            configuration: configuration
+        )
+
+        guard case let .updateStroke(stroke) = commands.first,
+              let lastPoint = stroke.points.last
+        else {
+            Issue.record("Expected stabilized stroke update")
+            return
+        }
+        #expect(lastPoint.position.x < 50)
+    }
+
+    @Test
     func shapeStrokeBuildsRectangleWithoutUIKit() {
         let reducer = CanvasInputReducer()
         var state = CanvasInputReducer.State()
