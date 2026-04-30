@@ -139,7 +139,10 @@ extension DocumentFeature {
     ) -> Effect<Action> {
         return performDocumentMutation(
             state: &state,
-            contract: DocumentMutationContract(canvasMutation: .clearSelection),
+            contract: DocumentMutationContract(
+                canvasMutation: .clearSelection,
+                refresh: .current
+            ),
             mutation: performMutation,
             onSuccess: { _, state in
                 state.canvas.resetTransientEditingState()

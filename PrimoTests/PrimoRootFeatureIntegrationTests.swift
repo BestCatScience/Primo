@@ -681,6 +681,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testCrossFeatureIntegrationReducerUndoRoutesToHistoryMutation() async {
+        let undoPresentation = PaintDocumentPresentation.renderedTestValue(width: 3, height: 3)
         let store = makeRootStore(
             initialState: {
                 var state = PrimoRootFeature.State()
@@ -688,13 +689,17 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
+            $0.documentQueryGateway = .stub(presentation: undoPresentation)
             $0.documentHistoryGateway = .stub(undo: { .success(()) })
         }
         store.exhaustivity = .off
 
-        await store.send(.document(.undoRequested))
-        await store.receive(.document(.delegate(.presentationRefreshRequested)))
-        await store.receive(.document(.presentationRefreshRequested))
+        await store.send(.document(.undoRequested)) {
+            $0.document.canvas.canvasSize = CGSize(width: 3, height: 3)
+            $0.document.canvas.renderSnapshot = undoPresentation.renderSnapshot
+            $0.document.canvas.lastCommittedRenderRevision = 1
+        }
+        await store.receive(.document(.delegate(.presentationApplied)))
     }
 
     func testUndoClearsPendingStrokePresentationStateAndRunsWhileStrokeStateIsStale() async {
@@ -724,6 +729,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
+            $0.documentQueryGateway = .stub(presentation: .renderedTestValue(width: 2, height: 2))
             $0.documentHistoryGateway = .stub(undo: { .success(()) })
         }
         store.exhaustivity = .off
@@ -731,7 +737,10 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         await store.send(.document(.undoRequested)) {
             $0.document.canvas.pendingCommittedSnapshot = nil
             $0.document.canvas.isStrokeActive = false
+            $0.document.canvas.renderSnapshot = PaintDocumentPresentation.renderedTestValue(width: 2, height: 2).renderSnapshot
+            $0.document.canvas.lastCommittedRenderRevision = 1
         }
+        await store.receive(.document(.delegate(.presentationApplied)))
     }
 
     func testCrossFeatureIntegrationReducerSaveHistoryRoutesToCatalogRequest() async {
