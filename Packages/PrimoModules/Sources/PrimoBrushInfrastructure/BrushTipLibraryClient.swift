@@ -3,9 +3,9 @@ import PrimoBrushFileFormats
 import PrimoCoreTypes
 
 public struct BrushTipLibraryClient: Sendable {
-    public var loadRaster: @Sendable (URL) throws -> BrushTipRaster
-    public var prepareBrushTipFile: @Sendable (URL) throws -> URL
-    public var importPhotoshopBrushSamples: @Sendable (URL) throws -> [ImportedPhotoshopBrushSample]
+    public let loadRaster: @Sendable (URL) throws -> BrushTipRaster
+    public let prepareBrushTipFile: @Sendable (URL) throws -> URL
+    public let importPhotoshopBrushSamples: @Sendable (URL) throws -> [ImportedPhotoshopBrushSample]
 
     public init(
         loadRaster: @escaping @Sendable (URL) throws -> BrushTipRaster,

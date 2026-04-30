@@ -39,7 +39,7 @@ public struct SelectionWorkflowService: Sendable {
                     mode == .add ? .add : .subtract,
                     canvasWidth,
                     canvasHeight
-                )
+                ).value
             else {
                 return nil
             }
@@ -70,7 +70,7 @@ public struct SelectionWorkflowService: Sendable {
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight
             )
-        )
+        ).value
     }
 
     public func adjustedSelection(
@@ -147,7 +147,7 @@ public struct SelectionWorkflowService: Sendable {
         guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
-        guard let mask = gpuOperations.lassoSelection(polygon, canvasWidth, canvasHeight) else {
+        guard let mask = gpuOperations.lassoSelection(polygon, canvasWidth, canvasHeight).value else {
             return nil
         }
         return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .lasso)
@@ -187,7 +187,7 @@ public struct SelectionWorkflowService: Sendable {
             opacityTolerance,
             colorTolerance,
             max(0, expansion)
-        ) else {
+        ).value else {
             return nil
         }
         return croppedSelection(from: selected, width: width, height: height, mode: .auto)
@@ -214,7 +214,7 @@ public struct SelectionWorkflowService: Sendable {
         }
 
         guard pixelData.count == geometry.rgbaByteCount else { return nil }
-        guard let selected = gpuOperations.colorRangeSelection(pixelData, width, height, request) else {
+        guard let selected = gpuOperations.colorRangeSelection(pixelData, width, height, request).value else {
             return nil
         }
 
@@ -227,26 +227,26 @@ public struct SelectionWorkflowService: Sendable {
     public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.expandedMask(source, width, height, expansion)
+        return gpuOperations.expandedMask(source, width, height, expansion).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.contractedMask(source, width, height, contraction)
+        return gpuOperations.contractedMask(source, width, height, contraction).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.featheredMask(source, width, height, radius)
+        return gpuOperations.featheredMask(source, width, height, radius).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
-        gpuOperations.invertMask(source)
+        gpuOperations.invertMask(source).value
             ?? [UInt8](repeating: 0, count: source.count)
     }
 

@@ -2,7 +2,7 @@ import Foundation
 import Security
 
 public struct ProcessEnvironmentClient: Sendable {
-    public var stringValue: @Sendable (String) -> String?
+    public let stringValue: @Sendable (String) -> String?
 
     public init(stringValue: @escaping @Sendable (String) -> String?) {
         self.stringValue = stringValue
@@ -14,7 +14,7 @@ public struct ProcessEnvironmentClient: Sendable {
 }
 
 public struct MainQueueClient: Sendable {
-    public var async: @Sendable (@escaping @MainActor () -> Void) -> Void
+    public let async: @Sendable (@escaping @MainActor () -> Void) -> Void
 
     public init(async: @escaping @Sendable (@escaping @MainActor () -> Void) -> Void) {
         self.async = async
@@ -28,7 +28,7 @@ public struct MainQueueClient: Sendable {
 }
 
 public struct DateClient: Sendable {
-    public var now: @Sendable () -> Date
+    public let now: @Sendable () -> Date
 
     public init(now: @escaping @Sendable () -> Date) {
         self.now = now
@@ -38,7 +38,7 @@ public struct DateClient: Sendable {
 }
 
 public struct UUIDClient: Sendable {
-    public var generate: @Sendable () -> UUID
+    public let generate: @Sendable () -> UUID
 
     public init(generate: @escaping @Sendable () -> UUID) {
         self.generate = generate
@@ -48,18 +48,18 @@ public struct UUIDClient: Sendable {
 }
 
 public struct FileClient: Sendable {
-    public var temporaryDirectory: @Sendable () -> URL
-    public var urls: @Sendable (FileManager.SearchPathDirectory, FileManager.SearchPathDomainMask) -> [URL]
-    public var fileExists: @Sendable (String) -> Bool
-    public var createDirectory: @Sendable (URL, Bool) throws -> Void
-    public var removeItem: @Sendable (URL) throws -> Void
-    public var copyItem: @Sendable (URL, URL) throws -> Void
-    public var moveItem: @Sendable (URL, URL) throws -> Void
-    public var replaceItem: @Sendable (URL, URL, String?) throws -> Void
-    public var contentsOfDirectory: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) throws -> [URL]
-    public var enumerateURLs: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) -> [URL]
-    public var readData: @Sendable (URL) throws -> Data
-    public var writeData: @Sendable (Data, URL, Data.WritingOptions) throws -> Void
+    public let temporaryDirectory: @Sendable () -> URL
+    public let urls: @Sendable (FileManager.SearchPathDirectory, FileManager.SearchPathDomainMask) -> [URL]
+    public let fileExists: @Sendable (String) -> Bool
+    public let createDirectory: @Sendable (URL, Bool) throws -> Void
+    public let removeItem: @Sendable (URL) throws -> Void
+    public let copyItem: @Sendable (URL, URL) throws -> Void
+    public let moveItem: @Sendable (URL, URL) throws -> Void
+    public let replaceItem: @Sendable (URL, URL, String?) throws -> Void
+    public let contentsOfDirectory: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) throws -> [URL]
+    public let enumerateURLs: @Sendable (URL, [URLResourceKey], FileManager.DirectoryEnumerationOptions) -> [URL]
+    public let readData: @Sendable (URL) throws -> Data
+    public let writeData: @Sendable (Data, URL, Data.WritingOptions) throws -> Void
 
     public init(
         temporaryDirectory: @escaping @Sendable () -> URL,
@@ -150,7 +150,7 @@ public struct FileClient: Sendable {
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct HTTPClient: Sendable {
-    public var data: @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    public let data: @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
     public init(data: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse)) {
         self.data = data
@@ -162,8 +162,8 @@ public struct HTTPClient: Sendable {
 }
 
 public struct KeyValueStoreClient: Sendable {
-    public var stringForKey: @Sendable (String) -> String?
-    public var setString: @Sendable (String?, String) -> Void
+    public let stringForKey: @Sendable (String) -> String?
+    public let setString: @Sendable (String?, String) -> Void
 
     public init(
         stringForKey: @escaping @Sendable (String) -> String?,
@@ -193,8 +193,8 @@ public enum SecretStoreError: Error, Equatable, Sendable {
 }
 
 public struct SecretStoreClient: Sendable {
-    public var readSecret: @Sendable (String) throws -> String?
-    public var writeSecret: @Sendable (String?, String) throws -> Void
+    public let readSecret: @Sendable (String) throws -> String?
+    public let writeSecret: @Sendable (String?, String) throws -> Void
 
     public init(
         readSecret: @escaping @Sendable (String) throws -> String?,
@@ -266,8 +266,8 @@ private func keychainQuery(for key: String) -> [String: Any] {
 }
 
 public struct SecurityScopedResourceClient: Sendable {
-    public var startAccessing: @Sendable (URL) -> Bool
-    public var stopAccessing: @Sendable (URL) -> Void
+    public let startAccessing: @Sendable (URL) -> Bool
+    public let stopAccessing: @Sendable (URL) -> Void
 
     public init(
         startAccessing: @escaping @Sendable (URL) -> Bool,

@@ -47,7 +47,7 @@ public struct DocumentWorkspacePreview: Equatable, Sendable {
 }
 
 public struct DocumentWorkspacePreviewGateway: Sendable {
-    public var loadProjectPreview: @Sendable (URL) throws -> DocumentWorkspacePreview
+    public let loadProjectPreview: @Sendable (URL) throws -> DocumentWorkspacePreview
 
     public init(
         loadProjectPreview: @escaping @Sendable (URL) throws -> DocumentWorkspacePreview
@@ -57,20 +57,20 @@ public struct DocumentWorkspacePreviewGateway: Sendable {
 }
 
 public struct DocumentWorkspaceClient: Sendable {
-    public var createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
-    public var createProjectURL: @Sendable () throws -> DocumentProjectPath
-    public var writePNGToTemporaryDirectory: @Sendable (Data) throws -> URL
-    public var timelapseTemporaryDirectory: @Sendable () -> URL
-    public var loadSavedProjects: @Sendable () throws -> [SavedProjectSummary]
-    public var moveSavedProject: @Sendable (DocumentProjectPath, RelativeProjectFolderPath?) throws -> DocumentProjectPath
-    public var loadAutosaveRecoveryItems: @Sendable () throws -> [AutosaveRecoveryItem]
-    public var discardAutosaveEntry: @Sendable (WorkspaceItemID) throws -> Void
-    public var discardAutosaveSnapshot: @Sendable (OpenDocumentTab) throws -> Void
-    public var persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
-    public var persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
-    public var loadSaveHistoryEntries: @Sendable (OpenDocumentTab) throws -> [SaveHistoryEntry]
-    public var persistSaveHistorySnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
-    public var removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
+    public let createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
+    public let createProjectURL: @Sendable () throws -> DocumentProjectPath
+    public let writePNGToTemporaryDirectory: @Sendable (Data) throws -> URL
+    public let timelapseTemporaryDirectory: @Sendable () -> URL
+    public let loadSavedProjects: @Sendable () throws -> [SavedProjectSummary]
+    public let moveSavedProject: @Sendable (DocumentProjectPath, RelativeProjectFolderPath?) throws -> DocumentProjectPath
+    public let loadAutosaveRecoveryItems: @Sendable () throws -> [AutosaveRecoveryItem]
+    public let discardAutosaveEntry: @Sendable (WorkspaceItemID) throws -> Void
+    public let discardAutosaveSnapshot: @Sendable (OpenDocumentTab) throws -> Void
+    public let persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
+    public let persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
+    public let loadSaveHistoryEntries: @Sendable (OpenDocumentTab) throws -> [SaveHistoryEntry]
+    public let persistSaveHistorySnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
+    public let removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
 
     public init(
         createTabBackingStoreURL: @escaping @Sendable (UUID) throws -> DocumentProjectPath,

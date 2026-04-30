@@ -184,24 +184,24 @@ public enum LayerProcessingRequest: Equatable, Sendable {
 }
 
 public struct DocumentMutationGateway: Sendable {
-    public var resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
-    public var resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
-    public var addLayer: @Sendable (String) -> DocumentIndexedMutationResult
-    public var deleteLayer: @Sendable (Int) -> DocumentMutationResult
-    public var setActiveLayer: @Sendable (Int) -> DocumentMutationResult
-    public var setLayerName: @Sendable (Int, String) -> DocumentMutationResult
-    public var setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
-    public var replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
-    public var replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
-    public var applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
-    public var applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
-    public var applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
-    public var replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
-    public var clearLayerMask: @Sendable (Int) -> DocumentMutationResult
-    public var applyLayerMask: @Sendable (Int) -> DocumentMutationResult
-    public var clearLayer: @Sendable (Int) -> DocumentMutationResult
-    public var applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
+    public let resizeCanvas: @Sendable (Int, Int) -> DocumentMutationResult
+    public let resizeCanvasExtent: @Sendable (Int, Int) -> DocumentMutationResult
+    public let addLayer: @Sendable (String) -> DocumentIndexedMutationResult
+    public let deleteLayer: @Sendable (Int) -> DocumentMutationResult
+    public let setActiveLayer: @Sendable (Int) -> DocumentMutationResult
+    public let setLayerName: @Sendable (Int, String) -> DocumentMutationResult
+    public let setLayerVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    public let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+    public let replaceLayerPixels: @Sendable (Int, Data) -> DocumentMutationResult
+    public let replaceLayerPixelsInRect: @Sendable (Int, LayerPixelRect, Data) -> DocumentMutationResult
+    public let applyLayerSurfaceMutation: @Sendable (Int, GpuLayerMutationPayload) -> DocumentMutationResult
+    public let applyLayerMutation: @Sendable (Int, DocumentLayerMutationPayload) -> DocumentMutationResult
+    public let applyTextLayerMutation: @Sendable (Int, TextLayerData, DocumentLayerMutationPayload) -> DocumentMutationResult
+    public let replaceLayerMask: @Sendable (Int, Data) -> DocumentMutationResult
+    public let clearLayerMask: @Sendable (Int) -> DocumentMutationResult
+    public let applyLayerMask: @Sendable (Int) -> DocumentMutationResult
+    public let clearLayer: @Sendable (Int) -> DocumentMutationResult
+    public let applyLayerProcessing: @Sendable (Int, LayerProcessingRequest) -> DocumentMutationResult
 
     public init(
         resizeCanvas: @escaping @Sendable (Int, Int) -> DocumentMutationResult,
@@ -245,14 +245,14 @@ public struct DocumentMutationGateway: Sendable {
 }
 
 public struct StrokeInputGateway: Sendable {
-    public var beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
-    public var appendStroke: @Sendable (StylusSample) -> Void
-    public var endStroke: @Sendable () -> DocumentMutationResult
-    public var cancelStroke: @Sendable () -> Void
-    public var blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
-    public var endBlurStroke: @Sendable () -> DocumentMutationResult
-    public var fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
-    public var applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
+    public let beginStroke: @Sendable (StylusSample, BrushRuntimeSettings) -> Void
+    public let appendStroke: @Sendable (StylusSample) -> Void
+    public let endStroke: @Sendable () -> DocumentMutationResult
+    public let cancelStroke: @Sendable () -> Void
+    public let blurStroke: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Bool) -> DocumentMutationResult
+    public let endBlurStroke: @Sendable () -> DocumentMutationResult
+    public let fill: @Sendable (StylusSample, BrushRuntimeSettings) -> DocumentMutationResult
+    public let applyGpuStrokeSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int) -> DocumentMutationResult
 
     public init(
         beginStroke: @escaping @Sendable (StylusSample, BrushRuntimeSettings) -> Void,
@@ -276,11 +276,11 @@ public struct StrokeInputGateway: Sendable {
 }
 
 public struct DocumentHistoryGateway: Sendable {
-    public var canUndo: @Sendable () -> Bool
-    public var canRedo: @Sendable () -> Bool
-    public var undo: @Sendable () -> DocumentMutationResult
-    public var redo: @Sendable () -> DocumentMutationResult
-    public var trimForMemoryPressure: @Sendable () -> Void
+    public let canUndo: @Sendable () -> Bool
+    public let canRedo: @Sendable () -> Bool
+    public let undo: @Sendable () -> DocumentMutationResult
+    public let redo: @Sendable () -> DocumentMutationResult
+    public let trimForMemoryPressure: @Sendable () -> Void
 
     public init(
         canUndo: @escaping @Sendable () -> Bool,
@@ -298,9 +298,9 @@ public struct DocumentHistoryGateway: Sendable {
 }
 
 public struct TextLayerGateway: Sendable {
-    public var textLayerData: @Sendable (Int) -> TextLayerData?
-    public var setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
-    public var clearTextLayerData: @Sendable (Int) -> Void
+    public let textLayerData: @Sendable (Int) -> TextLayerData?
+    public let setTextLayer: @Sendable (Int, TextLayerData) -> DocumentMutationResult
+    public let clearTextLayerData: @Sendable (Int) -> Void
 
     public init(
         textLayerData: @escaping @Sendable (Int) -> TextLayerData?,
@@ -314,7 +314,7 @@ public struct TextLayerGateway: Sendable {
 }
 
 public struct DocumentLayerEffectsGateway: Sendable {
-    public var mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    public let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
 
     public init(
         mergeLayerDown: @escaping @Sendable (Int) -> DocumentMutationResult

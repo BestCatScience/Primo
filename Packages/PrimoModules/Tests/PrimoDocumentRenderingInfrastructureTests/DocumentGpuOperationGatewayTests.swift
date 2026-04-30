@@ -10,6 +10,10 @@ import Testing
 
 private let metalRuntimeAvailable = PrimoMetalDocumentProcessingClient.shared.isAvailable
 
+private func failedRendering<Value>() -> DocumentRenderingResult<Value> {
+    .failure(.kernelFailed(operation: "test"))
+}
+
 struct DocumentGpuOperationGatewayTests {
     @Test
     func metalBackendFactoryInjectsProvidedBackendIntoDependentServices() throws {
@@ -48,18 +52,18 @@ struct DocumentGpuOperationGatewayTests {
     func layerTransformExpandsCroppedSelectionWithOriginBeforeCanvasSize() {
         let box = ExpandedSelectionMaskCallBox()
         let gateway = DocumentGpuOperationGateway(
-            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
-            compositedPreviewPixelData: { _, _, _ in nil },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
-            selectionOverlayRGBA: { _, _, _ in nil },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
-            shapePreviewSurface: { _, _, _, _ in nil },
-            textLayerSurface: { _, _ in nil },
+            compositedPaperPreviewRGBA: { _, _, _, _ in failedRendering() },
+            compositedPreviewPixelData: { _, _, _ in failedRendering() },
+            compositedPreviewIncrementalUpdate: { _, _, _, _ in failedRendering() },
+            selectionOverlayRGBA: { _, _, _ in failedRendering() },
+            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in failedRendering() },
+            shapePreviewSurface: { _, _, _, _ in failedRendering() },
+            textLayerSurface: { _, _ in failedRendering() },
             textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in nil },
-            alphaMask: { _, _, _ in nil },
+            processedLayerPixelData: { _, _, _, _ in failedRendering() },
+            alphaMask: { _, _, _ in failedRendering() },
             croppedSelectionMask: { _, _, _ in nil },
-            combinedSelectionMask: { _, _, _, _, _ in nil },
+            combinedSelectionMask: { _, _, _, _, _ in failedRendering() },
             expandedSelectionMask: { request in
                 box.arguments = (
                     maskWidth: request.maskWidth,
@@ -69,19 +73,19 @@ struct DocumentGpuOperationGatewayTests {
                     canvasWidth: request.canvasWidth,
                     canvasHeight: request.canvasHeight
                 )
-                return [UInt8](repeating: 255, count: request.canvasWidth * request.canvasHeight)
+                return .success([UInt8](repeating: 255, count: request.canvasWidth * request.canvasHeight))
             },
-            lassoSelection: { _, _, _ in nil },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
-            colorRangeSelection: { _, _, _, _ in nil },
-            expandedMask: { source, _, _, _ in source },
-            contractedMask: { source, _, _, _ in source },
-            featheredMask: { source, _, _, _ in source },
-            invertMask: { _ in nil },
-            transformedSelectionMask: { _ in nil },
-            transformedLayerPixelData: { request in request.source },
-            scaledPixelData: { _, _, _, _, _ in nil },
-            translatedPixelData: { _, _, _, _, _, _, _ in nil },
+            lassoSelection: { _, _, _ in failedRendering() },
+            autoSelection: { _, _, _, _, _, _, _, _, _ in failedRendering() },
+            colorRangeSelection: { _, _, _, _ in failedRendering() },
+            expandedMask: { source, _, _, _ in .success(source) },
+            contractedMask: { source, _, _, _ in .success(source) },
+            featheredMask: { source, _, _, _ in .success(source) },
+            invertMask: { _ in failedRendering() },
+            transformedSelectionMask: { _ in failedRendering() },
+            transformedLayerPixelData: { request in .success(request.source) },
+            scaledPixelData: { _, _, _, _, _ in failedRendering() },
+            translatedPixelData: { _, _, _, _, _, _, _ in failedRendering() },
             releaseSurfaceHandle: { _ in }
         )
         let processor = GpuLayerTransformProcessor(gpuOperations: gateway)
@@ -121,37 +125,37 @@ struct DocumentGpuOperationGatewayTests {
     func shapePreviewBrushSettingsExpandGrayscaleColorToRGB() throws {
         let box = BrushSettingsCallBox()
         let gateway = DocumentGpuOperationGateway(
-            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
-            compositedPreviewPixelData: { _, _, _ in nil },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
-            selectionOverlayRGBA: { _, _, _ in nil },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
+            compositedPaperPreviewRGBA: { _, _, _, _ in failedRendering() },
+            compositedPreviewPixelData: { _, _, _ in failedRendering() },
+            compositedPreviewIncrementalUpdate: { _, _, _, _ in failedRendering() },
+            selectionOverlayRGBA: { _, _, _ in failedRendering() },
+            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in failedRendering() },
             shapePreviewSurface: { _, brush, width, height in
                 box.brush = brush
-                return DocumentCompositeSurface(
+                return .success(DocumentCompositeSurface(
                     unsafeUncheckedWidth: width,
                     height: height,
                     pixelData: Data(repeating: 0, count: width * height * 4)
-                )
+                ))
             },
-            textLayerSurface: { _, _ in nil },
+            textLayerSurface: { _, _ in failedRendering() },
             textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in nil },
-            alphaMask: { _, _, _ in nil },
+            processedLayerPixelData: { _, _, _, _ in failedRendering() },
+            alphaMask: { _, _, _ in failedRendering() },
             croppedSelectionMask: { _, _, _ in nil },
-            combinedSelectionMask: { _, _, _, _, _ in nil },
-            expandedSelectionMask: { _ in nil },
-            lassoSelection: { _, _, _ in nil },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
-            colorRangeSelection: { _, _, _, _ in nil },
-            expandedMask: { source, _, _, _ in source },
-            contractedMask: { source, _, _, _ in source },
-            featheredMask: { source, _, _, _ in source },
-            invertMask: { _ in nil },
-            transformedSelectionMask: { _ in nil },
-            transformedLayerPixelData: { request in request.source },
-            scaledPixelData: { _, _, _, _, _ in nil },
-            translatedPixelData: { _, _, _, _, _, _, _ in nil },
+            combinedSelectionMask: { _, _, _, _, _ in failedRendering() },
+            expandedSelectionMask: { _ in failedRendering() },
+            lassoSelection: { _, _, _ in failedRendering() },
+            autoSelection: { _, _, _, _, _, _, _, _, _ in failedRendering() },
+            colorRangeSelection: { _, _, _, _ in failedRendering() },
+            expandedMask: { source, _, _, _ in .success(source) },
+            contractedMask: { source, _, _, _ in .success(source) },
+            featheredMask: { source, _, _, _ in .success(source) },
+            invertMask: { _ in failedRendering() },
+            transformedSelectionMask: { _ in failedRendering() },
+            transformedLayerPixelData: { request in .success(request.source) },
+            scaledPixelData: { _, _, _, _, _ in failedRendering() },
+            translatedPixelData: { _, _, _, _, _, _, _ in failedRendering() },
             releaseSurfaceHandle: { _ in }
         )
         let renderer = GpuCanvasPreviewRenderer(gpuOperations: gateway)
@@ -221,7 +225,7 @@ struct DocumentGpuOperationGatewayTests {
             ]
         )
 
-        let composited = try #require(gateway.compositedPreviewPixelData(snapshot, 0, adjustedPixels))
+        let composited = try #require(gateway.compositedPreviewPixelData(snapshot, 0, adjustedPixels).value)
         #expect(composited == adjustedPixels)
     }
 
@@ -273,7 +277,7 @@ struct DocumentGpuOperationGatewayTests {
     func compositedPaperPreviewRGBAProducesExportReadyPixels() throws {
         let gateway = DocumentGpuOperationGatewayFactory.live()
         let compositePixels = Data([255, 255, 255, 255, 0, 0, 0, 255])
-        let output = try #require(gateway.compositedPaperPreviewRGBA(compositePixels, 2, 1, .default))
+        let output = try #require(gateway.compositedPaperPreviewRGBA(compositePixels, 2, 1, .default).value)
         #expect(output.count == compositePixels.count)
     }
 
@@ -285,7 +289,7 @@ struct DocumentGpuOperationGatewayTests {
             200, 180, 160, 128,
         ])
 
-        let output = try #require(gateway.processedLayerPixelData(pixels, 2, 1, .luminanceToAlpha))
+        let output = try #require(gateway.processedLayerPixelData(pixels, 2, 1, .luminanceToAlpha).value)
         #expect(output.count == pixels.count)
         #expect(output[0] == 0)
         #expect(output[1] == 0)
@@ -758,10 +762,10 @@ struct DocumentGpuOperationGatewayTests {
         )
 
         let firstComposite = try #require(
-            gateway.compositedPreviewPixelData(firstSnapshot, 1, transparentActivePixels)
+            gateway.compositedPreviewPixelData(firstSnapshot, 1, transparentActivePixels).value
         )
         let secondComposite = try #require(
-            gateway.compositedPreviewPixelData(secondSnapshot, 1, transparentActivePixels)
+            gateway.compositedPreviewPixelData(secondSnapshot, 1, transparentActivePixels).value
         )
         #expect(firstComposite == redBackground)
         #expect(secondComposite == blueBackground)

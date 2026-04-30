@@ -523,7 +523,7 @@ public enum GpuStrokeSessionOutcome: Sendable {
 public struct DocumentStrokeSessionUseCase: Sendable {
     public var preview: DocumentStrokePreviewUseCase
     public var commit: DocumentStrokeCommitUseCase
-    public var resetInteractiveStrokeState: @Sendable () -> Void
+    public let resetInteractiveStrokeState: @Sendable () -> Void
     private var executeOverride: (@Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome)?
 
     public init(

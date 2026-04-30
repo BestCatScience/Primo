@@ -134,7 +134,7 @@ public enum AIImagePreviewPreparationFailure: Error, Equatable, Sendable {
 }
 
 public struct AIImageRemoteEditClient: Sendable {
-    public var execute: @Sendable (AIImageEditExecutionRequest, String, AIImageModel) async -> Result<Data, AIImageEditFailure>
+    public let execute: @Sendable (AIImageEditExecutionRequest, String, AIImageModel) async -> Result<Data, AIImageEditFailure>
 
     public init(
         execute: @escaping @Sendable (AIImageEditExecutionRequest, String, AIImageModel) async -> Result<Data, AIImageEditFailure>
@@ -144,7 +144,7 @@ public struct AIImageRemoteEditClient: Sendable {
 }
 
 public struct AIImageEditUseCase: Sendable {
-    public var execute: @Sendable (AIImageEditExecutionRequest) async -> Result<Data, AIImageEditFailure>
+    public let execute: @Sendable (AIImageEditExecutionRequest) async -> Result<Data, AIImageEditFailure>
 
     public init(
         execute: @escaping @Sendable (AIImageEditExecutionRequest) async -> Result<Data, AIImageEditFailure>

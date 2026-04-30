@@ -78,11 +78,11 @@ public struct TimelapseCapture: Equatable, Sendable {
 }
 
 public struct DocumentPersistenceGateway: Sendable {
-    public var saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
-    public var loadProject: @Sendable (URL) throws -> LoadedPaintProject
-    public var setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
-    public var newCanvas: @Sendable (Int, Int) -> Void
-    public var prewarmDrawingResources: @Sendable () -> Void
+    public let saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
+    public let loadProject: @Sendable (URL) throws -> LoadedPaintProject
+    public let setPaperStyle: @Sendable (CanvasPaperStyle) -> Void
+    public let newCanvas: @Sendable (Int, Int) -> Void
+    public let prewarmDrawingResources: @Sendable () -> Void
 
     public init(
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
@@ -100,9 +100,9 @@ public struct DocumentPersistenceGateway: Sendable {
 }
 
 public struct DocumentExportGateway: Sendable {
-    public var compositeSurface: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
-    public var compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
-    public var timelapseCapture: @Sendable () -> TimelapseCapture?
+    public let compositeSurface: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
+    public let compositePNGData: @Sendable (CanvasPaperStyle) -> Data?
+    public let timelapseCapture: @Sendable () -> TimelapseCapture?
 
     public init(
         compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface? = { _ in nil },

@@ -669,10 +669,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let oldHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let newHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        var gpuOperations = DocumentGpuOperationGateway.stub()
-        gpuOperations.releaseSurfaceHandle = { handle in
-            releasedHandles.record(handle)
-        }
+        let gpuOperations = DocumentGpuOperationGateway.stub(
+            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
+        )
 
         do {
             let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
@@ -730,10 +729,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testResetStrokePreviewReleasesCurrentSurfaceHandle() {
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        var gpuOperations = DocumentGpuOperationGateway.stub()
-        gpuOperations.releaseSurfaceHandle = { handle in
-            releasedHandles.record(handle)
-        }
+        let gpuOperations = DocumentGpuOperationGateway.stub(
+            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
+        )
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
@@ -758,10 +756,9 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     func testCompletedCommitDoesNotReleaseTransferredPreviewSurfaceHandle() {
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
-        var gpuOperations = DocumentGpuOperationGateway.stub()
-        gpuOperations.releaseSurfaceHandle = { handle in
-            releasedHandles.record(handle)
-        }
+        let gpuOperations = DocumentGpuOperationGateway.stub(
+            releaseSurfaceHandle: { handle in releasedHandles.record(handle) }
+        )
 
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
@@ -992,14 +989,14 @@ private struct DerivedGpuDependencyProbe {
 }
 
 private func markedGateway(_ marker: UInt8) -> DocumentGpuOperationGateway {
-    var gateway = DocumentGpuOperationGateway.stub()
-    gateway.compositedPreviewPixelData = { _, _, _ in Data([marker]) }
-    gateway.selectionOverlayRGBA = { _, width, height in
-        Data(repeating: marker, count: width * height * 4)
-    }
-    gateway.expandedSelectionMask = { request in
-        [UInt8](repeating: marker, count: request.canvasWidth * request.canvasHeight)
-    }
-    gateway.transformedLayerPixelData = { _ in Data([marker]) }
-    return gateway
+    DocumentGpuOperationGateway.stub(
+        compositedPreviewPixelData: { _, _, _ in Data([marker]) },
+        selectionOverlayRGBA: { _, width, height in
+            Data(repeating: marker, count: width * height * 4)
+        },
+        expandedSelectionMask: { request in
+            [UInt8](repeating: marker, count: request.canvasWidth * request.canvasHeight)
+        },
+        transformedLayerPixelData: { _ in Data([marker]) }
+    )
 }

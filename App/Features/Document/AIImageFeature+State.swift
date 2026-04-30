@@ -19,12 +19,31 @@ extension AIImageFeature {
         var model: AIImageModel = .flashImage31Preview
     }
 
+    enum ActiveGeneration: Equatable {
+        case none
+        case running(jobID: UUID, descriptor: AIImageEditDescriptor)
+
+        var isRunning: Bool {
+            if case .running = self { return true }
+            return false
+        }
+
+        var jobID: UUID? {
+            guard case let .running(jobID, _) = self else { return nil }
+            return jobID
+        }
+
+        var descriptor: AIImageEditDescriptor? {
+            guard case let .running(_, descriptor) = self else { return nil }
+            return descriptor
+        }
+    }
+
     struct ExecutionState: Equatable {
-        var isGenerating = false
         var jobs: [AIImageJob] = []
         var history: [AIImageHistoryItem] = []
-        var pendingDescriptor: AIImageEditDescriptor?
-        var activeJobID: UUID?
+        var activeGeneration: ActiveGeneration = .none
+        var lastDescriptor: AIImageEditDescriptor?
     }
 
     struct PresentationState: Equatable {
@@ -43,8 +62,7 @@ extension AIImageFeature {
         var presentation = PresentationState()
 
         var isGenerating: Bool {
-            get { execution.isGenerating }
-            set { execution.isGenerating = newValue }
+            execution.activeGeneration.isRunning
         }
 
         var jobs: [AIImageJob] {
@@ -58,13 +76,12 @@ extension AIImageFeature {
         }
 
         var pendingRequest: AIImageEditDescriptor? {
-            get { execution.pendingDescriptor }
-            set { execution.pendingDescriptor = newValue }
+            get { execution.activeGeneration.descriptor ?? execution.lastDescriptor }
+            set { execution.lastDescriptor = newValue }
         }
 
         var activeJobID: UUID? {
-            get { execution.activeJobID }
-            set { execution.activeJobID = newValue }
+            execution.activeGeneration.jobID
         }
 
         var isSheetPresented: Bool {
@@ -216,9 +233,8 @@ extension AIImageFeature {
             jobID: UUID,
             createdAt: Date
         ) {
-            execution.isGenerating = true
-            execution.pendingDescriptor = descriptor
-            execution.activeJobID = jobID
+            execution.activeGeneration = .running(jobID: jobID, descriptor: descriptor)
+            execution.lastDescriptor = descriptor
             execution.jobs.insert(
                 AIImageJob(
                     id: jobID,
@@ -233,7 +249,7 @@ extension AIImageFeature {
         }
 
         func regenerationRequest() -> AIImageEditDescriptor? {
-            execution.pendingDescriptor
+            pendingRequest
         }
 
         func retryRequest(for jobID: UUID) -> AIImageEditDescriptor? {
@@ -245,7 +261,8 @@ extension AIImageFeature {
             historyID: UUID,
             createdAt: Date
         ) {
-            execution.isGenerating = false
+            let activeJobID = execution.activeGeneration.jobID
+            execution.activeGeneration = .none
             execution.history.insert(
                 AIImageHistoryItem(
                     id: historyID,
@@ -256,7 +273,7 @@ extension AIImageFeature {
                 at: 0
             )
             execution.history = Array(execution.history.prefix(12))
-            if let activeJobID = execution.activeJobID,
+            if let activeJobID,
                let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
                 execution.jobs[jobIndex].status = .succeeded
                 execution.jobs[jobIndex].message = nil
@@ -264,8 +281,8 @@ extension AIImageFeature {
         }
 
         mutating func completeAppliedEdit(request: AIImageEditDescriptor) {
-            execution.pendingDescriptor = request
-            execution.activeJobID = nil
+            execution.lastDescriptor = request
+            execution.activeGeneration = .none
         }
 
         mutating func markFailed(
@@ -273,8 +290,9 @@ extension AIImageFeature {
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)
-            execution.isGenerating = false
-            if let activeJobID = execution.activeJobID,
+            let activeJobID = execution.activeGeneration.jobID
+            execution.activeGeneration = .none
+            if let activeJobID,
                let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
                 execution.jobs[jobIndex].status = .failed
                 execution.jobs[jobIndex].message = message
@@ -286,8 +304,9 @@ extension AIImageFeature {
             language: AppLanguage
         ) {
             let message = feedback.message(for: language)
-            execution.isGenerating = false
-            if let activeJobID = execution.activeJobID,
+            let activeJobID = execution.activeGeneration.jobID
+            execution.activeGeneration = .none
+            if let activeJobID,
                let jobIndex = execution.jobs.firstIndex(where: { $0.id == activeJobID }) {
                 execution.jobs[jobIndex].status = .canceled
                 execution.jobs[jobIndex].message = message

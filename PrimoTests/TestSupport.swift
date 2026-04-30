@@ -114,6 +114,136 @@ extension PaintDocumentPresentation {
     }
 }
 
+extension DocumentCompositeSurface {
+    init(unsafeUncheckedWidth width: Int, height: Int, pixelData: Data) {
+        self.init(validatingWidth: width, height: height, pixelData: pixelData)!
+    }
+}
+
+extension MetalLayerSnapshot {
+    static func unsafeUnchecked(
+        index: Int,
+        opacity: Float,
+        visible: Bool,
+        isClipped: Bool,
+        blendMode: LayerBlendMode,
+        thumbnailSurface: DocumentCompositeSurface? = nil,
+        thumbnailData: Data?,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) -> Self {
+        Self(
+            validatingIndex: index,
+            opacity: opacity,
+            visible: visible,
+            isClipped: isClipped,
+            blendMode: blendMode,
+            canvasWidth: gpuBufferHandle?.width ?? max(pixelData.count / 4, 1),
+            canvasHeight: gpuBufferHandle?.height ?? 1,
+            thumbnailSurface: thumbnailSurface,
+            thumbnailData: thumbnailData,
+            gpuBufferHandle: gpuBufferHandle,
+            pixelData: pixelData
+        )!
+    }
+}
+
+extension MetalDocumentSnapshot {
+    static func unsafeUnchecked(
+        width: Int,
+        height: Int,
+        revision: Int,
+        transferKind: MetalSnapshotTransferKind = .fullSnapshot,
+        compositeBufferHandle: MetalBufferHandle? = nil,
+        compositePixelData: Data,
+        layers: [MetalLayerSnapshot]
+    ) -> Self {
+        Self(
+            validatingWidth: width,
+            height: height,
+            revision: revision,
+            transferKind: transferKind,
+            compositeBufferHandle: compositeBufferHandle,
+            compositePixelData: compositePixelData,
+            layers: layers
+        )!
+    }
+}
+
+extension IncrementalLayerUpdate {
+    static func unsafeUnchecked(
+        id: UUID = UUID(),
+        layerIndex: Int,
+        originX: Int,
+        originY: Int,
+        width: Int,
+        height: Int,
+        transferKind: MetalSnapshotTransferKind = .dirtyRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) -> Self {
+        Self(
+            validatingID: id,
+            layerIndex: layerIndex,
+            originX: originX,
+            originY: originY,
+            width: width,
+            height: height,
+            transferKind: transferKind,
+            gpuBufferHandle: gpuBufferHandle,
+            pixelData: pixelData
+        )!
+    }
+}
+
+extension MetalBufferHandle {
+    static func unsafeUnchecked(id: UUID = UUID(), width: Int, height: Int, bytesPerRow: Int) -> Self {
+        Self(validatingWidth: width, height: height, bytesPerRow: bytesPerRow, id: id)!
+    }
+}
+
+extension CanvasSelection {
+    static func unsafeUnchecked(
+        bounds: CGRect,
+        maskWidth: Int,
+        maskHeight: Int,
+        maskData: Data,
+        mode: SelectionToolMode
+    ) -> Self {
+        Self(
+            validatingBounds: bounds,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight,
+            maskData: maskData,
+            mode: mode
+        )!
+    }
+}
+
+extension LayerPixelRect {
+    static func unsafeUnchecked(originX: Int, originY: Int, width: Int, height: Int) -> Self {
+        Self(validatingOriginX: originX, originY: originY, width: width, height: height)!
+    }
+}
+
+extension GpuSurfaceRegion {
+    init(originX: Int, originY: Int, width: Int, height: Int) {
+        self.init(validatingOriginX: originX, originY: originY, width: width, height: height)!
+    }
+}
+
+extension GpuLayerSurface {
+    init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle, pixelData: Data? = nil) {
+        self.init(
+            validatingLayerIndex: layerIndex,
+            width: width,
+            height: height,
+            handle: handle,
+            pixelData: pixelData
+        )!
+    }
+}
+
 extension LoadedPaintProject {
     static func testValue(
         presentation: PaintDocumentPresentation = .testValue(),
@@ -347,34 +477,133 @@ extension DocumentRuntimeComposition {
 }
 
 extension DocumentGpuOperationGateway {
-    static func stub() -> Self {
+    static func stub(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data? = { _, _, _, _ in nil },
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> Data? = { _, _, _ in nil },
+        compositedPreviewIncrementalUpdate: @escaping @Sendable (MetalDocumentSnapshot, Int, Data, LayerPixelRect) -> IncrementalLayerUpdate? = { _, _, _, _ in nil },
+        selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> Data? = { _, _, _ in nil },
+        eyedropperLoupeRGBA: @escaping @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> Data? = { _, _, _, _, _, _, _, _ in nil },
+        shapePreviewSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentCompositeSurface? = { _, _, _, _ in nil },
+        textLayerSurface: @escaping @Sendable (TextLayerData, CGSize) -> DocumentCompositeSurface? = { _, _ in nil },
+        textLayoutRect: @escaping @Sendable (TextLayerData, CGSize) -> CGRect? = { _, _ in nil },
+        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> Data? = { _, _, _, _ in nil },
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> [UInt8]? = { _, _, _ in nil },
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask? = { _, _, _ in nil },
+        combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> [UInt8]? = { _, _, _, _, _ in nil },
+        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> [UInt8]? = { _ in nil },
+        lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> [UInt8]? = { _, _, _ in nil },
+        autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> [UInt8]? = { _, _, _, _, _, _, _, _, _ in nil },
+        colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> [UInt8]? = { _, _, _, _ in nil },
+        expandedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
+        contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
+        featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> [UInt8]? = { _, _, _, _ in nil },
+        invertMask: @escaping @Sendable ([UInt8]) -> [UInt8]? = { _ in nil },
+        transformedSelectionMask: @escaping @Sendable (TransformedSelectionMaskRequest) -> [UInt8]? = { _ in nil },
+        transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> Data? = { _ in nil },
+        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> Data? = { _, _, _, _, _ in nil },
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data? = { _, _, _, _, _, _, _ in nil },
+        releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void = { _ in }
+    ) -> Self {
         Self(
-            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
-            compositedPreviewPixelData: { _, _, _ in nil },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
-            selectionOverlayRGBA: { _, _, _ in nil },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
-            shapePreviewSurface: { _, _, _, _ in nil },
-            textLayerSurface: { _, _ in nil },
-            textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in nil },
-            alphaMask: { _, _, _ in nil },
-            croppedSelectionMask: { _, _, _ in nil },
-            combinedSelectionMask: { _, _, _, _, _ in nil },
-            expandedSelectionMask: { _ in nil },
-            lassoSelection: { _, _, _ in nil },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
-            colorRangeSelection: { _, _, _, _ in nil },
-            expandedMask: { _, _, _, _ in nil },
-            contractedMask: { _, _, _, _ in nil },
-            featheredMask: { _, _, _, _ in nil },
-            invertMask: { _ in nil },
-            transformedSelectionMask: { _ in nil },
-            transformedLayerPixelData: { _ in nil },
-            scaledPixelData: { _, _, _, _, _ in nil },
-            translatedPixelData: { _, _, _, _, _, _, _ in nil },
-            releaseSurfaceHandle: { _ in }
+            compositedPaperPreviewRGBA: { pixelData, width, height, paperStyle in
+                stubRenderingResult(compositedPaperPreviewRGBA(pixelData, width, height, paperStyle))
+            },
+            compositedPreviewPixelData: { snapshot, activeLayerIndex, adjustedActiveLayerPixels in
+                stubRenderingResult(compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels))
+            },
+            compositedPreviewIncrementalUpdate: { snapshot, activeLayerIndex, adjustedActiveLayerPixels, dirtyRect in
+                stubRenderingResult(compositedPreviewIncrementalUpdate(snapshot, activeLayerIndex, adjustedActiveLayerPixels, dirtyRect))
+            },
+            selectionOverlayRGBA: { maskData, width, height in
+                stubRenderingResult(selectionOverlayRGBA(maskData, width, height))
+            },
+            eyedropperLoupeRGBA: { sourcePixelData, canvasWidth, canvasHeight, centerX, centerY, gridSize, paperStyle, blendWithPaper in
+                stubRenderingResult(
+                    eyedropperLoupeRGBA(
+                        sourcePixelData,
+                        canvasWidth,
+                        canvasHeight,
+                        centerX,
+                        centerY,
+                        gridSize,
+                        paperStyle,
+                        blendWithPaper
+                    )
+                )
+            },
+            shapePreviewSurface: { samples, brush, canvasWidth, canvasHeight in
+                stubRenderingResult(shapePreviewSurface(samples, brush, canvasWidth, canvasHeight))
+            },
+            textLayerSurface: { textLayer, canvasSize in
+                stubRenderingResult(textLayerSurface(textLayer, canvasSize))
+            },
+            textLayoutRect: textLayoutRect,
+            processedLayerPixelData: { pixelData, width, height, request in
+                stubRenderingResult(processedLayerPixelData(pixelData, width, height, request))
+            },
+            alphaMask: { pixelData, width, height in
+                stubRenderingResult(alphaMask(pixelData, width, height))
+            },
+            croppedSelectionMask: croppedSelectionMask,
+            combinedSelectionMask: { base, incoming, mode, width, height in
+                stubRenderingResult(combinedSelectionMask(base, incoming, mode, width, height))
+            },
+            expandedSelectionMask: { request in
+                stubRenderingResult(expandedSelectionMask(request))
+            },
+            lassoSelection: { points, width, height in
+                stubRenderingResult(lassoSelection(points, width, height))
+            },
+            autoSelection: { pixelData, width, height, seedX, seedY, thresholdMode, opacityTolerance, colorTolerance, expansion in
+                stubRenderingResult(
+                    autoSelection(
+                        pixelData,
+                        width,
+                        height,
+                        seedX,
+                        seedY,
+                        thresholdMode,
+                        opacityTolerance,
+                        colorTolerance,
+                        expansion
+                    )
+                )
+            },
+            colorRangeSelection: { pixelData, width, height, request in
+                stubRenderingResult(colorRangeSelection(pixelData, width, height, request))
+            },
+            expandedMask: { mask, width, height, expansion in
+                stubRenderingResult(expandedMask(mask, width, height, expansion))
+            },
+            contractedMask: { mask, width, height, contraction in
+                stubRenderingResult(contractedMask(mask, width, height, contraction))
+            },
+            featheredMask: { mask, width, height, radius in
+                stubRenderingResult(featheredMask(mask, width, height, radius))
+            },
+            invertMask: { mask in
+                stubRenderingResult(invertMask(mask))
+            },
+            transformedSelectionMask: { request in
+                stubRenderingResult(transformedSelectionMask(request))
+            },
+            transformedLayerPixelData: { request in
+                stubRenderingResult(transformedLayerPixelData(request))
+            },
+            scaledPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight in
+                stubRenderingResult(scaledPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight))
+            },
+            translatedPixelData: { source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
+                stubRenderingResult(
+                    translatedPixelData(source, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY)
+                )
+            },
+            releaseSurfaceHandle: releaseSurfaceHandle
         )
+    }
+
+    private static func stubRenderingResult<Value>(_ value: Value?) -> DocumentRenderingResult<Value> {
+        value.map(DocumentRenderingResult.success) ?? .failure(.kernelFailed(operation: "stub"))
     }
 }
 

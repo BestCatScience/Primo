@@ -125,7 +125,7 @@ public struct MetalBufferHandle: Equatable, Hashable, Sendable {
         self.bytesPerRow = bytesPerRow
     }
 
-    public static func unsafeUnchecked(id: UUID = UUID(), width: Int, height: Int, bytesPerRow: Int) -> Self {
+    package static func unsafeUnchecked(id: UUID = UUID(), width: Int, height: Int, bytesPerRow: Int) -> Self {
         Self(id: id, width: width, height: height, bytesPerRow: bytesPerRow)
     }
 
@@ -180,7 +180,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         self.pixelData = pixelData
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         index: Int,
         opacity: Float,
         visible: Bool,
@@ -267,7 +267,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         self.layers = layers
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         width: Int,
         height: Int,
         revision: Int,
@@ -349,7 +349,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         self.pixelData = pixelData
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         id: UUID = UUID(),
         layerIndex: Int,
         originX: Int,
@@ -444,7 +444,7 @@ public struct CanvasSelection: Equatable, Sendable {
         self.mode = mode
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         bounds: CGRect,
         maskWidth: Int,
         maskHeight: Int,
@@ -488,7 +488,7 @@ public struct LayerPixelRect: Equatable, Sendable {
         self.height = height
     }
 
-    public static func unsafeUnchecked(originX: Int, originY: Int, width: Int, height: Int) -> Self {
+    package static func unsafeUnchecked(originX: Int, originY: Int, width: Int, height: Int) -> Self {
         Self(originX: originX, originY: originY, width: width, height: height)
     }
 
@@ -528,7 +528,7 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
         self.fullPixelData = fullPixelData
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,
@@ -599,7 +599,7 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
         self.fallbackPixelData = fallbackPixelData
     }
 
-    public static func unsafeUnchecked(
+    package static func unsafeUnchecked(
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,

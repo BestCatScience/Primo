@@ -111,15 +111,15 @@ extension DocumentFeature {
             sourceSurface.height,
             max(Int(fittedSize.width.rounded()), 1),
             max(Int(fittedSize.height.rounded()), 1)
-        ) else {
+        ).value else {
             return nil
         }
 
-        let fittedSurface = DocumentCompositeSurface(
-            unsafeUncheckedWidth: max(Int(fittedSize.width.rounded()), 1),
+        guard let fittedSurface = DocumentCompositeSurface(
+            validatingWidth: max(Int(fittedSize.width.rounded()), 1),
             height: max(Int(fittedSize.height.rounded()), 1),
             pixelData: scaled
-        )
+        ) else { return nil }
         return composedSurface(
             fittedSurface,
             in: CGSize(width: width, height: height),
@@ -156,10 +156,10 @@ extension DocumentFeature {
             height,
             offsetX,
             offsetY
-        )
+        ).value
         guard let translated else { return nil }
         return DocumentCompositeSurface(
-            unsafeUncheckedWidth: width,
+            validatingWidth: width,
             height: height,
             pixelData: translated
         )

@@ -4,6 +4,10 @@ import PrimoDocumentContracts
 import XCTest
 @testable import Primo
 
+private func imageImportRenderingFailure<Value>() -> DocumentRenderingResult<Value> {
+    .failure(.kernelFailed(operation: "imageImportTest"))
+}
+
 final class ImageImportOpsTests: XCTestCase {
     private func sampleSurface() -> DocumentCompositeSurface {
         DocumentCompositeSurface(
@@ -48,31 +52,31 @@ final class ImageImportOpsTests: XCTestCase {
 
     private func imageImportGpuOperations() -> DocumentGpuOperationGateway {
         DocumentGpuOperationGateway(
-            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
-            compositedPreviewPixelData: { _, _, _ in nil },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
-            selectionOverlayRGBA: { _, _, _ in nil },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
-            shapePreviewSurface: { _, _, _, _ in nil },
-            textLayerSurface: { _, _ in nil },
+            compositedPaperPreviewRGBA: { _, _, _, _ in imageImportRenderingFailure() },
+            compositedPreviewPixelData: { _, _, _ in imageImportRenderingFailure() },
+            compositedPreviewIncrementalUpdate: { _, _, _, _ in imageImportRenderingFailure() },
+            selectionOverlayRGBA: { _, _, _ in imageImportRenderingFailure() },
+            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in imageImportRenderingFailure() },
+            shapePreviewSurface: { _, _, _, _ in imageImportRenderingFailure() },
+            textLayerSurface: { _, _ in imageImportRenderingFailure() },
             textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in nil },
-            alphaMask: { _, _, _ in nil },
+            processedLayerPixelData: { _, _, _, _ in imageImportRenderingFailure() },
+            alphaMask: { _, _, _ in imageImportRenderingFailure() },
             croppedSelectionMask: { _, _, _ in nil },
-            combinedSelectionMask: { _, _, _, _, _ in nil },
-            expandedSelectionMask: { _ in nil },
-            lassoSelection: { _, _, _ in nil },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in nil },
-            colorRangeSelection: { _, _, _, _ in nil },
-            expandedMask: { _, _, _, _ in nil },
-            contractedMask: { _, _, _, _ in nil },
-            featheredMask: { _, _, _, _ in nil },
-            invertMask: { _ in nil },
-            transformedSelectionMask: { _ in nil },
-            transformedLayerPixelData: { _ in nil },
+            combinedSelectionMask: { _, _, _, _, _ in imageImportRenderingFailure() },
+            expandedSelectionMask: { _ in imageImportRenderingFailure() },
+            lassoSelection: { _, _, _ in imageImportRenderingFailure() },
+            autoSelection: { _, _, _, _, _, _, _, _, _ in imageImportRenderingFailure() },
+            colorRangeSelection: { _, _, _, _ in imageImportRenderingFailure() },
+            expandedMask: { _, _, _, _ in imageImportRenderingFailure() },
+            contractedMask: { _, _, _, _ in imageImportRenderingFailure() },
+            featheredMask: { _, _, _, _ in imageImportRenderingFailure() },
+            invertMask: { _ in imageImportRenderingFailure() },
+            transformedSelectionMask: { _ in imageImportRenderingFailure() },
+            transformedLayerPixelData: { _ in imageImportRenderingFailure() },
             scaledPixelData: { data, _, _, targetWidth, targetHeight in
                 let pixel = data.prefix(4)
-                return Data(Array(repeating: Array(pixel), count: targetWidth * targetHeight).flatMap { $0 })
+                return .success(Data(Array(repeating: Array(pixel), count: targetWidth * targetHeight).flatMap { $0 }))
             },
             translatedPixelData: { data, sourceWidth, sourceHeight, targetWidth, targetHeight, offsetX, offsetY in
                 var output = Data(repeating: 0, count: targetWidth * targetHeight * 4)
@@ -88,9 +92,10 @@ final class ImageImportOpsTests: XCTestCase {
                         output.replaceSubrange(targetIndex..<(targetIndex + 4), with: data[sourceIndex..<(sourceIndex + 4)])
                     }
                 }
-                return output
+                return .success(output)
             },
             releaseSurfaceHandle: { _ in }
         )
     }
+
 }

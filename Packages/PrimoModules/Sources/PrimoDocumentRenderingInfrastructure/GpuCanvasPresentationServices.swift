@@ -34,14 +34,14 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
             gridSize,
             paperStyle,
             blendWithPaper
-        ) else {
+        ).value else {
             return nil
         }
         return DocumentCompositeSurface(unsafeUncheckedWidth: gridSize, height: gridSize, pixelData: rgba)
     }
 
     public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        guard let rgba = gpuOperations.selectionOverlayRGBA(maskData, width, height) else {
+        guard let rgba = gpuOperations.selectionOverlayRGBA(maskData, width, height).value else {
             return nil
         }
         return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
@@ -52,7 +52,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        gpuOperations.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
+        gpuOperations.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels).value
     }
 
     public func paperCompositeSurface(
@@ -61,7 +61,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         height: Int,
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface? {
-        guard let rgba = gpuOperations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle) else {
+        guard let rgba = gpuOperations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).value else {
             return nil
         }
         return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
@@ -80,7 +80,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
             brushSettings(for: style),
             canvasWidth,
             canvasHeight
-        )
+        ).value
     }
 
     public func transformedTextPreviewSurface(
@@ -91,7 +91,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         gpuOperations.textLayerSurface(
             textLayer,
             CGSize(width: canvasWidth, height: canvasHeight)
-        )
+        ).value
     }
 
     public func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
@@ -288,7 +288,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             bounds = selection.bounds
         } else {
             guard
-                let alphaMask = gpuOperations.alphaMask(source, canvasWidth, canvasHeight),
+                let alphaMask = gpuOperations.alphaMask(source, canvasWidth, canvasHeight).value,
                 let cropped = gpuOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
             else {
                 return nil
@@ -323,7 +323,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
                 destinationQuad: resolved.effective,
                 usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
             )
-        )
+        ).value
     }
 
     public func transformationBounds(
@@ -336,7 +336,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             return selection.bounds
         }
         guard
-            let alphaMask = gpuOperations.alphaMask(pixelData, canvasWidth, canvasHeight),
+            let alphaMask = gpuOperations.alphaMask(pixelData, canvasWidth, canvasHeight).value,
             let cropped = gpuOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
         else {
             return nil
@@ -386,7 +386,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
                 destinationQuad: resolved.effective,
                 usesFreeformQuad: mode == .freeform && !quadOffsets.isZero
             )
-        ) else {
+        ).value else {
             return nil
         }
 

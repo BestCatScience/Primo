@@ -34,13 +34,13 @@ public enum ImportedDocumentStageFailure: LocalizedError, Equatable, Sendable {
 }
 
 public struct WorkspaceBackingStoreGateway: Sendable {
-    public var saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
-    public var persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
-    public var createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
-    public var persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
-    public var discardAutosaveSnapshot: @Sendable (OpenDocumentTab) throws -> Void
-    public var persistSaveHistorySnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
-    public var removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
+    public let saveProject: @Sendable (URL, CanvasPaperStyle) throws -> Void
+    public let persistProjectSnapshot: @Sendable (DocumentProjectPath, DocumentProjectPath?) throws -> DocumentProjectPath
+    public let createTabBackingStoreURL: @Sendable (UUID) throws -> DocumentProjectPath
+    public let persistAutosaveSnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab) throws -> Void
+    public let discardAutosaveSnapshot: @Sendable (OpenDocumentTab) throws -> Void
+    public let persistSaveHistorySnapshot: @Sendable (DocumentProjectPath, OpenDocumentTab, SaveHistoryTrigger) throws -> Void
+    public let removeWorkspaceItem: @Sendable (DocumentProjectPath) throws -> Void
 
     public init(
         saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
@@ -62,11 +62,11 @@ public struct WorkspaceBackingStoreGateway: Sendable {
 }
 
 public struct WorkspaceCatalogGateway: Sendable {
-    public var loadSavedProjects: @Sendable () throws -> [SavedProjectSummary]
-    public var moveSavedProject: @Sendable (DocumentProjectPath, RelativeProjectFolderPath?) throws -> DocumentProjectPath
-    public var loadAutosaveRecoveryItems: @Sendable () throws -> [AutosaveRecoveryItem]
-    public var discardAutosaveEntry: @Sendable (WorkspaceItemID) throws -> Void
-    public var loadSaveHistoryEntries: @Sendable (OpenDocumentTab) throws -> [SaveHistoryEntry]
+    public let loadSavedProjects: @Sendable () throws -> [SavedProjectSummary]
+    public let moveSavedProject: @Sendable (DocumentProjectPath, RelativeProjectFolderPath?) throws -> DocumentProjectPath
+    public let loadAutosaveRecoveryItems: @Sendable () throws -> [AutosaveRecoveryItem]
+    public let discardAutosaveEntry: @Sendable (WorkspaceItemID) throws -> Void
+    public let loadSaveHistoryEntries: @Sendable (OpenDocumentTab) throws -> [SaveHistoryEntry]
 
     public init(
         loadSavedProjects: @escaping @Sendable () throws -> [SavedProjectSummary],
@@ -84,7 +84,7 @@ public struct WorkspaceCatalogGateway: Sendable {
 }
 
 public struct WorkspaceIdentityGenerator: Sendable {
-    public var generateTabID: @Sendable () -> UUID
+    public let generateTabID: @Sendable () -> UUID
 
     public init(generateTabID: @escaping @Sendable () -> UUID) {
         self.generateTabID = generateTabID
@@ -92,8 +92,8 @@ public struct WorkspaceIdentityGenerator: Sendable {
 }
 
 public struct DocumentImportGateway: Sendable {
-    public var stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>
-    public var discardStagedDocument: @Sendable (DocumentProjectPath) -> Result<Void, ImportedDocumentStageFailure>
+    public let stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>
+    public let discardStagedDocument: @Sendable (DocumentProjectPath) -> Result<Void, ImportedDocumentStageFailure>
 
     public init(
         stageImportedDocument: @escaping @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>,
@@ -105,7 +105,7 @@ public struct DocumentImportGateway: Sendable {
 }
 
 public struct ProjectLoadingGateway<LoadedProject>: Sendable {
-    public var loadProject: @Sendable (URL) throws -> LoadedProject
+    public let loadProject: @Sendable (URL) throws -> LoadedProject
 
     public init(
         loadProject: @escaping @Sendable (URL) throws -> LoadedProject

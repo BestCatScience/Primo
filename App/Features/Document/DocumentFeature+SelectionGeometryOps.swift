@@ -34,7 +34,7 @@ extension DocumentFeature {
                 pixelData,
                 canvasWidth,
                 canvasHeight
-            ),
+            ).value,
             let cropped = gpuOperations.croppedSelectionMask(
                 alphaMask,
                 canvasWidth,

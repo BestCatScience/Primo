@@ -7,11 +7,11 @@ import PrimoCoreTypes
 import SwiftUI
 
 struct BrushPresetLibraryClient: Sendable {
-    var loadSavedPresets: @Sendable () -> [BrushPreset]
-    var savePreset: @Sendable (BrushPreset, Bool) throws -> [BrushPreset]
-    var uniqueName: @Sendable (String, [String]) -> String
-    var deletePreset: @Sendable (String) throws -> [BrushPreset]
-    var renamePreset: @Sendable (String, String) throws -> [BrushPreset]
+    let loadSavedPresets: @Sendable () -> [BrushPreset]
+    let savePreset: @Sendable (BrushPreset, Bool) throws -> [BrushPreset]
+    let uniqueName: @Sendable (String, [String]) -> String
+    let deletePreset: @Sendable (String) throws -> [BrushPreset]
+    let renamePreset: @Sendable (String, String) throws -> [BrushPreset]
 
     static func live(
         fileClient: PrimoCoreTypes.FileClient,

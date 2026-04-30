@@ -14,16 +14,18 @@ extension DocumentFeature {
             guard compositeSurface.pixelData.count == compositeSurface.width * compositeSurface.height * 4 else {
                 return false
             }
-            state.canvas.applyIncrementalRenderUpdate(
-                IncrementalLayerUpdate.unsafeUnchecked(
-                    layerIndex: -1,
-                    originX: 0,
-                    originY: 0,
-                    width: compositeSurface.width,
-                    height: compositeSurface.height,
-                    pixelData: compositeSurface.pixelData
-                )
-            )
+            guard let update = IncrementalLayerUpdate(
+                validatingID: UUID(),
+                layerIndex: -1,
+                originX: 0,
+                originY: 0,
+                width: compositeSurface.width,
+                height: compositeSurface.height,
+                pixelData: compositeSurface.pixelData
+            ) else {
+                return false
+            }
+            state.canvas.applyIncrementalRenderUpdate(update)
             return true
         }
 
@@ -39,34 +41,37 @@ extension DocumentFeature {
                 baseSnapshot,
                 activeLayerIndex,
                 adjustedActiveLayerPixels
-            ) else {
+            ).value else {
                 return false
             }
 
             let nextLayers = baseSnapshot.layers.map { layer in
                 guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot.unsafeUnchecked(
-                    index: layer.index,
+                return MetalLayerSnapshot(
+                    validatingIndex: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
                     isClipped: layer.isClipped,
                     blendMode: layer.blendMode,
+                    canvasWidth: baseSnapshot.width,
+                    canvasHeight: baseSnapshot.height,
                     thumbnailSurface: layer.thumbnailSurface,
                     thumbnailData: layer.thumbnailData,
                     pixelData: adjustedActiveLayerPixels
-                )
+                ) ?? layer
             }
 
             let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
-            state.canvas.applyPreviewRenderSnapshot(
-                MetalDocumentSnapshot.unsafeUnchecked(
-                    width: baseSnapshot.width,
-                    height: baseSnapshot.height,
-                    revision: nextRevision,
-                    compositePixelData: composite,
-                    layers: nextLayers
-                )
-            )
+            guard let snapshot = MetalDocumentSnapshot(
+                validatingWidth: baseSnapshot.width,
+                height: baseSnapshot.height,
+                revision: nextRevision,
+                compositePixelData: composite,
+                layers: nextLayers
+            ) else {
+                return false
+            }
+            state.canvas.applyPreviewRenderSnapshot(snapshot)
             return true
         }
     }

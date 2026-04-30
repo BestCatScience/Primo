@@ -223,20 +223,22 @@ struct CanvasFeature {
             let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) ?? baseSnapshot.compositePixelData
             let layers = baseSnapshot.layers.map { layer in
                 guard layer.index == surface.layerIndex else { return layer }
-                return MetalLayerSnapshot.unsafeUnchecked(
-                    index: layer.index,
+                return MetalLayerSnapshot(
+                    validatingIndex: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
                     isClipped: layer.isClipped,
                     blendMode: layer.blendMode,
+                    canvasWidth: baseSnapshot.width,
+                    canvasHeight: baseSnapshot.height,
                     thumbnailSurface: layer.thumbnailSurface,
                     thumbnailData: layer.thumbnailData,
                     gpuBufferHandle: nil,
                     pixelData: committedLayerPixelData
-                )
+                ) ?? layer
             }
-            pendingCommittedSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
-                width: baseSnapshot.width,
+            pendingCommittedSnapshot = MetalDocumentSnapshot(
+                validatingWidth: baseSnapshot.width,
                 height: baseSnapshot.height,
                 revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
                 transferKind: .fullSnapshot,
@@ -325,16 +327,16 @@ struct CanvasFeature {
         }
 
         mutating func applyPreviewRenderSnapshot(_ renderSnapshot: MetalDocumentSnapshot) {
-            applyIncrementalRenderUpdate(
-                IncrementalLayerUpdate.unsafeUnchecked(
-                    layerIndex: -1,
-                    originX: 0,
-                    originY: 0,
-                    width: renderSnapshot.width,
-                    height: renderSnapshot.height,
-                    pixelData: renderSnapshot.compositePixelData
-                )
-            )
+            guard let update = IncrementalLayerUpdate(
+                validatingID: UUID(),
+                layerIndex: -1,
+                originX: 0,
+                originY: 0,
+                width: renderSnapshot.width,
+                height: renderSnapshot.height,
+                pixelData: renderSnapshot.compositePixelData
+            ) else { return }
+            applyIncrementalRenderUpdate(update)
         }
 
         mutating func resetStrokePreview() {

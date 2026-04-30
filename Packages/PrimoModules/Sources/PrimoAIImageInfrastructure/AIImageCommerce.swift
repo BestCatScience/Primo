@@ -4,8 +4,8 @@ import PrimoAIImageDomain
 import StoreKit
 
 public struct AIImageSettingsClient: Sendable {
-    public var load: @Sendable () -> AIImageSettingsDraft
-    public var persist: @Sendable (AIImageSettingsDraft) throws -> Void
+    public let load: @Sendable () -> AIImageSettingsDraft
+    public let persist: @Sendable (AIImageSettingsDraft) throws -> Void
 
     public static let accessModeStorageKey = "primo.aiimage.accessMode"
     public static let apiKeyStorageKey = "primo.aiimage.apiKey"
@@ -126,10 +126,10 @@ public struct AIImageCommerceState: Equatable, Sendable {
 }
 
 public struct AIImageCommerceClient: Sendable {
-    public var prepare: @Sendable () async -> AIImageCommerceSnapshot
-    public var purchasePrimaryProduct: @Sendable () async -> AIImageCommerceSnapshot
-    public var restorePurchases: @Sendable () async -> AIImageCommerceSnapshot
-    public var clearPurchaseError: @Sendable () async -> AIImageCommerceSnapshot
+    public let prepare: @Sendable () async -> AIImageCommerceSnapshot
+    public let purchasePrimaryProduct: @Sendable () async -> AIImageCommerceSnapshot
+    public let restorePurchases: @Sendable () async -> AIImageCommerceSnapshot
+    public let clearPurchaseError: @Sendable () async -> AIImageCommerceSnapshot
 
     public init(
         prepare: @escaping @Sendable () async -> AIImageCommerceSnapshot,

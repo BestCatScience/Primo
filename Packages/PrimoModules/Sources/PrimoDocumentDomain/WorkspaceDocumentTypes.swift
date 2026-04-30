@@ -12,7 +12,7 @@ public struct DocumentCompositeSurface: Equatable, Sendable {
         self.pixelData = pixelData
     }
 
-    public init(unsafeUncheckedWidth width: Int, height: Int, pixelData: Data) {
+    package init(unsafeUncheckedWidth width: Int, height: Int, pixelData: Data) {
         self.init(width: width, height: height, pixelData: pixelData)
     }
 

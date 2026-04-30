@@ -436,7 +436,7 @@ struct ContentView: View {
             return nil
         }
         return DocumentCompositeSurface(
-            unsafeUncheckedWidth: snapshot.width,
+            validatingWidth: snapshot.width,
             height: snapshot.height,
             pixelData: layer.pixelData
         )

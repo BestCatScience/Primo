@@ -49,9 +49,9 @@ enum BrushTipImportFailure: LocalizedError, Equatable, OperationFailure {
 }
 
 struct BrushImportClient: Sendable {
-    var importBrushPresets: @Sendable (BrushPresetImportRequest) -> BrushPresetImportResult
-    var importTextFonts: @Sendable (TextFontImportRequest) -> TextFontImportResult
-    var loadCustomTip: @Sendable (URL) -> Result<BrushTipRaster, BrushTipImportFailure>
+    let importBrushPresets: @Sendable (BrushPresetImportRequest) -> BrushPresetImportResult
+    let importTextFonts: @Sendable (TextFontImportRequest) -> TextFontImportResult
+    let loadCustomTip: @Sendable (URL) -> Result<BrushTipRaster, BrushTipImportFailure>
 
     static func live(
         brushTipLibraryClient: BrushTipLibraryClient,

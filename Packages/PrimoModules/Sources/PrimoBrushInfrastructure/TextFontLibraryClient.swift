@@ -9,8 +9,8 @@ import AppKit
 #endif
 
 public struct TextFontLibraryClient: Sendable {
-    public var loadAvailableFonts: @Sendable () -> [TextFontOption]
-    public var importFonts: @Sendable ([URL]) throws -> [TextFontOption]
+    public let loadAvailableFonts: @Sendable () -> [TextFontOption]
+    public let importFonts: @Sendable ([URL]) throws -> [TextFontOption]
 
     public init(
         loadAvailableFonts: @escaping @Sendable () -> [TextFontOption],

@@ -19,7 +19,7 @@ public struct GpuSurfaceRegion: Equatable, Sendable {
     public let width: Int
     public let height: Int
 
-    public init(originX: Int, originY: Int, width: Int, height: Int) {
+    package init(originX: Int, originY: Int, width: Int, height: Int) {
         self.originX = originX
         self.originY = originY
         self.width = width
@@ -28,6 +28,12 @@ public struct GpuSurfaceRegion: Equatable, Sendable {
 
     public init(_ rect: LayerPixelRect) {
         self.init(originX: rect.originX, originY: rect.originY, width: rect.width, height: rect.height)
+    }
+
+    public init?(validatingOriginX originX: Int, originY: Int, width: Int, height: Int) {
+        guard originX >= 0, originY >= 0 else { return nil }
+        guard PixelGeometry(width: width, height: height) != nil else { return nil }
+        self.init(originX: originX, originY: originY, width: width, height: height)
     }
 
     public var layerPixelRect: LayerPixelRect {
@@ -63,12 +69,27 @@ public struct GpuLayerSurface: Equatable, Sendable {
     public let handle: GpuSurfaceHandle
     public let pixelData: Data?
 
-    public init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle, pixelData: Data? = nil) {
+    package init(layerIndex: Int, width: Int, height: Int, handle: GpuSurfaceHandle, pixelData: Data? = nil) {
         self.layerIndex = layerIndex
         self.width = width
         self.height = height
         self.handle = handle
         self.pixelData = pixelData
+    }
+
+    public init?(
+        validatingLayerIndex layerIndex: Int,
+        width: Int,
+        height: Int,
+        handle: GpuSurfaceHandle,
+        pixelData: Data? = nil
+    ) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard handle.buffer.isCompatible(with: geometry) else { return nil }
+        if let pixelData {
+            guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        }
+        self.init(layerIndex: layerIndex, width: width, height: height, handle: handle, pixelData: pixelData)
     }
 }
 
@@ -121,10 +142,16 @@ public struct MaterializedSurfaceResult: Equatable, Sendable {
     public let height: Int
     public let pixelData: Data
 
-    public init(width: Int, height: Int, pixelData: Data) {
+    package init(width: Int, height: Int, pixelData: Data) {
         self.width = width
         self.height = height
         self.pixelData = pixelData
+    }
+
+    public init?(validatingWidth width: Int, height: Int, pixelData: Data) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        self.init(width: width, height: height, pixelData: pixelData)
     }
 }
 
@@ -135,7 +162,7 @@ public struct LayerSurfaceRef: Equatable, Sendable {
     public let pixelData: Data
     public let gpuHandle: GpuSurfaceHandle?
 
-    public init(
+    package init(
         layerIndex: Int,
         width: Int,
         height: Int,
@@ -147,6 +174,21 @@ public struct LayerSurfaceRef: Equatable, Sendable {
         self.height = height
         self.pixelData = pixelData
         self.gpuHandle = gpuHandle
+    }
+
+    public init?(
+        validatingLayerIndex layerIndex: Int,
+        width: Int,
+        height: Int,
+        pixelData: Data,
+        gpuHandle: GpuSurfaceHandle? = nil
+    ) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        if let gpuHandle {
+            guard gpuHandle.buffer.isCompatible(with: geometry) else { return nil }
+        }
+        self.init(layerIndex: layerIndex, width: width, height: height, pixelData: pixelData, gpuHandle: gpuHandle)
     }
 }
 
@@ -318,7 +360,7 @@ public struct RenderFrameUpdate: Sendable {
 }
 
 public struct GpuResourceLifetime: Sendable {
-    public var release: @Sendable (GpuSurfaceHandle) -> Void
+    public let release: @Sendable (GpuSurfaceHandle) -> Void
 
     public init(release: @escaping @Sendable (GpuSurfaceHandle) -> Void) {
         self.release = release

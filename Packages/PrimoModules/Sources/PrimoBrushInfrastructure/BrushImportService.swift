@@ -24,9 +24,9 @@ public struct BrushImportService: Sendable {
         public var errorDescription: String? { message }
     }
 
-    public var importBrushTipSamples: @Sendable ([URL]) -> [Result<[ImportedPhotoshopBrushSample], ImportFailure>]
-    public var importTextFonts: @Sendable ([URL]) -> [Result<[TextFontOption], ImportFailure>]
-    public var loadCustomTip: @Sendable (URL) -> Result<BrushTipRaster, BrushTipImportFailure>
+    public let importBrushTipSamples: @Sendable ([URL]) -> [Result<[ImportedPhotoshopBrushSample], ImportFailure>]
+    public let importTextFonts: @Sendable ([URL]) -> [Result<[TextFontOption], ImportFailure>]
+    public let loadCustomTip: @Sendable (URL) -> Result<BrushTipRaster, BrushTipImportFailure>
 
     public init(
         importBrushTipSamples: @escaping @Sendable ([URL]) -> [Result<[ImportedPhotoshopBrushSample], ImportFailure>],

@@ -55,7 +55,7 @@ extension AdjustmentWorkflowReducer {
             snapshot.width,
             snapshot.height,
             request
-        )
+        ).value
     }
 
     static func previewAdjustedActiveLayer(

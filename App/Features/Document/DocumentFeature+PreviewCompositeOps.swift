@@ -14,12 +14,16 @@ extension DocumentFeature {
             snapshot.width,
             snapshot.height,
             paperStyle
-        ) ?? snapshot.compositePixelData
+        ).value ?? snapshot.compositePixelData
 
         return DocumentCompositeSurface(
-            unsafeUncheckedWidth: snapshot.width,
+            validatingWidth: snapshot.width,
             height: snapshot.height,
             pixelData: pixelData
-        )
+        ) ?? DocumentCompositeSurface(
+            validatingWidth: snapshot.width,
+            height: snapshot.height,
+            pixelData: snapshot.compositePixelData
+        )!
     }
 }

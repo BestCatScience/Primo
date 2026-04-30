@@ -47,11 +47,13 @@ extension AIImageWorkflowReducer {
             let outputLayerIndex = command.descriptor.outputMode == .replaceCurrentLayer
                 ? command.descriptor.inputLayerIndex
                 : state.canvas.activeLayerIndex
-            let sourceSurface = DocumentCompositeSurface(
-                unsafeUncheckedWidth: snapshot.width,
+            guard let sourceSurface = DocumentCompositeSurface(
+                validatingWidth: snapshot.width,
                 height: snapshot.height,
                 pixelData: layer.pixelData
-            )
+            ) else {
+                return .failure(AIImageValidationFailure(feedback: .aiImagePrepareLayerFailed))
+            }
             let selectionRegion: AIImageSelectionRegion?
             if let adjustedSelection {
                 guard let expandedMask = selectionWorkflow.expandedMask(

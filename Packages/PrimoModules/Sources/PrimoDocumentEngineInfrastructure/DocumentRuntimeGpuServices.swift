@@ -9,25 +9,25 @@ import PrimoDocumentMetalRuntimeInfrastructure
 typealias DocumentRuntimeStrokeMutationResult = PrimoMetalStrokeMutationResult
 
 struct DocumentRuntimeGpuServices: Sendable {
-    var release: @Sendable (MetalBufferHandle?) -> Void
-    var retain: @Sendable (MetalBufferHandle?) -> Bool
-    var _materializedPixelData: @Sendable (MetalBufferHandle) -> Data?
-    var _scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
-    var _scaledMaskData: @Sendable (Data, Int, Int, Int, Int) -> Data?
-    var _translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
-    var _translatedMaskData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
-    var _applyLayerMask: @Sendable (Data, Data, Int, Int) -> Data?
-    var _processLayer: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentLayerMutationPayload?
-    var _mergeLayers: @Sendable (Data, Data, Data?, Int, Int, Float, LayerBlendMode) -> Data?
-    var _rasterizeTextLayer: @Sendable (TextLayerData, CGSize) -> DocumentLayerMutationPayload?
-    var _blurPixels: @Sendable (Data, MetalBufferHandle?, Int, Int, [StylusSample], BrushRuntimeSettings) -> DocumentLayerMutationPayload?
-    var _fillPixels: @Sendable (Data, MetalBufferHandle?, Int, Int, StylusSample, BrushRuntimeSettings) -> DocumentLayerMutationPayload?
-    var _commitStrokeMutation: @Sendable (Data, MetalBufferHandle?, Int, Int, [StylusSample], BrushRuntimeSettings, Int, Int) -> PrimoMetalStrokeMutationResult?
-    var _preservingExistingAlphaBufferHandle: @Sendable (MetalBufferHandle, MetalBufferHandle?, Data, Int, Int) -> MetalBufferHandle?
-    var _compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
-    var _compositedIncrementalUpdate: @Sendable (MetalDocumentSnapshot, (originX: Int, originY: Int, width: Int, height: Int)) -> IncrementalLayerUpdate?
-    var _compositeDocumentSurface: @Sendable (MetalDocumentSnapshot) -> DocumentCompositeSurface?
-    var _compositeDocumentBufferHandle: @Sendable (MetalDocumentSnapshot) -> MetalBufferHandle?
+    let release: @Sendable (MetalBufferHandle?) -> Void
+    let retain: @Sendable (MetalBufferHandle?) -> Bool
+    let _materializedPixelData: @Sendable (MetalBufferHandle) -> Data?
+    let _scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> Data?
+    let _scaledMaskData: @Sendable (Data, Int, Int, Int, Int) -> Data?
+    let _translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
+    let _translatedMaskData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> Data?
+    let _applyLayerMask: @Sendable (Data, Data, Int, Int) -> Data?
+    let _processLayer: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentLayerMutationPayload?
+    let _mergeLayers: @Sendable (Data, Data, Data?, Int, Int, Float, LayerBlendMode) -> Data?
+    let _rasterizeTextLayer: @Sendable (TextLayerData, CGSize) -> DocumentLayerMutationPayload?
+    let _blurPixels: @Sendable (Data, MetalBufferHandle?, Int, Int, [StylusSample], BrushRuntimeSettings) -> DocumentLayerMutationPayload?
+    let _fillPixels: @Sendable (Data, MetalBufferHandle?, Int, Int, StylusSample, BrushRuntimeSettings) -> DocumentLayerMutationPayload?
+    let _commitStrokeMutation: @Sendable (Data, MetalBufferHandle?, Int, Int, [StylusSample], BrushRuntimeSettings, Int, Int) -> PrimoMetalStrokeMutationResult?
+    let _preservingExistingAlphaBufferHandle: @Sendable (MetalBufferHandle, MetalBufferHandle?, Data, Int, Int) -> MetalBufferHandle?
+    let _compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> Data?
+    let _compositedIncrementalUpdate: @Sendable (MetalDocumentSnapshot, (originX: Int, originY: Int, width: Int, height: Int)) -> IncrementalLayerUpdate?
+    let _compositeDocumentSurface: @Sendable (MetalDocumentSnapshot) -> DocumentCompositeSurface?
+    let _compositeDocumentBufferHandle: @Sendable (MetalDocumentSnapshot) -> MetalBufferHandle?
 
     func materializedPixelData(for handle: MetalBufferHandle) -> Data? { _materializedPixelData(handle) }
     func scaledPixelData(_ data: Data, sourceWidth: Int, sourceHeight: Int, targetWidth: Int, targetHeight: Int) -> Data? { _scaledPixelData(data, sourceWidth, sourceHeight, targetWidth, targetHeight) }

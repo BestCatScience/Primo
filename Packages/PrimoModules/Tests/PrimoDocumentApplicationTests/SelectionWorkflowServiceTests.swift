@@ -94,18 +94,22 @@ struct SelectionWorkflowServiceTests {
 }
 
 private extension DocumentGpuOperationGateway {
+    static func selectionFailure<Value>() -> DocumentRenderingResult<Value> {
+        .failure(.kernelFailed(operation: "selectionStub"))
+    }
+
     static func selectionStub() -> DocumentGpuOperationGateway {
         DocumentGpuOperationGateway(
-            compositedPaperPreviewRGBA: { _, _, _, _ in nil },
-            compositedPreviewPixelData: { _, _, _ in nil },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in nil },
-            selectionOverlayRGBA: { _, _, _ in nil },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in nil },
-            shapePreviewSurface: { _, _, _, _ in nil },
-            textLayerSurface: { _, _ in nil },
+            compositedPaperPreviewRGBA: { _, _, _, _ in selectionFailure() },
+            compositedPreviewPixelData: { _, _, _ in selectionFailure() },
+            compositedPreviewIncrementalUpdate: { _, _, _, _ in selectionFailure() },
+            selectionOverlayRGBA: { _, _, _ in selectionFailure() },
+            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in selectionFailure() },
+            shapePreviewSurface: { _, _, _, _ in selectionFailure() },
+            textLayerSurface: { _, _ in selectionFailure() },
             textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in nil },
-            alphaMask: { _, _, _ in nil },
+            processedLayerPixelData: { _, _, _, _ in selectionFailure() },
+            alphaMask: { _, _, _ in selectionFailure() },
             croppedSelectionMask: { mask, width, height in
                 guard mask.contains(where: { $0 > 0 }) else { return nil }
                 return DocumentCroppedSelectionMask(
@@ -116,35 +120,35 @@ private extension DocumentGpuOperationGateway {
                 )
             },
             combinedSelectionMask: { base, incoming, mode, _, _ in
-                zip(base, incoming).map { left, right in
+                .success(zip(base, incoming).map { left, right in
                     switch mode {
                     case .add:
                         return max(left, right)
                     case .subtract:
                         return right > 0 ? 0 : left
                     }
-                }
+                })
             },
             expandedSelectionMask: { request in
-                Array(request.maskData.prefix(request.canvasWidth * request.canvasHeight))
+                .success(Array(request.maskData.prefix(request.canvasWidth * request.canvasHeight)))
             },
             lassoSelection: { _, width, height in
-                [UInt8](repeating: 255, count: width * height)
+                .success([UInt8](repeating: 255, count: width * height))
             },
             autoSelection: { _, width, height, _, _, _, _, _, _ in
-                [UInt8](repeating: 255, count: width * height)
+                .success([UInt8](repeating: 255, count: width * height))
             },
             colorRangeSelection: { _, width, height, _ in
-                [UInt8](repeating: 255, count: width * height)
+                .success([UInt8](repeating: 255, count: width * height))
             },
-            expandedMask: { source, _, _, _ in source },
-            contractedMask: { source, _, _, _ in source },
-            featheredMask: { source, _, _, _ in source },
-            invertMask: { source in source.map { $0 > 0 ? 0 : 255 } },
-            transformedSelectionMask: { _ in nil },
-            transformedLayerPixelData: { _ in nil },
-            scaledPixelData: { _, _, _, _, _ in nil },
-            translatedPixelData: { _, _, _, _, _, _, _ in nil },
+            expandedMask: { source, _, _, _ in .success(source) },
+            contractedMask: { source, _, _, _ in .success(source) },
+            featheredMask: { source, _, _, _ in .success(source) },
+            invertMask: { source in .success(source.map { $0 > 0 ? 0 : 255 }) },
+            transformedSelectionMask: { _ in selectionFailure() },
+            transformedLayerPixelData: { _ in selectionFailure() },
+            scaledPixelData: { _, _, _, _, _ in selectionFailure() },
+            translatedPixelData: { _, _, _, _, _, _, _ in selectionFailure() },
             releaseSurfaceHandle: { _ in }
         )
     }

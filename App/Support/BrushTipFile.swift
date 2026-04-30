@@ -6,9 +6,9 @@ import PrimoCoreTypes
 import UniformTypeIdentifiers
 
 struct BrushTipLibraryClient: Sendable {
-    var loadRaster: @Sendable (URL) throws -> PrimoBrushFileFormats.BrushTipRaster
-    var prepareBrushTipFile: @Sendable (URL) throws -> URL
-    var importPhotoshopBrushes: @Sendable (URL) throws -> [ImportedPhotoshopBrush]
+    let loadRaster: @Sendable (URL) throws -> PrimoBrushFileFormats.BrushTipRaster
+    let prepareBrushTipFile: @Sendable (URL) throws -> URL
+    let importPhotoshopBrushes: @Sendable (URL) throws -> [ImportedPhotoshopBrush]
 
     static func live(fileClient: PrimoCoreTypes.FileClient) -> BrushTipLibraryClient {
         let client = PrimoBrushInfrastructure.BrushTipLibraryClient.live(fileClient: fileClient)

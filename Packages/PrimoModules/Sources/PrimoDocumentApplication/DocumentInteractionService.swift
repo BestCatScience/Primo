@@ -19,11 +19,11 @@ public struct ImportedCanvasRequest: Equatable, Sendable {
 }
 
 public struct DocumentCanvasCommandService: Sendable {
-    public var createCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
-    public var resizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
-    public var resizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
-    public var initializeImportedCanvas: @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult
-    public var compositeSurface: @Sendable () -> DocumentCompositeSurface
+    public let createCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public let resizeCanvas: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public let resizeCanvasExtent: @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult
+    public let initializeImportedCanvas: @Sendable (_ request: ImportedCanvasRequest, _ layerName: String) -> DocumentMutationResult
+    public let compositeSurface: @Sendable () -> DocumentCompositeSurface
 
     public init(
         createCanvas: @escaping @Sendable (_ width: Int, _ height: Int) -> DocumentMutationResult,
@@ -71,13 +71,13 @@ public struct DocumentCanvasCommandService: Sendable {
 }
 
 public struct DocumentLayerCommandService: Sendable {
-    public var ensureLayerVisible: @Sendable (Int) -> DocumentMutationResult
-    public var replaceLayerPixels: @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult
-    public var replaceLayerPixelsInRect: @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult
-    public var applyLayerSurfaceMutation: @Sendable (_ layerIndex: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
-    public var applyLayerMutation: @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
-    public var applyTextLayerMutation: @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
-    public var revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
+    public let ensureLayerVisible: @Sendable (Int) -> DocumentMutationResult
+    public let replaceLayerPixels: @Sendable (_ layerIndex: Int, _ pixelData: Data) -> DocumentMutationResult
+    public let replaceLayerPixelsInRect: @Sendable (_ layerIndex: Int, _ rect: LayerPixelRect, _ pixelData: Data) -> DocumentMutationResult
+    public let applyLayerSurfaceMutation: @Sendable (_ layerIndex: Int, _ payload: GpuLayerMutationPayload) -> DocumentMutationResult
+    public let applyLayerMutation: @Sendable (_ layerIndex: Int, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
+    public let applyTextLayerMutation: @Sendable (_ layerIndex: Int, _ textLayer: TextLayerData, _ payload: DocumentLayerMutationPayload) -> DocumentMutationResult
+    public let revealLayerForEditing: @Sendable (Int) -> DocumentMutationResult
 
     public init(
         ensureLayerVisible: @escaping @Sendable (Int) -> DocumentMutationResult,
@@ -111,14 +111,14 @@ public struct DocumentLayerCommandService: Sendable {
 }
 
 public struct DocumentStrokeCommandService: Sendable {
-    public var beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void
-    public var appendStroke: @Sendable (StylusSample) -> Void
-    public var endStroke: @Sendable () -> DocumentMutationResult
-    public var cancelStroke: @Sendable () -> Void
-    public var applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
-    public var blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
-    public var endBlurStroke: @Sendable () -> DocumentMutationResult
-    public var fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
+    public let beginStroke: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void
+    public let appendStroke: @Sendable (StylusSample) -> Void
+    public let endStroke: @Sendable () -> DocumentMutationResult
+    public let cancelStroke: @Sendable () -> Void
+    public let applyGpuStrokeSurface: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int) -> DocumentMutationResult
+    public let blurStroke: @Sendable (_ samples: [StylusSample], _ brush: BrushRuntimeSettings, _ layerIndex: Int, _ clearSelectionAfterBlur: Bool) -> DocumentMutationResult
+    public let endBlurStroke: @Sendable () -> DocumentMutationResult
+    public let fill: @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> DocumentMutationResult
 
     public init(
         beginStroke: @escaping @Sendable (_ sample: StylusSample, _ brush: BrushRuntimeSettings) -> Void,
@@ -155,9 +155,9 @@ public struct DocumentStrokeCommandService: Sendable {
 }
 
 public struct DocumentHistoryCommandService: Sendable {
-    public var undo: @Sendable () -> DocumentMutationResult
-    public var redo: @Sendable () -> DocumentMutationResult
-    public var trimForMemoryPressure: @Sendable () -> Void
+    public let undo: @Sendable () -> DocumentMutationResult
+    public let redo: @Sendable () -> DocumentMutationResult
+    public let trimForMemoryPressure: @Sendable () -> Void
 
     public init(
         undo: @escaping @Sendable () -> DocumentMutationResult,

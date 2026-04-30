@@ -25,8 +25,8 @@ enum AppDiagnostics {
 }
 
 struct AppLanguageClient: Sendable {
-    var load: @Sendable () -> AppLanguage
-    var persist: @Sendable (AppLanguage) -> Void
+    let load: @Sendable () -> AppLanguage
+    let persist: @Sendable (AppLanguage) -> Void
 
     static func live(keyValueStoreClient: KeyValueStoreClient) -> AppLanguageClient {
         AppLanguageClient(
