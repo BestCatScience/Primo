@@ -4,16 +4,16 @@ import PrimoAIImageDomain
 import StoreKit
 
 public struct AIImageSettingsClient: Sendable {
-    public var load: @Sendable () -> AIImageSettings
-    public var persist: @Sendable (AIImageSettings) throws -> Void
+    public var load: @Sendable () -> AIImageSettingsDraft
+    public var persist: @Sendable (AIImageSettingsDraft) throws -> Void
 
     public static let accessModeStorageKey = "primo.aiimage.accessMode"
     public static let apiKeyStorageKey = "primo.aiimage.apiKey"
     public static let openAIAPIKeyStorageKey = "primo.aiimage.openAIAPIKey"
 
     public init(
-        load: @escaping @Sendable () -> AIImageSettings,
-        persist: @escaping @Sendable (AIImageSettings) throws -> Void
+        load: @escaping @Sendable () -> AIImageSettingsDraft,
+        persist: @escaping @Sendable (AIImageSettingsDraft) throws -> Void
     ) {
         self.load = load
         self.persist = persist
@@ -37,7 +37,7 @@ public struct AIImageSettingsClient: Sendable {
                     keyValueStoreClient: keyValueStoreClient,
                     secretStoreClient: secretStoreClient
                 )
-                return AIImageSettings(
+                return AIImageSettingsDraft(
                     accessMode: accessMode,
                     apiKey: apiKey,
                     openAIAPIKey: openAIAPIKey
@@ -64,13 +64,13 @@ public struct AIImageSettingsClient: Sendable {
         guard let legacySecret = keyValueStoreClient.stringForKey(key), !legacySecret.isEmpty else {
             return ""
         }
-        if writeSecret(legacySecret, key: key, secretStoreClient: secretStoreClient) {
+        if migrateLegacySecretIfPossible(legacySecret, key: key, secretStoreClient: secretStoreClient) {
             keyValueStoreClient.setString(nil, key)
         }
         return legacySecret
     }
 
-    private static func writeSecret(
+    private static func migrateLegacySecretIfPossible(
         _ secret: String?,
         key: String,
         secretStoreClient: SecretStoreClient

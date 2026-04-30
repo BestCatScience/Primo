@@ -9,7 +9,7 @@ struct SelectionWorkflowServiceTests {
     @Test
     func combineReplaceReturnsIncomingSelection() {
         let service = SelectionWorkflowService(gpuOperations: .selectionStub())
-        let incoming = CanvasSelection(
+        let incoming = CanvasSelection.unsafeUnchecked(
             bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
             maskWidth: 1,
             maskHeight: 1,

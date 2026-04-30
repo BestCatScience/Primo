@@ -7,7 +7,7 @@ import XCTest
 final class ImageImportOpsTests: XCTestCase {
     private func sampleSurface() -> DocumentCompositeSurface {
         DocumentCompositeSurface(
-            width: 2,
+            unsafeUncheckedWidth: 2,
             height: 2,
             pixelData: Data([
                 255, 0, 0, 255,

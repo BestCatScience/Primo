@@ -45,7 +45,7 @@ struct DocumentWorkspaceClientAutosaveTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let previewSurface = DocumentCompositeSurface(
-            width: 1,
+            unsafeUncheckedWidth: 1,
             height: 1,
             pixelData: Data([0x10, 0x20, 0x30, 0xFF])
         )

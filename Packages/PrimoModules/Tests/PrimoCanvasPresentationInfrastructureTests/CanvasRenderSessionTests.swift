@@ -93,6 +93,17 @@ struct CanvasRenderSessionTests {
     }
 
     @Test
+    func defaultLifetimeNamesSharedMetalResourceOwnership() throws {
+        let source = try String(
+            contentsOf: canvasRenderSessionSourceURL(),
+            encoding: .utf8
+        )
+
+        #expect(source.contains("sharedMetalResourceLifetime"))
+        #expect(source.contains("resourceStore.release(handle.buffer)"))
+    }
+
+    @Test
     func previewStrokeStyleSimdColorHandlesThreeComponentColor() throws {
         let source = try String(
             contentsOf: canvasPresentationContainerViewSourceURL(),
@@ -133,6 +144,14 @@ struct CanvasRenderSessionTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalCanvasView.swift")
+    }
+
+    private func canvasRenderSessionSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasRenderSession.swift")
     }
 
     private func canvasPresentationContainerViewSourceURL() -> URL {

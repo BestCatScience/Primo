@@ -29,7 +29,7 @@ enum StoredSurfaceAdapter {
             return nil
         }
         return DocumentCompositeSurface(
-            width: decoded.width,
+            validatingWidth: decoded.width,
             height: decoded.height,
             pixelData: decoded.pixelData
         )

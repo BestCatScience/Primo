@@ -342,7 +342,7 @@ public enum TimelapseExportService {
             return nil
         }
         return DocumentCompositeSurface(
-            width: decoded.width,
+            validatingWidth: decoded.width,
             height: decoded.height,
             pixelData: decoded.pixelData
         )

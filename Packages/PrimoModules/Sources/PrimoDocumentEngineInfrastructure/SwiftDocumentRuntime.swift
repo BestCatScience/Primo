@@ -1443,8 +1443,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             gpuServices.release(gpuResult.gpuBufferHandle)
             return .failure(failure)
         }
-        let dirtyRect = LayerPixelRect(
-            originX: gpuResult.dirtyRect.originX,
+        let dirtyRect = LayerPixelRect.unsafeUnchecked(originX: gpuResult.dirtyRect.originX,
             originY: gpuResult.dirtyRect.originY,
             width: gpuResult.dirtyRect.width,
             height: gpuResult.dirtyRect.height
@@ -1950,7 +1949,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         }
         logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
         return DocumentCompositeSurface(
-            width: snapshot.canvasWidth,
+            unsafeUncheckedWidth: snapshot.canvasWidth,
             height: snapshot.canvasHeight,
             pixelData: Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
         )
@@ -1970,7 +1969,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         ) else {
             return nil
         }
-        return DocumentCompositeSurface(width: surface.width, height: surface.height, pixelData: pixelData)
+        return DocumentCompositeSurface(
+            unsafeUncheckedWidth: surface.width,
+            height: surface.height,
+            pixelData: pixelData
+        )
     }
 
     static func compositePNGData(
@@ -2269,7 +2272,11 @@ extension SwiftDocumentRuntime {
         ) else {
             return nil
         }
-        return DocumentCompositeSurface(width: surface.width, height: surface.height, pixelData: pixelData)
+        return DocumentCompositeSurface(
+            unsafeUncheckedWidth: surface.width,
+            height: surface.height,
+            pixelData: pixelData
+        )
     }
 
     func timelapseCapture() -> TimelapseCapture? {
@@ -2614,8 +2621,7 @@ extension SwiftDocumentRuntime {
     }
 
     private func fullCanvasRect() -> LayerPixelRect {
-        LayerPixelRect(
-            originX: 0,
+        LayerPixelRect.unsafeUnchecked(originX: 0,
             originY: 0,
             width: store.snapshot.canvasWidth,
             height: store.snapshot.canvasHeight
@@ -2631,7 +2637,7 @@ extension SwiftDocumentRuntime {
     }
 
     private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {
-        let rect = rect ?? LayerPixelRect(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
+        let rect = rect ?? LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: store.snapshot.canvasWidth, height: store.snapshot.canvasHeight)
         let snapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
         if let dirtyUpdate = gpuServices.compositedIncrementalUpdate(
             snapshot: snapshot,
@@ -2667,7 +2673,7 @@ extension SwiftDocumentRuntime {
         }
         Self.logger.error("GPU composite failed for snapshot revision \(snapshot.revision, privacy: .public)")
         return DocumentCompositeSurface(
-            width: snapshot.canvasWidth,
+            unsafeUncheckedWidth: snapshot.canvasWidth,
             height: snapshot.canvasHeight,
             pixelData: Data(count: snapshot.canvasWidth * snapshot.canvasHeight * 4)
         )
@@ -2826,7 +2832,7 @@ extension SwiftDocumentRuntime {
             return nil
         }
         let surface = DocumentCompositeSurface(
-            width: targetWidth,
+            unsafeUncheckedWidth: targetWidth,
             height: targetHeight,
             pixelData: scaled
         )
@@ -2865,7 +2871,7 @@ extension SwiftDocumentRuntime {
             return nil
         }
         return DocumentCompositeSurface(
-            width: max(Int(targetSize.width.rounded()), 1),
+            unsafeUncheckedWidth: max(Int(targetSize.width.rounded()), 1),
             height: max(Int(targetSize.height.rounded()), 1),
             pixelData: scaled
         )

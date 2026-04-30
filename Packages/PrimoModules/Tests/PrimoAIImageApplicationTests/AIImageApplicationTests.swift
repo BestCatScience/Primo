@@ -35,6 +35,31 @@ struct AIImageApplicationTests {
     }
 
     @Test
+    func commandBuilderPromotesSettingsDraftToExecutionConfig() throws {
+        let draft = AIImageDraft(
+            prompt: "refine shadows",
+            accessMode: .userAPIKey,
+            model: .flashImage31Preview,
+            inputLayerIndex: 4,
+            editScope: .selectedArea,
+            outputMode: .newLayer
+        )
+        let settings = AIImageSettingsDraft(
+            accessMode: .userAPIKey,
+            apiKey: "  secret-key  "
+        )
+
+        let result = AIImageCommandBuilder().build(
+            draft: draft,
+            settings: settings,
+            commerce: AIImageCommerceSnapshot()
+        )
+
+        let command = try result.get()
+        #expect(command.executionConfig == .userAPIKey(apiKey: AIImageAPIKey("secret-key")!))
+    }
+
+    @Test
     func commandBuilderBuildsOpenAIUserKeyCommand() throws {
         let draft = AIImageDraft(
             prompt: "  refine text  ",
@@ -154,7 +179,7 @@ struct AIImageApplicationTests {
             executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
         )
         let surface = DocumentCompositeSurface(
-            width: 2,
+            unsafeUncheckedWidth: 2,
             height: 2,
             pixelData: Data([
             255, 0, 0, 255,
@@ -236,7 +261,7 @@ struct AIImageApplicationTests {
             executionConfig: .userAPIKey(apiKey: AIImageAPIKey("secret-key")!)
         )
         let surface = DocumentCompositeSurface(
-            width: 4,
+            unsafeUncheckedWidth: 4,
             height: 4,
             pixelData: Data(repeating: 0xFF, count: 4 * 4 * 4)
         )
@@ -311,7 +336,7 @@ struct AIImageApplicationTests {
 
     private func solidSurface(width: Int, height: Int) -> DocumentCompositeSurface {
         DocumentCompositeSurface(
-            width: width,
+            unsafeUncheckedWidth: width,
             height: height,
             pixelData: Data(repeating: 0x7F, count: width * height * 4)
         )

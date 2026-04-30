@@ -17,7 +17,7 @@ extension DocumentFeature {
         ) ?? snapshot.compositePixelData
 
         return DocumentCompositeSurface(
-            width: snapshot.width,
+            unsafeUncheckedWidth: snapshot.width,
             height: snapshot.height,
             pixelData: pixelData
         )

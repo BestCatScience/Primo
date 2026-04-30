@@ -8,7 +8,7 @@ struct WorkspaceApplicationTests {
     @Test
     func catalogUseCaseForwardsGatewayResponses() throws {
         let previewSurface = DocumentCompositeSurface(
-            width: 2,
+            unsafeUncheckedWidth: 2,
             height: 1,
             pixelData: Data([0x10, 0x20, 0x30, 0xFF, 0x40, 0x50, 0x60, 0xFF])
         )
@@ -67,7 +67,7 @@ struct WorkspaceApplicationTests {
     @Test
     func loadedProjectFollowUpPlannerBuildsTypedPersistenceRequest() {
         let previewSurface = DocumentCompositeSurface(
-            width: 1,
+            unsafeUncheckedWidth: 1,
             height: 1,
             pixelData: Data([0x01, 0x02, 0x03, 0xFF])
         )
@@ -227,7 +227,7 @@ struct WorkspaceApplicationTests {
     @Test
     func saveActiveDocumentResultPreservesPreviewSurface() throws {
         let previewSurface = DocumentCompositeSurface(
-            width: 2,
+            unsafeUncheckedWidth: 2,
             height: 2,
             pixelData: Data(repeating: 0x7F, count: 16)
         )

@@ -509,7 +509,7 @@ extension PrimoMetalDocumentProcessingClient {
     public func compositeDocumentSurface(snapshot: MetalDocumentSnapshot) -> DocumentCompositeSurface? {
         guard isAvailable else { return nil }
         guard let pixelData = compositeDocument(snapshot: snapshot) else { return nil }
-        return DocumentCompositeSurface(width: snapshot.width, height: snapshot.height, pixelData: pixelData)
+        return DocumentCompositeSurface(unsafeUncheckedWidth: snapshot.width, height: snapshot.height, pixelData: pixelData)
     }
 
     public func processLayer(
@@ -576,7 +576,7 @@ extension PrimoMetalDocumentProcessingClient {
             guard commandBuffer.status == .completed else { return nil }
 
             let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
-            let dirtyRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+            let dirtyRect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
             return DocumentLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
@@ -638,7 +638,7 @@ extension PrimoMetalDocumentProcessingClient {
             bounds: layout.rotatedBounds,
             canvasWidth: width,
             canvasHeight: height
-        ) ?? LayerPixelRect(originX: 0, originY: 0, width: width, height: height)
+        ) ?? LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height)
         let rectPixelData = dirtyRect.width == width && dirtyRect.height == height
             ? fullPixelData
             : crop(pixelData: fullPixelData, canvasWidth: width, rect: dirtyRect)
@@ -775,7 +775,7 @@ extension PrimoMetalDocumentProcessingClient {
 
         let x = Int(sample.point.x.rounded())
         let y = Int(sample.point.y.rounded())
-        let fullRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+        let fullRect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
         guard x >= 0, x < canvasWidth, y >= 0, y < canvasHeight else {
             return DocumentLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: canvasWidth,
@@ -1302,7 +1302,7 @@ extension PrimoMetalDocumentProcessingClient {
         guard commandBuffer.status == .completed else { return nil }
 
         let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
-        let dirtyRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
+        let dirtyRect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
         return DocumentLayerMutationPayload.unsafeUnchecked(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
@@ -1531,9 +1531,9 @@ extension PrimoMetalDocumentProcessingClient {
         let minY = max(0, Int((sampleYs.min() ?? 0) - influenceRadius - 2.0))
         let maxY = min(height - 1, Int((sampleYs.max() ?? 0) + influenceRadius + 2.0))
         guard minX <= maxX, minY <= maxY else {
-            return LayerPixelRect(originX: 0, originY: 0, width: width, height: height)
+            return LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height)
         }
-        return LayerPixelRect(originX: minX, originY: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+        return LayerPixelRect.unsafeUnchecked(originX: minX, originY: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
     private func crop(pixelData: Data, canvasWidth: Int, rect: LayerPixelRect) -> Data {
@@ -1722,8 +1722,7 @@ extension PrimoMetalDocumentProcessingClient {
         let maxX = min(Int(ceil(bounds.maxX)), canvasWidth)
         let maxY = min(Int(ceil(bounds.maxY)), canvasHeight)
         guard maxX > minX, maxY > minY else { return nil }
-        return LayerPixelRect(
-            originX: minX,
+        return LayerPixelRect.unsafeUnchecked(originX: minX,
             originY: minY,
             width: maxX - minX,
             height: maxY - minY

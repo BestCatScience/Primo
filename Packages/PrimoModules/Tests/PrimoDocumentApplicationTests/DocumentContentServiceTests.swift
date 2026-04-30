@@ -147,7 +147,7 @@ private func queryGateway(activeLayerIndex: Int) -> DocumentQueryGateway {
         lightweightPresentation: { presentation },
         presentation: { presentation },
         compositePixelData: { Data() },
-        compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
+        compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
         pixelDataForLayer: { _ in Data() },
         consumeDirtyUpdate: { nil }
     )

@@ -31,7 +31,7 @@ public struct GpuSurfaceRegion: Equatable, Sendable {
     }
 
     public var layerPixelRect: LayerPixelRect {
-        LayerPixelRect(originX: originX, originY: originY, width: width, height: height)
+        LayerPixelRect.unsafeUnchecked(originX: originX, originY: originY, width: width, height: height)
     }
 
     public var isEmpty: Bool { width <= 0 || height <= 0 }

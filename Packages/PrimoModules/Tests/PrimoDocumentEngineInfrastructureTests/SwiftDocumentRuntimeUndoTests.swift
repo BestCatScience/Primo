@@ -83,7 +83,7 @@ struct SwiftDocumentRuntimeUndoTests {
     func dirtyRectReplacementUndoRedoRestoresOnlyChangedPixels() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
         let runtime = SwiftDocumentRuntime(width: 3, height: 2, gpuServices: gpu.services())
-        let rect = LayerPixelRect(originX: 1, originY: 0, width: 1, height: 1)
+        let rect = LayerPixelRect.unsafeUnchecked(originX: 1, originY: 0, width: 1, height: 1)
         let patch = Data([0x10, 0x20, 0x30, 0x40])
 
         _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: patch).get()
@@ -109,7 +109,7 @@ struct SwiftDocumentRuntimeUndoTests {
             maxUndoEntryCount: 50,
             maxUndoRetainedBytes: 200
         )
-        let rect = LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4)
+        let rect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4)
 
         _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x11, count: 64)).get()
         _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x22, count: 64)).get()
@@ -133,7 +133,7 @@ struct SwiftDocumentRuntimeUndoTests {
             maxUndoEntryCount: 50,
             maxUndoRetainedBytes: 1_024
         )
-        let rect = LayerPixelRect(originX: 0, originY: 0, width: 1, height: 1)
+        let rect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 1, height: 1)
 
         for value in UInt8(1)...UInt8(10) {
             _ = try runtime.replaceLayerPixels(
@@ -184,7 +184,7 @@ struct SwiftDocumentRuntimeUndoTests {
             payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                 gpuBufferHandle: handle,
                 fallbackPixelData: nil
             )
@@ -213,7 +213,7 @@ struct SwiftDocumentRuntimeUndoTests {
             payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                 gpuBufferHandle: handle,
                 fallbackPixelData: nil
             )
@@ -254,7 +254,7 @@ struct SwiftDocumentRuntimeUndoTests {
             payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                 gpuBufferHandle: handle,
                 fallbackPixelData: nil
             )
@@ -299,7 +299,7 @@ struct SwiftDocumentRuntimeUndoTests {
             payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                 gpuBufferHandle: handle,
                 fallbackPixelData: nil
             )
@@ -328,7 +328,7 @@ struct SwiftDocumentRuntimeUndoTests {
             payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                 gpuBufferHandle: handle,
                 fallbackPixelData: nil
             )
@@ -488,7 +488,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
                     gpuBufferHandle: nil,
                     rectPixelData: pixelData,
                     fullPixelData: pixelData
@@ -502,7 +502,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
                     gpuBufferHandle: nil,
                     rectPixelData: pixelData,
                     fullPixelData: pixelData
@@ -515,7 +515,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
                     gpuBufferHandle: nil,
                     rectPixelData: pixelData,
                     fullPixelData: pixelData
@@ -528,7 +528,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
                     gpuBufferHandle: nil,
                     rectPixelData: pixelData,
                     fullPixelData: pixelData
@@ -554,7 +554,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             },
             _compositeDocumentSurface: { snapshot in
                 DocumentCompositeSurface(
-                    width: snapshot.width,
+                    unsafeUncheckedWidth: snapshot.width,
                     height: snapshot.height,
                     pixelData: snapshot.layers.first?.pixelData ?? Data()
                 )

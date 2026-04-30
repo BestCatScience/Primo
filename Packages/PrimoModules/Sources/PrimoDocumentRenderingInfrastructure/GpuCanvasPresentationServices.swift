@@ -37,14 +37,14 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         ) else {
             return nil
         }
-        return DocumentCompositeSurface(width: gridSize, height: gridSize, pixelData: rgba)
+        return DocumentCompositeSurface(unsafeUncheckedWidth: gridSize, height: gridSize, pixelData: rgba)
     }
 
     public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
         guard let rgba = gpuOperations.selectionOverlayRGBA(maskData, width, height) else {
             return nil
         }
-        return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
+        return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
     }
 
     public func compositePreviewImageData(
@@ -64,7 +64,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         guard let rgba = gpuOperations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle) else {
             return nil
         }
-        return DocumentCompositeSurface(width: width, height: height, pixelData: rgba)
+        return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
     }
 
     public func shapePreviewSurface(

@@ -6,10 +6,14 @@ public struct DocumentCompositeSurface: Equatable, Sendable {
     public let height: Int
     public let pixelData: Data
 
-    public init(width: Int, height: Int, pixelData: Data) {
+    init(width: Int, height: Int, pixelData: Data) {
         self.width = width
         self.height = height
         self.pixelData = pixelData
+    }
+
+    public init(unsafeUncheckedWidth width: Int, height: Int, pixelData: Data) {
+        self.init(width: width, height: height, pixelData: pixelData)
     }
 
     public init?(validatingWidth width: Int, height: Int, pixelData: Data) {

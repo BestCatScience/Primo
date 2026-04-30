@@ -175,7 +175,7 @@ extension DocumentQueryGateway {
         presentation: PaintDocumentPresentation = .testValue(),
         compositePixelData: @escaping @Sendable () -> Data = { Data() },
         compositeSurface: @escaping @Sendable () -> DocumentCompositeSurface = {
-            DocumentCompositeSurface(width: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
+            DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 1, pixelData: Data([0, 0, 0, 0]))
         },
         pixelDataForLayer: @escaping @Sendable (Int) -> Data = { _ in Data() }
     ) -> Self {

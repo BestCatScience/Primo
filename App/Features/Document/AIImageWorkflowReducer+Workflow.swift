@@ -48,7 +48,7 @@ extension AIImageWorkflowReducer {
                 ? command.descriptor.inputLayerIndex
                 : state.canvas.activeLayerIndex
             let sourceSurface = DocumentCompositeSurface(
-                width: snapshot.width,
+                unsafeUncheckedWidth: snapshot.width,
                 height: snapshot.height,
                 pixelData: layer.pixelData
             )

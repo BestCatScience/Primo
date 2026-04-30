@@ -18,6 +18,19 @@ public struct AIImageCommandBuilder: Sendable {
 
     public func build(
         draft: AIImageDraft,
+        settings: AIImageSettingsDraft,
+        commerce: AIImageCommerceSnapshot
+    ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure> {
+        build(
+            draft: draft,
+            apiKey: settings.apiKey,
+            openAIAPIKey: settings.openAIAPIKey,
+            commerce: commerce
+        )
+    }
+
+    public func build(
+        draft: AIImageDraft,
         apiKey: String,
         openAIAPIKey: String,
         commerce: AIImageCommerceSnapshot
@@ -254,7 +267,7 @@ public struct AIImagePreviewPreparationService: Sendable {
         _ request: AIImagePreviewPreparationRequest
     ) async -> Result<AIImagePreviewState, AIImagePreviewPreparationFailure> {
         let blankSurface = DocumentCompositeSurface(
-            width: request.sourceSurface.width,
+            unsafeUncheckedWidth: request.sourceSurface.width,
             height: request.sourceSurface.height,
             pixelData: Data(repeating: 0, count: request.sourceSurface.width * request.sourceSurface.height * 4)
         )
@@ -296,7 +309,11 @@ public struct AIImagePreviewPreparationService: Sendable {
                     expandedMask: selectionRegion.expandedMask
                 ),
                 let cropPNGData = DocumentRasterImageService.pngData(
-                    from: DocumentCompositeSurface(width: crop.width, height: crop.height, pixelData: crop.pixelData)
+                    from: DocumentCompositeSurface(
+                        unsafeUncheckedWidth: crop.width,
+                        height: crop.height,
+                        pixelData: crop.pixelData
+                    )
                 )
             else {
                 finalSurface = nil
@@ -331,7 +348,7 @@ public struct AIImagePreviewPreparationService: Sendable {
                     break
                 }
                 finalSurface = DocumentCompositeSurface(
-                    width: request.sourceSurface.width,
+                    unsafeUncheckedWidth: request.sourceSurface.width,
                     height: request.sourceSurface.height,
                     pixelData: applied
                 )
@@ -364,7 +381,7 @@ public struct AIImagePreviewPreparationService: Sendable {
         }
         if decoded.width == fallbackSize.width, decoded.height == fallbackSize.height {
             return DocumentCompositeSurface(
-                width: decoded.width,
+                validatingWidth: decoded.width,
                 height: decoded.height,
                 pixelData: decoded.pixelData
             )
@@ -377,7 +394,7 @@ public struct AIImagePreviewPreparationService: Sendable {
             return nil
         }
         return DocumentCompositeSurface(
-            width: fallbackSize.width,
+            unsafeUncheckedWidth: fallbackSize.width,
             height: fallbackSize.height,
             pixelData: resampledPixelData
         )

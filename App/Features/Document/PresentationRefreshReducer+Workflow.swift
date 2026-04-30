@@ -5,19 +5,10 @@ import PrimoDocumentDomain
 
 extension PresentationRefreshReducer {
     func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {
-        let paperStyle = DocumentFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
-        let previewSurface = state.canvas.renderSnapshot.map {
-            DocumentFeature.renderedCompositeSurface(
-                snapshot: $0,
-                paperStyle: paperStyle,
-                gpuOperations: documentGpuOperationGateway
-            )
-        } ?? documentExportGateway.compositeSurface(paperStyle)
-        return WorkspaceDocumentSnapshot(
-            activeTab: nil,
-            paperStyle: paperStyle,
-            previewSurface: previewSurface,
-            canvasSize: state.canvas.canvasSize
+        DocumentFeature.workspaceSnapshotCoordinator.snapshot(
+            state: state,
+            documentExportGateway: documentExportGateway,
+            documentGpuOperationGateway: documentGpuOperationGateway
         )
     }
 

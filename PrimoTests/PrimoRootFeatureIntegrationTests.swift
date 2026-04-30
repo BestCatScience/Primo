@@ -18,7 +18,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     private func previewSurface() -> DocumentCompositeSurface {
         DocumentCompositeSurface(
-            width: 1,
+            unsafeUncheckedWidth: 1,
             height: 1,
             pixelData: Data([0x01, 0x02, 0x03, 0xFF])
         )

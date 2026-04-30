@@ -34,14 +34,14 @@ struct DocumentRasterImageServiceTests {
 
     @Test
     func decodedImageFromEncodedDataMatchesOriginalDimensions() throws {
-        let surface = DocumentCompositeSurface(
-            width: 2,
+        let surface = try #require(DocumentCompositeSurface(
+            validatingWidth: 2,
             height: 1,
             pixelData: Data([
                 255, 0, 0, 255,
                 0, 255, 0, 255,
             ])
-        )
+        ))
 
         let pngData = try #require(DocumentRasterImageService.pngData(from: surface))
         let decoded = try #require(

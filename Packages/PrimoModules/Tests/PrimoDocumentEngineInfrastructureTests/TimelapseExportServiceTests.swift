@@ -50,7 +50,7 @@ struct TimelapseExportServiceTests {
     @Test
     func writeSurfaceCopiesRowsIntoPixelBufferWithLargerStride() throws {
         let surface = DocumentCompositeSurface(
-            width: 3,
+            unsafeUncheckedWidth: 3,
             height: 2,
             pixelData: Data([
                 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,

@@ -4,7 +4,7 @@ import PrimoAIImageDomain
 extension AIImageFeature {
     enum Action: Equatable {
         case task
-        case settingsLoaded(AIImageSettings)
+        case settingsLoaded(AIImageSettingsDraft)
         case commerceUpdated(AIImageCommerceSnapshot)
         case prepareComposer(activeLayerIndex: Int, hasSelection: Bool)
         case promptChanged(String)

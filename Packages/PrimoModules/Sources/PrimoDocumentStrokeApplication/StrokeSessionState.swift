@@ -157,7 +157,7 @@ public struct StrokeSessionState: Equatable, Sendable {
         let minY = min(lhs.originY, rhs.originY)
         let maxX = max(lhs.originX + lhs.width, rhs.originX + rhs.width)
         let maxY = max(lhs.originY + lhs.height, rhs.originY + rhs.height)
-        return LayerPixelRect(
+        return LayerPixelRect.unsafeUnchecked(
             originX: minX,
             originY: minY,
             width: max(0, maxX - minX),

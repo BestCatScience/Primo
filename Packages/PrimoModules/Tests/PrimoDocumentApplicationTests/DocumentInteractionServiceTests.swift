@@ -9,7 +9,7 @@ struct DocumentCommandServiceTests {
     @Test
     func compositeSurfaceReturnsQueryGatewayPayload() {
         let expected = Data([0x10, 0x20, 0x30])
-        let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
+        let expectedSurface = DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 3, pixelData: expected)
         let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
@@ -29,7 +29,7 @@ struct DocumentCommandServiceTests {
     @Test
     func compositeSurfaceReplacesLegacyPixelDataReadback() {
         let expected = Data([0x10, 0x20, 0x30])
-        let expectedSurface = DocumentCompositeSurface(width: 1, height: 3, pixelData: expected)
+        let expectedSurface = DocumentCompositeSurface(unsafeUncheckedWidth: 1, height: 3, pixelData: expected)
         let service = DocumentCanvasCommandService(
             queryGateway: DocumentQueryGateway(
                 lightweightPresentation: { queryGateway().lightweightPresentation() },
@@ -126,7 +126,7 @@ private func queryGateway() -> DocumentQueryGateway {
         lightweightPresentation: { presentation },
         presentation: { presentation },
         compositePixelData: { Data() },
-        compositeSurface: { DocumentCompositeSurface(width: 0, height: 0, pixelData: Data()) },
+        compositeSurface: { DocumentCompositeSurface(unsafeUncheckedWidth: 0, height: 0, pixelData: Data()) },
         pixelDataForLayer: { _ in Data() },
         consumeDirtyUpdate: { nil }
     )

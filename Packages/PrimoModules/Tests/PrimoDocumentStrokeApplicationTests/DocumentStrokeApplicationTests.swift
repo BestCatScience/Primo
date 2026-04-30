@@ -25,7 +25,7 @@ struct DocumentStrokeApplicationTests {
         ))
 
         #expect(resolution.baseSnapshotToCapture == nil)
-        #expect(resolution.result.dirtyRect == LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
+        #expect(resolution.result.dirtyRect == LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2))
         #expect(planner.requests.count == 1)
         #expect(planner.requests[0].activeLayerIndex == 2)
         #expect(planner.requests[0].baseLayer.layerIndex == 2)
@@ -73,7 +73,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 2,
@@ -110,7 +110,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: previousBrush,
             sampleCount: 2,
@@ -145,7 +145,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 2,
@@ -177,7 +177,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: makeContext(layerIndex: 0, brush: oilBrushSettings()).previewBrush,
             sampleCount: 2,
@@ -217,7 +217,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 2,
@@ -252,7 +252,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 14,
             layerIndex: 0,
             surfaceHandle: previousHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: true
         )
         let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
@@ -283,7 +283,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 21,
             layerIndex: 0,
             surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 0,
@@ -337,7 +337,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 21,
             layerIndex: 0,
             surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 0,
@@ -392,7 +392,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 21,
             layerIndex: 0,
             surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
             sampleCount: 0,
@@ -503,7 +503,7 @@ struct DocumentStrokeApplicationTests {
 
         #expect(session.baseSnapshot?.revision == 11)
         #expect(session.renderState?.surfaceHandle == handle)
-        #expect(session.renderState?.dirtyRect == LayerPixelRect(originX: 0, originY: 1, width: 2, height: 1))
+        #expect(session.renderState?.dirtyRect == LayerPixelRect.unsafeUnchecked(originX: 0, originY: 1, width: 2, height: 1))
         #expect(session.renderState?.isApproximatePreview == true)
         #expect(session.renderState?.sampleCount == 4)
         #expect(session.renderState?.supportsIncrementalContinuation == true)
@@ -544,7 +544,7 @@ struct DocumentStrokeApplicationTests {
             supportsIncrementalContinuation: true
         )
 
-        #expect(session.renderState?.dirtyRect == LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2))
+        #expect(session.renderState?.dirtyRect == LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2))
     }
 
     @Test
@@ -574,7 +574,7 @@ struct DocumentStrokeApplicationTests {
             baseRevision: 11,
             layerIndex: 1,
             surfaceHandle: handle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: true,
             previewBrush: brushSettings(),
             sampleCount: 1,
@@ -1003,7 +1003,7 @@ struct DocumentStrokeApplicationTests {
                     baseRevision: snapshot.revision,
                     layerIndex: 0,
                     surfaceHandle: previewHandle,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                     isApproximatePreview: false,
                     previewBrush: eraserBrush,
                     sampleCount: 1,
@@ -1079,7 +1079,7 @@ struct DocumentStrokeApplicationTests {
                     baseRevision: snapshot.revision,
                     layerIndex: 0,
                     surfaceHandle: handle,
-                    dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
                     isApproximatePreview: false,
                     previewBrush: brushSettings(),
                     sampleCount: 1,

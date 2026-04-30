@@ -8,11 +8,17 @@ public final class CanvasRenderSession {
     private let lifetime: GpuResourceLifetime
 
     public init(
-        lifetime: GpuResourceLifetime = GpuResourceLifetime { handle in
-            MetalResourceStore().release(handle.buffer)
-        }
+        lifetime: GpuResourceLifetime = CanvasRenderSession.sharedMetalResourceLifetime()
     ) {
         self.lifetime = lifetime
+    }
+
+    public static func sharedMetalResourceLifetime(
+        resourceStore: MetalResourceStore = MetalResourceStore()
+    ) -> GpuResourceLifetime {
+        GpuResourceLifetime { handle in
+            resourceStore.release(handle.buffer)
+        }
     }
 
     deinit {

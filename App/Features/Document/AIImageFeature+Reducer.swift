@@ -197,7 +197,7 @@ extension AIImageFeature {
         }
     }
 
-    private func persistSettingsEffect(_ settings: AIImageSettings) -> Effect<Action> {
+    private func persistSettingsEffect(_ settings: AIImageSettingsDraft) -> Effect<Action> {
         .run { [aiImageSettingsClient] send in
             try? await Task.sleep(nanoseconds: 300_000_000)
             try Task.checkCancellation()

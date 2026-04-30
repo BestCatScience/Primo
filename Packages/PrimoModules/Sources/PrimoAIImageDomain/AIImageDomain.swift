@@ -305,7 +305,7 @@ public struct AIImageHistoryItem: Equatable, Sendable, Identifiable {
     }
 }
 
-public struct AIImageSettings: Equatable, Sendable {
+public struct AIImageSettingsDraft: Equatable, Sendable {
     public var accessMode: AIImageAccessMode
     public var apiKey: String
     public var openAIAPIKey: String
@@ -320,6 +320,8 @@ public struct AIImageSettings: Equatable, Sendable {
         self.openAIAPIKey = openAIAPIKey
     }
 }
+
+public typealias AIImageSettings = AIImageSettingsDraft
 
 public struct AIImageCommerceSnapshot: Equatable, Sendable {
     public struct ProductSummary: Equatable, Sendable {

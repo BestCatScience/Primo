@@ -436,12 +436,28 @@ public struct CanvasSelection: Equatable, Sendable {
     public let maskData: Data
     public let mode: SelectionToolMode
 
-    public init(bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
+    init(bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
         self.bounds = bounds
         self.maskWidth = maskWidth
         self.maskHeight = maskHeight
         self.maskData = maskData
         self.mode = mode
+    }
+
+    public static func unsafeUnchecked(
+        bounds: CGRect,
+        maskWidth: Int,
+        maskHeight: Int,
+        maskData: Data,
+        mode: SelectionToolMode
+    ) -> Self {
+        Self(
+            bounds: bounds,
+            maskWidth: maskWidth,
+            maskHeight: maskHeight,
+            maskData: maskData,
+            mode: mode
+        )
     }
 
     public init?(validatingBounds bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
@@ -465,11 +481,15 @@ public struct LayerPixelRect: Equatable, Sendable {
     public let width: Int
     public let height: Int
 
-    public init(originX: Int, originY: Int, width: Int, height: Int) {
+    init(originX: Int, originY: Int, width: Int, height: Int) {
         self.originX = originX
         self.originY = originY
         self.width = width
         self.height = height
+    }
+
+    public static func unsafeUnchecked(originX: Int, originY: Int, width: Int, height: Int) -> Self {
+        Self(originX: originX, originY: originY, width: width, height: height)
     }
 
     public init?(validatingOriginX originX: Int, originY: Int, width: Int, height: Int) {

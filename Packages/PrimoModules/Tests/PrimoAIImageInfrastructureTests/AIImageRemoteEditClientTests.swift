@@ -457,7 +457,7 @@ struct AIImageRemoteEditClientTests {
 
     private func solidSurface(width: Int, height: Int) -> DocumentCompositeSurface {
         DocumentCompositeSurface(
-            width: width,
+            unsafeUncheckedWidth: width,
             height: height,
             pixelData: Data(repeating: 0x7F, count: width * height * 4)
         )

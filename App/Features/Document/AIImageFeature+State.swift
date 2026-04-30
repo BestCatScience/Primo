@@ -37,7 +37,7 @@ extension AIImageFeature {
     @ObservableState
     struct State: Equatable {
         var composer = ComposerState()
-        var settings = AIImageSettings(accessMode: .appManaged)
+        var settings = AIImageSettingsDraft(accessMode: .appManaged)
         var commerce = AIImageCommerceSnapshot()
         var execution = ExecutionState()
         var presentation = PresentationState()
@@ -172,8 +172,7 @@ extension AIImageFeature {
         ) -> Result<SubmitAIImageEditCommand, AIImageCommandBuilderFailure> {
             builder.build(
                 draft: buildDraft(),
-                apiKey: apiKey,
-                openAIAPIKey: openAIAPIKey,
+                settings: settings,
                 commerce: commerce
             )
         }
@@ -192,8 +191,7 @@ extension AIImageFeature {
                     outputMode: descriptor.outputMode,
                     maskSettings: descriptor.maskSettings
                 ),
-                apiKey: apiKey,
-                openAIAPIKey: openAIAPIKey,
+                settings: settings,
                 commerce: commerce
             )
         }

@@ -78,7 +78,7 @@ extension DocumentFeature {
             return nil
         }
         return DocumentCompositeSurface(
-            width: decoded.width,
+            validatingWidth: decoded.width,
             height: decoded.height,
             pixelData: decoded.pixelData
         )
@@ -116,7 +116,7 @@ extension DocumentFeature {
         }
 
         let fittedSurface = DocumentCompositeSurface(
-            width: max(Int(fittedSize.width.rounded()), 1),
+            unsafeUncheckedWidth: max(Int(fittedSize.width.rounded()), 1),
             height: max(Int(fittedSize.height.rounded()), 1),
             pixelData: scaled
         )
@@ -158,6 +158,10 @@ extension DocumentFeature {
             offsetY
         )
         guard let translated else { return nil }
-        return DocumentCompositeSurface(width: width, height: height, pixelData: translated)
+        return DocumentCompositeSurface(
+            unsafeUncheckedWidth: width,
+            height: height,
+            pixelData: translated
+        )
     }
 }

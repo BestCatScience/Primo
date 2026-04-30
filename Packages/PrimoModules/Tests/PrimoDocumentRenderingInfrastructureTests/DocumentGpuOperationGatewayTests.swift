@@ -86,7 +86,7 @@ struct DocumentGpuOperationGatewayTests {
         )
         let processor = GpuLayerTransformProcessor(gpuOperations: gateway)
         let source = Data(repeating: 0, count: 4 * 3 * 4)
-        let selection = CanvasSelection(
+        let selection = CanvasSelection.unsafeUnchecked(
             bounds: CGRect(x: 2.4, y: 1.7, width: 2, height: 1),
             maskWidth: 2,
             maskHeight: 1,
@@ -129,7 +129,7 @@ struct DocumentGpuOperationGatewayTests {
             shapePreviewSurface: { _, brush, width, height in
                 box.brush = brush
                 return DocumentCompositeSurface(
-                    width: width,
+                    unsafeUncheckedWidth: width,
                     height: height,
                     pixelData: Data(repeating: 0, count: width * height * 4)
                 )

@@ -147,7 +147,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
         XCTAssertEqual(state.canvas.strokeSession.baseSnapshot?.revision, 12)
         XCTAssertEqual(state.canvas.strokeSession.renderState?.surfaceHandle, handle)
-        XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
+        XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2))
         XCTAssertEqual(state.canvas.strokeSession.renderState?.isApproximatePreview, true)
     }
 
@@ -170,7 +170,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             baseRevision: 12,
             layerIndex: 0,
             surfaceHandle: expectedHandle,
-            dirtyRect: LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2),
             isApproximatePreview: true,
             previewBrush: previewBrush,
             sampleCount: 32,
@@ -221,7 +221,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             baseRevision: 12,
             layerIndex: 0,
             surfaceHandle: expectedHandle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
             isApproximatePreview: false,
             previewBrush: brush,
             sampleCount: 1,
@@ -392,7 +392,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             XCTFail("Expected committed GPU surface mutation, got \(failure)")
         }
         XCTAssertEqual(surfaceCalls.values.first?.gpuBufferHandle, handle)
-        XCTAssertEqual(surfaceCalls.values.first?.dirtyRect, LayerPixelRect(originX: 1, originY: 1, width: 2, height: 2))
+        XCTAssertEqual(surfaceCalls.values.first?.dirtyRect, LayerPixelRect.unsafeUnchecked(originX: 1, originY: 1, width: 2, height: 2))
     }
 
     func testGpuCommitStagesPendingCommittedSnapshotForNextStrokeBase() {
@@ -597,7 +597,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             releaseSurfaceHandle: { _ in }
         )
 
-        XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4))
+        XCTAssertEqual(state.canvas.strokeSession.renderState?.dirtyRect, LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4))
         let result = sessionCoordinator.resolveStrokeCommit(
             state: &state,
             samples: [.testValue()],
@@ -692,7 +692,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 baseRevision: 11,
                 layerIndex: 0,
                 surfaceHandle: oldHandle,
-                dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
                 isApproximatePreview: false
             )
 
@@ -744,7 +744,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             baseRevision: 11,
             layerIndex: 0,
             surfaceHandle: handle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
             isApproximatePreview: false
         )
 
@@ -772,7 +772,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             baseRevision: 11,
             layerIndex: 0,
             surfaceHandle: handle,
-            dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4),
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 4),
             isApproximatePreview: false
         )
 
@@ -933,8 +933,7 @@ private struct DerivedGpuDependencyProbe {
             compositePixelData: Data(count: 4),
             layers: []
         )
-        let selection = CanvasSelection(
-            bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+        let selection = CanvasSelection.unsafeUnchecked(bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
             maskWidth: 1,
             maskHeight: 1,
             maskData: Data([255]),

@@ -142,14 +142,14 @@ struct PaintDocumentMutationContractTests {
     @Test
     func replaceLayerPixelsInRectRejectsEmptyInput() {
         let runtime = DocumentEngineFactory.live()
-        let rect = LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+        let rect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2)
         expectFailure(runtime.mutationGateway.replaceLayerPixelsInRect(0, rect, Data()), .emptyInput)
     }
 
     @Test
     func replaceLayerPixelsInRectRejectsMismatchedRectPayload() {
         let runtime = DocumentEngineFactory.live()
-        let rect = LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
+        let rect = LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2)
         expectFailure(
             runtime.mutationGateway.replaceLayerPixelsInRect(0, rect, Data(count: 4)),
             .gpu(.invalidPayloadSize(
@@ -387,7 +387,7 @@ struct PaintDocumentMutationContractTests {
         if client.isAvailable {
             #expect(payload != nil)
             #expect(payload?.fullPixelData?.count == 4)
-            #expect(payload?.dirtyRect == LayerPixelRect(originX: 0, originY: 0, width: 1, height: 1))
+            #expect(payload?.dirtyRect == LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 1, height: 1))
         } else {
             #expect(payload == nil)
         }

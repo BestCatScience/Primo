@@ -63,7 +63,11 @@ enum MetalDocumentGpuOperationBackendFactory {
                 else {
                     return nil
                 }
-                return DocumentCompositeSurface(width: canvasWidth, height: canvasHeight, pixelData: pixelData)
+                return DocumentCompositeSurface(
+                    unsafeUncheckedWidth: canvasWidth,
+                    height: canvasHeight,
+                    pixelData: pixelData
+                )
             },
             textLayerSurface: { textLayer, canvasSize in
                 textService.rasterizeTextLayer(textLayer, canvasSize: canvasSize).flatMap { payload in
@@ -74,7 +78,7 @@ enum MetalDocumentGpuOperationBackendFactory {
                         return nil
                     }
                     return DocumentCompositeSurface(
-                        width: width,
+                        unsafeUncheckedWidth: width,
                         height: height,
                         pixelData: pixelData
                     )
