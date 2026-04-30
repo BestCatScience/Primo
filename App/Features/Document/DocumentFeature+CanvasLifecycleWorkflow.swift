@@ -137,11 +137,6 @@ extension DocumentFeature {
         operation: CanvasHistoryOperation,
         performMutation: () -> DocumentMutationResult
     ) -> Effect<Action> {
-        if state.canvas.isStrokeActive {
-            return presentCanvasLifecycleFailure(
-                operation == .undo ? .undoUnavailableWhileDrawing : .redoUnavailableWhileDrawing
-            )
-        }
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(canvasMutation: .clearSelection),

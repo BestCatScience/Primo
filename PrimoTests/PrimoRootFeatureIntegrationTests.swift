@@ -697,7 +697,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         await store.receive(.document(.presentationRefreshRequested))
     }
 
-    func testUndoClearsPendingStrokePresentationState() async {
+    func testUndoClearsPendingStrokePresentationStateAndRunsWhileStrokeStateIsStale() async {
         let pendingSnapshot = MetalDocumentSnapshot(
             width: 2,
             height: 2,
@@ -720,6 +720,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 var state = PrimoRootFeature.State()
                 state.application.showsHome = false
                 state.document.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
+                state.document.canvas.isStrokeActive = true
                 return state
             }()
         ) {
@@ -729,6 +730,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
         await store.send(.document(.undoRequested)) {
             $0.document.canvas.pendingCommittedSnapshot = nil
+            $0.document.canvas.isStrokeActive = false
         }
     }
 
