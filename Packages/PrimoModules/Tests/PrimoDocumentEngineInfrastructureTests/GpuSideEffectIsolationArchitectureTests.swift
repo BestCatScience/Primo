@@ -216,6 +216,67 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func documentFeatureDelegatesEditorWorkflowsToFocusedReducers() throws {
+        let repoRoot = try Self.repoRoot()
+        let documentRoot = repoRoot.appendingPathComponent("App/Features/Document", isDirectory: true)
+        let documentFeature = documentRoot.appendingPathComponent("DocumentFeature.swift", isDirectory: false)
+        let body = try String(contentsOf: documentFeature, encoding: .utf8)
+        let workflowReducers = [
+            ("PresentationRefreshReducer", "presentation"),
+            ("DocumentLifecycleReducer", "lifecycle"),
+            ("CanvasEditingWorkflowReducer", "canvasEditing"),
+            ("LayerWorkflowReducer", "layerWorkflow"),
+            ("AdjustmentWorkflowReducer", "adjustment"),
+            ("AIImageWorkflowReducer", "aiImageWorkflow")
+        ]
+
+        for (reducer, action) in workflowReducers {
+            let reducerFile = documentRoot.appendingPathComponent("\(reducer).swift", isDirectory: false)
+            #expect(FileManager.default.fileExists(atPath: reducerFile.path), "\(reducer).swift should own a focused document workflow")
+            #expect(
+                body.contains("Scope(state: \\.self, action: \\.\(action))") && body.contains("\(reducer)()"),
+                "DocumentFeature should compose \(reducer) through a self-state workflow scope"
+            )
+        }
+
+        #expect(!body.contains("@Dependency"), "DocumentFeature.swift should not own workflow dependencies")
+        #expect(!body.contains("DocumentFeature()"), "DocumentFeature.swift should not instantiate itself as a workflow shell")
+        #expect(!body.contains("DocumentWorkflowExecutor"), "DocumentFeature.swift should not reference a shared workflow shell")
+        #expect(!body.contains("func handle"), "DocumentFeature.swift should not own workflow handlers")
+        #expect(!body.contains("case .editing"), "DocumentFeature.swift should route editing actions through workflow reducers")
+        #expect(!body.contains("case .photoImportReceived"), "DocumentFeature.swift should route layer import through LayerWorkflowReducer")
+        #expect(!body.contains("case .aiImageEditRequested"), "DocumentFeature.swift should route AI image edits through AIImageWorkflowReducer")
+
+        let executorFile = documentRoot.appendingPathComponent("DocumentWorkflowExecutor.swift", isDirectory: false)
+        #expect(!FileManager.default.fileExists(atPath: executorFile.path), "DocumentWorkflowExecutor.swift should not exist")
+
+        let oldWorkflowFilenames = [
+            "DocumentFeature+Workflow.swift",
+            "DocumentFeature+CanvasLifecycleWorkflow.swift",
+            "DocumentFeature+CanvasStrokeWorkflow.swift",
+            "DocumentFeature+SelectionWorkflow.swift",
+            "DocumentFeature+SelectionTransformWorkflow.swift",
+            "DocumentFeature+DocumentMutationWorkflow.swift",
+            "DocumentFeature+AdjustmentPreviewWorkflow.swift",
+            "DocumentFeature+AIImageWorkflow.swift"
+        ]
+        for filename in oldWorkflowFilenames {
+            let oldFile = documentRoot.appendingPathComponent(filename, isDirectory: false)
+            #expect(!FileManager.default.fileExists(atPath: oldFile.path), "\(filename) should be renamed to its workflow reducer owner")
+        }
+
+        for (reducer, _) in workflowReducers {
+            let reducerBody = try String(
+                contentsOf: documentRoot.appendingPathComponent("\(reducer).swift", isDirectory: false),
+                encoding: .utf8
+            )
+            #expect(!reducerBody.contains("typealias ParentAction"), "\(reducer).swift should reduce its workflow action directly")
+            #expect(!reducerBody.contains("typealias Action = DocumentFeature.Action"), "\(reducer).swift should not alias the parent action")
+            #expect(!reducerBody.contains("guard case let ."), "\(reducer).swift should not unwrap parent action cases")
+        }
+    }
+
+    @Test
     func canvasImageRendererDoesNotOwnGpuProcessingServices() throws {
         let repoRoot = try Self.repoRoot()
         let renderer = repoRoot.appendingPathComponent("App/Rendering/MetalCanvasRenderer.swift", isDirectory: false)

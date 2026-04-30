@@ -314,7 +314,7 @@ extension ContentView {
                             let width = resolvedCanvasDimension(from: newCanvasWidthText, fallback: defaultNewCanvasWidth),
                             let height = resolvedCanvasDimension(from: newCanvasHeightText, fallback: defaultNewCanvasHeight)
                         else { return }
-                        store.send(.document(.newCanvasRequested(width: width, height: height)))
+                        store.send(.document(.lifecycle(.newCanvasRequested(width: width, height: height))))
                         showsNewCanvasSheet = false
                     }
                     .disabled(
@@ -368,7 +368,7 @@ extension ContentView {
                             let width = resolvedCanvasDimension(from: resizeCanvasWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)),
                             let height = resolvedCanvasDimension(from: resizeCanvasHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1))
                         else { return }
-                        store.send(.document(.resizeCanvasRequested(width: width, height: height)))
+                        store.send(.document(.lifecycle(.resizeCanvasRequested(width: width, height: height))))
                         showsResizeCanvasSheet = false
                     }
                     .disabled(
@@ -418,7 +418,7 @@ extension ContentView {
                             let width = resolvedCanvasDimension(from: resizeCanvasExtentWidthText, fallback: max(Int(store.document.canvas.canvasSize.width.rounded()), 1)),
                             let height = resolvedCanvasDimension(from: resizeCanvasExtentHeightText, fallback: max(Int(store.document.canvas.canvasSize.height.rounded()), 1))
                         else { return }
-                        store.send(.document(.resizeCanvasExtentRequested(width: width, height: height)))
+                        store.send(.document(.lifecycle(.resizeCanvasExtentRequested(width: width, height: height))))
                         showsResizeCanvasExtentSheet = false
                     }
                     .disabled(
@@ -464,7 +464,7 @@ extension ContentView {
             text: $selectionFeatherRadiusText,
             confirmTitle: language.localized("適用")
         ) { amount in
-            store.send(.document(.editing(.featherSelectionRequested(amount))))
+            store.send(.document(.canvasEditing(.editing(.featherSelectionRequested(amount)))))
             showsFeatherSelectionSheet = false
         }
     }
@@ -721,7 +721,7 @@ extension ContentView {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(language.localized("選択")) {
-                        store.send(.document(.editing(.colorRangeSelectionRequested(currentColorRangeRequest))))
+                        store.send(.document(.canvasEditing(.editing(.colorRangeSelectionRequested(currentColorRangeRequest)))))
                         showsColorRangeSelectionSheet = false
                     }
                 }
@@ -771,24 +771,24 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.hueSaturationBrightnessPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.hueSaturationBrightnessPreviewChanged(nil)))))
                         showsHSBSheet = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.hueSaturationBrightnessApplied(hsbAdjustmentSettings))))
+                        store.send(.document(.adjustment(.editing(.hueSaturationBrightnessApplied(hsbAdjustmentSettings)))))
                         showsHSBSheet = false
                     }
                 }
             }
         }
         .onChange(of: hsbAdjustmentSettings) { _, newValue in
-            store.send(.document(.editing(.hueSaturationBrightnessPreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.hueSaturationBrightnessPreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.hueSaturationBrightnessPreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.hueSaturationBrightnessPreviewChanged(nil)))))
         }
         .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
@@ -824,24 +824,24 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.brightnessContrastPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.brightnessContrastPreviewChanged(nil)))))
                         showsBrightnessContrastSheet = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.brightnessContrastApplied(brightnessContrastSettings))))
+                        store.send(.document(.adjustment(.editing(.brightnessContrastApplied(brightnessContrastSettings)))))
                         showsBrightnessContrastSheet = false
                     }
                 }
             }
         }
         .onChange(of: brightnessContrastSettings) { _, newValue in
-            store.send(.document(.editing(.brightnessContrastPreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.brightnessContrastPreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.brightnessContrastPreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.brightnessContrastPreviewChanged(nil)))))
         }
         .presentationDetents([.height(320)])
         .presentationDragIndicator(.visible)
@@ -888,23 +888,23 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.levelsPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.levelsPreviewChanged(nil)))))
                         showsLevelsSheet = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.levelsApplied(normalizedLevelsSettings))))
+                        store.send(.document(.adjustment(.editing(.levelsApplied(normalizedLevelsSettings)))))
                         showsLevelsSheet = false
                     }
                 }
             }
         }
         .onChange(of: levelsAdjustmentSettings) { _, _ in
-            store.send(.document(.editing(.levelsPreviewChanged(normalizedLevelsSettings))))
+            store.send(.document(.adjustment(.editing(.levelsPreviewChanged(normalizedLevelsSettings)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.levelsPreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.levelsPreviewChanged(nil)))))
         }
         .presentationDetents([.height(480)])
         .presentationDragIndicator(.visible)
@@ -939,23 +939,23 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.toneCurvePreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.toneCurvePreviewChanged(nil)))))
                         showsToneCurveSheet = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.toneCurveApplied(toneCurveSettings))))
+                        store.send(.document(.adjustment(.editing(.toneCurveApplied(toneCurveSettings)))))
                         showsToneCurveSheet = false
                     }
                 }
             }
         }
         .onChange(of: toneCurveSettings) { _, newValue in
-            store.send(.document(.editing(.toneCurvePreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.toneCurvePreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.toneCurvePreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.toneCurvePreviewChanged(nil)))))
         }
         .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
@@ -990,23 +990,23 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.colorBalancePreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.colorBalancePreviewChanged(nil)))))
                         showsColorBalanceSheet = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.colorBalanceApplied(colorBalanceSettings))))
+                        store.send(.document(.adjustment(.editing(.colorBalanceApplied(colorBalanceSettings)))))
                         showsColorBalanceSheet = false
                     }
                 }
             }
         }
         .onChange(of: colorBalanceSettings) { _, newValue in
-            store.send(.document(.editing(.colorBalancePreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.colorBalancePreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.colorBalancePreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.colorBalancePreviewChanged(nil)))))
         }
         .presentationDetents([.height(360)])
         .presentationDragIndicator(.visible)
@@ -1029,23 +1029,23 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.thresholdPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.thresholdPreviewChanged(nil)))))
                         showsThresholdSheet = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.thresholdApplied(thresholdSettings))))
+                        store.send(.document(.adjustment(.editing(.thresholdApplied(thresholdSettings)))))
                         showsThresholdSheet = false
                     }
                 }
             }
         }
         .onChange(of: thresholdSettings) { _, newValue in
-            store.send(.document(.editing(.thresholdPreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.thresholdPreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.thresholdPreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.thresholdPreviewChanged(nil)))))
         }
         .presentationDetents([.height(240)])
         .presentationDragIndicator(.visible)
@@ -1069,23 +1069,23 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.posterizePreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.posterizePreviewChanged(nil)))))
                         showsPosterizeSheet = false
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.posterizeApplied(posterizeSettings))))
+                        store.send(.document(.adjustment(.editing(.posterizeApplied(posterizeSettings)))))
                         showsPosterizeSheet = false
                     }
                 }
             }
         }
         .onChange(of: posterizeSettings) { _, newValue in
-            store.send(.document(.editing(.posterizePreviewChanged(newValue))))
+            store.send(.document(.adjustment(.editing(.posterizePreviewChanged(newValue)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.posterizePreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.posterizePreviewChanged(nil)))))
         }
         .presentationDetents([.height(240)])
         .presentationDragIndicator(.visible)
@@ -1128,14 +1128,14 @@ extension ContentView {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        store.send(.document(.editing(.gradientMapPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.gradientMapPreviewChanged(nil)))))
                         showsGradientMapSheet = false
                     }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button(StudioStrings.apply(language)) {
-                        store.send(.document(.editing(.gradientMapApplied(normalizedGradientMapSettings))))
+                        store.send(.document(.adjustment(.editing(.gradientMapApplied(normalizedGradientMapSettings)))))
                         showsGradientMapSheet = false
                     }
                 }
@@ -1145,13 +1145,13 @@ extension ContentView {
             if selectedGradientStopID == nil {
                 selectedGradientStopID = normalizedGradientMapSettings.stops.dropFirst().first?.id
             }
-            store.send(.document(.editing(.gradientMapPreviewChanged(normalizedGradientMapSettings))))
+            store.send(.document(.adjustment(.editing(.gradientMapPreviewChanged(normalizedGradientMapSettings)))))
         }
         .onChange(of: gradientMapSettings) { _, _ in
-            store.send(.document(.editing(.gradientMapPreviewChanged(normalizedGradientMapSettings))))
+            store.send(.document(.adjustment(.editing(.gradientMapPreviewChanged(normalizedGradientMapSettings)))))
         }
         .onDisappear {
-            store.send(.document(.editing(.gradientMapPreviewChanged(nil))))
+            store.send(.document(.adjustment(.editing(.gradientMapPreviewChanged(nil)))))
         }
         .presentationDetents([.height(620)])
         .presentationDragIndicator(.visible)
@@ -1636,7 +1636,7 @@ extension ContentView {
                 Menu(StudioStrings.newCanvas(language)) {
                     ForEach(canvasSizePresets, id: \.label) { preset in
                         Button(preset.label) {
-                            store.send(.document(.newCanvasRequested(width: preset.width, height: preset.height)))
+                            store.send(.document(.lifecycle(.newCanvasRequested(width: preset.width, height: preset.height))))
                         }
                     }
 
@@ -1719,20 +1719,20 @@ extension ContentView {
 
                 Menu(StudioStrings.colorCorrection(language)) {
                     Button(StudioStrings.hueSaturationBrightness(language)) {
-                        store.send(.document(.editing(.brightnessContrastPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.brightnessContrastPreviewChanged(nil)))))
                         hsbAdjustmentSettings = HueSaturationBrightnessSettings()
                         showsHSBSheet = true
                     }
 
                     Button(StudioStrings.brightnessContrast(language)) {
-                        store.send(.document(.editing(.hueSaturationBrightnessPreviewChanged(nil))))
+                        store.send(.document(.adjustment(.editing(.hueSaturationBrightnessPreviewChanged(nil)))))
                         brightnessContrastSettings = BrightnessContrastSettings()
                         showsBrightnessContrastSheet = true
                     }
 
                     Button(StudioStrings.levels(language)) {
                         levelsAdjustmentSettings = LevelsAdjustmentSettings()
-                        store.send(.document(.editing(.levelsPreviewChanged(normalizedLevelsSettings))))
+                        store.send(.document(.adjustment(.editing(.levelsPreviewChanged(normalizedLevelsSettings)))))
                         showsLevelsSheet = true
                     }
 
@@ -1757,7 +1757,7 @@ extension ContentView {
                     }
 
                     Button(language.localized("輝度を透明度に変換")) {
-                        store.send(.document(.editing(.luminanceToAlphaRequested)))
+                        store.send(.document(.adjustment(.editing(.luminanceToAlphaRequested))))
                     }
 
                     Menu(StudioStrings.gradientMap(language)) {
@@ -1770,7 +1770,7 @@ extension ContentView {
 
                         ForEach(GradientMapPreset.allCases) { preset in
                             Button(preset.localizedTitle(language)) {
-                                store.send(.document(.editing(.gradientMapSelected(preset))))
+                                store.send(.document(.adjustment(.editing(.gradientMapSelected(preset)))))
                             }
                         }
                     }
@@ -1786,7 +1786,7 @@ extension ContentView {
                 Divider()
 
                 Button(StudioStrings.clearActiveLayer(language)) {
-                    store.send(.document(.editing(.clearActiveLayerButtonTapped)))
+                    store.send(.document(.layerWorkflow(.editing(.clearActiveLayerButtonTapped))))
                 }
 
                 Button(StudioStrings.refreshView(language)) {
@@ -1817,43 +1817,43 @@ extension ContentView {
                 }
 
                 Button(activeLayerIsVisible ? StudioStrings.hideActiveLayer(language) : StudioStrings.showActiveLayer(language)) {
-                    store.send(.document(.editing(.activeLayerVisibilityToggled)))
+                    store.send(.document(.layerWorkflow(.editing(.activeLayerVisibilityToggled))))
                 }
                 .disabled(activeLayer == nil)
 
                 Divider()
 
                 Button(StudioStrings.selectUpperLayer(language)) {
-                    store.send(.document(.editing(.selectPreviousLayer)))
+                    store.send(.document(.layerWorkflow(.editing(.selectPreviousLayer))))
                 }
                 .disabled(!canSelectPreviousLayer)
 
                 Button(StudioStrings.selectLowerLayer(language)) {
-                    store.send(.document(.editing(.selectNextLayer)))
+                    store.send(.document(.layerWorkflow(.editing(.selectNextLayer))))
                 }
                 .disabled(!canSelectNextLayer)
 
                 Divider()
 
                 Button(language.localized("選択範囲からマスク作成")) {
-                    store.send(.document(.editing(.createLayerMaskFromSelectionRequested)))
+                    store.send(.document(.layerWorkflow(.editing(.createLayerMaskFromSelectionRequested))))
                 }
                 .disabled(activeLayer == nil || store.document.canvas.selection?.isEmpty != false)
 
                 Button(language.localized("マスクを削除")) {
-                    store.send(.document(.editing(.clearLayerMaskRequested)))
+                    store.send(.document(.layerWorkflow(.editing(.clearLayerMaskRequested))))
                 }
                 .disabled(activeLayerHasMask == false)
 
                 Button(language.localized("マスクを適用")) {
-                    store.send(.document(.editing(.applyLayerMaskRequested)))
+                    store.send(.document(.layerWorkflow(.editing(.applyLayerMaskRequested))))
                 }
                 .disabled(activeLayerHasMask == false)
 
                 Divider()
 
                 Button(StudioStrings.clearActiveLayer(language)) {
-                    store.send(.document(.editing(.clearActiveLayerButtonTapped)))
+                    store.send(.document(.layerWorkflow(.editing(.clearActiveLayerButtonTapped))))
                 }
                 .disabled(activeLayer == nil)
             }
@@ -1899,11 +1899,11 @@ extension ContentView {
                 Divider()
 
                 Button(store.document.brushPanel.isCollapsed ? StudioStrings.showBrushPanel(language) : StudioStrings.hideBrushPanel(language)) {
-                    store.send(.document(.editing(.panelCollapseToggled(.brush))))
+                    store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.brush)))))
                 }
 
                 Button(store.document.layerPanel.isCollapsed ? StudioStrings.showLayerPanel(language) : StudioStrings.hideLayerPanel(language)) {
-                    store.send(.document(.editing(.panelCollapseToggled(.layers))))
+                    store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.layers)))))
                 }
 
                 Divider()
@@ -1935,7 +1935,7 @@ extension ContentView {
     var undoRedoBar: some View {
         HStack(spacing: 6) {
             Button {
-                store.send(.document(.undoRequested))
+                store.send(.document(.lifecycle(.undoRequested)))
             } label: {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 11, weight: .semibold))
@@ -1955,7 +1955,7 @@ extension ContentView {
             }
 
             Button {
-                store.send(.document(.redoRequested))
+                store.send(.document(.lifecycle(.redoRequested)))
             } label: {
                 Image(systemName: "arrow.uturn.forward")
                     .font(.system(size: 11, weight: .semibold))
@@ -1995,7 +1995,7 @@ extension ContentView {
             }
 
             Button {
-                store.send(.document(.editing(.clearActiveLayerButtonTapped)))
+                store.send(.document(.layerWorkflow(.editing(.clearActiveLayerButtonTapped))))
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11, weight: .semibold))

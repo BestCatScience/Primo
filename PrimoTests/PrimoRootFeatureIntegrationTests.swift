@@ -162,7 +162,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
         await store.send(.workspace(.homeReturnRequested))
         await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
-        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.receive(.document(.presentation(.workspaceSnapshotRequested(.pendingWorkspaceOperation))))
         await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
             $0.workspace.openTabs = [savedTab]
         }
@@ -199,7 +199,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             $0.workspace.pendingDocumentSnapshotOperation = .lifecycleAutosave
         }
         await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
-        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.receive(.document(.presentation(.workspaceSnapshotRequested(.pendingWorkspaceOperation))))
         await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
             $0.workspace.openTabs = [refreshedTab]
             $0.workspace.pendingDocumentSnapshotOperation = nil
@@ -239,7 +239,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             $0.workspace.pendingDocumentSnapshotOperation = .closeTabsSave(.tab(activeTab.id), [activeTab.id])
         }
         await store.receive(.workspace(.delegate(.requestDocumentSnapshot)))
-        await store.receive(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+        await store.receive(.document(.presentation(.workspaceSnapshotRequested(.pendingWorkspaceOperation))))
         await store.send(.workspace(.documentSnapshotPrepared(workspaceSnapshot(activeTab: activeTab, previewSurface: previewSurface)))) {
             $0.workspace.openTabs = []
             $0.workspace.activeTabID = nil
@@ -505,7 +505,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         let store = makeRootStore()
         store.exhaustivity = .off
 
-        await store.send(.document(.newCanvasPreparationCompleted(dimensions)))
+        await store.send(.document(.lifecycle(.newCanvasPreparationCompleted(dimensions))))
         await store.receive(
             .workspace(
                 .freshDocumentRequested(
@@ -662,7 +662,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
 
     func testCanvasLifecycleFailureNoLongerEmbedsPresentationFeedback() throws {
         let contents = try String(
-            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/DocumentFeature+CanvasLifecycleWorkflow.swift"),
+            contentsOf: repoRoot.appendingPathComponent("App/Features/Document/DocumentLifecycleReducer+Workflow.swift"),
             encoding: .utf8
         )
 
@@ -704,7 +704,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.document(.undoRequested)) {
+        await store.send(.document(.lifecycle(.undoRequested))) {
             $0.document.canvas.canvasSize = CGSize(width: 3, height: 3)
             $0.document.canvas.renderSnapshot = undoPresentation.renderSnapshot
             $0.document.canvas.lastCommittedRenderRevision = 1
@@ -744,7 +744,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         }
         store.exhaustivity = .off
 
-        await store.send(.document(.undoRequested)) {
+        await store.send(.document(.lifecycle(.undoRequested))) {
             $0.document.canvas.pendingCommittedSnapshot = nil
             $0.document.canvas.isStrokeActive = false
             $0.document.canvas.renderSnapshot = PaintDocumentPresentation.renderedTestValue(width: 2, height: 2).renderSnapshot
@@ -794,6 +794,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         await store.send(.canvas(.zoomScaleChanged(1.75))) {
             $0.canvas.zoomScale = 1.75
         }
+        await store.receive(.canvasEditing(.canvas(.zoomScaleChanged(1.75))))
     }
 
     func testImportExportDismissalRoutesThroughFeatureSlice() async {

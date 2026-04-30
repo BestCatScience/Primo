@@ -5,7 +5,7 @@ import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension DocumentFeature {
+extension CanvasEditingWorkflowReducer {
     typealias SelectionTransformCommit = PrimoDocumentApplication.SelectionTransformCommit
     typealias SelectionTransformService = PrimoDocumentApplication.DocumentContentService
 
@@ -89,9 +89,13 @@ extension DocumentFeature {
             contentService: selectionTransformService,
             layerTransformProcessor: layerTransformProcessor
         ) else {
-            DocumentCanvasMutationCoordinator().apply(
-                .resetTransformPreview,
-                to: &state
+            _ = completeDocumentMutation(
+                state: &state,
+                contract: DocumentMutationContract(
+                    canvasMutation: .resetTransformPreview,
+                    refresh: .none,
+                    successFeedback: nil
+                )
             )
             return .none
         }
@@ -100,11 +104,13 @@ extension DocumentFeature {
         case let .text(layerIndex, textLayer):
             switch selectionTransformService.setTextLayer(layerIndex, textLayer) {
             case .success:
-                DocumentCanvasMutationCoordinator().apply(
-                    .resetTransformPreview,
-                    to: &state
+                return completeDocumentMutation(
+                    state: &state,
+                    contract: DocumentMutationContract(
+                        canvasMutation: .resetTransformPreview,
+                        successFeedback: nil
+                    )
                 )
-                return .send(.delegate(.presentationRefreshRequested))
 
             case let .failure(failure):
                 return transformFailureEffect(failure)
@@ -113,14 +119,16 @@ extension DocumentFeature {
         case let .pixels(layerIndex, pixelData, selection):
             switch selectionTransformService.replaceLayerPixels(layerIndex, pixelData) {
             case .success:
-                DocumentCanvasMutationCoordinator().apply(
-                    .completeTransform(
-                        layerIndex: layerIndex,
-                        selection: selection
-                    ),
-                    to: &state
+                return completeDocumentMutation(
+                    state: &state,
+                    contract: DocumentMutationContract(
+                        canvasMutation: .completeTransform(
+                            layerIndex: layerIndex,
+                            selection: selection
+                        ),
+                        successFeedback: nil
+                    )
                 )
-                return .send(.delegate(.presentationRefreshRequested))
 
             case let .failure(failure):
                 return transformFailureEffect(failure)

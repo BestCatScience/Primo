@@ -28,13 +28,13 @@ struct CrossFeatureIntegrationReducer: Reducer {
             )
 
         case .application(.delegate(.requestPresentationRefresh)):
-            return .send(.document(.presentationRefreshRequested))
+            return .send(.document(.presentation(.presentationRefreshRequested)))
 
         case .application(.delegate(.requestLifecycleAutosave)):
             return .send(.workspace(.lifecycleAutosaveRequested))
 
         case .application(.delegate(.requestStartupPresentationBootstrap)):
-            return .send(.document(.startupPresentationBootstrapRequested))
+            return .send(.document(.presentation(.startupPresentationBootstrapRequested)))
 
         case .importExport(.delegate(.saveHistoryEntriesRequested)):
             return .send(.workspace(.saveHistoryEntriesRequested))
@@ -52,7 +52,7 @@ struct CrossFeatureIntegrationReducer: Reducer {
             return .send(.application(.feedbackPresented(.timelapseHistoryUnavailable)))
 
         case let .importExport(.photoImportReceived(name, data)):
-            return .send(.document(.photoImportReceived(name: name, data: data)))
+            return .send(.document(.layerWorkflow(.photoImportReceived(name: name, data: data))))
 
         case .importExport(.photoImportFailed):
             return .none
@@ -64,7 +64,7 @@ struct CrossFeatureIntegrationReducer: Reducer {
             return .send(.application(.feedbackPresented(feedback)))
 
         case let .importExport(.delegate(.newCanvasFromImagePrepared(plan))):
-            return .send(.document(.newCanvasFromImagePreparationCompleted(plan)))
+            return .send(.document(.lifecycle(.newCanvasFromImagePreparationCompleted(plan))))
 
         case let .importExport(.saveHistoryRestoreFailed(message)):
             return .send(.application(.hydrationFailed(message)))
@@ -138,13 +138,13 @@ struct CrossFeatureIntegrationReducer: Reducer {
             return .send(.application(.homeProjectsLoadRequested))
 
         case .workspace(.delegate(.requestDocumentSnapshot)):
-            return .send(.document(.workspaceSnapshotRequested(.pendingWorkspaceOperation)))
+            return .send(.document(.presentation(.workspaceSnapshotRequested(.pendingWorkspaceOperation))))
 
         case let .workspace(.delegate(.applyLoadedProject(loaded))):
-            return .send(.document(.applyLoadedProjectRequested(loaded)))
+            return .send(.document(.presentation(.applyLoadedProjectRequested(loaded))))
 
         case let .workspace(.delegate(.requestFreshDocumentMutation(request))):
-            return .send(.document(.freshDocumentMutationRequested(request)))
+            return .send(.document(.lifecycle(.freshDocumentMutationRequested(request))))
 
         case let .document(.delegate(.workspaceSnapshotPrepared(_, snapshot))):
             return .send(.workspace(.documentSnapshotPrepared(snapshot)))
@@ -177,22 +177,22 @@ struct CrossFeatureIntegrationReducer: Reducer {
             return .send(.aiImage(.generationApplied(applied)))
 
         case let .aiImage(.delegate(.requestEdit(request))):
-            return .send(.document(.aiImageEditRequested(request)))
+            return .send(.document(.aiImageWorkflow(.aiImageEditRequested(request))))
 
         case .aiImage(.delegate(.cancelEdit)):
-            return .send(.document(.aiImageCancelRequested))
+            return .send(.document(.aiImageWorkflow(.aiImageCancelRequested)))
 
         case let .document(.delegate(.paperStyleSyncRequested(paperStyle))):
-            return .send(.document(.paperStyleSyncRequested(paperStyle)))
+            return .send(.document(.presentation(.paperStyleSyncRequested(paperStyle))))
 
         case .document(.brushPalette(.delegate(.cancelTransform))),
              .document(.brushPalette(.delegate(.applyTransform))),
              .document(.canvas(.delegate(.applyTransform))):
             return .none
 
-        case .document(.editing(.activeLayerVisibilityToggled)),
-             .document(.editing(.selectPreviousLayer)),
-             .document(.editing(.selectNextLayer)),
+        case .document(.layerWorkflow(.editing(.activeLayerVisibilityToggled))),
+             .document(.layerWorkflow(.editing(.selectPreviousLayer))),
+             .document(.layerWorkflow(.editing(.selectNextLayer))),
              .document(.layerSidebar(.delegate(.setOpacity))),
              .document(.layerSidebar(.delegate(.toggleLayerLock))),
              .document(.layerSidebar(.delegate(.toggleAlphaLock))),
@@ -214,61 +214,44 @@ struct CrossFeatureIntegrationReducer: Reducer {
              .document(.layerSidebar(.delegate(.removeLayerFromFolder))),
              .document(.layerSidebar(.delegate(.mergeDown))),
              .document(.brushPalette(.delegate(.applyText))),
-             .document(.editing(.clearActiveLayerButtonTapped)),
+             .document(.layerWorkflow(.editing(.clearActiveLayerButtonTapped))),
              .document(.brushPalette(.delegate(.clearActiveLayer))),
-             .document(.editing(.createLayerMaskFromSelectionRequested)),
-             .document(.editing(.clearLayerMaskRequested)),
-             .document(.editing(.applyLayerMaskRequested)),
-             .document(.photoImportReceived):
+             .document(.layerWorkflow(.editing(.createLayerMaskFromSelectionRequested))),
+             .document(.layerWorkflow(.editing(.clearLayerMaskRequested))),
+             .document(.layerWorkflow(.editing(.applyLayerMaskRequested))),
+             .document(.layerWorkflow(.photoImportReceived)):
             return .none
 
         case .document(.delegate(.presentationRefreshRequested)):
-            return .send(.document(.presentationRefreshRequested))
+            return .send(.document(.presentation(.presentationRefreshRequested)))
 
         case let .document(.delegate(.documentMutationFeedback(feedback))):
             return .send(.application(.feedbackPresented(feedback)))
 
-        case .document(.editing(.gradientMapPreviewChanged)),
-             .document(.editing(.hueSaturationBrightnessPreviewChanged)),
-             .document(.editing(.brightnessContrastPreviewChanged)),
-             .document(.editing(.levelsPreviewChanged)),
-             .document(.editing(.toneCurvePreviewChanged)),
-             .document(.editing(.colorBalancePreviewChanged)),
-             .document(.editing(.thresholdPreviewChanged)),
-             .document(.editing(.posterizePreviewChanged)),
-             .document(.editing(.gradientMapSelected)),
-             .document(.editing(.gradientMapApplied)),
-             .document(.editing(.hueSaturationBrightnessApplied)),
-             .document(.editing(.brightnessContrastApplied)),
-             .document(.editing(.levelsApplied)),
-             .document(.editing(.toneCurveApplied)),
-             .document(.editing(.colorBalanceApplied)),
-             .document(.editing(.thresholdApplied)),
-             .document(.editing(.posterizeApplied)),
-             .document(.editing(.luminanceToAlphaRequested)),
-             .document(.resizeCanvasRequested),
-             .document(.resizeCanvasExtentRequested),
-             .document(.undoRequested),
-             .document(.redoRequested):
+        case .document(.adjustment),
+             .document(.lifecycle(.resizeCanvasRequested)),
+             .document(.lifecycle(.resizeCanvasExtentRequested)),
+             .document(.lifecycle(.undoRequested)),
+             .document(.lifecycle(.redoRequested)):
             return .none
 
         case .application(.deferredPresentationRefresh):
-            return .send(.document(.deferredPresentationRefreshRequested))
+            return .send(.document(.presentation(.deferredPresentationRefreshRequested)))
 
         case .application(.refreshPresentationRequested):
-            return .send(.document(.presentationRefreshRequested))
+            return .send(.document(.presentation(.presentationRefreshRequested)))
 
         case .application(.loadPresentationAfterLaunch):
-            return .send(.document(.deferredPresentationLoadRequested))
+            return .send(.document(.presentation(.deferredPresentationLoadRequested)))
 
         case let .application(.documentPaperStyleSyncRequested(paperStyle)):
-            return .send(.document(.paperStyleSyncRequested(paperStyle)))
+            return .send(.document(.presentation(.paperStyleSyncRequested(paperStyle))))
 
         case let .application(.bootstrapPresentationLoaded(presentation)):
-            return .send(.document(.bootstrapPresentationLoaded(presentation)))
+            return .send(.document(.presentation(.bootstrapPresentationLoaded(presentation))))
 
         case let .application(.presentationLoaded(presentation)):
-            return .send(.document(.presentationLoaded(presentation)))
+            return .send(.document(.presentation(.presentationLoaded(presentation))))
 
         case .document(.delegate(.presentationApplied)):
             return .send(.application(.hydrationFinished()))

@@ -23,12 +23,12 @@ struct PrimoApp: App {
         .commands {
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
-                    store.send(.document(.undoRequested))
+                    store.send(.document(.lifecycle(.undoRequested)))
                 }
                 .keyboardShortcut("z", modifiers: .command)
 
                 Button("Redo") {
-                    store.send(.document(.redoRequested))
+                    store.send(.document(.lifecycle(.redoRequested)))
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
             }

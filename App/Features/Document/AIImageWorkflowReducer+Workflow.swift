@@ -6,7 +6,7 @@ import PrimoDocumentContracts
 import PrimoAIImageApplication
 import PrimoAIImageDomain
 
-extension DocumentFeature {
+extension AIImageWorkflowReducer {
     private struct AIImageValidatedEdit {
         let command: SubmitAIImageEditCommand
         let selectionRegion: AIImageSelectionRegion?
@@ -191,7 +191,7 @@ extension DocumentFeature {
                 case let .success(preview):
                     await send(.aiImagePreviewPrepared(jobID: jobID, preview: preview))
                 case let .failure(.editFailed(failure)):
-                    await send(.aiImagePreviewPreparationFailed(jobID: jobID, feedback: Self.aiImageFailureFeedback(failure)))
+                    await send(.aiImagePreviewPreparationFailed(jobID: jobID, feedback: DocumentFeature.aiImageFailureFeedback(failure)))
                 case .failure(.unsupportedImage):
                     await send(.aiImagePreviewPreparationFailed(jobID: jobID, feedback: .aiImageUnsupportedImage))
                 }

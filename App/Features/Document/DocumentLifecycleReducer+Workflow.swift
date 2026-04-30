@@ -4,7 +4,24 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 
-extension DocumentFeature {
+extension DocumentLifecycleReducer {
+    func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {
+        let paperStyle = DocumentFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
+        let previewSurface = state.canvas.renderSnapshot.map {
+            DocumentFeature.renderedCompositeSurface(
+                snapshot: $0,
+                paperStyle: paperStyle,
+                gpuOperations: documentGpuOperationGateway
+            )
+        } ?? documentExportGateway.compositeSurface(paperStyle)
+        return WorkspaceDocumentSnapshot(
+            activeTab: nil,
+            paperStyle: paperStyle,
+            previewSurface: previewSurface,
+            canvasSize: state.canvas.canvasSize
+        )
+    }
+
     enum CanvasLifecycleContractFailure: Error, Equatable, Sendable, FailureReason {
         case unsupportedCanvasSize
         case invalidImageData
@@ -242,8 +259,8 @@ extension DocumentFeature {
             state.canvas.setCanvasSize(request.contract.canvasSize)
             state.layerSidebar = LayerSidebarFeature.State()
             state.brushPalette = BrushPaletteFeature.State()
-            Self.toolPanelStateCoordinator.resetPanels(in: &state)
-            _ = applyPresentation(documentQueryGateway.presentation(), to: &state)
+            DocumentFeature.toolPanelStateCoordinator.resetPanels(in: &state)
+            _ = documentMutationWorkflowSupport.applyPresentation(documentQueryGateway.presentation(), to: &state)
             return .send(
                 .delegate(
                     .freshDocumentMutationSucceeded(

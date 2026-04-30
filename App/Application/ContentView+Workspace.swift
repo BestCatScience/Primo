@@ -241,18 +241,18 @@ extension ContentView {
                 case .brush:
                     if panelState.isCollapsed {
                         if translation > dragThreshold {
-                            store.send(.document(.editing(.panelCollapseToggled(panel))))
+                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                         }
                     } else if translation < -dragThreshold {
-                        store.send(.document(.editing(.panelCollapseToggled(panel))))
+                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                     }
                 case .layers:
                     if panelState.isCollapsed {
                         if translation < -dragThreshold {
-                            store.send(.document(.editing(.panelCollapseToggled(panel))))
+                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                         }
                     } else if translation > dragThreshold {
-                        store.send(.document(.editing(.panelCollapseToggled(panel))))
+                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                     }
                 }
             }
@@ -274,7 +274,7 @@ extension ContentView {
                 .gesture(panelDragGesture)
                 .onTapGesture {
                     if panelState.isCollapsed {
-                        store.send(.document(.editing(.panelCollapseToggled(panel))))
+                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                     }
                 }
         }
@@ -294,7 +294,7 @@ extension ContentView {
         StudioPanelShell(
             title: panel.title(language),
             isCollapsed: panelState.isCollapsed,
-            onToggleCollapse: { store.send(.document(.editing(.panelCollapseToggled(panel)))) }
+            onToggleCollapse: { store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel))))) }
         ) {
             switch panel {
             case .brush:
@@ -314,7 +314,7 @@ extension ContentView {
                     language: language,
                     showsTitle: false,
                     onSelectTool: { tool in
-                        store.send(.document(.editing(.toolSelected(tool))))
+                        store.send(.document(.canvasEditing(.editing(.toolSelected(tool)))))
                     },
                     onRequestExpandSelection: {
                         selectionExpansionText = "4"
@@ -1055,11 +1055,11 @@ extension ContentView {
             )
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
-                store.send(.document(.editing(.toolSelected(tool))))
+                store.send(.document(.canvasEditing(.editing(.toolSelected(tool)))))
             }
             .onLongPressGesture(minimumDuration: 0.45) {
                 if tool == .brush || tool == .erase {
-                    store.send(.document(.editing(.toolLongPressed(tool))))
+                    store.send(.document(.canvasEditing(.editing(.toolLongPressed(tool)))))
                 }
             }
     }

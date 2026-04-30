@@ -2,7 +2,7 @@ import Foundation
 import ComposableArchitecture
 import PrimoDocumentContracts
 
-extension DocumentFeature {
+extension AdjustmentWorkflowReducer {
     struct AdjustmentWorkflowService {
         let documentMutationGateway: DocumentMutationGateway
 
@@ -98,7 +98,7 @@ extension DocumentFeature {
         guard
             let adjustedPixels,
             let snapshot = state.canvas.renderSnapshot,
-            Self.canvasPreviewStateCoordinator.applyLiveStrokePreview(
+            DocumentFeature.canvasPreviewStateCoordinator.applyLiveStrokePreview(
                 baseSnapshot: snapshot,
                 activeLayerIndex: state.canvas.activeLayerIndex,
                 adjustedActiveLayerPixels: adjustedPixels,

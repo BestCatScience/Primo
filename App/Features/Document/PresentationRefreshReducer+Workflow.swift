@@ -3,11 +3,11 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension DocumentFeature {
+extension PresentationRefreshReducer {
     func workspaceDocumentSnapshot(state: State) -> WorkspaceDocumentSnapshot {
-        let paperStyle = Self.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
+        let paperStyle = DocumentFeature.canvasToolStateCoordinator.resolvedPaperStyle(for: state)
         let previewSurface = state.canvas.renderSnapshot.map {
-            Self.renderedCompositeSurface(
+            DocumentFeature.renderedCompositeSurface(
                 snapshot: $0,
                 paperStyle: paperStyle,
                 gpuOperations: documentGpuOperationGateway
@@ -88,7 +88,7 @@ extension DocumentFeature {
         _ presentation: PaintDocumentPresentation,
         to state: inout State
     ) -> Effect<Action> {
-        guard Self.canvasPresentationStateCoordinator.applyPresentation(presentation, to: &state) else {
+        guard DocumentFeature.canvasPresentationStateCoordinator.applyPresentation(presentation, to: &state) else {
             return .none
         }
         return .send(.delegate(.presentationApplied))

@@ -4,7 +4,7 @@ import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 
-extension DocumentFeature {
+extension CanvasEditingWorkflowReducer {
     func handleInvertSelection(state: inout State) {
         state.canvas.replaceSelection(
             selectionWorkflowService.invertedSelection(

@@ -21,11 +21,7 @@ extension DocumentMutationWorkflowOutcome where Selection == CanvasSelection, Fe
     }
 }
 
-extension DocumentFeature {
-    typealias LayerContentMutationTarget = PrimoDocumentApplication.LayerContentMutationTarget
-    typealias AppliedLayerContentMutation = PrimoDocumentApplication.AppliedLayerContentMutation
-    typealias LayerContentWorkflowService = PrimoDocumentApplication.DocumentContentService
-
+extension LayerWorkflowReducer {
     var layerWorkflowService: LayerWorkflowService {
         documentMutationWorkflowService
     }
@@ -36,89 +32,6 @@ extension DocumentFeature {
             documentMutationGateway: documentMutationGateway,
             textLayerGateway: textLayerGateway
         )
-    }
-
-    struct DocumentCanvasMutationCoordinator {
-        func apply(
-            _ mutation: DocumentCanvasMutation,
-            to state: inout State
-        ) {
-            switch mutation {
-            case .none:
-                break
-            case .clearSelection:
-                state.canvas.clearSelection()
-            case let .finalizeLayer(finalization):
-                state.canvas.finalizeLayerMutation(
-                    at: finalization.index,
-                    incrementsRevision: finalization.incrementsRevision,
-                    clearsSelection: finalization.clearsSelection
-                )
-            case let .completeTransform(layerIndex, selection):
-                state.canvas.completeTransformMutation(
-                    at: layerIndex,
-                    selection: selection
-                )
-            case .resetTransientEditingState:
-                state.canvas.resetTransientEditingState()
-            case .resetTransformPreview:
-                state.canvas.resetTransformPreview()
-            }
-        }
-    }
-
-    @discardableResult
-    func completeDocumentMutation(
-        state: inout State,
-        contract: DocumentMutationContract = .dirty
-    ) -> Effect<Action> {
-        DocumentCanvasMutationCoordinator().apply(
-            contract.canvasMutation,
-            to: &state
-        )
-        let refreshEffect: Effect<Action>
-        switch contract.refresh {
-        case .none:
-            refreshEffect = .none
-        case .current:
-            refreshEffect = applyPresentation(documentQueryGateway.presentation(), to: &state)
-        case .dirty:
-            refreshEffect = .send(.delegate(.presentationRefreshRequested))
-        }
-        return .merge(
-            refreshEffect,
-            documentMutationFeedbackEffect(for: contract.successFeedback)
-        )
-    }
-
-    @discardableResult
-    func performDocumentMutation<Success>(
-        state: inout State,
-        contract: DocumentMutationContract = .dirty,
-        failureFeedback: ApplicationFeature.Feedback? = nil,
-        mutation: () -> Result<Success, DocumentMutationFailure>,
-        onSuccess: (Success, inout State) -> Void = { _, _ in }
-    ) -> Effect<Action> {
-        switch mutation() {
-        case let .success(success):
-            onSuccess(success, &state)
-            return completeDocumentMutation(state: &state, contract: contract)
-
-        case let .failure(failure):
-            return documentMutationFeedbackEffect(
-                for: DocumentMutationFeedbackMapper().feedback(
-                    for: failure,
-                    default: failureFeedback
-                )
-            )
-        }
-    }
-
-    func documentMutationFeedbackEffect(
-        for feedback: ApplicationFeature.Feedback?
-    ) -> Effect<Action> {
-        guard let feedback else { return .none }
-        return .send(.delegate(.documentMutationFeedback(feedback)))
     }
 
     func handleActiveLayerVisibilityToggle(state: inout State) -> Effect<Action> {
@@ -437,7 +350,7 @@ extension DocumentFeature {
         name: String?,
         data: Data
     ) -> Effect<Action> {
-        guard let importedPixelData = Self.fittedLayerPixelData(
+        guard let importedPixelData = DocumentFeature.fittedLayerPixelData(
             fromImageData: data,
             canvasSize: state.canvas.canvasSize,
             gpuOperations: documentGpuOperationGateway
@@ -556,7 +469,7 @@ extension DocumentFeature {
 
     func handleCreateLayerMask(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
-        guard let maskData = Self.layerMaskData(
+        guard let maskData = DocumentFeature.layerMaskData(
             from: state.canvas.selection,
             canvasSize: state.canvas.canvasSize,
             gpuOperations: documentGpuOperationGateway

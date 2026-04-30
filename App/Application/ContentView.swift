@@ -361,7 +361,7 @@ struct ContentView: View {
                             showsTitle: false,
                             rendersFloatingPanelOnly: true,
                             onSelectTool: { tool in
-                                store.send(.document(.editing(.toolSelected(tool))))
+                                store.send(.document(.canvasEditing(.editing(.toolSelected(tool)))))
                             },
                             onRequestExpandSelection: {
                                 selectionExpansionText = "4"
