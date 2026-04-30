@@ -23,6 +23,7 @@ struct DocumentLifecycleReducer: Reducer {
         case newCanvasFromImagePreparationCompleted(ImportExportFeature.ImportedCanvasPlan)
         case undoRequested
         case redoRequested
+        case memoryPressureTrimRequested
         case resizeCanvasRequested(width: Int, height: Int)
         case resizeCanvasExtentRequested(width: Int, height: Int)
         case delegate(DocumentFeature.Action.Delegate)
@@ -68,6 +69,10 @@ struct DocumentLifecycleReducer: Reducer {
 
         case .redoRequested:
             return handleRedoRequested(state: &state)
+
+        case .memoryPressureTrimRequested:
+            documentHistoryCommandService.trimForMemoryPressure()
+            return .none
 
         case .delegate:
             return .none

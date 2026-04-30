@@ -324,42 +324,348 @@ private struct TimelapseRecorder: Sendable {
 }
 
 private struct UndoSnapshotPolicy: Sendable {
-    private var undoStack: [SwiftDocumentStoreSnapshot] = []
-    private var redoStack: [SwiftDocumentStoreSnapshot] = []
+    struct Limits: Sendable {
+        var maxEntryCount: Int = 50
+        var maxRetainedBytes: Int = 128 * 1024 * 1024
+    }
+
+    struct DebugStats: Sendable, Equatable {
+        var retainedBytes: Int
+        var undoCount: Int
+        var redoCount: Int
+        var evictedCount: Int
+        var droppedOversizedCount: Int
+    }
+
+    private var undoStack: [UndoHistoryEntry] = []
+    private var redoStack: [UndoHistoryEntry] = []
+    private var retainedBytes = 0
+    private var evictedCount = 0
+    private var droppedOversizedCount = 0
+    private let limits: Limits
+
+    init(limits: Limits = Limits()) {
+        self.limits = limits
+    }
 
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }
 
-    mutating func recordMutation(before: SwiftDocumentStoreSnapshot) {
-        undoStack.append(before)
-        redoStack.removeAll(keepingCapacity: true)
+    var debugStats: DebugStats {
+        DebugStats(
+            retainedBytes: retainedBytes,
+            undoCount: undoStack.count,
+            redoCount: redoStack.count,
+            evictedCount: evictedCount,
+            droppedOversizedCount: droppedOversizedCount
+        )
+    }
+
+    mutating func recordMutation(
+        before: SwiftDocumentStoreSnapshot,
+        after: SwiftDocumentStoreSnapshot,
+        changedLayerIndex: Int?,
+        dirtyRect: LayerPixelRect?
+    ) -> DebugStats {
+        let entry = UndoHistoryEntry(
+            before: before,
+            after: after,
+            changedLayerIndex: changedLayerIndex,
+            dirtyRect: dirtyRect
+        )
+        clearRedo()
+        appendUndo(entry)
+        enforceLimits()
+        return debugStats
     }
 
     mutating func restoreUndo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
-        while let previous = undoStack.popLast() {
-            guard !previous.hasSameDocumentContent(as: current) else { continue }
-            redoStack.append(current)
+        while let entry = popUndo() {
+            guard let previous = entry.undoSnapshot(from: current),
+                  !previous.hasSameDocumentContent(as: current)
+            else {
+                continue
+            }
+            appendRedo(entry.flipped(current: current))
+            enforceLimits()
             return .success(previous)
         }
         return .failure(.noUndoState)
     }
 
     mutating func restoreRedo(current: SwiftDocumentStoreSnapshot) -> Result<SwiftDocumentStoreSnapshot, DocumentMutationFailure> {
-        while let next = redoStack.popLast() {
-            guard !next.hasSameDocumentContent(as: current) else { continue }
-            undoStack.append(current)
+        while let entry = popRedo() {
+            guard let next = entry.redoSnapshot(from: current),
+                  !next.hasSameDocumentContent(as: current)
+            else {
+                continue
+            }
+            appendUndo(entry.flipped(current: current))
+            enforceLimits()
             return .success(next)
         }
         return .failure(.noRedoState)
     }
 
+    mutating func trimForMemoryPressure() -> DebugStats {
+        clearRedo()
+        let targetBytes = limits.maxRetainedBytes / 4
+        while undoStack.count > 8 || retainedBytes > targetBytes {
+            guard !undoStack.isEmpty else { break }
+            removeOldestUndoEntry()
+        }
+        return debugStats
+    }
+
     mutating func clear() {
         undoStack.removeAll(keepingCapacity: true)
         redoStack.removeAll(keepingCapacity: true)
+        retainedBytes = 0
+    }
+
+    private mutating func appendUndo(_ entry: UndoHistoryEntry) {
+        guard entry.byteCount <= limits.maxRetainedBytes else {
+            droppedOversizedCount += 1
+            return
+        }
+        undoStack.append(entry)
+        retainedBytes += entry.byteCount
+    }
+
+    private mutating func appendRedo(_ entry: UndoHistoryEntry) {
+        guard entry.byteCount <= limits.maxRetainedBytes else {
+            droppedOversizedCount += 1
+            return
+        }
+        redoStack.append(entry)
+        retainedBytes += entry.byteCount
+    }
+
+    private mutating func popUndo() -> UndoHistoryEntry? {
+        guard let entry = undoStack.popLast() else { return nil }
+        retainedBytes -= entry.byteCount
+        return entry
+    }
+
+    private mutating func popRedo() -> UndoHistoryEntry? {
+        guard let entry = redoStack.popLast() else { return nil }
+        retainedBytes -= entry.byteCount
+        return entry
+    }
+
+    private mutating func clearRedo() {
+        retainedBytes -= redoStack.reduce(0) { $0 + $1.byteCount }
+        redoStack.removeAll(keepingCapacity: true)
+    }
+
+    private mutating func enforceLimits() {
+        while undoStack.count + redoStack.count > limits.maxEntryCount || retainedBytes > limits.maxRetainedBytes {
+            if !undoStack.isEmpty {
+                removeOldestUndoEntry()
+            } else if !redoStack.isEmpty {
+                removeOldestRedoEntry()
+            } else {
+                break
+            }
+        }
+    }
+
+    private mutating func removeOldestUndoEntry() {
+        let entry = undoStack.removeFirst()
+        retainedBytes -= entry.byteCount
+        evictedCount += 1
+    }
+
+    private mutating func removeOldestRedoEntry() {
+        let entry = redoStack.removeFirst()
+        retainedBytes -= entry.byteCount
+        evictedCount += 1
+    }
+}
+
+private enum UndoHistoryEntry: Sendable {
+    case snapshot(SwiftDocumentStoreSnapshot)
+    case layerRectDelta(LayerRectDeltaUndoEntry)
+
+    init(
+        before: SwiftDocumentStoreSnapshot,
+        after: SwiftDocumentStoreSnapshot,
+        changedLayerIndex: Int?,
+        dirtyRect: LayerPixelRect?
+    ) {
+        guard let changedLayerIndex,
+              let dirtyRect,
+              let delta = LayerRectDeltaUndoEntry(
+                before: before,
+                after: after,
+                layerIndex: changedLayerIndex,
+                rect: dirtyRect
+              )
+        else {
+            self = .snapshot(before)
+            return
+        }
+        self = .layerRectDelta(delta)
+    }
+
+    var byteCount: Int {
+        switch self {
+        case let .snapshot(snapshot):
+            return snapshot.undoRetainedByteCount
+        case let .layerRectDelta(delta):
+            return delta.byteCount
+        }
+    }
+
+    func undoSnapshot(from current: SwiftDocumentStoreSnapshot) -> SwiftDocumentStoreSnapshot? {
+        switch self {
+        case let .snapshot(snapshot):
+            return snapshot
+        case let .layerRectDelta(delta):
+            return delta.snapshot(from: current, direction: .undo)
+        }
+    }
+
+    func redoSnapshot(from current: SwiftDocumentStoreSnapshot) -> SwiftDocumentStoreSnapshot? {
+        switch self {
+        case let .snapshot(snapshot):
+            return snapshot
+        case let .layerRectDelta(delta):
+            return delta.snapshot(from: current, direction: .redo)
+        }
+    }
+
+    func flipped(current: SwiftDocumentStoreSnapshot) -> UndoHistoryEntry {
+        switch self {
+        case .snapshot:
+            return .snapshot(current)
+        case .layerRectDelta:
+            return self
+        }
+    }
+}
+
+private struct LayerRectDeltaUndoEntry: Sendable {
+    enum Direction {
+        case undo
+        case redo
+    }
+
+    var layerIndex: Int
+    var rect: LayerPixelRect
+    var canvasWidth: Int
+    var canvasHeight: Int
+    var beforeLayer: LayerUndoMetadata
+    var afterLayer: LayerUndoMetadata
+    var beforePixels: Data
+    var afterPixels: Data
+
+    init?(
+        before: SwiftDocumentStoreSnapshot,
+        after: SwiftDocumentStoreSnapshot,
+        layerIndex: Int,
+        rect: LayerPixelRect
+    ) {
+        guard before.canvasWidth == after.canvasWidth,
+              before.canvasHeight == after.canvasHeight,
+              before.layers.indices.contains(layerIndex),
+              after.layers.indices.contains(layerIndex),
+              rect.isContained(inWidth: before.canvasWidth, height: before.canvasHeight),
+              let beforePixels = before.layers[layerIndex].pixelData.cropped(width: before.canvasWidth, rect: rect),
+              let afterPixels = after.layers[layerIndex].pixelData.cropped(width: after.canvasWidth, rect: rect)
+        else {
+            return nil
+        }
+        self.layerIndex = layerIndex
+        self.rect = rect
+        self.canvasWidth = before.canvasWidth
+        self.canvasHeight = before.canvasHeight
+        self.beforeLayer = LayerUndoMetadata(layer: before.layers[layerIndex])
+        self.afterLayer = LayerUndoMetadata(layer: after.layers[layerIndex])
+        self.beforePixels = beforePixels
+        self.afterPixels = afterPixels
+    }
+
+    var byteCount: Int {
+        beforePixels.count + afterPixels.count + beforeLayer.byteCount + afterLayer.byteCount
+    }
+
+    func snapshot(from current: SwiftDocumentStoreSnapshot, direction: Direction) -> SwiftDocumentStoreSnapshot? {
+        guard current.canvasWidth == canvasWidth,
+              current.canvasHeight == canvasHeight,
+              current.layers.indices.contains(layerIndex)
+        else {
+            return nil
+        }
+        let pixels = direction == .undo ? beforePixels : afterPixels
+        let metadata = direction == .undo ? beforeLayer : afterLayer
+        guard let patchedPixels = current.layers[layerIndex].pixelData.patching(
+            pixels,
+            width: canvasWidth,
+            rect: rect
+        ) else {
+            return nil
+        }
+        var snapshot = current
+        metadata.apply(to: &snapshot.layers[layerIndex])
+        snapshot.layers[layerIndex].pixelData = patchedPixels
+        return snapshot
+    }
+}
+
+private struct LayerUndoMetadata: Sendable {
+    var name: String
+    var visible: Bool
+    var locked: Bool
+    var alphaLocked: Bool
+    var clipped: Bool
+    var opacity: Double
+    var blendMode: LayerBlendMode
+    var folderID: Int?
+    var textLayer: TextLayerData?
+
+    init(layer: SwiftDocumentLayerRecord) {
+        name = layer.name
+        visible = layer.visible
+        locked = layer.locked
+        alphaLocked = layer.alphaLocked
+        clipped = layer.clipped
+        opacity = layer.opacity
+        blendMode = layer.blendMode
+        folderID = layer.folderID
+        textLayer = layer.textLayer
+    }
+
+    var byteCount: Int {
+        name.utf8.count + (textLayer?.text.utf8.count ?? 0)
+    }
+
+    func apply(to layer: inout SwiftDocumentLayerRecord) {
+        layer.name = name
+        layer.visible = visible
+        layer.locked = locked
+        layer.alphaLocked = alphaLocked
+        layer.clipped = clipped
+        layer.opacity = opacity
+        layer.blendMode = blendMode
+        layer.folderID = folderID
+        layer.textLayer = textLayer
     }
 }
 
 private extension SwiftDocumentStoreSnapshot {
+    var undoRetainedByteCount: Int {
+        layers.reduce(0) { partial, layer in
+            partial +
+                layer.pixelData.count +
+                (layer.maskData?.count ?? 0) +
+                layer.name.utf8.count +
+                (layer.textLayer?.text.utf8.count ?? 0)
+        } + thumbnailCache.values.reduce(0) { $0 + $1.count } +
+            timelapseFrames.reduce(0) { $0 + $1.imageURL.absoluteString.utf8.count } +
+            timelapseEvents.undoRetainedByteCount
+    }
+
     func hasSameDocumentContent(as other: SwiftDocumentStoreSnapshot) -> Bool {
         canvasWidth == other.canvasWidth &&
             canvasHeight == other.canvasHeight &&
@@ -372,13 +678,119 @@ private extension SwiftDocumentStoreSnapshot {
     }
 }
 
+private extension Array where Element == TimelapseOperation {
+    var undoRetainedByteCount: Int {
+        reduce(0) { partial, operation in
+            partial + operation.undoRetainedByteCount
+        }
+    }
+}
+
+private extension TimelapseOperation {
+    var undoRetainedByteCount: Int {
+        switch self {
+        case let .stroke(_, brush, samples),
+             let .blurStroke(_, brush, samples):
+            return brushMemoryByteCount(brush) + samples.count * MemoryLayout<StylusSample>.stride
+        case let .fill(_, brush, _):
+            return brushMemoryByteCount(brush) + MemoryLayout<StylusSample>.stride
+        case let .addLayer(name),
+             let .duplicateLayer(_, name),
+             let .setLayerName(_, name),
+             let .createFolder(_, name, _),
+             let .setFolderName(_, name):
+            return name.utf8.count
+        case let .replaceLayerPixels(_, data),
+             let .replaceLayerMask(_, data):
+            return data.count
+        default:
+            return 0
+        }
+    }
+
+    private func brushMemoryByteCount(_ brush: BrushRuntimeSettings) -> Int {
+        MemoryLayout<BrushRuntimeSettings>.stride + (brush.customTip?.alphaData.count ?? 0)
+    }
+}
+
+private extension LayerPixelRect {
+    func isContained(inWidth width: Int, height: Int) -> Bool {
+        originX >= 0 &&
+            originY >= 0 &&
+            self.width > 0 &&
+            self.height > 0 &&
+            originX <= width &&
+            originY <= height &&
+            self.width <= width - originX &&
+            self.height <= height - originY
+    }
+}
+
+private extension Data {
+    func cropped(width: Int, rect: LayerPixelRect) -> Data? {
+        guard let requiredByteCount = requiredByteCount(width: width, rect: rect),
+              count >= requiredByteCount
+        else {
+            return nil
+        }
+        var output = Data(count: rect.width * rect.height * 4)
+        output.withUnsafeMutableBytes { destinationBytes in
+            withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<rect.height {
+                    let sourceOffset = (((rect.originY + row) * width) + rect.originX) * 4
+                    let destinationOffset = row * rect.width * 4
+                    memcpy(destination + destinationOffset, source + sourceOffset, rect.width * 4)
+                }
+            }
+        }
+        return output
+    }
+
+    func patching(_ patch: Data, width: Int, rect: LayerPixelRect) -> Data? {
+        guard patch.count == rect.width * rect.height * 4,
+              let requiredByteCount = requiredByteCount(width: width, rect: rect),
+              count >= requiredByteCount
+        else {
+            return nil
+        }
+        var output = self
+        output.withUnsafeMutableBytes { destinationBytes in
+            patch.withUnsafeBytes { sourceBytes in
+                guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                      let source = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                else { return }
+                for row in 0..<rect.height {
+                    let destinationOffset = (((rect.originY + row) * width) + rect.originX) * 4
+                    let sourceOffset = row * rect.width * 4
+                    memcpy(destination + destinationOffset, source + sourceOffset, rect.width * 4)
+                }
+            }
+        }
+        return output
+    }
+
+    private func requiredByteCount(width: Int, rect: LayerPixelRect) -> Int? {
+        guard rect.isContained(inWidth: width, height: Int.max) else { return nil }
+        let rowResult = rect.originY.addingReportingOverflow(rect.height)
+        guard !rowResult.overflow else { return nil }
+        let pixelResult = width.multipliedReportingOverflow(by: rowResult.partialValue)
+        guard !pixelResult.overflow else { return nil }
+        let byteResult = pixelResult.partialValue.multipliedReportingOverflow(by: 4)
+        guard !byteResult.overflow else { return nil }
+        return byteResult.partialValue
+    }
+}
+
 final class SwiftDocumentRuntime: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.primo.app", category: "SwiftDocumentRuntime")
 
     private let services: DocumentEngineServices
     private let gpuServices: DocumentRuntimeGpuServices
     private let store: SwiftDocumentStore
-    private var undoPolicy = UndoSnapshotPolicy()
+    private var undoPolicy: UndoSnapshotPolicy
     private var pendingDirtyUpdate: IncrementalLayerUpdate?
     private var currentStroke: (layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
     private var currentBlurStroke: (baseline: SwiftDocumentStoreSnapshot?, layerIndex: Int, brush: BrushRuntimeSettings, samples: [StylusSample])?
@@ -392,7 +804,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live,
-        gpuServices: DocumentRuntimeGpuServices
+        gpuServices: DocumentRuntimeGpuServices,
+        maxUndoEntryCount: Int = 50,
+        maxUndoRetainedBytes: Int = 128 * 1024 * 1024
     ) {
         self.services = DocumentEngineServices(
             fileClient: fileClient,
@@ -401,6 +815,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         )
         self.gpuServices = gpuServices
         self.store = SwiftDocumentStore(width: width, height: height)
+        self.undoPolicy = UndoSnapshotPolicy(
+            limits: UndoSnapshotPolicy.Limits(
+                maxEntryCount: maxUndoEntryCount,
+                maxRetainedBytes: maxUndoRetainedBytes
+            )
+        )
         captureDirtyUpdate()
     }
 
@@ -519,6 +939,11 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         store.snapshot.revision += 1
         captureDirtyUpdate()
         return .success(())
+    }
+
+    func trimUndoHistoryForMemoryPressure() {
+        let stats = undoPolicy.trimForMemoryPressure()
+        logUndoHistoryStats(stats, reason: "memoryPressure")
     }
 
     func resizeCanvas(width: Int, height: Int) -> DocumentMutationResult {
@@ -705,7 +1130,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             )
             setLayerPixelState(index: index, pixelData: output, gpuBufferHandle: nil)
             invalidateThumbnail(for: index)
-            recordMutation(before: before, timelapseEvent: nil, dirtyRect: rect)
+            recordMutation(before: before, timelapseEvent: nil, changedLayerIndex: index, dirtyRect: rect)
             return .success(())
         }
         return .failure(failure)
@@ -808,7 +1233,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             let before = undoSnapshot()
             setLayerPixelState(index: index, pixelData: Data(count: rgbaByteCount), gpuBufferHandle: nil)
             invalidateThumbnail(for: index)
-            recordMutation(before: before, timelapseEvent: .clearLayer(index: .unchecked(index)))
+            recordMutation(
+                before: before,
+                timelapseEvent: .clearLayer(index: .unchecked(index)),
+                changedLayerIndex: index,
+                dirtyRect: fullCanvasRect()
+            )
             return .success(())
         }
         return .failure(failure)
@@ -1040,6 +1470,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         recordMutation(
             before: before,
             timelapseEvent: .stroke(layerIndex: .unchecked(plan.layerIndex), brush: plan.brush, samples: plan.samples),
+            changedLayerIndex: plan.layerIndex,
             dirtyRect: dirtyRect
         )
         return .success(())
@@ -1420,7 +1851,12 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         guard store.snapshot.layers.indices.contains(currentBlurStroke.layerIndex) else {
             return .failure(.invalidLayerIndex(currentBlurStroke.layerIndex))
         }
-        undoPolicy.recordMutation(before: baseline)
+        recordMutation(
+            before: baseline,
+            timelapseEvent: nil,
+            changedLayerIndex: currentBlurStroke.layerIndex,
+            dirtyRect: fullCanvasRect()
+        )
         timelapseRecorder.record(
             .blurStroke(
                 layerIndex: .unchecked(currentBlurStroke.layerIndex),
@@ -1429,8 +1865,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             ),
             in: store
         )
-        store.snapshot.revision += 1
-        captureDirtyUpdate()
         self.currentBlurStroke = nil
         return .success(())
     }
@@ -1938,7 +2372,12 @@ extension SwiftDocumentRuntime {
         setLayerPixelState(index: index, pixelData: adjusted, gpuBufferHandle: nil)
         store.snapshot.layers[index].textLayer = nil
         invalidateThumbnail(for: index)
-        recordMutation(before: before, timelapseEvent: timelapseEvent)
+        recordMutation(
+            before: before,
+            timelapseEvent: timelapseEvent,
+            changedLayerIndex: index,
+            dirtyRect: fullCanvasRect()
+        )
         return .success(())
     }
 
@@ -1984,6 +2423,7 @@ extension SwiftDocumentRuntime {
         recordMutation(
             before: before,
             timelapseEvent: finalTimelapseEvent,
+            changedLayerIndex: index,
             dirtyRect: payload.dirtyRect
         )
         return .success(())
@@ -2009,6 +2449,7 @@ extension SwiftDocumentRuntime {
         recordMutation(
             before: before,
             timelapseEvent: .replaceLayerPixels(index: .unchecked(index), data: payload.fullPixelData ?? currentPixelData(for: index)),
+            changedLayerIndex: index,
             dirtyRect: payload.dirtyRect
         )
         return .success(())
@@ -2081,12 +2522,37 @@ extension SwiftDocumentRuntime {
     private func recordMutation(
         before: SwiftDocumentStoreSnapshot,
         timelapseEvent: TimelapseOperation?,
+        changedLayerIndex: Int? = nil,
         dirtyRect: LayerPixelRect? = nil
     ) {
-        undoPolicy.recordMutation(before: before)
+        let after = changedLayerIndex != nil && dirtyRect != nil ? undoSnapshot() : before
+        let stats = undoPolicy.recordMutation(
+            before: before,
+            after: after,
+            changedLayerIndex: changedLayerIndex,
+            dirtyRect: dirtyRect
+        )
+        logUndoHistoryStats(stats, reason: "recordMutation")
         timelapseRecorder.record(timelapseEvent, marksOperationPersistence: true, in: store)
         store.snapshot.revision += 1
         captureDirtyUpdate(rect: dirtyRect)
+    }
+
+    private func fullCanvasRect() -> LayerPixelRect {
+        LayerPixelRect(
+            originX: 0,
+            originY: 0,
+            width: store.snapshot.canvasWidth,
+            height: store.snapshot.canvasHeight
+        )
+    }
+
+    private func logUndoHistoryStats(_ stats: UndoSnapshotPolicy.DebugStats, reason: String) {
+        #if DEBUG
+        Self.logger.debug(
+            "Undo history \(reason, privacy: .public): bytes=\(stats.retainedBytes, privacy: .public) undo=\(stats.undoCount, privacy: .public) redo=\(stats.redoCount, privacy: .public) evicted=\(stats.evictedCount, privacy: .public) droppedOversized=\(stats.droppedOversizedCount, privacy: .public)"
+        )
+        #endif
     }
 
     private func captureDirtyUpdate(rect: LayerPixelRect? = nil) {

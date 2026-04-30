@@ -132,7 +132,8 @@ public enum DocumentEngineFactory {
             canUndo: { runtimeBox.withRuntime { $0.canUndo() } },
             canRedo: { runtimeBox.withRuntime { $0.canRedo() } },
             undo: { runtimeBox.withRuntime { $0.undo() } },
-            redo: { runtimeBox.withRuntime { $0.redo() } }
+            redo: { runtimeBox.withRuntime { $0.redo() } },
+            trimForMemoryPressure: { runtimeBox.withRuntime { $0.trimUndoHistoryForMemoryPressure() } }
         )
 
         let persistenceGateway = DocumentPersistenceGateway(

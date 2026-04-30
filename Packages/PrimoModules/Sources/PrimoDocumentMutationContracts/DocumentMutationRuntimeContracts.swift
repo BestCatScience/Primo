@@ -253,17 +253,20 @@ public struct DocumentHistoryGateway: Sendable {
     public var canRedo: @Sendable () -> Bool
     public var undo: @Sendable () -> DocumentMutationResult
     public var redo: @Sendable () -> DocumentMutationResult
+    public var trimForMemoryPressure: @Sendable () -> Void
 
     public init(
         canUndo: @escaping @Sendable () -> Bool,
         canRedo: @escaping @Sendable () -> Bool,
         undo: @escaping @Sendable () -> DocumentMutationResult,
-        redo: @escaping @Sendable () -> DocumentMutationResult
+        redo: @escaping @Sendable () -> DocumentMutationResult,
+        trimForMemoryPressure: @escaping @Sendable () -> Void = {}
     ) {
         self.canUndo = canUndo
         self.canRedo = canRedo
         self.undo = undo
         self.redo = redo
+        self.trimForMemoryPressure = trimForMemoryPressure
     }
 }
 

@@ -80,6 +80,98 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func dirtyRectReplacementUndoRedoRestoresOnlyChangedPixels() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 3, height: 2, gpuServices: gpu.services())
+        let rect = LayerPixelRect(originX: 1, originY: 0, width: 1, height: 1)
+        let patch = Data([0x10, 0x20, 0x30, 0x40])
+
+        _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: patch).get()
+
+        var expected = Data(count: 24)
+        expected.replaceSubrange(4..<8, with: patch)
+        #expect(runtime.pixelDataForLayer(index: 0) == expected)
+
+        _ = try runtime.undo().get()
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 24))
+
+        _ = try runtime.redo().get()
+        #expect(runtime.pixelDataForLayer(index: 0) == expected)
+    }
+
+    @Test
+    func undoHistoryEvictsOldEntriesWhenByteBudgetIsExceeded() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(
+            width: 4,
+            height: 4,
+            gpuServices: gpu.services(),
+            maxUndoEntryCount: 50,
+            maxUndoRetainedBytes: 200
+        )
+        let rect = LayerPixelRect(originX: 0, originY: 0, width: 4, height: 4)
+
+        _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x11, count: 64)).get()
+        _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x22, count: 64)).get()
+        _ = try runtime.replaceLayerPixels(index: 0, in: rect, data: Data(repeating: 0x33, count: 64)).get()
+
+        _ = try runtime.undo().get()
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(repeating: 0x22, count: 64))
+        guard case .failure(.noUndoState) = runtime.undo() else {
+            Issue.record("Expected older undo entries to be evicted by byte budget")
+            return
+        }
+    }
+
+    @Test
+    func memoryPressureTrimDropsRedoAndShrinksUndoHistory() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(
+            width: 2,
+            height: 2,
+            gpuServices: gpu.services(),
+            maxUndoEntryCount: 50,
+            maxUndoRetainedBytes: 1_024
+        )
+        let rect = LayerPixelRect(originX: 0, originY: 0, width: 1, height: 1)
+
+        for value in UInt8(1)...UInt8(10) {
+            _ = try runtime.replaceLayerPixels(
+                index: 0,
+                in: rect,
+                data: Data([value, value, value, value])
+            ).get()
+        }
+        _ = try runtime.undo().get()
+        #expect(runtime.canRedo())
+
+        runtime.trimUndoHistoryForMemoryPressure()
+
+        #expect(!runtime.canRedo())
+        var undoCount = 0
+        while runtime.canUndo() {
+            _ = try runtime.undo().get()
+            undoCount += 1
+        }
+        #expect(undoCount <= 8)
+    }
+
+    @Test
+    func structuralMutationsUseSnapshotFallbackForUndoRedo() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.addLayer(name: "Snapshot fallback").get()
+        #expect(runtime.lightweightPresentation().layerRows.count == 2)
+
+        _ = try runtime.undo().get()
+        #expect(runtime.lightweightPresentation().layerRows.count == 1)
+
+        _ = try runtime.redo().get()
+        #expect(runtime.lightweightPresentation().layerRows.count == 2)
+    }
+
+    @Test
     func alphaLockedGpuStrokeTimelapseDoesNotRecordEmptyReplaceLayerPixels() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
         let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())

@@ -157,19 +157,23 @@ public struct DocumentStrokeCommandService: Sendable {
 public struct DocumentHistoryCommandService: Sendable {
     public var undo: @Sendable () -> DocumentMutationResult
     public var redo: @Sendable () -> DocumentMutationResult
+    public var trimForMemoryPressure: @Sendable () -> Void
 
     public init(
         undo: @escaping @Sendable () -> DocumentMutationResult,
-        redo: @escaping @Sendable () -> DocumentMutationResult
+        redo: @escaping @Sendable () -> DocumentMutationResult,
+        trimForMemoryPressure: @escaping @Sendable () -> Void = {}
     ) {
         self.undo = undo
         self.redo = redo
+        self.trimForMemoryPressure = trimForMemoryPressure
     }
 
     public init(historyGateway: DocumentHistoryGateway) {
         self.init(
             undo: historyGateway.undo,
-            redo: historyGateway.redo
+            redo: historyGateway.redo,
+            trimForMemoryPressure: historyGateway.trimForMemoryPressure
         )
     }
 }

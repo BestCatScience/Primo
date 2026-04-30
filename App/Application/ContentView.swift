@@ -108,6 +108,9 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             store.send(.application(.scenePhaseChanged(ApplicationFeature.ScenePhase(newPhase))))
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            store.send(.document(.lifecycle(.memoryPressureTrimRequested)))
+        }
         .sheet(item: Binding(
             get: { exportState.shareSheet },
             set: { _ in store.send(.importExport(.exportSheetDismissed)) }

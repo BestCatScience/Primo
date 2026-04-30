@@ -232,7 +232,8 @@ struct CrossFeatureIntegrationReducer: Reducer {
              .document(.lifecycle(.resizeCanvasRequested)),
              .document(.lifecycle(.resizeCanvasExtentRequested)),
              .document(.lifecycle(.undoRequested)),
-             .document(.lifecycle(.redoRequested)):
+             .document(.lifecycle(.redoRequested)),
+             .document(.lifecycle(.memoryPressureTrimRequested)):
             return .none
 
         case .application(.deferredPresentationRefresh):
