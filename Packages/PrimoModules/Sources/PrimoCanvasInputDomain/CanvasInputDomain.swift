@@ -236,7 +236,13 @@ public struct CanvasInputReducer: Sendable {
                     predicted: false
                 )
             } else {
-                appendFilteredPoints(coalescedSamples.map(\.strokePoint), to: &stroke, isFinishingStroke: false, brushSize: configuration.brushSize)
+                appendFilteredPoints(
+                    coalescedSamples.map(\.strokePoint),
+                    to: &stroke,
+                    isFinishingStroke: false,
+                    brushSize: configuration.brushSize,
+                    stabilization: configuration.strokeStabilization
+                )
             }
             stroke.predictedPoints.removeAll()
             state.currentStroke = stroke
@@ -254,7 +260,13 @@ public struct CanvasInputReducer: Sendable {
                     predicted: false
                 )
             } else {
-                appendFilteredPoints(coalescedSamples.map(\.strokePoint), to: &stroke, isFinishingStroke: true, brushSize: configuration.brushSize)
+                appendFilteredPoints(
+                    coalescedSamples.map(\.strokePoint),
+                    to: &stroke,
+                    isFinishingStroke: true,
+                    brushSize: configuration.brushSize,
+                    stabilization: configuration.strokeStabilization
+                )
             }
             stroke.predictedPoints.removeAll()
             state.currentStroke = nil
@@ -329,7 +341,8 @@ public struct CanvasInputReducer: Sendable {
         _ points: [CanvasStrokePoint],
         to stroke: inout CanvasInputStroke,
         isFinishingStroke: Bool,
-        brushSize: Float
+        brushSize: Float,
+        stabilization: Float
     ) {
         for rawPoint in points {
             var candidate = rawPoint
@@ -341,6 +354,14 @@ public struct CanvasInputReducer: Sendable {
             if candidate.pressure <= 0.001 {
                 candidate.pressure = max(previous.pressure * 0.92, 0.12)
             }
+
+            candidate = stabilizedStrokePoint(
+                candidate,
+                previous: previous,
+                brushSize: brushSize,
+                stabilization: stabilization,
+                isFinishingStroke: isFinishingStroke
+            )
 
             let delta = candidate.position - previous.position
             let distance = simd_length(delta)
@@ -381,6 +402,31 @@ public struct CanvasInputReducer: Sendable {
                 stroke.points.append(candidate)
             }
         }
+    }
+
+    private func stabilizedStrokePoint(
+        _ point: CanvasStrokePoint,
+        previous: CanvasStrokePoint,
+        brushSize: Float,
+        stabilization: Float,
+        isFinishingStroke: Bool
+    ) -> CanvasStrokePoint {
+        let amount = min(max(stabilization, 0), 1)
+        guard amount > 0.001 else { return point }
+
+        let delta = point.position - previous.position
+        let distance = simd_length(delta)
+        guard distance > 0.001 else { return point }
+
+        let baseResponse = 0.9 - (amount * 0.78)
+        let distanceScale = max(brushSize * 0.35, 6.0)
+        let distanceResponse = min(distance / distanceScale, 1.0) * 0.22 * (1.0 - amount * 0.35)
+        let finishingResponse: Float = isFinishingStroke ? 0.16 : 0.0
+        let response = min(max(baseResponse + distanceResponse + finishingResponse, 0.08), 1.0)
+
+        var stabilized = point
+        stabilized.position = previous.position + delta * response
+        return stabilized
     }
 
     private func shouldRejectFinishingJump(_ candidate: CanvasStrokePoint, previous: CanvasStrokePoint, distance: Float, brushSize: Float) -> Bool {

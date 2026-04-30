@@ -59,6 +59,45 @@ struct CanvasInputReducerTests {
     }
 
     @Test
+    func brushStrokeStabilizationSmoothsInputPoints() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            brushSize: 8,
+            strokeStabilization: 1.0
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 0, y: 0, pressure: 0.6, time: 0),
+            coalescedSamples: [sample(x: 0, y: 0, pressure: 0.6, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        let commands = reducer.reduce(
+            phase: .moved,
+            sample: sample(x: 30, y: 12, pressure: 0.6, time: 0.3),
+            coalescedSamples: [
+                sample(x: 10, y: 12, pressure: 0.6, time: 0.1),
+                sample(x: 20, y: -12, pressure: 0.6, time: 0.2),
+                sample(x: 30, y: 12, pressure: 0.6, time: 0.3)
+            ],
+            state: &state,
+            configuration: configuration
+        )
+
+        guard case let .updateStroke(stroke) = commands.first,
+              let lastPoint = stroke.points.last
+        else {
+            Issue.record("Expected stabilized stroke update")
+            return
+        }
+        #expect(lastPoint.position.x < 30)
+        #expect(abs(lastPoint.position.y) < 12)
+    }
+
+    @Test
     func shapeStrokeBuildsRectangleWithoutUIKit() {
         let reducer = CanvasInputReducer()
         var state = CanvasInputReducer.State()
