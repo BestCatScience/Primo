@@ -74,7 +74,7 @@ struct CanvasFeature {
             angle: 0.0,
             followsStrokeAngle: true,
             pressureSensitivity: 0.4,
-            stabilization: 0.0,
+            stabilization: 0.5,
             customTip: nil,
             color: CGColor(red: 31.0 / 255.0, green: 31.0 / 255.0, blue: 34.0 / 255.0, alpha: 1.0)
         )

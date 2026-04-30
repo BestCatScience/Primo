@@ -151,7 +151,7 @@ public struct CanvasInputConfiguration: Equatable, Sendable {
         brushTipKind: BrushTipKind = .pencil,
         brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1),
         brushSize: Float = 4,
-        strokeStabilization: Float = 0
+        strokeStabilization: Float = 0.5
     ) {
         self.tool = tool
         self.selectionMode = selectionMode
@@ -181,6 +181,7 @@ public struct CanvasInputReducer: Sendable {
         phase: CanvasInputTouchPhase,
         sample: CanvasInputSample,
         coalescedSamples: [CanvasInputSample],
+        predictedSamples: [CanvasInputSample] = [],
         state: inout State,
         configuration: CanvasInputConfiguration
     ) -> [CanvasInputCommand] {
@@ -206,7 +207,14 @@ public struct CanvasInputReducer: Sendable {
                 return [.requestColorSample(sample.stylusSample)]
             }
         default:
-            return reduceStroke(phase: phase, sample: sample, coalescedSamples: coalescedSamples, state: &state, configuration: configuration)
+            return reduceStroke(
+                phase: phase,
+                sample: sample,
+                coalescedSamples: coalescedSamples,
+                predictedSamples: predictedSamples,
+                state: &state,
+                configuration: configuration
+            )
         }
     }
 
@@ -214,6 +222,7 @@ public struct CanvasInputReducer: Sendable {
         phase: CanvasInputTouchPhase,
         sample: CanvasInputSample,
         coalescedSamples: [CanvasInputSample],
+        predictedSamples: [CanvasInputSample],
         state: inout State,
         configuration: CanvasInputConfiguration
     ) -> [CanvasInputCommand] {
@@ -246,7 +255,13 @@ public struct CanvasInputReducer: Sendable {
                     stabilization: configuration.strokeStabilization
                 )
             }
-            stroke.predictedPoints.removeAll()
+            stroke.predictedPoints = predictedStrokePoints(
+                predictedSamples.map(\.strokePoint),
+                after: stroke,
+                anchor: state.stabilizerAnchor,
+                brushSize: configuration.brushSize,
+                stabilization: configuration.strokeStabilization
+            )
             state.currentStroke = stroke
             return [.updateStroke(stroke)]
         case .stationary:
@@ -440,11 +455,46 @@ public struct CanvasInputReducer: Sendable {
         }
 
         let targetDelta = targetPosition - anchor.position
-        let response = max(1.0 - (amount * 0.42), 0.5)
+        let response = max(1.0 - (amount * 0.55), 0.38)
 
         var stabilized = point
         stabilized.position = anchor.position + targetDelta * response
         return stabilized
+    }
+
+    private func predictedStrokePoints(
+        _ points: [CanvasStrokePoint],
+        after stroke: CanvasInputStroke,
+        anchor: CanvasStrokePoint?,
+        brushSize: Float,
+        stabilization: Float
+    ) -> [CanvasStrokePoint] {
+        guard !points.isEmpty else { return [] }
+        var previewStroke = CanvasInputStroke(
+            points: stroke.points,
+            predictedPoints: [],
+            color: stroke.color,
+            brushSize: stroke.brushSize
+        )
+        var previewState = State()
+        previewState.stabilizerAnchor = anchor ?? stroke.points.last
+        appendFilteredPoints(
+            points.map { point in
+                var predicted = point
+                predicted.isPredicted = true
+                return predicted
+            },
+            to: &previewStroke,
+            state: &previewState,
+            isFinishingStroke: false,
+            brushSize: brushSize,
+            stabilization: stabilization
+        )
+        return Array(previewStroke.points.dropFirst(stroke.points.count)).map { point in
+            var predicted = point
+            predicted.isPredicted = true
+            return predicted
+        }
     }
 
     private func resetStrokeState(_ state: inout State) {
@@ -455,9 +505,9 @@ public struct CanvasInputReducer: Sendable {
     }
 
     private func stabilizationLazyRadius(brushSize: Float, amount: Float) -> Float {
-        let scaledAmount = pow(amount, 1.18)
-        let brushScaledRadius = max(brushSize * 1.6, 18.0)
-        return min(brushScaledRadius * scaledAmount, 96.0)
+        let scaledAmount = pow(amount, 1.05)
+        let brushScaledRadius = max(brushSize * 2.4, 28.0)
+        return min(brushScaledRadius * scaledAmount, 128.0)
     }
 
     private func shouldRejectFinishingJump(_ candidate: CanvasStrokePoint, previous: CanvasStrokePoint, distance: Float, brushSize: Float) -> Bool {

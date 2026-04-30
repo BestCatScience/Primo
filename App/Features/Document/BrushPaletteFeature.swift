@@ -86,7 +86,7 @@ struct BrushPaletteFeature {
             var flipY: Bool = BrushPreset.defaultPencil.flipY
             var customTip: BrushTipRaster? = BrushPreset.defaultPencil.customTip
             var pressureSensitivity: Double = BrushPreset.defaultPencil.pressureSensitivity
-            var stabilization: Double = 0.0
+            var stabilization: Double = 0.5
             var color: Color = BrushPreset.defaultPencil.color
             var secondaryColor: Color = Color(red: 0.92, green: 0.94, blue: 0.98)
             var selectedColorSlot: BrushColorSlot = .primary

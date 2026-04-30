@@ -75,7 +75,7 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
     public var flipY: Bool = false
     public var customTip: BrushTipRaster? = nil
     public var pressureSensitivity: Double
-    public var stabilization: Double = 0.0
+    public var stabilization: Double = 0.5
     public var fillThresholdMode: FillThresholdMode = .opacity
     public var fillOpacityTolerance: Double = 0.0
     public var fillColorTolerance: Double = 0.12
@@ -151,7 +151,7 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
         flipY: Bool = false,
         customTip: BrushTipRaster? = nil,
         pressureSensitivity: Double,
-        stabilization: Double = 0.0,
+        stabilization: Double = 0.5,
         fillThresholdMode: FillThresholdMode = .opacity,
         fillOpacityTolerance: Double = 0.0,
         fillColorTolerance: Double = 0.12,
@@ -299,7 +299,7 @@ public struct BrushRuntimeSettings: Equatable, Sendable {
         flipY: Bool = false,
         customTip: BrushTipRaster? = nil,
         pressureSensitivity: Double,
-        stabilization: Double = 0.0,
+        stabilization: Double = 0.5,
         fillThresholdMode: FillThresholdMode = .opacity,
         fillOpacityTolerance: Double = 0.0,
         fillColorTolerance: Double = 0.12,

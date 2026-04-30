@@ -11,7 +11,10 @@ struct CanvasInputReducerTests {
     func brushStrokeInterpolatesCoalescedSamplesAndEnds() {
         let reducer = CanvasInputReducer()
         var state = CanvasInputReducer.State()
-        let configuration = CanvasInputConfiguration(brushSize: 4)
+        let configuration = CanvasInputConfiguration(
+            brushSize: 4,
+            strokeStabilization: 0
+        )
 
         var commands = reducer.reduce(
             phase: .began,
@@ -169,6 +172,45 @@ struct CanvasInputReducerTests {
         #expect(lastPoint.position == SIMD2<Float>(0, 0))
         #expect(state.stabilizerAnchor?.position == SIMD2<Float>(0, 0))
         #expect(state.rawStrokePoints.count == 4)
+    }
+
+    @Test
+    func predictedSamplesUpdatePredictedPointsOnly() {
+        let reducer = CanvasInputReducer()
+        var state = CanvasInputReducer.State()
+        let configuration = CanvasInputConfiguration(
+            brushSize: 8,
+            strokeStabilization: 1.0
+        )
+
+        _ = reducer.reduce(
+            phase: .began,
+            sample: sample(x: 0, y: 0, pressure: 0.6, time: 0),
+            coalescedSamples: [sample(x: 0, y: 0, pressure: 0.6, time: 0)],
+            state: &state,
+            configuration: configuration
+        )
+
+        let commands = reducer.reduce(
+            phase: .moved,
+            sample: sample(x: 80, y: 0, pressure: 0.6, time: 0.1),
+            coalescedSamples: [sample(x: 80, y: 0, pressure: 0.6, time: 0.1)],
+            predictedSamples: [
+                sample(x: 92, y: 3, pressure: 0.6, time: 0.12),
+                sample(x: 104, y: 4, pressure: 0.6, time: 0.14)
+            ],
+            state: &state,
+            configuration: configuration
+        )
+
+        guard case let .updateStroke(stroke) = commands.first else {
+            Issue.record("Expected stabilized stroke update")
+            return
+        }
+        #expect(!stroke.predictedPoints.isEmpty)
+        #expect(stroke.predictedPoints.allSatisfy { $0.isPredicted })
+        #expect(stroke.points.allSatisfy { !$0.isPredicted })
+        #expect(state.rawStrokePoints.count == 2)
     }
 
     @Test

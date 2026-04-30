@@ -35,7 +35,7 @@ public final class CanvasInputHandler {
     public var brushTipKind: BrushTipKind = .pencil
     public var brushColor: SIMD4<Float> = SIMD4(0, 0, 0, 1)
     public var brushSize: Float = 4.0
-    public var strokeStabilization: Float = 0.0
+    public var strokeStabilization: Float = 0.5
     public var allowsFingerTouchInput = false
     public var pointMapper: ((CGPoint, UIView) -> SIMD2<Float>)?
 
@@ -64,10 +64,12 @@ public final class CanvasInputHandler {
         }
 
         let coalescedTouches = event?.coalescedTouches(for: touch) ?? [touch]
+        let predictedTouches = event?.predictedTouches(for: touch) ?? []
         let commands = inputReducer.reduce(
             phase: phase,
             sample: makeInputSample(touch, in: view),
             coalescedSamples: coalescedTouches.map { makeInputSample($0, in: view) },
+            predictedSamples: predictedTouches.map { makeInputSample($0, in: view) },
             state: &inputState,
             configuration: CanvasInputConfiguration(
                 tool: CanvasInputToolKind(tool),
