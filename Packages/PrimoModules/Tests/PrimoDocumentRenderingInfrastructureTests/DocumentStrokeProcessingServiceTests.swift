@@ -26,6 +26,58 @@ struct DocumentStrokeProcessingServiceTests {
     }
 
     @Test
+    func interactiveSmudgePreviewUsesGpuOnlyResponsiveMutation() throws {
+        let repoRoot = try Self.repoRoot()
+        let serviceSource = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: serviceSource, encoding: .utf8)
+        let preview = try #require(
+            body[function: "makeInteractiveStrokePreview", before: "materializedIncrementalUpdateIfNeeded"]
+        )
+
+        #expect(preview.contains("shouldUseGpuOnlyResponsivePreview"))
+        #expect(preview.contains("executeStrokeMutation"))
+        #expect(preview.contains("isApproximatePreview"))
+    }
+
+    @Test
+    func interactivePreviewDoesNotMaterializeGpuIncrementalUpdatesOnCpu() throws {
+        let repoRoot = try Self.repoRoot()
+        let serviceSource = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/DocumentStrokeProcessingService.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: serviceSource, encoding: .utf8)
+        let preview = try #require(
+            body[function: "makeInteractiveStrokePreview", before: "materializedIncrementalUpdateIfNeeded"]
+        )
+
+        #expect(!preview.contains("materializedIncrementalUpdateIfNeeded"))
+        #expect(!preview.contains("materializedPixelData(for: bufferHandle)"))
+    }
+
+    @Test
+    func responsiveOilPreviewBrushBypassesSmudgeCpuOrchestration() throws {
+        let repoRoot = try Self.repoRoot()
+        let gpuSupportSource = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentMetalStrokeInfrastructure/MetalStrokeGpuServices.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: gpuSupportSource, encoding: .utf8)
+        let responsiveBrush = try #require(
+            body[function: "responsivePreviewBrush", before: "strokePreviewDirtyRect"]
+        )
+
+        #expect(responsiveBrush.contains("preview.smudgeEngineEnabled = false"))
+        #expect(responsiveBrush.contains("preview.wetness = 0"))
+        #expect(responsiveBrush.contains("preview.colorMixStrength = 0"))
+        #expect(responsiveBrush.contains("preview.smudgeRadius = 0"))
+        #expect(responsiveBrush.contains("preview.smudgeLength = 0"))
+    }
+
+    @Test
     func stageCommittedSnapshotUsesProvidedCompositePixels() {
         let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 2,

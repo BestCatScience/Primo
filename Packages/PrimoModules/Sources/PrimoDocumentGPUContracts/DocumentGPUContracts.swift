@@ -60,6 +60,10 @@ public enum StrokePreviewContinuationPolicy {
         }
         return true
     }
+
+    public static func shouldUseGpuOnlyResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        brush.tipKind == .oil && brush.smudgeEngineEnabled && !brush.isEraser
+    }
 }
 
 public struct GpuLayerSurface: Equatable, Sendable {

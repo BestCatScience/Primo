@@ -2,11 +2,14 @@ import Foundation
 import ComposableArchitecture
 import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
+import PrimoBrushInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
+import PrimoDocumentMetalStrokeInfrastructure
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
+import SwiftUI
 import XCTest
 @testable import Primo
 
@@ -80,6 +83,174 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         case let .failure(failure):
             XCTAssertEqual(failure, .layerLocked(0))
         }
+    }
+
+    func testEraserRuntimeSettingsIgnorePaletteColorAndDisablePaintEngines() {
+        var state = DocumentEditingState()
+        state.canvas.currentTool = .erase
+        state.brushPalette.brush.tipKind = .oil
+        state.brushPalette.brush.smudgeEngineEnabled = true
+        state.brushPalette.brush.wetness = 1.0
+        state.brushPalette.brush.colorMixStrength = 1.0
+        state.brushPalette.brush.selectedColorSlot = .secondary
+        state.brushPalette.brush.secondaryColor = .red
+
+        let settings = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+
+        XCTAssertTrue(settings.isEraser)
+        XCTAssertEqual(settings.tipKind, .ink)
+        XCTAssertFalse(settings.smudgeEngineEnabled)
+        XCTAssertEqual(settings.colorMixingMode, .off)
+        XCTAssertEqual(settings.wetness, 0.0)
+        XCTAssertEqual(settings.colorMixStrength, 0.0)
+        XCTAssertEqual(settings.red, 255)
+        XCTAssertEqual(settings.green, 255)
+        XCTAssertEqual(settings.blue, 255)
+    }
+
+    func testEraserRuntimeSettingsAlwaysRespondToPressure() {
+        var state = DocumentEditingState()
+        state.canvas.currentTool = .erase
+        state.brushPalette.brush.opacity = 0.2
+        state.brushPalette.brush.flow = 0.2
+        state.brushPalette.brush.opacityPressureSensitivity = 0.0
+
+        let settings = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
+
+        XCTAssertEqual(settings.opacity, 1.0)
+        XCTAssertEqual(settings.flow, 1.0)
+        XCTAssertGreaterThanOrEqual(settings.opacityPressureSensitivity, 0.72)
+    }
+
+    func testAllDefaultBrushesAreEligibleForGpuResponsivePreviewMutation() {
+        var failures: [String] = []
+
+        for preset in BrushPreset.defaults {
+            let brush = Self.runtimeSettings(for: preset)
+            let previewBrush = GpuRenderingSupport.responsivePreviewBrush(from: brush)
+            let canUseGpuMutation =
+                GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush) ||
+                GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
+
+            if !canUseGpuMutation {
+                failures.append("\(preset.name): responsive preview would fall back instead of using GPU mutation")
+            }
+            if GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush), previewBrush.smudgeEngineEnabled {
+                failures.append("\(preset.name): oil/smudge responsive preview still enables smudge CPU orchestration")
+            }
+        }
+
+        XCTAssertTrue(failures.isEmpty, failures.joined(separator: "\n"))
+    }
+
+    func testDeferredPresentationLoadedDoesNotApplyStaleRenderSnapshot() async {
+        let currentSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 8)
+        let pendingSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 9)
+        let stalePresentation = PaintDocumentPresentation.testValue(
+            canvasSize: CGSize(width: 4, height: 4),
+            renderSnapshot: makeCompositeSnapshot(width: 4, height: 4, revision: 7)
+        )
+        let store = TestStore(
+            initialState: {
+                var state = DocumentEditingState()
+                state.canvas.renderSnapshot = currentSnapshot
+                state.canvas.stagePendingCommittedSnapshot(pendingSnapshot)
+                state.canvas.lastCommittedRenderRevision = currentSnapshot.revision
+                return state
+            }()
+        ) {
+            PresentationRefreshReducer()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.presentationLoaded(stalePresentation))
+    }
+
+    func testDeferredPresentationLoadedAppliesCurrentOrNewerRenderSnapshot() async {
+        let currentSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 8)
+        let newerSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 9)
+        let presentation = PaintDocumentPresentation.testValue(
+            canvasSize: CGSize(width: 4, height: 4),
+            renderSnapshot: newerSnapshot
+        )
+        let store = TestStore(
+            initialState: {
+                var state = DocumentEditingState()
+                state.canvas.renderSnapshot = currentSnapshot
+                state.canvas.lastCommittedRenderRevision = currentSnapshot.revision
+                return state
+            }()
+        ) {
+            PresentationRefreshReducer()
+        }
+        store.exhaustivity = .off
+
+        await store.send(.presentationLoaded(presentation)) {
+            $0.canvas.renderSnapshot = newerSnapshot
+            $0.canvas.lastCommittedRenderRevision = newerSnapshot.revision
+        }
+        await store.receive(.delegate(.presentationApplied))
+    }
+
+    func testWorkspaceSnapshotFallsBackWhenRenderSnapshotOnlyHasGpuCompositeHandle() {
+        let fallbackSurface = DocumentCompositeSurface(
+            unsafeUncheckedWidth: 1,
+            height: 1,
+            pixelData: Data([0xAA, 0xBB, 0xCC, 0xFF])
+        )
+        var state = DocumentEditingState()
+        state.canvas.renderSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 12,
+            compositeBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
+            compositePixelData: Data(),
+            layers: [
+                MetalLayerSnapshot.unsafeUnchecked(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: Data(repeating: 0, count: 4 * 4 * 4)
+                )
+            ]
+        )
+
+        let snapshot = DocumentFeature.workspaceSnapshotCoordinator.snapshot(
+            state: state,
+            documentExportGateway: .stub(compositeSurface: { _ in fallbackSurface }),
+            documentGpuOperationGateway: .stub()
+        )
+
+        XCTAssertEqual(snapshot.previewSurface, fallbackSurface)
+    }
+
+    func testRenderedCompositeSurfaceHandlesMissingCompositePixelData() {
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 12,
+            compositeBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
+            compositePixelData: Data(),
+            layers: []
+        )
+
+        XCTAssertNil(DocumentFeature.renderedCompositeSurfaceIfAvailable(
+            snapshot: snapshot,
+            paperStyle: .default,
+            gpuOperations: .stub()
+        ))
+
+        let fallback = DocumentFeature.renderedCompositeSurface(
+            snapshot: snapshot,
+            paperStyle: .default,
+            gpuOperations: .stub()
+        )
+        XCTAssertEqual(fallback.width, 4)
+        XCTAssertEqual(fallback.height, 4)
+        XCTAssertEqual(fallback.pixelData.count, 4 * 4 * 4)
     }
 
     func testGpuStrokeCommitSurfacesSessionFailure() {
@@ -491,6 +662,69 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
     }
 
+    func testGpuOnlyCommitStagesAuthoritativePendingSnapshotForNextStrokeBase() {
+        let oldHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
+        let committedHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
+        let baseLayerPixels = Data(repeating: 0x22, count: 64)
+        let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 12,
+            transferKind: .dirtyRect,
+            compositeBufferHandle: oldHandle,
+            compositePixelData: Data(),
+            layers: [
+                MetalLayerSnapshot.unsafeUnchecked(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    gpuBufferHandle: oldHandle,
+                    pixelData: baseLayerPixels
+                )
+            ]
+        )
+        var state = DocumentEditingState()
+
+        state.canvas.stagePendingCommittedStrokeSnapshot(
+            baseSnapshot: baseSnapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 0,
+                width: 4,
+                height: 4,
+                handle: GpuSurfaceHandle(buffer: committedHandle),
+                pixelData: nil
+            )
+        )
+
+        guard let pendingSnapshot = state.canvas.pendingCommittedSnapshot else {
+            XCTFail("Expected GPU-only commit to stage a pending snapshot")
+            return
+        }
+        XCTAssertEqual(pendingSnapshot.revision, 13)
+        XCTAssertEqual(pendingSnapshot.compositeBufferHandle, committedHandle)
+        XCTAssertTrue(pendingSnapshot.compositePixelData.isEmpty)
+        XCTAssertEqual(pendingSnapshot.layers.first?.gpuBufferHandle, committedHandle)
+        XCTAssertEqual(pendingSnapshot.layers.first?.pixelData, baseLayerPixels)
+
+        let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
+            layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
+            strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
+        )
+        var loadedCurrentPresentation = false
+        coordinator.captureBaseSnapshotIfNeeded(
+            state: &state,
+            ensureCurrentPresentationLoaded: { _ in
+                loadedCurrentPresentation = true
+            }
+        )
+
+        XCTAssertEqual(state.canvas.strokeSession.baseSnapshot, pendingSnapshot)
+        XCTAssertFalse(loadedCurrentPresentation)
+    }
+
     func testGpuCommitStagesPendingCommittedSnapshotWithAccumulatedPreviewUpdates() {
         let previewHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let commitHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
@@ -657,7 +891,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 3),
                     isApproximatePreview: false,
                     previewBrush: brush,
-                    sampleCount: index
+                    sampleCount: index,
+                    supportsIncrementalContinuation: true
                 ),
                 baseSnapshot: baseSnapshot,
                 surface: surface,
@@ -678,6 +913,148 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(Array(compacted.pixelData[ninthOffset..<ninthOffset + 4]), [9, 9, 9, 9])
     }
 
+    func testPreviewIncrementalUpdatesAccumulateForResponsivePreviewEvenWhenContinuationIsUnsupported() {
+        let baseSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 12)
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
+        let surface = GpuLayerSurface(
+            layerIndex: 0,
+            width: 4,
+            height: 4,
+            handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16))
+        )
+        var state = DocumentEditingState()
+
+        state.canvas.recordPreviewIncrementalUpdate(
+            IncrementalLayerUpdate.unsafeUnchecked(
+                layerIndex: -1,
+                originX: 0,
+                originY: 0,
+                width: 1,
+                height: 1,
+                pixelData: Data(repeating: 1, count: 4)
+            ),
+            previousRenderState: nil,
+            baseSnapshot: baseSnapshot,
+            surface: surface,
+            previewBrush: brush,
+            sampleCount: 1
+        )
+        state.canvas.recordPreviewIncrementalUpdate(
+            IncrementalLayerUpdate.unsafeUnchecked(
+                layerIndex: -1,
+                originX: 3,
+                originY: 3,
+                width: 1,
+                height: 1,
+                pixelData: Data(repeating: 2, count: 4)
+            ),
+            previousRenderState: StrokeSessionRenderState(
+                baseRevision: 12,
+                layerIndex: 0,
+                surfaceHandle: surface.handle.buffer,
+                dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 1, height: 1),
+                isApproximatePreview: false,
+                previewBrush: brush,
+                sampleCount: 1,
+                supportsIncrementalContinuation: false
+            ),
+            baseSnapshot: baseSnapshot,
+            surface: surface,
+            previewBrush: brush,
+            sampleCount: 2
+        )
+
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.count, 2)
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.first?.originX, 0)
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.first?.originY, 0)
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.last?.originX, 3)
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.last?.originY, 3)
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.last?.pixelData, Data(repeating: 2, count: 4))
+    }
+
+    func testGpuBackedPreviewIncrementalUpdateWithMaterializedPixelsStagesCommittedComposite() {
+        let committedLayerPixels = Data(repeating: 0x55, count: 64)
+        let baseSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 12)
+        var state = DocumentEditingState()
+        state.canvas.recordPreviewIncrementalUpdate(
+            IncrementalLayerUpdate.unsafeUnchecked(
+                layerIndex: -1,
+                originX: 2,
+                originY: 2,
+                width: 1,
+                height: 1,
+                gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 1, height: 1, bytesPerRow: 4),
+                pixelData: Data([0x88, 0x87, 0x86, 0x85])
+            ),
+            previousRenderState: nil,
+            baseSnapshot: baseSnapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 0,
+                width: 4,
+                height: 4,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16))
+            ),
+            previewBrush: DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state),
+            sampleCount: 1
+        )
+
+        state.canvas.stagePendingCommittedStrokeSnapshot(
+            baseSnapshot: baseSnapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 0,
+                width: 4,
+                height: 4,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)),
+                pixelData: committedLayerPixels
+            )
+        )
+
+        guard let pendingSnapshot = state.canvas.pendingCommittedSnapshot else {
+            XCTFail("Expected pending committed snapshot")
+            return
+        }
+        let offset = ((2 * 4) + 2) * 4
+        XCTAssertEqual(Array(pendingSnapshot.compositePixelData[offset..<offset + 4]), [0x88, 0x87, 0x86, 0x85])
+    }
+
+    func testGpuCompositeOnlyBaseSnapshotStagesSingleLayerCommittedComposite() {
+        let committedLayerPixels = Data(repeating: 0x66, count: 64)
+        let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
+            width: 4,
+            height: 4,
+            revision: 12,
+            compositeBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
+            compositePixelData: Data(),
+            layers: [
+                MetalLayerSnapshot.unsafeUnchecked(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
+                    pixelData: Data(repeating: 0x22, count: 64)
+                )
+            ]
+        )
+        var state = DocumentEditingState()
+
+        state.canvas.stagePendingCommittedStrokeSnapshot(
+            baseSnapshot: baseSnapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 0,
+                width: 4,
+                height: 4,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)),
+                pixelData: committedLayerPixels
+            )
+        )
+
+        XCTAssertEqual(state.canvas.pendingCommittedSnapshot?.compositePixelData, committedLayerPixels)
+        XCTAssertNil(state.canvas.pendingCommittedSnapshot?.compositeBufferHandle)
+    }
+
     func testOversizedPreviewIncrementalUpdateIsRejectedWhenPatchingComposite() {
         let committedLayerPixels = Data(repeating: 0x55, count: 64)
         let baseSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 12)
@@ -685,11 +1062,11 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         state.canvas.applyIncrementalRenderUpdate(
             IncrementalLayerUpdate.unsafeUnchecked(
                 layerIndex: -1,
-                originX: 1,
-                originY: 1,
-                width: 1,
-                height: 1,
-                pixelData: Data([0x99, 0x98, 0x97, 0x96, 0x00])
+                originX: 3,
+                originY: 3,
+                width: 2,
+                height: 2,
+                pixelData: Data(repeating: 0x99, count: 16)
             )
         )
 
@@ -1020,6 +1397,88 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     pixelData: Data(repeating: 0x22, count: width * height * 4)
                 )
             ]
+        )
+    }
+
+    private static func runtimeSettings(for preset: BrushPreset) -> BrushRuntimeSettings {
+        BrushRuntimeSettingsAssemblyService().makeRuntimeSettings(
+            brush: BrushRuntimeDescriptor(
+                tipKind: preset.tipKind,
+                radius: preset.radius,
+                sizeSpeedSensitivity: preset.sizeSpeedSensitivity,
+                taperIn: preset.taperIn,
+                taperOut: preset.taperOut,
+                opacity: preset.opacity,
+                hardness: preset.hardness,
+                roundness: preset.roundness,
+                roundnessPressureSensitivity: preset.roundnessPressureSensitivity,
+                roundnessTiltSensitivity: preset.roundnessTiltSensitivity,
+                angle: preset.angle,
+                anglePressureSensitivity: preset.anglePressureSensitivity,
+                angleTiltSensitivity: preset.angleTiltSensitivity,
+                angleMode: preset.angleMode,
+                spacing: preset.spacing,
+                spacingJitter: preset.spacingJitter,
+                scatterEnabled: preset.scatterEnabled,
+                scatterMode: preset.scatterMode,
+                scatterLateral: preset.scatterLateral,
+                scatterLinear: preset.scatterLinear,
+                count: Double(preset.count),
+                countJitter: preset.countJitter,
+                countSizeJitter: preset.countSizeJitter,
+                countOpacityJitter: preset.countOpacityJitter,
+                angleJitter: preset.angleJitter,
+                roundnessJitter: preset.roundnessJitter,
+                textureMode: preset.textureMode,
+                textureStrength: preset.textureStrength,
+                flow: preset.flow,
+                flowPressureSensitivity: preset.flowPressureSensitivity,
+                flowJitter: preset.flowJitter,
+                velocityInfluence: preset.velocityInfluence,
+                wetness: preset.wetness,
+                wetnessPressureSensitivity: preset.wetnessPressureSensitivity,
+                opacityPressureSensitivity: preset.opacityPressureSensitivity,
+                colorMixStrength: preset.colorMixStrength,
+                smudgeRadius: preset.smudgeRadius,
+                paintLoad: preset.paintLoad,
+                smudgeEngineEnabled: preset.smudgeEngineEnabled,
+                smudgeMode: preset.smudgeMode,
+                smudgeLength: preset.smudgeLength,
+                colorRate: preset.colorRate,
+                loadPressureSensitivity: preset.loadPressureSensitivity,
+                paintAmountPressureBypass: preset.paintAmountPressureBypass,
+                paintDensityPressureBypass: preset.paintDensityPressureBypass,
+                colorStretchPressureBypass: preset.colorStretchPressureBypass,
+                dualEnabled: preset.dualBrushEnabled,
+                dualTipKind: preset.dualTipKind,
+                dualScale: preset.dualScale,
+                dualSpacing: preset.dualSpacing,
+                dualScatter: preset.dualScatter,
+                dualAngle: preset.dualAngle,
+                dualBlendMode: preset.dualBlendMode,
+                grainScale: preset.grainScale,
+                grainContrast: preset.grainContrast,
+                paperScale: preset.paperScale,
+                paperStrength: preset.paperStrength,
+                paperThreshold: preset.paperThreshold,
+                flipX: preset.flipX,
+                flipY: preset.flipY,
+                customTip: preset.customTip,
+                pressureSensitivity: preset.pressureSensitivity,
+                stabilization: 0,
+                isEraser: false
+            ),
+            fill: BrushFillRuntimeDescriptor(
+                thresholdMode: .opacity,
+                opacityTolerance: 0,
+                colorTolerance: 0.12,
+                expansion: 0
+            ),
+            color: BrushColorComponents(
+                red: Double(preset.red) / 255.0,
+                green: Double(preset.green) / 255.0,
+                blue: Double(preset.blue) / 255.0
+            )
         )
     }
 }

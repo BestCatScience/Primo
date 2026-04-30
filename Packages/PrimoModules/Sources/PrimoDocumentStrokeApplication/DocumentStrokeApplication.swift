@@ -19,18 +19,14 @@ private extension GpuLayerSurface {
 }
 
 private extension GpuCommitMutation {
-    static func materializedPreviewSurface(
+    static func previewSurface(
         _ surface: GpuLayerSurface,
         dirtyRegion: GpuSurfaceRegion,
-        refreshViaDirtyPresentation: Bool,
-        commit: DocumentStrokeCommitUseCase
+        refreshViaDirtyPresentation: Bool
     ) -> GpuStrokeSessionOutcome {
-        guard let pixelData = commit.materializedPixelData(for: surface) else {
-            return .failure(.bridgeMutationFailed("GPU stroke commit materialization failed"))
-        }
         return .commit(
             GpuCommitMutation(
-                surface: surface.materialized(with: pixelData),
+                surface: surface,
                 dirtyRegion: dirtyRegion,
                 refreshViaDirtyPresentation: refreshViaDirtyPresentation
             )
@@ -574,41 +570,13 @@ public struct DocumentStrokeSessionUseCase: Sendable {
             if
                 let renderState,
                 let snapshot,
-                !renderState.isApproximatePreview,
                 renderState.baseRevision == snapshot.revision,
                 renderState.layerIndex == commitContext.activeLayerIndex,
                 renderState.previewBrush == commitContext.previewBrush,
                 renderState.surfaceHandle.width == snapshot.width,
                 renderState.surfaceHandle.height == snapshot.height,
-                renderState.sampleCount == samples.count,
-                renderState.previewBrush != nil
-            {
-                let surface = GpuLayerSurface(
-                    layerIndex: renderState.layerIndex,
-                    width: renderState.surfaceHandle.width,
-                    height: renderState.surfaceHandle.height,
-                    handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
-                )
-                return GpuCommitMutation.materializedPreviewSurface(
-                    surface,
-                    dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
-                    refreshViaDirtyPresentation: refreshViaDirtyPresentation,
-                    commit: commit
-                )
-            }
-            if
-                let renderState,
-                let snapshot,
-                renderState.isApproximatePreview,
-                allowsApproximatePreviewCommit,
-                renderState.baseRevision == snapshot.revision,
-                renderState.layerIndex == commitContext.activeLayerIndex,
-                renderState.previewBrush == commitContext.previewBrush,
-                renderState.surfaceHandle.width == snapshot.width,
-                renderState.surfaceHandle.height == snapshot.height,
-                renderState.sampleCount == samples.count,
                 renderState.previewBrush != nil,
-                !commitContext.previewBrush.smudgeEngineEnabled
+                (!renderState.isApproximatePreview || allowsApproximatePreviewCommit)
             {
                 let surface = GpuLayerSurface(
                     layerIndex: renderState.layerIndex,
@@ -616,11 +584,10 @@ public struct DocumentStrokeSessionUseCase: Sendable {
                     height: renderState.surfaceHandle.height,
                     handle: GpuSurfaceHandle(buffer: renderState.surfaceHandle)
                 )
-                return GpuCommitMutation.materializedPreviewSurface(
+                return GpuCommitMutation.previewSurface(
                     surface,
                     dirtyRegion: GpuSurfaceRegion(renderState.dirtyRect),
-                    refreshViaDirtyPresentation: refreshViaDirtyPresentation,
-                    commit: commit
+                    refreshViaDirtyPresentation: refreshViaDirtyPresentation
                 )
             }
 

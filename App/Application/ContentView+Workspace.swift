@@ -225,7 +225,7 @@ extension ContentView {
         else {
             return nil
         }
-        return DocumentFeature.renderedCompositeSurface(
+        return DocumentFeature.renderedCompositeSurfaceIfAvailable(
             snapshot: snapshot,
             paperStyle: store.document.editing.canvas.paperStyle,
             gpuOperations: documentGpuOperationGateway

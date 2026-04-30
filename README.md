@@ -196,7 +196,7 @@ scripts/codex-test-package.sh
 scripts/codex-test-canvas-stroke.sh
 ```
 
-`scripts/codex-test-canvas-stroke.sh` は既定で `platform=iOS Simulator,name=iPad Pro (11-inch)` を使います。別の simulator を使う場合は `PRIMO_TEST_DESTINATION` で上書きできます。
+`scripts/codex-test-canvas-stroke.sh` は利用可能な iPad Simulator を自動選択します。特定の simulator を使う場合は `PRIMO_TEST_DESTINATION` で上書きできます。
 
 Metal / simulator / device 依存のテストが増えた場合は、GPU 必須テストと pure reducer tests を分けて、CI でも別 job として扱います。
 

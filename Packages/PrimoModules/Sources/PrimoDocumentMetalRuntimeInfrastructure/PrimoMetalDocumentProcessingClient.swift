@@ -1866,7 +1866,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         _ request: PrimoMetalStrokeExecutionRequest,
         includeFullPixelData: Bool
     ) -> (pixelData: Data?, dirtyRect: (originX: Int, originY: Int, width: Int, height: Int), rectPixelData: Data?)? {
-        if request.brush.smudgeEngineEnabled {
+        if request.brush.smudgeEngineEnabled && !request.brush.isEraser {
             return executeColorSmudgeStroke(request, includeFullPixelData: includeFullPixelData)
         }
         guard Self.supportsStrokeRasterization(request.brush) else { return nil }
@@ -1988,12 +1988,14 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             width: dirtyRect.width,
             height: dirtyRect.height
         )
-        let rectPixelData = bytes(
-            from: executionContext.buffers.current,
-            dirtyRect: cachedDirtyRect,
-            canvasWidth: request.canvasWidth,
-            canvasHeight: request.canvasHeight
-        )
+        let rectPixelData = includeFullPixelData
+            ? bytes(
+                from: executionContext.buffers.current,
+                dirtyRect: cachedDirtyRect,
+                canvasWidth: request.canvasWidth,
+                canvasHeight: request.canvasHeight
+            )
+            : nil
         withCacheLock {
             cachedStrokeExecution = StrokeExecutionCache(
                 width: request.canvasWidth,
@@ -2053,11 +2055,17 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         else {
             return nil
         }
+        let smudgeDirtyRect = Self.expandedSmudgeDirtyRect(
+            smudgeGeneration.dirtyRect,
+            brush: request.brush,
+            canvasWidth: request.canvasWidth,
+            canvasHeight: request.canvasHeight
+        )
         guard let executionContext = prepareStrokeExecutionContext(request: request, descriptors: preprocess.descriptors) else {
             return nil
         }
         if executionContext.shouldAdoptCachedOutput {
-            let resolvedDirtyRect = smudgeGeneration.dirtyRect
+            let resolvedDirtyRect = smudgeDirtyRect
                 ?? executionContext.cachedDirtyRect.map { ($0.originX, $0.originY, $0.width, $0.height) }
                 ?? (0, 0, request.canvasWidth, request.canvasHeight)
             return (
@@ -2077,7 +2085,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             return nil
         }
 
-        let dabsPerCommandBuffer = 64
+        let dabsPerCommandBuffer = request.mode == .interactive ? 128 : 64
         var batchStart = 0
         while batchStart < smudgeGeneration.dabs.count {
             guard let commandBuffer = commandQueue.makeCommandBuffer() else { return nil }
@@ -2125,7 +2133,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             guard commandBuffer.status == .completed else { return nil }
             batchStart = batchEnd
         }
-        guard let resolvedDirtyRect = smudgeGeneration.dirtyRect else {
+        guard let resolvedDirtyRect = smudgeDirtyRect else {
             return (
                 pixelData: includeFullPixelData ? bytes(from: executionContext.buffers.current, count: request.basePixelData.count) : nil,
                 dirtyRect: (0, 0, request.canvasWidth, request.canvasHeight),
@@ -2713,6 +2721,24 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         let maxRectY = min(canvasHeight - 1, Int(ceil(maxY)))
         guard maxRectX >= originX, maxRectY >= originY else { return nil }
         return (originX, originY, maxRectX - originX + 1, maxRectY - originY + 1)
+    }
+
+    private static func expandedSmudgeDirtyRect(
+        _ rect: (originX: Int, originY: Int, width: Int, height: Int)?,
+        brush: BrushRuntimeSettings,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> (originX: Int, originY: Int, width: Int, height: Int)? {
+        guard let rect, canvasWidth > 0, canvasHeight > 0 else { return rect }
+        let softness = max(0, 1.0 - CGFloat(brush.hardness))
+        let smudgePadding = CGFloat(brush.radius) * max(CGFloat(brush.smudgeRadius), CGFloat(brush.smudgeLength))
+        let padding = max(2, Int(ceil((CGFloat(brush.radius) * (0.25 + softness * 0.5)) + smudgePadding + 2)))
+        let originX = max(0, rect.originX - padding)
+        let originY = max(0, rect.originY - padding)
+        let limitX = min(canvasWidth, rect.originX + rect.width + padding)
+        let limitY = min(canvasHeight, rect.originY + rect.height + padding)
+        guard limitX > originX, limitY > originY else { return nil }
+        return (originX, originY, limitX - originX, limitY - originY)
     }
 
     private static func clippedRect(

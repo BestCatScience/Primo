@@ -219,10 +219,15 @@ struct CanvasFeature {
             else {
                 return
             }
-            guard let committedLayerPixelData = surface.pixelData else {
+            let surfaceCanRepresentComposite = surface.pixelData == nil &&
+                singleVisibleNormalActiveLayer(baseSnapshot: baseSnapshot, layerIndex: surface.layerIndex) != nil
+            guard let compositePixelData = committedStrokeCompositePixelData(
+                baseSnapshot: baseSnapshot,
+                surface: surface,
+                committedLayerPixelData: surface.pixelData
+            ) else {
                 return
             }
-            let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) ?? baseSnapshot.compositePixelData
             let layers = baseSnapshot.layers.map { layer in
                 guard layer.index == surface.layerIndex else { return layer }
                 return MetalLayerSnapshot(
@@ -235,8 +240,8 @@ struct CanvasFeature {
                     canvasHeight: baseSnapshot.height,
                     thumbnailSurface: layer.thumbnailSurface,
                     thumbnailData: layer.thumbnailData,
-                    gpuBufferHandle: nil,
-                    pixelData: committedLayerPixelData
+                    gpuBufferHandle: surface.pixelData == nil ? surface.handle.buffer : nil,
+                    pixelData: surface.pixelData ?? layer.pixelData
                 ) ?? layer
             }
             pendingCommittedSnapshot = MetalDocumentSnapshot(
@@ -244,10 +249,74 @@ struct CanvasFeature {
                 height: baseSnapshot.height,
                 revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
                 transferKind: .fullSnapshot,
-                compositeBufferHandle: nil,
-                compositePixelData: compositePixelData,
+                compositeBufferHandle: surfaceCanRepresentComposite ? surface.handle.buffer : nil,
+                compositePixelData: surfaceCanRepresentComposite ? Data() : compositePixelData,
                 layers: layers
             )
+        }
+
+        private func committedStrokeCompositePixelData(
+            baseSnapshot: MetalDocumentSnapshot,
+            surface: GpuLayerSurface,
+            committedLayerPixelData: Data?
+        ) -> Data? {
+            let expectedByteCount = baseSnapshot.width * baseSnapshot.height * 4
+            if let stagedComposite = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot),
+               stagedComposite.count == expectedByteCount {
+                return stagedComposite
+            }
+            if baseSnapshot.compositePixelData.count == expectedByteCount {
+                return baseSnapshot.compositePixelData
+            }
+            guard let committedLayerPixelData else {
+                return singleVisibleNormalActiveLayer(
+                    baseSnapshot: baseSnapshot,
+                    layerIndex: surface.layerIndex
+                ) == nil ? nil : Data(count: expectedByteCount)
+            }
+            return singleLayerCommittedCompositePixelData(
+                baseSnapshot: baseSnapshot,
+                surface: surface,
+                committedLayerPixelData: committedLayerPixelData,
+                expectedByteCount: expectedByteCount
+            )
+        }
+
+        private func singleLayerCommittedCompositePixelData(
+            baseSnapshot: MetalDocumentSnapshot,
+            surface: GpuLayerSurface,
+            committedLayerPixelData: Data,
+            expectedByteCount: Int
+        ) -> Data? {
+            guard committedLayerPixelData.count == expectedByteCount else { return nil }
+            let visibleLayers = baseSnapshot.layers.filter(\.visible)
+            guard visibleLayers.count == 1,
+                  let activeLayer = visibleLayers.first,
+                  activeLayer.index == surface.layerIndex,
+                  activeLayer.blendMode == .normal,
+                  activeLayer.opacity >= 0.999,
+                  !activeLayer.isClipped
+            else {
+                return nil
+            }
+            return committedLayerPixelData
+        }
+
+        private func singleVisibleNormalActiveLayer(
+            baseSnapshot: MetalDocumentSnapshot,
+            layerIndex: Int
+        ) -> MetalLayerSnapshot? {
+            let visibleLayers = baseSnapshot.layers.filter(\.visible)
+            guard visibleLayers.count == 1,
+                  let activeLayer = visibleLayers.first,
+                  activeLayer.index == layerIndex,
+                  activeLayer.blendMode == .normal,
+                  activeLayer.opacity >= 0.999,
+                  !activeLayer.isClipped
+            else {
+                return nil
+            }
+            return activeLayer
         }
 
         mutating func setActiveStrokeRenderState(_ renderState: StrokeSessionRenderState?) {

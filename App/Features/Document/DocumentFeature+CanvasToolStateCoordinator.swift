@@ -228,8 +228,10 @@ extension DocumentFeature {
             if settings.tipKind == .oil {
                 settings.stabilization = max(settings.stabilization, 0.34)
             }
-            if state.canvas.currentTool == .erase || (state.canvas.currentTool == .brush && state.brushPalette.brush.usesTransparentColor) {
-                settings.isEraser = true
+            if state.canvas.currentTool == .erase {
+                settings = eraserRuntimeSettings(from: settings)
+            } else if state.canvas.currentTool == .brush && state.brushPalette.brush.usesTransparentColor {
+                settings = transparentBrushRuntimeSettings(from: settings)
             }
             return settings
         }
@@ -286,6 +288,44 @@ extension DocumentFeature {
                     alpha: 1.0
                 )
             )
+        }
+
+        private func eraserRuntimeSettings(from settings: BrushRuntimeSettings) -> BrushRuntimeSettings {
+            var eraser = settings
+            eraser.tipKind = .ink
+            eraser.opacity = 1.0
+            eraser.flow = 1.0
+            eraser.opacityPressureSensitivity = max(eraser.opacityPressureSensitivity, 0.72)
+            eraser.colorMixingMode = .off
+            eraser.wetness = 0.0
+            eraser.colorMixStrength = 0.0
+            eraser.smudgeBlurEnabled = false
+            eraser.smudgeBleed = 0.0
+            eraser.smudgeRadius = 0.0
+            eraser.paintLoad = 1.0
+            eraser.smudgeEngineEnabled = false
+            eraser.smudgeLength = 0.0
+            eraser.colorRate = 1.0
+            eraser.dualBrushEnabled = false
+            eraser.red = 255
+            eraser.green = 255
+            eraser.blue = 255
+            eraser.isEraser = true
+            return eraser
+        }
+
+        private func transparentBrushRuntimeSettings(from settings: BrushRuntimeSettings) -> BrushRuntimeSettings {
+            var eraser = settings
+            eraser.colorMixingMode = .off
+            eraser.wetness = 0.0
+            eraser.colorMixStrength = 0.0
+            eraser.smudgeBlurEnabled = false
+            eraser.smudgeBleed = 0.0
+            eraser.smudgeRadius = 0.0
+            eraser.smudgeEngineEnabled = false
+            eraser.smudgeLength = 0.0
+            eraser.isEraser = true
+            return eraser
         }
 
         func resolvedPaperStyle(for state: DocumentEditingState) -> CanvasPaperStyle {

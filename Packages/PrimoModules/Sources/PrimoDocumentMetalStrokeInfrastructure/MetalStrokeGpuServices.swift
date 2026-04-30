@@ -173,8 +173,25 @@ public enum GpuRenderingSupport {
         StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush)
     }
 
+    public static func shouldUseGpuOnlyResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        StrokePreviewContinuationPolicy.shouldUseGpuOnlyResponsivePreview(for: brush)
+    }
+
     public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
-        brush
+        guard StrokePreviewContinuationPolicy.shouldUseGpuOnlyResponsivePreview(for: brush) else {
+            return brush
+        }
+
+        var preview = brush
+        preview.smudgeEngineEnabled = false
+        preview.stampSpacing = max(brush.stampSpacing, 0.18)
+        preview.textureStrength = min(brush.textureStrength, 0.12)
+        preview.wetness = 0
+        preview.wetnessPressureSensitivity = 0
+        preview.colorMixStrength = 0
+        preview.smudgeRadius = 0
+        preview.smudgeLength = 0
+        return preview
     }
 
     public static func strokePreviewDirtyRect(

@@ -57,6 +57,7 @@ struct PresentationRefreshReducer: Reducer {
 
         case let .presentationLoaded(presentation):
             guard !state.canvas.isStrokeActive else { return .none }
+            guard shouldApplyAsynchronousPresentation(presentation, to: state) else { return .none }
             return applyPresentation(presentation, to: &state)
 
         case let .workspaceSnapshotRequested(purpose):
@@ -78,5 +79,20 @@ struct PresentationRefreshReducer: Reducer {
         case .delegate:
             return .none
         }
+    }
+
+    private func shouldApplyAsynchronousPresentation(
+        _ presentation: PaintDocumentPresentation,
+        to state: State
+    ) -> Bool {
+        guard let incomingRevision = presentation.renderSnapshot?.revision else {
+            return true
+        }
+        let visibleRevision = max(
+            state.canvas.renderSnapshot?.revision ?? -1,
+            state.canvas.pendingCommittedSnapshot?.revision ?? -1,
+            state.canvas.lastCommittedRenderRevision
+        )
+        return incomingRevision >= visibleRevision
     }
 }

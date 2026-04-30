@@ -216,10 +216,12 @@ public struct DocumentStrokeProcessingService: Sendable {
         let previewBrush = usesResponsivePreview
             ? GpuRenderingSupport.responsivePreviewBrush(from: brush)
             : brush
-        let usesApproximatePreview = previewBrush != brush
+        let usesGpuOnlyResponsivePreview = usesResponsivePreview &&
+            GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
+        let usesApproximatePreview = previewBrush != brush || usesGpuOnlyResponsivePreview
 
         if !preserveAlphaLockedPixels,
-           GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush),
+           (GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: previewBrush) || usesGpuOnlyResponsivePreview),
            let gpuResult = strokeService.executeStrokeMutation(
                MetalStrokeExecutionRequest(
                    basePixelData: basePixelData,
@@ -244,30 +246,19 @@ public struct DocumentStrokeProcessingService: Sendable {
                     pixelData: nil,
                     gpuBufferHandle: bufferHandle,
                     dirtyRect: gpuResult.dirtyRect,
-                    rectPixelData: usesApproximatePreview ? gpuResult.rectPixelData : nil,
-                    incrementalUpdate: incrementalUpdate,
-                    isApproximatePreview: usesApproximatePreview
-                )
-            }
-            if
-                let adjustedPixels = materializationService.materializedPixelData(for: bufferHandle),
-                let incrementalUpdate = livePreviewIncrementalUpdate(
-                    snapshot: snapshot,
-                    activeLayerIndex: activeLayerIndex,
-                    adjustedActiveLayerPixels: adjustedPixels,
-                    dirtyRect: gpuResult.dirtyRect
-                )
-            {
-                return DocumentInteractiveStrokePreviewResult(
-                    pixelData: adjustedPixels,
-                    gpuBufferHandle: bufferHandle,
-                    dirtyRect: gpuResult.dirtyRect,
-                    rectPixelData: usesApproximatePreview ? gpuResult.rectPixelData : nil,
+                    rectPixelData: usesApproximatePreview && !usesGpuOnlyResponsivePreview ? gpuResult.rectPixelData : nil,
                     incrementalUpdate: incrementalUpdate,
                     isApproximatePreview: usesApproximatePreview
                 )
             }
             strokeService.release(bufferHandle)
+            if usesResponsivePreview {
+                return nil
+            }
+        }
+
+        guard !usesResponsivePreview else {
+            return nil
         }
 
         guard let gpuResult = strokeService.executeStroke(
@@ -350,6 +341,28 @@ public struct DocumentStrokeProcessingService: Sendable {
             ),
             incrementalUpdate: incrementalUpdate,
             isApproximatePreview: usesApproximatePreview
+        )
+    }
+
+    private func materializedIncrementalUpdateIfNeeded(
+        _ update: IncrementalLayerUpdate
+    ) -> IncrementalLayerUpdate {
+        guard update.pixelData.isEmpty, let handle = update.gpuBufferHandle else {
+            return update
+        }
+        guard let pixelData = materializationService.materializedPixelData(for: handle) else {
+            return update
+        }
+        return IncrementalLayerUpdate.unsafeUnchecked(
+            id: update.id,
+            layerIndex: update.layerIndex,
+            originX: update.originX,
+            originY: update.originY,
+            width: update.width,
+            height: update.height,
+            transferKind: update.transferKind,
+            gpuBufferHandle: update.gpuBufferHandle,
+            pixelData: pixelData
         )
     }
 

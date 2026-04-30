@@ -15,6 +15,7 @@ private enum FileClientKey: DependencyKey {
 
 private enum ProcessEnvironmentClientKey: DependencyKey {
     static let liveValue = PrimoCoreTypes.ProcessEnvironmentClient.live
+    static let testValue = PrimoCoreTypes.ProcessEnvironmentClient { _ in nil }
 }
 
 private enum HTTPClientKey: DependencyKey {

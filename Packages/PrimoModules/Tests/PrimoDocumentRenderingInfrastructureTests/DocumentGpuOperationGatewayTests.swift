@@ -397,6 +397,34 @@ struct DocumentGpuOperationGatewayTests {
             ]
         )
 
+        var eraserBrush = BrushRuntimeSettings(
+            tipKind: .oil,
+            radius: 8,
+            opacity: 1,
+            hardness: 1,
+            roundness: 1,
+            angle: 0,
+            angleMode: .fixed,
+            stampSpacing: 0.15,
+            spacingJitter: 0,
+            scatterLateral: 0,
+            scatterLinear: 0,
+            count: 1,
+            countJitter: 0,
+            angleJitter: 0,
+            roundnessJitter: 0,
+            textureMode: .off,
+            textureStrength: 0,
+            pressureSensitivity: 1,
+            red: 255,
+            green: 0,
+            blue: 0,
+            isEraser: true
+        )
+        eraserBrush.smudgeEngineEnabled = true
+        eraserBrush.wetness = 1.0
+        eraserBrush.colorMixStrength = 1.0
+
         let committed = try #require(strokeService.makeCommittedSurface(
             snapshot: snapshot,
             activeLayerIndex: 0,
@@ -409,30 +437,7 @@ struct DocumentGpuOperationGatewayTests {
                     timestamp: 0
                 )
             ],
-            brush: .init(
-                tipKind: .ink,
-                radius: 8,
-                opacity: 1,
-                hardness: 1,
-                roundness: 1,
-                angle: 0,
-                angleMode: .fixed,
-                stampSpacing: 0.15,
-                spacingJitter: 0,
-                scatterLateral: 0,
-                scatterLinear: 0,
-                count: 1,
-                countJitter: 0,
-                angleJitter: 0,
-                roundnessJitter: 0,
-                textureMode: .off,
-                textureStrength: 0,
-                pressureSensitivity: 1,
-                red: 255,
-                green: 0,
-                blue: 0,
-                isEraser: true
-            ),
+            brush: eraserBrush,
             preserveAlphaLockedPixels: false
         ))
         let pixels = try #require(committed.fallbackPixelData ?? strokeService.materializedPixelData(for: committed.handle))
@@ -606,8 +611,10 @@ struct DocumentGpuOperationGatewayTests {
         ))
 
         let liveUpdate = try #require(preview.incrementalUpdate)
-        #expect(!preview.isApproximatePreview)
+        #expect(preview.isApproximatePreview)
         #expect(!liveUpdate.isEmpty)
+        #expect(liveUpdate.pixelData.isEmpty)
+        #expect(liveUpdate.gpuBufferHandle != nil)
         #expect(liveUpdate.width > 0)
         #expect(liveUpdate.height > 0)
     }
@@ -657,7 +664,7 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
-    func responsivePreviewBrushPreservesSmudgeForLiveSmudgePreview() {
+    func responsivePreviewBrushLightensSmudgeForLiveSmudgePreview() {
         let customTip = BrushTipRaster(width: 2, height: 1, alphaData: Data([64, 255]))
         let original = BrushRuntimeSettings(
             tipKind: .oil,
@@ -680,6 +687,7 @@ struct DocumentGpuOperationGatewayTests {
             flow: 0.82,
             wetness: 0.20,
             colorMixStrength: 0.24,
+            smudgeRadius: 0.36,
             paintLoad: 0.08,
             smudgeEngineEnabled: true,
             smudgeMode: .smearing,
@@ -694,7 +702,14 @@ struct DocumentGpuOperationGatewayTests {
 
         let preview = GpuRenderingSupport.responsivePreviewBrush(from: original)
 
-        #expect(preview == original)
+        #expect(preview != original)
+        #expect(preview.tipKind == original.tipKind)
+        #expect(!preview.smudgeEngineEnabled)
+        #expect(preview.stampSpacing > original.stampSpacing)
+        #expect(preview.smudgeRadius < original.smudgeRadius)
+        #expect(preview.smudgeLength < original.smudgeLength)
+        #expect(preview.colorMixStrength < original.colorMixStrength)
+        #expect(preview.wetness < original.wetness)
         #expect(preview.customTip == original.customTip)
         #expect(preview.red == original.red)
         #expect(preview.green == original.green)

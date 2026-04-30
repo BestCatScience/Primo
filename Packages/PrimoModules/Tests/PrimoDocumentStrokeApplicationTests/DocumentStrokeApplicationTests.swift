@@ -622,7 +622,10 @@ struct DocumentStrokeApplicationTests {
             layerIndex: preview.surface.layerIndex,
             surfaceHandle: preview.surface.handle.buffer,
             dirtyRect: preview.dirtyRegion.layerPixelRect,
-            isApproximatePreview: false
+            isApproximatePreview: false,
+            previewBrush: makeContext(layerIndex: 0).previewBrush,
+            sampleCount: 1,
+            supportsIncrementalContinuation: true
         )
         let commit = try #require(useCase.execute(
             .finish(
@@ -636,9 +639,8 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
-        #expect(renderer.requests.count == 1)
-        #expect(renderer.requests[0].samples == [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)])
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test
@@ -684,7 +686,7 @@ struct DocumentStrokeApplicationTests {
         ).commitMutation)
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
-        #expect(commit.surface.pixelData != nil)
+        #expect(commit.surface.pixelData == nil)
         #expect(commit.dirtyRegion == preview.dirtyRegion)
         #expect(renderer.requests.isEmpty)
     }
@@ -719,7 +721,7 @@ struct DocumentStrokeApplicationTests {
             sampleCount: 1,
             supportsIncrementalContinuation: true
         )
-        let outcome = useCase.execute(
+        let commit = try #require(useCase.execute(
             .finish(
                 renderState: renderState,
                 baseSnapshot: snapshot,
@@ -729,9 +731,10 @@ struct DocumentStrokeApplicationTests {
                 allowsApproximatePreviewCommit: false,
                 refreshViaDirtyPresentation: true
             )
-        )
+        ).commitMutation)
 
-        #expect(outcome.failure == .bridgeMutationFailed("GPU stroke commit materialization failed"))
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(commit.surface.pixelData == nil)
         #expect(renderer.requests.isEmpty)
     }
 
@@ -777,7 +780,7 @@ struct DocumentStrokeApplicationTests {
         ).commitMutation)
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
-        #expect(commit.surface.pixelData != nil)
+        #expect(commit.surface.pixelData == nil)
         #expect(renderer.requests.isEmpty)
     }
 
@@ -827,12 +830,12 @@ struct DocumentStrokeApplicationTests {
 
         #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
         #expect(commit.dirtyRegion == preview.dirtyRegion)
-        #expect(commit.surface.pixelData != nil)
+        #expect(commit.surface.pixelData == nil)
         #expect(renderer.requests.isEmpty)
     }
 
     @Test
-    func strokeSessionUseCaseRerendersSmudgeWhenPreviewSamplesDoNotMatchFinalStroke() throws {
+    func strokeSessionUseCaseCommitsDisplayedSmudgePreviewWhenSampleCountDiffers() throws {
         let planner = RecordingPreviewPlanner()
         let renderer = RecordingCommitRenderer()
         let useCase = DocumentStrokeSessionUseCase(
@@ -874,10 +877,8 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
-        #expect(renderer.requests.count == 1)
-        #expect(renderer.requests[0].samples == finalSamples)
-        #expect(renderer.requests[0].brush.smudgeEngineEnabled)
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test
@@ -928,7 +929,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     @Test
-    func strokeSessionUseCaseRerendersResponsivePreviewWhenSampleCountDiffers() throws {
+    func strokeSessionUseCaseCommitsDisplayedResponsivePreviewWhenSampleCountDiffers() throws {
         let renderer = RecordingCommitRenderer()
         let useCase = DocumentStrokeSessionUseCase(
             preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
@@ -969,9 +970,8 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer != preview.surface.handle.buffer)
-        #expect(renderer.requests.count == 1)
-        #expect(renderer.requests[0].samples == finalSamples)
+        #expect(commit.surface.handle.buffer == preview.surface.handle.buffer)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test
@@ -1018,10 +1018,8 @@ struct DocumentStrokeApplicationTests {
             )
         ).commitMutation)
 
-        #expect(commit.surface.handle.buffer != previewHandle)
-        #expect(renderer.requests.count == 1)
-        #expect(renderer.requests[0].samples == finalSamples)
-        #expect(renderer.requests[0].brush == eraserBrush)
+        #expect(commit.surface.handle.buffer == previewHandle)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test
@@ -1047,6 +1045,53 @@ struct DocumentStrokeApplicationTests {
 
         #expect(renderer.requests.count == 1)
         #expect(renderer.requests[0].brush.smudgeEngineEnabled)
+    }
+
+    @Test
+    func smudgeBrushUsesGpuOnlyResponsivePreviewButNotExactContinuation() {
+        let brush = smudgeBrushSettings()
+
+        #expect(StrokePreviewContinuationPolicy.shouldUseGpuOnlyResponsivePreview(for: brush))
+        #expect(!StrokePreviewContinuationPolicy.shouldUseIncrementalPreviewUpdate(for: brush))
+    }
+
+    @Test
+    func approximateSmudgePreviewCommitsDisplayedPreviewSurface() throws {
+        let renderer = RecordingCommitRenderer()
+        let useCase = DocumentStrokeSessionUseCase(
+            preview: DocumentStrokePreviewUseCase(planner: RecordingPreviewPlanner()),
+            commit: DocumentStrokeCommitUseCase(renderer: renderer),
+            resetInteractiveStrokeState: {}
+        )
+        let snapshot = makeSnapshot(layerIndex: 0)
+        let brush = smudgeBrushSettings()
+        let context = makeContext(layerIndex: 0, brush: brush)
+        let previewHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
+        let samples = [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)]
+
+        let commit = try #require(useCase.execute(
+            .finish(
+                renderState: StrokeSessionRenderState(
+                    baseRevision: snapshot.revision,
+                    layerIndex: 0,
+                    surfaceHandle: previewHandle,
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
+                    isApproximatePreview: true,
+                    previewBrush: brush,
+                    sampleCount: samples.count,
+                    supportsIncrementalContinuation: false
+                ),
+                baseSnapshot: snapshot,
+                renderSnapshot: nil,
+                samples: samples,
+                context: context,
+                allowsApproximatePreviewCommit: true,
+                refreshViaDirtyPresentation: true
+            )
+        ).commitMutation)
+
+        #expect(commit.surface.handle.buffer == previewHandle)
+        #expect(renderer.requests.isEmpty)
     }
 
     @Test

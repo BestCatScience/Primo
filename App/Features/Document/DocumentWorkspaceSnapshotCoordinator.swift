@@ -12,8 +12,8 @@ extension DocumentFeature {
             documentGpuOperationGateway: DocumentGpuOperationGateway
         ) -> WorkspaceDocumentSnapshot {
             let paperStyle = canvasToolStateCoordinator.resolvedPaperStyle(for: state)
-            let previewSurface = state.canvas.renderSnapshot.map {
-                renderedCompositeSurface(
+            let previewSurface = state.canvas.renderSnapshot.flatMap {
+                renderedCompositeSurfaceIfAvailable(
                     snapshot: $0,
                     paperStyle: paperStyle,
                     gpuOperations: documentGpuOperationGateway
