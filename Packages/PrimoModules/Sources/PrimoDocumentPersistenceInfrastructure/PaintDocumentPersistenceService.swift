@@ -1,7 +1,12 @@
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentDomain
 
 public struct PaintDocumentPersistenceService {
+    private static let maxPackageByteCount = 2 * 1024 * 1024 * 1024
+    private static let maxPackageFileCount = 300_000
+    private static let maxSingleFileByteCount = 512 * 1024 * 1024
+
     let fileClient: FileClient
 
     public init(fileClient: FileClient) {
@@ -45,15 +50,27 @@ public struct PaintDocumentPersistenceService {
         guard fileClient.fileExists(projectURL.path) else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Missing project package at \(projectURL.path)")
         }
+        try validatePackageFootprint(at: projectURL)
         let manifestURL = projectURL.appendingPathComponent("manifest.json", isDirectory: false)
         let manifestData = try fileClient.readData(manifestURL)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: manifestData)
-        guard document.canvasWidth > 0, document.canvasHeight > 0, !document.layers.isEmpty else {
+        guard PixelGeometry(width: document.canvasWidth, height: document.canvasHeight) != nil,
+              !document.layers.isEmpty,
+              document.layers.count <= CanvasSizePolicy.maxLayerCount,
+              document.folders.count <= CanvasSizePolicy.maxFolderCount,
+              document.timelapseOperations.count <= CanvasSizePolicy.maxTimelapseOperationCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid project manifest dimensions or layers")
         }
+        guard document.layers.allSatisfy({ $0.name.count <= CanvasSizePolicy.maxLayerNameLength }),
+              document.folders.allSatisfy({ $0.name.count <= CanvasSizePolicy.maxLayerNameLength }) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid project manifest name length")
+        }
 
-        let expectedLayerBytes = document.canvasWidth * document.canvasHeight * 4
-        let expectedMaskBytes = document.canvasWidth * document.canvasHeight
+        guard let geometry = PixelGeometry(width: document.canvasWidth, height: document.canvasHeight) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid project manifest dimensions")
+        }
+        let expectedLayerBytes = geometry.rgbaByteCount
+        let expectedMaskBytes = geometry.maskByteCount
         for layer in document.layers {
             try validateRelativeFile(
                 layer.pixelFilename,
@@ -156,6 +173,7 @@ public struct PaintDocumentPersistenceService {
         label: String
     ) throws {
         let fileURL = try validatedRelativeURL(relativePath, in: projectURL, label: label)
+        try validateNonSymlink(fileURL, packageRoot: projectURL, label: label)
         let data = try fileClient.readData(fileURL)
         guard data.count == expectedByteCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid byte count for \(label) \(relativePath)")
@@ -175,6 +193,44 @@ public struct PaintDocumentPersistenceService {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping \(label) path \(relativePath)")
         }
         return fileURL
+    }
+
+    private func validatePackageFootprint(at projectURL: URL) throws {
+        let urls = fileClient.enumerateURLs(
+            projectURL,
+            [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey],
+            [.skipsHiddenFiles]
+        )
+        guard urls.count <= Self.maxPackageFileCount else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Project package contains too many files")
+        }
+        var totalBytes = 0
+        for url in urls {
+            try validateNonSymlink(url, packageRoot: projectURL, label: "package entry")
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+            guard values?.isRegularFile == true else { continue }
+            let fileSize = values?.fileSize ?? 0
+            guard fileSize <= Self.maxSingleFileByteCount else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Project package contains an oversized file")
+            }
+            let newTotal = totalBytes.addingReportingOverflow(fileSize)
+            guard !newTotal.overflow, newTotal.partialValue <= Self.maxPackageByteCount else {
+                throw PaintDocumentPersistenceError.invalidProjectPackage("Project package is too large")
+            }
+            totalBytes = newTotal.partialValue
+        }
+    }
+
+    private func validateNonSymlink(_ fileURL: URL, packageRoot: URL, label: String) throws {
+        let values = try? fileURL.resourceValues(forKeys: [.isSymbolicLinkKey])
+        guard values?.isSymbolicLink != true else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid symbolic link in \(label)")
+        }
+        let resolved = fileURL.resolvingSymlinksInPath().standardizedFileURL
+        let root = packageRoot.resolvingSymlinksInPath().standardizedFileURL
+        guard resolved.path == root.path || resolved.path.hasPrefix(root.path + "/") else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Escaping symbolic link in \(label)")
+        }
     }
 
     private func restoreBackupIfAvailable(backupURL: URL, destinationURL: URL) throws {

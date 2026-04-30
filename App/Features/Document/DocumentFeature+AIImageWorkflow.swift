@@ -175,6 +175,8 @@ extension DocumentFeature {
             jobID: uuidClient.generate(),
             createdAt: dateClient.now()
         )
+        let jobID = generationStart.jobID
+        state.activeAIImageJobID = jobID
         return .merge(
             .send(.delegate(.aiImageGenerationStarted(generationStart))),
             .run { [aiImagePreviewPreparationService] send in
@@ -187,11 +189,11 @@ extension DocumentFeature {
                     )
                 ) {
                 case let .success(preview):
-                    await send(.aiImagePreviewPrepared(preview))
+                    await send(.aiImagePreviewPrepared(jobID: jobID, preview: preview))
                 case let .failure(.editFailed(failure)):
-                    await send(.aiImagePreviewPreparationFailed(Self.aiImageFailureFeedback(failure)))
+                    await send(.aiImagePreviewPreparationFailed(jobID: jobID, feedback: Self.aiImageFailureFeedback(failure)))
                 case .failure(.unsupportedImage):
-                    await send(.aiImagePreviewPreparationFailed(.aiImageUnsupportedImage))
+                    await send(.aiImagePreviewPreparationFailed(jobID: jobID, feedback: .aiImageUnsupportedImage))
                 }
             }
             .cancellable(id: ApplicationFeature.CancelID.aiImageEdit, cancelInFlight: true)
@@ -202,6 +204,7 @@ extension DocumentFeature {
         state: inout State,
         preview: AIImagePreviewState
     ) -> Effect<Action> {
+        state.activeAIImageJobID = nil
         let language = appLanguageClient.load()
         let applicationPlan: AIImagePreviewApplicationPlan
         switch aiImagePreviewApplicationContract.validate(
@@ -260,11 +263,13 @@ extension DocumentFeature {
         state: inout State,
         feedback: ApplicationFeature.Feedback
     ) -> Effect<Action> {
-        .send(.delegate(.aiImageGenerationFailed(feedback, appLanguageClient.load())))
+        state.activeAIImageJobID = nil
+        return .send(.delegate(.aiImageGenerationFailed(feedback, appLanguageClient.load())))
     }
 
     func handleAIImageCancelRequested(state: inout State) -> Effect<Action> {
-        .merge(
+        state.activeAIImageJobID = nil
+        return .merge(
             .send(.delegate(.aiImageGenerationFailed(.aiImageGenerationCanceled, appLanguageClient.load()))),
             .cancel(id: ApplicationFeature.CancelID.aiImageEdit)
         )

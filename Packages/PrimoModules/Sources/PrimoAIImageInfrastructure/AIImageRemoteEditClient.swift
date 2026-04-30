@@ -28,6 +28,10 @@ public extension AIImageRemoteEditClient {
         }
     }
 
+    private static var maxResponseBodyBytes: Int { 48 * 1024 * 1024 }
+    private static var maxBase64ImageCharacters: Int { 64 * 1024 * 1024 }
+    private static var maxDisplayErrorCharacters: Int { 4096 }
+
     private static func performEditRequest(
         inputPNGData: Data,
         prompt: String,
@@ -51,10 +55,10 @@ public extension AIImageRemoteEditClient {
 
                 guard (200...299).contains(httpResponse.statusCode) else {
                     if let apiError = decodeAPIErrorEnvelope(from: data) {
-                        throw AIImageEditFailure.apiError(apiError.error.message)
+                        throw AIImageEditFailure.apiError(truncatedDisplayMessage(apiError.error.message))
                     }
                     throw AIImageEditFailure.apiError(
-                        String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                        displayErrorBody(data, statusCode: httpResponse.statusCode)
                     )
                 }
 
@@ -76,10 +80,10 @@ public extension AIImageRemoteEditClient {
 
                     guard (200...299).contains(httpResponse.statusCode) else {
                         if let apiError = decodeAPIErrorEnvelope(from: data) {
-                            throw AIImageEditFailure.apiError(apiError.error.message)
+                            throw AIImageEditFailure.apiError(truncatedDisplayMessage(apiError.error.message))
                         }
                         throw AIImageEditFailure.apiError(
-                            String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                            displayErrorBody(data, statusCode: httpResponse.statusCode)
                         )
                     }
 
@@ -114,10 +118,10 @@ public extension AIImageRemoteEditClient {
 
             guard (200...299).contains(httpResponse.statusCode) else {
                 if let apiError = decodeAPIErrorEnvelope(from: data) {
-                    throw AIImageEditFailure.apiError(apiError.error.message)
+                    throw AIImageEditFailure.apiError(truncatedDisplayMessage(apiError.error.message))
                 }
                 throw AIImageEditFailure.apiError(
-                    String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+                    displayErrorBody(data, statusCode: httpResponse.statusCode)
                 )
             }
 
@@ -332,6 +336,9 @@ public extension AIImageRemoteEditClient {
     }
 
     private static func decodeImageData(from data: Data) throws -> Data? {
+        guard data.count <= maxResponseBodyBytes else {
+            throw AIImageEditFailure.missingImageData("AI image editing response was too large to decode safely.")
+        }
         if let decoded = decodeOpenAIImageEditResponse(from: data) {
             for image in decoded.data {
                 if let imageBase64 = image.b64JSON, let decodedImage = decodeBase64ImageData(imageBase64) {
@@ -424,13 +431,27 @@ public extension AIImageRemoteEditClient {
 
     private static func decodeBase64ImageData(_ rawValue: String) -> Data? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= maxBase64ImageCharacters else { return nil }
         let base64Payload: String
         if let commaIndex = trimmed.firstIndex(of: ","), trimmed[..<commaIndex].contains("base64") {
             base64Payload = String(trimmed[trimmed.index(after: commaIndex)...])
         } else {
             base64Payload = trimmed
         }
+        guard base64Payload.count <= maxBase64ImageCharacters else { return nil }
         return Data(base64Encoded: base64Payload, options: [.ignoreUnknownCharacters])
+    }
+
+    private static func displayErrorBody(_ data: Data, statusCode: Int) -> String {
+        guard let raw = String(data: data.prefix(maxDisplayErrorCharacters), encoding: .utf8) else {
+            return "HTTP \(statusCode)"
+        }
+        return truncatedDisplayMessage(raw.isEmpty ? "HTTP \(statusCode)" : raw)
+    }
+
+    private static func truncatedDisplayMessage(_ message: String) -> String {
+        guard message.count > maxDisplayErrorCharacters else { return message }
+        return String(message.prefix(maxDisplayErrorCharacters))
     }
 
     private static func recursivelyExtractImageData(from value: Any) -> Data? {

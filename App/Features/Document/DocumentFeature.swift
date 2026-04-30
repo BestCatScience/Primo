@@ -166,6 +166,7 @@ struct DocumentFeature {
         var canvas = CanvasFeature.State()
         var brushPanel = StudioPanelLayoutState()
         var layerPanel = StudioPanelLayoutState()
+        var activeAIImageJobID: UUID?
     }
 
     enum EditingAction: Equatable {
@@ -233,8 +234,8 @@ struct DocumentFeature {
         case newCanvasPreparationCompleted(CanvasDimensions)
         case newCanvasFromImagePreparationCompleted(ImportExportFeature.ImportedCanvasPlan)
         case aiImageEditRequested(SubmitAIImageEditCommand)
-        case aiImagePreviewPrepared(AIImagePreviewState)
-        case aiImagePreviewPreparationFailed(ApplicationFeature.Feedback)
+        case aiImagePreviewPrepared(jobID: UUID, preview: AIImagePreviewState)
+        case aiImagePreviewPreparationFailed(jobID: UUID, feedback: ApplicationFeature.Feedback)
         case aiImageCancelRequested
         case undoRequested
         case redoRequested
@@ -360,10 +361,12 @@ struct DocumentFeature {
                 case let .aiImageEditRequested(request):
                     return handleAIImageEditRequest(state: &state, request: request)
 
-                case let .aiImagePreviewPrepared(preview):
+                case let .aiImagePreviewPrepared(jobID, preview):
+                    guard state.activeAIImageJobID == jobID else { return .none }
                     return handleAIImageEditSucceeded(state: &state, preview: preview)
 
-                case let .aiImagePreviewPreparationFailed(feedback):
+                case let .aiImagePreviewPreparationFailed(jobID, feedback):
+                    guard state.activeAIImageJobID == jobID else { return .none }
                     return handleAIImageEditFailed(state: &state, feedback: feedback)
 
                 case .aiImageCancelRequested:

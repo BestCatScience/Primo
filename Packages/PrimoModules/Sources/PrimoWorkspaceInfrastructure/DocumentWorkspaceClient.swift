@@ -433,7 +433,9 @@ private struct DocumentWorkspaceStorage: Sendable {
     }
 
     private func appProjectsDirectory() throws -> URL {
-        let documentsDirectory = fileClient.urls(.documentDirectory, .userDomainMask)[0]
+        guard let documentsDirectory = fileClient.urls(.documentDirectory, .userDomainMask).first else {
+            throw DocumentWorkspaceCatalogError.resourceLookupFailed("Could not locate the documents directory.")
+        }
         let directory = documentsDirectory
             .appendingPathComponent(Self.appProjectsDirectoryName, isDirectory: true)
         try fileClient.createDirectory(directory, true)

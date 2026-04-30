@@ -27,8 +27,9 @@ public struct SelectionWorkflowService: Sendable {
                 return mode == .add ? incoming : nil
             }
 
-            let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-            let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+            guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+            let canvasWidth = canvasGeometry.width
+            let canvasHeight = canvasGeometry.height
             guard
                 let baseMask = expandedMask(from: existing, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
                 let incomingMask = expandedMask(from: incoming, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
@@ -48,12 +49,15 @@ public struct SelectionWorkflowService: Sendable {
     }
 
     public func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        guard let selectionGeometry = PixelGeometry(width: selection.maskWidth, height: selection.maskHeight) else { return nil }
+        guard selection.maskData.count == selectionGeometry.maskByteCount else { return nil }
         let originX = max(Int(selection.bounds.minX.rounded(.down)), 0)
         let originY = max(Int(selection.bounds.minY.rounded(.down)), 0)
         let width = min(selection.maskWidth, canvasWidth - originX)
         let height = min(selection.maskHeight, canvasHeight - originY)
         guard width > 0, height > 0 else {
-            return [UInt8](repeating: 0, count: canvasWidth * canvasHeight)
+            return [UInt8](repeating: 0, count: canvasGeometry.maskByteCount)
         }
 
         return gpuOperations.expandedSelectionMask(
@@ -76,8 +80,9 @@ public struct SelectionWorkflowService: Sendable {
         isInverted: Bool
     ) -> CanvasSelection? {
         guard let selection else { return nil }
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
         guard var mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
@@ -100,8 +105,9 @@ public struct SelectionWorkflowService: Sendable {
         canvasSize: CGSize,
         mode: SelectionToolMode
     ) -> CanvasSelection? {
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
 
         if let selection {
             return adjustedSelection(
@@ -112,7 +118,7 @@ public struct SelectionWorkflowService: Sendable {
             )
         }
 
-        let fullMask = [UInt8](repeating: 255, count: canvasWidth * canvasHeight)
+        let fullMask = [UInt8](repeating: 255, count: canvasGeometry.maskByteCount)
         return croppedSelection(from: fullMask, width: canvasWidth, height: canvasHeight, mode: mode)
     }
 
@@ -122,8 +128,9 @@ public struct SelectionWorkflowService: Sendable {
         radius: Int
     ) -> CanvasSelection? {
         guard let selection else { return nil }
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
         guard let mask = expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
@@ -134,11 +141,12 @@ public struct SelectionWorkflowService: Sendable {
     public func makeLassoSelection(from points: [CGPoint], canvasSize: CGSize) -> CanvasSelection? {
         guard points.count >= 3 else { return nil }
 
-        let polygon = closedPolygon(points, canvasSize: canvasSize)
+        let polygon = closedPolygon(simplifiedLassoPoints(points), canvasSize: canvasSize)
         guard polygon.count >= 3 else { return nil }
 
-        let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
-        let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
+        guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
+        let canvasWidth = canvasGeometry.width
+        let canvasHeight = canvasGeometry.height
         guard let mask = gpuOperations.lassoSelection(polygon, canvasWidth, canvasHeight) else {
             return nil
         }
@@ -163,11 +171,11 @@ public struct SelectionWorkflowService: Sendable {
 
         let width = snapshot.width
         let height = snapshot.height
-        guard width > 0, height > 0 else { return nil }
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
 
         let startX = min(max(Int(point.x.rounded()), 0), width - 1)
         let startY = min(max(Int(point.y.rounded()), 0), height - 1)
-        guard layer.pixelData.count == width * height * 4 else { return nil }
+        guard layer.pixelData.count == geometry.rgbaByteCount else { return nil }
 
         guard let selected = gpuOperations.autoSelection(
             layer.pixelData,
@@ -194,7 +202,7 @@ public struct SelectionWorkflowService: Sendable {
         guard let snapshot else { return nil }
         let width = snapshot.width
         let height = snapshot.height
-        guard width > 0, height > 0 else { return nil }
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
 
         let pixelData: Data
         switch request.source {
@@ -205,7 +213,7 @@ public struct SelectionWorkflowService: Sendable {
             pixelData = snapshot.compositePixelData
         }
 
-        guard pixelData.count == width * height * 4 else { return nil }
+        guard pixelData.count == geometry.rgbaByteCount else { return nil }
         guard let selected = gpuOperations.colorRangeSelection(pixelData, width, height, request) else {
             return nil
         }
@@ -218,20 +226,23 @@ public struct SelectionWorkflowService: Sendable {
 
     public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
+        guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return gpuOperations.expandedMask(source, width, height, expansion)
-            ?? [UInt8](repeating: 0, count: width * height)
+            ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
+        guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return gpuOperations.contractedMask(source, width, height, contraction)
-            ?? [UInt8](repeating: 0, count: width * height)
+            ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0 else { return source }
+        guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
         return gpuOperations.featheredMask(source, width, height, radius)
-            ?? [UInt8](repeating: 0, count: width * height)
+            ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
@@ -240,12 +251,15 @@ public struct SelectionWorkflowService: Sendable {
     }
 
     public func croppedSelection(from source: [UInt8], width: Int, height: Int, mode: SelectionToolMode) -> CanvasSelection? {
+        guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else {
+            return nil
+        }
         guard let cropped = gpuOperations.croppedSelectionMask(source, width, height) else {
             return nil
         }
 
         return CanvasSelection(
-            bounds: cropped.bounds,
+            validatingBounds: cropped.bounds,
             maskWidth: cropped.maskWidth,
             maskHeight: cropped.maskHeight,
             maskData: cropped.maskData,
@@ -265,5 +279,28 @@ public struct SelectionWorkflowService: Sendable {
             return clamped
         }
         return clamped + [first]
+    }
+
+    private func canvasGeometry(from canvasSize: CGSize) -> PixelGeometry? {
+        let width = Int(canvasSize.width.rounded())
+        let height = Int(canvasSize.height.rounded())
+        return PixelGeometry(width: width, height: height)
+    }
+
+    private func simplifiedLassoPoints(_ points: [CGPoint]) -> [CGPoint] {
+        guard points.count > CanvasSizePolicy.maxLassoPointCount else { return points }
+        let stride = max(1, Int(ceil(Double(points.count) / Double(CanvasSizePolicy.maxLassoPointCount))))
+        var simplified: [CGPoint] = []
+        simplified.reserveCapacity(CanvasSizePolicy.maxLassoPointCount)
+        for (index, point) in points.enumerated() where index % stride == 0 {
+            if let last = simplified.last, hypot(last.x - point.x, last.y - point.y) < 2 {
+                continue
+            }
+            simplified.append(point)
+            if simplified.count == CanvasSizePolicy.maxLassoPointCount {
+                break
+            }
+        }
+        return simplified
     }
 }

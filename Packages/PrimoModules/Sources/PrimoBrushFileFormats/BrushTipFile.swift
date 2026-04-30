@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ImageIO
+import PrimoDocumentDomain
 import UniformTypeIdentifiers
 
 @available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
@@ -23,6 +24,8 @@ public struct BrushTipRaster: Equatable, Sendable {
 
 public struct BrushTipFile: Equatable, Sendable {
     public static let fileExtension = "aptip"
+    public static let maxEncodedByteCount = 32 * 1024 * 1024
+    public static let maxNameByteCount = 256
 
     public let name: String
     public let width: Int
@@ -41,7 +44,18 @@ public struct BrushTipFile: Equatable, Sendable {
     }
 
     public func encodedData() throws -> Data {
+        guard let geometry = PixelGeometry(width: width, height: height),
+              alphaData.count == geometry.maskByteCount,
+              width <= Int(UInt32.max),
+              height <= Int(UInt32.max) else {
+            throw BrushTipFileError.invalidPayload
+        }
         let nameData = Data(name.utf8)
+        guard nameData.count <= Self.maxNameByteCount,
+              nameData.count <= Int(UInt32.max),
+              alphaData.count <= Int(UInt32.max) else {
+            throw BrushTipFileError.invalidPayload
+        }
         var data = Data()
         data.append(contentsOf: [0x41, 0x50, 0x54, 0x49, 0x50, 0x31])
         data.appendUInt16(1)
@@ -57,6 +71,9 @@ public struct BrushTipFile: Equatable, Sendable {
     }
 
     public static func decode(from data: Data) throws -> BrushTipFile {
+        guard data.count <= maxEncodedByteCount else {
+            throw BrushTipFileError.invalidPayload
+        }
         var cursor = 0
         let magic = try data.readData(length: 6, cursor: &cursor)
         guard magic == Data([0x41, 0x50, 0x54, 0x49, 0x50, 0x31]) else {
@@ -72,6 +89,15 @@ public struct BrushTipFile: Equatable, Sendable {
         let nameLength = Int(try data.readUInt32(cursor: &cursor))
         _ = Int(try data.readUInt32(cursor: &cursor))
         let payloadLength = Int(try data.readUInt32(cursor: &cursor))
+        guard nameLength <= maxNameByteCount, payloadLength <= maxEncodedByteCount else {
+            throw BrushTipFileError.invalidPayload
+        }
+        guard let geometry = PixelGeometry(width: width, height: height) else {
+            throw BrushTipFileError.invalidPayload
+        }
+        guard payloadLength == geometry.maskByteCount else {
+            throw BrushTipFileError.invalidPayload
+        }
         let nameData = try data.readData(length: nameLength, cursor: &cursor)
         guard let name = String(data: nameData, encoding: .utf8) else {
             throw BrushTipFileError.invalidName
@@ -84,7 +110,7 @@ public struct BrushTipFile: Equatable, Sendable {
         default:
             throw BrushTipFileError.unsupportedCompression
         }
-        guard alphaData.count == width * height else {
+        guard alphaData.count == geometry.maskByteCount else {
             throw BrushTipFileError.invalidPayload
         }
         return BrushTipFile(name: name, width: width, height: height, alphaData: alphaData)
@@ -92,7 +118,11 @@ public struct BrushTipFile: Equatable, Sendable {
 
     public static func importPNG(data: Data, suggestedName: String) throws -> BrushTipFile {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let metadata = validatedPNGMetadata(from: source),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw BrushTipFileError.invalidPNG
+        }
+        guard image.width == metadata.width, image.height == metadata.height else {
             throw BrushTipFileError.invalidPNG
         }
         let raster = try Self.makeRaster(from: image)
@@ -102,13 +132,13 @@ public struct BrushTipFile: Equatable, Sendable {
     private static func makeRaster(from image: CGImage) throws -> BrushTipRaster {
         let width = image.width
         let height = image.height
-        guard width > 0, height > 0 else {
+        guard let geometry = PixelGeometry(width: width, height: height) else {
             throw BrushTipFileError.invalidPNG
         }
 
         let bytesPerPixel = 4
-        let bytesPerRow = width * bytesPerPixel
-        var rgba = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
+        let bytesPerRow = geometry.width * bytesPerPixel
+        var rgba = [UInt8](repeating: 0, count: geometry.rgbaByteCount)
         guard let context = CGContext(
             data: &rgba,
             width: width,
@@ -122,8 +152,8 @@ public struct BrushTipFile: Equatable, Sendable {
         }
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        var alpha = [UInt8](repeating: 0, count: width * height)
-        for index in 0..<(width * height) {
+        var alpha = [UInt8](repeating: 0, count: geometry.maskByteCount)
+        for index in 0..<geometry.pixelCount {
             let offset = index * bytesPerPixel
             let r = Float(rgba[offset]) / 255.0
             let g = Float(rgba[offset + 1]) / 255.0
@@ -161,13 +191,34 @@ public struct BrushTipFile: Equatable, Sendable {
 
         let croppedWidth = maxX - minX + 1
         let croppedHeight = maxY - minY + 1
-        var cropped = [UInt8](repeating: 0, count: croppedWidth * croppedHeight)
+        guard let croppedCount = CanvasSizePolicy.safeMaskByteCount(width: croppedWidth, height: croppedHeight) else {
+            return (width: 1, height: 1, alpha: [255])
+        }
+        var cropped = [UInt8](repeating: 0, count: croppedCount)
         for y in 0..<croppedHeight {
             for x in 0..<croppedWidth {
                 cropped[(y * croppedWidth) + x] = alpha[((minY + y) * width) + (minX + x)]
             }
         }
         return (width: croppedWidth, height: croppedHeight, alpha: cropped)
+    }
+
+    private static func validatedPNGMetadata(from source: CGImageSource) -> (width: Int, height: Int)? {
+        guard CGImageSourceGetCount(source) >= 1 else { return nil }
+        if let typeIdentifier = CGImageSourceGetType(source) as String? {
+            guard typeIdentifier == "public.png" else { return nil }
+        }
+        guard
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let widthValue = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+            let heightValue = properties[kCGImagePropertyPixelHeight] as? NSNumber
+        else {
+            return nil
+        }
+        let width = widthValue.intValue
+        let height = heightValue.intValue
+        guard PixelGeometry(width: width, height: height) != nil else { return nil }
+        return (width, height)
     }
 }
 
@@ -201,18 +252,15 @@ private extension Data {
     }
 
     func readUInt16(cursor: inout Int) throws -> UInt16 {
-        let data = try readData(length: MemoryLayout<UInt16>.size, cursor: &cursor)
-        guard data.count == MemoryLayout<UInt16>.size else {
-            throw BrushTipFileError.invalidPayload
-        }
-        return data.withUnsafeBytes { $0.load(as: UInt16.self) }.littleEndian
+        let bytes = [UInt8](try readData(length: MemoryLayout<UInt16>.size, cursor: &cursor))
+        return UInt16(bytes[0]) | (UInt16(bytes[1]) << 8)
     }
 
     func readUInt32(cursor: inout Int) throws -> UInt32 {
-        let data = try readData(length: MemoryLayout<UInt32>.size, cursor: &cursor)
-        guard data.count == MemoryLayout<UInt32>.size else {
-            throw BrushTipFileError.invalidPayload
-        }
-        return data.withUnsafeBytes { $0.load(as: UInt32.self) }.littleEndian
+        let bytes = [UInt8](try readData(length: MemoryLayout<UInt32>.size, cursor: &cursor))
+        return UInt32(bytes[0]) |
+            (UInt32(bytes[1]) << 8) |
+            (UInt32(bytes[2]) << 16) |
+            (UInt32(bytes[3]) << 24)
     }
 }

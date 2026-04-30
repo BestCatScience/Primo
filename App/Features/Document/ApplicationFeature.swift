@@ -22,6 +22,7 @@ struct ApplicationFeature {
         case workspaceProjectLoad
         case timelapseExport
         case aiImageEdit
+        case aiImageSettingsPersist
     }
 
     enum Feedback: Equatable, Sendable {

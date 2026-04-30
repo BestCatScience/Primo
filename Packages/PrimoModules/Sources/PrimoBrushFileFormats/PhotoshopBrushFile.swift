@@ -1,5 +1,6 @@
 import Foundation
 import PrimoCoreTypes
+import PrimoDocumentDomain
 
 public struct ImportedPhotoshopBrushSample: Equatable, Sendable {
     public let name: String
@@ -12,11 +13,17 @@ public struct ImportedPhotoshopBrushSample: Equatable, Sendable {
 }
 
 public enum PhotoshopBrushFile {
+    public static let maxABRBytes = 64 * 1024 * 1024
+    public static let maxBrushSamples = 4096
+
     public static func importABR(
         from sourceURL: URL,
         fileClient: FileClient = .live
     ) throws -> [ImportedPhotoshopBrushSample] {
         let data = try fileClient.readData(sourceURL)
+        guard data.count <= maxABRBytes else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         try validateABRHeader(data)
         let parser = ABRParser(data: data, sourceName: sourceURL.deletingPathExtension().lastPathComponent)
         return try parser.parse().enumerated().map { index, sample in
@@ -41,9 +48,8 @@ public enum PhotoshopBrushFile {
             throw PhotoshopBrushImportError.htmlInsteadOfABR
         }
 
-        let version = data.prefix(2).withUnsafeBytes { rawBuffer in
-            rawBuffer.load(as: UInt16.self).bigEndian
-        }
+        let bytes = [UInt8](data.prefix(2))
+        let version = (UInt16(bytes[0]) << 8) | UInt16(bytes[1])
         guard [1, 2, 6].contains(version) else {
             throw PhotoshopBrushImportError.invalidABR
         }
@@ -52,7 +58,8 @@ public enum PhotoshopBrushFile {
 
 private extension BrushTipRaster {
     static func normalizedABRTip(width: Int, height: Int, alpha: [UInt8]) -> BrushTipRaster {
-        guard width > 0, height > 0, alpha.count == width * height else {
+        guard let geometry = PixelGeometry(width: width, height: height),
+              alpha.count == geometry.maskByteCount else {
             return BrushTipRaster(width: 1, height: 1, alphaData: Data([255]))
         }
 
@@ -93,7 +100,10 @@ private extension BrushTipRaster {
         let occupied = occupiedCount(alpha: alpha, threshold: threshold)
         guard occupied > 0 else { return -Double.infinity }
 
-        let coverage = Double(occupied) / Double(width * height)
+        guard let pixelCount = CanvasSizePolicy.safePixelCount(width: width, height: height) else {
+            return -Double.infinity
+        }
+        let coverage = Double(occupied) / Double(pixelCount)
         let border = borderCoverage(alpha: alpha, width: width, height: height, threshold: threshold)
         let compactness = 1.0 - min(1.0, abs(coverage - 0.38))
         return compactness - (border * 1.35)
@@ -150,7 +160,10 @@ private extension BrushTipRaster {
 
         let croppedWidth = maxX - minX + 1
         let croppedHeight = maxY - minY + 1
-        var cropped = [UInt8](repeating: 0, count: croppedWidth * croppedHeight)
+        guard let croppedCount = CanvasSizePolicy.safeMaskByteCount(width: croppedWidth, height: croppedHeight) else {
+            return (width: 1, height: 1, alpha: [255])
+        }
+        var cropped = [UInt8](repeating: 0, count: croppedCount)
         for y in 0..<croppedHeight {
             for x in 0..<croppedWidth {
                 cropped[(y * croppedWidth) + x] = alpha[((minY + y) * width) + (minX + x)]
@@ -169,7 +182,10 @@ private extension BrushTipRaster {
         let targetWidth = max(1, Int((Double(raster.width) * scale).rounded()))
         let targetHeight = max(1, Int((Double(raster.height) * scale).rounded()))
         let source = [UInt8](raster.alphaData)
-        var output = [UInt8](repeating: 0, count: targetWidth * targetHeight)
+        guard let targetCount = CanvasSizePolicy.safeMaskByteCount(width: targetWidth, height: targetHeight) else {
+            return BrushTipRaster(width: 1, height: 1, alphaData: Data([255]))
+        }
+        var output = [UInt8](repeating: 0, count: targetCount)
 
         let sourceWidth = Double(raster.width)
         let sourceHeight = Double(raster.height)
@@ -232,6 +248,9 @@ private struct ABRParser {
     func parse() throws -> [ABRSample] {
         var cursor = 0
         let header = try readHeader(cursor: &cursor)
+        guard header.count <= PhotoshopBrushFile.maxBrushSamples else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         var sampleCursor = header.sampleDataOffset
         var samples: [ABRSample] = []
         samples.reserveCapacity(header.count)
@@ -263,14 +282,26 @@ private struct ABRParser {
             let sampleOffset = try findSection(named: "samp", from: cursor)
             var sampleCursor = sampleOffset
             let sectionLength = Int(try data.abrReadBEUInt32(cursor: &sampleCursor))
+            guard sectionLength >= 0, sampleCursor + sectionLength <= data.count else {
+                throw PhotoshopBrushImportError.invalidABR
+            }
             let sectionEnd = sampleCursor + sectionLength
             var count = 0
             var probe = sampleCursor
             while probe < sectionEnd {
                 let brushSize = Int(try data.abrReadBEUInt32(cursor: &probe))
+                guard brushSize >= 0, brushSize <= data.count - probe else {
+                    throw PhotoshopBrushImportError.invalidABR
+                }
                 let padded = brushSize + ((4 - (brushSize % 4)) % 4)
+                guard padded >= brushSize, probe + padded <= sectionEnd else {
+                    throw PhotoshopBrushImportError.invalidABR
+                }
                 probe += padded
                 count += 1
+                guard count <= PhotoshopBrushFile.maxBrushSamples else {
+                    throw PhotoshopBrushImportError.invalidABR
+                }
             }
             return ABRHeader(version: version, subversion: subversion, count: count, sampleDataOffset: sampleCursor)
         default:
@@ -290,6 +321,9 @@ private struct ABRParser {
                 return cursor
             }
             let length = Int(try data.abrReadBEUInt32(cursor: &cursor))
+            guard length >= 0, cursor + length <= data.count else {
+                throw PhotoshopBrushImportError.invalidABR
+            }
             cursor += length
         }
         throw PhotoshopBrushImportError.missingSampleSection
@@ -298,6 +332,9 @@ private struct ABRParser {
     private func parseV12Sample(cursor: inout Int, version: UInt16, index: Int) throws -> ABRSample? {
         let brushType = try data.abrReadBEUInt16(cursor: &cursor)
         let brushSize = Int(try data.abrReadBEUInt32(cursor: &cursor))
+        guard brushSize >= 0, brushSize <= data.count - cursor else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         let nextBrush = cursor + brushSize
         guard brushType == 2 else {
             cursor = nextBrush
@@ -321,7 +358,7 @@ private struct ABRParser {
 
         let width = right - left
         let height = bottom - top
-        guard width > 0, height > 0, depth == 8 else {
+        guard PixelGeometry(width: width, height: height) != nil, depth == 8 else {
             cursor = nextBrush
             return nil
         }
@@ -333,7 +370,13 @@ private struct ABRParser {
 
     private func parseV6Sample(cursor: inout Int, subversion: UInt16, index: Int) throws -> ABRSample? {
         let brushSize = Int(try data.abrReadBEUInt32(cursor: &cursor))
+        guard brushSize >= 0, brushSize <= data.count - cursor else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         let paddedSize = brushSize + ((4 - (brushSize % 4)) % 4)
+        guard paddedSize >= brushSize, paddedSize <= data.count - cursor else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         let nextBrush = cursor + paddedSize
 
         cursor += 37
@@ -353,7 +396,7 @@ private struct ABRParser {
         let compression = try data.abrReadUInt8(cursor: &cursor)
         let width = right - left
         let height = bottom - top
-        guard width > 0, height > 0, depth == 8 else {
+        guard PixelGeometry(width: width, height: height) != nil, depth == 8 else {
             cursor = nextBrush
             return nil
         }
@@ -365,7 +408,10 @@ private struct ABRParser {
 
     private func readBitmap(cursor: inout Int, width: Int, height: Int, compression: UInt8) throws -> [UInt8] {
         if compression == 0 {
-            return try data.abrReadBytes(length: width * height, cursor: &cursor)
+            guard let count = CanvasSizePolicy.safeMaskByteCount(width: width, height: height) else {
+                throw PhotoshopBrushImportError.invalidABR
+            }
+            return try data.abrReadBytes(length: count, cursor: &cursor)
         }
         if compression == 1 {
             return try decodeRLE(cursor: &cursor, width: width, height: height)
@@ -380,28 +426,43 @@ private struct ABRParser {
             scanlineLengths.append(Int(try data.abrReadBEUInt16(cursor: &cursor)))
         }
 
+        guard let expectedCount = CanvasSizePolicy.safeMaskByteCount(width: width, height: height) else {
+            throw PhotoshopBrushImportError.invalidABR
+        }
         var output: [UInt8] = []
-        output.reserveCapacity(width * height)
+        output.reserveCapacity(expectedCount)
 
         for scanlineLength in scanlineLengths {
+            guard scanlineLength >= 0, cursor + scanlineLength <= data.count else {
+                throw PhotoshopBrushImportError.invalidABR
+            }
             let lineEnd = cursor + scanlineLength
-            while cursor < lineEnd && output.count < width * height {
+            while cursor < lineEnd && output.count < expectedCount {
                 let nByte = try data.abrReadUInt8(cursor: &cursor)
                 let n = Int(Int8(bitPattern: nByte))
                 if n < 0 {
                     if n == -128 { continue }
                     let value = try data.abrReadUInt8(cursor: &cursor)
                     for _ in 0..<(-n + 1) {
+                        guard output.count < expectedCount else {
+                            throw PhotoshopBrushImportError.invalidABR
+                        }
                         output.append(value)
                     }
                 } else {
                     let count = n + 1
+                    guard output.count + count <= expectedCount else {
+                        throw PhotoshopBrushImportError.invalidABR
+                    }
                     output.append(contentsOf: try data.abrReadBytes(length: count, cursor: &cursor))
                 }
             }
+            guard cursor == lineEnd else {
+                throw PhotoshopBrushImportError.invalidABR
+            }
         }
-        if output.count > width * height {
-            output = Array(output.prefix(width * height))
+        guard output.count == expectedCount else {
+            throw PhotoshopBrushImportError.invalidABR
         }
         return output
     }
@@ -410,6 +471,9 @@ private struct ABRParser {
         let characterCount = Int(try data.abrReadBEUInt32(cursor: &cursor))
         if characterCount == 0 {
             return nil
+        }
+        guard characterCount <= CanvasSizePolicy.maxLayerNameLength else {
+            throw PhotoshopBrushImportError.invalidABR
         }
         let raw = try data.abrReadData(length: characterCount * 2, cursor: &cursor)
         return String(data: raw, encoding: .utf16BigEndian)?.trimmingCharacters(in: .controlCharacters)

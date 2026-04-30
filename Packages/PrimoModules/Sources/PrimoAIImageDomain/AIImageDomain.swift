@@ -88,42 +88,50 @@ public enum AIImageAccessMode: String, CaseIterable, Equatable, Sendable, Identi
 }
 
 public struct NonEmptyPrompt: Equatable, Sendable {
+    public static let maxCharacterCount = 8192
     public let rawValue: String
 
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count <= Self.maxCharacterCount else { return nil }
         self.rawValue = trimmed
     }
 }
 
 public struct AIImageAPIKey: Equatable, Sendable {
+    public static let maxCharacterCount = 512
     public let rawValue: String
 
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count <= Self.maxCharacterCount else { return nil }
         self.rawValue = trimmed
     }
 }
 
 public struct AIImageEntitlementToken: Equatable, Sendable {
+    public static let maxCharacterCount = 512
     public let rawValue: String
 
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count <= Self.maxCharacterCount else { return nil }
         self.rawValue = trimmed
     }
 }
 
 public struct ProxyEndpoint: Equatable, Sendable {
+    public static let maxCharacterCount = 2048
     public let rawValue: String
 
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard
             !trimmed.isEmpty,
+            trimmed.count <= Self.maxCharacterCount,
             let url = URL(string: trimmed),
             url.scheme == "https"
         else { return nil }

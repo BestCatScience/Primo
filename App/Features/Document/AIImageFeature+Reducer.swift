@@ -63,22 +63,31 @@ extension AIImageFeature {
             state.fallBackToUserAPIKeyIfAppManagedUnavailable()
             let updatedSettings = state.settings
             return .run { [aiImageSettingsClient] _ in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                try Task.checkCancellation()
                 aiImageSettingsClient.persist(updatedSettings)
             }
+            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
 
         case let .apiKeyChanged(apiKey):
             state.apiKey = apiKey
             let updatedSettings = state.settings
             return .run { [aiImageSettingsClient] _ in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                try Task.checkCancellation()
                 aiImageSettingsClient.persist(updatedSettings)
             }
+            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
 
         case let .openAIAPIKeyChanged(apiKey):
             state.openAIAPIKey = apiKey
             let updatedSettings = state.settings
             return .run { [aiImageSettingsClient] _ in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                try Task.checkCancellation()
                 aiImageSettingsClient.persist(updatedSettings)
             }
+            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
 
         case let .sheetPresentationChanged(isPresented):
             state.isSheetPresented = isPresented

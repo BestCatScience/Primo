@@ -391,7 +391,10 @@ let package = Package(
         ),
         .target(
             name: "PrimoBrushFileFormats",
-            dependencies: ["PrimoCoreTypes"]
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
+            ]
         ),
         .target(
             name: "PrimoBrushInfrastructure",
@@ -446,7 +449,11 @@ let package = Package(
         ),
         .testTarget(
             name: "PrimoDocumentApplicationTests",
-            dependencies: ["PrimoDocumentApplication"]
+            dependencies: [
+                "PrimoDocumentApplication",
+                "PrimoDocumentDomain",
+                "PrimoDocumentPresentationContracts",
+            ]
         ),
         .testTarget(
             name: "PrimoDocumentEngineInfrastructureTests",

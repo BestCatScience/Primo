@@ -8,6 +8,10 @@ public typealias ImportedDocumentStageResult = PrimoDocumentContracts.ImportedDo
 public typealias ImportedDocumentStageFailure = PrimoDocumentContracts.ImportedDocumentStageFailure
 
 public struct DocumentImportClient: Sendable {
+    private static let maxImportedPackageByteCount = 2 * 1024 * 1024 * 1024
+    private static let maxImportedPackageFileCount = 300_000
+    private static let maxImportedSingleFileByteCount = 512 * 1024 * 1024
+
     public var stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>
     public var discardStagedDocument: @Sendable (DocumentProjectPath) -> Result<Void, ImportedDocumentStageFailure>
 
@@ -41,6 +45,7 @@ public struct DocumentImportClient: Sendable {
                 )
 
                 do {
+                    try validateImportedPackageFootprint(at: request.sourceURL, fileClient: fileClient)
                     try fileClient.createDirectory(stagingRoot, true)
                     if fileClient.fileExists(destinationURL.path) {
                         try fileClient.removeItem(destinationURL)
@@ -69,5 +74,33 @@ public struct DocumentImportClient: Sendable {
                 }
             }
         )
+    }
+
+    private static func validateImportedPackageFootprint(at sourceURL: URL, fileClient: FileClient) throws {
+        let urls = fileClient.enumerateURLs(
+            sourceURL,
+            [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey],
+            []
+        )
+        guard urls.count <= maxImportedPackageFileCount else {
+            throw ImportedDocumentStageFailure.stagingFailed("Imported project contains too many files.")
+        }
+        var totalBytes = 0
+        for url in urls {
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+            guard values?.isSymbolicLink != true else {
+                throw ImportedDocumentStageFailure.stagingFailed("Imported project contains symbolic links.")
+            }
+            guard values?.isRegularFile == true else { continue }
+            let fileSize = values?.fileSize ?? 0
+            guard fileSize <= maxImportedSingleFileByteCount else {
+                throw ImportedDocumentStageFailure.stagingFailed("Imported project contains an oversized file.")
+            }
+            let nextTotal = totalBytes.addingReportingOverflow(fileSize)
+            guard !nextTotal.overflow, nextTotal.partialValue <= maxImportedPackageByteCount else {
+                throw ImportedDocumentStageFailure.stagingFailed("Imported project is too large.")
+            }
+            totalBytes = nextTotal.partialValue
+        }
     }
 }

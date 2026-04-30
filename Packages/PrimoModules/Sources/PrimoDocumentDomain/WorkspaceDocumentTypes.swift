@@ -11,6 +11,18 @@ public struct DocumentCompositeSurface: Equatable, Sendable {
         self.height = height
         self.pixelData = pixelData
     }
+
+    public init?(validatingWidth width: Int, height: Int, pixelData: Data) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        self.width = width
+        self.height = height
+        self.pixelData = pixelData
+    }
+
+    public var pixelGeometry: PixelGeometry? {
+        PixelGeometry(width: width, height: height)
+    }
 }
 
 public struct CanvasPaperStyle: Equatable, Sendable {

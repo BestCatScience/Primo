@@ -217,6 +217,8 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
         let copyWidth = min(update.width, maxWidth)
         let copyHeight = min(update.height, maxHeight)
         guard copyWidth > 0, copyHeight > 0 else { return }
+        guard update.originX >= 0, update.originY >= 0 else { return }
+        guard let updateGeometry = PixelGeometry(width: update.width, height: update.height) else { return }
 
         if let handle = update.gpuBufferHandle,
            resourceStore.populateTexture(
@@ -234,6 +236,7 @@ public final class PrimoMetalCanvasView: MTKView, MTKViewDelegate {
             return
         }
 
+        guard update.pixelData.count == updateGeometry.rgbaByteCount else { return }
         update.pixelData.withUnsafeBytes { bytes in
             guard let baseAddress = bytes.baseAddress else { return }
             texture.replace(

@@ -423,7 +423,7 @@ public enum DocumentEngineFactory {
     }
 }
 
-public final class DocumentTimelapseReplayService: @unchecked Sendable {
+public final class DocumentTimelapseReplayService {
     private let runtime: SwiftDocumentRuntime
     private var folderIDMap: [DocumentFolderID: Int] = [:]
 

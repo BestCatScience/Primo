@@ -347,6 +347,7 @@ public struct CanvasInputReducer: Sendable {
 
     private func appendSelectionPoints(_ points: [CGPoint], to currentSelectionPoints: inout [CGPoint]) {
         for point in points {
+            guard currentSelectionPoints.count < CanvasSizePolicy.maxLassoPointCount else { break }
             guard let previous = currentSelectionPoints.last else {
                 currentSelectionPoints.append(point)
                 continue
@@ -365,8 +366,11 @@ public struct CanvasInputReducer: Sendable {
         stabilization: Float
     ) {
         for rawPoint in points {
+            guard stroke.points.count < CanvasSizePolicy.maxStrokeSampleCount else { break }
             var candidate = rawPoint
-            state.rawStrokePoints.append(rawPoint)
+            if state.rawStrokePoints.count < CanvasSizePolicy.maxStrokeSampleCount {
+                state.rawStrokePoints.append(rawPoint)
+            }
             guard let previous = stroke.points.last else {
                 stroke.points.append(candidate)
                 state.stabilizerAnchor = candidate
@@ -406,8 +410,12 @@ public struct CanvasInputReducer: Sendable {
 
             let interpolationSpacing = preferredInterpolationSpacing(brushSize: brushSize)
             if distance > interpolationSpacing {
-                let steps = max(1, Int(ceil(distance / interpolationSpacing)))
+                let steps = min(
+                    CanvasSizePolicy.maxInterpolatedSamplesPerEvent,
+                    max(1, Int(ceil(distance / interpolationSpacing)))
+                )
                 for step in 1...steps {
+                    guard stroke.points.count < CanvasSizePolicy.maxStrokeSampleCount else { break }
                     let t = Float(step) / Float(steps)
                     stroke.points.append(
                         CanvasStrokePoint(

@@ -2,6 +2,7 @@ import AVFoundation
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
+import PrimoDocumentDomain
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 
@@ -35,10 +36,13 @@ public enum TimelapseExportError: Error {
     case failedToStartWriting
     case invalidFrameData
     case exportFailed
+    case cancelled
 }
 
 public enum TimelapseExportService {
     private static let maxExportFrameCount = 90000
+    private static let progressPreviewInterval: TimeInterval = 0.25
+    private static let progressPreviewStep = 0.01
 
     public static func exportVideo(
         from capture: TimelapseCapture,
@@ -47,6 +51,7 @@ public enum TimelapseExportService {
         dateClient: DateClient = .live,
         progress: ((TimelapseExportProgress) -> Void)? = nil
     ) throws -> TimelapseExportResult {
+        try checkCancellation()
         try fileClient.createDirectory(directory, true)
         let outputURL = directory.appendingPathComponent(exportFilename(date: dateClient.now()))
         if fileClient.fileExists(outputURL.path) {
@@ -146,13 +151,16 @@ public enum TimelapseExportService {
         }
 
         input.markAsFinished()
+        try checkCancellation()
         let semaphore = DispatchSemaphore(value: 0)
         var completionError: Error?
         writer.finishWriting {
             completionError = writer.error
             semaphore.signal()
         }
-        semaphore.wait()
+        while semaphore.wait(timeout: .now() + 0.05) == .timedOut {
+            try checkCancellation()
+        }
 
         if let completionError {
             throw completionError
@@ -176,7 +184,9 @@ public enum TimelapseExportService {
         totalFrameCount: Int,
         progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
+        var progressGate = ProgressPreviewGate()
         for (index, frameURL) in frameURLs.enumerated() {
+            try checkCancellation()
             guard let surface = decodedSurface(from: frameURL, fileClient: fileClient) else {
                 throw TimelapseExportError.invalidFrameData
             }
@@ -189,12 +199,12 @@ public enum TimelapseExportService {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            progress?(
-                TimelapseExportProgress(
-                    progress: Double(index + 1) / Double(totalFrameCount),
-                    previewSurface: surface,
-                    previewImageData: makePreviewData(surface: surface)
-                )
+            emitProgressIfNeeded(
+                progress: progress,
+                gate: &progressGate,
+                completed: index + 1,
+                total: totalFrameCount,
+                surface: surface
             )
         }
 
@@ -204,6 +214,7 @@ public enum TimelapseExportService {
         }
 
         for holdIndex in 1...holdFrameCount {
+            try checkCancellation()
             try appendRenderedSurface(
                 finalSurface,
                 at: frameURLs.count - 1 + holdIndex,
@@ -213,12 +224,12 @@ public enum TimelapseExportService {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            progress?(
-                TimelapseExportProgress(
-                    progress: Double(frameURLs.count + holdIndex) / Double(totalFrameCount),
-                    previewSurface: finalSurface,
-                    previewImageData: makePreviewData(surface: finalSurface)
-                )
+            emitProgressIfNeeded(
+                progress: progress,
+                gate: &progressGate,
+                completed: frameURLs.count + holdIndex,
+                total: totalFrameCount,
+                surface: finalSurface
             )
         }
     }
@@ -236,6 +247,7 @@ public enum TimelapseExportService {
         totalFrameCount: Int,
         progress: ((TimelapseExportProgress) -> Void)?
     ) throws {
+        var progressGate = ProgressPreviewGate()
         let replayService = DocumentTimelapseReplayService(
             canvasSize: capture.canvasSize,
             fileClient: fileClient
@@ -243,6 +255,7 @@ public enum TimelapseExportService {
         var finalSurface: DocumentCompositeSurface?
 
         for (index, operation) in operations.enumerated() {
+            try checkCancellation()
             guard let surface = replayService.replaySurface(operation) else {
                 throw TimelapseExportError.exportFailed
             }
@@ -256,12 +269,12 @@ public enum TimelapseExportService {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            progress?(
-                TimelapseExportProgress(
-                    progress: Double(index + 1) / Double(totalFrameCount),
-                    previewSurface: surface,
-                    previewImageData: makePreviewData(surface: surface)
-                )
+            emitProgressIfNeeded(
+                progress: progress,
+                gate: &progressGate,
+                completed: index + 1,
+                total: totalFrameCount,
+                surface: surface
             )
         }
 
@@ -270,6 +283,7 @@ public enum TimelapseExportService {
         }
 
         for holdIndex in 1...holdFrameCount {
+            try checkCancellation()
             try appendRenderedSurface(
                 finalSurface,
                 at: operations.count - 1 + holdIndex,
@@ -279,12 +293,12 @@ public enum TimelapseExportService {
                 pixelBufferPool: pixelBufferPool,
                 frameDuration: frameDuration
             )
-            progress?(
-                TimelapseExportProgress(
-                    progress: Double(operations.count + holdIndex) / Double(totalFrameCount),
-                    previewSurface: finalSurface,
-                    previewImageData: makePreviewData(surface: finalSurface)
-                )
+            emitProgressIfNeeded(
+                progress: progress,
+                gate: &progressGate,
+                completed: operations.count + holdIndex,
+                total: totalFrameCount,
+                surface: finalSurface
             )
         }
     }
@@ -299,6 +313,7 @@ public enum TimelapseExportService {
         frameDuration: CMTime
     ) throws {
         while !input.isReadyForMoreMediaData {
+            try checkCancellation()
             Thread.sleep(forTimeInterval: 0.002)
         }
 
@@ -342,11 +357,14 @@ public enum TimelapseExportService {
         exportFrames: [TimelapseFrame],
         fileClient: FileClient = .live
     ) -> CGSize {
+        let rawSize: CGSize
         if let firstFrame = exportFrames.first,
            let surface = decodedSurface(from: firstFrame.imageURL, fileClient: fileClient) {
-            return CGSize(width: surface.width, height: surface.height)
+            rawSize = CGSize(width: surface.width, height: surface.height)
+        } else {
+            rawSize = capture.canvasSize
         }
-        return capture.canvasSize
+        return downscaledVideoDimensions(rawSize)
     }
 
     private static func sampledFrames(from frames: [TimelapseFrame]) -> [TimelapseFrame] {
@@ -372,6 +390,66 @@ public enum TimelapseExportService {
         let raw = formatter.string(from: date)
             .replacingOccurrences(of: ":", with: "-")
         return "timelapse-\(raw).mp4"
+    }
+
+    private struct ProgressPreviewGate {
+        var lastPreviewDate = Date.distantPast
+        var lastPreviewProgress = 0.0
+    }
+
+    private static func emitProgressIfNeeded(
+        progress: ((TimelapseExportProgress) -> Void)?,
+        gate: inout ProgressPreviewGate,
+        completed: Int,
+        total: Int,
+        surface: DocumentCompositeSurface
+    ) {
+        guard let progress else { return }
+        let fraction = min(max(Double(completed) / Double(max(total, 1)), 0), 1)
+        let now = Date()
+        let shouldIncludePreview =
+            now.timeIntervalSince(gate.lastPreviewDate) >= progressPreviewInterval ||
+            fraction - gate.lastPreviewProgress >= progressPreviewStep ||
+            completed == total
+        if shouldIncludePreview {
+            gate.lastPreviewDate = now
+            gate.lastPreviewProgress = fraction
+            progress(
+                TimelapseExportProgress(
+                    progress: fraction,
+                    previewSurface: surface,
+                    previewImageData: makePreviewData(surface: surface)
+                )
+            )
+        } else {
+            progress(
+                TimelapseExportProgress(
+                    progress: fraction,
+                    previewSurface: nil,
+                    previewImageData: nil
+                )
+            )
+        }
+    }
+
+    private static func downscaledVideoDimensions(_ size: CGSize) -> CGSize {
+        let width = max(size.width.rounded(), 1)
+        let height = max(size.height.rounded(), 1)
+        let largest = max(width, height)
+        guard largest > CGFloat(CanvasSizePolicy.maxVideoDimension) else {
+            return CGSize(width: width, height: height)
+        }
+        let scale = CGFloat(CanvasSizePolicy.maxVideoDimension) / largest
+        return CGSize(
+            width: max((width * scale).rounded(), 1),
+            height: max((height * scale).rounded(), 1)
+        )
+    }
+
+    private static func checkCancellation() throws {
+        if Task.isCancelled {
+            throw TimelapseExportError.cancelled
+        }
     }
 
     static func writeSurface(

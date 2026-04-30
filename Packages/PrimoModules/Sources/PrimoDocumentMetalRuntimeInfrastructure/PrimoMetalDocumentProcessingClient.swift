@@ -774,11 +774,27 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         height: Int? = nil
     ) -> Bool {
         guard let resource = cachedBufferResource(for: handle) else { return false }
+        guard sourceOriginX >= 0, sourceOriginY >= 0, destinationOriginX >= 0, destinationOriginY >= 0 else {
+            return false
+        }
+        guard sourceOriginX < resource.width, sourceOriginY < resource.height else { return false }
+        guard destinationOriginX < texture.width, destinationOriginY < texture.height else { return false }
+        guard resource.bytesPerRow >= resource.width * 4 else { return false }
         let copyWidth = min(width ?? resource.width, resource.width - sourceOriginX)
         let copyHeight = min(height ?? resource.height, resource.height - sourceOriginY)
         guard copyWidth > 0, copyHeight > 0 else { return false }
-        let byteOffset = (sourceOriginY * resource.bytesPerRow) + (sourceOriginX * 4)
-        let pointer = resource.buffer.contents().advanced(by: byteOffset)
+        guard destinationOriginX + copyWidth <= texture.width,
+              destinationOriginY + copyHeight <= texture.height else { return false }
+        let rowOffset = sourceOriginY.multipliedReportingOverflow(by: resource.bytesPerRow)
+        let columnOffset = sourceOriginX.multipliedReportingOverflow(by: 4)
+        guard !rowOffset.overflow, !columnOffset.overflow else { return false }
+        let byteOffset = rowOffset.partialValue.addingReportingOverflow(columnOffset.partialValue)
+        guard !byteOffset.overflow else { return false }
+        let requiredBytes = byteOffset.partialValue.addingReportingOverflow((copyHeight - 1) * resource.bytesPerRow + copyWidth * 4)
+        guard !requiredBytes.overflow, requiredBytes.partialValue <= resource.bytesPerRow * resource.height else {
+            return false
+        }
+        let pointer = resource.buffer.contents().advanced(by: byteOffset.partialValue)
         texture.replace(
             region: MTLRegionMake2D(destinationOriginX, destinationOriginY, copyWidth, copyHeight),
             mipmapLevel: 0,
@@ -794,7 +810,8 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         bytesPerRow: Int,
         buffer: MTLBuffer
     ) -> MetalBufferHandle {
-        let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: bytesPerRow)
+        let handle = MetalBufferHandle(validatingWidth: width, height: height, bytesPerRow: bytesPerRow)
+            ?? MetalBufferHandle(width: width, height: height, bytesPerRow: bytesPerRow)
         withCacheLock {
             cachedBuffers[handle.id] = CachedBufferResource(
                 width: width,

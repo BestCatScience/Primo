@@ -39,24 +39,43 @@ public struct DecodedRasterImage: Sendable, Equatable {
         self.height = height
         self.pixelData = pixelData
     }
+
+    public init?(validatingWidth width: Int, height: Int, pixelData: Data) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        self.width = width
+        self.height = height
+        self.pixelData = pixelData
+    }
 }
 
 public enum DocumentRasterImageService {
+    public struct ImageMetadata: Equatable, Sendable {
+        public let width: Int
+        public let height: Int
+        public let typeIdentifier: String?
+        public let frameCount: Int
+    }
+
     public static func decodedImage(fromEncodedData encodedData: Data) -> DecodedRasterImage? {
         guard
             let source = CGImageSourceCreateWithData(encodedData as CFData, nil),
+            let metadata = validatedImageMetadata(from: source),
             let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else {
             return nil
         }
 
-        let width = image.width
-        let height = image.height
-        guard width > 0, height > 0 else { return nil }
-        guard let pixelData = rgbaPixelData(from: image, width: width, height: height) else {
+        guard image.width == metadata.width, image.height == metadata.height else { return nil }
+        guard let pixelData = rgbaPixelData(from: image, width: metadata.width, height: metadata.height) else {
             return nil
         }
-        return DecodedRasterImage(width: width, height: height, pixelData: pixelData)
+        return DecodedRasterImage(validatingWidth: metadata.width, height: metadata.height, pixelData: pixelData)
+    }
+
+    public static func imageMetadata(fromEncodedData encodedData: Data) -> ImageMetadata? {
+        guard let source = CGImageSourceCreateWithData(encodedData as CFData, nil) else { return nil }
+        return validatedImageMetadata(from: source)
     }
 
     public static func pngData(from surface: DocumentCompositeSurface) -> Data? {
@@ -93,8 +112,9 @@ public enum DocumentRasterImageService {
         expandedMask: [UInt8],
         padding: Int = 64
     ) -> InpaintCrop? {
-        guard source.count == canvasWidth * canvasHeight * 4,
-              expandedMask.count == canvasWidth * canvasHeight,
+        guard let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight),
+              source.count == geometry.rgbaByteCount,
+              expandedMask.count == geometry.maskByteCount,
               canvasWidth > 0,
               canvasHeight > 0 else {
             return nil
@@ -105,9 +125,9 @@ public enum DocumentRasterImageService {
         let maxY = min(canvasHeight, Int(ceil(selectionBounds.maxY)) + padding)
         let cropWidth = max(0, maxX - minX)
         let cropHeight = max(0, maxY - minY)
-        guard cropWidth > 0, cropHeight > 0 else { return nil }
-        var pixelData = Data(count: cropWidth * cropHeight * 4)
-        var selectionMask = [UInt8](repeating: 0, count: cropWidth * cropHeight)
+        guard let cropGeometry = PixelGeometry(width: cropWidth, height: cropHeight) else { return nil }
+        var pixelData = Data(count: cropGeometry.rgbaByteCount)
+        var selectionMask = [UInt8](repeating: 0, count: cropGeometry.maskByteCount)
         pixelData.withUnsafeMutableBytes { destinationBytes in
             source.withUnsafeBytes { sourceBytes in
                 guard let destination = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
@@ -143,9 +163,11 @@ public enum DocumentRasterImageService {
         crop: InpaintCrop,
         featherRadius: Int = 10
     ) -> Data? {
-        guard baseLayerPixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
-        guard editedCropPixelData.count == crop.width * crop.height * 4 else { return nil }
-        guard crop.selectionMask.count == crop.width * crop.height else { return nil }
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        guard let cropGeometry = PixelGeometry(width: crop.width, height: crop.height) else { return nil }
+        guard baseLayerPixelData.count == canvasGeometry.rgbaByteCount else { return nil }
+        guard editedCropPixelData.count == cropGeometry.rgbaByteCount else { return nil }
+        guard crop.selectionMask.count == cropGeometry.maskByteCount else { return nil }
         var output = baseLayerPixelData
         output.withUnsafeMutableBytes { destinationBytes in
             editedCropPixelData.withUnsafeBytes { sourceBytes in
@@ -175,19 +197,21 @@ public enum DocumentRasterImageService {
 
     public static func rawLayerPixelData(fromPNGData pngData: Data, width: Int, height: Int) -> Data? {
         guard
-            width > 0,
-            height > 0,
             let source = CGImageSourceCreateWithData(pngData as CFData, nil),
+            let metadata = validatedImageMetadata(from: source),
+            PixelGeometry(width: width, height: height) != nil,
             let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
         else {
             return nil
         }
+        guard image.width == metadata.width, image.height == metadata.height else { return nil }
         return rgbaPixelData(from: image, width: width, height: height)
     }
 
     private static func rgbaPixelData(from image: CGImage, width: Int, height: Int) -> Data? {
-        let bytesPerRow = width * 4
-        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        let bytesPerRow = geometry.width * 4
+        var buffer = [UInt8](repeating: 0, count: geometry.rgbaByteCount)
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
             data: &buffer,
@@ -214,7 +238,8 @@ public enum DocumentRasterImageService {
         typeIdentifier: CFString,
         compressionQuality: CGFloat? = nil
     ) -> Data? {
-        guard width > 0, height > 0, pixelData.count == width * height * 4 else { return nil }
+        guard let geometry = PixelGeometry(width: width, height: height),
+              pixelData.count == geometry.rgbaByteCount else { return nil }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let provider = CGDataProvider(data: pixelData as CFData) else { return nil }
         guard let image = CGImage(
@@ -222,7 +247,7 @@ public enum DocumentRasterImageService {
             height: height,
             bitsPerComponent: 8,
             bitsPerPixel: 32,
-            bytesPerRow: width * 4,
+            bytesPerRow: geometry.width * 4,
             space: colorSpace,
             bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
             provider: provider,
@@ -249,4 +274,25 @@ public enum DocumentRasterImageService {
         return output as Data
     }
 
+    private static func validatedImageMetadata(from source: CGImageSource) -> ImageMetadata? {
+        let frameCount = CGImageSourceGetCount(source)
+        guard frameCount >= 1 else { return nil }
+        let typeIdentifier = CGImageSourceGetType(source) as String?
+        if let typeIdentifier {
+            guard typeIdentifier == "public.png" || typeIdentifier == "public.jpeg" else {
+                return nil
+            }
+        }
+        guard
+            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let widthValue = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+            let heightValue = properties[kCGImagePropertyPixelHeight] as? NSNumber
+        else {
+            return nil
+        }
+        let width = widthValue.intValue
+        let height = heightValue.intValue
+        guard PixelGeometry(width: width, height: height) != nil else { return nil }
+        return ImageMetadata(width: width, height: height, typeIdentifier: typeIdentifier, frameCount: frameCount)
+    }
 }

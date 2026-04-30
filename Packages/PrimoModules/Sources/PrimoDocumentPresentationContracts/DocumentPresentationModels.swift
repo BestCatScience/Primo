@@ -124,6 +124,21 @@ public struct MetalBufferHandle: Equatable, Hashable, Sendable {
         self.height = height
         self.bytesPerRow = bytesPerRow
     }
+
+    public init?(validatingWidth width: Int, height: Int, bytesPerRow: Int, id: UUID = UUID()) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        guard bytesPerRow >= geometry.width * 4 else { return nil }
+        self.id = id
+        self.width = width
+        self.height = height
+        self.bytesPerRow = bytesPerRow
+    }
+
+    public func isCompatible(with geometry: PixelGeometry) -> Bool {
+        width == geometry.width &&
+        height == geometry.height &&
+        bytesPerRow >= geometry.width * 4
+    }
 }
 
 public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
@@ -160,6 +175,36 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         self.gpuBufferHandle = gpuBufferHandle
         self.pixelData = pixelData
     }
+
+    public init?(
+        validatingIndex index: Int,
+        opacity: Float,
+        visible: Bool,
+        isClipped: Bool,
+        blendMode: LayerBlendMode,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        thumbnailSurface: DocumentCompositeSurface? = nil,
+        thumbnailData: Data?,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) {
+        guard let geometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        if let gpuBufferHandle {
+            guard gpuBufferHandle.isCompatible(with: geometry) else { return nil }
+        } else {
+            guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        }
+        self.index = index
+        self.opacity = opacity
+        self.visible = visible
+        self.isClipped = isClipped
+        self.blendMode = blendMode
+        self.thumbnailSurface = thumbnailSurface
+        self.thumbnailData = thumbnailData
+        self.gpuBufferHandle = gpuBufferHandle
+        self.pixelData = pixelData
+    }
 }
 
 public enum MetalSnapshotTransferKind: String, Equatable, Sendable {
@@ -185,6 +230,31 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         compositePixelData: Data,
         layers: [MetalLayerSnapshot]
     ) {
+        self.width = width
+        self.height = height
+        self.revision = revision
+        self.transferKind = transferKind
+        self.compositeBufferHandle = compositeBufferHandle
+        self.compositePixelData = compositePixelData
+        self.layers = layers
+    }
+
+    public init?(
+        validatingWidth width: Int,
+        height: Int,
+        revision: Int,
+        transferKind: MetalSnapshotTransferKind = .fullSnapshot,
+        compositeBufferHandle: MetalBufferHandle? = nil,
+        compositePixelData: Data,
+        layers: [MetalLayerSnapshot]
+    ) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        if let compositeBufferHandle {
+            guard compositeBufferHandle.isCompatible(with: geometry) else { return nil }
+        } else {
+            guard compositePixelData.count == geometry.rgbaByteCount else { return nil }
+        }
+        guard layers.count <= CanvasSizePolicy.maxLayerCount else { return nil }
         self.width = width
         self.height = height
         self.revision = revision
@@ -229,6 +299,35 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
     }
 
     public var isEmpty: Bool { width <= 0 || height <= 0 || (pixelData.isEmpty && gpuBufferHandle == nil) }
+
+    public init?(
+        validatingID id: UUID = UUID(),
+        layerIndex: Int,
+        originX: Int,
+        originY: Int,
+        width: Int,
+        height: Int,
+        transferKind: MetalSnapshotTransferKind = .dirtyRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) {
+        guard originX >= 0, originY >= 0 else { return nil }
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        if let gpuBufferHandle {
+            guard gpuBufferHandle.isCompatible(with: geometry) else { return nil }
+        } else {
+            guard pixelData.count == geometry.rgbaByteCount else { return nil }
+        }
+        self.id = id
+        self.layerIndex = layerIndex
+        self.originX = originX
+        self.originY = originY
+        self.width = width
+        self.height = height
+        self.transferKind = transferKind
+        self.gpuBufferHandle = gpuBufferHandle
+        self.pixelData = pixelData
+    }
 }
 
 public struct PaintDocumentPresentation: Equatable, Sendable {
@@ -270,6 +369,16 @@ public struct CanvasSelection: Equatable, Sendable {
         self.mode = mode
     }
 
+    public init?(validatingBounds bounds: CGRect, maskWidth: Int, maskHeight: Int, maskData: Data, mode: SelectionToolMode) {
+        guard let geometry = PixelGeometry(width: maskWidth, height: maskHeight) else { return nil }
+        guard maskData.count == geometry.maskByteCount else { return nil }
+        self.bounds = bounds
+        self.maskWidth = maskWidth
+        self.maskHeight = maskHeight
+        self.maskData = maskData
+        self.mode = mode
+    }
+
     public var isEmpty: Bool {
         maskWidth <= 0 || maskHeight <= 0 || maskData.isEmpty || bounds.isNull || bounds.isEmpty
     }
@@ -282,6 +391,15 @@ public struct LayerPixelRect: Equatable, Sendable {
     public let height: Int
 
     public init(originX: Int, originY: Int, width: Int, height: Int) {
+        self.originX = originX
+        self.originY = originY
+        self.width = width
+        self.height = height
+    }
+
+    public init?(validatingOriginX originX: Int, originY: Int, width: Int, height: Int) {
+        guard originX >= 0, originY >= 0 else { return nil }
+        guard PixelGeometry(width: width, height: height) != nil else { return nil }
         self.originX = originX
         self.originY = originY
         self.width = width
@@ -314,6 +432,37 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
         self.rectPixelData = rectPixelData
         self.fullPixelData = fullPixelData
     }
+
+    public init?(
+        validatingCanvasWidth canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        rectPixelData: Data = Data(),
+        fullPixelData: Data? = nil
+    ) {
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth,
+              dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard let rectGeometry = PixelGeometry(width: dirtyRect.width, height: dirtyRect.height) else { return nil }
+        if let gpuBufferHandle {
+            guard gpuBufferHandle.isCompatible(with: canvasGeometry) || gpuBufferHandle.isCompatible(with: rectGeometry) else {
+                return nil
+            }
+        } else {
+            guard rectPixelData.count == rectGeometry.rgbaByteCount else { return nil }
+        }
+        if let fullPixelData {
+            guard fullPixelData.count == canvasGeometry.rgbaByteCount else { return nil }
+        }
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
+        self.rectPixelData = rectPixelData
+        self.fullPixelData = fullPixelData
+    }
 }
 
 public struct GpuLayerMutationPayload: Equatable, Sendable {
@@ -330,6 +479,28 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
         gpuBufferHandle: MetalBufferHandle,
         fallbackPixelData: Data? = nil
     ) {
+        self.canvasWidth = canvasWidth
+        self.canvasHeight = canvasHeight
+        self.dirtyRect = dirtyRect
+        self.gpuBufferHandle = gpuBufferHandle
+        self.fallbackPixelData = fallbackPixelData
+    }
+
+    public init?(
+        validatingCanvasWidth canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferHandle: MetalBufferHandle,
+        fallbackPixelData: Data? = nil
+    ) {
+        guard let canvasGeometry = PixelGeometry(width: canvasWidth, height: canvasHeight) else { return nil }
+        guard dirtyRect.originX >= 0, dirtyRect.originY >= 0 else { return nil }
+        guard dirtyRect.originX + dirtyRect.width <= canvasWidth,
+              dirtyRect.originY + dirtyRect.height <= canvasHeight else { return nil }
+        guard gpuBufferHandle.isCompatible(with: canvasGeometry) else { return nil }
+        if let fallbackPixelData {
+            guard fallbackPixelData.count == canvasGeometry.rgbaByteCount else { return nil }
+        }
         self.canvasWidth = canvasWidth
         self.canvasHeight = canvasHeight
         self.dirtyRect = dirtyRect
