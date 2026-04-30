@@ -29,6 +29,7 @@ struct ContentView: View {
     @State var showsPhotoLayerImporter = false
     @State var showsNewCanvasPhotoImporter = false
     @State var showsNewCanvasSheet = false
+    @State var showsNewCanvasCustomSizeSheet = false
     @State var showsResizeCanvasSheet = false
     @State var showsResizeCanvasExtentSheet = false
     @State var showsHSBSheet = false
@@ -48,6 +49,7 @@ struct ContentView: View {
     @State var showsAIImageSettingsSheet = false
     @State var newCanvasWidthText = ""
     @State var newCanvasHeightText = ""
+    @State var newCanvasPresetLandscapeSelections: [String: Bool] = [:]
     @State var resizeCanvasWidthText = ""
     @State var resizeCanvasHeightText = ""
     @State var resizeCanvasExtentWidthText = ""
@@ -510,6 +512,13 @@ struct ContentView: View {
         showsNewCanvasSheet = false
         mainQueueClient.async {
             showsNewCanvasPhotoImporter = true
+        }
+    }
+
+    func beginOpenDocumentFromNewCanvasFlow() {
+        showsNewCanvasSheet = false
+        mainQueueClient.async {
+            showsOpenDocumentImporter = true
         }
     }
 }

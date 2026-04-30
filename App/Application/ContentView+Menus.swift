@@ -4,6 +4,49 @@ import SwiftUI
 import UIKit
 import PrimoAIImageDomain
 
+private enum NewCanvasPresetMeasurement: Equatable {
+    case pixels(Int, Int)
+    case millimeters(Int, Int, dpi: Int)
+
+    var canvasSize: (width: Int, height: Int) {
+        switch self {
+        case let .pixels(width, height):
+            return (width, height)
+        case let .millimeters(width, height, dpi):
+            return (
+                Int((Double(width) / 25.4 * Double(dpi)).rounded()),
+                Int((Double(height) / 25.4 * Double(dpi)).rounded())
+            )
+        }
+    }
+
+    var detailText: String {
+        switch self {
+        case let .pixels(width, height):
+            return "\(width.formatted()) × \(height.formatted()) px\n350dpi"
+        case let .millimeters(width, height, dpi):
+            return "\(width) × \(height) mm\n\(dpi)dpi"
+        }
+    }
+}
+
+private struct NewCanvasPreset: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let measurement: NewCanvasPresetMeasurement
+    let defaultIsLandscape: Bool
+
+    var portraitSize: (width: Int, height: Int) {
+        let size = measurement.canvasSize
+        return size.width <= size.height ? size : (size.height, size.width)
+    }
+
+    var landscapeSize: (width: Int, height: Int) {
+        let size = measurement.canvasSize
+        return size.width >= size.height ? size : (size.height, size.width)
+    }
+}
+
 extension ContentView {
     var resolvedAIImageInputLayerIndex: Int {
         if store.document.layerSidebar.layers.contains(where: { $0.index == aiImageState.composer.inputLayerIndex }) {
@@ -283,28 +326,84 @@ extension ContentView {
     }
 
     var newCanvasSheet: some View {
+        GeometryReader { proxy in
+            let contentWidth = max(proxy.size.width, 720)
+
+            VStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 18) {
+                    Text(StudioStrings.newCanvasTitle(language))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.26, green: 0.26, blue: 0.26))
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 10) {
+                        newCanvasToolbarButton(systemName: "photo.badge.plus", accessibilityLabel: StudioStrings.createFromImage(language)) {
+                            beginCreateCanvasFromImageFlow()
+                        }
+
+                        newCanvasToolbarButton(systemName: "doc.badge.plus", accessibilityLabel: StudioStrings.openFileCTA(language)) {
+                            beginOpenDocumentFromNewCanvasFlow()
+                        }
+
+                        newCanvasToolbarButton(systemName: "plus", accessibilityLabel: StudioStrings.customSize(language)) {
+                            if newCanvasWidthText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                newCanvasWidthText = "\(defaultNewCanvasWidth)"
+                            }
+                            if newCanvasHeightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                newCanvasHeightText = "\(defaultNewCanvasHeight)"
+                            }
+                            showsNewCanvasCustomSizeSheet = true
+                        }
+                    }
+                }
+                .padding(.horizontal, 36)
+                .padding(.top, 44)
+                .padding(.bottom, 22)
+
+                ScrollView {
+                    LazyVGrid(
+                        columns: newCanvasGridColumns(for: contentWidth),
+                        alignment: .center,
+                        spacing: 20
+                    ) {
+                        ForEach(newCanvasPresets) { preset in
+                            newCanvasPresetCard(preset)
+                        }
+                    }
+                    .padding(.horizontal, 36)
+                    .padding(.top, 8)
+                    .padding(.bottom, 34)
+                }
+            }
+            .frame(width: contentWidth, height: proxy.size.height, alignment: .top)
+        }
+        .frame(minWidth: 720, idealWidth: 760, maxWidth: 980, minHeight: 570, idealHeight: 620)
+        .background(Color.white)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .sheet(isPresented: $showsNewCanvasCustomSizeSheet) {
+            newCanvasCustomSizeSheet
+        }
+    }
+
+    private var newCanvasCustomSizeSheet: some View {
         NavigationStack {
             Form {
-                Section("サイズ") {
+                Section(language.localized("サイズ")) {
                     TextField(StudioStrings.width(language), text: $newCanvasWidthText)
                         .keyboardType(.numberPad)
 
                     TextField(StudioStrings.height(language), text: $newCanvasHeightText)
                         .keyboardType(.numberPad)
                 }
-
-                Section(language.localized("開始方法")) {
-                    Button(language.localized("画像から作成")) {
-                        beginCreateCanvasFromImageFlow()
-                    }
-                }
             }
-            .navigationTitle(StudioStrings.newCanvas(language))
+            .navigationTitle(StudioStrings.customSize(language))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(StudioStrings.cancel(language)) {
-                        showsNewCanvasSheet = false
+                        showsNewCanvasCustomSizeSheet = false
                     }
                 }
 
@@ -314,8 +413,8 @@ extension ContentView {
                             let width = resolvedCanvasDimension(from: newCanvasWidthText, fallback: defaultNewCanvasWidth),
                             let height = resolvedCanvasDimension(from: newCanvasHeightText, fallback: defaultNewCanvasHeight)
                         else { return }
-                        store.send(.document(.lifecycle(.newCanvasRequested(width: width, height: height))))
-                        showsNewCanvasSheet = false
+                        createNewCanvas(width: width, height: height)
+                        showsNewCanvasCustomSizeSheet = false
                     }
                     .disabled(
                         resolvedCanvasDimension(from: newCanvasWidthText, fallback: defaultNewCanvasWidth) == nil ||
@@ -324,16 +423,171 @@ extension ContentView {
                 }
             }
         }
-        .onAppear {
-            if newCanvasWidthText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                newCanvasWidthText = "\(defaultNewCanvasWidth)"
-            }
-            if newCanvasHeightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                newCanvasHeightText = "\(defaultNewCanvasHeight)"
-            }
-        }
-        .presentationDetents([.height(410)])
+        .presentationDetents([.height(280)])
         .presentationDragIndicator(.visible)
+    }
+
+    private var newCanvasPresets: [NewCanvasPreset] {
+        [
+            NewCanvasPreset(id: "screen", title: StudioStrings.screenSize(language), measurement: .pixels(2388, 1668), defaultIsLandscape: true),
+            NewCanvasPreset(id: "square", title: StudioStrings.square(language), measurement: .pixels(2000, 2000), defaultIsLandscape: false),
+            NewCanvasPreset(id: "a3", title: "A3", measurement: .millimeters(297, 420, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "a4", title: "A4", measurement: .millimeters(210, 297, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "a5", title: "A5", measurement: .millimeters(148, 210, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "b3", title: "B3", measurement: .millimeters(364, 515, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "b4", title: "B4", measurement: .millimeters(257, 364, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "b5", title: "B5", measurement: .millimeters(182, 257, dpi: 350), defaultIsLandscape: false),
+            NewCanvasPreset(id: "720p", title: "720p", measurement: .pixels(1280, 720), defaultIsLandscape: true),
+            NewCanvasPreset(id: "1080p", title: "1080p", measurement: .pixels(1920, 1080), defaultIsLandscape: true),
+            NewCanvasPreset(id: "2160p", title: "2160p", measurement: .pixels(3840, 2160), defaultIsLandscape: true)
+        ]
+    }
+
+    private func newCanvasToolbarButton(
+        systemName: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Color(red: 0.25, green: 0.25, blue: 0.25))
+                .frame(width: 58, height: 46)
+                .background(Color(red: 0.965, green: 0.965, blue: 0.965), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private func newCanvasGridColumns(for width: CGFloat) -> [GridItem] {
+        let columnCount: Int
+        if width >= 700 {
+            columnCount = 5
+        } else if width >= 560 {
+            columnCount = 4
+        } else if width >= 420 {
+            columnCount = 3
+        } else {
+            columnCount = 2
+        }
+
+        return Array(
+            repeating: GridItem(.flexible(minimum: 98, maximum: 138), spacing: 24, alignment: .top),
+            count: columnCount
+        )
+    }
+
+    private func newCanvasPresetCard(_ preset: NewCanvasPreset) -> some View {
+        let isLandscape = newCanvasPresetLandscapeSelections[preset.id] ?? preset.defaultIsLandscape
+        let selectedSize = isLandscape ? preset.landscapeSize : preset.portraitSize
+
+        return VStack(spacing: 8) {
+            Button {
+                createNewCanvas(width: selectedSize.width, height: selectedSize.height)
+            } label: {
+                newCanvasPaperPreview(width: selectedSize.width, height: selectedSize.height)
+                    .frame(height: 86)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 8) {
+                newCanvasOrientationToggle(
+                    systemName: "rectangle.portrait",
+                    isSelected: !isLandscape,
+                    accessibilityLabel: StudioStrings.portrait(language)
+                ) {
+                    newCanvasPresetLandscapeSelections[preset.id] = false
+                }
+
+                newCanvasOrientationToggle(
+                    systemName: "rectangle",
+                    isSelected: isLandscape,
+                    accessibilityLabel: StudioStrings.landscape(language)
+                ) {
+                    newCanvasPresetLandscapeSelections[preset.id] = true
+                }
+
+                Button {} label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.56, green: 0.56, blue: 0.56))
+                        .frame(width: 22, height: 28)
+                }
+                .buttonStyle(.plain)
+                .disabled(true)
+                .accessibilityHidden(true)
+            }
+
+            Button {
+                createNewCanvas(width: selectedSize.width, height: selectedSize.height)
+            } label: {
+                VStack(spacing: 4) {
+                    Text(preset.title)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(red: 0.31, green: 0.31, blue: 0.31))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+
+                    Text(preset.measurement.detailText)
+                        .font(.system(size: 12, weight: .regular, design: .rounded))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(1)
+                        .foregroundStyle(Color(red: 0.68, green: 0.68, blue: 0.68))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func newCanvasPaperPreview(width: Int, height: Int) -> some View {
+        GeometryReader { proxy in
+            let maxWidth = proxy.size.width
+            let maxHeight = proxy.size.height
+            let scale = min(maxWidth / CGFloat(width), maxHeight / CGFloat(height), 1)
+            let previewWidth = max(24, CGFloat(width) * scale)
+            let previewHeight = max(24, CGFloat(height) * scale)
+
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color(red: 0.82, green: 0.82, blue: 0.82))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .stroke(Color(red: 0.72, green: 0.72, blue: 0.72), lineWidth: 1.5)
+                )
+                .frame(width: previewWidth, height: previewHeight)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        }
+    }
+
+    private func newCanvasOrientationToggle(
+        systemName: String,
+        isSelected: Bool,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.black : Color(red: 0.65, green: 0.65, blue: 0.65))
+                .frame(width: 32, height: 28)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? Color.white : Color(red: 0.975, green: 0.975, blue: 0.975))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(isSelected ? Color(red: 0.90, green: 0.90, blue: 0.90) : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private func createNewCanvas(width: Int, height: Int) {
+        store.send(.document(.lifecycle(.newCanvasRequested(width: width, height: height))))
+        showsNewCanvasSheet = false
     }
 
     var resizeCanvasSheet: some View {

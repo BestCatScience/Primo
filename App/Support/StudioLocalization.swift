@@ -482,8 +482,14 @@ enum StudioStrings {
             english: "Review copyright notices and full license texts for the OSS packages used by the app."
         )
     }
-    static func newCanvas(_ language: AppLanguage) -> String { language.localized("新規キャンバス") }
-    static func customSize(_ language: AppLanguage) -> String { language.localized("カスタムサイズ...") }
+    static func newCanvas(_ language: AppLanguage) -> String { localized(language, japanese: "新規キャンバス", english: "New Canvas") }
+    static func newCanvasTitle(_ language: AppLanguage) -> String { localized(language, japanese: "新しいキャンバス", english: "New Canvas") }
+    static func customSize(_ language: AppLanguage) -> String { localized(language, japanese: "カスタムサイズ...", english: "Custom Size...") }
+    static func screenSize(_ language: AppLanguage) -> String { localized(language, japanese: "スクリーンサイズ", english: "Screen Size") }
+    static func square(_ language: AppLanguage) -> String { localized(language, japanese: "正方形", english: "Square") }
+    static func portrait(_ language: AppLanguage) -> String { localized(language, japanese: "縦向き", english: "Portrait") }
+    static func landscape(_ language: AppLanguage) -> String { localized(language, japanese: "横向き", english: "Landscape") }
+    static func createFromImage(_ language: AppLanguage) -> String { localized(language, japanese: "画像から作成", english: "Create From Image") }
     static func open(_ language: AppLanguage) -> String { language.localized("開く") }
     static func save(_ language: AppLanguage) -> String { language.localized("保存") }
     static func colorCorrection(_ language: AppLanguage) -> String { language.localized("色補正") }
