@@ -627,6 +627,90 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(Array(pendingSnapshot.compositePixelData[secondOffset..<secondOffset + 4]), [0x91, 0x92, 0x93, 0x94])
     }
 
+    func testPreviewIncrementalUpdatesCompactAfterBoundedQueueLimit() {
+        let baseSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 12)
+        let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: DocumentEditingState())
+        let surface = GpuLayerSurface(
+            layerIndex: 0,
+            width: 4,
+            height: 4,
+            handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16))
+        )
+        var state = DocumentEditingState()
+
+        for index in 0..<9 {
+            let x = index % 4
+            let y = index / 4
+            state.canvas.recordPreviewIncrementalUpdate(
+                IncrementalLayerUpdate.unsafeUnchecked(
+                    layerIndex: -1,
+                    originX: x,
+                    originY: y,
+                    width: 1,
+                    height: 1,
+                    pixelData: Data(repeating: UInt8(index + 1), count: 4)
+                ),
+                previousRenderState: index == 0 ? nil : StrokeSessionRenderState(
+                    baseRevision: 12,
+                    layerIndex: 0,
+                    surfaceHandle: surface.handle.buffer,
+                    dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 4, height: 3),
+                    isApproximatePreview: false,
+                    previewBrush: brush,
+                    sampleCount: index
+                ),
+                baseSnapshot: baseSnapshot,
+                surface: surface,
+                previewBrush: brush,
+                sampleCount: index + 1
+            )
+        }
+
+        XCTAssertEqual(state.canvas.pendingPreviewIncrementalUpdates.count, 1)
+        let compacted = state.canvas.pendingPreviewIncrementalUpdates[0]
+        XCTAssertEqual(compacted.originX, 0)
+        XCTAssertEqual(compacted.originY, 0)
+        XCTAssertEqual(compacted.width, 4)
+        XCTAssertEqual(compacted.height, 3)
+        XCTAssertEqual(compacted.pixelData.count, 4 * 3 * 4)
+        XCTAssertEqual(Array(compacted.pixelData[0..<4]), [1, 1, 1, 1])
+        let ninthOffset = ((2 * 4) + 0) * 4
+        XCTAssertEqual(Array(compacted.pixelData[ninthOffset..<ninthOffset + 4]), [9, 9, 9, 9])
+    }
+
+    func testOversizedPreviewIncrementalUpdateIsRejectedWhenPatchingComposite() {
+        let committedLayerPixels = Data(repeating: 0x55, count: 64)
+        let baseSnapshot = makeCompositeSnapshot(width: 4, height: 4, revision: 12)
+        var state = DocumentEditingState()
+        state.canvas.applyIncrementalRenderUpdate(
+            IncrementalLayerUpdate.unsafeUnchecked(
+                layerIndex: -1,
+                originX: 1,
+                originY: 1,
+                width: 1,
+                height: 1,
+                pixelData: Data([0x99, 0x98, 0x97, 0x96, 0x00])
+            )
+        )
+
+        state.canvas.stagePendingCommittedStrokeSnapshot(
+            baseSnapshot: baseSnapshot,
+            surface: GpuLayerSurface(
+                layerIndex: 0,
+                width: 4,
+                height: 4,
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)),
+                pixelData: committedLayerPixels
+            )
+        )
+
+        guard let pendingSnapshot = state.canvas.pendingCommittedSnapshot else {
+            XCTFail("Expected pending committed snapshot")
+            return
+        }
+        XCTAssertEqual(pendingSnapshot.compositePixelData, baseSnapshot.compositePixelData)
+    }
+
     func testNextStrokeCapturesPendingCommittedSnapshotBeforePresentationRefresh() {
         let coordinator = DocumentFeature.CanvasStrokeStateCoordinator(
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
@@ -913,6 +997,30 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         XCTAssertEqual(addLayerCalls.values.count, 1)
         XCTAssertEqual(deleteLayerCalls.values, [9])
         XCTAssertEqual(setActiveLayerCalls.values, [2])
+    }
+
+    private func makeCompositeSnapshot(
+        width: Int,
+        height: Int,
+        revision: Int
+    ) -> MetalDocumentSnapshot {
+        MetalDocumentSnapshot.unsafeUnchecked(
+            width: width,
+            height: height,
+            revision: revision,
+            compositePixelData: Data(repeating: 0x11, count: width * height * 4),
+            layers: [
+                MetalLayerSnapshot.unsafeUnchecked(
+                    index: 0,
+                    opacity: 1,
+                    visible: true,
+                    isClipped: false,
+                    blendMode: .normal,
+                    thumbnailData: nil,
+                    pixelData: Data(repeating: 0x22, count: width * height * 4)
+                )
+            ]
+        )
     }
 }
 

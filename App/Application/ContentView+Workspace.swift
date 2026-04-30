@@ -686,7 +686,7 @@ extension ContentView {
 
     @ViewBuilder
     var workspaceAIImageAccessNotice: some View {
-        if !aiImageState.commerce.isSubscriptionActive {
+        if aiImageState.requiresSubscriptionForCurrentAccessMode {
             HStack(alignment: .top, spacing: 8) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .semibold))
@@ -839,7 +839,7 @@ extension ContentView {
     }
 
     var workspaceAIImageActions: some View {
-        let requiresSubscription = !aiImageState.commerce.isSubscriptionActive
+        let requiresSubscription = aiImageState.requiresSubscriptionForCurrentAccessMode
         let isDimmed = aiImageState.isGenerating || store.document.editing.layerSidebar.layers.isEmpty || aiImageState.commerce.isLoading
         return HStack(spacing: 8) {
             Button {

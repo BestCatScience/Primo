@@ -45,6 +45,7 @@ final class AIImageFeatureTests: XCTestCase {
         }
         await store.receive(.commerceUpdated(snapshot)) {
             $0.commerce = snapshot
+            $0.commerceSnapshotLoaded = true
         }
     }
 
@@ -76,6 +77,28 @@ final class AIImageFeatureTests: XCTestCase {
         }
         await store.receive(.commerceUpdated(snapshot)) {
             $0.commerce = snapshot
+            $0.commerceSnapshotLoaded = true
+            $0.accessMode = .userAPIKey
+        }
+    }
+
+    func testSettingsLoadedAfterCommerceFallsBackWhenProxyEndpointIsMissing() async {
+        let snapshot = AIImageCommerceSnapshot(
+            isSubscriptionActive: true,
+            latestEntitlementJWS: "signed-jws",
+            proxyEndpoint: ""
+        )
+
+        var initialState = AIImageFeature.State()
+        initialState.commerce = snapshot
+        initialState.commerceSnapshotLoaded = true
+
+        let store = TestStore(initialState: initialState) {
+            AIImageFeature()
+        }
+
+        await store.send(.settingsLoaded(AIImageSettings(accessMode: .appManaged, apiKey: "persisted-key"))) {
+            $0.settings = AIImageSettings(accessMode: .appManaged, apiKey: "persisted-key")
             $0.accessMode = .userAPIKey
         }
     }
@@ -100,6 +123,41 @@ final class AIImageFeatureTests: XCTestCase {
 
         await store.send(.accessModeChanged(.appManaged))
         try? await Task.sleep(nanoseconds: 350_000_000)
+    }
+
+    func testGenerateUsesUserAPIKeyFallbackInsteadOfPaywallWhenProxyEndpointIsMissing() async {
+        var initialState = AIImageFeature.State(
+            settings: AIImageSettings(accessMode: .appManaged, apiKey: "user-key"),
+            commerce: AIImageCommerceSnapshot(
+                isSubscriptionActive: false,
+                latestEntitlementJWS: "",
+                proxyEndpoint: ""
+            )
+        )
+        initialState.commerceSnapshotLoaded = true
+        initialState.composer.prompt = "Enhance linework"
+        initialState.fallBackToUserAPIKeyIfAppManagedUnavailable()
+
+        let expectedRequest = SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
+                prompt: NonEmptyPrompt("Enhance linework")!,
+                accessMode: .userAPIKey,
+                model: .flashImage31Preview,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .userAPIKey(apiKey: AIImageAPIKey("user-key")!)
+        )
+
+        let store = TestStore(initialState: initialState) {
+            AIImageFeature()
+        } withDependencies: {
+            $0.aiImageCommandBuilder = AIImageCommandBuilder()
+        }
+
+        await store.send(.generateButtonTapped(closeSheet: false))
+        await store.receive(.delegate(.requestEdit(expectedRequest)))
     }
 
     func testAccessModeChangedAllowsAppManagedWhenProxyEndpointIsConfigured() async {

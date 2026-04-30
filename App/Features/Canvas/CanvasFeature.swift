@@ -24,6 +24,8 @@ struct CanvasFeature {
 
     @ObservableState
     struct State: Equatable {
+        private static let maxPendingPreviewIncrementalUpdateCount = 8
+
         var canvasSize: CGSize = CanvasFeature.defaultCanvasSize
         var renderSnapshot: MetalDocumentSnapshot?
         var adjustmentPreviewPixelData: Data?
@@ -285,7 +287,7 @@ struct CanvasFeature {
                 previewBrush: previewBrush,
                 sampleCount: sampleCount
             ) {
-                pendingPreviewIncrementalUpdates.append(update)
+                appendPendingPreviewIncrementalUpdate(update, baseSnapshot: baseSnapshot)
             } else {
                 pendingPreviewIncrementalUpdates = [update]
             }
@@ -422,7 +424,7 @@ struct CanvasFeature {
                 update.originY >= 0,
                 update.originX + update.width <= canvasWidth,
                 update.originY + update.height <= canvasHeight,
-                update.pixelData.count >= update.width * update.height * 4
+                update.pixelData.count == update.width * update.height * 4
             else {
                 return nil
             }
@@ -445,6 +447,103 @@ struct CanvasFeature {
                 }
             }
             return nextComposite
+        }
+
+        private mutating func appendPendingPreviewIncrementalUpdate(
+            _ update: IncrementalLayerUpdate,
+            baseSnapshot: MetalDocumentSnapshot
+        ) {
+            pendingPreviewIncrementalUpdates.append(update)
+            guard pendingPreviewIncrementalUpdates.count > Self.maxPendingPreviewIncrementalUpdateCount else {
+                return
+            }
+            if let compacted = compactedPreviewIncrementalUpdate(baseSnapshot: baseSnapshot) {
+                pendingPreviewIncrementalUpdates = [compacted]
+            } else {
+                pendingPreviewIncrementalUpdates = Array(
+                    pendingPreviewIncrementalUpdates.suffix(Self.maxPendingPreviewIncrementalUpdateCount)
+                )
+            }
+        }
+
+        private func compactedPreviewIncrementalUpdate(baseSnapshot: MetalDocumentSnapshot) -> IncrementalLayerUpdate? {
+            guard let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot),
+                  let unionRect = pendingPreviewIncrementalUpdates.reduce(nil, { partial, update in
+                      Self.union(partial, update)
+                  }),
+                  let croppedPixelData = Self.croppedCompositeRegion(
+                      in: compositePixelData,
+                      canvasWidth: baseSnapshot.width,
+                      canvasHeight: baseSnapshot.height,
+                      rect: unionRect
+                  )
+            else {
+                return nil
+            }
+            return IncrementalLayerUpdate(
+                validatingID: UUID(),
+                layerIndex: -1,
+                originX: unionRect.originX,
+                originY: unionRect.originY,
+                width: unionRect.width,
+                height: unionRect.height,
+                pixelData: croppedPixelData
+            )
+        }
+
+        private static func croppedCompositeRegion(
+            in compositePixelData: Data,
+            canvasWidth: Int,
+            canvasHeight: Int,
+            rect: LayerPixelRect
+        ) -> Data? {
+            guard compositePixelData.count == canvasWidth * canvasHeight * 4 else { return nil }
+            guard !rect.isEmpty,
+                  rect.originX >= 0,
+                  rect.originY >= 0,
+                  rect.originX + rect.width <= canvasWidth,
+                  rect.originY + rect.height <= canvasHeight
+            else {
+                return nil
+            }
+            var output = Data(count: rect.width * rect.height * 4)
+            output.withUnsafeMutableBytes { destinationBytes in
+                compositePixelData.withUnsafeBytes { sourceBytes in
+                    guard
+                        let destinationBase = destinationBytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                        let sourceBase = sourceBytes.baseAddress?.assumingMemoryBound(to: UInt8.self)
+                    else {
+                        return
+                    }
+                    for row in 0..<rect.height {
+                        let sourceOffset = ((rect.originY + row) * canvasWidth + rect.originX) * 4
+                        let destinationOffset = row * rect.width * 4
+                        memcpy(destinationBase + destinationOffset, sourceBase + sourceOffset, rect.width * 4)
+                    }
+                }
+            }
+            return output
+        }
+
+        private static func union(_ lhs: LayerPixelRect?, _ rhs: IncrementalLayerUpdate) -> LayerPixelRect? {
+            guard !rhs.isEmpty else { return lhs }
+            guard let rhsRect = LayerPixelRect(
+                validatingOriginX: rhs.originX,
+                originY: rhs.originY,
+                width: rhs.width,
+                height: rhs.height
+            ) else { return lhs }
+            guard let lhs else { return rhsRect }
+            let minX = min(lhs.originX, rhsRect.originX)
+            let minY = min(lhs.originY, rhsRect.originY)
+            let maxX = max(lhs.originX + lhs.width, rhsRect.originX + rhsRect.width)
+            let maxY = max(lhs.originY + lhs.height, rhsRect.originY + rhsRect.height)
+            return LayerPixelRect(
+                validatingOriginX: minX,
+                originY: minY,
+                width: Swift.max(0, maxX - minX),
+                height: Swift.max(0, maxY - minY)
+            )
         }
 
         private func canAccumulatePreviewIncrementalUpdate(

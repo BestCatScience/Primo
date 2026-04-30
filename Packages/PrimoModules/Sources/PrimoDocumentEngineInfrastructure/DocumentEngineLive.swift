@@ -42,7 +42,20 @@ public enum DocumentEngineFactory {
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
     ) -> DocumentEngineLive {
-        let gpuServices = DocumentRuntimeGpuServicesFactory.live()
+        live(
+            fileClient: fileClient,
+            dateClient: dateClient,
+            uuidClient: uuidClient,
+            gpuServices: DocumentRuntimeGpuServicesFactory.live()
+        )
+    }
+
+    static func live(
+        fileClient: PrimoCoreTypes.FileClient = .live,
+        dateClient: PrimoCoreTypes.DateClient = .live,
+        uuidClient: PrimoCoreTypes.UUIDClient = .live,
+        gpuServices: DocumentRuntimeGpuServices
+    ) -> DocumentEngineLive {
         let runtimeBox = LockedDocumentRuntimeBox(
             runtime: SwiftDocumentRuntime(
                 fileClient: fileClient,

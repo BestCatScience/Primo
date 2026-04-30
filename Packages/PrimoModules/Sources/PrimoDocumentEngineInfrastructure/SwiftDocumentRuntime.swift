@@ -20,6 +20,7 @@ struct RuntimeResizeCanvasPlan: Sendable {
     }
 
     let mode: Mode
+    let documentGeneration: UUID
     let before: SwiftDocumentStoreSnapshot
     let sourceWidth: Int
     let sourceHeight: Int
@@ -144,6 +145,7 @@ struct RuntimeResizeCanvasPlan: Sendable {
 struct RuntimeLayerProcessingPlan: Sendable {
     let index: Int
     let request: LayerProcessingRequest
+    let documentGeneration: UUID
     let revision: Int
     let canvasWidth: Int
     let canvasHeight: Int
@@ -153,6 +155,7 @@ struct RuntimeLayerProcessingPlan: Sendable {
 
 struct RuntimeFillPlan: Sendable {
     let layerIndex: Int
+    let documentGeneration: UUID
     let revision: Int
     let canvasWidth: Int
     let canvasHeight: Int
@@ -166,6 +169,7 @@ struct RuntimeFillPlan: Sendable {
 
 struct RuntimeStrokeCommitPlan: Sendable {
     let layerIndex: Int
+    let documentGeneration: UUID
     let revision: Int
     let canvasWidth: Int
     let canvasHeight: Int
@@ -179,6 +183,7 @@ struct RuntimeStrokeCommitPlan: Sendable {
 
 struct RuntimeBlurPlan: Sendable {
     let layerIndex: Int
+    let documentGeneration: UUID
     let revision: Int
     let canvasWidth: Int
     let canvasHeight: Int
@@ -546,6 +551,9 @@ private enum UndoHistoryEntry: Sendable {
 }
 
 private struct LayerRectDeltaUndoEntry: Sendable {
+    // Rect deltas intentionally capture the layer metadata produced by the same
+    // mutation. Pixel operations can clear text layers or materialize GPU state,
+    // while independent metadata edits are recorded as separate snapshot entries.
     enum Direction {
         case undo
         case redo
@@ -797,6 +805,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private var thumbnailSurfaceCache: [Int: DocumentCompositeSurface] = [:]
     private var gpuLayerStorage = GpuLayerStoragePolicy()
     private let timelapseRecorder = TimelapseRecorder()
+    private let documentGeneration = UUID()
 
     init(
         width: Int = 1152,
@@ -908,6 +917,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     }
 
     func undo() -> DocumentMutationResult {
+        let currentRevision = store.snapshot.revision
         let previous: SwiftDocumentStoreSnapshot
         switch undoPolicy.restoreUndo(current: undoSnapshot()) {
         case let .success(snapshot):
@@ -919,12 +929,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
         timelapseRecorder.record(.undo, in: store)
-        store.snapshot.revision += 1
+        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
         captureDirtyUpdate()
         return .success(())
     }
 
     func redo() -> DocumentMutationResult {
+        let currentRevision = store.snapshot.revision
         let next: SwiftDocumentStoreSnapshot
         switch undoPolicy.restoreRedo(current: undoSnapshot()) {
         case let .success(snapshot):
@@ -936,7 +947,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         thumbnailSurfaceCache.removeAll(keepingCapacity: true)
         releaseLayerBufferHandles()
         timelapseRecorder.record(.redo, in: store)
-        store.snapshot.revision += 1
+        store.snapshot.revision = max(currentRevision, store.snapshot.revision) + 1
         captureDirtyUpdate()
         return .success(())
     }
@@ -996,6 +1007,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(
             RuntimeResizeCanvasPlan(
                 mode: mode,
+                documentGeneration: documentGeneration,
                 before: before,
                 sourceWidth: sourceSize.width,
                 sourceHeight: sourceSize.height,
@@ -1012,6 +1024,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         layers: [SwiftDocumentLayerRecord]
     ) -> DocumentMutationResult {
         guard store.snapshot.revision == plan.before.revision,
+              documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.sourceWidth,
               store.snapshot.canvasHeight == plan.sourceHeight,
               store.snapshot.layers.count == plan.before.layers.count,
@@ -1297,6 +1310,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             RuntimeLayerProcessingPlan(
                 index: index,
                 request: request,
+                documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
@@ -1311,6 +1325,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
         guard store.snapshot.revision == plan.revision,
+              documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
             gpuServices.release(payload.gpuBufferHandle)
@@ -1347,6 +1362,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(
             RuntimeFillPlan(
                 layerIndex: layerIndex,
+                documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
@@ -1376,6 +1392,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
         guard store.snapshot.revision == plan.revision,
+              documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
             gpuServices.release(payload.gpuBufferHandle)
@@ -1403,6 +1420,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(
             RuntimeStrokeCommitPlan(
                 layerIndex: layerIndex,
+                documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
@@ -1434,6 +1452,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         gpuResult: DocumentRuntimeStrokeMutationResult
     ) -> DocumentMutationResult {
         guard store.snapshot.revision == plan.revision,
+              documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
             gpuServices.release(gpuResult.gpuBufferHandle)
@@ -1529,6 +1548,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         return .success(
             RuntimeBlurPlan(
                 layerIndex: layerIndex,
+                documentGeneration: documentGeneration,
                 revision: store.snapshot.revision,
                 canvasWidth: store.snapshot.canvasWidth,
                 canvasHeight: store.snapshot.canvasHeight,
@@ -1559,6 +1579,7 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         payload: DocumentLayerMutationPayload
     ) -> DocumentMutationResult {
         guard store.snapshot.revision == plan.revision,
+              documentGeneration == plan.documentGeneration,
               store.snapshot.canvasWidth == plan.canvasWidth,
               store.snapshot.canvasHeight == plan.canvasHeight else {
             gpuServices.release(payload.gpuBufferHandle)

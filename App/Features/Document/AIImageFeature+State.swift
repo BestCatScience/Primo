@@ -58,6 +58,7 @@ extension AIImageFeature {
         var composer = ComposerState()
         var settings = AIImageSettingsDraft(accessMode: .appManaged)
         var commerce = AIImageCommerceSnapshot()
+        var commerceSnapshotLoaded = false
         var execution = ExecutionState()
         var presentation = PresentationState()
 
@@ -134,6 +135,14 @@ extension AIImageFeature {
 
         var appManagedProxyEndpointConfigured: Bool {
             ProxyEndpoint(commerce.proxyEndpoint) != nil
+        }
+
+        var appManagedAccessAvailable: Bool {
+            appManagedProxyEndpointConfigured
+        }
+
+        var requiresSubscriptionForCurrentAccessMode: Bool {
+            accessMode == .appManaged && !commerce.isSubscriptionActive
         }
 
         var selectedAPIKey: String {

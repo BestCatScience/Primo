@@ -20,10 +20,14 @@ extension AIImageFeature {
 
         case let .settingsLoaded(settings):
             state.settings = settings
+            if state.commerceSnapshotLoaded {
+                state.fallBackToUserAPIKeyIfAppManagedUnavailable()
+            }
             return .none
 
         case let .commerceUpdated(snapshot):
             state.commerce = snapshot
+            state.commerceSnapshotLoaded = true
             state.fallBackToUserAPIKeyIfAppManagedUnavailable()
             return .none
 
@@ -95,7 +99,8 @@ extension AIImageFeature {
             return .none
 
         case let .generateButtonTapped(closeSheet):
-            if state.accessMode == .appManaged, !state.commerce.isSubscriptionActive {
+            state.fallBackToUserAPIKeyIfAppManagedUnavailable()
+            if state.requiresSubscriptionForCurrentAccessMode {
                 state.isPaywallPresented = true
                 return .none
             }

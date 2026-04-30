@@ -100,6 +100,85 @@ struct SwiftDocumentRuntimeUndoTests {
     }
 
     @Test
+    func strokeThenRenameUndoRedoKeepsPixelAndMetadataEntriesSeparate() throws {
+        let strokePixels = Data(repeating: 0x44, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+        _ = try runtime.setLayerName(index: 0, name: "Renamed").get()
+
+        _ = try runtime.undo().get()
+        #expect(runtime.lightweightPresentation().layerRows[0].name == "Layer 1")
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+
+        _ = try runtime.redo().get()
+        #expect(runtime.lightweightPresentation().layerRows[0].name == "Renamed")
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+
+        _ = try runtime.undo().get()
+        _ = try runtime.undo().get()
+        #expect(runtime.lightweightPresentation().layerRows[0].name == "Layer 1")
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+    }
+
+    @Test
+    func strokeThenVisibilityUndoRedoKeepsPixelAndMetadataEntriesSeparate() throws {
+        let strokePixels = Data(repeating: 0x55, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+        _ = try runtime.setLayerVisibility(index: 0, isVisible: false).get()
+
+        _ = try runtime.undo().get()
+        #expect(runtime.lightweightPresentation().layerRows[0].visible)
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+
+        _ = try runtime.redo().get()
+        #expect(!runtime.lightweightPresentation().layerRows[0].visible)
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+
+        _ = try runtime.undo().get()
+        _ = try runtime.undo().get()
+        #expect(runtime.lightweightPresentation().layerRows[0].visible)
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+    }
+
+    @Test
+    func strokeUndoRestoresTextLayerMetadataClearedByStrokeDelta() throws {
+        let textLayer = TextLayerData(
+            text: "Undo text",
+            positionX: 1,
+            positionY: 1,
+            fontPostScriptName: "Helvetica",
+            fontDisplayName: "Helvetica",
+            fontSize: 12,
+            red: 1,
+            green: 1,
+            blue: 1,
+            alpha: 1
+        )
+        let strokePixels = Data(repeating: 0x66, count: 16)
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [strokePixels])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.setTextLayer(index: 0, textLayer: textLayer).get()
+        #expect(runtime.textLayerData(index: 0) == textLayer)
+
+        _ = try runtime.applyGpuStrokeSurface(samples: [sample()], brush: brush(), layerIndex: 0).get()
+        #expect(runtime.textLayerData(index: 0) == nil)
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+
+        _ = try runtime.undo().get()
+        #expect(runtime.textLayerData(index: 0) == textLayer)
+
+        _ = try runtime.redo().get()
+        #expect(runtime.textLayerData(index: 0) == nil)
+        #expect(runtime.pixelDataForLayer(index: 0) == strokePixels)
+    }
+
+    @Test
     func undoHistoryEvictsOldEntriesWhenByteBudgetIsExceeded() throws {
         let gpu = RuntimeGpuServiceSpy(strokeOutputs: [])
         let runtime = SwiftDocumentRuntime(
@@ -346,6 +425,166 @@ struct SwiftDocumentRuntimeUndoTests {
         #expect(!gpu.hasCachedPixelData(for: handle))
     }
 
+    @Test
+    func staleStrokeGpuResultAfterUndoDoesNotApply() throws {
+        let staleStrokePixels = Data(repeating: 0xEE, count: 16)
+        let gpu = BlockingRuntimeGpuServiceSpy(operation: .stroke, stalePixelData: staleStrokePixels)
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+        let sample = sample()
+        let brush = brush()
+
+        runtime.persistenceGateway.newCanvas(2, 2)
+        _ = try runtime.mutationGateway.replaceLayerPixels(0, Data(repeating: 0x11, count: 16)).get()
+        gpu.setBlockingEnabled(true)
+
+        let staleResult = AsyncMutationResult {
+            runtime.strokeGateway.applyGpuStrokeSurface([sample], brush, 0)
+        }
+        defer { gpu.releaseGpu() }
+        try gpu.waitForGpuStart()
+        _ = try runtime.historyGateway.undo().get()
+        gpu.releaseGpu()
+
+        guard case .failure(.gpu(.staleSnapshot(operation: "applyCommittedStroke"))) = try staleResult.wait() else {
+            Issue.record("Expected stale stroke GPU result to be rejected")
+            return
+        }
+        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+        #expect(gpu.releasedHandleCount == 1)
+    }
+
+    @Test
+    func staleFillGpuResultAfterNewCanvasDoesNotApplyAcrossGenerationReset() throws {
+        let stalePixels = Data(repeating: 0xCC, count: 16)
+        let gpu = BlockingRuntimeGpuServiceSpy(operation: .fill, stalePixelData: stalePixels)
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+        let sample = sample()
+        let brush = brush()
+        gpu.setBlockingEnabled(true)
+
+        let staleResult = AsyncMutationResult {
+            runtime.strokeGateway.fill(sample, brush)
+        }
+        defer { gpu.releaseGpu() }
+        try gpu.waitForGpuStart()
+        runtime.persistenceGateway.newCanvas(2, 2)
+        gpu.releaseGpu()
+
+        guard case .failure(.gpu(.staleSnapshot(operation: "fill"))) = try staleResult.wait() else {
+            Issue.record("Expected stale fill GPU result to be rejected")
+            return
+        }
+        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+    }
+
+    @Test
+    func staleBlurGpuResultAfterNewCanvasDoesNotApplyAcrossGenerationReset() throws {
+        let stalePixels = Data(repeating: 0xDD, count: 16)
+        let gpu = BlockingRuntimeGpuServiceSpy(operation: .blur, stalePixelData: stalePixels)
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+        let sample = sample()
+        let brush = brush()
+        gpu.setBlockingEnabled(true)
+
+        let staleResult = AsyncMutationResult {
+            runtime.strokeGateway.blurStroke([sample], brush, 0, false)
+        }
+        defer { gpu.releaseGpu() }
+        try gpu.waitForGpuStart()
+        runtime.persistenceGateway.newCanvas(2, 2)
+        gpu.releaseGpu()
+
+        guard case .failure(.gpu(.staleSnapshot(operation: "blurStroke"))) = try staleResult.wait() else {
+            Issue.record("Expected stale blur GPU result to be rejected")
+            return
+        }
+        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+    }
+
+    @Test
+    func staleLayerProcessingGpuResultAfterNewCanvasDoesNotApplyAcrossGenerationReset() throws {
+        let stalePixels = Data(repeating: 0xBB, count: 16)
+        let gpu = BlockingRuntimeGpuServiceSpy(operation: .layerProcessing, stalePixelData: stalePixels)
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+        gpu.setBlockingEnabled(true)
+
+        let staleResult = AsyncMutationResult {
+            runtime.mutationGateway.applyLayerProcessing(0, .luminanceToAlpha)
+        }
+        defer { gpu.releaseGpu() }
+        try gpu.waitForGpuStart()
+        runtime.persistenceGateway.newCanvas(2, 2)
+        gpu.releaseGpu()
+
+        guard case .failure(.gpu(.staleSnapshot(operation: "applyLayerProcessing"))) = try staleResult.wait() else {
+            Issue.record("Expected stale layer processing GPU result to be rejected")
+            return
+        }
+        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+    }
+
+    @Test
+    func staleDirectGpuPlansAfterLayerMutationDoNotApply() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0xEE, count: 16)])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+        let layerPayload = DocumentLayerMutationPayload.unsafeUnchecked(
+            canvasWidth: 2,
+            canvasHeight: 2,
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: 2, height: 2),
+            gpuBufferHandle: nil,
+            rectPixelData: Data(repeating: 0xBB, count: 16),
+            fullPixelData: Data(repeating: 0xBB, count: 16)
+        )
+
+        let processingPlan = try runtime.makeLayerProcessingPlan(index: 0, request: .luminanceToAlpha).get()
+        _ = try runtime.setLayerName(index: 0, name: "Layer mutation").get()
+        guard case .failure(.gpu(.staleSnapshot(operation: "applyLayerProcessing"))) =
+            runtime.applyLayerProcessingPlan(processingPlan, payload: layerPayload)
+        else {
+            Issue.record("Expected stale layer processing plan to be rejected after layer mutation")
+            return
+        }
+
+        let blurPlan = try runtime.makeBlurPlan(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0,
+            captureTimelapse: false
+        ).get()
+        _ = try runtime.setLayerVisibility(index: 0, isVisible: false).get()
+        guard case .failure(.gpu(.staleSnapshot(operation: "blurStroke"))) =
+            runtime.applyBlurPlan(blurPlan, payload: layerPayload)
+        else {
+            Issue.record("Expected stale blur plan to be rejected after layer mutation")
+            return
+        }
+
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+    }
+
+    @Test
+    func staleResizeGpuResultAfterNewCanvasDoesNotApplyAcrossGenerationReset() throws {
+        let gpu = BlockingRuntimeGpuServiceSpy(operation: .resize, stalePixelData: Data(repeating: 0xAA, count: 36))
+        let runtime = DocumentEngineFactory.live(gpuServices: gpu.services())
+        gpu.setBlockingEnabled(true)
+
+        let staleResult = AsyncMutationResult {
+            runtime.mutationGateway.resizeCanvas(3, 3)
+        }
+        defer { gpu.releaseGpu() }
+        try gpu.waitForGpuStart()
+        runtime.persistenceGateway.newCanvas(2, 2)
+        gpu.releaseGpu()
+
+        guard case .failure(.gpu(.staleSnapshot(operation: "resizeCanvas"))) = try staleResult.wait() else {
+            Issue.record("Expected stale resize GPU result to be rejected")
+            return
+        }
+        #expect(runtime.queryGateway.lightweightPresentation().canvasSize.width == 2)
+        #expect(runtime.queryGateway.lightweightPresentation().canvasSize.height == 2)
+        #expect(runtime.queryGateway.pixelDataForLayer(0) == Data(count: 16))
+    }
+
     private func sample() -> StylusSample {
         StylusSample(
             point: CGPoint(x: 1, y: 1),
@@ -380,6 +619,164 @@ struct SwiftDocumentRuntimeUndoTests {
             green: 255,
             blue: 255
         )
+    }
+}
+
+private final class BlockingRuntimeGpuServiceSpy: @unchecked Sendable {
+    enum Operation {
+        case stroke
+        case fill
+        case blur
+        case layerProcessing
+        case resize
+    }
+
+    private let lock = NSLock()
+    private let operation: Operation
+    private let stalePixelData: Data
+    private let started = DispatchSemaphore(value: 0)
+    private let release = DispatchSemaphore(value: 0)
+    private var shouldBlock = false
+    private var releasedHandles = 0
+
+    init(operation: Operation, stalePixelData: Data) {
+        self.operation = operation
+        self.stalePixelData = stalePixelData
+    }
+
+    var releasedHandleCount: Int {
+        lock.withLock { releasedHandles }
+    }
+
+    func setBlockingEnabled(_ value: Bool) {
+        lock.withLock {
+            shouldBlock = value
+        }
+    }
+
+    func waitForGpuStart() throws {
+        guard started.wait(timeout: .now() + 2) == .success else {
+            throw BlockingGpuTimeout()
+        }
+    }
+
+    func releaseGpu() {
+        release.signal()
+    }
+
+    func services() -> DocumentRuntimeGpuServices {
+        DocumentRuntimeGpuServices(
+            release: { handle in
+                guard handle != nil else { return }
+                self.lock.withLock {
+                    self.releasedHandles += 1
+                }
+            },
+            retain: { _ in false },
+            _materializedPixelData: { _ in nil },
+            _scaledPixelData: { data, sourceWidth, sourceHeight, targetWidth, targetHeight in
+                self.blockIfNeeded(.resize)
+                guard sourceWidth > 0, sourceHeight > 0, targetWidth > 0, targetHeight > 0 else { return nil }
+                return self.stalePixelData.count == targetWidth * targetHeight * 4
+                    ? self.stalePixelData
+                    : data
+            },
+            _scaledMaskData: { data, _, _, _, _ in data },
+            _translatedPixelData: { data, _, _, _, _, _, _ in data },
+            _translatedMaskData: { data, _, _, _, _, _, _ in data },
+            _applyLayerMask: { pixelData, _, _, _ in pixelData },
+            _processLayer: { _, width, height, _ in
+                self.blockIfNeeded(.layerProcessing)
+                return self.payload(width: width, height: height)
+            },
+            _mergeLayers: { lower, _, _, _, _, _, _ in lower },
+            _rasterizeTextLayer: { _, size in
+                let width = Int(size.width)
+                let height = Int(size.height)
+                return self.payload(width: width, height: height)
+            },
+            _blurPixels: { _, _, width, height, _, _ in
+                self.blockIfNeeded(.blur)
+                return self.payload(width: width, height: height)
+            },
+            _fillPixels: { _, _, width, height, _, _ in
+                self.blockIfNeeded(.fill)
+                return self.payload(width: width, height: height)
+            },
+            _commitStrokeMutation: { _, _, width, height, _, _, _, _ in
+                self.blockIfNeeded(.stroke)
+                let handle = MetalBufferHandle.unsafeUnchecked(width: width, height: height, bytesPerRow: width * 4)
+                return PrimoMetalStrokeMutationResult(
+                    dirtyRect: (originX: 0, originY: 0, width: width, height: height),
+                    gpuBufferHandle: handle,
+                    rectPixelData: nil
+                )
+            },
+            _preservingExistingAlphaBufferHandle: { sourceHandle, _, _, _, _ in sourceHandle },
+            _compositedPaperPreviewRGBA: { pixelData, _, _, _ in pixelData },
+            _compositedIncrementalUpdate: { _, dirtyRect in
+                IncrementalLayerUpdate.unsafeUnchecked(
+                    layerIndex: -1,
+                    originX: dirtyRect.originX,
+                    originY: dirtyRect.originY,
+                    width: dirtyRect.width,
+                    height: dirtyRect.height,
+                    pixelData: Data(count: dirtyRect.width * dirtyRect.height * 4)
+                )
+            },
+            _compositeDocumentSurface: { snapshot in
+                DocumentCompositeSurface(
+                    unsafeUncheckedWidth: snapshot.width,
+                    height: snapshot.height,
+                    pixelData: snapshot.layers.first?.pixelData ?? Data()
+                )
+            },
+            _compositeDocumentBufferHandle: { _ in nil }
+        )
+    }
+
+    private func blockIfNeeded(_ currentOperation: Operation) {
+        guard currentOperation == operation else { return }
+        let shouldWait = lock.withLock { shouldBlock }
+        guard shouldWait else { return }
+        started.signal()
+        release.wait()
+    }
+
+    private func payload(width: Int, height: Int) -> DocumentLayerMutationPayload {
+        DocumentLayerMutationPayload.unsafeUnchecked(
+            canvasWidth: width,
+            canvasHeight: height,
+            dirtyRect: LayerPixelRect.unsafeUnchecked(originX: 0, originY: 0, width: width, height: height),
+            gpuBufferHandle: nil,
+            rectPixelData: stalePixelData,
+            fullPixelData: stalePixelData
+        )
+    }
+}
+
+private struct BlockingGpuTimeout: Error {}
+
+private final class AsyncMutationResult: @unchecked Sendable {
+    private let lock = NSLock()
+    private let finished = DispatchSemaphore(value: 0)
+    private var result: DocumentMutationResult?
+
+    init(_ operation: @escaping @Sendable () -> DocumentMutationResult) {
+        DispatchQueue.global().async {
+            let result = operation()
+            self.lock.withLock {
+                self.result = result
+            }
+            self.finished.signal()
+        }
+    }
+
+    func wait() throws -> DocumentMutationResult {
+        guard finished.wait(timeout: .now() + 2) == .success else {
+            throw BlockingGpuTimeout()
+        }
+        return try #require(lock.withLock { result })
     }
 }
 

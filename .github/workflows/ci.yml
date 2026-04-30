@@ -40,6 +40,74 @@ jobs:
         working-directory: Packages/PrimoModules
         run: swift test
 
+  package-ios-simulator-tests:
+    name: Swift 6 Package iOS Simulator Tests (UIKit/Metal Presentation)
+    # SwiftPM's `swift test` exercises the macOS path. Run the package through
+    # xcodebuild on an iOS simulator so package-local UIKit/Metal presentation
+    # code is compiled and tested before the app target is involved.
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      PACKAGE_IOS_DEPLOYMENT_TARGET: "26.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Validate package iOS deployment target
+        run: |
+          grep -Fq ".iOS(\"${PACKAGE_IOS_DEPLOYMENT_TARGET}\")" Packages/PrimoModules/Package.swift
+
+      - name: Pick simulator
+        id: simulator
+        run: |
+          xcrun simctl list devices available
+          simulator_id="$(
+            xcrun simctl list devices available -j | ruby -rjson -e '
+              target = ENV.fetch("PACKAGE_IOS_DEPLOYMENT_TARGET").split(".").map(&:to_i)
+              target_major = target.fetch(0)
+              target_minor = target.fetch(1, 0)
+              devices_by_runtime = JSON.parse(STDIN.read).fetch("devices")
+              destinations = devices_by_runtime.flat_map do |runtime, devices|
+                runtime_match = runtime.match(/com\.apple\.CoreSimulator\.SimRuntime\.iOS-(\d+)-(\d+)/)
+                next [] unless runtime_match
+                runtime_major = runtime_match[1].to_i
+                runtime_minor = runtime_match[2].to_i
+                next [] if runtime_major < target_major ||
+                  (runtime_major == target_major && runtime_minor < target_minor)
+                devices.map { |device| device.merge("runtime" => runtime) }
+              end.select do |device|
+                device["isAvailable"] &&
+                  device["udid"] &&
+                  (device["name"].start_with?("iPad") || device["name"].start_with?("iPhone"))
+              end
+              preferred = destinations.find { |device| device["name"].start_with?("iPad") } ||
+                destinations.find { |device| device["name"].start_with?("iPhone") }
+              abort("No available iOS simulator destination found for deployment target #{ENV.fetch("PACKAGE_IOS_DEPLOYMENT_TARGET")}") unless preferred
+              warn("Selected " + preferred.fetch("name") + " on " + preferred.fetch("runtime"))
+              puts preferred["udid"]
+            '
+          )"
+          echo "id=$simulator_id" >> "$GITHUB_OUTPUT"
+
+      - name: Run package tests on iOS simulator
+        working-directory: Packages/PrimoModules
+        run: |
+          xcodebuild \
+            -scheme PrimoModules-Package \
+            -destination "id=${{ steps.simulator.outputs.id }}" \
+            -skipMacroValidation \
+            -configuration Debug \
+            -derivedDataPath ../../build/PackageIOSDerivedData \
+            -clonedSourcePackagesDirPath ../../build/PackageIOSSourcePackages \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
   app-tests:
     name: Swift 6 Xcode App Tests (iOS 26)
     # The app target deploys to iOS 26.0, so keep this on macos-26 for matching

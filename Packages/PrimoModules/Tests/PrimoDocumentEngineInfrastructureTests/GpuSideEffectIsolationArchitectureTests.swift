@@ -324,10 +324,12 @@ struct GpuSideEffectIsolationArchitectureTests {
     func appCanvasFeatureDoesNotReachGpuGatewayDocumentMutationOrPixelTransformHotPath() throws {
         let repoRoot = try Self.repoRoot()
         let canvasRoot = repoRoot.appendingPathComponent("App/Features/Canvas", isDirectory: true)
+        let bannedImports = Set([
+            "PrimoDocumentApplication",
+            "PrimoDocumentEngineInfrastructure",
+            "PrimoDocumentRenderingInfrastructure"
+        ])
         let banned = [
-            "import PrimoDocumentApplication",
-            "import PrimoDocumentEngineInfrastructure",
-            "import PrimoDocumentRenderingInfrastructure",
             "DocumentGpuOperationGateway",
             "DocumentGpuOperationGatewayFactory",
             "DocumentMutationGateway",
@@ -359,6 +361,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         let sources = try Self.swiftSources(under: canvasRoot)
         for source in sources {
             let body = try String(contentsOf: source, encoding: .utf8)
+            let imports = Self.swiftImports(in: body)
+            #expect(
+                imports.isDisjoint(with: bannedImports),
+                "\(source.path) should not import app workflow or concrete document runtime modules"
+            )
             for token in banned {
                 #expect(!body.contains(token), "\(source.path) should not reference \(token)")
             }
@@ -417,9 +424,13 @@ struct GpuSideEffectIsolationArchitectureTests {
             isDirectory: false
         )
         let body = try String(contentsOf: runtime, encoding: .utf8)
+        let imports = Self.swiftImports(in: body)
+        let bannedImports = Set([
+            "PrimoDocumentMetalRuntimeInfrastructure",
+            "PrimoDocumentRenderingInfrastructure"
+        ])
         let banned = [
             "PrimoMetalDocumentProcessingClient.shared",
-            "PrimoDocumentMetalRuntimeInfrastructure",
             "MetalRuntimeContext",
             "MetalResourceStore",
             "MetalStrokeExecutionService",
@@ -428,6 +439,10 @@ struct GpuSideEffectIsolationArchitectureTests {
             "MetalTextService",
             "MetalStrokeExecutionRequest"
         ]
+        #expect(
+            imports.isDisjoint(with: bannedImports),
+            "SwiftDocumentRuntime should depend on injected GPU services instead of concrete Metal/rendering modules"
+        )
         for token in banned {
             #expect(!body.contains(token), "SwiftDocumentRuntime should not construct or reach \(token)")
         }
@@ -459,6 +474,29 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func renderingInfrastructurePublicSurfaceStaysNarrow() throws {
+        let repoRoot = try Self.repoRoot()
+        let renderingRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure",
+            isDirectory: true
+        )
+        let actualSymbols = try Set(
+            Self.swiftSources(under: renderingRoot)
+                .flatMap { source in
+                    Self.publicTopLevelSymbols(in: try String(contentsOf: source, encoding: .utf8))
+                }
+        )
+        let expectedSymbols: Set<String> = [
+            "DocumentGpuOperationGatewayFactory",
+            "GpuCanvasEyedropperSampler",
+            "GpuCanvasPreviewRenderer",
+            "GpuLayerTransformProcessor"
+        ]
+
+        #expect(actualSymbols == expectedSymbols)
+    }
+
+    @Test
     func publicGpuOperationGatewayFactoryDoesNotConstructMetalServices() throws {
         let repoRoot = try Self.repoRoot()
         let factory = repoRoot.appendingPathComponent(
@@ -481,15 +519,34 @@ struct GpuSideEffectIsolationArchitectureTests {
 
     @Test
     func metalStrokeAndLayerInfrastructureDoNotDependOnRenderingInfrastructure() throws {
-        let repoRoot = try Self.repoRoot()
-        let manifest = repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false)
-        let body = try String(contentsOf: manifest, encoding: .utf8)
-        let bannedEdges = [
-            "\"PrimoDocumentMetalStrokeInfrastructure\",\n            dependencies: [\n                \"PrimoDocumentGPUContracts\",\n                \"PrimoDocumentMetalSurfaceInfrastructure\",\n                \"PrimoDocumentRenderingInfrastructure\"",
-            "\"PrimoDocumentMetalLayerInfrastructure\",\n            dependencies: [\n                \"PrimoDocumentGPUContracts\",\n                \"PrimoDocumentMetalRuntimeInfrastructure\",\n                \"PrimoDocumentRenderingInfrastructure\""
+        let graph = try Self.packageTargetGraph()
+        let bannedEdges: [(source: String, dependency: String)] = [
+            ("PrimoDocumentMetalStrokeInfrastructure", "PrimoDocumentRenderingInfrastructure"),
+            ("PrimoDocumentMetalLayerInfrastructure", "PrimoDocumentRenderingInfrastructure")
         ]
         for edge in bannedEdges {
-            #expect(!body.contains(edge), "Metal infrastructure must not depend on rendering infrastructure")
+            #expect(
+                graph[edge.source]?.contains(edge.dependency) != true,
+                "\(edge.source) must not depend on \(edge.dependency)"
+            )
+        }
+    }
+
+    @Test
+    func packageDependencyGraphKeepsStableLayersFreeOfInfrastructureEdges() throws {
+        let graph = try Self.packageTargetGraph()
+        for (target, dependencies) in graph {
+            let isStableLayer = target.hasSuffix("Domain") ||
+                target.hasSuffix("Application") ||
+                target.hasSuffix("Contracts")
+            guard isStableLayer else { continue }
+
+            for dependency in dependencies {
+                #expect(
+                    !dependency.contains("Infrastructure"),
+                    "\(target) must not depend on concrete infrastructure target \(dependency)"
+                )
+            }
         }
     }
 
@@ -555,5 +612,154 @@ struct GpuSideEffectIsolationArchitectureTests {
             let values = try url.resourceValues(forKeys: [.isRegularFileKey])
             return values.isRegularFile == true ? url : nil
         }
+    }
+
+    private static func swiftImports(in source: String) -> Set<String> {
+        Set(source.split(separator: "\n").compactMap { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("import ") else { return nil }
+            let remainder = trimmed.dropFirst("import ".count)
+            let module = remainder.split(whereSeparator: { $0 == " " || $0 == "." }).first
+            return module.map(String.init)
+        })
+    }
+
+    private static func publicTopLevelSymbols(in source: String) -> [String] {
+        source.split(separator: "\n").compactMap { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("public ") else { return nil }
+            let parts = trimmed.split(whereSeparator: { $0 == " " || $0 == ":" || $0 == "<" || $0 == "(" })
+            guard let declarationIndex = parts.firstIndex(where: { part in
+                part == "struct" ||
+                    part == "enum" ||
+                    part == "protocol" ||
+                    part == "class" ||
+                    part == "actor" ||
+                    part == "typealias"
+            }) else {
+                return nil
+            }
+            let nameIndex = parts.index(after: declarationIndex)
+            guard parts.indices.contains(nameIndex) else { return nil }
+            return String(parts[nameIndex])
+        }
+    }
+
+    private static func packageTargetGraph() throws -> [String: Set<String>] {
+        let repoRoot = try Self.repoRoot()
+        let manifest = repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false)
+        let body = try String(contentsOf: manifest, encoding: .utf8)
+        return PackageManifestTargetParser.parseTargetDependencies(from: body)
+    }
+}
+
+private enum PackageManifestTargetParser {
+    static func parseTargetDependencies(from manifest: String) -> [String: Set<String>] {
+        var graph: [String: Set<String>] = [:]
+        for block in targetBlocks(in: manifest) {
+            guard let name = firstQuotedValue(after: "name:", in: block) else { continue }
+            graph[name] = Set(dependencies(in: block))
+        }
+        return graph
+    }
+
+    private static func targetBlocks(in manifest: String) -> [String] {
+        var blocks: [String] = []
+        var searchStart = manifest.startIndex
+        while let markerRange = manifest.range(of: ".target(", range: searchStart..<manifest.endIndex) {
+            let openParen = manifest.index(before: markerRange.upperBound)
+            guard let closeParen = matchingDelimiter(
+                in: manifest,
+                open: openParen,
+                opening: "(",
+                closing: ")"
+            ) else {
+                break
+            }
+            blocks.append(String(manifest[markerRange.lowerBound...closeParen]))
+            searchStart = manifest.index(after: closeParen)
+        }
+        return blocks
+    }
+
+    private static func dependencies(in targetBlock: String) -> [String] {
+        guard let dependenciesRange = targetBlock.range(of: "dependencies:"),
+              let openBracket = targetBlock[dependenciesRange.upperBound...].firstIndex(of: "["),
+              let closeBracket = matchingDelimiter(
+                in: targetBlock,
+                open: openBracket,
+                opening: "[",
+                closing: "]"
+              )
+        else {
+            return []
+        }
+        return quotedStrings(in: String(targetBlock[openBracket...closeBracket]))
+    }
+
+    private static func firstQuotedValue(after label: String, in block: String) -> String? {
+        guard let labelRange = block.range(of: label) else { return nil }
+        return quotedStrings(in: String(block[labelRange.upperBound...])).first
+    }
+
+    private static func quotedStrings(in text: String) -> [String] {
+        var output: [String] = []
+        var index = text.startIndex
+        while let opening = text[index...].firstIndex(of: "\"") {
+            var cursor = text.index(after: opening)
+            var value = ""
+            var escaped = false
+            while cursor < text.endIndex {
+                let character = text[cursor]
+                if escaped {
+                    value.append(character)
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    output.append(value)
+                    index = text.index(after: cursor)
+                    break
+                } else {
+                    value.append(character)
+                }
+                cursor = text.index(after: cursor)
+            }
+            if cursor >= text.endIndex { break }
+        }
+        return output
+    }
+
+    private static func matchingDelimiter(
+        in text: String,
+        open: String.Index,
+        opening: Character,
+        closing: Character
+    ) -> String.Index? {
+        var depth = 0
+        var cursor = open
+        var isInsideString = false
+        var escaped = false
+        while cursor < text.endIndex {
+            let character = text[cursor]
+            if isInsideString {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+            } else if character == "\"" {
+                isInsideString = true
+            } else if character == opening {
+                depth += 1
+            } else if character == closing {
+                depth -= 1
+                if depth == 0 { return cursor }
+            }
+            cursor = text.index(after: cursor)
+        }
+        return nil
     }
 }

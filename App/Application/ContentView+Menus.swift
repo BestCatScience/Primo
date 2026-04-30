@@ -124,14 +124,14 @@ extension ContentView {
     }
 
     var aiImagePrimaryActionDisabled: Bool {
-        if !aiImageState.commerce.isSubscriptionActive {
+        if aiImageState.requiresSubscriptionForCurrentAccessMode {
             return aiImageState.commerce.isLoading
         }
         return aiImageGenerateDisabled
     }
 
     func aiImagePrimaryActionTitle(fallback: String) -> String {
-        if !aiImageState.commerce.isSubscriptionActive {
+        if aiImageState.requiresSubscriptionForCurrentAccessMode {
             return language.localized("サブスクリプションが必要です")
         }
         return fallback
@@ -162,7 +162,7 @@ extension ContentView {
     }
 
     func handleAIImagePrimaryAction(closeSheet: Bool) {
-        guard aiImageState.commerce.isSubscriptionActive else {
+        guard !aiImageState.requiresSubscriptionForCurrentAccessMode else {
             aiImageFocusedField = nil
             store.send(.aiImage(.paywallPresentationChanged(true)))
             return
