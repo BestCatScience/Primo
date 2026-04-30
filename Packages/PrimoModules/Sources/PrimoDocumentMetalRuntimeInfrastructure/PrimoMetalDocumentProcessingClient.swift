@@ -811,7 +811,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         buffer: MTLBuffer
     ) -> MetalBufferHandle {
         let handle = MetalBufferHandle(validatingWidth: width, height: height, bytesPerRow: bytesPerRow)
-            ?? MetalBufferHandle(width: width, height: height, bytesPerRow: bytesPerRow)
+            ?? MetalBufferHandle.unsafeUnchecked(width: width, height: height, bytesPerRow: bytesPerRow)
         withCacheLock {
             cachedBuffers[handle.id] = CachedBufferResource(
                 width: width,
@@ -1598,7 +1598,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         ) else {
             return nil
         }
-        return IncrementalLayerUpdate(
+        return IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: dirtyRect.originX,
             originY: dirtyRect.originY,
@@ -1636,7 +1636,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         ) else {
             return nil
         }
-        return IncrementalLayerUpdate(
+        return IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: dirtyRect.originX,
             originY: dirtyRect.originY,
@@ -1661,7 +1661,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
         ) else {
             return nil
         }
-        return IncrementalLayerUpdate(
+        return IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: dirtyRect.originX,
             originY: dirtyRect.originY,
@@ -1779,13 +1779,13 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
             resolvedUpper = upperPixelData
         }
 
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: canvasWidth,
             height: canvasHeight,
             revision: 0,
             compositePixelData: Data(count: expectedCount),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1.0,
                     visible: true,
@@ -1795,7 +1795,7 @@ public final class PrimoMetalDocumentProcessingClient: @unchecked Sendable {
                     thumbnailData: nil,
                     pixelData: lowerPixelData
                 ),
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 1,
                     opacity: upperOpacity,
                     visible: true,

@@ -203,13 +203,13 @@ struct DocumentGpuOperationGatewayTests {
         let gateway = DocumentGpuOperationGatewayFactory.live()
         let basePixels = Data([0, 0, 0, 0, 0, 0, 0, 0])
         let adjustedPixels = Data([255, 0, 0, 255, 0, 255, 0, 255])
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 2,
             height: 1,
             revision: 1,
             compositePixelData: basePixels,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -297,13 +297,13 @@ struct DocumentGpuOperationGatewayTests {
     func interactiveStrokePreviewBuildsPreviewThroughRuntimeBoundary() throws {
         let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 32,
             height: 32,
             revision: 3,
             compositePixelData: basePixels,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -375,13 +375,13 @@ struct DocumentGpuOperationGatewayTests {
         let strokeService = DocumentStrokeProcessingService()
         let basePixel: [UInt8] = [28, 42, 56, 255]
         let basePixels = Data((0..<32 * 32).flatMap { _ in basePixel })
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 32,
             height: 32,
             revision: 4,
             compositePixelData: basePixels,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -444,13 +444,13 @@ struct DocumentGpuOperationGatewayTests {
     func responsiveOilPreviewWithoutSmudgeStaysExact() throws {
         let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 32 * 32 * 4)
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 32,
             height: 32,
             revision: 4,
             compositePixelData: basePixels,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -528,13 +528,13 @@ struct DocumentGpuOperationGatewayTests {
     func responsiveSmudgePreviewProvidesLiveDisplayUpdateWhenIncrementalContinuationIsDisabled() throws {
         let strokeService = DocumentStrokeProcessingService()
         let basePixels = Data(count: 96 * 96 * 4)
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 96,
             height: 96,
             revision: 5,
             compositePixelData: basePixels,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -704,13 +704,13 @@ struct DocumentGpuOperationGatewayTests {
         let redBackground = Data([255, 0, 0, 255])
         let blueBackground = Data([0, 0, 255, 255])
 
-        let firstSnapshot = MetalDocumentSnapshot(
+        let firstSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 1,
             height: 1,
             revision: 0,
             compositePixelData: redBackground,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -719,7 +719,7 @@ struct DocumentGpuOperationGatewayTests {
                     thumbnailData: nil,
                     pixelData: redBackground
                 ),
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 1,
                     opacity: 1,
                     visible: true,
@@ -730,13 +730,13 @@ struct DocumentGpuOperationGatewayTests {
                 )
             ]
         )
-        let secondSnapshot = MetalDocumentSnapshot(
+        let secondSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 1,
             height: 1,
             revision: 0,
             compositePixelData: blueBackground,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
@@ -745,7 +745,7 @@ struct DocumentGpuOperationGatewayTests {
                     thumbnailData: nil,
                     pixelData: blueBackground
                 ),
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 1,
                     opacity: 1,
                     visible: true,

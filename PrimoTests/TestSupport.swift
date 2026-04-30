@@ -93,13 +93,13 @@ extension PaintDocumentPresentation {
         testValue(
             canvasSize: CGSize(width: width, height: height),
             activeLayerIndex: activeLayerIndex,
-            renderSnapshot: MetalDocumentSnapshot(
+            renderSnapshot: MetalDocumentSnapshot.unsafeUnchecked(
                 width: width,
                 height: height,
                 revision: 1,
                 compositePixelData: Data(repeating: 0, count: width * height * 4),
                 layers: [
-                    MetalLayerSnapshot(
+                    MetalLayerSnapshot.unsafeUnchecked(
                         index: activeLayerIndex,
                         opacity: 1,
                         visible: true,

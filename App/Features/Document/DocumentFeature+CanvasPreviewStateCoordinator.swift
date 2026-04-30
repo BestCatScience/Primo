@@ -15,7 +15,7 @@ extension DocumentFeature {
                 return false
             }
             state.canvas.applyIncrementalRenderUpdate(
-                IncrementalLayerUpdate(
+                IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: -1,
                     originX: 0,
                     originY: 0,
@@ -45,7 +45,7 @@ extension DocumentFeature {
 
             let nextLayers = baseSnapshot.layers.map { layer in
                 guard layer.index == activeLayerIndex else { return layer }
-                return MetalLayerSnapshot(
+                return MetalLayerSnapshot.unsafeUnchecked(
                     index: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
@@ -59,7 +59,7 @@ extension DocumentFeature {
 
             let nextRevision = max(state.canvas.renderSnapshot?.revision ?? 0, state.canvas.lastCommittedRenderRevision) + 1
             state.canvas.applyPreviewRenderSnapshot(
-                MetalDocumentSnapshot(
+                MetalDocumentSnapshot.unsafeUnchecked(
                     width: baseSnapshot.width,
                     height: baseSnapshot.height,
                     revision: nextRevision,

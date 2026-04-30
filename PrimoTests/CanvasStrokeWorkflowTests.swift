@@ -119,14 +119,14 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         var state = DocumentFeature.State()
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 4,
             height: 4,
             revision: 12,
             compositePixelData: Data(repeating: 0, count: 64),
             layers: []
         )
-        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         coordinator.applyPreviewMutation(
             GpuPreviewMutation(
@@ -152,7 +152,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testAppendStrokePreviewPassesCurrentRenderStateToSessionUseCase() {
-        let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let expectedHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let recordedRenderStates = TestRecorder<StrokeSessionRenderState?>()
         let coordinator = makeStrokeSessionCoordinator(
             strokeInteraction: CanvasStrokeInteractionService(
@@ -202,7 +202,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testShapeStrokePreviewUsesStrokeSessionPreviewWithFullSamples() {
         let recordedCommands = TestRecorder<GpuStrokeSessionCommand>()
-        let expectedHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let expectedHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let coordinator = makeStrokeSessionCoordinator(
             strokeInteraction: CanvasStrokeInteractionService(
                 sessionUseCase: .stub { command in
@@ -341,7 +341,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testGpuCommitOutcomeAppliesLayerSurfaceMutation() {
         let surfaceCalls = TestRecorder<GpuLayerMutationPayload>()
-        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         let runtime = DocumentRuntimeComposition.stub(
             mutationGateway: .stub(
@@ -396,25 +396,25 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testGpuCommitStagesPendingCommittedSnapshotForNextStrokeBase() {
-        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let baseComposite = Data(repeating: 0x11, count: 64)
         let committedLayerPixels = Data(repeating: 0x44, count: 64)
-        let baseSnapshot = MetalDocumentSnapshot(
+        let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 4,
             height: 4,
             revision: 12,
             transferKind: .dirtyRect,
-            compositeBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+            compositeBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
             compositePixelData: baseComposite,
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
                     isClipped: false,
                     blendMode: .normal,
                     thumbnailData: nil,
-                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
                     pixelData: Data(repeating: 0x22, count: 64)
                 )
             ]
@@ -447,7 +447,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         var state = DocumentFeature.State()
         state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
         state.canvas.applyIncrementalRenderUpdate(
-            IncrementalLayerUpdate(
+            IncrementalLayerUpdate.unsafeUnchecked(
                 layerIndex: -1,
                 originX: 1,
                 originY: 1,
@@ -492,23 +492,23 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testGpuCommitStagesPendingCommittedSnapshotWithAccumulatedPreviewUpdates() {
-        let previewHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
-        let commitHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let previewHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
+        let commitHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let committedLayerPixels = Data(repeating: 0x55, count: 64)
-        let baseSnapshot = MetalDocumentSnapshot(
+        let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 4,
             height: 4,
             revision: 12,
             compositePixelData: Data(repeating: 0x11, count: 64),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
                     isClipped: false,
                     blendMode: .normal,
                     thumbnailData: nil,
-                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
                     pixelData: Data(repeating: 0x22, count: 64)
                 )
             ]
@@ -554,7 +554,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     handle: GpuSurfaceHandle(buffer: previewHandle)
                 ),
                 dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: 1, height: 1),
-                incrementalUpdate: IncrementalLayerUpdate(
+                incrementalUpdate: IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: -1,
                     originX: 0,
                     originY: 0,
@@ -580,7 +580,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     handle: GpuSurfaceHandle(buffer: previewHandle)
                 ),
                 dirtyRegion: GpuSurfaceRegion(originX: 3, originY: 3, width: 1, height: 1),
-                incrementalUpdate: IncrementalLayerUpdate(
+                incrementalUpdate: IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: -1,
                     originX: 3,
                     originY: 3,
@@ -632,20 +632,20 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             layerCommands: DocumentLayerCommandService(mutationGateway: .stub()),
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
-        let pendingSnapshot = MetalDocumentSnapshot(
+        let pendingSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 4,
             height: 4,
             revision: 21,
             compositePixelData: Data(repeating: 0x33, count: 64),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,
                     isClipped: false,
                     blendMode: .normal,
                     thumbnailData: nil,
-                    gpuBufferHandle: MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16),
+                    gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16),
                     pixelData: Data(repeating: 0x44, count: 64)
                 )
             ]
@@ -666,8 +666,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testPreviewReplacementReleasesPreviousSurfaceHandle() {
-        let oldHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
-        let newHandle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let oldHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
+        let newHandle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
         var gpuOperations = DocumentGpuOperationGateway.stub()
         gpuOperations.releaseSurfaceHandle = { handle in
@@ -681,7 +681,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             )
             var state = DocumentFeature.State()
             let previewBrush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
-            let snapshot = MetalDocumentSnapshot(
+            let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
                 width: 4,
                 height: 4,
                 revision: 12,
@@ -728,7 +728,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testResetStrokePreviewReleasesCurrentSurfaceHandle() {
-        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
         var gpuOperations = DocumentGpuOperationGateway.stub()
         gpuOperations.releaseSurfaceHandle = { handle in
@@ -756,7 +756,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
     }
 
     func testCompletedCommitDoesNotReleaseTransferredPreviewSurfaceHandle() {
-        let handle = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
         let releasedHandles = TestRecorder<MetalBufferHandle?>()
         var gpuOperations = DocumentGpuOperationGateway.stub()
         gpuOperations.releaseSurfaceHandle = { handle in
@@ -926,7 +926,7 @@ private struct DerivedGpuDependencyProbe {
     @Dependency(\.canvasPresentationEnvironment) var canvasPresentationEnvironment
 
     func outputs() -> [Data?] {
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 1,
             height: 1,
             revision: 0,

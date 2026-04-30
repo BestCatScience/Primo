@@ -1,5 +1,6 @@
 import ComposableArchitecture
 import PrimoAIImageApplication
+import PrimoAIImageDomain
 
 extension AIImageFeature {
     func coreReduce(
@@ -62,32 +63,20 @@ extension AIImageFeature {
             state.accessMode = accessMode
             state.fallBackToUserAPIKeyIfAppManagedUnavailable()
             let updatedSettings = state.settings
-            return .run { [aiImageSettingsClient] _ in
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                try Task.checkCancellation()
-                aiImageSettingsClient.persist(updatedSettings)
-            }
-            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
+            return persistSettingsEffect(updatedSettings)
 
         case let .apiKeyChanged(apiKey):
             state.apiKey = apiKey
             let updatedSettings = state.settings
-            return .run { [aiImageSettingsClient] _ in
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                try Task.checkCancellation()
-                aiImageSettingsClient.persist(updatedSettings)
-            }
-            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
+            return persistSettingsEffect(updatedSettings)
 
         case let .openAIAPIKeyChanged(apiKey):
             state.openAIAPIKey = apiKey
             let updatedSettings = state.settings
-            return .run { [aiImageSettingsClient] _ in
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                try Task.checkCancellation()
-                aiImageSettingsClient.persist(updatedSettings)
-            }
-            .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
+            return persistSettingsEffect(updatedSettings)
+
+        case let .settingsPersistFailed(message):
+            return .send(.delegate(.presentBanner(message)))
 
         case let .sheetPresentationChanged(isPresented):
             state.isSheetPresented = isPresented
@@ -206,5 +195,18 @@ extension AIImageFeature {
         case .delegate:
             return .none
         }
+    }
+
+    private func persistSettingsEffect(_ settings: AIImageSettings) -> Effect<Action> {
+        .run { [aiImageSettingsClient] send in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            try Task.checkCancellation()
+            do {
+                try aiImageSettingsClient.persist(settings)
+            } catch {
+                await send(.settingsPersistFailed("API key を保存できませんでした"))
+            }
+        }
+        .cancellable(id: ApplicationFeature.CancelID.aiImageSettingsPersist, cancelInFlight: true)
     }
 }

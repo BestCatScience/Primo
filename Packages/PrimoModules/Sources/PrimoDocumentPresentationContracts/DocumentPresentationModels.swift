@@ -113,7 +113,7 @@ public struct MetalBufferHandle: Equatable, Hashable, Sendable {
     public let height: Int
     public let bytesPerRow: Int
 
-    public init(
+    init(
         id: UUID = UUID(),
         width: Int,
         height: Int,
@@ -123,6 +123,10 @@ public struct MetalBufferHandle: Equatable, Hashable, Sendable {
         self.width = width
         self.height = height
         self.bytesPerRow = bytesPerRow
+    }
+
+    public static func unsafeUnchecked(id: UUID = UUID(), width: Int, height: Int, bytesPerRow: Int) -> Self {
+        Self(id: id, width: width, height: height, bytesPerRow: bytesPerRow)
     }
 
     public init?(validatingWidth width: Int, height: Int, bytesPerRow: Int, id: UUID = UUID()) {
@@ -154,7 +158,7 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
     public let gpuBufferHandle: MetalBufferHandle?
     public let pixelData: Data
 
-    public init(
+    init(
         index: Int,
         opacity: Float,
         visible: Bool,
@@ -174,6 +178,30 @@ public struct MetalLayerSnapshot: Identifiable, Equatable, Sendable {
         self.thumbnailData = thumbnailData
         self.gpuBufferHandle = gpuBufferHandle
         self.pixelData = pixelData
+    }
+
+    public static func unsafeUnchecked(
+        index: Int,
+        opacity: Float,
+        visible: Bool,
+        isClipped: Bool,
+        blendMode: LayerBlendMode,
+        thumbnailSurface: DocumentCompositeSurface? = nil,
+        thumbnailData: Data?,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) -> Self {
+        Self(
+            index: index,
+            opacity: opacity,
+            visible: visible,
+            isClipped: isClipped,
+            blendMode: blendMode,
+            thumbnailSurface: thumbnailSurface,
+            thumbnailData: thumbnailData,
+            gpuBufferHandle: gpuBufferHandle,
+            pixelData: pixelData
+        )
     }
 
     public init?(
@@ -221,7 +249,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
     public let compositePixelData: Data
     public let layers: [MetalLayerSnapshot]
 
-    public init(
+    init(
         width: Int,
         height: Int,
         revision: Int,
@@ -239,6 +267,26 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         self.layers = layers
     }
 
+    public static func unsafeUnchecked(
+        width: Int,
+        height: Int,
+        revision: Int,
+        transferKind: MetalSnapshotTransferKind = .fullSnapshot,
+        compositeBufferHandle: MetalBufferHandle? = nil,
+        compositePixelData: Data,
+        layers: [MetalLayerSnapshot]
+    ) -> Self {
+        Self(
+            width: width,
+            height: height,
+            revision: revision,
+            transferKind: transferKind,
+            compositeBufferHandle: compositeBufferHandle,
+            compositePixelData: compositePixelData,
+            layers: layers
+        )
+    }
+
     public init?(
         validatingWidth width: Int,
         height: Int,
@@ -254,7 +302,7 @@ public struct MetalDocumentSnapshot: Equatable, Sendable {
         } else {
             guard compositePixelData.count == geometry.rgbaByteCount else { return nil }
         }
-        guard layers.count <= CanvasSizePolicy.maxLayerCount else { return nil }
+        guard layers.count <= CanvasSizePolicy.maxLayerCountForCanvas(geometry) else { return nil }
         self.width = width
         self.height = height
         self.revision = revision
@@ -279,7 +327,7 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
     public let gpuBufferHandle: MetalBufferHandle?
     public let pixelData: Data
 
-    public init(
+    init(
         id: UUID = UUID(),
         layerIndex: Int,
         originX: Int,
@@ -299,6 +347,30 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
         self.transferKind = transferKind
         self.gpuBufferHandle = gpuBufferHandle
         self.pixelData = pixelData
+    }
+
+    public static func unsafeUnchecked(
+        id: UUID = UUID(),
+        layerIndex: Int,
+        originX: Int,
+        originY: Int,
+        width: Int,
+        height: Int,
+        transferKind: MetalSnapshotTransferKind = .dirtyRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        pixelData: Data
+    ) -> Self {
+        Self(
+            id: id,
+            layerIndex: layerIndex,
+            originX: originX,
+            originY: originY,
+            width: width,
+            height: height,
+            transferKind: transferKind,
+            gpuBufferHandle: gpuBufferHandle,
+            pixelData: pixelData
+        )
     }
 
     public var isEmpty: Bool { width <= 0 || height <= 0 || (pixelData.isEmpty && gpuBufferHandle == nil) }
@@ -420,7 +492,7 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
     public let rectPixelData: Data
     public let fullPixelData: Data?
 
-    public init(
+    init(
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,
@@ -434,6 +506,24 @@ public struct DocumentLayerMutationPayload: Equatable, Sendable {
         self.gpuBufferHandle = gpuBufferHandle
         self.rectPixelData = rectPixelData
         self.fullPixelData = fullPixelData
+    }
+
+    public static func unsafeUnchecked(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferHandle: MetalBufferHandle? = nil,
+        rectPixelData: Data = Data(),
+        fullPixelData: Data? = nil
+    ) -> Self {
+        Self(
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            dirtyRect: dirtyRect,
+            gpuBufferHandle: gpuBufferHandle,
+            rectPixelData: rectPixelData,
+            fullPixelData: fullPixelData
+        )
     }
 
     public init?(
@@ -475,7 +565,7 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
     public let gpuBufferHandle: MetalBufferHandle
     public let fallbackPixelData: Data?
 
-    public init(
+    init(
         canvasWidth: Int,
         canvasHeight: Int,
         dirtyRect: LayerPixelRect,
@@ -487,6 +577,22 @@ public struct GpuLayerMutationPayload: Equatable, Sendable {
         self.dirtyRect = dirtyRect
         self.gpuBufferHandle = gpuBufferHandle
         self.fallbackPixelData = fallbackPixelData
+    }
+
+    public static func unsafeUnchecked(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        dirtyRect: LayerPixelRect,
+        gpuBufferHandle: MetalBufferHandle,
+        fallbackPixelData: Data? = nil
+    ) -> Self {
+        Self(
+            canvasWidth: canvasWidth,
+            canvasHeight: canvasHeight,
+            dirtyRect: dirtyRect,
+            gpuBufferHandle: gpuBufferHandle,
+            fallbackPixelData: fallbackPixelData
+        )
     }
 
     public init?(

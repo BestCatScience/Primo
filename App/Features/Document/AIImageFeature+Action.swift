@@ -17,6 +17,7 @@ extension AIImageFeature {
         case accessModeChanged(AIImageAccessMode)
         case apiKeyChanged(String)
         case openAIAPIKeyChanged(String)
+        case settingsPersistFailed(String)
         case sheetPresentationChanged(Bool)
         case paywallPresentationChanged(Bool)
         case workspaceBottomPanelSectionChanged(WorkspaceBottomPanelSection)
@@ -40,5 +41,6 @@ extension AIImageFeature {
     enum Delegate: Equatable {
         case requestEdit(SubmitAIImageEditCommand)
         case cancelEdit
+        case presentBanner(String)
     }
 }

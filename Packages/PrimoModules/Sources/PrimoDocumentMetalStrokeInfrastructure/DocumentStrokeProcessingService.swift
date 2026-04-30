@@ -182,7 +182,7 @@ public struct DocumentStrokeProcessingService: Sendable {
 
         let layers = baseSnapshot.layers.map { layer in
             guard layer.index == activeLayerIndex else { return layer }
-            return MetalLayerSnapshot(
+            return MetalLayerSnapshot.unsafeUnchecked(
                 index: layer.index,
                 opacity: layer.opacity,
                 visible: layer.visible,
@@ -194,7 +194,7 @@ public struct DocumentStrokeProcessingService: Sendable {
             )
         }
 
-        return MetalDocumentSnapshot(
+        return MetalDocumentSnapshot.unsafeUnchecked(
             width: baseSnapshot.width,
             height: baseSnapshot.height,
             revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
@@ -374,7 +374,7 @@ public struct DocumentStrokeProcessingService: Sendable {
         ) else {
             return nil
         }
-        return IncrementalLayerUpdate(
+        return IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: 0,
             originY: 0,

@@ -4,7 +4,7 @@ import PrimoAIImageInfrastructure
 import Testing
 
 struct AIImageSettingsClientTests {
-    private enum TestSecretFailure: Error {
+    private enum TestSecretFailure: Error, Equatable {
         case writeFailed
     }
 
@@ -46,7 +46,7 @@ struct AIImageSettingsClientTests {
     }
 
     @Test
-    func persistWritesAccessModeToDefaultsAndSecretsToSecretStore() {
+    func persistWritesAccessModeToDefaultsAndSecretsToSecretStore() throws {
         let defaults = TestStorage([:])
         let secrets = TestStorage([:])
         let client = AIImageSettingsClient.live(
@@ -60,7 +60,7 @@ struct AIImageSettingsClientTests {
             )
         )
 
-        client.persist(
+        try client.persist(
             AIImageSettings(
                 accessMode: .appManaged,
                 apiKey: "persisted-gemini-key",
@@ -112,7 +112,7 @@ struct AIImageSettingsClientTests {
     }
 
     @Test
-    func persistEmptyAPIKeysRemovesSecrets() {
+    func persistEmptyAPIKeysRemovesSecrets() throws {
         let defaults = TestStorage([:])
         let secrets = TestStorage([
             AIImageSettingsClient.apiKeyStorageKey: "old-gemini-key",
@@ -135,14 +135,14 @@ struct AIImageSettingsClientTests {
             )
         )
 
-        client.persist(AIImageSettings(accessMode: .appManaged))
+        try client.persist(AIImageSettings(accessMode: .appManaged))
 
         #expect(secrets.values[AIImageSettingsClient.apiKeyStorageKey] == nil)
         #expect(secrets.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == nil)
     }
 
     @Test
-    func persistKeepsLegacyDefaultsWhenSecretWriteFails() {
+    func persistThrowsAndKeepsLegacyDefaultsWhenSecretWriteFails() {
         let defaults = TestStorage([
             AIImageSettingsClient.apiKeyStorageKey: "legacy-gemini-key",
             AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
@@ -159,17 +159,58 @@ struct AIImageSettingsClientTests {
             )
         )
 
-        client.persist(
-            AIImageSettings(
-                accessMode: .appManaged,
-                apiKey: "persisted-gemini-key",
-                openAIAPIKey: "persisted-openai-key"
+        #expect(throws: TestSecretFailure.writeFailed) {
+            try client.persist(
+                AIImageSettings(
+                    accessMode: .appManaged,
+                    apiKey: "persisted-gemini-key",
+                    openAIAPIKey: "persisted-openai-key"
+                )
             )
-        )
+        }
 
         #expect(defaults.values[AIImageSettingsClient.apiKeyStorageKey] == "legacy-gemini-key")
         #expect(defaults.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "legacy-openai-key")
         #expect(secrets.values.isEmpty)
+    }
+
+    @Test
+    func persistKeepsLegacyDefaultsWhenSecondSecretWriteFails() {
+        let defaults = TestStorage([
+            AIImageSettingsClient.apiKeyStorageKey: "legacy-gemini-key",
+            AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
+        ])
+        let secrets = TestStorage([:])
+        let client = AIImageSettingsClient.live(
+            keyValueStoreClient: KeyValueStoreClient(
+                stringForKey: { defaults.values[$0] },
+                setString: { value, key in defaults.values[key] = value }
+            ),
+            secretStoreClient: SecretStoreClient(
+                readSecret: { secrets.values[$0] },
+                writeSecret: { value, key in
+                    if key == AIImageSettingsClient.openAIAPIKeyStorageKey {
+                        throw TestSecretFailure.writeFailed
+                    }
+                    secrets.values[key] = value
+                }
+            )
+        )
+
+        #expect(throws: TestSecretFailure.writeFailed) {
+            try client.persist(
+                AIImageSettings(
+                    accessMode: .appManaged,
+                    apiKey: "persisted-gemini-key",
+                    openAIAPIKey: "persisted-openai-key"
+                )
+            )
+        }
+
+        #expect(defaults.values[AIImageSettingsClient.apiKeyStorageKey] == "legacy-gemini-key")
+        #expect(defaults.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == "legacy-openai-key")
+        #expect(secrets.values[AIImageSettingsClient.apiKeyStorageKey] == "persisted-gemini-key")
+        #expect(secrets.values[AIImageSettingsClient.openAIAPIKeyStorageKey] == nil)
     }
 
     @Test

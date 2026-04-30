@@ -15,7 +15,7 @@ struct CanvasRenderSessionTests {
                 released.append(handle.buffer)
             }
         )
-        let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let first = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         session.adoptTransferredResources(for: update(handle: first))
         #expect(released.values.isEmpty)
@@ -32,7 +32,7 @@ struct CanvasRenderSessionTests {
                 released.append(handle.buffer)
             }
         )
-        let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let first = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         session.adoptTransferredResources(for: update(handle: first))
         session.adoptTransferredResources(for: update(handle: first))
@@ -51,8 +51,8 @@ struct CanvasRenderSessionTests {
                 released.append(handle.buffer)
             }
         )
-        let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
-        let second = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let first = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
+        let second = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         session.adoptTransferredResources(for: update(handle: first))
         session.adoptTransferredResources(for: update(handle: second))
@@ -65,7 +65,7 @@ struct CanvasRenderSessionTests {
     @Test
     func releasesCurrentIncrementalHandleOnceOnDeinit() {
         let released = ReleasedHandles()
-        let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
+        let first = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
         do {
             let session = CanvasRenderSession(
@@ -109,7 +109,7 @@ struct CanvasRenderSessionTests {
             snapshot: nil,
             activeLayerIndex: 0,
             incrementalUpdate: handle.map {
-                IncrementalLayerUpdate(
+                IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: 0,
                     originX: 0,
                     originY: 0,

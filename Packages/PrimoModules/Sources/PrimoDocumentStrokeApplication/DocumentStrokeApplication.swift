@@ -153,15 +153,18 @@ public struct DocumentStrokeCommitWorkflowService: Sendable {
 
         switch outcome {
         case let .commit(mutation):
+            guard let payload = GpuLayerMutationPayload(
+                validatingCanvasWidth: mutation.surface.width,
+                canvasHeight: mutation.surface.height,
+                dirtyRect: mutation.dirtyRegion.layerPixelRect,
+                gpuBufferHandle: mutation.surface.handle.buffer,
+                fallbackPixelData: mutation.surface.pixelData
+            ) else {
+                return .failure(.bridgeMutationFailed("GPU stroke commit invalid payload"))
+            }
             let result = layerCommands.applyLayerSurfaceMutation(
                 mutation.surface.layerIndex,
-                GpuLayerMutationPayload(
-                    canvasWidth: mutation.surface.width,
-                    canvasHeight: mutation.surface.height,
-                    dirtyRect: mutation.dirtyRegion.layerPixelRect,
-                    gpuBufferHandle: mutation.surface.handle.buffer,
-                    fallbackPixelData: mutation.surface.pixelData
-                )
+                payload
             )
             switch result {
             case .success:

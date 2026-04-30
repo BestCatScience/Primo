@@ -181,7 +181,7 @@ struct SwiftDocumentRuntimeUndoTests {
         _ = try runtime.setLayerAlphaLocked(index: 0, isAlphaLocked: true).get()
         _ = try runtime.applyLayerSurfaceMutation(
             index: 0,
-            payload: GpuLayerMutationPayload(
+            payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
                 dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
@@ -210,7 +210,7 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.applyLayerSurfaceMutation(
             index: 0,
-            payload: GpuLayerMutationPayload(
+            payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
                 dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
@@ -251,7 +251,7 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.applyLayerSurfaceMutation(
             index: 0,
-            payload: GpuLayerMutationPayload(
+            payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
                 dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
@@ -296,7 +296,7 @@ struct SwiftDocumentRuntimeUndoTests {
         _ = try runtime.addLayer(name: "CPU").get()
         _ = try runtime.applyLayerSurfaceMutation(
             index: 0,
-            payload: GpuLayerMutationPayload(
+            payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
                 dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
@@ -325,7 +325,7 @@ struct SwiftDocumentRuntimeUndoTests {
 
         _ = try runtime.applyLayerSurfaceMutation(
             index: 0,
-            payload: GpuLayerMutationPayload(
+            payload: GpuLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: 2,
                 canvasHeight: 2,
                 dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
@@ -401,7 +401,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
 
     func makeHandle(width: Int, height: Int, pixelData: Data) -> MetalBufferHandle {
         lock.withLock {
-            let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: width * 4)
+            let handle = MetalBufferHandle.unsafeUnchecked(width: width, height: height, bytesPerRow: width * 4)
             pixelDataByHandle[handle] = pixelData
             referenceCountByHandle[handle] = 1
             return handle
@@ -485,7 +485,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             _translatedMaskData: { data, _, _, _, _, _, _ in data },
             _applyLayerMask: { pixelData, _, _, _ in pixelData },
             _processLayer: { pixelData, width, height, _ in
-                DocumentLayerMutationPayload(
+                DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
                     dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
@@ -499,7 +499,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 let width = Int(size.width)
                 let height = Int(size.height)
                 let pixelData = Data(count: width * height * 4)
-                return DocumentLayerMutationPayload(
+                return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
                     dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
@@ -512,7 +512,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 self.lock.withLock {
                     self.blurSourceBufferHandles.append(sourceBufferHandle)
                 }
-                return DocumentLayerMutationPayload(
+                return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
                     dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
@@ -525,7 +525,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
                 self.lock.withLock {
                     self.fillSourceBufferHandles.append(sourceBufferHandle)
                 }
-                return DocumentLayerMutationPayload(
+                return DocumentLayerMutationPayload.unsafeUnchecked(
                     canvasWidth: width,
                     canvasHeight: height,
                     dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: width, height: height),
@@ -543,7 +543,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
             _preservingExistingAlphaBufferHandle: { sourceHandle, _, _, _, _ in sourceHandle },
             _compositedPaperPreviewRGBA: { pixelData, _, _, _ in pixelData },
             _compositedIncrementalUpdate: { _, dirtyRect in
-                IncrementalLayerUpdate(
+                IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: -1,
                     originX: dirtyRect.originX,
                     originY: dirtyRect.originY,
@@ -567,7 +567,7 @@ private final class RuntimeGpuServiceSpy: @unchecked Sendable {
         lock.withLock {
             guard !strokeOutputs.isEmpty else { return nil }
             let pixelData = strokeOutputs.removeFirst()
-            let handle = MetalBufferHandle(width: width, height: height, bytesPerRow: width * 4)
+            let handle = MetalBufferHandle.unsafeUnchecked(width: width, height: height, bytesPerRow: width * 4)
             pixelDataByHandle[handle] = pixelData
             referenceCountByHandle[handle] = 1
             return PrimoMetalStrokeMutationResult(

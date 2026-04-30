@@ -64,7 +64,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let context = makeContext(layerIndex: 0)
         let previous = stylusSample(x: 2, y: 2)
         let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
@@ -100,7 +100,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         var previousBrush = brushSettings()
         previousBrush.radius = 3
         let context = makeContext(layerIndex: 0)
@@ -137,7 +137,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let context = makeContext(layerIndex: 0, isAlphaLocked: true)
         let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
         let fullSamples = [stylusSample(x: 0, y: 0), stylusSample(x: 2, y: 2)] + appended
@@ -172,7 +172,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let renderState = StrokeSessionRenderState(
             baseRevision: 14,
             layerIndex: 0,
@@ -208,7 +208,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let context = makeContext(layerIndex: 0, brush: smudgeBrushSettings())
         let previous = stylusSample(x: 2, y: 2)
         let appended = [stylusSample(x: 3, y: 3), stylusSample(x: 4, y: 4)]
@@ -247,7 +247,7 @@ struct DocumentStrokeApplicationTests {
         let planner = RecordingPreviewPlanner()
         let useCase = DocumentStrokePreviewUseCase(planner: planner)
         let baseSnapshot = makeSnapshot(layerIndex: 0, revision: 14)
-        let previousHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previousHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let renderState = StrokeSessionRenderState(
             baseRevision: 14,
             layerIndex: 0,
@@ -282,7 +282,7 @@ struct DocumentStrokeApplicationTests {
         var renderState = StrokeSessionRenderState(
             baseRevision: 21,
             layerIndex: 0,
-            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
@@ -336,7 +336,7 @@ struct DocumentStrokeApplicationTests {
         var renderState = StrokeSessionRenderState(
             baseRevision: 21,
             layerIndex: 0,
-            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
@@ -391,7 +391,7 @@ struct DocumentStrokeApplicationTests {
         var renderState = StrokeSessionRenderState(
             baseRevision: 21,
             layerIndex: 0,
-            surfaceHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+            surfaceHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
             dirtyRect: LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2),
             isApproximatePreview: false,
             previewBrush: context.previewBrush,
@@ -481,7 +481,7 @@ struct DocumentStrokeApplicationTests {
     @Test
     func strokeSessionTrimsDuplicateSamplesAndTracksPreviewSurface() throws {
         let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
-        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         var session = StrokeSessionState()
 
         session.applyPreview(
@@ -513,7 +513,7 @@ struct DocumentStrokeApplicationTests {
     @Test
     func strokeSessionUnionsPreviewDirtyRectsAcrossIncrementalUpdates() throws {
         let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
-        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let brush = brushSettings()
         let surface = GpuLayerSurface(
             layerIndex: 1,
@@ -550,7 +550,7 @@ struct DocumentStrokeApplicationTests {
     @Test
     func strokeSessionAppliesPreviewWithoutIncrementalUpdate() throws {
         let snapshot = makeSnapshot(layerIndex: 1, revision: 11)
-        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         var session = StrokeSessionState()
 
         session.applyPreview(
@@ -996,7 +996,7 @@ struct DocumentStrokeApplicationTests {
         let changedContext = makeContext(layerIndex: 0, brush: currentBrush)
         let finalSamples = [stylusSample(x: 1, y: 1), stylusSample(x: 8, y: 8)]
 
-        let previewHandle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let previewHandle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let commit = try #require(useCase.execute(
             .finish(
                 renderState: StrokeSessionRenderState(
@@ -1053,7 +1053,7 @@ struct DocumentStrokeApplicationTests {
     func commitWorkflowReusesMatchingPreviewAndStagesPendingSnapshot() throws {
         let renderer = RecordingCommitRenderer()
         let snapshot = makeSnapshot(layerIndex: 0)
-        let handle = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let handle = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
         let appliedPayloads = LockedValues<GpuLayerMutationPayload>()
         let service = DocumentStrokeCommitWorkflowService(
             layerCommands: layerCommands(
@@ -1205,20 +1205,20 @@ struct DocumentStrokeApplicationTests {
     }
 
     private func makeSnapshot(layerIndex: Int, revision: Int = 7) -> MetalDocumentSnapshot {
-        MetalDocumentSnapshot(
+        MetalDocumentSnapshot.unsafeUnchecked(
             width: 2,
             height: 2,
             revision: revision,
             compositePixelData: Data(repeating: 1, count: 16),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: layerIndex,
                     opacity: 1,
                     visible: true,
                     isClipped: false,
                     blendMode: .normal,
                     thumbnailData: nil,
-                    gpuBufferHandle: MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8),
+                    gpuBufferHandle: MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8),
                     pixelData: Data(repeating: 2, count: 16)
                 )
             ]
@@ -1257,7 +1257,7 @@ struct DocumentStrokeApplicationTests {
     }
 
     private func incrementalUpdate(originX: Int, originY: Int, width: Int, height: Int) -> IncrementalLayerUpdate {
-        IncrementalLayerUpdate(
+        IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: originX,
             originY: originY,
@@ -1376,7 +1376,7 @@ private final class RecordingPreviewPlanner: StrokePreviewPlanning, @unchecked S
                 layerIndex: request.activeLayerIndex,
                 width: request.snapshot.width,
                 height: request.snapshot.height,
-                handle: GpuSurfaceHandle(buffer: MetalBufferHandle(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
             ),
             dirtyRegion: GpuSurfaceRegion(originX: 1, originY: 1, width: 2, height: 2),
             incrementalUpdate: nil,
@@ -1422,7 +1422,7 @@ private final class RecordingCommitRenderer: StrokeCommitRendering, @unchecked S
                 layerIndex: request.activeLayerIndex,
                 width: request.snapshot.width,
                 height: request.snapshot.height,
-                handle: GpuSurfaceHandle(buffer: MetalBufferHandle(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
+                handle: GpuSurfaceHandle(buffer: MetalBufferHandle.unsafeUnchecked(width: request.snapshot.width, height: request.snapshot.height, bytesPerRow: request.snapshot.width * 4))
             ),
             dirtyRegion: GpuSurfaceRegion(originX: 0, originY: 0, width: request.snapshot.width, height: request.snapshot.height)
         )

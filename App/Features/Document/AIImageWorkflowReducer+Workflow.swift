@@ -231,13 +231,20 @@ extension AIImageWorkflowReducer {
                 ) ?? .aiImageApplyFailed
             )
         }
+        let correctedPreview = AIImagePreviewState(
+            descriptor: preview.descriptor,
+            outputLayerIndex: appliedPreview.targetLayerIndex,
+            outputSurface: preview.outputSurface,
+            beforePreviewImageData: preview.beforePreviewImageData,
+            afterPreviewImageData: preview.afterPreviewImageData
+        )
 
         return .merge(
             .send(
                 .delegate(
                     .aiImageEditApplied(
                         AIImageAppliedEdit(
-                            preview: preview,
+                            preview: correctedPreview,
                             historyID: uuidClient.generate(),
                             createdAt: dateClient.now()
                         )

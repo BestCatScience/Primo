@@ -59,7 +59,7 @@ struct SelectionWorkflowServiceTests {
     @Test
     func autoSelectionUsesActiveLayerPixels() throws {
         let service = SelectionWorkflowService(gpuOperations: .selectionStub())
-        let layer = MetalLayerSnapshot(
+        let layer = MetalLayerSnapshot.unsafeUnchecked(
             index: 2,
             opacity: 1,
             visible: true,
@@ -68,7 +68,7 @@ struct SelectionWorkflowServiceTests {
             thumbnailData: nil,
             pixelData: Data([255, 0, 0, 255])
         )
-        let snapshot = MetalDocumentSnapshot(
+        let snapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 1,
             height: 1,
             revision: 1,

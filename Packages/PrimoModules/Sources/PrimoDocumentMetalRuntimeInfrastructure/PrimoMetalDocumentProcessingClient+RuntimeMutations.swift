@@ -577,7 +577,7 @@ extension PrimoMetalDocumentProcessingClient {
 
             let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
             let dirtyRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
-            return DocumentLayerMutationPayload(
+            return DocumentLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 dirtyRect: dirtyRect,
@@ -642,7 +642,7 @@ extension PrimoMetalDocumentProcessingClient {
         let rectPixelData = dirtyRect.width == width && dirtyRect.height == height
             ? fullPixelData
             : crop(pixelData: fullPixelData, canvasWidth: width, rect: dirtyRect)
-        return DocumentLayerMutationPayload(
+        return DocumentLayerMutationPayload.unsafeUnchecked(
             canvasWidth: width,
             canvasHeight: height,
             dirtyRect: dirtyRect,
@@ -743,7 +743,7 @@ extension PrimoMetalDocumentProcessingClient {
         let rectPixelData = dirtyRect.width == canvasWidth && dirtyRect.height == canvasHeight
             ? fullPixelData
             : crop(pixelData: fullPixelData, canvasWidth: canvasWidth, rect: dirtyRect)
-        return DocumentLayerMutationPayload(
+        return DocumentLayerMutationPayload.unsafeUnchecked(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: dirtyRect,
@@ -777,7 +777,7 @@ extension PrimoMetalDocumentProcessingClient {
         let y = Int(sample.point.y.rounded())
         let fullRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
         guard x >= 0, x < canvasWidth, y >= 0, y < canvasHeight else {
-            return DocumentLayerMutationPayload(
+            return DocumentLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 dirtyRect: fullRect,
@@ -809,7 +809,7 @@ extension PrimoMetalDocumentProcessingClient {
            seedBytes.green == brush.green,
            seedBytes.blue == brush.blue,
            abs(seedAlpha - targetAlpha) < 0.0001 {
-            return DocumentLayerMutationPayload(
+            return DocumentLayerMutationPayload.unsafeUnchecked(
                 canvasWidth: canvasWidth,
                 canvasHeight: canvasHeight,
                 dirtyRect: fullRect,
@@ -930,7 +930,7 @@ extension PrimoMetalDocumentProcessingClient {
         commandBuffer.waitUntilCompleted()
         guard commandBuffer.status == .completed else { return nil }
 
-        return DocumentLayerMutationPayload(
+        return DocumentLayerMutationPayload.unsafeUnchecked(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: fullRect,
@@ -1303,7 +1303,7 @@ extension PrimoMetalDocumentProcessingClient {
 
         let fullPixelData = bytes(from: outputBuffer, count: pixelData.count)
         let dirtyRect = LayerPixelRect(originX: 0, originY: 0, width: canvasWidth, height: canvasHeight)
-        return DocumentLayerMutationPayload(
+        return DocumentLayerMutationPayload.unsafeUnchecked(
             canvasWidth: canvasWidth,
             canvasHeight: canvasHeight,
             dirtyRect: dirtyRect,

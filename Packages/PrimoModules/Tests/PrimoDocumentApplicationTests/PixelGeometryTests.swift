@@ -24,6 +24,17 @@ struct PixelGeometryTests {
         #expect(geometry.maskByteCount == 144)
         #expect(geometry.fitsMetalUInt32)
     }
+
+    @Test
+    func layerBudgetScalesDownForLargeCanvases() throws {
+        let small = try #require(PixelGeometry(width: 64, height: 64))
+        #expect(CanvasSizePolicy.maxLayerCountForCanvas(small) == CanvasSizePolicy.maxLayerCount)
+
+        let huge = try #require(PixelGeometry(width: 8192, height: 8192))
+        #expect(CanvasSizePolicy.maxLayerCountForCanvas(huge) < CanvasSizePolicy.maxLayerCount)
+        #expect(CanvasSizePolicy.layerPixelBytesFitDocumentBudget(canvasRGBAByteCount: huge.rgbaByteCount, layerCount: CanvasSizePolicy.maxLayerCountForCanvas(huge)))
+        #expect(!CanvasSizePolicy.layerPixelBytesFitDocumentBudget(canvasRGBAByteCount: huge.rgbaByteCount, layerCount: CanvasSizePolicy.maxLayerCountForCanvas(huge) + 1))
+    }
 }
 
 @Suite

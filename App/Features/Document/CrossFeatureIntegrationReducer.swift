@@ -182,6 +182,9 @@ struct CrossFeatureIntegrationReducer: Reducer {
         case .aiImage(.delegate(.cancelEdit)):
             return .send(.document(.aiImageWorkflow(.aiImageCancelRequested)))
 
+        case let .aiImage(.delegate(.presentBanner(message))):
+            return .send(.application(.bannerPresented(message)))
+
         case let .document(.delegate(.paperStyleSyncRequested(paperStyle))):
             return .send(.document(.presentation(.paperStyleSyncRequested(paperStyle))))
 

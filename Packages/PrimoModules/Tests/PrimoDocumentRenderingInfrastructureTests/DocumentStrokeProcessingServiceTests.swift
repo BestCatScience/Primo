@@ -27,13 +27,13 @@ struct DocumentStrokeProcessingServiceTests {
 
     @Test
     func stageCommittedSnapshotUsesProvidedCompositePixels() {
-        let baseSnapshot = MetalDocumentSnapshot(
+        let baseSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 2,
             height: 2,
             revision: 3,
             compositePixelData: Data(repeating: 0x00, count: 16),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1.0,
                     visible: true,

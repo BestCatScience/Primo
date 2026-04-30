@@ -713,13 +713,13 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
     }
 
     func testUndoClearsPendingStrokePresentationStateAndRunsWhileStrokeStateIsStale() async {
-        let pendingSnapshot = MetalDocumentSnapshot(
+        let pendingSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
             width: 2,
             height: 2,
             revision: 4,
             compositePixelData: Data(count: 16),
             layers: [
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: 0,
                     opacity: 1,
                     visible: true,

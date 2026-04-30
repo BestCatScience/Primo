@@ -5,7 +5,7 @@ import StoreKit
 
 public struct AIImageSettingsClient: Sendable {
     public var load: @Sendable () -> AIImageSettings
-    public var persist: @Sendable (AIImageSettings) -> Void
+    public var persist: @Sendable (AIImageSettings) throws -> Void
 
     public static let accessModeStorageKey = "primo.aiimage.accessMode"
     public static let apiKeyStorageKey = "primo.aiimage.apiKey"
@@ -13,7 +13,7 @@ public struct AIImageSettingsClient: Sendable {
 
     public init(
         load: @escaping @Sendable () -> AIImageSettings,
-        persist: @escaping @Sendable (AIImageSettings) -> Void
+        persist: @escaping @Sendable (AIImageSettings) throws -> Void
     ) {
         self.load = load
         self.persist = persist
@@ -45,12 +45,10 @@ public struct AIImageSettingsClient: Sendable {
             },
             persist: { settings in
                 keyValueStoreClient.setString(settings.accessMode.rawValue, Self.accessModeStorageKey)
-                if Self.writeSecret(secretOrNil(settings.apiKey), key: Self.apiKeyStorageKey, secretStoreClient: secretStoreClient) {
-                    keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
-                }
-                if Self.writeSecret(secretOrNil(settings.openAIAPIKey), key: Self.openAIAPIKeyStorageKey, secretStoreClient: secretStoreClient) {
-                    keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
-                }
+                try secretStoreClient.writeSecret(secretOrNil(settings.apiKey), Self.apiKeyStorageKey)
+                try secretStoreClient.writeSecret(secretOrNil(settings.openAIAPIKey), Self.openAIAPIKeyStorageKey)
+                keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
+                keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
             }
         )
     }

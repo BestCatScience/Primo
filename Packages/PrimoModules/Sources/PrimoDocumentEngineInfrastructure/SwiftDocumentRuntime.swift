@@ -1149,19 +1149,38 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
                 actual: payload.fallbackPixelData?.count ?? 0
             )))
         }
+        guard GpuLayerMutationPayload(
+            validatingCanvasWidth: payload.canvasWidth,
+            canvasHeight: payload.canvasHeight,
+            dirtyRect: payload.dirtyRect,
+            gpuBufferHandle: payload.gpuBufferHandle,
+            fallbackPixelData: payload.fallbackPixelData
+        ) != nil else {
+            return .failure(.gpu(.invalidPayloadSize(
+                operation: "applyLayerSurfaceMutation",
+                expected: rgbaByteCount,
+                actual: payload.fallbackPixelData?.count ?? 0
+            )))
+        }
         guard !payload.dirtyRect.isEmpty else {
             return .failure(.gpu(.invalidDirtyRect(operation: "applyLayerSurfaceMutation")))
         }
         guard let failure = validateEditableLayer(index) else {
             let layer = store.snapshot.layers[index]
-            let fallbackPayload = DocumentLayerMutationPayload(
-                canvasWidth: payload.canvasWidth,
+            guard let fallbackPayload = DocumentLayerMutationPayload(
+                validatingCanvasWidth: payload.canvasWidth,
                 canvasHeight: payload.canvasHeight,
                 dirtyRect: payload.dirtyRect,
                 gpuBufferHandle: payload.gpuBufferHandle,
                 rectPixelData: Data(),
                 fullPixelData: payload.fallbackPixelData
-            )
+            ) else {
+                return .failure(.gpu(.invalidPayloadSize(
+                    operation: "applyLayerSurfaceMutation",
+                    expected: rgbaByteCount,
+                    actual: payload.fallbackPixelData?.count ?? 0
+                )))
+            }
             return applyLayerMutationPayload(
                 index: index,
                 payload: fallbackPayload,
@@ -1969,13 +1988,13 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
     private static func materializedMetalSnapshot(
         for snapshot: SwiftDocumentStoreSnapshot
     ) -> MetalDocumentSnapshot {
-        MetalDocumentSnapshot(
+        MetalDocumentSnapshot.unsafeUnchecked(
             width: snapshot.canvasWidth,
             height: snapshot.canvasHeight,
             revision: snapshot.revision,
             compositePixelData: Data(),
             layers: snapshot.layers.enumerated().map { index, layer in
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: index,
                     opacity: Float(layer.opacity),
                     visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),
@@ -2415,6 +2434,20 @@ extension SwiftDocumentRuntime {
                 actual: payload.fullPixelData?.count ?? payload.rectPixelData.count
             )))
         }
+        guard DocumentLayerMutationPayload(
+            validatingCanvasWidth: payload.canvasWidth,
+            canvasHeight: payload.canvasHeight,
+            dirtyRect: payload.dirtyRect,
+            gpuBufferHandle: payload.gpuBufferHandle,
+            rectPixelData: payload.rectPixelData,
+            fullPixelData: payload.fullPixelData
+        ) != nil else {
+            return .failure(.gpu(.invalidPayloadSize(
+                operation: "applyLayerMutation",
+                expected: rgbaByteCount,
+                actual: payload.fullPixelData?.count ?? payload.rectPixelData.count
+            )))
+        }
         let before = undoSnapshot()
         let existing = currentPixelData(for: index)
         let shouldMaterialize = store.snapshot.layers[index].alphaLocked || recordsFinalLayerPixels
@@ -2460,6 +2493,20 @@ extension SwiftDocumentRuntime {
     ) -> DocumentMutationResult {
         guard payload.canvasWidth == store.snapshot.canvasWidth,
               payload.canvasHeight == store.snapshot.canvasHeight else {
+            return .failure(.gpu(.invalidPayloadSize(
+                operation: "applyTextLayerMutation",
+                expected: rgbaByteCount,
+                actual: payload.fullPixelData?.count ?? payload.rectPixelData.count
+            )))
+        }
+        guard DocumentLayerMutationPayload(
+            validatingCanvasWidth: payload.canvasWidth,
+            canvasHeight: payload.canvasHeight,
+            dirtyRect: payload.dirtyRect,
+            gpuBufferHandle: payload.gpuBufferHandle,
+            rectPixelData: payload.rectPixelData,
+            fullPixelData: payload.fullPixelData
+        ) != nil else {
             return .failure(.gpu(.invalidPayloadSize(
                 operation: "applyTextLayerMutation",
                 expected: rgbaByteCount,
@@ -2595,7 +2642,7 @@ extension SwiftDocumentRuntime {
         }
         let composite = compositePixelDataForSnapshot(store.snapshot)
         let pixelData = crop(pixelData: composite, width: store.snapshot.canvasWidth, rect: rect)
-        setPendingDirtyUpdate(IncrementalLayerUpdate(
+        setPendingDirtyUpdate(IncrementalLayerUpdate.unsafeUnchecked(
             layerIndex: -1,
             originX: rect.originX,
             originY: rect.originY,
@@ -2652,14 +2699,14 @@ extension SwiftDocumentRuntime {
         let baseSnapshot = makeMetalSnapshot(for: store.snapshot, includeCompositePixelData: false)
         let compositeHandle = gpuServices.compositeDocumentBufferHandle(snapshot: baseSnapshot)
         let composite = compositeHandle == nil ? compositeSurface() : nil
-        return MetalDocumentSnapshot(
+        return MetalDocumentSnapshot.unsafeUnchecked(
             width: baseSnapshot.width,
             height: baseSnapshot.height,
             revision: baseSnapshot.revision,
             compositeBufferHandle: compositeHandle,
             compositePixelData: composite?.pixelData ?? Data(),
             layers: baseSnapshot.layers.enumerated().map { index, layer in
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
@@ -2678,13 +2725,13 @@ extension SwiftDocumentRuntime {
         for snapshot: SwiftDocumentStoreSnapshot,
         includeCompositePixelData: Bool
     ) -> MetalDocumentSnapshot {
-        MetalDocumentSnapshot(
+        MetalDocumentSnapshot.unsafeUnchecked(
             width: snapshot.canvasWidth,
             height: snapshot.canvasHeight,
             revision: snapshot.revision,
             compositePixelData: includeCompositePixelData ? compositePixelDataForSnapshot(snapshot) : Data(),
             layers: snapshot.layers.enumerated().map { index, layer in
-                MetalLayerSnapshot(
+                MetalLayerSnapshot.unsafeUnchecked(
                     index: index,
                     opacity: Float(layer.opacity),
                     visible: layer.visible && (layer.folderID == nil || (snapshot.folders.first(where: { $0.id == layer.folderID })?.visible ?? true)),

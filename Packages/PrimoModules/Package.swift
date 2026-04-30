@@ -474,6 +474,14 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "PrimoDocumentPersistenceInfrastructureTests",
+            dependencies: [
+                "PrimoCoreTypes",
+                "PrimoDocumentDomain",
+                "PrimoDocumentPersistenceInfrastructure",
+            ]
+        ),
+        .testTarget(
             name: "PrimoDocumentMetalSurfaceInfrastructureTests",
             dependencies: [
                 "PrimoDocumentContracts",

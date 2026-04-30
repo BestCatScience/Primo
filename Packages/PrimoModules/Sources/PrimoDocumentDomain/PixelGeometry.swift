@@ -4,6 +4,7 @@ public enum CanvasSizePolicy: Sendable {
     public static let maxCanvasDimension = 8192
     public static let maxPixelCount = 8192 * 8192
     public static let maxLayerCount = 512
+    public static let maxDocumentLayerPixelBytes = 1024 * 1024 * 1024
     public static let maxFolderCount = 256
     public static let maxLayerNameLength = 256
     public static let maxTimelapseOperationCount = 250_000
@@ -49,6 +50,21 @@ public enum CanvasSizePolicy: Sendable {
 
     public static func safeRectMaskByteCount(width: Int, height: Int) -> Int? {
         safeMaskByteCount(width: width, height: height)
+    }
+
+    public static func maxLayerCountForCanvas(_ geometry: PixelGeometry) -> Int {
+        maxLayerCount(canvasRGBAByteCount: geometry.rgbaByteCount)
+    }
+
+    public static func maxLayerCount(canvasRGBAByteCount: Int) -> Int {
+        guard canvasRGBAByteCount > 0 else { return 0 }
+        return max(1, min(maxLayerCount, maxDocumentLayerPixelBytes / canvasRGBAByteCount))
+    }
+
+    public static func layerPixelBytesFitDocumentBudget(canvasRGBAByteCount: Int, layerCount: Int) -> Bool {
+        guard layerCount >= 0, canvasRGBAByteCount >= 0 else { return false }
+        let bytes = canvasRGBAByteCount.multipliedReportingOverflow(by: layerCount)
+        return !bytes.overflow && bytes.partialValue <= maxDocumentLayerPixelBytes
     }
 }
 

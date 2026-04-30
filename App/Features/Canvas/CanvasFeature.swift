@@ -223,7 +223,7 @@ struct CanvasFeature {
             let compositePixelData = stagedPreviewCompositePixelData(baseSnapshot: baseSnapshot) ?? baseSnapshot.compositePixelData
             let layers = baseSnapshot.layers.map { layer in
                 guard layer.index == surface.layerIndex else { return layer }
-                return MetalLayerSnapshot(
+                return MetalLayerSnapshot.unsafeUnchecked(
                     index: layer.index,
                     opacity: layer.opacity,
                     visible: layer.visible,
@@ -235,7 +235,7 @@ struct CanvasFeature {
                     pixelData: committedLayerPixelData
                 )
             }
-            pendingCommittedSnapshot = MetalDocumentSnapshot(
+            pendingCommittedSnapshot = MetalDocumentSnapshot.unsafeUnchecked(
                 width: baseSnapshot.width,
                 height: baseSnapshot.height,
                 revision: max(baseSnapshot.revision, lastCommittedRenderRevision) + 1,
@@ -326,7 +326,7 @@ struct CanvasFeature {
 
         mutating func applyPreviewRenderSnapshot(_ renderSnapshot: MetalDocumentSnapshot) {
             applyIncrementalRenderUpdate(
-                IncrementalLayerUpdate(
+                IncrementalLayerUpdate.unsafeUnchecked(
                     layerIndex: -1,
                     originX: 0,
                     originY: 0,

@@ -60,7 +60,7 @@ struct MetalSurfaceResourceGatewayTests {
     func staleRetainDoesNotCreatePhantomResource() throws {
         let client = PrimoMetalDocumentProcessingClient()
         let store = MetalResourceStore(client: client)
-        let stale = MetalBufferHandle(width: 2, height: 2, bytesPerRow: 8)
+        let stale = MetalBufferHandle.unsafeUnchecked(width: 2, height: 2, bytesPerRow: 8)
 
         #expect(!store.retain(stale))
         store.release(stale)

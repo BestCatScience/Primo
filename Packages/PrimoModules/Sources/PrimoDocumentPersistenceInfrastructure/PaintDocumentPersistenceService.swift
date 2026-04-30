@@ -6,6 +6,7 @@ public struct PaintDocumentPersistenceService {
     private static let maxPackageByteCount = 2 * 1024 * 1024 * 1024
     private static let maxPackageFileCount = 300_000
     private static let maxSingleFileByteCount = 512 * 1024 * 1024
+    private static let maxTimelapsePayloadTotalByteCount = 1024 * 1024 * 1024
 
     let fileClient: FileClient
 
@@ -56,7 +57,6 @@ public struct PaintDocumentPersistenceService {
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: manifestData)
         guard PixelGeometry(width: document.canvasWidth, height: document.canvasHeight) != nil,
               !document.layers.isEmpty,
-              document.layers.count <= CanvasSizePolicy.maxLayerCount,
               document.folders.count <= CanvasSizePolicy.maxFolderCount,
               document.timelapseOperations.count <= CanvasSizePolicy.maxTimelapseOperationCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid project manifest dimensions or layers")
@@ -68,6 +68,13 @@ public struct PaintDocumentPersistenceService {
 
         guard let geometry = PixelGeometry(width: document.canvasWidth, height: document.canvasHeight) else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid project manifest dimensions")
+        }
+        guard document.layers.count <= CanvasSizePolicy.maxLayerCountForCanvas(geometry),
+              CanvasSizePolicy.layerPixelBytesFitDocumentBudget(
+                canvasRGBAByteCount: geometry.rgbaByteCount,
+                layerCount: document.layers.count
+              ) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Project manifest exceeds layer memory budget")
         }
         let expectedLayerBytes = geometry.rgbaByteCount
         let expectedMaskBytes = geometry.maskByteCount
@@ -89,18 +96,29 @@ public struct PaintDocumentPersistenceService {
         }
 
         for frame in document.timelapseFrames {
-            _ = try validatedRelativeURL(frame.filename, in: projectURL, label: "timelapse frame")
-            guard fileClient.fileExists(projectURL.appendingPathComponent(frame.filename, isDirectory: false).path) else {
-                throw PaintDocumentPersistenceError.invalidProjectPackage("Missing timelapse frame \(frame.filename)")
-            }
+            _ = try validateReferencedAsset(
+                frame.filename,
+                in: projectURL,
+                maxByteCount: Self.maxSingleFileByteCount,
+                label: "timelapse frame"
+            )
         }
 
+        var timelapsePayloadBytes = 0
         for operation in document.timelapseOperations {
             if let dataFilename = operation.dataFilename {
-                _ = try validatedRelativeURL(dataFilename, in: projectURL, label: "timelapse payload")
-                guard fileClient.fileExists(projectURL.appendingPathComponent(dataFilename, isDirectory: false).path) else {
-                    throw PaintDocumentPersistenceError.invalidProjectPackage("Missing timelapse payload \(dataFilename)")
+                let payloadBytes = try validateReferencedAsset(
+                    dataFilename,
+                    in: projectURL,
+                    maxByteCount: Self.maxSingleFileByteCount,
+                    label: "timelapse payload"
+                )
+                let newTotal = timelapsePayloadBytes.addingReportingOverflow(payloadBytes)
+                guard !newTotal.overflow,
+                      newTotal.partialValue <= Self.maxTimelapsePayloadTotalByteCount else {
+                    throw PaintDocumentPersistenceError.invalidProjectPackage("Timelapse payloads are too large")
                 }
+                timelapsePayloadBytes = newTotal.partialValue
             }
         }
     }
@@ -180,6 +198,28 @@ public struct PaintDocumentPersistenceService {
         }
     }
 
+    private func validateReferencedAsset(
+        _ relativePath: String,
+        in projectURL: URL,
+        maxByteCount: Int,
+        label: String
+    ) throws -> Int {
+        let fileURL = try validatedRelativeURL(relativePath, in: projectURL, label: label)
+        guard fileClient.fileExists(fileURL.path) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Missing \(label) \(relativePath)")
+        }
+        try validateNonSymlink(fileURL, packageRoot: projectURL, label: label)
+        let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid \(label) file")
+        }
+        let fileSize = values.fileSize ?? 0
+        guard fileSize <= maxByteCount else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Oversized \(label)")
+        }
+        return fileSize
+    }
+
     private func validatedRelativeURL(_ relativePath: String, in projectURL: URL, label: String) throws -> URL {
         guard !relativePath.isEmpty,
               !relativePath.hasPrefix("/"),
@@ -199,7 +239,7 @@ public struct PaintDocumentPersistenceService {
         let urls = fileClient.enumerateURLs(
             projectURL,
             [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey],
-            [.skipsHiddenFiles]
+            []
         )
         guard urls.count <= Self.maxPackageFileCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Project package contains too many files")

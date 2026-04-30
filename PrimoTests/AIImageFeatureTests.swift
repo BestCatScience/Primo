@@ -7,6 +7,10 @@ import XCTest
 
 @MainActor
 final class AIImageFeatureTests: XCTestCase {
+    private enum TestSecretFailure: Error {
+        case writeFailed
+    }
+
     func testTaskLoadsSettingsAndCommerceSnapshot() async {
         let snapshot = AIImageCommerceSnapshot(
             primaryProduct: .init(
@@ -118,6 +122,23 @@ final class AIImageFeatureTests: XCTestCase {
         await store.send(.accessModeChanged(.appManaged)) {
             $0.accessMode = .appManaged
         }
+    }
+
+    func testSettingsPersistFailurePresentsBanner() async {
+        let store = TestStore(initialState: AIImageFeature.State()) {
+            AIImageFeature()
+        } withDependencies: {
+            $0.aiImageSettingsClient = AIImageSettingsClient(
+                load: { AIImageSettings() },
+                persist: { _ in throw TestSecretFailure.writeFailed }
+            )
+        }
+
+        await store.send(.apiKeyChanged("user-key")) {
+            $0.apiKey = "user-key"
+        }
+        await store.receive(.settingsPersistFailed("API key を保存できませんでした"))
+        await store.receive(.delegate(.presentBanner("API key を保存できませんでした")))
     }
 
     func testGenerateShowsPaywallWhenAppManagedIsInactive() async {
