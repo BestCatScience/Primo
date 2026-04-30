@@ -152,7 +152,11 @@ struct PaintDocumentMutationContractTests {
         let rect = LayerPixelRect(originX: 0, originY: 0, width: 2, height: 2)
         expectFailure(
             runtime.mutationGateway.replaceLayerPixelsInRect(0, rect, Data(count: 4)),
-            .bridgeMutationFailed("replaceLayerPixelsInRect")
+            .gpu(.invalidPayloadSize(
+                operation: "replaceLayerPixelsInRect",
+                expected: 16,
+                actual: 4
+            ))
         )
     }
 
@@ -185,7 +189,7 @@ struct PaintDocumentMutationContractTests {
             #expect(output[2] == 30)
             #expect(output[3] == 128)
         } else {
-            expectFailure(result, .bridgeMutationFailed("applyLayerMask"))
+            expectFailure(result, .gpu(.kernelFailed(operation: "applyLayerMask")))
         }
     }
 
@@ -300,7 +304,7 @@ struct PaintDocumentMutationContractTests {
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
         } else {
-            expectFailure(result, .bridgeMutationFailed("applyLayerProcessing"))
+            expectFailure(result, .gpu(.kernelFailed(operation: "applyLayerProcessing")))
         }
     }
 
@@ -340,7 +344,7 @@ struct PaintDocumentMutationContractTests {
         if PrimoMetalDocumentProcessingClient.shared.isAvailable {
             expectSuccess(result)
         } else {
-            expectFailure(result, .bridgeMutationFailed("fill"))
+            expectFailure(result, .gpu(.kernelFailed(operation: "fill")))
         }
     }
 

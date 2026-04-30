@@ -17,7 +17,7 @@ struct CanvasRenderSessionTests {
         )
         let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
 
-        session.retainResources(for: update(handle: first))
+        session.adoptTransferredResources(for: update(handle: first))
         #expect(released.values.isEmpty)
 
         session.reset()
@@ -34,8 +34,8 @@ struct CanvasRenderSessionTests {
         )
         let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
 
-        session.retainResources(for: update(handle: first))
-        session.retainResources(for: update(handle: first))
+        session.adoptTransferredResources(for: update(handle: first))
+        session.adoptTransferredResources(for: update(handle: first))
         #expect(released.values.isEmpty)
 
         session.reset()
@@ -54,8 +54,8 @@ struct CanvasRenderSessionTests {
         let first = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
         let second = MetalBufferHandle(width: 4, height: 4, bytesPerRow: 16)
 
-        session.retainResources(for: update(handle: first))
-        session.retainResources(for: update(handle: second))
+        session.adoptTransferredResources(for: update(handle: first))
+        session.adoptTransferredResources(for: update(handle: second))
         #expect(released.values == [first])
 
         session.reset()
@@ -73,7 +73,7 @@ struct CanvasRenderSessionTests {
                     released.append(handle.buffer)
                 }
             )
-            session.retainResources(for: update(handle: first))
+            session.adoptTransferredResources(for: update(handle: first))
             #expect(released.values.isEmpty)
         }
 
@@ -90,6 +90,18 @@ struct CanvasRenderSessionTests {
 
         #expect(!applyBody.contains("MetalResourceStore()"))
         #expect(!applyBody.contains(".release("))
+    }
+
+    @Test
+    func previewStrokeStyleSimdColorHandlesThreeComponentColor() throws {
+        let source = try String(
+            contentsOf: canvasPresentationContainerViewSourceURL(),
+            encoding: .utf8
+        )
+        let simdColorBody = try #require(source.propertyBody(named: "simdColor"))
+
+        #expect(simdColorBody.contains("case 3:"))
+        #expect(simdColorBody.contains("Float(color.alpha)"))
     }
 
     private func update(handle: MetalBufferHandle?) -> RenderFrameUpdate {
@@ -122,6 +134,14 @@ struct CanvasRenderSessionTests {
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/PrimoDocumentMetalRuntimeInfrastructure/PrimoMetalCanvasView.swift")
     }
+
+    private func canvasPresentationContainerViewSourceURL() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/PrimoCanvasPresentationInfrastructure/CanvasPresentationContainerView.swift")
+    }
 }
 
 private final class ReleasedHandles: @unchecked Sendable {
@@ -141,7 +161,15 @@ private final class ReleasedHandles: @unchecked Sendable {
 
 private extension String {
     func methodBody(named name: String) -> String? {
-        guard let range = range(of: "func \(name)") else { return nil }
+        bracedBody(after: "func \(name)")
+    }
+
+    func propertyBody(named name: String) -> String? {
+        bracedBody(after: "var \(name)")
+    }
+
+    private func bracedBody(after marker: String) -> String? {
+        guard let range = range(of: marker) else { return nil }
         guard let openingBrace = self[range.lowerBound...].firstIndex(of: "{") else { return nil }
 
         var depth = 0

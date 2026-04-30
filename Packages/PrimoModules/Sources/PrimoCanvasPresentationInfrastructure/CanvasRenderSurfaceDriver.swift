@@ -14,7 +14,7 @@ public final class CanvasRenderSurfaceDriver {
     }
 
     public func render(_ update: RenderFrameUpdate, into backend: PrimoMetalCanvasView) {
-        renderSession.retainResources(for: update)
+        renderSession.adoptTransferredResources(for: update)
         currentActiveLayerIndex = update.activeLayerIndex
         backend.currentActiveLayerIndex = update.activeLayerIndex
         backend.updateDocumentSize(update.documentSize)

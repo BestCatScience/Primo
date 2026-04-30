@@ -273,6 +273,9 @@ public struct IncrementalLayerUpdate: Equatable, Identifiable, Sendable {
     public let width: Int
     public let height: Int
     public let transferKind: MetalSnapshotTransferKind
+    /// Ownership of this handle transfers to the presentation session that consumes the update.
+    /// Producers must not release it after publishing the update; consumers release it when replaced,
+    /// reset, or deinitialized.
     public let gpuBufferHandle: MetalBufferHandle?
     public let pixelData: Data
 

@@ -67,10 +67,16 @@ enum MetalDocumentGpuOperationBackendFactory {
             },
             textLayerSurface: { textLayer, canvasSize in
                 textService.rasterizeTextLayer(textLayer, canvasSize: canvasSize).flatMap { payload in
-                    DocumentCompositeSurface(
-                        width: max(Int(canvasSize.width.rounded()), 1),
-                        height: max(Int(canvasSize.height.rounded()), 1),
-                        pixelData: payload.fullPixelData ?? payload.rectPixelData
+                    let width = max(Int(canvasSize.width.rounded()), 1)
+                    let height = max(Int(canvasSize.height.rounded()), 1)
+                    let pixelData = payload.fullPixelData ?? payload.rectPixelData
+                    guard pixelData.count == width * height * 4 else {
+                        return nil
+                    }
+                    return DocumentCompositeSurface(
+                        width: width,
+                        height: height,
+                        pixelData: pixelData
                     )
                 }
             },

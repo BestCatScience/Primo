@@ -363,6 +363,8 @@ private extension PreviewStrokeStyle {
         switch components.count {
         case 4:
             return SIMD4(Float(components[0]), Float(components[1]), Float(components[2]), Float(components[3]))
+        case 3:
+            return SIMD4(Float(components[0]), Float(components[1]), Float(components[2]), Float(color.alpha))
         case 2:
             return SIMD4(Float(components[0]), Float(components[0]), Float(components[0]), Float(components[1]))
         default:

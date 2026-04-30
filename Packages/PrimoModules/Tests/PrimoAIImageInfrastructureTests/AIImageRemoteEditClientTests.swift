@@ -170,6 +170,157 @@ struct AIImageRemoteEditClientTests {
     }
 
     @Test
+    func appManagedProxyRequestUsesAllowlistedHostAndTimeout() async throws {
+        final class Recorder: @unchecked Sendable {
+            var request: URLRequest?
+            var body: Data?
+        }
+        let recorder = Recorder()
+        let outputData = Data([0x0A, 0x0B, 0x0C])
+        let httpClient = HTTPClient { request in
+            recorder.request = request
+            recorder.body = request.httpBody
+            let responseData = """
+            {
+              "image_base64": "\(outputData.base64EncodedString())"
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (responseData, response)
+        }
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let inputPNGData = Data([0x89, 0x50, 0x4E, 0x47])
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: inputPNGData, command: appManagedCommand()),
+            "Edit through proxy",
+            .flashImage31Preview
+        )
+
+        let data = try result.get()
+        #expect(data == outputData)
+        let request = try #require(recorder.request)
+        #expect(request.url?.absoluteString == "https://proxy.bestcatscience.com/edit")
+        #expect(request.timeoutInterval == 60)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer signed-entitlement")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        let body = String(decoding: try #require(recorder.body), as: UTF8.self)
+        #expect(body.contains("\"image_base64\":\"\(inputPNGData.base64EncodedString())\""))
+    }
+
+    @Test
+    func rejectsOversizedInputBeforeUploading() async throws {
+        final class Recorder: @unchecked Sendable {
+            var callCount = 0
+        }
+        let recorder = Recorder()
+        let httpClient = HTTPClient { request in
+            recorder.callCount += 1
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (Data(), response)
+        }
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let oversizedPNGData = Data(count: 16 * 1024 * 1024 + 1)
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: oversizedPNGData, command: appManagedCommand()),
+            "Edit through proxy",
+            .flashImage31Preview
+        )
+
+        #expect(recorder.callCount == 0)
+        #expect(result == .failure(.missingImageData("AI image editing input PNG is too large to upload safely.")))
+    }
+
+    @Test
+    func providerErrorDisplayRedactsSecrets() async throws {
+        let httpClient = HTTPClient { request in
+            let responseData = """
+            {
+              "error": {
+                "message": "Authorization: Bearer supersecrettoken123456 and api_key=sk-secretvalue123456"
+              }
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (responseData, response)
+        }
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
+            "Edit through proxy",
+            .flashImage31Preview
+        )
+
+        #expect(result == .failure(.apiError("Authorization: Bearer [redacted] and api_key=[redacted]")))
+    }
+
+    @Test
+    func recursiveJSONImageExtractionStopsAtMaximumDepth() async throws {
+        let imageData = Data([0x11, 0x12, 0x13]).base64EncodedString()
+        let httpClient = HTTPClient { request in
+            let responseData = """
+            {
+              "a": {
+                "a": {
+                  "a": {
+                    "a": {
+                      "a": {
+                        "a": {
+                          "a": {
+                            "a": {
+                              "a": {
+                                "inline_data": {
+                                  "mime_type": "image/png",
+                                  "data": "\(imageData)"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """.data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (responseData, response)
+        }
+        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+
+        let result = await client.execute(
+            AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
+            "Edit through proxy",
+            .flashImage31Preview
+        )
+
+        #expect(result == .failure(.missingImageData("AI image editing did not return decodable image bytes.")))
+    }
+
+    @Test
     func geminiImageConfigUsesSourceAspectRatioForPortraitCanvas() async throws {
         final class Recorder: @unchecked Sendable {
             var body: Data?
@@ -284,6 +435,23 @@ struct AIImageRemoteEditClientTests {
                 outputMode: .replaceCurrentLayer
             ),
             executionConfig: .userAPIKey(apiKey: AIImageAPIKey("gemini-key")!)
+        )
+    }
+
+    private func appManagedCommand() -> SubmitAIImageEditCommand {
+        SubmitAIImageEditCommand(
+            descriptor: AIImageEditDescriptor(
+                prompt: NonEmptyPrompt("Improve image")!,
+                accessMode: .appManaged,
+                model: .flashImage31Preview,
+                inputLayerIndex: 0,
+                editScope: .wholeLayer,
+                outputMode: .replaceCurrentLayer
+            ),
+            executionConfig: .appManaged(
+                entitlement: AIImageEntitlementToken("signed-entitlement")!,
+                endpoint: ProxyEndpoint("https://proxy.bestcatscience.com/edit")!
+            )
         )
     }
 

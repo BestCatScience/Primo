@@ -260,7 +260,7 @@ public enum DocumentEngineFactory {
         case let .success(plan):
             guard let plan else { return .success(()) }
             guard let layers = plan.resizedLayers() else {
-                return .failure(.bridgeMutationFailed("resizeCanvas"))
+                return .failure(.gpu(.kernelFailed(operation: "resizeCanvas")))
             }
             return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
         }
@@ -278,7 +278,7 @@ public enum DocumentEngineFactory {
         case let .success(plan):
             guard let plan else { return .success(()) }
             guard let layers = plan.resizedLayers() else {
-                return .failure(.bridgeMutationFailed("resizeCanvasExtent"))
+                return .failure(.gpu(.kernelFailed(operation: "resizeCanvasExtent")))
             }
             return runtimeBox.withRuntime { $0.applyResizeCanvasPlan(plan, layers: layers) }
         }
@@ -300,7 +300,7 @@ public enum DocumentEngineFactory {
                 canvasHeight: plan.canvasHeight,
                 request: plan.request
             ) else {
-                return .failure(.bridgeMutationFailed("applyLayerProcessing"))
+                return .failure(.gpu(.kernelFailed(operation: "applyLayerProcessing")))
             }
             return runtimeBox.withRuntime { $0.applyLayerProcessingPlan(plan, payload: payload) }
         }
@@ -324,7 +324,7 @@ public enum DocumentEngineFactory {
                 sample: plan.sample,
                 brush: plan.brush
             ) else {
-                return .failure(.bridgeMutationFailed("fill"))
+                return .failure(.gpu(.kernelFailed(operation: "fill")))
             }
             return runtimeBox.withRuntime { $0.applyFillPlan(plan, payload: payload) }
         }
@@ -353,7 +353,7 @@ public enum DocumentEngineFactory {
                 snapshotRevision: plan.revision,
                 activeLayerIndex: plan.layerIndex
             ) else {
-                return .failure(.bridgeMutationFailed("applyCommittedStroke"))
+                return .failure(.gpu(.kernelFailed(operation: "applyCommittedStroke")))
             }
             return runtimeBox.withRuntime { $0.applyStrokeCommitPlan(plan, gpuResult: result) }
         }
@@ -380,7 +380,7 @@ public enum DocumentEngineFactory {
                 snapshotRevision: plan.revision,
                 activeLayerIndex: plan.layerIndex
             ) else {
-                let failure = DocumentMutationFailure.bridgeMutationFailed("applyCommittedStroke")
+                let failure = DocumentMutationFailure.gpu(.kernelFailed(operation: "applyCommittedStroke"))
                 Self.logger.error("Current stroke GPU commit failed: \(String(describing: failure), privacy: .public)")
                 return .failure(failure)
             }
@@ -417,7 +417,7 @@ public enum DocumentEngineFactory {
                 samples: plan.samples,
                 brush: plan.brush
             ) else {
-                return .failure(.bridgeMutationFailed("blurStroke"))
+                return .failure(.gpu(.kernelFailed(operation: "blurStroke")))
             }
             return runtimeBox.withRuntime { $0.applyBlurPlan(plan, payload: payload) }
         }

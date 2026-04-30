@@ -16,7 +16,7 @@ final class AIImageFeatureTests: XCTestCase {
             ),
             isSubscriptionActive: true,
             latestEntitlementJWS: "signed-jws",
-            proxyEndpoint: "https://proxy.example.com/edit"
+            proxyEndpoint: "https://proxy.bestcatscience.com/edit"
         )
 
         let store = TestStore(initialState: AIImageFeature.State()) {
@@ -100,7 +100,7 @@ final class AIImageFeatureTests: XCTestCase {
     func testAccessModeChangedAllowsAppManagedWhenProxyEndpointIsConfigured() async {
         var initialState = AIImageFeature.State(
             settings: AIImageSettings(accessMode: .userAPIKey, apiKey: "user-key"),
-            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.bestcatscience.com/edit")
         )
         initialState.composer.prompt = "Enhance linework"
 
@@ -125,7 +125,7 @@ final class AIImageFeatureTests: XCTestCase {
         initialState.settings = AIImageSettings(accessMode: .appManaged, apiKey: "")
         initialState.commerce = AIImageCommerceSnapshot(
             isSubscriptionActive: false,
-            proxyEndpoint: "https://proxy.example.com/edit"
+            proxyEndpoint: "https://proxy.bestcatscience.com/edit"
         )
 
         let store = TestStore(initialState: initialState) {
@@ -142,7 +142,7 @@ final class AIImageFeatureTests: XCTestCase {
     func testGenerateDelegatesRequestWhenConfigured() async {
         var initialState = AIImageFeature.State(
             settings: AIImageSettings(accessMode: .userAPIKey, apiKey: "user-key"),
-            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.bestcatscience.com/edit")
         )
         initialState.composer.prompt = "Enhance linework"
         initialState.composer.inputLayerIndex = 3
@@ -184,7 +184,7 @@ final class AIImageFeatureTests: XCTestCase {
                 apiKey: "gemini-key",
                 openAIAPIKey: "openai-key"
             ),
-            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+            commerce: AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.bestcatscience.com/edit")
         )
         initialState.composer.prompt = "Improve lettering"
         initialState.composer.model = AIImageModel.defaultOpenAIDirectEditModel

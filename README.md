@@ -12,7 +12,7 @@ Apple Pencil での入力、マルチレイヤー編集、選択・変形・塗�
 - 保存済み project のロードは full render snapshot 付きの presentation を返し、再起動後のディスクロードでも canvas へ適用できるようにしています。
 - 連続ストロークでは、正式な presentation refresh を待つ間も直前の GPU commit surface を `pendingCommittedSnapshot` として次ストロークの base に使います。
 - canvas thumbnail / project preview は表示専用 view として扱い、SwiftUI の card / button gesture を妨げないようにしています。
-- `CanvasStrokeWorkflowTests`、`PrimoRootFeatureIntegrationTests`、`PrimoCanvasPresentationInfrastructureTests`、`scripts/codex-build.sh` で直近の修正を確認しています。
+- 直近の修正は app build、package tests、focused app tests を分けて確認しています。
 
 ## 目的
 
@@ -80,6 +80,7 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   SwiftUI / TCA のアプリ本体です。画面、reducer、workflow、dependency wiring、menus、workspace UI、canvas wrapper を持ちます。
 - `Packages/PrimoModules/`
   domain、application、contracts、runtime、Metal infrastructure、workspace、brush、AI 画像編集、localization をまとめたローカル Swift package です。
+  Primo app 専用の module 群として app と同じ iOS 26.0 以上を前提にしています。macOS target は package 単体の `swift test` を実行するためのものです。
 - `PrimoTests/`
   app 側 workflow と reducer まわりのテストです。
 - `Packages/PrimoModules/Tests/`
@@ -181,11 +182,25 @@ cd Packages/PrimoModules
 swift test
 ```
 
-リポジトリルートのアプリビルド確認には `scripts/codex-build.sh` を使います。
+リポジトリルートのアプリビルド確認には `scripts/codex-build.sh` を使います。この script は package dependency resolve と app build だけを行い、test は実行しません。
 
 ```bash
 scripts/codex-build.sh
 ```
+
+CI / pre-merge の最低限の品質ゲートは、build と test を分けて実行します。
+
+```bash
+scripts/codex-build.sh
+scripts/codex-test-package.sh
+scripts/codex-test-canvas-stroke.sh
+```
+
+`scripts/codex-test-canvas-stroke.sh` は既定で `platform=iOS Simulator,name=iPad Pro (11-inch)` を使います。別の simulator を使う場合は `PRIMO_TEST_DESTINATION` で上書きできます。
+
+Metal / simulator / device 依存のテストが増えた場合は、GPU 必須テストと pure reducer tests を分けて、CI でも別 job として扱います。
+
+Fork している Swift package dependency の理由、upstream 差分、upstream へ戻す条件、security update と third-party notices の更新方針は [docs/DependencyForks.md](docs/DependencyForks.md) にまとめています。
 
 よく使う focused test は次のとおりです。
 

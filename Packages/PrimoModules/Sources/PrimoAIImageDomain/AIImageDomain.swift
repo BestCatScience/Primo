@@ -125,6 +125,7 @@ public struct AIImageEntitlementToken: Equatable, Sendable {
 
 public struct ProxyEndpoint: Equatable, Sendable {
     public static let maxCharacterCount = 2048
+    public static let allowedHostSuffixes: Set<String> = ["bestcatscience.com"]
     public let rawValue: String
 
     public init?(_ rawValue: String) {
@@ -133,9 +134,17 @@ public struct ProxyEndpoint: Equatable, Sendable {
             !trimmed.isEmpty,
             trimmed.count <= Self.maxCharacterCount,
             let url = URL(string: trimmed),
-            url.scheme == "https"
+            url.scheme == "https",
+            Self.isAllowedHost(url.host)
         else { return nil }
         self.rawValue = trimmed
+    }
+
+    public static func isAllowedHost(_ host: String?) -> Bool {
+        guard let host = host?.lowercased(), !host.isEmpty else { return false }
+        return allowedHostSuffixes.contains { suffix in
+            host == suffix || host.hasSuffix(".\(suffix)")
+        }
     }
 }
 

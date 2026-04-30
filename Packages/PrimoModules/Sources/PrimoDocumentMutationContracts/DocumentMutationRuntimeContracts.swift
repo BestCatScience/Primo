@@ -8,6 +8,32 @@ import PrimoDocumentDomain
 public typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
 public typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
 
+public enum DocumentGpuMutationFailure: Error, Equatable, Sendable {
+    case gpuUnavailable
+    case staleSnapshot(operation: String)
+    case invalidPayloadSize(operation: String, expected: Int, actual: Int)
+    case invalidDirtyRect(operation: String)
+    case resourceHandleInvalid
+    case kernelFailed(operation: String)
+
+    public var displayMessage: String {
+        switch self {
+        case .gpuUnavailable:
+            return "GPU unavailable"
+        case let .staleSnapshot(operation):
+            return "\(operation): stale snapshot"
+        case let .invalidPayloadSize(operation, expected, actual):
+            return "\(operation): invalid payload size, expected \(expected), got \(actual)"
+        case let .invalidDirtyRect(operation):
+            return "\(operation): invalid dirty rect"
+        case .resourceHandleInvalid:
+            return "GPU resource handle invalid"
+        case let .kernelFailed(operation):
+            return "\(operation): GPU kernel failed"
+        }
+    }
+}
+
 public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
     case invalidLayerIndex(Int)
     case invalidFolderID(Int)
@@ -18,6 +44,7 @@ public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailur
     case emptyInput
     case noUndoState
     case noRedoState
+    case gpu(DocumentGpuMutationFailure)
     case bridgeMutationFailed(String)
     case incompatibleLayerType(Int)
     indirect case transactionFailure(primary: DocumentMutationFailure, rollback: DocumentMutationFailure)

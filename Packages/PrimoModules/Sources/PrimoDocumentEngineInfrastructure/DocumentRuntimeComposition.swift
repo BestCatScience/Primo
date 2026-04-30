@@ -295,6 +295,8 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
         return .noUndoState
     case .noRedoState:
         return .noRedoState
+    case let .gpu(failure):
+        return .bridgeMutationFailed(failure.displayMessage)
     case let .bridgeMutationFailed(message):
         return .bridgeMutationFailed(message)
     case let .incompatibleLayerType(index):

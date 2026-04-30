@@ -28,9 +28,11 @@ struct AIImageDomainTests {
     }
 
     @Test
-    func proxyEndpointRequiresHTTPS() {
-        #expect(ProxyEndpoint("https://proxy.example.com/aiimage/edit")?.rawValue == "https://proxy.example.com/aiimage/edit")
+    func proxyEndpointRequiresHTTPSAndAllowedHost() {
+        #expect(ProxyEndpoint("https://proxy.bestcatscience.com/aiimage/edit")?.rawValue == "https://proxy.bestcatscience.com/aiimage/edit")
         #expect(ProxyEndpoint("http://127.0.0.1:8787/aiimage/edit") == nil)
+        #expect(ProxyEndpoint("https://proxy.example.com/aiimage/edit") == nil)
+        #expect(ProxyEndpoint("https://bestcatscience.com.evil.example/aiimage/edit") == nil)
     }
 
     @Test

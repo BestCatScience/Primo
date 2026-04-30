@@ -30,7 +30,10 @@ public extension AIImageRemoteEditClient {
 
     private static var maxResponseBodyBytes: Int { 48 * 1024 * 1024 }
     private static var maxBase64ImageCharacters: Int { 64 * 1024 * 1024 }
-    private static var maxDisplayErrorCharacters: Int { 4096 }
+    private static var maxInputPNGBytes: Int { 16 * 1024 * 1024 }
+    private static var maxDisplayErrorCharacters: Int { 512 }
+    private static var maxRecursiveJSONExtractionDepth: Int { 8 }
+    private static var requestTimeoutSeconds: TimeInterval { 60 }
 
     private static func performEditRequest(
         inputPNGData: Data,
@@ -39,6 +42,10 @@ public extension AIImageRemoteEditClient {
         model: AIImageModel,
         httpClient: HTTPClient
     ) async throws -> Data? {
+        guard inputPNGData.count <= maxInputPNGBytes else {
+            throw AIImageEditFailure.missingImageData("AI image editing input PNG is too large to upload safely.")
+        }
+
         switch config {
         case let .userAPIKey(apiKey):
             if model.provider == .openAI {
@@ -189,6 +196,7 @@ public extension AIImageRemoteEditClient {
 
         return requestBodies.compactMap { requestBody in
             var request = URLRequest(url: url)
+            request.timeoutInterval = requestTimeoutSeconds
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -231,6 +239,7 @@ public extension AIImageRemoteEditClient {
         appendString("--\(boundary)--\r\n", to: &body)
 
         var request = URLRequest(url: url)
+        request.timeoutInterval = requestTimeoutSeconds
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -279,6 +288,9 @@ public extension AIImageRemoteEditClient {
         guard let url = URL(string: endpoint), !endpoint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AIImageEditFailure.invalidEndpoint
         }
+        guard isAllowedProxyURL(url) else {
+            throw AIImageEditFailure.invalidEndpoint
+        }
 
         let requestBody = ProxyEditRequest(
             prompt: prompt,
@@ -288,6 +300,7 @@ public extension AIImageRemoteEditClient {
         )
 
         var request = URLRequest(url: url)
+        request.timeoutInterval = requestTimeoutSeconds
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if !accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -387,7 +400,7 @@ public extension AIImageRemoteEditClient {
 
         do {
             let jsonObject = try JSONSerialization.jsonObject(with: data)
-            if let recursivelyDecodedImage = recursivelyExtractImageData(from: jsonObject) {
+            if let recursivelyDecodedImage = recursivelyExtractImageData(from: jsonObject, depth: 0) {
                 return recursivelyDecodedImage
             }
         } catch {
@@ -446,22 +459,48 @@ public extension AIImageRemoteEditClient {
         guard let raw = String(data: data.prefix(maxDisplayErrorCharacters), encoding: .utf8) else {
             return "HTTP \(statusCode)"
         }
-        return truncatedDisplayMessage(raw.isEmpty ? "HTTP \(statusCode)" : raw)
+        return sanitizedDisplayMessage(raw.isEmpty ? "HTTP \(statusCode)" : raw)
     }
 
     private static func truncatedDisplayMessage(_ message: String) -> String {
-        guard message.count > maxDisplayErrorCharacters else { return message }
-        return String(message.prefix(maxDisplayErrorCharacters))
+        sanitizedDisplayMessage(message)
     }
 
-    private static func recursivelyExtractImageData(from value: Any) -> Data? {
+    private static func sanitizedDisplayMessage(_ message: String) -> String {
+        let redacted = redactSecrets(in: message)
+        guard redacted.count > maxDisplayErrorCharacters else { return redacted }
+        return String(redacted.prefix(maxDisplayErrorCharacters))
+    }
+
+    private static func redactSecrets(in message: String) -> String {
+        var redacted = message
+        let patterns: [(String, String)] = [
+            (#"(?i)Bearer\s+[A-Za-z0-9._~+/=-]{8,}"#, "Bearer [redacted]"),
+            (#"sk-[A-Za-z0-9_-]{8,}"#, "sk-[redacted]"),
+            (#"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"#, "[redacted-jws]"),
+            (#"(?i)(api[_ -]?key|authorization|token|secret|jws)(["']?\s*[:=]\s*["']?)[^"',\s}]{8,}"#, "$1$2[redacted]"),
+        ]
+        for (pattern, template) in patterns {
+            guard let expression = try? NSRegularExpression(pattern: pattern) else { continue }
+            let range = NSRange(redacted.startIndex..<redacted.endIndex, in: redacted)
+            redacted = expression.stringByReplacingMatches(
+                in: redacted,
+                range: range,
+                withTemplate: template
+            )
+        }
+        return redacted
+    }
+
+    private static func recursivelyExtractImageData(from value: Any, depth: Int) -> Data? {
+        guard depth <= maxRecursiveJSONExtractionDepth else { return nil }
         if let dictionary = value as? [String: Any] {
             if let imageData = imageData(from: dictionary) {
                 return imageData
             }
 
             for nestedValue in dictionary.values {
-                if let imageData = recursivelyExtractImageData(from: nestedValue) {
+                if let imageData = recursivelyExtractImageData(from: nestedValue, depth: depth + 1) {
                     return imageData
                 }
             }
@@ -469,13 +508,23 @@ public extension AIImageRemoteEditClient {
 
         if let array = value as? [Any] {
             for nestedValue in array {
-                if let imageData = recursivelyExtractImageData(from: nestedValue) {
+                if let imageData = recursivelyExtractImageData(from: nestedValue, depth: depth + 1) {
                     return imageData
                 }
             }
         }
 
         return nil
+    }
+
+    private static func isAllowedProxyURL(_ url: URL) -> Bool {
+        guard
+            url.scheme == "https",
+            url.user == nil,
+            url.password == nil,
+            ProxyEndpoint.isAllowedHost(url.host)
+        else { return false }
+        return true
     }
 
     private static func imageData(from dictionary: [String: Any]) -> Data? {

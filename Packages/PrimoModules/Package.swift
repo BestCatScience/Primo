@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "PrimoModules",
     platforms: [
-        .iOS(.v17),
+        .iOS("26.0"),
         .macOS(.v13),
     ],
     products: [

@@ -4,7 +4,7 @@ import PrimoDocumentGPUContracts
 import PrimoDocumentMetalRuntimeInfrastructure
 
 public final class CanvasRenderSession {
-    private var retainedIncrementalHandle: GpuSurfaceHandle?
+    private var adoptedIncrementalHandle: GpuSurfaceHandle?
     private let lifetime: GpuResourceLifetime
 
     public init(
@@ -16,19 +16,19 @@ public final class CanvasRenderSession {
     }
 
     deinit {
-        lifetime.release(retainedIncrementalHandle)
+        lifetime.release(adoptedIncrementalHandle)
     }
 
-    public func retainResources(for update: RenderFrameUpdate) {
+    public func adoptTransferredResources(for update: RenderFrameUpdate) {
         let nextHandle = update.incrementalUpdate?.gpuBufferHandle.map(GpuSurfaceHandle.init(buffer:))
-        if retainedIncrementalHandle != nextHandle {
-            lifetime.release(retainedIncrementalHandle)
+        if adoptedIncrementalHandle != nextHandle {
+            lifetime.release(adoptedIncrementalHandle)
         }
-        retainedIncrementalHandle = nextHandle
+        adoptedIncrementalHandle = nextHandle
     }
 
     public func reset() {
-        lifetime.release(retainedIncrementalHandle)
-        retainedIncrementalHandle = nil
+        lifetime.release(adoptedIncrementalHandle)
+        adoptedIncrementalHandle = nil
     }
 }

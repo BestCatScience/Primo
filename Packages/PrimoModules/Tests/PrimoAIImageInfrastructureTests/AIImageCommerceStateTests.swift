@@ -16,7 +16,7 @@ struct AIImageCommerceStateTests {
             isSubscriptionActive: true,
             latestEntitlementJWS: "signed-jws",
             purchaseErrorMessage: "temporarily unavailable",
-            proxyEndpoint: "https://proxy.example.com/edit"
+            proxyEndpoint: "https://proxy.bestcatscience.com/edit"
         )
 
         let snapshot = state.snapshot()
@@ -26,6 +26,6 @@ struct AIImageCommerceStateTests {
         #expect(snapshot.isSubscriptionActive)
         #expect(snapshot.latestEntitlementJWS == "signed-jws")
         #expect(snapshot.purchaseErrorMessage == "temporarily unavailable")
-        #expect(snapshot.proxyEndpoint == "https://proxy.example.com/edit")
+        #expect(snapshot.proxyEndpoint == "https://proxy.bestcatscience.com/edit")
     }
 }

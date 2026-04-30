@@ -26,6 +26,8 @@ extension DocumentFeature {
             return ApplicationFeature.Feedback.invalidLayerOpacity.message(for: language)
         case .emptyInput:
             return ApplicationFeature.Feedback.emptyDocumentMutationInput.message(for: language)
+        case let .gpu(failure):
+            return ApplicationFeature.Feedback.documentMutationBridgeFailed(failure.displayMessage).message(for: language)
         case let .bridgeMutationFailed(message):
             return ApplicationFeature.Feedback.documentMutationBridgeFailed(message).message(for: language)
         case .incompatibleLayerType:
@@ -66,6 +68,8 @@ extension DocumentFeature {
                 return .invalidLayerOpacity
             case .emptyInput:
                 return .emptyDocumentMutationInput
+            case let .gpu(failure):
+                return .documentMutationBridgeFailed(failure.displayMessage)
             case let .bridgeMutationFailed(message):
                 return .documentMutationBridgeFailed(message)
             case .incompatibleLayerType:

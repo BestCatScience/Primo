@@ -31,6 +31,20 @@ struct DocumentGpuOperationGatewayTests {
     }
 
     @Test
+    func metalBackendTextLayerSurfaceRejectsMismatchedPayloadSize() throws {
+        let repoRoot = try Self.repoRoot()
+        let factorySource = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRenderingInfrastructure/MetalDocumentGpuOperationBackendFactory.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: factorySource, encoding: .utf8)
+
+        #expect(body.contains("let width = max(Int(canvasSize.width.rounded()), 1)"))
+        #expect(body.contains("let height = max(Int(canvasSize.height.rounded()), 1)"))
+        #expect(body.contains("guard pixelData.count == width * height * 4 else"))
+    }
+
+    @Test
     func layerTransformExpandsCroppedSelectionWithOriginBeforeCanvasSize() {
         let box = ExpandedSelectionMaskCallBox()
         let gateway = DocumentGpuOperationGateway(

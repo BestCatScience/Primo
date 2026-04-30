@@ -17,7 +17,7 @@ struct AIImageApplicationTests {
             outputMode: .newLayer,
             maskSettings: .init(expansion: 6, isInverted: true)
         )
-        let snapshot = AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.example.com/edit")
+        let snapshot = AIImageCommerceSnapshot(proxyEndpoint: "https://proxy.bestcatscience.com/edit")
 
         let result = AIImageCommandBuilder().build(
             draft: draft,
