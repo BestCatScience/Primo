@@ -670,6 +670,16 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         XCTAssertTrue(contents.contains("CanvasLifecycleFeedbackMapper"))
     }
 
+    func testPrimoAppInjectsOneSharedDocumentRuntimeComposition() throws {
+        let contents = try String(
+            contentsOf: repoRoot.appendingPathComponent("App/Application/PrimoApp.swift"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(contents.contains("let documentRuntimeComposition = DocumentRuntimeCompositionFactory.live()"))
+        XCTAssertTrue(contents.contains("$0.documentRuntimeComposition = documentRuntimeComposition"))
+    }
+
     func testCrossFeatureIntegrationReducerHomeProjectsLoadRoutesToCatalogRequest() async {
         let store = makeRootStore()
         store.exhaustivity = .off

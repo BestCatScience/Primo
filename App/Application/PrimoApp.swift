@@ -1,10 +1,18 @@
 import ComposableArchitecture
+import PrimoDocumentEngineInfrastructure
 import SwiftUI
 
 @main
 struct PrimoApp: App {
-    let store = Store(initialState: PrimoRootFeature.State()) {
-        PrimoRootFeature()
+    let store: StoreOf<PrimoRootFeature>
+
+    init() {
+        let documentRuntimeComposition = DocumentRuntimeCompositionFactory.live()
+        self.store = Store(initialState: PrimoRootFeature.State()) {
+            PrimoRootFeature()
+        } withDependencies: {
+            $0.documentRuntimeComposition = documentRuntimeComposition
+        }
     }
 
     var body: some Scene {
