@@ -11,6 +11,26 @@ import Testing
 
 struct SwiftDocumentRuntimeUndoTests {
     @Test
+    func redundantLayerVisibilityChangeDoesNotCreateUndoStep() throws {
+        let gpu = RuntimeGpuServiceSpy(strokeOutputs: [Data(repeating: 0x33, count: 16)])
+        let runtime = SwiftDocumentRuntime(width: 2, height: 2, gpuServices: gpu.services())
+
+        _ = try runtime.setLayerVisibility(index: 0, isVisible: true).get()
+        _ = try runtime.applyGpuStrokeSurface(
+            samples: [sample()],
+            brush: brush(),
+            layerIndex: 0
+        ).get()
+        _ = try runtime.undo().get()
+
+        #expect(runtime.pixelDataForLayer(index: 0) == Data(count: 16))
+        guard case .failure(.noUndoState) = runtime.undo() else {
+            Issue.record("Expected redundant visibility request not to leave an undo step")
+            return
+        }
+    }
+
+    @Test
     func undoAfterTwoGpuStrokesRestoresFirstStrokePixels() throws {
         let firstStrokePixels = Data(repeating: 0x11, count: 16)
         let secondStrokePixels = Data(repeating: 0x22, count: 16)

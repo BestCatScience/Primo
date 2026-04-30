@@ -631,6 +631,9 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func setLayerVisibility(index: Int, isVisible: Bool) -> DocumentMutationResult {
         if let failure = validateLayer(index) { return .failure(failure) }
+        guard store.snapshot.layers[index].visible != isVisible else {
+            return .success(())
+        }
         let before = undoSnapshot()
         store.snapshot.layers[index].visible = isVisible
         recordMutation(before: before, timelapseEvent: .setLayerVisibility(index: .unchecked(index), isVisible: isVisible))
