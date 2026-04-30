@@ -3,9 +3,30 @@ import PrimoDocumentDomain
 import SwiftUI
 import UIKit
 
+private extension StudioPanelKind {
+    var expandedToggleSystemName: String {
+        switch self {
+        case .brush:
+            return "chevron.left"
+        case .layers:
+            return "chevron.right"
+        }
+    }
+
+}
+
 extension ContentView {
     private var workspaceBottomGestureClearance: CGFloat { 36 }
     private var workspaceAIImagePickerMaximumHeight: CGFloat { 144 }
+    private var workspaceStageLeadingPadding: CGFloat {
+        store.document.brushPanel.isCollapsed ? 6 : 18
+    }
+    private var workspaceStageTrailingPadding: CGFloat {
+        store.document.layerPanel.isCollapsed ? 6 : 18
+    }
+    private var workspaceStageHorizontalInsets: EdgeInsets {
+        EdgeInsets(top: 0, leading: workspaceStageLeadingPadding, bottom: 0, trailing: workspaceStageTrailingPadding)
+    }
 
     func dismissBrushSettingsPopover() {
         if store.document.brushPalette.ui.showsBrushSettingsPopover {
@@ -43,30 +64,42 @@ extension ContentView {
                         workspacePaneStage(.primary)
                         workspacePaneStage(.secondary)
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
+                    .padding(workspaceStageHorizontalInsets)
+                    .padding(.top, 8)
                 } else {
                     workspacePaneStage(.primary)
-                        .padding(.horizontal, 18)
-                        .padding(.top, 16)
+                        .padding(workspaceStageHorizontalInsets)
+                        .padding(.top, 8)
                 }
 
                 if !aiImageState.workspaceBottomPanelCollapsed {
                     workspaceBottomPanel
-                        .padding(.horizontal, 18)
-                        .padding(.bottom, workspaceBottomGestureClearance)
-                } else {
-                    collapsedWorkspaceBottomBar
-                        .padding(.horizontal, 18)
+                        .padding(workspaceStageHorizontalInsets)
                         .padding(.bottom, workspaceBottomGestureClearance)
                 }
             }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            bottomWorkspacePanelToggle
+                .padding(.trailing, workspaceStageTrailingPadding + 10)
+                .padding(.bottom, aiImageState.workspaceBottomPanelCollapsed ? 10 : workspaceBottomGestureClearance + 10)
         }
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
             }
         )
+    }
+
+    var bottomWorkspacePanelToggle: some View {
+        panelToolbarToggleButton(
+            systemImage: aiImageState.workspaceBottomPanelCollapsed ? "dock.rectangle" : "chevron.down.to.line",
+            accessibilityLabel: aiImageState.workspaceBottomPanelCollapsed
+                ? language.localized("AI Image パネルを表示")
+                : language.localized("AI Image パネルを閉じる")
+        ) {
+            store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(!aiImageState.workspaceBottomPanelCollapsed)))
+        }
     }
 
     @ViewBuilder
@@ -101,13 +134,6 @@ extension ContentView {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(alignment: .topLeading) {
-            Text(pane == .primary ? language.localized("左ペイン") : language.localized("右ペイン"))
-                .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(.white.opacity(0.48))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-        }
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(isActivePane ? StudioTheme.Palette.selectedBorder : Color.white.opacity(0.05), lineWidth: 1)
@@ -219,8 +245,8 @@ extension ContentView {
 
             Spacer(minLength: 0)
         }
-        .frame(width: 82)
-        .padding(.top, 12)
+        .frame(width: 70)
+        .padding(.top, 8)
         .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .trailing) {
             Rectangle()
@@ -229,71 +255,63 @@ extension ContentView {
         }
     }
 
+    @ViewBuilder
     func panelRail(for panel: StudioPanelKind) -> some View {
         let panelState = panelState(for: panel)
         let dragThreshold: CGFloat = 80
 
-        let panelDragGesture = DragGesture(minimumDistance: 12)
-            .onEnded { value in
-                let translation = value.translation.width
+        if panelState.isCollapsed {
+            Color.clear
+                .frame(width: 0)
+        } else {
+            let panelDragGesture = DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    let translation = value.translation.width
 
-                switch panel {
-                case .brush:
-                    if panelState.isCollapsed {
+                    switch panel {
+                    case .brush:
+                        if translation < dragThreshold * -1 {
+                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
+                        }
+                    case .layers:
                         if translation > dragThreshold {
                             store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                         }
-                    } else if translation < -dragThreshold {
-                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
-                    }
-                case .layers:
-                    if panelState.isCollapsed {
-                        if translation < -dragThreshold {
-                            store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
-                        }
-                    } else if translation > dragThreshold {
-                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
                     }
                 }
-            }
 
-        return VStack(spacing: 12) {
-            studioPanel(for: panel)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .frame(width: panelState.isCollapsed ? 64 : (panel == .layers ? 290 : 332))
-        .frame(maxHeight: .infinity, alignment: .top)
-        .overlay(alignment: panel == .brush ? .trailing : .leading) {
-            Rectangle()
-                .fill(Color.clear)
-                .contentShape(Rectangle())
-                .frame(width: 18)
-                .gesture(panelDragGesture)
-                .onTapGesture {
-                    if panelState.isCollapsed {
-                        store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel)))))
+            VStack(spacing: 12) {
+                studioPanel(for: panel)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .frame(width: panel == .layers ? 324 : 332)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .overlay(alignment: panel == .brush ? .trailing : .leading) {
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .frame(width: 18)
+                    .gesture(panelDragGesture)
+            }
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    if panel != .brush {
+                        dismissBrushSettingsPopover()
                     }
                 }
+            )
         }
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                if panel != .brush {
-                    dismissBrushSettingsPopover()
-                }
-            }
-        )
     }
 
     @ViewBuilder
     func studioPanel(for panel: StudioPanelKind) -> some View {
-        let panelState = panelState(for: panel)
-
         StudioPanelShell(
             title: panel.title(language),
-            isCollapsed: panelState.isCollapsed,
+            isCollapsed: false,
+            toggleSystemName: panel.expandedToggleSystemName,
             onToggleCollapse: { store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(panel))))) }
         ) {
             switch panel {
@@ -347,7 +365,7 @@ extension ContentView {
                 )
             }
         }
-        .frame(maxHeight: panelState.isCollapsed ? 50 : .infinity, alignment: .top)
+        .frame(maxHeight: .infinity, alignment: .top)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
@@ -394,32 +412,6 @@ extension ContentView {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
-        )
-    }
-
-    var collapsedWorkspaceBottomBar: some View {
-        HStack {
-            Text(
-                aiImageState.workspaceBottomPanelSection == .aiImage
-                ? "AI IMAGE"
-                : aiImageState.workspaceBottomPanelSection == .history ? "HISTORY" : "OUTPUT"
-            )
-                .font(StudioTheme.Typography.mono(10))
-                .foregroundStyle(.white.opacity(0.55))
-            Spacer(minLength: 0)
-            workspaceTabChromeButton(symbol: "chevron.up") {
-                store.send(.aiImage(.workspaceBottomPanelCollapsedChanged(false)))
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(StudioTheme.Palette.overlayBlack.opacity(0.7))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
     }
@@ -998,7 +990,7 @@ extension ContentView {
     }
 
     var toolDock: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             ForEach(studioTools) { tool in
                 let isActive = store.document.canvas.currentTool == tool
 
@@ -1009,30 +1001,18 @@ extension ContentView {
 
             Spacer()
         }
-        .padding(8)
-        .frame(width: 58)
+        .padding(6)
+        .frame(width: 50)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(StudioTheme.Gradients.surface)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(StudioTheme.Palette.panelInset.opacity(0.72))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 .allowsHitTesting(false)
         )
-        .overlay(alignment: .top) {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.06), Color.clear],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .padding(1)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.22), radius: 18, y: 10)
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 6)
         .simultaneousGesture(
             TapGesture().onEnded {
                 dismissBrushSettingsPopover()
@@ -1042,16 +1022,16 @@ extension ContentView {
 
     func toolDockItem(tool: StudioToolKind, isActive: Bool) -> some View {
         Image(systemName: tool.systemImage)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
-            .frame(width: 38, height: 38)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(isActive ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.iconInactive)
+            .frame(width: 36, height: 36)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isActive ? StudioTheme.Palette.selectedFill : Color.clear)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(isActive ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isActive ? StudioTheme.Palette.selectedBorder : Color.clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .stroke(isActive ? StudioTheme.Palette.selectedBorder : StudioTheme.Palette.hairline, lineWidth: 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .onTapGesture {
@@ -1078,7 +1058,7 @@ extension ContentView {
                 metric: .opacity
             )
         }
-        .frame(width: 62)
+        .frame(width: 54)
     }
 
     func toolMetricBubble(
@@ -1088,7 +1068,7 @@ extension ContentView {
     ) -> some View {
         ZStack {
             Circle()
-                .fill(StudioTheme.Gradients.surface)
+                .fill(StudioTheme.Palette.panelInset)
 
             Circle()
                 .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
@@ -1123,8 +1103,8 @@ extension ContentView {
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
             }
         }
-        .frame(width: 46, height: 46)
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+        .frame(width: 42, height: 42)
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 4)
         .contentShape(Circle())
         .onTapGesture {
             if selectedToolMetricEditor == metric {

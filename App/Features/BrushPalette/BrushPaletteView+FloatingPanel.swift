@@ -30,24 +30,14 @@ extension BrushPaletteView {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.98),
-                            Color(red: 0.97, green: 0.97, blue: 0.96)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(StudioTheme.Gradients.panel)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.18), radius: 28, x: 0, y: 18)
-        .environment(\.colorScheme, .light)
+        .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
     }
 
     var floatingPanelIsWide: Bool {
@@ -65,11 +55,11 @@ extension BrushPaletteView {
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.black.opacity(0.62))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
                     .frame(width: 34, height: 34)
                     .background(
                         Circle()
-                            .fill(Color.black.opacity(0.04))
+                            .fill(StudioTheme.Palette.cardFillStrong)
                     )
             }
             .buttonStyle(.plain)
@@ -77,10 +67,10 @@ extension BrushPaletteView {
             VStack(alignment: .leading, spacing: 2) {
                 Text(store.library.selectedBrush?.name ?? currentTool.localizedTitle(language))
                     .font(StudioTheme.Typography.title(16))
-                    .foregroundStyle(Color.black.opacity(0.72))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
                 Text(language.localized("ブラシの詳細設定"))
                     .font(StudioTheme.Typography.body(11))
-                    .foregroundStyle(Color.black.opacity(0.38))
+                    .foregroundStyle(StudioTheme.Palette.textMuted)
             }
 
             Spacer(minLength: 0)
@@ -106,24 +96,14 @@ extension BrushPaletteView {
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.99),
-                            Color(red: 0.97, green: 0.97, blue: 0.96)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(StudioTheme.Gradients.panel)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
         )
-        .shadow(color: .black.opacity(0.18), radius: 26, x: 0, y: 16)
-        .environment(\.colorScheme, .light)
+        .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 12)
     }
 
     var compactBrushToolHeader: some View {
@@ -133,14 +113,14 @@ extension BrushPaletteView {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.black.opacity(0.52))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
 
             Text(language.localized("ツール"))
                 .font(StudioTheme.Typography.title(18))
-                .foregroundStyle(Color.black.opacity(0.76))
+                .foregroundStyle(StudioTheme.Palette.textPrimary)
 
             Spacer(minLength: 0)
         }
@@ -148,7 +128,7 @@ extension BrushPaletteView {
 
     var compactBrushPreviewCard: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(currentTool == .erase ? Color(red: 0.74, green: 0.74, blue: 0.74) : Color.white)
+            .fill(currentTool == .erase ? StudioTheme.Palette.panelControl : StudioTheme.Palette.panelInset)
             .frame(height: 84)
             .overlay {
                 ZStack {
@@ -165,7 +145,7 @@ extension BrushPaletteView {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             )
     }
 
@@ -178,12 +158,12 @@ extension BrushPaletteView {
                 } label: {
                     Text(tab.localizedTitle(language))
                         .font(StudioTheme.Typography.title(14))
-                        .foregroundStyle(isSelected ? StudioTheme.Palette.accent : Color.black.opacity(0.62))
+                        .foregroundStyle(isSelected ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 32)
                         .background(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(isSelected ? Color(red: 0.86, green: 0.93, blue: 1.0) : Color.black.opacity(0.05))
+                                .fill(isSelected ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFillStrong)
                         )
                 }
                 .buttonStyle(.plain)
@@ -222,7 +202,7 @@ extension BrushPaletteView {
             VStack(alignment: .leading, spacing: 8) {
                 Text(language.localized("ブラシタイプ"))
                     .font(StudioTheme.Typography.title(14))
-                    .foregroundStyle(Color.black.opacity(0.72))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
 
                 HStack(spacing: 0) {
                     compactToolSwitchButton(tool: .brush)
@@ -231,7 +211,7 @@ extension BrushPaletteView {
                 .padding(2)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.black.opacity(0.06))
+                        .fill(StudioTheme.Palette.panelInset)
                 )
             }
 
@@ -248,23 +228,23 @@ extension BrushPaletteView {
             HStack {
                 Text(title)
                     .font(StudioTheme.Typography.title(14))
-                    .foregroundStyle(Color.black.opacity(0.74))
+                    .foregroundStyle(StudioTheme.Palette.textPrimary)
 
                 Spacer(minLength: 0)
 
                 Text(value)
                     .font(StudioTheme.Typography.title(14))
-                    .foregroundStyle(Color.black.opacity(0.6))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
                     .padding(.horizontal, 8)
                     .frame(minWidth: 48, minHeight: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.black.opacity(0.05))
+                            .fill(StudioTheme.Palette.panelInset)
                     )
             }
 
             slider
-                .tint(Color.black.opacity(0.45))
+                .tint(StudioTheme.Palette.accentBright)
                 .frame(minHeight: 28)
         }
     }
@@ -277,12 +257,12 @@ extension BrushPaletteView {
         } label: {
             Text(tool.localizedTitle(language))
                 .font(StudioTheme.Typography.title(14))
-                .foregroundStyle(isSelected ? Color.black.opacity(0.78) : Color.black.opacity(0.54))
+                .foregroundStyle(isSelected ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 28)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(isSelected ? Color.white.opacity(0.95) : Color.clear)
+                        .fill(isSelected ? StudioTheme.Palette.selectedFill : Color.clear)
                 )
         }
         .buttonStyle(.plain)
@@ -306,8 +286,8 @@ extension BrushPaletteView {
     }
 
     var floatingPanelPreviewCard: some View {
-        RoundedRectangle(cornerRadius: 26, style: .continuous)
-            .fill(Color.white)
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(StudioTheme.Palette.panelInset)
             .frame(height: floatingPanelIsWide ? 186 : 150)
             .overlay(
                 BrushStrokePreview(style: currentBrushPreviewStyle)
@@ -315,10 +295,10 @@ extension BrushPaletteView {
                     .padding(.vertical, floatingPanelIsWide ? 18 : 14)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.06), radius: 14, x: 0, y: 8)
+            .shadow(color: .black.opacity(0.16), radius: 10, x: 0, y: 6)
     }
 
     var floatingPanelPrimaryControls: some View {
@@ -340,12 +320,12 @@ extension BrushPaletteView {
             } label: {
                 Text(language.localized("設定をリセット"))
                     .font(StudioTheme.Typography.title(14))
-                    .foregroundStyle(Color.black.opacity(0.52))
+                    .foregroundStyle(StudioTheme.Palette.textSecondary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(
                         Capsule(style: .continuous)
-                            .fill(Color.black.opacity(0.06))
+                            .fill(StudioTheme.Palette.cardFillStrong)
                     )
             }
             .buttonStyle(.plain)
@@ -353,8 +333,8 @@ extension BrushPaletteView {
         .padding(.horizontal, floatingPanelIsWide ? 4 : 0)
         .padding(.vertical, floatingPanelIsWide ? 8 : 0)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(floatingPanelIsWide ? 0.03 : 0.0))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(floatingPanelIsWide ? StudioTheme.Palette.cardFill : Color.clear)
         )
     }
 
@@ -372,12 +352,12 @@ extension BrushPaletteView {
                             .font(StudioTheme.Typography.mono(9))
                             .lineLimit(1)
                     }
-                    .foregroundStyle(isSelected ? Color.white : Color.black.opacity(0.52))
+                    .foregroundStyle(isSelected ? StudioTheme.Palette.textPrimary : StudioTheme.Palette.textSecondary)
                     .frame(maxWidth: .infinity)
                     .frame(height: floatingPanelIsWide ? 60 : 54)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(isSelected ? StudioTheme.Palette.accent : Color.black.opacity(0.05))
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(isSelected ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFillStrong)
                     )
                 }
                 .buttonStyle(.plain)
@@ -425,16 +405,16 @@ extension BrushPaletteView {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(StudioTheme.Typography.mono(9))
-                .foregroundStyle(Color.black.opacity(0.35))
+                .foregroundStyle(StudioTheme.Palette.textMuted)
             Text(value)
                 .font(StudioTheme.Typography.title(12))
-                .foregroundStyle(Color.black.opacity(0.68))
+                .foregroundStyle(StudioTheme.Palette.textSecondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(
             Capsule(style: .continuous)
-                .fill(Color.black.opacity(0.05))
+                .fill(StudioTheme.Palette.cardFillStrong)
         )
     }
 }

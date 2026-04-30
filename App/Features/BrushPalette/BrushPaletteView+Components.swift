@@ -4,7 +4,7 @@ import UIKit
 
 extension BrushPaletteView {
     var usesLightPanelTheme: Bool {
-        rendersFloatingPanelOnly
+        false
     }
 
     var panelPrimaryTextStyle: Color {

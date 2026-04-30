@@ -1854,35 +1854,35 @@ extension ContentView {
             Button {
                 store.send(.workspace(.homeReturnRequested))
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 7) {
                     Image("AppLogo")
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
                         .scaledToFit()
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .accessibilityHidden(true)
 
                     Text(language.localized("ホーム"))
-                        .font(StudioTheme.Typography.label(9))
+                        .font(StudioTheme.Typography.label(10))
                 }
                 .foregroundStyle(StudioTheme.Palette.textPrimary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(StudioTheme.Palette.cardFillStrong)
+                        .fill(StudioTheme.Palette.toolbarFill)
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                        .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
                 }
             }
             .buttonStyle(.plain)
 
             HStack(spacing: 8) {
                 Text(StudioStrings.appName(language))
-                    .font(StudioTheme.Typography.label(10))
+                    .font(StudioTheme.Typography.label(11))
                     .foregroundStyle(StudioTheme.Palette.textPrimary)
             }
 
@@ -2170,117 +2170,164 @@ extension ContentView {
             Spacer(minLength: 8)
 
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
         .background(StudioTheme.Gradients.topBar)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color.white.opacity(0.04))
+                .fill(Color.white.opacity(0.025))
                 .frame(height: 1)
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.white.opacity(0.04))
                 .frame(height: 1)
         }
         .contentShape(Rectangle())
     }
 
     var undoRedoBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
+            panelToolbarToggleButton(
+                systemImage: "sidebar.left",
+                accessibilityLabel: store.document.brushPanel.isCollapsed
+                    ? StudioStrings.showBrushPanel(language)
+                    : StudioStrings.hideBrushPanel(language)
+            ) {
+                store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.brush)))))
+            }
+
             Button {
                 store.send(.document(.lifecycle(.undoRequested)))
             } label: {
                 Image(systemName: "arrow.uturn.backward")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .minimumHitTarget(30)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .minimumHitTarget(36)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .fill(StudioTheme.Palette.toolbarFill)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
             }
 
             Button {
                 store.send(.document(.lifecycle(.redoRequested)))
             } label: {
                 Image(systemName: "arrow.uturn.forward")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .minimumHitTarget(30)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .minimumHitTarget(36)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .fill(StudioTheme.Palette.toolbarFill)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
             }
 
             Button {
                 showsPhotoLayerImporter = true
             } label: {
                 Image(systemName: "photo.badge.plus")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .minimumHitTarget(30)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .minimumHitTarget(36)
             .background(
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .fill(StudioTheme.Palette.toolbarFill)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
             }
 
             Button {
                 store.send(.document(.layerWorkflow(.editing(.clearActiveLayerButtonTapped))))
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .frame(width: 18, height: 18)
             }
             .buttonStyle(.plain)
             .foregroundStyle(StudioTheme.Palette.textPrimary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
             .minimumHitTarget(44)
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
             .background(
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(StudioTheme.Palette.cardFillStrong)
+                    .fill(StudioTheme.Palette.toolbarFill)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
             }
             .disabled(activeLayer == nil)
 
             Spacer(minLength: 0)
+
+            panelToolbarToggleButton(
+                systemImage: "sidebar.right",
+                accessibilityLabel: store.document.layerPanel.isCollapsed
+                    ? StudioStrings.showLayerPanel(language)
+                    : StudioStrings.hideLayerPanel(language)
+            ) {
+                store.send(.document(.canvasEditing(.editing(.panelCollapseToggled(.layers)))))
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(StudioTheme.Gradients.chrome)
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.white.opacity(0.04))
                 .frame(height: 1)
         }
+    }
+
+    func panelToolbarToggleButton(
+        systemImage: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .frame(width: 18, height: 18)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(StudioTheme.Palette.textPrimary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .minimumHitTarget(36)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(StudioTheme.Palette.toolbarFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
+        }
+        .accessibilityLabel(accessibilityLabel)
     }
 
     func menuBarMenu<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -2288,18 +2335,18 @@ extension ContentView {
             content()
         } label: {
             Text(title)
-                .font(StudioTheme.Typography.label(9))
+                .font(StudioTheme.Typography.label(10))
                 .foregroundStyle(StudioTheme.Palette.textPrimary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .minimumHitTarget(28)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .minimumHitTarget(34)
                 .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(StudioTheme.Palette.toolbarFill)
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(StudioTheme.Palette.hairline, lineWidth: 1)
                 }
         }
     }

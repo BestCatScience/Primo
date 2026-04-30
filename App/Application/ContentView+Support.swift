@@ -1024,17 +1024,20 @@ let studioTools: [StudioToolKind] = [.brush, .erase, .blur, .fill, .eyedropper, 
 struct StudioPanelShell<Content: View>: View {
     let title: String
     let isCollapsed: Bool
+    let toggleSystemName: String
     let onToggleCollapse: () -> Void
     let content: Content
 
     init(
         title: String,
         isCollapsed: Bool,
+        toggleSystemName: String,
         onToggleCollapse: @escaping () -> Void,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.isCollapsed = isCollapsed
+        self.toggleSystemName = toggleSystemName
         self.onToggleCollapse = onToggleCollapse
         self.content = content()
     }
@@ -1050,36 +1053,30 @@ struct StudioPanelShell<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(panelBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(panelBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(StudioTheme.Palette.cardBorder, lineWidth: 1)
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.03), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.025), lineWidth: 1)
                 .blur(radius: 0.5)
                 .padding(1)
         }
-        .overlay(alignment: .top) {
-            Capsule(style: .continuous)
-                .fill(StudioTheme.Gradients.accentBar)
-                .frame(width: isCollapsed ? 28 : 120, height: 3)
-                .padding(.top, 10)
-        }
-        .shadow(color: Color.black.opacity(0.32), radius: 28, y: 18)
+        .shadow(color: Color.black.opacity(0.24), radius: 18, y: 12)
     }
 
     private var header: some View {
         HStack(spacing: 8) {
             HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(StudioTheme.Gradients.accent)
-                    .frame(width: 4, height: 24)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(StudioTheme.Palette.accentBright.opacity(isCollapsed ? 0.45 : 0.9))
+                    .frame(width: 3, height: 18)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(StudioTheme.Typography.title(19))
+                        .font(StudioTheme.Typography.title(16))
                         .foregroundStyle(StudioTheme.Palette.textPrimary)
                         .lineLimit(1)
                 }
@@ -1087,22 +1084,17 @@ struct StudioPanelShell<Content: View>: View {
 
             Spacer(minLength: 6)
 
-            panelButton(systemName: isCollapsed ? "chevron.right" : "chevron.left", isActive: false, action: onToggleCollapse)
+            panelButton(systemName: toggleSystemName, isActive: false, action: onToggleCollapse)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.045),
-                    Color.clear,
-                    Color.black.opacity(0.1)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(StudioTheme.Gradients.panelHeader)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(StudioTheme.Palette.hairline)
+                .frame(height: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var panelBackground: LinearGradient {
@@ -1114,9 +1106,9 @@ struct StudioPanelShell<Content: View>: View {
             Image(systemName: systemName)
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
-                .frame(width: 28, height: 28)
+                .frame(width: 24, height: 24)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(isActive ? StudioTheme.Palette.accent : StudioTheme.Palette.cardFillStrong)
                 )
         }

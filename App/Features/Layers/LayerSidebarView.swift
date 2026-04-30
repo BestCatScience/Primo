@@ -42,17 +42,17 @@ struct LayerSidebarView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 if showsTitle {
                     Text(StudioStrings.layersTitle(language))
                         .font(StudioTheme.Typography.title(26))
                         .foregroundStyle(StudioTheme.Palette.textPrimary)
                 }
 
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center) {
                         Text(StudioStrings.layers(store.layers.count + 1, language))
-                            .font(StudioTheme.Typography.title(16))
+                            .font(StudioTheme.Typography.title(15))
                             .foregroundStyle(StudioTheme.Palette.textSecondary)
 
                         Spacer()
@@ -63,9 +63,9 @@ struct LayerSidebarView: View {
                             Image(systemName: "folder.badge.plus")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(StudioTheme.Palette.textSecondary)
-                                .frame(width: 28, height: 28)
+                                .frame(width: 26, height: 26)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                                         .fill(StudioTheme.Palette.cardFillStrong)
                                 )
                         }
@@ -78,10 +78,10 @@ struct LayerSidebarView: View {
                             Label(StudioStrings.addLayer(language), systemImage: "plus")
                                 .font(StudioTheme.Typography.label(11))
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                                         .fill(StudioTheme.Gradients.accent)
                                 )
                         }

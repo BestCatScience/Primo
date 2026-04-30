@@ -93,15 +93,15 @@ extension LayerSidebarView {
         Button(action: action) {
             Image(systemName: systemImage)
                 .rotationEffect(.degrees(rotationDegrees))
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(isActive ? .white : StudioTheme.Palette.textSecondary)
-                .frame(width: 30, height: 28)
+                .frame(width: 28, height: 26)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(isActive ? StudioTheme.Palette.accent.opacity(0.82) : StudioTheme.Palette.cardFillStrong)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .stroke(isActive ? StudioTheme.Palette.accentBright.opacity(0.78) : StudioTheme.Palette.cardBorder, lineWidth: 1)
                 )
         }
@@ -111,7 +111,7 @@ extension LayerSidebarView {
     }
 
     func folderRow(for folder: LayerFolderModel) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             Button {
                 store.send(.folderTapped(folder.id))
             } label: {
@@ -124,7 +124,7 @@ extension LayerSidebarView {
 
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(StudioTheme.Palette.cardFillStrong)
-                .frame(width: 40, height: 40)
+                .frame(width: 34, height: 34)
                 .overlay {
                     Image(systemName: folder.isExpanded ? "folder.fill" : "folder")
                         .font(.system(size: 18, weight: .semibold))
@@ -176,13 +176,13 @@ extension LayerSidebarView {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.vertical, 7)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(folderBackgroundFill(for: folder))
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(folderBorderColor(for: folder), lineWidth: folderStrokeWidth(for: folder))
         }
         .shadow(color: folderShadowColor(for: folder), radius: dropTargetFolderID == folder.id ? 12 : 0, x: 0, y: 0)
@@ -194,7 +194,7 @@ extension LayerSidebarView {
                 )
             }
         )
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture {
             isDraggingLayer = false
             draggedLayerIndex = nil
@@ -215,18 +215,22 @@ extension LayerSidebarView {
         let snapshot = layerSnapshots.first(where: { $0.index == layer.index })
         let childIndent = CGFloat(depth) * 28
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: 9) {
             layerDragHandle(for: layer, snapshot: snapshot)
 
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(StudioTheme.Palette.cardFillStrong)
-                .frame(width: 34, height: 34)
+                .frame(width: 38, height: 38)
                 .overlay {
                     LayerThumbnailView(snapshot: snapshot)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(StudioTheme.Palette.cardBorder, lineWidth: 1)
                 }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 8) {
                     if editingLayerIndex == layer.index {
                         TextField("", text: $editingLayerName)
@@ -266,7 +270,13 @@ extension LayerSidebarView {
                             .foregroundStyle(StudioTheme.Palette.warning)
                     }
 
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 8) {
+                    Text("\(Int((layer.opacity * 100).rounded()))%")
+                        .font(StudioTheme.Typography.mono(9))
+                        .foregroundStyle(StudioTheme.Palette.textMuted)
 
                     Menu {
                         Button {
@@ -295,18 +305,15 @@ extension LayerSidebarView {
                     } label: {
                         Text(layer.blendMode.localizedTitle(language))
                             .font(StudioTheme.Typography.mono(9))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(StudioTheme.Palette.cardFillStrong)
-                            )
+                            .foregroundStyle(StudioTheme.Palette.textSecondary)
+                            .lineLimit(1)
                     }
                     .menuStyle(.button)
                     .buttonStyle(.plain)
-                    .minimumHitTarget()
+                    .minimumHitTarget(28)
                     .fixedSize(horizontal: true, vertical: false)
+
+                    Spacer(minLength: 0)
                 }
 
                 if layer.folderID != nil {
@@ -324,21 +331,21 @@ extension LayerSidebarView {
             } label: {
                 Image(systemName: layer.visible ? "eye.fill" : "eye.slash.fill")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(layer.visible ? .white.opacity(0.9) : .white.opacity(0.45))
+                    .foregroundStyle(layer.visible ? StudioTheme.Palette.textSecondary : StudioTheme.Palette.textDim)
                     .frame(width: 24, height: 24)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
                             .fill(StudioTheme.Palette.cardFillStrong)
                     )
             }
             .buttonStyle(.plain)
-            .minimumHitTarget()
+            .minimumHitTarget(36)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
         .padding(.leading, childIndent)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(backgroundFill(for: layer))
         )
         .shadow(color: dragShadowColor(for: layer), radius: isDraggedLayer(layer) ? 12 : 0, x: 0, y: 0)
@@ -349,7 +356,7 @@ extension LayerSidebarView {
         .animation(.easeInOut(duration: 0.12), value: dropTargetFolderID)
         .overlay {
             ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(borderColor(for: layer), lineWidth: borderWidth(for: layer))
 
                 if depth > 0 {
@@ -373,7 +380,7 @@ extension LayerSidebarView {
                 )
             }
         )
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .onTapGesture {
             isDraggingLayer = false
             draggedLayerIndex = nil
@@ -610,7 +617,7 @@ extension LayerSidebarView {
         if showsInsertionIndicator(for: layer) {
             return StudioTheme.Palette.accent.opacity(0.10)
         }
-        return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedFill : StudioTheme.Palette.cardFill
+        return store.activeLayerIndex == layer.index ? StudioTheme.Palette.selectedRowFill : StudioTheme.Palette.cardFill
     }
 
     func borderColor(for layer: LayerRowModel) -> Color {

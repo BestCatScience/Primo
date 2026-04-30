@@ -10,6 +10,9 @@ enum StudioTheme {
         static let stageBottom = Color(red: 0.11, green: 0.12, blue: 0.14)
         static let panelTop = Color(red: 0.18, green: 0.19, blue: 0.22)
         static let panelBottom = Color(red: 0.11, green: 0.12, blue: 0.14)
+        static let panelHeader = Color(red: 0.13, green: 0.14, blue: 0.16)
+        static let panelInset = Color(red: 0.09, green: 0.10, blue: 0.12)
+        static let panelControl = Color(red: 0.17, green: 0.18, blue: 0.21)
         static let surfaceTop = Color(red: 0.22, green: 0.23, blue: 0.26)
         static let surfaceBottom = Color(red: 0.15, green: 0.16, blue: 0.19)
         static let insetTop = Color.white.opacity(0.05)
@@ -26,13 +29,15 @@ enum StudioTheme {
         static let textSecondary = Color.white.opacity(0.72)
         static let textMuted = Color.white.opacity(0.42)
         static let textDim = Color.white.opacity(0.32)
-        static let hairline = Color.white.opacity(0.07)
-        static let cardFill = Color.white.opacity(0.04)
-        static let cardFillStrong = Color.white.opacity(0.075)
-        static let cardBorder = Color.white.opacity(0.11)
-        static let toolbarFill = Color.white.opacity(0.05)
-        static let toolbarHighlight = Color.white.opacity(0.018)
-        static let selectedFill = accent.opacity(0.22)
+        static let iconInactive = Color.white.opacity(0.50)
+        static let hairline = Color.white.opacity(0.055)
+        static let cardFill = Color.white.opacity(0.035)
+        static let cardFillStrong = Color.white.opacity(0.065)
+        static let cardBorder = Color.white.opacity(0.09)
+        static let toolbarFill = Color.white.opacity(0.028)
+        static let toolbarHighlight = Color.white.opacity(0.06)
+        static let selectedFill = accent.opacity(0.20)
+        static let selectedRowFill = Color(red: 0.12, green: 0.25, blue: 0.39).opacity(0.88)
         static let selectedBorder = accentBright.opacity(0.82)
         static let overlayBlack = Color.black.opacity(0.62)
     }
@@ -78,8 +83,8 @@ enum StudioTheme {
 
         static let topBar = LinearGradient(
             colors: [
-                Color(red: 0.16, green: 0.17, blue: 0.19),
-                Color(red: 0.11, green: 0.12, blue: 0.14)
+                Color(red: 0.125, green: 0.135, blue: 0.155),
+                Color(red: 0.095, green: 0.105, blue: 0.125)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -92,9 +97,18 @@ enum StudioTheme {
         )
 
         static let panel = LinearGradient(
-            colors: [Palette.panelTop, Palette.panelBottom],
+            colors: [Palette.panelTop.opacity(0.96), Palette.panelBottom],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
+        )
+
+        static let panelHeader = LinearGradient(
+            colors: [
+                Palette.panelHeader.opacity(0.98),
+                Palette.panelInset.opacity(0.96)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
         )
 
         static let surface = LinearGradient(
