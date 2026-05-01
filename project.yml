@@ -95,7 +95,7 @@ targets:
       - package: PrimoModules
         product: PrimoCanvasPresentationDomain
       - package: PrimoModules
-        product: PrimoDocumentEngineInfrastructure
+        product: PrimoDocumentRuntime
       - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
@@ -104,16 +104,6 @@ targets:
         product: PrimoAIImageApplication
       - package: PrimoModules
         product: PrimoAIImageInfrastructure
-      - package: PrimoModules
-        product: PrimoDocumentStrokeInfrastructure
-      - package: PrimoModules
-        product: PrimoCanvasPresentationInfrastructure
-      - package: PrimoModules
-        product: PrimoDocumentRenderingInfrastructure
-      - package: PrimoModules
-        product: PrimoDocumentTimelapseInfrastructure
-      - package: PrimoModules
-        product: PrimoDocumentInfrastructure
       - sdk: AVFoundation.framework
       - sdk: AppIntents.framework
       - sdk: CoreGraphics.framework

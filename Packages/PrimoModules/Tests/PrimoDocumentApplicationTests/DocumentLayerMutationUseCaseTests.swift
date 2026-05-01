@@ -180,13 +180,13 @@ private struct StructureGatewayStub: LayerStructureGateway {
     var createFolderResult: DocumentLayerIndexedMutationResult = .success(9)
 
     func addLayer(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
-    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult { activeLayerResult }
-    func duplicateLayer(index: Int, name: String) -> DocumentLayerIndexedMutationResult { duplicateLayerResult }
-    func deleteLayer(index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: Int) -> DocumentLayerIndexedMutationResult { createFolderResult }
-    func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult { .success(()) }
-    func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult { activeLayerResult }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { duplicateLayerResult }
+    func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult { createFolderResult }
+    func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
+    func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult { .success(()) }
 }
 
 private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructureGateway {
@@ -204,31 +204,31 @@ private final class StructureGatewayRecorder: @unchecked Sendable, LayerStructur
 
     func addLayer(name: String) -> DocumentLayerIndexedMutationResult { addLayerResult }
 
-    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult {
-        activeLayerIndices.append(index)
+    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        activeLayerIndices.append(index.rawValue)
         return activeLayerResult
     }
 
-    func duplicateLayer(index: Int, name: String) -> DocumentLayerIndexedMutationResult { .success(5) }
-    func deleteLayer(index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func moveLayer(from index: Int, to destinationIndex: Int) -> DocumentLayerMutationResult { .success(()) }
-    func createFolder(name: String, anchorLayerIndex: Int) -> DocumentLayerIndexedMutationResult { .success(9) }
-    func deleteFolder(id folderID: Int) -> DocumentLayerMutationResult { .success(()) }
-    func assignLayer(index: Int, toFolder folderID: Int) -> DocumentLayerMutationResult { .success(()) }
+    func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult { .success(5) }
+    func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func createFolder(name: String, anchorLayerIndex: LayerAnchorIndex) -> DocumentLayerIndexedMutationResult { .success(9) }
+    func deleteFolder(id folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
+    func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult { .success(()) }
 }
 
 private struct AttributeGatewayStub: LayerAttributeGateway {
     var setLayerVisibleResult: DocumentLayerMutationResult = .success(())
 
-    func setActiveLayerIndex(_ index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerName(_ name: String, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerVisible(_ isVisible: Bool, index: Int) -> DocumentLayerMutationResult { setLayerVisibleResult }
-    func setLayerLocked(_ isLocked: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerClipped(_ isClipped: Bool, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerOpacity(_ opacity: Double, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setFolderExpanded(_ isExpanded: Bool, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setFolderVisible(_ isVisible: Bool, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
-    func setFolderName(_ name: String, folderID: Int) -> DocumentLayerMutationResult { .success(()) }
+    func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerName(_ name: String, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerVisible(_ isVisible: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult { setLayerVisibleResult }
+    func setLayerLocked(_ isLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerClipped(_ isClipped: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerOpacity(_ opacity: ValidatedLayerOpacity, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setLayerBlendMode(_ blendMode: LayerBlendMode, index: ExistingLayerIndex) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderExpanded(_ isExpanded: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderVisible(_ isVisible: Bool, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
+    func setFolderName(_ name: String, folderID: ExistingFolderID) -> DocumentLayerMutationResult { .success(()) }
 }

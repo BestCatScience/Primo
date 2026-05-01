@@ -37,10 +37,10 @@ public struct StrokeSessionRenderState: Equatable, Sendable {
 }
 
 public struct StrokeSessionState: Equatable, Sendable {
-    public var baseSnapshot: MetalDocumentSnapshot?
-    public var renderState: StrokeSessionRenderState?
-    public var pendingIncrementalUpdate: IncrementalLayerUpdate?
-    public var committedPointCount: Int
+    public private(set) var baseSnapshot: MetalDocumentSnapshot?
+    public private(set) var renderState: StrokeSessionRenderState?
+    public private(set) var pendingIncrementalUpdate: IncrementalLayerUpdate?
+    public private(set) var committedPointCount: Int
 
     public init(
         baseSnapshot: MetalDocumentSnapshot? = nil,
@@ -96,6 +96,18 @@ public struct StrokeSessionState: Equatable, Sendable {
 
     public mutating func markCommittedPointCount(_ pointCount: Int) {
         committedPointCount = max(committedPointCount, pointCount)
+    }
+
+    public mutating func resetCommittedPointCount() {
+        committedPointCount = 0
+    }
+
+    public mutating func replaceRenderState(_ renderState: StrokeSessionRenderState?) {
+        self.renderState = renderState
+    }
+
+    public mutating func replacePendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
+        pendingIncrementalUpdate = update
     }
 
     public mutating func resetPreview() {

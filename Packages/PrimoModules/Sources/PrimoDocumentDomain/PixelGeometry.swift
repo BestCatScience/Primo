@@ -103,3 +103,41 @@ public struct PixelGeometry: Equatable, Sendable {
         CanvasSizePolicy.fitsPositiveUInt32(height)
     }
 }
+
+public struct RgbaSurface: Equatable, Sendable {
+    public let geometry: PixelGeometry
+    public let data: Data
+
+    public init?(geometry: PixelGeometry, data: Data) {
+        guard data.count == geometry.rgbaByteCount else { return nil }
+        self.geometry = geometry
+        self.data = data
+    }
+
+    public init?(width: Int, height: Int, data: Data) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        self.init(geometry: geometry, data: data)
+    }
+
+    public var width: Int { geometry.width }
+    public var height: Int { geometry.height }
+}
+
+public struct MaskSurface: Equatable, Sendable {
+    public let geometry: PixelGeometry
+    public let data: Data
+
+    public init?(geometry: PixelGeometry, data: Data) {
+        guard data.count == geometry.maskByteCount else { return nil }
+        self.geometry = geometry
+        self.data = data
+    }
+
+    public init?(width: Int, height: Int, data: Data) {
+        guard let geometry = PixelGeometry(width: width, height: height) else { return nil }
+        self.init(geometry: geometry, data: data)
+    }
+
+    public var width: Int { geometry.width }
+    public var height: Int { geometry.height }
+}

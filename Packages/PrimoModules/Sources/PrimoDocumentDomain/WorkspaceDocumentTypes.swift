@@ -87,7 +87,7 @@ public struct WorkspaceItemID: Hashable, Codable, Sendable, Identifiable {
         self.rawValue = normalized
     }
 
-    public init(unchecked rawValue: String) {
+    package init(unchecked rawValue: String) {
         self.rawValue = rawValue
     }
 

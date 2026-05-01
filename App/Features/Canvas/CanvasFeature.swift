@@ -195,7 +195,7 @@ struct CanvasFeature {
             activeStroke = nil
             pendingCommittedSnapshot = nil
             pendingPreviewIncrementalUpdates = []
-            strokeSession.committedPointCount = 0
+            strokeSession.resetCommittedPointCount()
             shapePreviewIsLive = false
             isStrokeActive = false
             isAwaitingCommittedRender = false
@@ -320,16 +320,16 @@ struct CanvasFeature {
         }
 
         mutating func setActiveStrokeRenderState(_ renderState: StrokeSessionRenderState?) {
-            strokeSession.renderState = renderState
+            strokeSession.replaceRenderState(renderState)
         }
 
         mutating func setPendingIncrementalUpdate(_ update: IncrementalLayerUpdate?) {
-            strokeSession.pendingIncrementalUpdate = update
+            strokeSession.replacePendingIncrementalUpdate(update)
             pendingPreviewIncrementalUpdates = update.map { [$0] } ?? []
         }
 
         mutating func clearPendingIncrementalUpdate() {
-            strokeSession.pendingIncrementalUpdate = nil
+            strokeSession.replacePendingIncrementalUpdate(nil)
             pendingPreviewIncrementalUpdates = []
         }
 
@@ -867,7 +867,7 @@ struct CanvasFeature {
                 if state.currentTool == .shape {
                     let samples = stroke.points.map(\.stylusSample)
                     state.activeStroke = nil
-                    state.strokeSession.committedPointCount = 0
+                    state.strokeSession.resetCommittedPointCount()
                     state.shapePreviewIsLive = false
                     guard samples.count >= 2 else {
                         state.isAwaitingCommittedRender = false
@@ -877,7 +877,7 @@ struct CanvasFeature {
                 }
                 if state.currentTool == .blur {
                     state.activeStroke = nil
-                    state.strokeSession.committedPointCount = 0
+                    state.strokeSession.resetCommittedPointCount()
                     return .send(.delegate(.endBlurStroke))
                 }
                 let previousStroke = state.activeStroke
@@ -892,7 +892,7 @@ struct CanvasFeature {
                 )
                 state.activeStroke = stroke
                 let didCommitStroke = state.strokeSession.hasCommittedPoints
-                state.strokeSession.committedPointCount = 0
+                state.strokeSession.resetCommittedPointCount()
                 if didCommitStroke {
                     var effects: [Effect<Action>] = []
                     if !appendedSamples.isEmpty {
@@ -913,7 +913,7 @@ struct CanvasFeature {
                 state.isAwaitingCommittedRender = false
                 state.activeStroke = nil
                 let didCommitStroke = state.strokeSession.hasCommittedPoints
-                state.strokeSession.committedPointCount = 0
+                state.strokeSession.resetCommittedPointCount()
                 state.shapePreviewIsLive = false
                 if state.currentTool == .blur {
                     return .send(.delegate(.cancelBlurStroke))

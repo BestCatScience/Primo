@@ -1,5 +1,5 @@
 import ComposableArchitecture
-import PrimoDocumentEngineInfrastructure
+import PrimoDocumentRuntime
 import SwiftUI
 
 @main

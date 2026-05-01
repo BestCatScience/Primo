@@ -443,7 +443,7 @@ extension LayerWorkflowReducer {
     func handleClearActiveLayer(state: inout State) -> Effect<Action> {
         let activeLayerIndex = state.layerSidebar.activeLayerIndex
         state.canvas.activeStroke = nil
-        state.canvas.strokeSession.committedPointCount = 0
+        state.canvas.strokeSession.resetCommittedPointCount()
         state.canvas.shapePreviewIsLive = false
         state.canvas.isStrokeActive = false
         state.canvas.isAwaitingCommittedRender = false

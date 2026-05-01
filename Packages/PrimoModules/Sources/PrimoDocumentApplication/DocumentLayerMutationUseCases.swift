@@ -13,17 +13,21 @@ public struct LayerStructureUseCase: Sendable {
         in context: DocumentLayerMutationContext,
         gateway: any LayerStructureGateway
     ) -> Result<LayerStructureMutationPlan, DocumentLayerMutationFailure> {
-        if let failure = validator.validate(command, in: context) {
+        let validatedCommand: ValidatedLayerStructureCommand
+        switch validator.validated(command, in: context) {
+        case let .failure(failure):
             return .failure(failure)
+        case let .success(validated):
+            validatedCommand = validated
         }
 
-        switch command {
+        switch validatedCommand {
         case let .addLayer(name):
             switch gateway.addLayer(name: name) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(createdIndex):
-                switch gateway.setActiveLayerIndex(createdIndex) {
+                switch gateway.setActiveLayerIndex(ExistingLayerIndex(createdIndex)) {
                 case let .failure(failure):
                     return .failure(failure)
                 case .success:
@@ -44,8 +48,8 @@ public struct LayerStructureUseCase: Sendable {
                 return .success(
                     LayerStructureMutationPlan(
                         resultingIndex: duplicatedIndex,
-                        indexMutation: .duplication(sourceIndex: index, duplicatedIndex: duplicatedIndex),
-                        lifecycleEvent: .duplicateLayer(index: index, duplicatedIndex: duplicatedIndex, name: name)
+                        indexMutation: .duplication(sourceIndex: index.rawValue, duplicatedIndex: duplicatedIndex),
+                        lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex, name: name)
                     )
                 )
             }
@@ -57,8 +61,8 @@ public struct LayerStructureUseCase: Sendable {
             case .success:
                 return .success(
                     LayerStructureMutationPlan(
-                        indexMutation: .deletion(index: index),
-                        lifecycleEvent: .deleteLayer(index: index)
+                        indexMutation: .deletion(index: index.rawValue),
+                        lifecycleEvent: .deleteLayer(index: index.rawValue)
                     )
                 )
             }
@@ -70,8 +74,8 @@ public struct LayerStructureUseCase: Sendable {
             case .success:
                 return .success(
                     LayerStructureMutationPlan(
-                        indexMutation: .move(sourceIndex: index, destinationIndex: destinationIndex),
-                        lifecycleEvent: .moveLayer(index: index, destinationIndex: destinationIndex)
+                        indexMutation: .move(sourceIndex: index.rawValue, destinationIndex: destinationIndex.rawValue),
+                        lifecycleEvent: .moveLayer(index: index.rawValue, destinationIndex: destinationIndex.rawValue)
                     )
                 )
             }
@@ -87,7 +91,7 @@ public struct LayerStructureUseCase: Sendable {
                         lifecycleEvent: .createFolder(
                             folderID: folderID,
                             name: name,
-                            anchorLayerIndex: anchorLayerIndex >= 0 ? anchorLayerIndex : nil
+                            anchorLayerIndex: anchorLayerIndex.rawValue
                         )
                     )
                 )
@@ -100,7 +104,7 @@ public struct LayerStructureUseCase: Sendable {
             case .success:
                 return .success(
                     LayerStructureMutationPlan(
-                        lifecycleEvent: .deleteFolder(folderID: folderID)
+                        lifecycleEvent: .deleteFolder(folderID: folderID.rawValue)
                     )
                 )
             }
@@ -113,8 +117,8 @@ public struct LayerStructureUseCase: Sendable {
                 return .success(
                     LayerStructureMutationPlan(
                         lifecycleEvent: .assignLayerToFolder(
-                            index: index,
-                            folderID: folderID >= 0 ? folderID : nil
+                            index: index.rawValue,
+                            folderID: folderID?.rawValue
                         )
                     )
                 )
@@ -135,11 +139,15 @@ public struct LayerAttributeUseCase: Sendable {
         in context: DocumentLayerMutationContext,
         gateway: any LayerAttributeGateway
     ) -> Result<LayerAttributeMutationPlan, DocumentLayerMutationFailure> {
-        if let failure = validator.validate(command, in: context) {
+        let validatedCommand: ValidatedLayerAttributeCommand
+        switch validator.validated(command, in: context) {
+        case let .failure(failure):
             return .failure(failure)
+        case let .success(validated):
+            validatedCommand = validated
         }
 
-        switch command {
+        switch validatedCommand {
         case let .setActiveLayer(index):
             return gateway.setActiveLayerIndex(index).map { .init() }
 
@@ -148,37 +156,37 @@ public struct LayerAttributeUseCase: Sendable {
 
         case let .setLayerVisibility(index, isVisible):
             return gateway.setLayerVisible(isVisible, index: index)
-                .map { .init(lifecycleEvent: .setLayerVisibility(index: index, isVisible: isVisible)) }
+                .map { .init(lifecycleEvent: .setLayerVisibility(index: index.rawValue, isVisible: isVisible)) }
 
         case let .setLayerLocked(index, isLocked):
             return gateway.setLayerLocked(isLocked, index: index)
-                .map { .init(lifecycleEvent: .setLayerLocked(index: index, isLocked: isLocked)) }
+                .map { .init(lifecycleEvent: .setLayerLocked(index: index.rawValue, isLocked: isLocked)) }
 
         case let .setLayerAlphaLocked(index, isAlphaLocked):
             return gateway.setLayerAlphaLocked(isAlphaLocked, index: index)
-                .map { .init(lifecycleEvent: .setLayerAlphaLocked(index: index, isAlphaLocked: isAlphaLocked)) }
+                .map { .init(lifecycleEvent: .setLayerAlphaLocked(index: index.rawValue, isAlphaLocked: isAlphaLocked)) }
 
         case let .setLayerClipped(index, isClipped):
             return gateway.setLayerClipped(isClipped, index: index)
-                .map { .init(lifecycleEvent: .setLayerClipped(index: index, isClipped: isClipped)) }
+                .map { .init(lifecycleEvent: .setLayerClipped(index: index.rawValue, isClipped: isClipped)) }
 
         case let .revealLayerForEditing(index):
             return gateway.setLayerVisible(true, index: index).map { .init() }
 
         case let .setLayerOpacity(index, opacity):
             return gateway.setLayerOpacity(opacity, index: index)
-                .map { .init(lifecycleEvent: .setLayerOpacity(index: index, opacity: opacity)) }
+                .map { .init(lifecycleEvent: .setLayerOpacity(index: index.rawValue, opacity: opacity.rawValue)) }
 
         case let .setLayerBlendMode(index, blendMode):
             return gateway.setLayerBlendMode(blendMode, index: index)
-                .map { .init(lifecycleEvent: .setLayerBlendMode(index: index, blendMode: blendMode)) }
+                .map { .init(lifecycleEvent: .setLayerBlendMode(index: index.rawValue, blendMode: blendMode)) }
 
         case let .setFolderExpanded(folderID, isExpanded):
             return gateway.setFolderExpanded(isExpanded, folderID: folderID).map { .init() }
 
         case let .setFolderVisibility(folderID, isVisible):
             return gateway.setFolderVisible(isVisible, folderID: folderID)
-                .map { .init(lifecycleEvent: .setFolderVisibility(folderID: folderID, isVisible: isVisible)) }
+                .map { .init(lifecycleEvent: .setFolderVisibility(folderID: folderID.rawValue, isVisible: isVisible)) }
 
         case let .setFolderName(folderID, name):
             return gateway.setFolderName(name, folderID: folderID).map { .init() }

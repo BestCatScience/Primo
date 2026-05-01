@@ -1,4 +1,0 @@
-import PrimoCanvasPresentationInfrastructure
-
-typealias InputHandler = CanvasInputHandler
-typealias InputHandlerDelegate = CanvasInputHandlingDelegate

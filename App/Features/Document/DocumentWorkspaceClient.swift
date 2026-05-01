@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
-import PrimoDocumentEngineInfrastructure
+import PrimoDocumentRuntime
 import PrimoWorkspaceInfrastructure
 
 private enum DocumentWorkspaceClientKey: DependencyKey {

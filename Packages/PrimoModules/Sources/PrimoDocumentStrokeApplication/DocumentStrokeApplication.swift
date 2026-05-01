@@ -212,7 +212,7 @@ public struct DocumentStrokePreviewResolution: Sendable {
 }
 
 public struct DocumentStrokePreviewUseCase: Sendable {
-    public var planner: any StrokePreviewPlanning
+    private let planner: any StrokePreviewPlanning
 
     public init(planner: any StrokePreviewPlanning) {
         self.planner = planner
@@ -454,7 +454,7 @@ public struct DocumentStrokePreviewUseCase: Sendable {
 }
 
 public struct DocumentStrokeCommitUseCase: Sendable {
-    public var renderer: any StrokeCommitRendering
+    private let renderer: any StrokeCommitRendering
 
     public init(renderer: any StrokeCommitRendering) {
         self.renderer = renderer
@@ -517,10 +517,10 @@ public enum GpuStrokeSessionOutcome: Sendable {
 }
 
 public struct DocumentStrokeSessionUseCase: Sendable {
-    public var preview: DocumentStrokePreviewUseCase
-    public var commit: DocumentStrokeCommitUseCase
+    public let preview: DocumentStrokePreviewUseCase
+    public let commit: DocumentStrokeCommitUseCase
     public let resetInteractiveStrokeState: @Sendable () -> Void
-    private var executeOverride: (@Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome)?
+    private let executeOverride: (@Sendable (GpuStrokeSessionCommand) -> GpuStrokeSessionOutcome)?
 
     public init(
         preview: DocumentStrokePreviewUseCase,

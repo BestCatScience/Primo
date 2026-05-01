@@ -373,6 +373,112 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
+    func appTargetUsesDocumentRuntimeFacadeInsteadOfDocumentInfrastructureProducts() throws {
+        let repoRoot = try Self.repoRoot()
+        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
+        let bannedImports = Set([
+            "PrimoCanvasPresentationInfrastructure",
+            "PrimoDocumentEngineInfrastructure",
+            "PrimoDocumentInfrastructure",
+            "PrimoDocumentMetalRuntimeInfrastructure",
+            "PrimoDocumentRenderingInfrastructure",
+            "PrimoDocumentStrokeInfrastructure",
+            "PrimoDocumentTimelapseInfrastructure"
+        ])
+        for source in try Self.swiftSources(under: appRoot) {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            let imports = Self.swiftImports(in: body)
+            #expect(
+                imports.isDisjoint(with: bannedImports),
+                "\(source.path) should import PrimoDocumentRuntime instead of concrete document infrastructure modules"
+            )
+        }
+
+        let projectYML = try String(
+            contentsOf: repoRoot.appendingPathComponent("project.yml", isDirectory: false),
+            encoding: .utf8
+        )
+        let appTargetBlock = try #require(Self.yamlTargetBlock(named: "Primo", in: projectYML))
+        let bannedProducts = [
+            "product: PrimoCanvasPresentationInfrastructure",
+            "product: PrimoDocumentEngineInfrastructure",
+            "product: PrimoDocumentInfrastructure",
+            "product: PrimoDocumentRenderingInfrastructure",
+            "product: PrimoDocumentStrokeInfrastructure",
+            "product: PrimoDocumentTimelapseInfrastructure"
+        ]
+        #expect(appTargetBlock.contains("product: PrimoDocumentRuntime"))
+        for product in bannedProducts {
+            #expect(!appTargetBlock.contains(product), "App target should depend on PrimoDocumentRuntime instead of \(product)")
+        }
+    }
+
+    @Test
+    func documentRuntimeFacadeDoesNotReexportConcreteInfrastructureModules() throws {
+        let repoRoot = try Self.repoRoot()
+        let facade = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: facade, encoding: .utf8)
+        #expect(!body.contains("@_exported import"), "PrimoDocumentRuntime should expose explicit App-facing wrappers instead of reexporting infrastructure modules")
+        #expect(!body.contains("public typealias"), "PrimoDocumentRuntime should wrap App-facing infrastructure APIs instead of typealiasing them")
+
+        let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
+        let expectedSymbols: Set<String> = [
+            "DocumentRuntimeComposition",
+            "DocumentRuntimeCompositionFactory",
+            "DocumentProjectPreview",
+            "DocumentProjectPreviewLoader",
+            "TimelapseExportProgress",
+            "TimelapseExportResult",
+            "TimelapseExportError",
+            "TimelapseExportService",
+            "GpuCanvasPreviewRenderer",
+            "GpuCanvasEyedropperSampler",
+            "GpuLayerTransformProcessor",
+            "BrushStrokeKernel",
+            "PrimoMetalSurfaceFiltering",
+            "CanvasPresentationContainerView",
+            "CanvasPixelSurfaceView"
+        ]
+        #expect(publicSymbols == expectedSymbols)
+    }
+
+    @Test
+    func strokeSessionStateDoesNotExposePublicMutableCoreState() throws {
+        let repoRoot = try Self.repoRoot()
+        let strokeState = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentStrokeApplication/StrokeSessionState.swift",
+            isDirectory: false
+        )
+        let strokeUseCases = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentStrokeApplication/DocumentStrokeApplication.swift",
+            isDirectory: false
+        )
+        let stateBody = try String(contentsOf: strokeState, encoding: .utf8)
+        let useCaseBody = try String(contentsOf: strokeUseCases, encoding: .utf8)
+
+        let bannedStateFields = [
+            "public var baseSnapshot",
+            "public var renderState",
+            "public var pendingIncrementalUpdate",
+            "public var committedPointCount"
+        ]
+        for field in bannedStateFields {
+            #expect(!stateBody.contains(field), "StrokeSessionState should mutate \(field) only through explicit methods")
+        }
+
+        let bannedUseCaseFields = [
+            "public var planner",
+            "public var renderer"
+        ]
+        for field in bannedUseCaseFields {
+            #expect(!useCaseBody.contains(field), "Stroke use cases should not expose \(field) as mutable public state")
+        }
+    }
+
+    @Test
     func canvasPresentationModelsLiveOutsideAppModelLayer() throws {
         let repoRoot = try Self.repoRoot()
         let appModels = repoRoot.appendingPathComponent("App/Models/PaintModels.swift", isDirectory: false)
@@ -413,6 +519,53 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(lineCount < 100, "DocumentRuntimeContracts.swift should stay a thin compatibility umbrella")
         for token in banned {
             #expect(!body.contains(token), "Runtime contract type \(token) should live in a narrow contract target")
+        }
+    }
+
+    @Test
+    func layerMutationGatewaysRequireValidatedIdentifiers() throws {
+        let repoRoot = try Self.repoRoot()
+        let contracts = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentApplication/DocumentLayerMutationContracts.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: contracts, encoding: .utf8)
+        let banned = [
+            "func setActiveLayerIndex(_ index: Int)",
+            "func duplicateLayer(index: Int",
+            "func deleteLayer(index: Int)",
+            "func moveLayer(from index: Int",
+            "func createFolder(name: String, anchorLayerIndex: Int)",
+            "func deleteFolder(id folderID: Int)",
+            "func assignLayer(index: Int",
+            "func setLayerName(_ name: String, index: Int)",
+            "func setLayerVisible(_ isVisible: Bool, index: Int)",
+            "func setLayerLocked(_ isLocked: Bool, index: Int)",
+            "func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: Int)",
+            "func setLayerClipped(_ isClipped: Bool, index: Int)",
+            "func setLayerOpacity(_ opacity: Double, index: Int)",
+            "func setLayerBlendMode(_ blendMode: LayerBlendMode, index: Int)",
+            "func setFolderExpanded(_ isExpanded: Bool, folderID: Int)",
+            "func setFolderVisible(_ isVisible: Bool, folderID: Int)",
+            "func setFolderName(_ name: String, folderID: Int)"
+        ]
+        for token in banned {
+            #expect(!body.contains(token), "Layer mutation gateways should accept validated value objects instead of \(token)")
+        }
+    }
+
+    @Test
+    func domainUncheckedConstructorsStayPackageScoped() throws {
+        let repoRoot = try Self.repoRoot()
+        let domainRoot = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentDomain",
+            isDirectory: true
+        )
+        let sources = try Self.swiftSources(under: domainRoot)
+        for source in sources {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            #expect(!body.contains("public init(unchecked"), "\(source.path) should keep unsafe constructors package-scoped")
+            #expect(!body.contains("public static func unchecked"), "\(source.path) should keep unsafe factories package-scoped")
         }
     }
 
@@ -622,6 +775,16 @@ struct GpuSideEffectIsolationArchitectureTests {
             let module = remainder.split(whereSeparator: { $0 == " " || $0 == "." }).first
             return module.map(String.init)
         })
+    }
+
+    private static func yamlTargetBlock(named targetName: String, in yaml: String) -> String? {
+        let marker = "\n  \(targetName):\n"
+        guard let range = yaml.range(of: marker) else { return nil }
+        let bodyStart = range.upperBound
+        let remaining = yaml[bodyStart...]
+        let nextTarget = remaining.range(of: "\n  [^\\s][A-Za-z0-9_ -]*:\\n", options: .regularExpression)
+        let bodyEnd = nextTarget?.lowerBound ?? yaml.endIndex
+        return String(yaml[range.lowerBound..<bodyEnd])
     }
 
     private static func publicTopLevelSymbols(in source: String) -> [String] {

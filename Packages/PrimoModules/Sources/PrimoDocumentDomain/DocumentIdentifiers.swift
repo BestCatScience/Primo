@@ -10,11 +10,11 @@ public struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Com
         self.rawValue = rawValue
     }
 
-    public init(unchecked rawValue: Int) {
+    package init(unchecked rawValue: Int) {
         self.rawValue = rawValue
     }
 
-    public static func unchecked(_ rawValue: Int) -> Self {
+    package static func unchecked(_ rawValue: Int) -> Self {
         Self(unchecked: rawValue)
     }
 
@@ -53,11 +53,11 @@ public struct DocumentFolderID: Hashable, Codable, Sendable, Identifiable, Compa
         self.rawValue = rawValue
     }
 
-    public init(unchecked rawValue: Int) {
+    package init(unchecked rawValue: Int) {
         self.rawValue = rawValue
     }
 
-    public static func unchecked(_ rawValue: Int) -> Self {
+    package static func unchecked(_ rawValue: Int) -> Self {
         Self(unchecked: rawValue)
     }
 

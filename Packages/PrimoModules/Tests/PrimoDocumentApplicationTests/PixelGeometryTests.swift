@@ -26,6 +26,21 @@ struct PixelGeometryTests {
     }
 
     @Test
+    func rgbaAndMaskSurfacesValidatePayloadSizes() throws {
+        let geometry = try #require(PixelGeometry(width: 3, height: 2))
+
+        let rgba = RgbaSurface(geometry: geometry, data: Data(count: geometry.rgbaByteCount))
+        #expect(rgba?.width == 3)
+        #expect(rgba?.height == 2)
+        #expect(RgbaSurface(geometry: geometry, data: Data(count: geometry.maskByteCount)) == nil)
+
+        let mask = MaskSurface(geometry: geometry, data: Data(count: geometry.maskByteCount))
+        #expect(mask?.width == 3)
+        #expect(mask?.height == 2)
+        #expect(MaskSurface(geometry: geometry, data: Data(count: geometry.rgbaByteCount)) == nil)
+    }
+
+    @Test
     func layerBudgetScalesDownForLargeCanvases() throws {
         let small = try #require(PixelGeometry(width: 64, height: 64))
         #expect(CanvasSizePolicy.maxLayerCountForCanvas(small) == CanvasSizePolicy.maxLayerCount)

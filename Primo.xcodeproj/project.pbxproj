@@ -125,6 +125,7 @@
 		B90000000000000000000035 /* PrimoDocumentEngineInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */; };
 		B90000000000000000000037 /* PrimoDocumentRenderingInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B90000000000000000000038 /* PrimoDocumentRenderingInfrastructure */; };
 		B90000000000000000000039 /* PrimoDocumentTimelapseInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003A /* PrimoDocumentTimelapseInfrastructure */; };
+		B93000000000000000000001 /* PrimoDocumentRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = B93000000000000000000011 /* PrimoDocumentRuntime */; };
 		B9000000000000000000003B /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B9000000000000000000003C /* PrimoWorkspaceApplication in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003D /* PrimoWorkspaceApplication */; };
 		B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */ = {isa = PBXBuildFile; productRef = B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */; };
@@ -321,14 +322,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B90000000000000000000035 /* PrimoDocumentEngineInfrastructure in Frameworks */,
-				B90000000000000000000037 /* PrimoDocumentRenderingInfrastructure in Frameworks */,
-				B90000000000000000000039 /* PrimoDocumentTimelapseInfrastructure in Frameworks */,
-				B90000000000000000000030 /* PrimoDocumentInfrastructure in Frameworks */,
+				B93000000000000000000001 /* PrimoDocumentRuntime in Frameworks */,
 				B91000000000000000000001 /* PrimoCanvasInputDomain in Frameworks */,
 				B91000000000000000000002 /* PrimoDocumentStrokeApplication in Frameworks */,
-				B9000000000000000000003E /* PrimoDocumentStrokeInfrastructure in Frameworks */,
-				B91000000000000000000004 /* PrimoCanvasPresentationInfrastructure in Frameworks */,
 				B90000000000000000000021 /* PrimoBrushDomain in Frameworks */,
 				B9000000000000000000001E /* PrimoBrushFileFormats in Frameworks */,
 				B9000000000000000000001A /* PrimoBrushInfrastructure in Frameworks */,
@@ -668,14 +664,9 @@
 				B90000000000000000000029 /* PrimoAIImageInfrastructure */,
 				B90000000000000000000012 /* PrimoDocumentDomain */,
 				B9000000000000000000002A /* PrimoDocumentApplication */,
-				B90000000000000000000036 /* PrimoDocumentEngineInfrastructure */,
-				B90000000000000000000038 /* PrimoDocumentRenderingInfrastructure */,
-				B9000000000000000000003A /* PrimoDocumentTimelapseInfrastructure */,
-				B90000000000000000000032 /* PrimoDocumentInfrastructure */,
+				B93000000000000000000011 /* PrimoDocumentRuntime */,
 				B91000000000000000000011 /* PrimoCanvasInputDomain */,
 				B91000000000000000000012 /* PrimoDocumentStrokeApplication */,
-				B9000000000000000000003F /* PrimoDocumentStrokeInfrastructure */,
-				B91000000000000000000014 /* PrimoCanvasPresentationInfrastructure */,
 				B90000000000000000000013 /* PrimoDocumentContracts */,
 				B92000000000000000000011 /* PrimoBrushRuntimeContracts */,
 				B92000000000000000000012 /* PrimoDocumentMutationContracts */,
@@ -1432,6 +1423,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
 			productName = PrimoCanvasPresentationInfrastructure;
+		};
+		B93000000000000000000011 /* PrimoDocumentRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B90000000000000000000010 /* XCLocalSwiftPackageReference "Packages/PrimoModules" */;
+			productName = PrimoDocumentRuntime;
 		};
 		B92000000000000000000011 /* PrimoBrushRuntimeContracts */ = {
 			isa = XCSwiftPackageProductDependency;

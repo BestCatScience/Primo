@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "PrimoDocumentGPUContracts", targets: ["PrimoDocumentGPUContracts"]),
         .library(name: "PrimoDocumentApplication", targets: ["PrimoDocumentApplication"]),
         .library(name: "PrimoDocumentStrokeApplication", targets: ["PrimoDocumentStrokeApplication"]),
+        .library(name: "PrimoDocumentRuntime", targets: ["PrimoDocumentRuntime"]),
         .library(name: "PrimoDocumentInfrastructure", targets: ["PrimoDocumentInfrastructure"]),
         .library(name: "PrimoDocumentMetalRuntimeInfrastructure", targets: ["PrimoDocumentMetalRuntimeInfrastructure"]),
         .library(name: "PrimoDocumentMetalSurfaceInfrastructure", targets: ["PrimoDocumentMetalSurfaceInfrastructure"]),
@@ -248,6 +249,17 @@ let package = Package(
                 "PrimoDocumentTimelapseInfrastructure",
             ],
             path: "Sources/PrimoDocumentEngineInfrastructure"
+        ),
+        .target(
+            name: "PrimoDocumentRuntime",
+            dependencies: [
+                "PrimoCanvasPresentationInfrastructure",
+                "PrimoDocumentEngineInfrastructure",
+                "PrimoDocumentMetalRuntimeInfrastructure",
+                "PrimoDocumentRenderingInfrastructure",
+                "PrimoDocumentStrokeInfrastructure",
+            ],
+            path: "Sources/PrimoDocumentRuntime"
         ),
         .target(
             name: "PrimoBrushDomain"

@@ -1,8 +1,7 @@
-import PrimoCanvasPresentationInfrastructure
 import PrimoDocumentContracts
 import PrimoDocumentApplication
 import PrimoDocumentDomain
-import PrimoDocumentMetalRuntimeInfrastructure
+import PrimoDocumentRuntime
 import SwiftUI
 import UIKit
 
