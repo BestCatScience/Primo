@@ -19,7 +19,6 @@ struct CanvasEditingWorkflowReducer: Reducer {
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
     @Dependency(\.documentQueryGateway) var documentQueryGateway
     @Dependency(\.documentStrokeCommandService) var documentStrokeCommandService
-    @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
     @Dependency(\.selectionWorkflowService) var selectionWorkflowService
 
     enum EditingAction: Equatable {

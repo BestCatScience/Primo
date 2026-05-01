@@ -495,6 +495,7 @@ let package = Package(
             dependencies: [
                 "PrimoDocumentContracts",
                 "PrimoDocumentEngineInfrastructure",
+                "PrimoDocumentRuntime",
                 "PrimoDocumentMetalRuntimeInfrastructure",
             ]
         ),

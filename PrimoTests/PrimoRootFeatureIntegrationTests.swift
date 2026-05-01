@@ -43,7 +43,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         TestStore(initialState: initialState) {
             PrimoRootFeature()
         } withDependencies: {
-            $0.documentRuntimeComposition = .stub()
+            $0.documentRuntime = .stub()
             $0.documentWorkspaceClient = .stub()
             $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
             $0.dateClient = DateClient(now: { Date(timeIntervalSince1970: 1_234) })
@@ -101,7 +101,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         ) {
             WorkspaceFeature()
         } withDependencies: {
-            $0.documentRuntimeComposition = .stub()
+            $0.documentRuntime = .stub()
             $0.documentWorkspaceClient = .stub()
             $0.workspaceApplicationWorkflowService = WorkspaceApplicationWorkflowService()
             $0.uuidClient = UUIDClient(generate: {
@@ -152,7 +152,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            $0.documentRuntimeComposition = .stub(
+            $0.documentRuntime = .stub(
                 exportGateway: .stub(
                     compositeSurface: { _ in previewSurface }
                 )
@@ -183,7 +183,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            $0.documentRuntimeComposition = .stub(
+            $0.documentRuntime = .stub(
                 exportGateway: .stub(
                     compositeSurface: { _ in previewSurface }
                 )
@@ -226,7 +226,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            $0.documentRuntimeComposition = .stub(
+            $0.documentRuntime = .stub(
                 exportGateway: .stub(
                     compositeSurface: { _ in previewSurface }
                 )
@@ -438,7 +438,7 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             }()
         ) {
             $0.uuidClient = UUIDClient(generate: { reservedID })
-            $0.documentRuntimeComposition = .stub(
+            $0.documentRuntime = .stub(
                 persistenceGateway: .stub(
                     loadProject: { url in
                         loadProjectCalls.record(url)
@@ -670,14 +670,14 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
         XCTAssertTrue(contents.contains("CanvasLifecycleFeedbackMapper"))
     }
 
-    func testPrimoAppInjectsOneSharedDocumentRuntimeComposition() throws {
+    func testPrimoAppInjectsOneSharedDocumentRuntime() throws {
         let contents = try String(
             contentsOf: repoRoot.appendingPathComponent("App/Application/PrimoApp.swift"),
             encoding: .utf8
         )
 
-        XCTAssertTrue(contents.contains("let documentRuntimeComposition = DocumentRuntimeCompositionFactory.live()"))
-        XCTAssertTrue(contents.contains("$0.documentRuntimeComposition = documentRuntimeComposition"))
+        XCTAssertTrue(contents.contains("let documentRuntime = DocumentRuntimeFactory.live()"))
+        XCTAssertTrue(contents.contains("$0.documentRuntime = documentRuntime"))
     }
 
     func testCrossFeatureIntegrationReducerHomeProjectsLoadRoutesToCatalogRequest() async {
@@ -700,7 +700,9 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             }()
         ) {
             $0.documentQueryGateway = .stub(presentation: undoPresentation)
-            $0.documentHistoryGateway = .stub(undo: { .success(()) })
+            $0.documentHistoryCommandService = DocumentHistoryCommandService(
+                historyGateway: .stub(undo: { .success(()) })
+            )
         }
         store.exhaustivity = .off
 
@@ -740,7 +742,9 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
             }()
         ) {
             $0.documentQueryGateway = .stub(presentation: .renderedTestValue(width: 2, height: 2))
-            $0.documentHistoryGateway = .stub(undo: { .success(()) })
+            $0.documentHistoryCommandService = DocumentHistoryCommandService(
+                historyGateway: .stub(undo: { .success(()) })
+            )
         }
         store.exhaustivity = .off
 

@@ -1,13 +1,33 @@
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentMutationContracts
+import PrimoDocumentRuntime
 import Testing
 @testable import PrimoDocumentEngineInfrastructure
 
 struct DocumentRuntimeCompositionTests {
     @Test
+    func runtimePresentationObservationPublishesInitialAndMutationSnapshots() async throws {
+        let runtime = PrimoDocumentRuntime.DocumentRuntimeFactory.live()
+        var iterator = runtime.observePresentation().makeAsyncIterator()
+
+        let initial = await iterator.next()
+        #expect(initial?.canvasSize.width != 3)
+
+        let outcome = await runtime.execute(.canvas(.resize(width: 3, height: 3)))
+        guard case .mutation(.success) = outcome else {
+            Issue.record("Expected resize command to succeed")
+            return
+        }
+
+        let updated = await iterator.next()
+        #expect(updated?.canvasSize.width == 3)
+        #expect(updated?.canvasSize.height == 3)
+    }
+
+    @Test
     func editingGatewayExecutesLayerRequestsThroughSharedRuntime() throws {
-        let runtime = DocumentRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
 
         let addResult = runtime.editingGateway.execute(
             .structure(.addLayer(name: "Foreground"))
@@ -32,7 +52,7 @@ struct DocumentRuntimeCompositionTests {
 
     @Test
     func compositionOverridesReturnNewBoundaryWhilePreservingSharedRuntime() throws {
-        let runtime = DocumentRuntimeCompositionFactory.live()
+        let runtime = PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live()
         let overridden = runtime.withOverrides(
             historyGateway: DocumentHistoryGateway(
                 canUndo: { false },

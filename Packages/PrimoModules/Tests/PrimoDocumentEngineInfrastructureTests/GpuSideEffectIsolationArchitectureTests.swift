@@ -489,8 +489,17 @@ struct GpuSideEffectIsolationArchitectureTests {
 
         let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
         let expectedSymbols: Set<String> = [
-            "DocumentRuntimeComposition",
-            "DocumentRuntimeCompositionFactory",
+            "DocumentRuntime",
+            "DocumentRuntimeFactory",
+            "DocumentCommand",
+            "DocumentCommandOutcome",
+            "DocumentCanvasCommand",
+            "DocumentLayerCommand",
+            "DocumentStrokeCommand",
+            "DocumentHistoryCommand",
+            "DocumentPresentationRequest",
+            "DocumentMutationSuccess",
+            "DocumentHistoryState",
             "DocumentProjectPreview",
             "DocumentProjectPreviewLoader",
             "TimelapseExportProgress",

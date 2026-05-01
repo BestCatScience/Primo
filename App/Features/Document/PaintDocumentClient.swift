@@ -8,13 +8,13 @@ import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
 
-private enum DocumentRuntimeCompositionKey: DependencyKey {
-    static var liveValue: DocumentRuntimeComposition {
+private enum DocumentRuntimeKey: DependencyKey {
+    static var liveValue: DocumentRuntime {
         @Dependency(\.fileClient) var fileClient
         @Dependency(\.dateClient) var dateClient
         @Dependency(\.uuidClient) var uuidClient
 
-        return DocumentRuntimeCompositionFactory.live(
+        return DocumentRuntimeFactory.live(
             fileClient: fileClient,
             dateClient: dateClient,
             uuidClient: uuidClient
@@ -24,83 +24,64 @@ private enum DocumentRuntimeCompositionKey: DependencyKey {
 
 private enum DocumentCanvasCommandServiceKey: DependencyKey {
     static var liveValue: DocumentCanvasCommandService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentCanvasCommandService(
-            queryGateway: composition.queryGateway,
-            renderGateway: composition.renderGateway,
-            mutationGateway: composition.mutationGateway,
-            persistenceGateway: composition.persistenceGateway
-        )
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.canvasCommands
     }
 }
 
 private enum DocumentLayerCommandServiceKey: DependencyKey {
     static var liveValue: DocumentLayerCommandService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.layerCommands
     }
 }
 
 private enum DocumentStrokeCommandServiceKey: DependencyKey {
     static var liveValue: DocumentStrokeCommandService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.strokeCommands
     }
 }
 
 private enum CanvasStrokeInteractionServiceKey: DependencyKey {
     static var liveValue: CanvasStrokeInteractionService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return CanvasStrokeInteractionService(sessionUseCase: composition.strokeSessionUseCase)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.canvasStrokeInteractionService
     }
 }
 
 private enum DocumentHistoryCommandServiceKey: DependencyKey {
     static var liveValue: DocumentHistoryCommandService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.historyCommands
     }
 }
 
 private enum DocumentMutationWorkflowServiceKey: DependencyKey {
     static var liveValue: DocumentMutationWorkflowService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentMutationWorkflowService(
-            documentEditingGateway: composition.editingGateway,
-            documentLayerEffectsGateway: composition.layerEffectsGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.mutationWorkflow
     }
 }
 
 private enum DocumentContentServiceKey: DependencyKey {
     static var liveValue: DocumentContentService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return DocumentContentService(
-            documentQueryGateway: composition.queryGateway,
-            documentRenderGateway: composition.renderGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.contentService
     }
 }
 
 private enum CanvasEditingWorkflowServiceKey: DependencyKey {
     static var liveValue: CanvasEditingWorkflowService {
-        @Dependency(\.documentContentService) var documentContentService
-        @Dependency(\.layerTransformProcessor) var layerTransformProcessor
-        return CanvasEditingWorkflowService(
-            documentContentService: documentContentService,
-            layerTransformProcessor: layerTransformProcessor
-        )
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.canvasEditingWorkflow
     }
 }
 
 private enum SelectionWorkflowServiceKey: DependencyKey {
     static var liveValue: SelectionWorkflowService {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return SelectionWorkflowService(gpuOperations: composition.gpuOperationGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.selectionWorkflow
     }
 }
 
@@ -110,22 +91,22 @@ private enum WorkspaceApplicationWorkflowServiceKey: DependencyKey {
 
 private enum CanvasPreviewRendererKey: DependencyKey {
     static var liveValue: any CanvasPreviewRendering {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.canvasPreviewRenderer
     }
 }
 
 private enum LayerTransformProcessorKey: DependencyKey {
     static var liveValue: any LayerTransformProcessing {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return GpuLayerTransformProcessor(gpuOperations: composition.gpuOperationGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.layerTransformProcessor
     }
 }
 
 private enum SelectionMaskProcessorKey: DependencyKey {
     static var liveValue: any SelectionMaskProcessing {
-        @Dependency(\.documentRuntimeComposition) var composition
-        return GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.selectionMaskProcessor
     }
 }
 
@@ -137,184 +118,94 @@ private enum CanvasEyedropperSamplerKey: DependencyKey {
 
 private enum CanvasPresentationEnvironmentKey: DependencyKey {
     static var liveValue: CanvasPresentationEnvironment {
-        @Dependency(\.canvasPreviewRenderer) var previewRenderer
-        @Dependency(\.canvasEyedropperSampler) var eyedropperSampler
-        @Dependency(\.selectionMaskProcessor) var selectionMaskProcessor
-        @Dependency(\.layerTransformProcessor) var layerTransformProcessor
-        return CanvasPresentationEnvironment(
-            previewRenderer: previewRenderer,
-            eyedropperSampler: eyedropperSampler,
-            selectionProcessor: selectionMaskProcessor,
-            layerTransformProcessor: layerTransformProcessor
-        )
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.canvasPresentationEnvironment
+    }
+}
+
+private enum DocumentQueryGatewayKey: DependencyKey {
+    static var liveValue: DocumentQueryGateway {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.queryGateway
+    }
+}
+
+private enum DocumentPersistenceGatewayKey: DependencyKey {
+    static var liveValue: DocumentPersistenceGateway {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.persistenceGateway
+    }
+}
+
+private enum DocumentExportGatewayKey: DependencyKey {
+    static var liveValue: DocumentExportGateway {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.exportGateway
+    }
+}
+
+private enum TextLayerGatewayKey: DependencyKey {
+    static var liveValue: TextLayerGateway {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.textLayerGateway
+    }
+}
+
+private enum DocumentGpuOperationGatewayKey: DependencyKey {
+    static var liveValue: DocumentGpuOperationGateway {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.gpuOperationGateway
     }
 }
 
 private extension DependencyValues {
-    mutating func setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(
-        _ gpuOperationGateway: DocumentGpuOperationGateway
-    ) {
-        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
-        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
-        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: gpuOperationGateway)
-        self[CanvasPreviewRendererKey.self] = canvasPreviewRenderer
-        self[SelectionMaskProcessorKey.self] = selectionMaskProcessor
-        self[LayerTransformProcessorKey.self] = layerTransformProcessor
-        self[CanvasPresentationEnvironmentKey.self] = CanvasPresentationEnvironment(
-            previewRenderer: canvasPreviewRenderer,
-            eyedropperSampler: self[CanvasEyedropperSamplerKey.self],
-            selectionProcessor: selectionMaskProcessor,
-            layerTransformProcessor: layerTransformProcessor
-        )
-        self[SelectionWorkflowServiceKey.self] = SelectionWorkflowService(
-            gpuOperations: gpuOperationGateway
-        )
-        self[CanvasEditingWorkflowServiceKey.self] = CanvasEditingWorkflowService(
-            documentContentService: self[DocumentContentServiceKey.self],
-            layerTransformProcessor: layerTransformProcessor
-        )
-    }
-
-    mutating func setDocumentRuntimeCompositionAndRefreshCommandServices(
-        _ composition: DocumentRuntimeComposition
-    ) {
-        self[DocumentRuntimeCompositionKey.self] = composition
-        self[DocumentCanvasCommandServiceKey.self] = DocumentCanvasCommandService(
-            queryGateway: composition.queryGateway,
-            renderGateway: composition.renderGateway,
-            mutationGateway: composition.mutationGateway,
-            persistenceGateway: composition.persistenceGateway
-        )
-        self[DocumentLayerCommandServiceKey.self] = DocumentLayerCommandService(
-            mutationGateway: composition.mutationGateway
-        )
-        self[DocumentStrokeCommandServiceKey.self] = DocumentStrokeCommandService(
-            strokeGateway: composition.strokeGateway
-        )
-        self[CanvasStrokeInteractionServiceKey.self] = CanvasStrokeInteractionService(
-            sessionUseCase: composition.strokeSessionUseCase
-        )
-        self[DocumentHistoryCommandServiceKey.self] = DocumentHistoryCommandService(
-            historyGateway: composition.historyGateway
-        )
-        self[DocumentMutationWorkflowServiceKey.self] = DocumentMutationWorkflowService(
-            documentEditingGateway: composition.editingGateway,
-            documentLayerEffectsGateway: composition.layerEffectsGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
-        self[DocumentContentServiceKey.self] = DocumentContentService(
-            documentQueryGateway: composition.queryGateway,
-            documentRenderGateway: composition.renderGateway,
-            documentMutationGateway: composition.mutationGateway,
-            textLayerGateway: composition.textLayerGateway
-        )
-        setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(composition.gpuOperationGateway)
+    mutating func setDocumentRuntimeAndRefreshServices(_ runtime: DocumentRuntime) {
+        self[DocumentRuntimeKey.self] = runtime
+        self[DocumentCanvasCommandServiceKey.self] = runtime.canvasCommands
+        self[DocumentLayerCommandServiceKey.self] = runtime.layerCommands
+        self[DocumentStrokeCommandServiceKey.self] = runtime.strokeCommands
+        self[CanvasStrokeInteractionServiceKey.self] = runtime.canvasStrokeInteractionService
+        self[DocumentHistoryCommandServiceKey.self] = runtime.historyCommands
+        self[DocumentMutationWorkflowServiceKey.self] = runtime.mutationWorkflow
+        self[DocumentContentServiceKey.self] = runtime.contentService
+        self[CanvasEditingWorkflowServiceKey.self] = runtime.canvasEditingWorkflow
+        self[SelectionWorkflowServiceKey.self] = runtime.selectionWorkflow
+        self[CanvasPreviewRendererKey.self] = runtime.canvasPreviewRenderer
+        self[SelectionMaskProcessorKey.self] = runtime.selectionMaskProcessor
+        self[LayerTransformProcessorKey.self] = runtime.layerTransformProcessor
+        self[CanvasPresentationEnvironmentKey.self] = runtime.canvasPresentationEnvironment
+        self[DocumentQueryGatewayKey.self] = runtime.queryGateway
+        self[DocumentPersistenceGatewayKey.self] = runtime.persistenceGateway
+        self[DocumentExportGatewayKey.self] = runtime.exportGateway
+        self[TextLayerGatewayKey.self] = runtime.textLayerGateway
+        self[DocumentGpuOperationGatewayKey.self] = runtime.gpuOperationGateway
     }
 }
 
 extension DependencyValues {
-    var documentRuntimeComposition: DocumentRuntimeComposition {
-        get { self[DocumentRuntimeCompositionKey.self] }
-        set { setDocumentRuntimeCompositionAndRefreshCommandServices(newValue) }
+    var documentRuntime: DocumentRuntime {
+        get { self[DocumentRuntimeKey.self] }
+        set { setDocumentRuntimeAndRefreshServices(newValue) }
     }
 
     var documentQueryGateway: DocumentQueryGateway {
-        get { documentRuntimeComposition.queryGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(queryGateway: newValue)
-            )
-        }
-    }
-
-    var documentRenderGateway: DocumentRenderGateway {
-        get { documentRuntimeComposition.renderGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(renderGateway: newValue)
-            )
-        }
-    }
-
-    var documentDirtyUpdateQueue: DocumentDirtyUpdateQueue {
-        get { documentRuntimeComposition.dirtyUpdateQueue }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(dirtyUpdateQueue: newValue)
-            )
-        }
-    }
-
-    var documentMutationGateway: DocumentMutationGateway {
-        get { documentRuntimeComposition.mutationGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(mutationGateway: newValue)
-            )
-        }
-    }
-
-    var strokeInputGateway: StrokeInputGateway {
-        get { documentRuntimeComposition.strokeGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(strokeGateway: newValue)
-            )
-        }
-    }
-
-    var documentHistoryGateway: DocumentHistoryGateway {
-        get { documentRuntimeComposition.historyGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(historyGateway: newValue)
-            )
-        }
+        get { self[DocumentQueryGatewayKey.self] }
+        set { self[DocumentQueryGatewayKey.self] = newValue }
     }
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
-        get { documentRuntimeComposition.persistenceGateway }
-        set {
-            setDocumentRuntimeCompositionAndRefreshCommandServices(
-                documentRuntimeComposition.withOverrides(persistenceGateway: newValue)
-            )
-        }
+        get { self[DocumentPersistenceGatewayKey.self] }
+        set { self[DocumentPersistenceGatewayKey.self] = newValue }
     }
 
     var documentExportGateway: DocumentExportGateway {
-        get { documentRuntimeComposition.exportGateway }
-        set {
-            documentRuntimeComposition = documentRuntimeComposition.withOverrides(exportGateway: newValue)
-        }
+        get { self[DocumentExportGatewayKey.self] }
+        set { self[DocumentExportGatewayKey.self] = newValue }
     }
 
     var textLayerGateway: TextLayerGateway {
-        get { documentRuntimeComposition.textLayerGateway }
-        set {
-            documentRuntimeComposition = documentRuntimeComposition.withOverrides(textLayerGateway: newValue)
-        }
-    }
-
-    var documentLayerEffectsGateway: DocumentLayerEffectsGateway {
-        get { documentRuntimeComposition.layerEffectsGateway }
-        set {
-            documentRuntimeComposition = documentRuntimeComposition.withOverrides(layerEffectsGateway: newValue)
-        }
-    }
-
-    var documentEditingGateway: DocumentEditingGateway {
-        get { documentRuntimeComposition.editingGateway }
-        set {
-            documentRuntimeComposition = documentRuntimeComposition.withOverrides(editingGateway: newValue)
-        }
-    }
-
-    var documentStrokeSessionUseCase: DocumentStrokeSessionUseCase {
-        get { documentRuntimeComposition.strokeSessionUseCase }
-        set {
-            documentRuntimeComposition = documentRuntimeComposition.withOverrides(strokeSessionUseCase: newValue)
-        }
+        get { self[TextLayerGatewayKey.self] }
+        set { self[TextLayerGatewayKey.self] = newValue }
     }
 
     var canvasStrokeInteractionService: CanvasStrokeInteractionService {
@@ -323,11 +214,8 @@ extension DependencyValues {
     }
 
     var documentGpuOperationGateway: DocumentGpuOperationGateway {
-        get { documentRuntimeComposition.gpuOperationGateway }
-        set {
-            self[DocumentRuntimeCompositionKey.self] = documentRuntimeComposition.withOverrides(gpuOperationGateway: newValue)
-            setDocumentGpuOperationGatewayAndRefreshDerivedDependencies(newValue)
-        }
+        get { self[DocumentGpuOperationGatewayKey.self] }
+        set { self[DocumentGpuOperationGatewayKey.self] = newValue }
     }
 
     var canvasPreviewRenderer: any CanvasPreviewRendering {

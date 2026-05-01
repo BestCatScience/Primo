@@ -453,9 +453,10 @@ extension DocumentExportGateway {
     }
 }
 
-extension DocumentRuntimeComposition {
+extension DocumentRuntime {
     static func stub(
         queryGateway: DocumentQueryGateway = .stub(),
+        renderGateway: DocumentRenderGateway = .stub(),
         mutationGateway: DocumentMutationGateway = .stub(),
         strokeGateway: StrokeInputGateway = .stub(),
         historyGateway: DocumentHistoryGateway = .stub(),
@@ -468,18 +469,137 @@ extension DocumentRuntimeComposition {
         gpuOperationGateway: DocumentGpuOperationGateway = .stub()
     ) -> Self {
         let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
-        return Self(
+        let canvasCommands = DocumentCanvasCommandService(
             queryGateway: queryGateway,
+            renderGateway: renderGateway,
             mutationGateway: mutationGateway,
-            strokeGateway: strokeGateway,
-            historyGateway: historyGateway,
-            persistenceGateway: persistenceGateway,
+            persistenceGateway: persistenceGateway
+        )
+        let layerCommands = DocumentLayerCommandService(mutationGateway: mutationGateway)
+        let strokeCommands = DocumentStrokeCommandService(strokeGateway: strokeGateway)
+        let canvasStrokeInteractionService = CanvasStrokeInteractionService(
+            sessionUseCase: strokeSessionUseCase ?? .stub()
+        )
+        let historyCommands = DocumentHistoryCommandService(historyGateway: historyGateway)
+        let mutationWorkflow = DocumentMutationWorkflowService(
+            documentEditingGateway: resolvedEditingGateway,
+            documentLayerEffectsGateway: layerEffectsGateway,
+            documentMutationGateway: mutationGateway,
+            textLayerGateway: textLayerGateway
+        )
+        let contentService = DocumentContentService(
+            documentQueryGateway: queryGateway,
+            documentRenderGateway: renderGateway,
+            documentMutationGateway: mutationGateway,
+            textLayerGateway: textLayerGateway
+        )
+        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
+        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: gpuOperationGateway)
+        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
+        let canvasEditingWorkflow = CanvasEditingWorkflowService(
+            documentContentService: contentService,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperationGateway)
+        let canvasPresentationEnvironment = CanvasPresentationEnvironment(
+            previewRenderer: canvasPreviewRenderer,
+            eyedropperSampler: GpuCanvasEyedropperSampler(),
+            selectionProcessor: selectionMaskProcessor,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        return Self(
+            execute: { command in
+                switch command {
+                case let .presentation(request):
+                    switch request {
+                    case .lightweight:
+                        return .presentation(queryGateway.lightweightPresentation())
+                    case .full, .current:
+                        return .presentation(queryGateway.presentation())
+                    }
+                case let .canvas(command):
+                    switch command {
+                    case let .create(width, height):
+                        return .mutation(canvasCommands.createCanvas(width, height).map { .completed })
+                    case let .resize(width, height):
+                        return .mutation(canvasCommands.resizeCanvas(width, height).map { .completed })
+                    case let .resizeExtent(width, height):
+                        return .mutation(canvasCommands.resizeCanvasExtent(width, height).map { .completed })
+                    case let .initializeImported(request, layerName):
+                        return .mutation(canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
+                    case .compositeSurface:
+                        return .compositeSurface(canvasCommands.compositeSurface())
+                    case let .setPaperStyle(style):
+                        persistenceGateway.setPaperStyle(style)
+                        return .none
+                    }
+                case let .layer(command):
+                    switch command {
+                    case let .edit(request):
+                        return .mutation(resolvedEditingGateway.execute(request).map { _ in .completed })
+                    case let .mergeLayerDown(index):
+                        return .mutation(layerEffectsGateway.mergeLayerDown(index).map { .completed })
+                    case let .setTextLayer(index, textLayer):
+                        return .mutation(textLayerGateway.setTextLayer(index, textLayer).map { .completed })
+                    case let .applyProcessing(index, request):
+                        return .mutation(mutationGateway.applyLayerProcessing(index, request).map { .completed })
+                    }
+                case let .stroke(command):
+                    switch command {
+                    case let .begin(sample, settings):
+                        strokeGateway.beginStroke(sample, settings)
+                        return .none
+                    case let .append(sample):
+                        strokeGateway.appendStroke(sample)
+                        return .none
+                    case .end:
+                        return .mutation(strokeGateway.endStroke().map { .completed })
+                    case .cancel:
+                        strokeGateway.cancelStroke()
+                        return .none
+                    case let .fill(sample, settings):
+                        return .mutation(strokeGateway.fill(sample, settings).map { .completed })
+                    }
+                case let .history(command):
+                    switch command {
+                    case .state:
+                        return .history(
+                            DocumentHistoryState(
+                                canUndo: historyGateway.canUndo(),
+                                canRedo: historyGateway.canRedo()
+                            )
+                        )
+                    case .undo:
+                        return .mutation(historyGateway.undo().map { .completed })
+                    case .redo:
+                        return .mutation(historyGateway.redo().map { .completed })
+                    }
+                }
+            },
+            observePresentation: {
+                AsyncStream { continuation in
+                    continuation.yield(queryGateway.lightweightPresentation())
+                    continuation.finish()
+                }
+            },
+            canvasCommands: canvasCommands,
+            layerCommands: layerCommands,
+            strokeCommands: strokeCommands,
+            canvasStrokeInteractionService: canvasStrokeInteractionService,
+            historyCommands: historyCommands,
+            mutationWorkflow: mutationWorkflow,
+            contentService: contentService,
+            canvasEditingWorkflow: canvasEditingWorkflow,
+            selectionWorkflow: selectionWorkflow,
+            canvasPreviewRenderer: canvasPreviewRenderer,
+            layerTransformProcessor: layerTransformProcessor,
+            selectionMaskProcessor: selectionMaskProcessor,
+            canvasPresentationEnvironment: canvasPresentationEnvironment,
             exportGateway: exportGateway,
-            textLayerGateway: textLayerGateway,
-            layerEffectsGateway: layerEffectsGateway,
-            editingGateway: resolvedEditingGateway,
-            strokeSessionUseCase: strokeSessionUseCase ?? .stub(),
-            gpuOperationGateway: gpuOperationGateway
+            persistenceGateway: persistenceGateway,
+            queryGateway: queryGateway,
+            gpuOperationGateway: gpuOperationGateway,
+            textLayerGateway: textLayerGateway
         )
     }
 }

@@ -446,7 +446,7 @@ extension LayerWorkflowReducer {
         state.canvas.resetStrokePreview()
         state.canvas.clearAdjustmentPreview()
         state.canvas.stagePendingCommittedSnapshot(nil)
-        _ = documentStrokeSessionUseCase.execute(.cancel)
+        _ = canvasStrokeInteractionService.cancel()
         return performDocumentMutation(
             state: &state,
             contract: DocumentMutationContract(

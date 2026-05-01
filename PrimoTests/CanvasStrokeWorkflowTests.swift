@@ -32,7 +32,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let newGateway = markedGateway(9)
 
         let outputs = withDependencies {
-            $0.documentRuntimeComposition = .stub(gpuOperationGateway: oldGateway)
+            $0.documentRuntime = .stub(gpuOperationGateway: oldGateway)
             let oldPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: oldGateway)
             let oldLayerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: oldGateway)
             $0.canvasPreviewRenderer = oldPreviewRenderer
@@ -591,7 +591,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let surfaceCalls = TestRecorder<GpuLayerMutationPayload>()
         let handle = MetalBufferHandle.unsafeUnchecked(width: 4, height: 4, bytesPerRow: 16)
 
-        let runtime = DocumentRuntimeComposition.stub(
+        let runtime = DocumentRuntime.stub(
             mutationGateway: .stub(
                 applyLayerSurfaceMutation: { _, payload in
                     surfaceCalls.record(payload)
@@ -614,8 +614,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             }
         )
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
-            strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
+            layerCommands: runtime.layerCommands,
+            strokeInteraction: runtime.canvasStrokeInteractionService
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)
@@ -668,7 +668,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             ]
         )
 
-        let runtime = DocumentRuntimeComposition.stub(
+        let runtime = DocumentRuntime.stub(
             mutationGateway: .stub(
                 applyLayerSurfaceMutation: { _, _ in .success(()) }
             ),
@@ -689,8 +689,8 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             }
         )
         let coordinator = makeStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
-            strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
+            layerCommands: runtime.layerCommands,
+            strokeInteraction: runtime.canvasStrokeInteractionService
         )
         var state = DocumentEditingState()
         state.canvas.captureStrokeBaseSnapshot(baseSnapshot)
@@ -824,7 +824,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                 )
             ]
         )
-        let runtime = DocumentRuntimeComposition.stub(
+        let runtime = DocumentRuntime.stub(
             mutationGateway: .stub(
                 applyLayerSurfaceMutation: { _, _ in .success(()) }
             ),
@@ -845,12 +845,12 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
             }
         )
         let stateCoordinator = DocumentFeature.CanvasStrokeStateCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
+            layerCommands: runtime.layerCommands,
             strokeCommands: DocumentStrokeCommandService(strokeGateway: .stub())
         )
         let sessionCoordinator = makeStrokeSessionCoordinator(
-            layerCommands: DocumentLayerCommandService(mutationGateway: runtime.mutationGateway),
-            strokeInteraction: CanvasStrokeInteractionService(sessionUseCase: runtime.strokeSessionUseCase)
+            layerCommands: runtime.layerCommands,
+            strokeInteraction: runtime.canvasStrokeInteractionService
         )
         var state = DocumentEditingState()
         let brush = DocumentFeature.canvasToolStateCoordinator.resolvedBrushSettings(for: state)

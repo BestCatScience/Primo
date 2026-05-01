@@ -18,22 +18,64 @@ import PrimoDocumentStrokeApplication
 import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentMetalStrokeInfrastructure
 
-public struct DocumentRuntimeComposition: Sendable {
-    public let queryGateway: DocumentQueryGateway
-    public let renderGateway: DocumentRenderGateway
-    public let dirtyUpdateQueue: DocumentDirtyUpdateQueue
-    public let mutationGateway: DocumentMutationGateway
-    public let strokeGateway: StrokeInputGateway
-    public let historyGateway: DocumentHistoryGateway
-    public let persistenceGateway: DocumentPersistenceGateway
-    public let exportGateway: DocumentExportGateway
-    public let textLayerGateway: TextLayerGateway
-    public let layerEffectsGateway: DocumentLayerEffectsGateway
-    public let editingGateway: DocumentEditingGateway
-    public let strokeSessionUseCase: DocumentStrokeSessionUseCase
-    public let gpuOperationGateway: DocumentGpuOperationGateway
+private final class DocumentRuntimePresentationBroadcaster: @unchecked Sendable {
+    private let lock = NSLock()
+    private let currentPresentation: @Sendable () -> PaintDocumentPresentation
+    private var continuations: [UUID: AsyncStream<PaintDocumentPresentation>.Continuation] = [:]
 
-    public init(
+    init(currentPresentation: @escaping @Sendable () -> PaintDocumentPresentation) {
+        self.currentPresentation = currentPresentation
+    }
+
+    func stream() -> AsyncStream<PaintDocumentPresentation> {
+        AsyncStream { continuation in
+            let id = UUID()
+            lock.lock()
+            continuations[id] = continuation
+            lock.unlock()
+            continuation.yield(currentPresentation())
+            continuation.onTermination = { [weak self] _ in
+                self?.removeContinuation(id)
+            }
+        }
+    }
+
+    func publishLatest() {
+        publish(currentPresentation())
+    }
+
+    private func publish(_ presentation: PaintDocumentPresentation) {
+        lock.lock()
+        let activeContinuations = Array(continuations.values)
+        lock.unlock()
+        for continuation in activeContinuations {
+            continuation.yield(presentation)
+        }
+    }
+
+    private func removeContinuation(_ id: UUID) {
+        lock.lock()
+        continuations[id] = nil
+        lock.unlock()
+    }
+}
+
+package struct DocumentRuntimeComposition: Sendable {
+    package let queryGateway: DocumentQueryGateway
+    package let renderGateway: DocumentRenderGateway
+    package let dirtyUpdateQueue: DocumentDirtyUpdateQueue
+    package let mutationGateway: DocumentMutationGateway
+    package let strokeGateway: StrokeInputGateway
+    package let historyGateway: DocumentHistoryGateway
+    package let persistenceGateway: DocumentPersistenceGateway
+    package let exportGateway: DocumentExportGateway
+    package let textLayerGateway: TextLayerGateway
+    package let layerEffectsGateway: DocumentLayerEffectsGateway
+    package let editingGateway: DocumentEditingGateway
+    package let strokeSessionUseCase: DocumentStrokeSessionUseCase
+    package let gpuOperationGateway: DocumentGpuOperationGateway
+
+    package init(
         queryGateway: DocumentQueryGateway,
         renderGateway: DocumentRenderGateway,
         dirtyUpdateQueue: DocumentDirtyUpdateQueue,
@@ -63,7 +105,7 @@ public struct DocumentRuntimeComposition: Sendable {
         self.gpuOperationGateway = gpuOperationGateway
     }
 
-    init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentRuntimeComposition) {
+    package init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentRuntimeComposition) {
         self.init(
             queryGateway: infrastructure.queryGateway,
             renderGateway: infrastructure.renderGateway,
@@ -81,7 +123,7 @@ public struct DocumentRuntimeComposition: Sendable {
         )
     }
 
-    public func withOverrides(
+    package func withOverrides(
         queryGateway: DocumentQueryGateway? = nil,
         renderGateway: DocumentRenderGateway? = nil,
         dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
@@ -114,14 +156,323 @@ public struct DocumentRuntimeComposition: Sendable {
     }
 }
 
-public enum DocumentRuntimeCompositionFactory {
-    public static func live(
+package enum DocumentRuntimeCompositionFactory {
+    package static func live(
         fileClient: FileClient = .live,
         dateClient: DateClient = .live,
         uuidClient: UUIDClient = .live
     ) -> DocumentRuntimeComposition {
         DocumentRuntimeComposition(
             PrimoDocumentEngineInfrastructure.DocumentRuntimeCompositionFactory.live(
+                fileClient: fileClient,
+                dateClient: dateClient,
+                uuidClient: uuidClient
+            )
+        )
+    }
+}
+
+public enum DocumentMutationSuccess: Equatable, Sendable {
+    case completed
+    case indexed(Int)
+}
+
+public struct DocumentHistoryState: Equatable, Sendable {
+    public let canUndo: Bool
+    public let canRedo: Bool
+
+    public init(canUndo: Bool, canRedo: Bool) {
+        self.canUndo = canUndo
+        self.canRedo = canRedo
+    }
+}
+
+public enum DocumentPresentationRequest: Equatable, Sendable {
+    case lightweight
+    case full
+    case current
+}
+
+public enum DocumentCanvasCommand: Sendable {
+    case create(width: Int, height: Int)
+    case resize(width: Int, height: Int)
+    case resizeExtent(width: Int, height: Int)
+    case initializeImported(ImportedCanvasRequest, layerName: String)
+    case compositeSurface
+    case setPaperStyle(CanvasPaperStyle)
+}
+
+public enum DocumentLayerCommand: Sendable {
+    case edit(DocumentEditingRequest)
+    case mergeLayerDown(Int)
+    case setTextLayer(index: Int, TextLayerData)
+    case applyProcessing(index: Int, LayerProcessingRequest)
+}
+
+public enum DocumentStrokeCommand: Sendable {
+    case begin(StylusSample, BrushRuntimeSettings)
+    case append(StylusSample)
+    case end
+    case cancel
+    case fill(StylusSample, BrushRuntimeSettings)
+}
+
+public enum DocumentHistoryCommand: Equatable, Sendable {
+    case state
+    case undo
+    case redo
+}
+
+public enum DocumentCommand: Sendable {
+    case presentation(DocumentPresentationRequest)
+    case canvas(DocumentCanvasCommand)
+    case layer(DocumentLayerCommand)
+    case stroke(DocumentStrokeCommand)
+    case history(DocumentHistoryCommand)
+}
+
+public enum DocumentCommandOutcome: Sendable {
+    case mutation(Result<DocumentMutationSuccess, DocumentMutationFailure>)
+    case presentation(PaintDocumentPresentation)
+    case compositeSurface(DocumentCompositeSurface)
+    case history(DocumentHistoryState)
+    case none
+}
+
+public struct DocumentRuntime: Sendable {
+    private let executeHandler: @Sendable (DocumentCommand) async -> DocumentCommandOutcome
+    private let observePresentationHandler: @Sendable () -> AsyncStream<PaintDocumentPresentation>
+
+    public let canvasCommands: DocumentCanvasCommandService
+    public let layerCommands: DocumentLayerCommandService
+    public let strokeCommands: DocumentStrokeCommandService
+    public let canvasStrokeInteractionService: CanvasStrokeInteractionService
+    public let historyCommands: DocumentHistoryCommandService
+    public let mutationWorkflow: DocumentMutationWorkflowService
+    public let contentService: DocumentContentService
+    public let canvasEditingWorkflow: CanvasEditingWorkflowService
+    public let selectionWorkflow: SelectionWorkflowService
+    public let canvasPreviewRenderer: any CanvasPreviewRendering
+    public let layerTransformProcessor: any LayerTransformProcessing
+    public let selectionMaskProcessor: any SelectionMaskProcessing
+    public let canvasPresentationEnvironment: CanvasPresentationEnvironment
+    public let exportGateway: DocumentExportGateway
+    public let persistenceGateway: DocumentPersistenceGateway
+    public let queryGateway: DocumentQueryGateway
+    public let gpuOperationGateway: DocumentGpuOperationGateway
+    public let textLayerGateway: TextLayerGateway
+
+    public init(
+        execute: @escaping @Sendable (DocumentCommand) async -> DocumentCommandOutcome,
+        observePresentation: @escaping @Sendable () -> AsyncStream<PaintDocumentPresentation>,
+        canvasCommands: DocumentCanvasCommandService,
+        layerCommands: DocumentLayerCommandService,
+        strokeCommands: DocumentStrokeCommandService,
+        canvasStrokeInteractionService: CanvasStrokeInteractionService,
+        historyCommands: DocumentHistoryCommandService,
+        mutationWorkflow: DocumentMutationWorkflowService,
+        contentService: DocumentContentService,
+        canvasEditingWorkflow: CanvasEditingWorkflowService,
+        selectionWorkflow: SelectionWorkflowService,
+        canvasPreviewRenderer: any CanvasPreviewRendering,
+        layerTransformProcessor: any LayerTransformProcessing,
+        selectionMaskProcessor: any SelectionMaskProcessing,
+        canvasPresentationEnvironment: CanvasPresentationEnvironment,
+        exportGateway: DocumentExportGateway,
+        persistenceGateway: DocumentPersistenceGateway,
+        queryGateway: DocumentQueryGateway,
+        gpuOperationGateway: DocumentGpuOperationGateway,
+        textLayerGateway: TextLayerGateway
+    ) {
+        self.executeHandler = execute
+        self.observePresentationHandler = observePresentation
+        self.canvasCommands = canvasCommands
+        self.layerCommands = layerCommands
+        self.strokeCommands = strokeCommands
+        self.canvasStrokeInteractionService = canvasStrokeInteractionService
+        self.historyCommands = historyCommands
+        self.mutationWorkflow = mutationWorkflow
+        self.contentService = contentService
+        self.canvasEditingWorkflow = canvasEditingWorkflow
+        self.selectionWorkflow = selectionWorkflow
+        self.canvasPreviewRenderer = canvasPreviewRenderer
+        self.layerTransformProcessor = layerTransformProcessor
+        self.selectionMaskProcessor = selectionMaskProcessor
+        self.canvasPresentationEnvironment = canvasPresentationEnvironment
+        self.exportGateway = exportGateway
+        self.persistenceGateway = persistenceGateway
+        self.queryGateway = queryGateway
+        self.gpuOperationGateway = gpuOperationGateway
+        self.textLayerGateway = textLayerGateway
+    }
+
+    public func execute(_ command: DocumentCommand) async -> DocumentCommandOutcome {
+        await executeHandler(command)
+    }
+
+    public func observePresentation() -> AsyncStream<PaintDocumentPresentation> {
+        observePresentationHandler()
+    }
+
+    package init(composition: DocumentRuntimeComposition) {
+        let canvasCommands = DocumentCanvasCommandService(
+            queryGateway: composition.queryGateway,
+            renderGateway: composition.renderGateway,
+            mutationGateway: composition.mutationGateway,
+            persistenceGateway: composition.persistenceGateway
+        )
+        let layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
+        let strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
+        let canvasStrokeInteractionService = CanvasStrokeInteractionService(
+            sessionUseCase: composition.strokeSessionUseCase
+        )
+        let historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
+        let mutationWorkflow = DocumentMutationWorkflowService(
+            documentEditingGateway: composition.editingGateway,
+            documentLayerEffectsGateway: composition.layerEffectsGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        let contentService = DocumentContentService(
+            documentQueryGateway: composition.queryGateway,
+            documentRenderGateway: composition.renderGateway,
+            documentMutationGateway: composition.mutationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: composition.gpuOperationGateway)
+        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+        let canvasEditingWorkflow = CanvasEditingWorkflowService(
+            documentContentService: contentService,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        let selectionWorkflow = SelectionWorkflowService(gpuOperations: composition.gpuOperationGateway)
+        let canvasPresentationEnvironment = CanvasPresentationEnvironment(
+            previewRenderer: canvasPreviewRenderer,
+            eyedropperSampler: GpuCanvasEyedropperSampler(),
+            selectionProcessor: selectionMaskProcessor,
+            layerTransformProcessor: layerTransformProcessor
+        )
+        let presentationBroadcaster = DocumentRuntimePresentationBroadcaster {
+            composition.queryGateway.lightweightPresentation()
+        }
+        let mutationOutcome: @Sendable (
+            Result<DocumentMutationSuccess, DocumentMutationFailure>
+        ) -> DocumentCommandOutcome = { result in
+            if case .success = result {
+                presentationBroadcaster.publishLatest()
+            }
+            return .mutation(result)
+        }
+
+        let executeClosure: @Sendable (DocumentCommand) async -> DocumentCommandOutcome = { command in
+            switch command {
+            case let .presentation(request):
+                switch request {
+                case .lightweight:
+                    return .presentation(composition.queryGateway.lightweightPresentation())
+                case .full, .current:
+                    return .presentation(composition.queryGateway.presentation())
+                }
+            case let .canvas(command):
+                switch command {
+                case let .create(width, height):
+                    return mutationOutcome(canvasCommands.createCanvas(width, height).map { .completed })
+                case let .resize(width, height):
+                    return mutationOutcome(canvasCommands.resizeCanvas(width, height).map { .completed })
+                case let .resizeExtent(width, height):
+                    return mutationOutcome(canvasCommands.resizeCanvasExtent(width, height).map { .completed })
+                case let .initializeImported(request, layerName):
+                    return mutationOutcome(canvasCommands.initializeImportedCanvas(request, layerName).map { .completed })
+                case .compositeSurface:
+                    return .compositeSurface(canvasCommands.compositeSurface())
+                case let .setPaperStyle(style):
+                    composition.persistenceGateway.setPaperStyle(style)
+                    presentationBroadcaster.publishLatest()
+                    return .none
+                }
+            case let .layer(command):
+                switch command {
+                case let .edit(request):
+                    return mutationOutcome(
+                        composition.editingGateway.execute(request)
+                            .map { _ in .completed }
+                    )
+                case let .mergeLayerDown(index):
+                    return mutationOutcome(composition.layerEffectsGateway.mergeLayerDown(index).map { .completed })
+                case let .setTextLayer(index, textLayer):
+                    return mutationOutcome(composition.textLayerGateway.setTextLayer(index, textLayer).map { .completed })
+                case let .applyProcessing(index, request):
+                    return mutationOutcome(composition.mutationGateway.applyLayerProcessing(index, request).map { .completed })
+                }
+            case let .stroke(command):
+                switch command {
+                case let .begin(sample, settings):
+                    composition.strokeGateway.beginStroke(sample, settings)
+                    return .none
+                case let .append(sample):
+                    composition.strokeGateway.appendStroke(sample)
+                    return .none
+                case .end:
+                    return mutationOutcome(composition.strokeGateway.endStroke().map { .completed })
+                case .cancel:
+                    composition.strokeGateway.cancelStroke()
+                    return .none
+                case let .fill(sample, settings):
+                    return mutationOutcome(composition.strokeGateway.fill(sample, settings).map { .completed })
+                }
+            case let .history(command):
+                switch command {
+                case .state:
+                    return .history(
+                        DocumentHistoryState(
+                            canUndo: composition.historyGateway.canUndo(),
+                            canRedo: composition.historyGateway.canRedo()
+                        )
+                    )
+                case .undo:
+                    return mutationOutcome(composition.historyGateway.undo().map { .completed })
+                case .redo:
+                    return mutationOutcome(composition.historyGateway.redo().map { .completed })
+                }
+            }
+        }
+
+        self.init(
+            execute: executeClosure,
+            observePresentation: {
+                presentationBroadcaster.stream()
+            },
+            canvasCommands: canvasCommands,
+            layerCommands: layerCommands,
+            strokeCommands: strokeCommands,
+            canvasStrokeInteractionService: canvasStrokeInteractionService,
+            historyCommands: historyCommands,
+            mutationWorkflow: mutationWorkflow,
+            contentService: contentService,
+            canvasEditingWorkflow: canvasEditingWorkflow,
+            selectionWorkflow: selectionWorkflow,
+            canvasPreviewRenderer: canvasPreviewRenderer,
+            layerTransformProcessor: layerTransformProcessor,
+            selectionMaskProcessor: selectionMaskProcessor,
+            canvasPresentationEnvironment: canvasPresentationEnvironment,
+            exportGateway: composition.exportGateway,
+            persistenceGateway: composition.persistenceGateway,
+            queryGateway: composition.queryGateway,
+            gpuOperationGateway: composition.gpuOperationGateway,
+            textLayerGateway: composition.textLayerGateway
+        )
+    }
+}
+
+public enum DocumentRuntimeFactory {
+    public static func live(
+        fileClient: FileClient = .live,
+        dateClient: DateClient = .live,
+        uuidClient: UUIDClient = .live
+    ) -> DocumentRuntime {
+        DocumentRuntime(
+            composition: DocumentRuntimeCompositionFactory.live(
                 fileClient: fileClient,
                 dateClient: dateClient,
                 uuidClient: uuidClient

@@ -18,7 +18,7 @@ struct LayerWorkflowReducer: Reducer {
     @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
     @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
     @Dependency(\.documentQueryGateway) var documentQueryGateway
-    @Dependency(\.documentStrokeSessionUseCase) var documentStrokeSessionUseCase
+    @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
     @Dependency(\.textLayerGateway) var textLayerGateway
 
     enum EditingAction: Equatable {
