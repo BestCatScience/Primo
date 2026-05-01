@@ -2,7 +2,6 @@ import CasePaths
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication

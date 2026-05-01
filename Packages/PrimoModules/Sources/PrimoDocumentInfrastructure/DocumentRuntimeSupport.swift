@@ -25,7 +25,8 @@ public struct DocumentProjectPreview: Equatable, Sendable {
 /// Keep `Runtime` mutations inside `withRuntime` / `replaceRuntime`; move this
 /// boundary to an actor only if the gateway surface becomes async end-to-end.
 package final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
-    private let lock = NSLock()
+    private let lock = NSRecursiveLock()
+    private var isExecuting = false
     private var runtime: Runtime
 
     package init(runtime: Runtime) {
@@ -36,13 +37,23 @@ package final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
         _ body: (Runtime) throws -> T
     ) rethrows -> T {
         lock.lock()
-        defer { lock.unlock() }
+        precondition(!isExecuting, "Reentrant document runtime access")
+        isExecuting = true
+        defer {
+            isExecuting = false
+            lock.unlock()
+        }
         return try body(runtime)
     }
 
     package func replaceRuntime(with newRuntime: Runtime) {
         lock.lock()
-        defer { lock.unlock() }
+        precondition(!isExecuting, "Reentrant document runtime access")
+        isExecuting = true
+        defer {
+            isExecuting = false
+            lock.unlock()
+        }
         runtime = newRuntime
     }
 }

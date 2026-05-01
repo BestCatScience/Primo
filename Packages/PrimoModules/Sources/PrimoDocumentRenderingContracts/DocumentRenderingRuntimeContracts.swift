@@ -1,9 +1,9 @@
 import CoreGraphics
 import Foundation
-@_exported import PrimoBrushRuntimeContracts
+import PrimoBrushRuntimeContracts
 import PrimoDocumentDomain
-@_exported import PrimoDocumentMutationContracts
-@_exported import PrimoDocumentPresentationContracts
+import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 
 public struct DocumentReadGateway: Sendable {
     public let lightweightPresentation: @Sendable () -> PaintDocumentPresentation

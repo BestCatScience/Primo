@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
 import PrimoLocalization
 
 typealias AppLanguage = PrimoLocalization.AppLanguage

@@ -563,7 +563,40 @@ struct GpuSideEffectIsolationArchitectureTests {
 
             #expect(!body.contains("MetalBufferHandle"), "\(file) should not pass rendering resource handles through App workflow")
             #expect(!body.contains("releaseSurfaceHandle"), "\(file) should release preview resources through lease abstractions")
+            #expect(!body.contains("SurfaceHandleReleasing"), "\(file) should not depend on rendering-resource release capability")
             #expect(body.contains("StrokePreviewLease"), "\(file) should use the App-facing preview lease abstraction")
+        }
+    }
+
+    @Test
+    func appDocumentDependenciesAreAggregatedThroughRuntimeEnvironment() throws {
+        let repoRoot = try Self.repoRoot()
+        let paintDocumentClient = repoRoot.appendingPathComponent(
+            "App/Features/Document/PaintDocumentClient.swift",
+            isDirectory: false
+        )
+        let body = try String(contentsOf: paintDocumentClient, encoding: .utf8)
+        let bannedKeys = [
+            "DocumentCanvasCommandServiceKey",
+            "DocumentLayerCommandServiceKey",
+            "DocumentStrokeCommandServiceKey",
+            "DocumentHistoryCommandServiceKey",
+            "DocumentMutationWorkflowServiceKey",
+            "DocumentContentServiceKey",
+            "CanvasEditingWorkflowServiceKey",
+            "SelectionWorkflowServiceKey",
+            "DocumentPresentationReaderKey",
+            "DocumentPersistenceGatewayKey",
+            "DocumentExportGatewayKey",
+            "DocumentRenderingWorkflowKey"
+        ]
+
+        #expect(body.contains("struct DocumentApplicationEnvironment: Sendable"))
+        #expect(body.contains("struct SelectionWorkflowEnvironment: Sendable"))
+        #expect(body.contains("struct TransformWorkflowEnvironment: Sendable"))
+        #expect(body.contains("private enum DocumentApplicationEnvironmentKey: DependencyKey"))
+        for key in bannedKeys {
+            #expect(!body.contains(key), "PaintDocumentClient should derive \(key) from DocumentApplicationEnvironment")
         }
     }
 
@@ -760,7 +793,8 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        #expect(reducer.contains("@Dependency(\\.canvasEditingWorkflowService)"))
+        #expect(reducer.contains("@Dependency(\\.transformWorkflowEnvironment)"))
+        #expect(!reducer.contains("@Dependency(\\.canvasEditingWorkflowService)"))
         for dependency in [
             "@Dependency(\\.documentContentService)",
             "@Dependency(\\.layerTransformProcessor)",

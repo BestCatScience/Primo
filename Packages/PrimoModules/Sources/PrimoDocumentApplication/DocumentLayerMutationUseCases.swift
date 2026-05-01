@@ -23,25 +23,25 @@ public struct LayerStructureUseCase: Sendable {
 
         switch validatedCommand {
         case let .addLayer(name):
-            switch gateway.addLayer(name: name) {
+            switch gateway.addLayer(name: name.rawValue) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(createdIndex):
-                switch gateway.setActiveLayerIndex(ExistingLayerIndex(createdIndex)) {
+                switch gateway.setActiveLayerIndex(context.newlyCreatedLayerIndex(createdIndex)) {
                 case let .failure(failure):
                     return .failure(failure)
                 case .success:
                     return .success(
                         LayerStructureMutationPlan(
                             resultingIndex: createdIndex,
-                            lifecycleEvent: .addLayer(name: name, index: createdIndex)
+                            lifecycleEvent: .addLayer(name: name.rawValue, index: createdIndex)
                         )
                     )
                 }
             }
 
         case let .duplicateLayer(index, name):
-            switch gateway.duplicateLayer(index: index, name: name) {
+            switch gateway.duplicateLayer(index: index, name: name.rawValue) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(duplicatedIndex):
@@ -49,7 +49,7 @@ public struct LayerStructureUseCase: Sendable {
                     LayerStructureMutationPlan(
                         resultingIndex: duplicatedIndex,
                         indexMutation: .duplication(sourceIndex: index.rawValue, duplicatedIndex: duplicatedIndex),
-                        lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex, name: name)
+                        lifecycleEvent: .duplicateLayer(index: index.rawValue, duplicatedIndex: duplicatedIndex, name: name.rawValue)
                     )
                 )
             }
@@ -81,7 +81,7 @@ public struct LayerStructureUseCase: Sendable {
             }
 
         case let .createFolder(name, anchorLayerIndex):
-            switch gateway.createFolder(name: name, anchorLayerIndex: anchorLayerIndex) {
+            switch gateway.createFolder(name: name.rawValue, anchorLayerIndex: anchorLayerIndex) {
             case let .failure(failure):
                 return .failure(failure)
             case let .success(folderID):
@@ -90,7 +90,7 @@ public struct LayerStructureUseCase: Sendable {
                         resultingIndex: folderID,
                         lifecycleEvent: .createFolder(
                             folderID: folderID,
-                            name: name,
+                            name: name.rawValue,
                             anchorLayerIndex: anchorLayerIndex.rawValue
                         )
                     )
@@ -152,7 +152,7 @@ public struct LayerAttributeUseCase: Sendable {
             return gateway.setActiveLayerIndex(index).map { .init() }
 
         case let .setLayerName(index, name):
-            return gateway.setLayerName(name, index: index).map { .init() }
+            return gateway.setLayerName(name.rawValue, index: index).map { .init() }
 
         case let .setLayerVisibility(index, isVisible):
             return gateway.setLayerVisible(isVisible, index: index)
@@ -189,7 +189,7 @@ public struct LayerAttributeUseCase: Sendable {
                 .map { .init(lifecycleEvent: .setFolderVisibility(folderID: folderID.rawValue, isVisible: isVisible)) }
 
         case let .setFolderName(folderID, name):
-            return gateway.setFolderName(name, folderID: folderID).map { .init() }
+            return gateway.setFolderName(name.rawValue, folderID: folderID).map { .init() }
         }
     }
 }

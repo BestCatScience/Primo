@@ -16,6 +16,10 @@ public struct ImportedCanvasRequest: Equatable, Sendable {
         self.height = height
         self.pixelData = pixelData
     }
+
+    public var validatedSize: ValidCanvasSize? {
+        ValidCanvasSize(width, height)
+    }
 }
 
 public struct DocumentCanvasCommandService: Sendable {
@@ -47,20 +51,39 @@ public struct DocumentCanvasCommandService: Sendable {
     ) {
         self.init(
             createCanvas: { width, height in
-                persistenceGateway.newCanvas(width, height)
+                guard let size = ValidCanvasSize(width, height) else {
+                    return .failure(.invalidCanvasSize(width: width, height: height))
+                }
+                persistenceGateway.newCanvas(size.width, size.height)
                 persistenceGateway.prewarmDrawingResources()
                 return .success(())
             },
-            resizeCanvas: mutationGateway.resizeCanvas,
-            resizeCanvasExtent: mutationGateway.resizeCanvasExtent,
+            resizeCanvas: { width, height in
+                guard let size = ValidCanvasSize(width, height) else {
+                    return .failure(.invalidCanvasSize(width: width, height: height))
+                }
+                return mutationGateway.resizeCanvas(size.width, size.height)
+            },
+            resizeCanvasExtent: { width, height in
+                guard let size = ValidCanvasSize(width, height) else {
+                    return .failure(.invalidCanvasSize(width: width, height: height))
+                }
+                return mutationGateway.resizeCanvasExtent(size.width, size.height)
+            },
             initializeImportedCanvas: { request, layerName in
-                persistenceGateway.newCanvas(request.width, request.height)
+                guard let size = request.validatedSize else {
+                    return .failure(.invalidCanvasSize(width: request.width, height: request.height))
+                }
+                guard let layerName = NonEmptyLayerName(layerName) else {
+                    return .failure(.emptyInput)
+                }
+                persistenceGateway.newCanvas(size.width, size.height)
                 persistenceGateway.prewarmDrawingResources()
                 switch mutationGateway.replaceLayerPixels(0, request.pixelData) {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
                 }
-                switch mutationGateway.setLayerName(0, layerName) {
+                switch mutationGateway.setLayerName(0, layerName.rawValue) {
                 case let .failure(failure): return .failure(failure)
                 case .success: break
                 }

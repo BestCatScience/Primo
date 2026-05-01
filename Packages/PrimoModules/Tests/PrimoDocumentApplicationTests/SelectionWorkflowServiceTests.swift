@@ -1,11 +1,7 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoBrushRuntimeContracts
-import PrimoDocumentGPUContracts
-import PrimoDocumentMutationContracts
-import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
@@ -14,7 +10,7 @@ import Testing
 struct SelectionWorkflowServiceTests {
     @Test
     func combineReplaceReturnsIncomingSelection() {
-        let service = SelectionWorkflowService(gpuOperations: .selectionStub())
+        let service = SelectionWorkflowService(operations: .selectionStub())
         let incoming = CanvasSelection.unsafeUnchecked(
             bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
             maskWidth: 1,
@@ -35,7 +31,7 @@ struct SelectionWorkflowServiceTests {
 
     @Test
     func lassoWithTooFewPointsReturnsNil() {
-        let service = SelectionWorkflowService(gpuOperations: .selectionStub())
+        let service = SelectionWorkflowService(operations: .selectionStub())
 
         let result = service.makeLassoSelection(
             from: [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 1)],
@@ -47,7 +43,7 @@ struct SelectionWorkflowServiceTests {
 
     @Test
     func invertWithoutSelectionBuildsFullCanvasSelection() throws {
-        let service = SelectionWorkflowService(gpuOperations: .selectionStub())
+        let service = SelectionWorkflowService(operations: .selectionStub())
 
         let selection = try #require(
             service.invertedSelection(
@@ -64,7 +60,7 @@ struct SelectionWorkflowServiceTests {
 
     @Test
     func autoSelectionUsesActiveLayerPixels() throws {
-        let service = SelectionWorkflowService(gpuOperations: .selectionStub())
+        let service = SelectionWorkflowService(operations: .selectionStub())
         let layer = MetalLayerSnapshot.unsafeUnchecked(
             index: 2,
             opacity: 1,
@@ -99,22 +95,13 @@ struct SelectionWorkflowServiceTests {
     }
 }
 
-private extension DocumentGpuOperationGateway {
+private extension DocumentSelectionMaskOperations {
     static func selectionFailure<Value>() -> DocumentRenderingResult<Value> {
         .failure(.kernelFailed(operation: "selectionStub"))
     }
 
-    static func selectionStub() -> DocumentGpuOperationGateway {
-        DocumentGpuOperationGateway(
-            compositedPaperPreviewRGBA: { _, _, _, _ in selectionFailure() },
-            compositedPreviewPixelData: { _, _, _ in selectionFailure() },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in selectionFailure() },
-            selectionOverlayRGBA: { _, _, _ in selectionFailure() },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in selectionFailure() },
-            shapePreviewSurface: { _, _, _, _ in selectionFailure() },
-            textLayerSurface: { _, _ in selectionFailure() },
-            textLayoutRect: { _, _ in nil },
-            processedLayerPixelData: { _, _, _, _ in selectionFailure() },
+    static func selectionStub() -> DocumentSelectionMaskOperations {
+        DocumentSelectionMaskOperations(
             alphaMask: { _, _, _ in selectionFailure() },
             croppedSelectionMask: { mask, width, height in
                 guard mask.contains(where: { $0 > 0 }) else { return nil }
@@ -151,11 +138,7 @@ private extension DocumentGpuOperationGateway {
             contractedMask: { source, _, _, _ in .success(source) },
             featheredMask: { source, _, _, _ in .success(source) },
             invertMask: { source in .success(source.map { $0 > 0 ? 0 : 255 }) },
-            transformedSelectionMask: { _ in selectionFailure() },
-            transformedLayerPixelData: { _ in selectionFailure() },
-            scaledPixelData: { _, _, _, _, _ in selectionFailure() },
-            translatedPixelData: { _, _, _, _, _, _, _ in selectionFailure() },
-            releaseSurfaceHandle: { _ in }
+            transformedSelectionMask: { _ in selectionFailure() }
         )
     }
 }

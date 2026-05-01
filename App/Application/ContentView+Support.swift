@@ -1,4 +1,3 @@
-import PrimoDocumentContracts
 import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts

@@ -5,6 +5,24 @@ import Testing
 
 struct DocumentLayerMutationUseCaseTests {
     @Test
+    func mutationContextEmbedsRevisionInValidatedLayerIndexes() throws {
+        let context = DocumentLayerMutationContext(
+            revision: DocumentRevision(42),
+            layerCount: 3,
+            folderIDs: [],
+            isLayerLocked: { _ in false }
+        )
+
+        let existingIndex = try #require(context.existingLayerIndex(1))
+        let createdIndex = context.newlyCreatedLayerIndex(3)
+
+        #expect(existingIndex.rawValue == 1)
+        #expect(existingIndex.revision == DocumentRevision(42))
+        #expect(createdIndex.rawValue == 3)
+        #expect(createdIndex.revision == DocumentRevision(43))
+    }
+
+    @Test
     func structureUseCaseBuildsDuplicatePlanAndIndexMutation() {
         let useCase = LayerStructureUseCase()
         let context = DocumentLayerMutationContext(

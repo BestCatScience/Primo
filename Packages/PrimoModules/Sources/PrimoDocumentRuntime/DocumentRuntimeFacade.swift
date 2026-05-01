@@ -498,7 +498,6 @@ public struct DocumentRuntime: Sendable {
     public let canvasPresentationEnvironment: CanvasPresentationEnvironment
     public let presentationReader: DocumentPresentationReader
     public let renderingWorkflow: DocumentRenderingWorkflow
-    public let surfaceHandleReleaser: any SurfaceHandleReleasing
     public let textLayerService: DocumentTextLayerService
     public let exportClient: DocumentExportClient
     public let persistenceClient: DocumentPersistenceClient
@@ -521,7 +520,6 @@ public struct DocumentRuntime: Sendable {
         canvasPresentationEnvironment: CanvasPresentationEnvironment,
         presentationReader: DocumentPresentationReader,
         renderingWorkflow: DocumentRenderingWorkflow,
-        surfaceHandleReleaser: any SurfaceHandleReleasing,
         textLayerService: DocumentTextLayerService,
         exportClient: DocumentExportClient,
         persistenceClient: DocumentPersistenceClient
@@ -543,7 +541,6 @@ public struct DocumentRuntime: Sendable {
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
         self.presentationReader = presentationReader
         self.renderingWorkflow = renderingWorkflow
-        self.surfaceHandleReleaser = surfaceHandleReleaser
         self.textLayerService = textLayerService
         self.exportClient = exportClient
         self.persistenceClient = persistenceClient
@@ -567,7 +564,8 @@ public struct DocumentRuntime: Sendable {
         let layerCommands = DocumentLayerCommandService(mutationGateway: composition.mutationGateway)
         let strokeCommands = DocumentStrokeCommandService(strokeGateway: composition.strokeGateway)
         let canvasStrokeInteractionService = CanvasStrokeInteractionService(
-            sessionUseCase: composition.strokeSessionUseCase
+            sessionUseCase: composition.strokeSessionUseCase,
+            releasePreviewLease: composition.surfaceHandleReleaser.releaseSurfaceLease
         )
         let historyCommands = DocumentHistoryCommandService(historyGateway: composition.historyGateway)
         let mutationWorkflow = DocumentMutationWorkflowService(
@@ -726,7 +724,6 @@ public struct DocumentRuntime: Sendable {
             canvasPresentationEnvironment: canvasPresentationEnvironment,
             presentationReader: presentationReader,
             renderingWorkflow: renderingWorkflow,
-            surfaceHandleReleaser: composition.surfaceHandleReleaser,
             textLayerService: textLayerService,
             exportClient: exportClient,
             persistenceClient: persistenceClient

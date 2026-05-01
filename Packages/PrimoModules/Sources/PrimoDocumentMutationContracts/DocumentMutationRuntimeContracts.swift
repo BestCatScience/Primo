@@ -1,9 +1,9 @@
 import CoreGraphics
 import Foundation
-@_exported import PrimoBrushRuntimeContracts
+import PrimoBrushRuntimeContracts
 import PrimoCoreTypes
 import PrimoDocumentDomain
-@_exported import PrimoDocumentPresentationContracts
+import PrimoDocumentPresentationContracts
 
 public typealias DocumentMutationResult = Result<Void, DocumentMutationFailure>
 public typealias DocumentIndexedMutationResult = Result<Int, DocumentMutationFailure>
@@ -36,6 +36,7 @@ public enum DocumentGpuMutationFailure: Error, Equatable, Sendable {
 
 public enum DocumentMutationFailure: Error, Equatable, Sendable, OperationFailure {
     case invalidLayerIndex(Int)
+    case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case invalidFolderID(Int)
     case layerLocked(Int)
     case alphaLocked(Int)

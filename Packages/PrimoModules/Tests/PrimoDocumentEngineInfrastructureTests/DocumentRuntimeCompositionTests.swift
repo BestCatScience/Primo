@@ -98,6 +98,25 @@ struct DocumentRuntimeCompositionTests {
     }
 
     @Test
+    func liveEditingGatewayRejectsStaleValidatedLayerIndexes() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let compositionURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift"
+        )
+        let body = try String(contentsOf: compositionURL, encoding: .utf8)
+
+        #expect(body.contains("private func validateFreshLayerIndex(_ index: ExistingLayerIndex)"))
+        #expect(body.contains("return .staleLayerIndex("))
+        #expect(body.contains("validationRevision: index.revision"))
+        #expect(body.contains("currentRevision: currentRevision"))
+    }
+
+    @Test
     func liveGatewayKeepsHeavyPersistenceAndExportWorkOutsideRuntimeLock() throws {
         let repoRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -115,6 +134,24 @@ struct DocumentRuntimeCompositionTests {
         #expect(!body.contains("try runtimeBox.withRuntime { session in\n                    try session.saveProject"))
         #expect(body.contains("SwiftDocumentRuntime.compositeExportSurface(\n                    forMaterializedSnapshot: snapshot"))
         #expect(body.contains("SwiftDocumentRuntime.compositePNGData(\n                    forMaterializedSnapshot: snapshot"))
+    }
+
+    @Test
+    func lockedRuntimeBoxGuardsAgainstReentrantAccess() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let supportURL = repoRoot.appendingPathComponent(
+            "Packages/PrimoModules/Sources/PrimoDocumentInfrastructure/DocumentRuntimeSupport.swift"
+        )
+        let body = try String(contentsOf: supportURL, encoding: .utf8)
+
+        #expect(body.contains("private var isExecuting = false"))
+        #expect(body.contains("precondition(!isExecuting, \"Reentrant document runtime access\")"))
+        #expect(body.contains("NSRecursiveLock()"))
     }
 
     @Test

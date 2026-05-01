@@ -2,7 +2,6 @@ import ComposableArchitecture
 import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
@@ -279,7 +278,7 @@ extension CanvasEditingWorkflowReducer {
             state: &state,
             preserving: transferredPreviewLease
         ) { lease in
-            surfaceHandleReleaser.releaseSurfaceLease(lease)
+            canvasStrokeInteractionService.discardPreviewLease(lease)
         }
     }
 
@@ -378,8 +377,8 @@ extension CanvasEditingWorkflowReducer {
             documentCanvasStrokeStateCoordinator.applyPreviewMutation(
                 mutation,
                 state: &state,
-                releaseSurfaceLease: { lease in
-                    surfaceHandleReleaser.releaseSurfaceLease(lease)
+                discardPreviewLease: { lease in
+                    canvasStrokeInteractionService.discardPreviewLease(lease)
                 }
             )
             return .none

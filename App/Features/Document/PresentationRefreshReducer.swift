@@ -1,6 +1,5 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication

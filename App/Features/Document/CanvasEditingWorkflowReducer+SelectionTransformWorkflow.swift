@@ -1,9 +1,12 @@
 import ComposableArchitecture
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentMutationContracts
 
 extension CanvasEditingWorkflowReducer {
+    var canvasEditingWorkflowService: CanvasEditingWorkflowService {
+        transformWorkflowEnvironment.workflow
+    }
+
     func handleApplyTransform(state: inout State) -> Effect<Action> {
         let outcome = canvasEditingWorkflowService.execute(
             .applyTransform,

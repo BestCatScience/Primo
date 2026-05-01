@@ -1,5 +1,34 @@
 import Foundation
 
+public struct DocumentRevision: Hashable, Codable, Sendable, Comparable {
+    public let rawValue: Int
+
+    public init(_ rawValue: Int) {
+        precondition(rawValue >= 0, "Document revision must be non-negative")
+        self.rawValue = rawValue
+    }
+
+    public static let initial = Self(0)
+
+    public func advanced() -> Self {
+        Self(rawValue + 1)
+    }
+
+    public static func < (lhs: DocumentRevision, rhs: DocumentRevision) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+public struct NonEmptyLayerName: Hashable, Codable, Sendable {
+    public let rawValue: String
+
+    public init?(_ rawValue: String) {
+        let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, value.count <= CanvasSizePolicy.maxLayerNameLength else { return nil }
+        self.rawValue = value
+    }
+}
+
 public struct DocumentLayerIndex: Hashable, Codable, Sendable, Identifiable, Comparable {
     public let rawValue: Int
 

@@ -1,6 +1,5 @@
 import ComposableArchitecture
 import Foundation
-import PrimoDocumentContracts
 import PrimoWorkspaceApplication
 import PrimoWorkspaceRuntime
 

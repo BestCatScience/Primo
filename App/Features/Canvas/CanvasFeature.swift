@@ -2,7 +2,6 @@ import ComposableArchitecture
 import CoreGraphics
 import Foundation
 import PrimoBrushRuntimeContracts
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentPresentationContracts

@@ -4,7 +4,6 @@ import Foundation
 import PrimoCoreTypes
 import PrimoBrushRuntimeContracts
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication

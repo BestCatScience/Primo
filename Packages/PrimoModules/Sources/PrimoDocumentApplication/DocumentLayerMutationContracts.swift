@@ -6,6 +6,7 @@ public typealias DocumentLayerIndexedMutationResult = Result<Int, DocumentLayerM
 
 public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
     case invalidLayerIndex(Int)
+    case staleLayerIndex(index: Int, validationRevision: DocumentRevision, currentRevision: DocumentRevision)
     case invalidFolderID(Int)
     case layerLocked(Int)
     case alphaLocked(Int)
@@ -20,15 +21,18 @@ public enum DocumentLayerMutationFailure: Error, Equatable, Sendable {
 }
 
 public struct DocumentLayerMutationContext: Sendable {
+    public let revision: DocumentRevision
     public let layerCount: Int
     public let folderIDs: Set<Int>
     public let isLayerLocked: @Sendable (Int) -> Bool
 
     public init(
+        revision: DocumentRevision = .initial,
         layerCount: Int,
         folderIDs: Set<Int>,
         isLayerLocked: @escaping @Sendable (Int) -> Bool
     ) {
+        self.revision = revision
         self.layerCount = layerCount
         self.folderIDs = folderIDs
         self.isLayerLocked = isLayerLocked
@@ -36,7 +40,11 @@ public struct DocumentLayerMutationContext: Sendable {
 
     public func existingLayerIndex(_ rawValue: Int) -> ExistingLayerIndex? {
         guard (0..<layerCount).contains(rawValue) else { return nil }
-        return ExistingLayerIndex(rawValue)
+        return ExistingLayerIndex(rawValue, revision: revision)
+    }
+
+    public func newlyCreatedLayerIndex(_ rawValue: Int) -> ExistingLayerIndex {
+        ExistingLayerIndex(rawValue, revision: revision.advanced())
     }
 
     public func existingFolderID(_ rawValue: Int) -> ExistingFolderID? {
@@ -52,9 +60,11 @@ public struct DocumentLayerMutationContext: Sendable {
 
 public struct ExistingLayerIndex: Hashable, Sendable {
     public let rawValue: Int
+    public let revision: DocumentRevision
 
-    package init(_ rawValue: Int) {
+    package init(_ rawValue: Int, revision: DocumentRevision) {
         self.rawValue = rawValue
+        self.revision = revision
     }
 }
 
@@ -108,18 +118,18 @@ public enum LayerAttributeCommand: Equatable, Sendable {
 }
 
 public enum ValidatedLayerStructureCommand: Equatable, Sendable {
-    case addLayer(name: String)
-    case duplicateLayer(index: ExistingLayerIndex, name: String)
+    case addLayer(name: NonEmptyLayerName)
+    case duplicateLayer(index: ExistingLayerIndex, name: NonEmptyLayerName)
     case deleteLayer(index: ExistingLayerIndex)
     case moveLayer(index: ExistingLayerIndex, destinationIndex: ExistingLayerIndex)
-    case createFolder(name: String, anchorLayerIndex: LayerAnchorIndex)
+    case createFolder(name: NonEmptyLayerName, anchorLayerIndex: LayerAnchorIndex)
     case deleteFolder(folderID: ExistingFolderID)
     case assignLayerToFolder(index: ExistingLayerIndex, folderID: ExistingFolderID?)
 }
 
 public enum ValidatedLayerAttributeCommand: Equatable, Sendable {
     case setActiveLayer(index: ExistingLayerIndex)
-    case setLayerName(index: ExistingLayerIndex, name: String)
+    case setLayerName(index: ExistingLayerIndex, name: NonEmptyLayerName)
     case setLayerVisibility(index: ExistingLayerIndex, isVisible: Bool)
     case setLayerLocked(index: ExistingLayerIndex, isLocked: Bool)
     case setLayerAlphaLocked(index: ExistingLayerIndex, isAlphaLocked: Bool)
@@ -129,7 +139,7 @@ public enum ValidatedLayerAttributeCommand: Equatable, Sendable {
     case setLayerBlendMode(index: ExistingLayerIndex, blendMode: LayerBlendMode)
     case setFolderExpanded(folderID: ExistingFolderID, isExpanded: Bool)
     case setFolderVisibility(folderID: ExistingFolderID, isVisible: Bool)
-    case setFolderName(folderID: ExistingFolderID, name: String)
+    case setFolderName(folderID: ExistingFolderID, name: NonEmptyLayerName)
 }
 
 public enum DocumentLayerMutationEvent: Equatable, Sendable {
@@ -213,8 +223,10 @@ public struct LayerStructureCommandValidator: Sendable {
     ) -> Result<ValidatedLayerStructureCommand, DocumentLayerMutationFailure> {
         switch command {
         case let .addLayer(name):
+            guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
             return .success(.addLayer(name: name))
         case let .duplicateLayer(index, name):
+            guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
             guard let index = context.existingLayerIndex(index) else {
                 return .failure(.invalidLayerIndex(index))
             }
@@ -233,6 +245,7 @@ public struct LayerStructureCommandValidator: Sendable {
             }
             return .success(.moveLayer(index: index, destinationIndex: destinationIndex))
         case let .createFolder(name, anchorLayerIndex):
+            guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
             guard let anchorLayerIndex = context.anchorLayerIndex(anchorLayerIndex) else {
                 return .failure(.invalidLayerIndex(anchorLayerIndex))
             }
@@ -275,6 +288,7 @@ public struct LayerAttributeCommandValidator: Sendable {
         case let .setActiveLayer(index):
             return existingLayer(index, in: context).map { .setActiveLayer(index: $0) }
         case let .setLayerName(index, name):
+            guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
             return existingLayer(index, in: context).map { .setLayerName(index: $0, name: name) }
         case let .setLayerVisibility(index, isVisible):
             return existingLayer(index, in: context).map { .setLayerVisibility(index: $0, isVisible: isVisible) }
@@ -301,6 +315,7 @@ public struct LayerAttributeCommandValidator: Sendable {
         case let .setFolderVisibility(folderID, isVisible):
             return existingFolder(folderID, in: context).map { .setFolderVisibility(folderID: $0, isVisible: isVisible) }
         case let .setFolderName(folderID, name):
+            guard let name = NonEmptyLayerName(name) else { return .failure(.emptyInput) }
             return existingFolder(folderID, in: context).map { .setFolderName(folderID: $0, name: name) }
         }
     }

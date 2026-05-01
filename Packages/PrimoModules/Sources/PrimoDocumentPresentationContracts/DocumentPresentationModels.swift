@@ -411,6 +411,7 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
     public var layerRows: [LayerRowModel]
     public var layerSidebarRows: [LayerSidebarRowModel]
     public var renderSnapshot: MetalDocumentSnapshot?
+    public var revision: DocumentRevision
 
     public init(
         canvasSize: CGSize,
@@ -419,11 +420,30 @@ public struct PaintDocumentPresentation: Equatable, Sendable {
         layerSidebarRows: [LayerSidebarRowModel],
         renderSnapshot: MetalDocumentSnapshot?
     ) {
+        self.init(
+            canvasSize: canvasSize,
+            activeLayerIndex: activeLayerIndex,
+            layerRows: layerRows,
+            layerSidebarRows: layerSidebarRows,
+            renderSnapshot: renderSnapshot,
+            revision: .initial
+        )
+    }
+
+    public init(
+        canvasSize: CGSize,
+        activeLayerIndex: Int,
+        layerRows: [LayerRowModel],
+        layerSidebarRows: [LayerSidebarRowModel],
+        renderSnapshot: MetalDocumentSnapshot?,
+        revision: DocumentRevision
+    ) {
         self.canvasSize = canvasSize
         self.activeLayerIndex = activeLayerIndex
         self.layerRows = layerRows
         self.layerSidebarRows = layerSidebarRows
         self.renderSnapshot = renderSnapshot
+        self.revision = revision
     }
 }
 

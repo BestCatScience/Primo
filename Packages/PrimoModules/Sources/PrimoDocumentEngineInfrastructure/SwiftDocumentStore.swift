@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
 
 struct SwiftDocumentLayerRecord: Equatable, Sendable {

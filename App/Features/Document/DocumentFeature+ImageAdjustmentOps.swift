@@ -1,5 +1,4 @@
 import Foundation
-import PrimoDocumentContracts
 import PrimoDocumentMutationContracts
 
 extension DocumentFeature {

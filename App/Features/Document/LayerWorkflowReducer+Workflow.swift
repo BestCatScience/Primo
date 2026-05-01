@@ -1,7 +1,6 @@
 import Foundation
 import ComposableArchitecture
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts

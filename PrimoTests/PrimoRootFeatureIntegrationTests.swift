@@ -704,8 +704,8 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            $0.documentPresentationReader = .stub(presentation: undoPresentation)
-            $0.documentHistoryCommandService = DocumentHistoryCommandService(
+            $0.documentRuntime = .stub(
+                queryGateway: .stub(presentation: undoPresentation),
                 historyGateway: .stub(undo: { .success(()) })
             )
         }
@@ -746,8 +746,8 @@ final class PrimoRootFeatureIntegrationTests: XCTestCase {
                 return state
             }()
         ) {
-            $0.documentPresentationReader = .stub(presentation: .renderedTestValue(width: 2, height: 2))
-            $0.documentHistoryCommandService = DocumentHistoryCommandService(
+            $0.documentRuntime = .stub(
+                queryGateway: .stub(presentation: .renderedTestValue(width: 2, height: 2)),
                 historyGateway: .stub(undo: { .success(()) })
             )
         }

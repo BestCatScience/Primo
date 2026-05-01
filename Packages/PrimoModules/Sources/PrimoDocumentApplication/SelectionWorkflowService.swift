@@ -56,12 +56,6 @@ public struct SelectionWorkflowService: Sendable {
         )
     }
 
-    package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.init(
-            operations: gpuOperations.selectionMaskOperations
-        )
-    }
-
     public func combinedSelection(
         existing: CanvasSelection?,
         incoming: CanvasSelection?,

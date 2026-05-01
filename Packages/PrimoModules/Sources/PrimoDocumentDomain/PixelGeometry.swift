@@ -68,6 +68,17 @@ public enum CanvasSizePolicy: Sendable {
     }
 }
 
+public struct ValidCanvasSize: Equatable, Sendable {
+    public let width: Int
+    public let height: Int
+
+    public init?(_ width: Int, _ height: Int) {
+        guard CanvasSizePolicy.safePixelCount(width: width, height: height) != nil else { return nil }
+        self.width = width
+        self.height = height
+    }
+}
+
 public struct PixelGeometry: Equatable, Sendable {
     public let width: Int
     public let height: Int

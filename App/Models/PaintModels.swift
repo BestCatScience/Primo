@@ -4,7 +4,6 @@ import CoreGraphics
 import PrimoBrushFileFormats
 import PrimoBrushDomain
 import PrimoBrushRuntimeContracts
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts

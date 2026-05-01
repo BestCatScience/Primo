@@ -152,6 +152,7 @@ extension DocumentEngineLive {
         return DocumentEditingGateway { request in
             let presentation = self.queryGateway.lightweightPresentation()
             let context = DocumentLayerMutationContext(
+                revision: presentation.revision,
                 layerCount: presentation.layerRows.count,
                 folderIDs: Set(
                     presentation.layerSidebarRows.compactMap { row in
@@ -180,16 +181,19 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func setActiveLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.mutationGateway.setActiveLayer(index.rawValue)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.setActiveLayer(index.rawValue)
             .mapError(mapRuntimeFailure)
     }
 
     func duplicateLayer(index: ExistingLayerIndex, name: String) -> DocumentLayerIndexedMutationResult {
-        runtime.duplicateLayer(index.rawValue, name)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.duplicateLayer(index.rawValue, name)
             .mapError(mapRuntimeFailure)
     }
 
     func deleteLayer(index: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
         switch runtime.mutationGateway.deleteLayer(index.rawValue) {
         case .success:
             return .success(())
@@ -199,6 +203,8 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func moveLayer(from index: ExistingLayerIndex, to destinationIndex: ExistingLayerIndex) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        if let failure = validateFreshLayerIndex(destinationIndex) { return .failure(failure) }
         switch runtime.moveLayer(index.rawValue, destinationIndex.rawValue) {
         case .success:
             return .success(())
@@ -222,6 +228,7 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func assignLayer(index: ExistingLayerIndex, toFolder folderID: ExistingFolderID?) -> DocumentLayerMutationResult {
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
         switch runtime.assignLayerToFolder(index, folderID) {
         case .success:
             return .success(())
@@ -231,37 +238,44 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
     }
 
     func setLayerName(_ name: String, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.mutationGateway.setLayerName(index.rawValue, name)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.setLayerName(index.rawValue, name)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerVisible(_ isVisible: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.mutationGateway.setLayerVisibility(index.rawValue, isVisible)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.mutationGateway.setLayerVisibility(index.rawValue, isVisible)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerLocked(_ isLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.setLayerLocked(index.rawValue, isLocked)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerLocked(index.rawValue, isLocked)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerAlphaLocked(_ isAlphaLocked: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.setLayerAlphaLocked(index.rawValue, isAlphaLocked)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerAlphaLocked(index.rawValue, isAlphaLocked)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerClipped(_ isClipped: Bool, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.setLayerClipped(index.rawValue, isClipped)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerClipped(index.rawValue, isClipped)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerOpacity(_ opacity: ValidatedLayerOpacity, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.setLayerOpacity(index.rawValue, opacity.rawValue)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerOpacity(index.rawValue, opacity.rawValue)
             .mapError(mapRuntimeFailure)
     }
 
     func setLayerBlendMode(_ blendMode: LayerBlendMode, index: ExistingLayerIndex) -> DocumentLayerMutationResult {
-        runtime.setLayerBlendMode(index.rawValue, blendMode)
+        if let failure = validateFreshLayerIndex(index) { return .failure(failure) }
+        return runtime.setLayerBlendMode(index.rawValue, blendMode)
             .mapError(mapRuntimeFailure)
     }
 
@@ -279,12 +293,30 @@ private struct LiveDocumentEditorGateway: DocumentEditorGateway {
         runtime.setFolderName(folderID.rawValue, name)
             .mapError(mapRuntimeFailure)
     }
+
+    private func validateFreshLayerIndex(_ index: ExistingLayerIndex) -> DocumentLayerMutationFailure? {
+        let currentRevision = runtime.queryGateway.lightweightPresentation().revision
+        guard index.revision == currentRevision else {
+            return .staleLayerIndex(
+                index: index.rawValue,
+                validationRevision: index.revision,
+                currentRevision: currentRevision
+            )
+        }
+        return nil
+    }
 }
 
 private func mapEditingFailure(_ failure: DocumentLayerMutationFailure) -> DocumentMutationFailure {
     switch failure {
     case let .invalidLayerIndex(index):
         return .invalidLayerIndex(index)
+    case let .staleLayerIndex(index, validationRevision, currentRevision):
+        return .staleLayerIndex(
+            index: index,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .invalidFolderID(folderID):
         return .invalidFolderID(folderID)
     case let .layerLocked(index):
@@ -317,6 +349,12 @@ private func mapRuntimeFailure(_ failure: DocumentMutationFailure) -> DocumentLa
     switch failure {
     case let .invalidLayerIndex(index):
         return .invalidLayerIndex(index)
+    case let .staleLayerIndex(index, validationRevision, currentRevision):
+        return .staleLayerIndex(
+            index: index,
+            validationRevision: validationRevision,
+            currentRevision: currentRevision
+        )
     case let .invalidFolderID(folderID):
         return .invalidFolderID(folderID)
     case let .layerLocked(index):

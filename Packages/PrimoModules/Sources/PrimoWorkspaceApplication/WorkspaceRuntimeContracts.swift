@@ -108,6 +108,8 @@ public struct DocumentWorkspaceClient: Sendable {
 public typealias ImportedDocumentStageRequest = PrimoDocumentContracts.ImportedDocumentStageRequest
 public typealias ImportedDocumentStageResult = PrimoDocumentContracts.ImportedDocumentStageResult
 public typealias ImportedDocumentStageFailure = PrimoDocumentContracts.ImportedDocumentStageFailure
+public typealias DocumentImportGateway = PrimoDocumentContracts.DocumentImportGateway
+public typealias ProjectLoadingGateway = PrimoDocumentContracts.ProjectLoadingGateway
 
 public struct DocumentImportClient: Sendable {
     public let stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>

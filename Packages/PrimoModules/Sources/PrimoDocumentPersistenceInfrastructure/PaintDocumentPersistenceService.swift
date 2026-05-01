@@ -10,10 +10,12 @@ public struct PaintDocumentPersistenceService {
 
     let fileClient: FileClient
     let uuidClient: UUIDClient
+    private let packageReader: ProjectPackageReader
 
     public init(fileClient: FileClient, uuidClient: UUIDClient = .live) {
         self.fileClient = fileClient
         self.uuidClient = uuidClient
+        self.packageReader = .live(fileClient: fileClient)
     }
 
     public func prepareProjectDirectory(at url: URL) throws {
@@ -24,38 +26,46 @@ public struct PaintDocumentPersistenceService {
     }
 
     public func createStagedProjectDirectory(for destinationURL: URL, id: UUID) throws -> URL {
-        let stagingRoot = destinationURL
-            .deletingLastPathComponent()
-            .appendingPathComponent(".primo-staging", isDirectory: true)
-        let stagedProjectURL = stagingRoot
-            .appendingPathComponent("\(destinationURL.lastPathComponent).\(id.uuidString)", isDirectory: true)
-        try fileClient.createDirectory(stagingRoot, true)
-        if fileClient.fileExists(stagedProjectURL.path) {
-            try fileClient.removeItem(stagedProjectURL)
-        }
-        try fileClient.createDirectory(stagedProjectURL, true)
-        return stagedProjectURL
+        try TemporaryStagingStore.live(
+            fileClient: fileClient,
+            destinationURL: destinationURL,
+            id: id
+        )
+        .createStagingDirectory()
+        .path
+        .fileURL
     }
 
     public func cleanupStagedProjectDirectory(_ stagedProjectURL: URL) throws {
-        if fileClient.fileExists(stagedProjectURL.path) {
-            try fileClient.removeItem(stagedProjectURL)
-        }
+        let staged = StagedProjectPackage(ProjectPackagePath(DocumentProjectPath(stagedProjectURL)))
         let stagingRoot = stagedProjectURL.deletingLastPathComponent()
-        if let children = try? fileClient.contentsOfDirectory(stagingRoot, [], []),
-           children.isEmpty,
-           fileClient.fileExists(stagingRoot.path) {
-            try fileClient.removeItem(stagingRoot)
-        }
+        let fileClient = fileClient
+        let stagingStore = TemporaryStagingStore(
+            createStagingDirectory: { staged },
+            discard: { staged in
+                if fileClient.fileExists(staged.path.fileURL.path) {
+                    try fileClient.removeItem(staged.path.fileURL)
+                }
+                if let children = try? fileClient.contentsOfDirectory(stagingRoot, [], []),
+                   children.isEmpty,
+                   fileClient.fileExists(stagingRoot.path) {
+                    try fileClient.removeItem(stagingRoot)
+                }
+            }
+        )
+        try stagingStore.discard(staged)
     }
 
     public func validateProjectPackage(at projectURL: URL) throws {
-        guard fileClient.fileExists(projectURL.path) else {
+        let package = ProjectPackagePath(DocumentProjectPath(projectURL))
+        guard packageReader.fileExists(package) else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Missing project package at \(projectURL.path)")
         }
         try validatePackageFootprint(at: projectURL)
-        let manifestURL = projectURL.appendingPathComponent("manifest.json", isDirectory: false)
-        let manifestData = try fileClient.readData(manifestURL)
+        guard let manifestFile = ProjectPackageFile(package: package, relativePath: "manifest.json") else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid manifest path")
+        }
+        let manifestData = try packageReader.readData(manifestFile)
         let document = try JSONDecoder().decode(StoredPrimoDocument.self, from: manifestData)
         guard PixelGeometry(width: document.canvasWidth, height: document.canvasHeight) != nil,
               !document.layers.isEmpty,
@@ -318,13 +328,15 @@ public struct PaintDocumentPersistenceService {
 
     public func publishStagedProjectDirectory(_ stagedProjectURL: URL, to destinationURL: URL) throws {
         try validateProjectPackage(at: stagedProjectURL)
-        try fileClient.createDirectory(destinationURL.deletingLastPathComponent(), true)
+        let staged = StagedProjectPackage(ProjectPackagePath(DocumentProjectPath(stagedProjectURL)))
+        let saved = SavedProjectPackage(ProjectPackagePath(DocumentProjectPath(destinationURL)))
 
         if fileClient.fileExists(destinationURL.path) {
             let backupName = ".\(destinationURL.lastPathComponent).backup-\(uuidClient.generate().uuidString)"
             let backupURL = destinationURL.deletingLastPathComponent().appendingPathComponent(backupName, isDirectory: true)
+            let packageWriter = ProjectPackageWriter.live(fileClient: fileClient, backupName: { backupName })
             do {
-                try fileClient.replaceItem(destinationURL, stagedProjectURL, backupName)
+                try packageWriter.replacePackage(staged, saved)
                 do {
                     try validateProjectPackage(at: destinationURL)
                     if fileClient.fileExists(backupURL.path) {
@@ -341,7 +353,8 @@ public struct PaintDocumentPersistenceService {
                 throw error
             }
         } else {
-            try fileClient.moveItem(stagedProjectURL, destinationURL)
+            let packageWriter = ProjectPackageWriter.live(fileClient: fileClient, backupName: { nil })
+            try packageWriter.replacePackage(staged, saved)
             try validateProjectPackage(at: destinationURL)
         }
     }
@@ -385,7 +398,11 @@ public struct PaintDocumentPersistenceService {
     ) throws {
         let fileURL = try validatedRelativeURL(relativePath, in: projectURL, label: label)
         try validateNonSymlink(fileURL, packageRoot: projectURL, label: label)
-        let data = try fileClient.readData(fileURL)
+        let package = ProjectPackagePath(DocumentProjectPath(projectURL))
+        guard let packageFile = ProjectPackageFile(package: package, relativePath: relativePath) else {
+            throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid \(label) path \(relativePath)")
+        }
+        let data = try packageReader.readData(packageFile)
         guard data.count == expectedByteCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Invalid byte count for \(label) \(relativePath)")
         }
@@ -429,11 +446,8 @@ public struct PaintDocumentPersistenceService {
     }
 
     private func validatePackageFootprint(at projectURL: URL) throws {
-        let urls = fileClient.enumerateURLs(
-            projectURL,
-            [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey],
-            []
-        )
+        let package = ProjectPackagePath(DocumentProjectPath(projectURL))
+        let urls = try packageReader.enumerateFiles(package).map(\.fileURL)
         guard urls.count <= Self.maxPackageFileCount else {
             throw PaintDocumentPersistenceError.invalidProjectPackage("Project package contains too many files")
         }

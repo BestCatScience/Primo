@@ -1,7 +1,6 @@
 import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 

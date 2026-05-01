@@ -1,6 +1,5 @@
 import Foundation
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentMutationContracts
 
 extension DocumentFeature {
@@ -16,6 +15,8 @@ extension DocumentFeature {
         case .noRedoState:
             return ApplicationFeature.Feedback.redoUnavailableWhileDrawing.message(for: language)
         case .invalidLayerIndex:
+            return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
+        case .staleLayerIndex:
             return ApplicationFeature.Feedback.layerUnavailable.message(for: language)
         case .invalidFolderID:
             return ApplicationFeature.Feedback.folderUnavailable.message(for: language)
@@ -58,6 +59,8 @@ extension DocumentFeature {
             case .noRedoState:
                 return .redoUnavailableWhileDrawing
             case .invalidLayerIndex:
+                return .layerUnavailable
+            case .staleLayerIndex:
                 return .layerUnavailable
             case .invalidFolderID:
                 return .folderUnavailable

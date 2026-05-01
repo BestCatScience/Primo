@@ -1,11 +1,15 @@
 import ComposableArchitecture
 import CoreGraphics
 import Foundation
-import PrimoDocumentContracts
+import PrimoDocumentApplication
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 
 extension CanvasEditingWorkflowReducer {
+    var selectionWorkflowService: SelectionWorkflowService {
+        selectionWorkflowEnvironment.workflow
+    }
+
     func handleInvertSelection(state: inout State) {
         state.canvas.replaceSelection(
             selectionWorkflowService.invertedSelection(

@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
@@ -194,6 +195,7 @@ public struct DocumentContentService: Sendable {
     private func layerMutationContext() -> DocumentLayerMutationContext {
         let presentation = documentQueryGateway.lightweightPresentation()
         return DocumentLayerMutationContext(
+            revision: presentation.revision,
             layerCount: presentation.layerRows.count,
             folderIDs: Set(
                 presentation.layerSidebarRows.compactMap { row in

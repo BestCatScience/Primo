@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import os
+import PrimoBrushRuntimeContracts
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentMutationContracts

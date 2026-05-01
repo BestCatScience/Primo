@@ -1,16 +1,26 @@
 import Foundation
 import PrimoDocumentPresentationContracts
 import PrimoDocumentGPUContracts
+import PrimoDocumentRenderingContracts
 
 public struct CanvasStrokeInteractionService: Sendable {
     private let sessionUseCase: DocumentStrokeSessionUseCase
+    private let releasePreviewLease: @Sendable (StrokePreviewLease) -> Void
 
-    public init(sessionUseCase: DocumentStrokeSessionUseCase) {
+    public init(
+        sessionUseCase: DocumentStrokeSessionUseCase,
+        releasePreviewLease: @escaping @Sendable (StrokePreviewLease) -> Void = { _ in }
+    ) {
         self.sessionUseCase = sessionUseCase
+        self.releasePreviewLease = releasePreviewLease
     }
 
     public func cancel() -> GpuStrokeSessionOutcome {
         sessionUseCase.execute(.cancel)
+    }
+
+    public func discardPreviewLease(_ lease: StrokePreviewLease) {
+        releasePreviewLease(lease)
     }
 
     public func beginPreview(

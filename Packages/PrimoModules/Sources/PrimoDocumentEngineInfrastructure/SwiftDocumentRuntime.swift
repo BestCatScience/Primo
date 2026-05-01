@@ -842,7 +842,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             activeLayerIndex: store.snapshot.activeLayerIndex,
             layerRows: buildLayerRows(),
             layerSidebarRows: buildSidebarRows(),
-            renderSnapshot: nil
+            renderSnapshot: nil,
+            revision: DocumentRevision(store.snapshot.revision)
         )
     }
 
@@ -852,7 +853,8 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
             activeLayerIndex: store.snapshot.activeLayerIndex,
             layerRows: buildLayerRows(),
             layerSidebarRows: buildSidebarRows(),
-            renderSnapshot: makeRenderSnapshot()
+            renderSnapshot: makeRenderSnapshot(),
+            revision: DocumentRevision(store.snapshot.revision)
         )
     }
 

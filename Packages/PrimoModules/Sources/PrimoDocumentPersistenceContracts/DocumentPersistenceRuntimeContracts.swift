@@ -1,8 +1,8 @@
 import CoreGraphics
 import Foundation
-@_exported import PrimoBrushRuntimeContracts
+import PrimoBrushRuntimeContracts
 import PrimoDocumentDomain
-@_exported import PrimoDocumentPresentationContracts
+import PrimoDocumentPresentationContracts
 
 public struct TimelapseFrame: Equatable, Sendable {
     public let imageURL: URL

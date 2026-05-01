@@ -3,6 +3,7 @@ import Foundation
 import PrimoCanvasPresentationDomain
 import PrimoDocumentDomain
 import PrimoDocumentMutationContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRenderingContracts
 
 public enum CanvasEditingCommand: Equatable, Sendable {

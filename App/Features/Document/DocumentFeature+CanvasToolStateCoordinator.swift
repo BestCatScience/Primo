@@ -1,7 +1,6 @@
 import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
@@ -130,13 +129,13 @@ extension DocumentFeature {
         func resetPreviewState(
             state: inout DocumentEditingState,
             preserving transferredPreviewLease: StrokePreviewLease = .none,
-            releaseSurfaceLease: (StrokePreviewLease) -> Void
+            discardPreviewLease: (StrokePreviewLease) -> Void
         ) {
             let previewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
             state.canvas.activeStroke = nil
             resetPreview(state: &state)
             if previewLease != transferredPreviewLease {
-                releaseSurfaceLease(previewLease)
+                discardPreviewLease(previewLease)
             }
         }
 
@@ -194,7 +193,7 @@ extension DocumentFeature {
         func applyPreviewMutation(
             _ mutation: GpuPreviewMutation,
             state: inout DocumentEditingState,
-            releaseSurfaceLease: (StrokePreviewLease) -> Void
+            discardPreviewLease: (StrokePreviewLease) -> Void
         ) {
             let previousPreviewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
             let previousRenderState = state.canvas.strokeSession.renderState
@@ -221,7 +220,7 @@ extension DocumentFeature {
             )
             let nextPreviewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
             if previousPreviewLease != nextPreviewLease {
-                releaseSurfaceLease(previousPreviewLease)
+                discardPreviewLease(previousPreviewLease)
             }
         }
     }

@@ -3,7 +3,6 @@ import Foundation
 import PrimoBrushDomain
 import PrimoBrushFileFormats
 import PrimoBrushRuntimeContracts
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import SwiftUI

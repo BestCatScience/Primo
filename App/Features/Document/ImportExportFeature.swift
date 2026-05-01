@@ -3,9 +3,9 @@ import ComposableArchitecture
 import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
-import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPersistenceContracts
+import PrimoDocumentPresentationContracts
 import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
 
