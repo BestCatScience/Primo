@@ -3,20 +3,20 @@ import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentDomain
 
-public struct SwiftDocumentLayerRecord: Equatable, Sendable {
-    public var name: String
-    public var visible: Bool
-    public var locked: Bool
-    public var alphaLocked: Bool
-    public var clipped: Bool
-    public var opacity: Double
-    public var blendMode: LayerBlendMode
-    public var folderID: Int?
-    public var textLayer: TextLayerData?
-    public var pixelData: Data
-    public var maskData: Data?
+struct SwiftDocumentLayerRecord: Equatable, Sendable {
+    var name: String
+    var visible: Bool
+    var locked: Bool
+    var alphaLocked: Bool
+    var clipped: Bool
+    var opacity: Double
+    var blendMode: LayerBlendMode
+    var folderID: Int?
+    var textLayer: TextLayerData?
+    var pixelData: Data
+    var maskData: Data?
 
-    public init(
+    init(
         name: String,
         visible: Bool,
         locked: Bool,
@@ -43,14 +43,14 @@ public struct SwiftDocumentLayerRecord: Equatable, Sendable {
     }
 }
 
-public struct SwiftDocumentFolderRecord: Equatable, Sendable {
-    public var id: Int
-    public var name: String
-    public var visible: Bool
-    public var expanded: Bool
-    public var anchorLayerIndex: Int?
+struct SwiftDocumentFolderRecord: Equatable, Sendable {
+    var id: Int
+    var name: String
+    var visible: Bool
+    var expanded: Bool
+    var anchorLayerIndex: Int?
 
-    public init(
+    init(
         id: Int,
         name: String,
         visible: Bool,
@@ -65,21 +65,21 @@ public struct SwiftDocumentFolderRecord: Equatable, Sendable {
     }
 }
 
-public struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
-    public var canvasWidth: Int
-    public var canvasHeight: Int
-    public var activeLayerIndex: Int
-    public var paperStyle: CanvasPaperStyle
-    public var revision: Int
-    public var nextFolderID: Int
-    public var layers: [SwiftDocumentLayerRecord]
-    public var folders: [SwiftDocumentFolderRecord]
-    public var thumbnailCache: [Int: Data]
-    public var timelapseFrames: [TimelapseFrame]
-    public var timelapseEvents: [TimelapseOperation]
-    public var timelapseUsesOperationPersistence: Bool
+struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
+    var canvasWidth: Int
+    var canvasHeight: Int
+    var activeLayerIndex: Int
+    var paperStyle: CanvasPaperStyle
+    var revision: Int
+    var nextFolderID: Int
+    var layers: [SwiftDocumentLayerRecord]
+    var folders: [SwiftDocumentFolderRecord]
+    var thumbnailCache: [Int: Data]
+    var timelapseFrames: [TimelapseFrame]
+    var timelapseEvents: [TimelapseOperation]
+    var timelapseUsesOperationPersistence: Bool
 
-    public init(
+    init(
         canvasWidth: Int,
         canvasHeight: Int,
         activeLayerIndex: Int,
@@ -108,24 +108,24 @@ public struct SwiftDocumentStoreSnapshot: Equatable, Sendable {
     }
 }
 
-public struct DocumentRectSnapshot: Equatable, Sendable {
-    public var layerIndex: Int
-    public var rect: LayerPixelRect
-    public var pixelData: Data
+struct DocumentRectSnapshot: Equatable, Sendable {
+    var layerIndex: Int
+    var rect: LayerPixelRect
+    var pixelData: Data
 
-    public init(layerIndex: Int, rect: LayerPixelRect, pixelData: Data) {
+    init(layerIndex: Int, rect: LayerPixelRect, pixelData: Data) {
         self.layerIndex = layerIndex
         self.rect = rect
         self.pixelData = pixelData
     }
 }
 
-public struct DocumentCommandRecord: Equatable, Sendable {
-    public var before: SwiftDocumentStoreSnapshot
-    public var after: SwiftDocumentStoreSnapshot
-    public var timelapseEvent: TimelapseOperation?
+struct DocumentCommandRecord: Equatable, Sendable {
+    var before: SwiftDocumentStoreSnapshot
+    var after: SwiftDocumentStoreSnapshot
+    var timelapseEvent: TimelapseOperation?
 
-    public init(
+    init(
         before: SwiftDocumentStoreSnapshot,
         after: SwiftDocumentStoreSnapshot,
         timelapseEvent: TimelapseOperation? = nil
@@ -136,10 +136,10 @@ public struct DocumentCommandRecord: Equatable, Sendable {
     }
 }
 
-public final class SwiftDocumentStore: @unchecked Sendable {
-    public var snapshot: SwiftDocumentStoreSnapshot
+final class SwiftDocumentStore: @unchecked Sendable {
+    var snapshot: SwiftDocumentStoreSnapshot
 
-    public init(
+    init(
         width: Int,
         height: Int,
         paperStyle: CanvasPaperStyle = .default
@@ -177,7 +177,7 @@ public final class SwiftDocumentStore: @unchecked Sendable {
         )
     }
 
-    public func restore(_ snapshot: SwiftDocumentStoreSnapshot) {
+    func restore(_ snapshot: SwiftDocumentStoreSnapshot) {
         self.snapshot = snapshot
     }
 }

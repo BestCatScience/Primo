@@ -3,7 +3,7 @@ import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
 

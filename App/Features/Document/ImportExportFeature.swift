@@ -7,7 +7,6 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentRuntime
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 
 @Reducer
 struct ImportExportFeature {

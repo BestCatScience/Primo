@@ -1,39 +1,25 @@
 import Foundation
+import PrimoAIImageApplication
 import PrimoCoreTypes
 import PrimoAIImageDomain
 import StoreKit
 
-public struct AIImageSettingsClient: Sendable {
-    public let load: @Sendable () -> AIImageSettingsDraft
-    public let persist: @Sendable (AIImageSettingsDraft) throws -> Void
-
-    public static let accessModeStorageKey = "primo.aiimage.accessMode"
-    public static let apiKeyStorageKey = "primo.aiimage.apiKey"
-    public static let openAIAPIKeyStorageKey = "primo.aiimage.openAIAPIKey"
-
-    public init(
-        load: @escaping @Sendable () -> AIImageSettingsDraft,
-        persist: @escaping @Sendable (AIImageSettingsDraft) throws -> Void
-    ) {
-        self.load = load
-        self.persist = persist
-    }
-
-    public static func live(
+public enum AIImageRuntimeFactory {
+    public static func settingsClient(
         keyValueStoreClient: KeyValueStoreClient,
         secretStoreClient: SecretStoreClient
     ) -> AIImageSettingsClient {
         AIImageSettingsClient(
             load: {
-                let rawAccessMode = keyValueStoreClient.stringForKey(Self.accessModeStorageKey)
+                let rawAccessMode = keyValueStoreClient.stringForKey(AIImageSettingsClient.accessModeStorageKey)
                 let accessMode = rawAccessMode.flatMap(AIImageAccessMode.init(rawValue:)) ?? .appManaged
                 let apiKey = migratedSecret(
-                    key: Self.apiKeyStorageKey,
+                    key: AIImageSettingsClient.apiKeyStorageKey,
                     keyValueStoreClient: keyValueStoreClient,
                     secretStoreClient: secretStoreClient
                 )
                 let openAIAPIKey = migratedSecret(
-                    key: Self.openAIAPIKeyStorageKey,
+                    key: AIImageSettingsClient.openAIAPIKeyStorageKey,
                     keyValueStoreClient: keyValueStoreClient,
                     secretStoreClient: secretStoreClient
                 )
@@ -44,11 +30,30 @@ public struct AIImageSettingsClient: Sendable {
                 )
             },
             persist: { settings in
-                keyValueStoreClient.setString(settings.accessMode.rawValue, Self.accessModeStorageKey)
-                try secretStoreClient.writeSecret(secretOrNil(settings.apiKey), Self.apiKeyStorageKey)
-                try secretStoreClient.writeSecret(secretOrNil(settings.openAIAPIKey), Self.openAIAPIKeyStorageKey)
-                keyValueStoreClient.setString(nil, Self.apiKeyStorageKey)
-                keyValueStoreClient.setString(nil, Self.openAIAPIKeyStorageKey)
+                keyValueStoreClient.setString(settings.accessMode.rawValue, AIImageSettingsClient.accessModeStorageKey)
+                try secretStoreClient.writeSecret(secretOrNil(settings.apiKey), AIImageSettingsClient.apiKeyStorageKey)
+                try secretStoreClient.writeSecret(secretOrNil(settings.openAIAPIKey), AIImageSettingsClient.openAIAPIKeyStorageKey)
+                keyValueStoreClient.setString(nil, AIImageSettingsClient.apiKeyStorageKey)
+                keyValueStoreClient.setString(nil, AIImageSettingsClient.openAIAPIKeyStorageKey)
+            }
+        )
+    }
+
+    @available(macOS 12.0, iOS 15.0, *)
+    public static func commerceClient(bundle: Bundle = .main) -> AIImageCommerceClient {
+        let store = AIImageCommerceStore(bundle: bundle)
+        return AIImageCommerceClient(
+            prepare: {
+                await store.prepare()
+            },
+            purchasePrimaryProduct: {
+                await store.purchasePrimaryProduct()
+            },
+            restorePurchases: {
+                await store.restorePurchases()
+            },
+            clearPurchaseError: {
+                await store.clearPurchaseError()
             }
         )
     }
@@ -121,44 +126,6 @@ public struct AIImageCommerceState: Equatable, Sendable {
             purchaseErrorMessage: purchaseErrorMessage,
             manageSubscriptionsURL: URL(string: "https://apps.apple.com/account/subscriptions"),
             proxyEndpoint: proxyEndpoint
-        )
-    }
-}
-
-public struct AIImageCommerceClient: Sendable {
-    public let prepare: @Sendable () async -> AIImageCommerceSnapshot
-    public let purchasePrimaryProduct: @Sendable () async -> AIImageCommerceSnapshot
-    public let restorePurchases: @Sendable () async -> AIImageCommerceSnapshot
-    public let clearPurchaseError: @Sendable () async -> AIImageCommerceSnapshot
-
-    public init(
-        prepare: @escaping @Sendable () async -> AIImageCommerceSnapshot,
-        purchasePrimaryProduct: @escaping @Sendable () async -> AIImageCommerceSnapshot,
-        restorePurchases: @escaping @Sendable () async -> AIImageCommerceSnapshot,
-        clearPurchaseError: @escaping @Sendable () async -> AIImageCommerceSnapshot
-    ) {
-        self.prepare = prepare
-        self.purchasePrimaryProduct = purchasePrimaryProduct
-        self.restorePurchases = restorePurchases
-        self.clearPurchaseError = clearPurchaseError
-    }
-
-    @available(macOS 12.0, iOS 15.0, *)
-    public static func live(bundle: Bundle = .main) -> AIImageCommerceClient {
-        let store = AIImageCommerceStore(bundle: bundle)
-        return AIImageCommerceClient(
-            prepare: {
-                await store.prepare()
-            },
-            purchasePrimaryProduct: {
-                await store.purchasePrimaryProduct()
-            },
-            restorePurchases: {
-                await store.restorePurchases()
-            },
-            clearPurchaseError: {
-                await store.clearPurchaseError()
-            }
         )
     }
 }

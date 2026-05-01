@@ -3,7 +3,6 @@ import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentDomain
-import PrimoWorkspaceApplication
 import PrimoWorkspaceDomain
 
 public struct WorkspaceBackingStoreService: Sendable {
@@ -199,20 +198,20 @@ public struct WorkspaceApplicationServices: Sendable {
         )
     }
 
-    public var persistenceUseCase: PrimoWorkspaceApplication.WorkspacePersistenceUseCase {
-        PrimoWorkspaceApplication.WorkspacePersistenceUseCase(
+    public var persistenceUseCase: WorkspacePersistenceUseCase {
+        WorkspacePersistenceUseCase(
             workspaceBackingStore: backingStoreGateway,
             workspaceCatalog: catalogGateway,
             identityGenerator: identityGenerator
         )
     }
 
-    public var catalogUseCase: PrimoWorkspaceApplication.WorkspaceCatalogUseCase {
-        PrimoWorkspaceApplication.WorkspaceCatalogUseCase(workspaceCatalog: catalogGateway)
+    public var catalogUseCase: WorkspaceCatalogUseCase {
+        WorkspaceCatalogUseCase(workspaceCatalog: catalogGateway)
     }
 
-    public var projectPreparationUseCase: PrimoWorkspaceApplication.WorkspaceProjectPreparationUseCase {
-        PrimoWorkspaceApplication.WorkspaceProjectPreparationUseCase(
+    public var projectPreparationUseCase: WorkspaceProjectPreparationUseCase {
+        WorkspaceProjectPreparationUseCase(
             workspacePersistenceUseCase: persistenceUseCase
         )
     }

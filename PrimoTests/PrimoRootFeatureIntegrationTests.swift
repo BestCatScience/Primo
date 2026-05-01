@@ -6,7 +6,7 @@ import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoDocumentPresentationContracts
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
 

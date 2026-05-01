@@ -97,13 +97,17 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentRuntime
       - package: PrimoModules
+        product: PrimoBrushRuntime
+      - package: PrimoModules
+        product: PrimoWorkspaceRuntime
+      - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
         product: PrimoAIImageDomain
       - package: PrimoModules
         product: PrimoAIImageApplication
       - package: PrimoModules
-        product: PrimoAIImageInfrastructure
+        product: PrimoAIImageRuntime
       - sdk: AVFoundation.framework
       - sdk: AppIntents.framework
       - sdk: CoreGraphics.framework
@@ -169,9 +173,11 @@ targets:
       - package: PrimoModules
         product: PrimoDocumentDomain
       - package: PrimoModules
-        product: PrimoDocumentEngineInfrastructure
+        product: PrimoDocumentRuntime
       - package: PrimoModules
         product: PrimoDocumentGPUContracts
+      - package: PrimoModules
+        product: PrimoBrushRuntime
       - package: PrimoModules
         product: PrimoDocumentStrokeApplication
       - package: PrimoModules
@@ -179,8 +185,8 @@ targets:
       - package: PrimoModules
         product: PrimoAIImageDomain
       - package: PrimoModules
-        product: PrimoAIImageInfrastructure
+        product: PrimoAIImageRuntime
       - package: PrimoModules
         product: PrimoWorkspaceApplication
       - package: PrimoModules
-        product: PrimoWorkspaceInfrastructure
+        product: PrimoWorkspaceRuntime

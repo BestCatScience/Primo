@@ -1,5 +1,6 @@
 import Foundation
 import PrimoCoreTypes
+import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import Testing
 
@@ -12,7 +13,7 @@ struct DocumentImportClientTests {
         try FileManager.default.createDirectory(at: sourceURL, withIntermediateDirectories: true)
         try Data("hello".utf8).write(to: sourceURL.appendingPathComponent("payload.txt"))
 
-        let client = DocumentImportClient.live(
+        let client = DocumentImportClient.infrastructureLive(
             fileClient: .live,
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000111")! }),
             securityScopedResourceClient: SecurityScopedResourceClient(
@@ -49,7 +50,7 @@ struct DocumentImportClientTests {
         let stagedURL = root.appendingPathComponent("Staged.project", isDirectory: true)
         try FileManager.default.createDirectory(at: stagedURL, withIntermediateDirectories: true)
 
-        let client = DocumentImportClient.live(
+        let client = DocumentImportClient.infrastructureLive(
             fileClient: .live,
             uuidClient: .live,
             securityScopedResourceClient: SecurityScopedResourceClient(

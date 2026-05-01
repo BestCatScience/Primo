@@ -1,4 +1,5 @@
 import PrimoCoreTypes
+import PrimoAIImageApplication
 import PrimoAIImageDomain
 import PrimoAIImageInfrastructure
 import Testing
@@ -25,7 +26,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.apiKeyStorageKey: "gemini-secret",
             AIImageSettingsClient.openAIAPIKeyStorageKey: "openai-secret",
         ])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }
@@ -49,7 +50,7 @@ struct AIImageSettingsClientTests {
     func persistWritesAccessModeToDefaultsAndSecretsToSecretStore() throws {
         let defaults = TestStorage([:])
         let secrets = TestStorage([:])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }
@@ -83,7 +84,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
         ])
         let secrets = TestStorage([:])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in
@@ -118,7 +119,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.apiKeyStorageKey: "old-gemini-key",
             AIImageSettingsClient.openAIAPIKeyStorageKey: "old-openai-key",
         ])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }
@@ -148,7 +149,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
         ])
         let secrets = TestStorage([:])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }
@@ -181,7 +182,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.openAIAPIKeyStorageKey: "legacy-openai-key",
         ])
         let secrets = TestStorage([:])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }
@@ -219,7 +220,7 @@ struct AIImageSettingsClientTests {
             AIImageSettingsClient.apiKeyStorageKey: "legacy-gemini-key",
         ])
         let secrets = TestStorage([:])
-        let client = AIImageSettingsClient.live(
+        let client = AIImageRuntimeFactory.settingsClient(
             keyValueStoreClient: KeyValueStoreClient(
                 stringForKey: { defaults.values[$0] },
                 setString: { value, key in defaults.values[key] = value }

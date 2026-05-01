@@ -2,12 +2,10 @@ import Foundation
 import ComposableArchitecture
 import PrimoCanvasPresentationDomain
 import PrimoDocumentApplication
-import PrimoBrushInfrastructure
+import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
-import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
-import PrimoDocumentMetalStrokeInfrastructure
-import PrimoDocumentRenderingInfrastructure
+import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import SwiftUI
 import XCTest

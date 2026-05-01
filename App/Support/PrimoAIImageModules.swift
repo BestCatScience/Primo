@@ -1,3 +1,3 @@
 @_exported import PrimoAIImageDomain
 @_exported import PrimoAIImageApplication
-@_exported import PrimoAIImageInfrastructure
+@_exported import PrimoAIImageRuntime

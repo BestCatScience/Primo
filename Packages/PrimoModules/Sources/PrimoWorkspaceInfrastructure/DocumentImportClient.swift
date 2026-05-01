@@ -2,28 +2,14 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoWorkspaceApplication
 
-public typealias ImportedDocumentStageRequest = PrimoDocumentContracts.ImportedDocumentStageRequest
-public typealias ImportedDocumentStageResult = PrimoDocumentContracts.ImportedDocumentStageResult
-public typealias ImportedDocumentStageFailure = PrimoDocumentContracts.ImportedDocumentStageFailure
-
-public struct DocumentImportClient: Sendable {
+public extension DocumentImportClient {
     private static let maxImportedPackageByteCount = 2 * 1024 * 1024 * 1024
     private static let maxImportedPackageFileCount = 300_000
     private static let maxImportedSingleFileByteCount = 512 * 1024 * 1024
 
-    public let stageImportedDocument: @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>
-    public let discardStagedDocument: @Sendable (DocumentProjectPath) -> Result<Void, ImportedDocumentStageFailure>
-
-    public init(
-        stageImportedDocument: @escaping @Sendable (ImportedDocumentStageRequest) -> Result<ImportedDocumentStageResult, ImportedDocumentStageFailure>,
-        discardStagedDocument: @escaping @Sendable (DocumentProjectPath) -> Result<Void, ImportedDocumentStageFailure>
-    ) {
-        self.stageImportedDocument = stageImportedDocument
-        self.discardStagedDocument = discardStagedDocument
-    }
-
-    public static func live(
+    static func infrastructureLive(
         fileClient: FileClient,
         uuidClient: UUIDClient,
         securityScopedResourceClient: SecurityScopedResourceClient

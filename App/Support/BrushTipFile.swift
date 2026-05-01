@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PrimoBrushFileFormats
-import PrimoBrushInfrastructure
+import PrimoBrushRuntime
 import PrimoCoreTypes
 import UniformTypeIdentifiers
 
@@ -11,7 +11,7 @@ struct BrushTipLibraryClient: Sendable {
     let importPhotoshopBrushes: @Sendable (URL) throws -> [ImportedPhotoshopBrush]
 
     static func live(fileClient: PrimoCoreTypes.FileClient) -> BrushTipLibraryClient {
-        let client = PrimoBrushInfrastructure.BrushTipLibraryClient.live(fileClient: fileClient)
+        let client = PrimoBrushRuntime.BrushTipLibraryClient.live(fileClient: fileClient)
         return BrushTipLibraryClient(
             loadRaster: client.loadRaster,
             prepareBrushTipFile: client.prepareBrushTipFile,

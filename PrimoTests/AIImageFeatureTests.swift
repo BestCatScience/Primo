@@ -2,7 +2,7 @@ import ComposableArchitecture
 @testable import Primo
 import PrimoAIImageApplication
 import PrimoAIImageDomain
-import PrimoAIImageInfrastructure
+import PrimoAIImageApplication
 import XCTest
 
 @MainActor

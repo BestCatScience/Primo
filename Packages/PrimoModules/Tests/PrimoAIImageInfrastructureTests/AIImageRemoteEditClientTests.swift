@@ -38,7 +38,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let command = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
@@ -93,7 +93,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let command = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
@@ -121,7 +121,7 @@ struct AIImageRemoteEditClientTests {
             Issue.record("Unsupported direct OpenAI model should fail before sending \(request)")
             throw AIImageEditFailure.invalidEndpoint
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let command = SubmitAIImageEditCommand(
             descriptor: AIImageEditDescriptor(
                 prompt: NonEmptyPrompt("Improve lettering")!,
@@ -168,7 +168,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let inputPNGData = Data([0x89, 0x50, 0x4E, 0x47])
 
         let result = await client.execute(
@@ -204,7 +204,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (Data(), response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let oversizedPNGData = Data(count: 16 * 1024 * 1024 + 1)
 
         let result = await client.execute(
@@ -235,7 +235,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
 
         let result = await client.execute(
             AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
@@ -284,7 +284,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
 
         let result = await client.execute(
             AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
@@ -319,7 +319,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
 
         let result = await client.execute(
             AIImageEditExecutionRequest(inputPNGData: Data([0x89, 0x50, 0x4E, 0x47]), command: appManagedCommand()),
@@ -365,7 +365,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let command = geminiCommand(editScope: .wholeLayer)
         let inputPNGData = try #require(DocumentRasterImageService.pngData(
             from: solidSurface(width: 1152, height: 1536)
@@ -415,7 +415,7 @@ struct AIImageRemoteEditClientTests {
             )!
             return (responseData, response)
         }
-        let client = AIImageRemoteEditClient.live(httpClient: httpClient)
+        let client = AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
         let inputPNGData = try #require(DocumentRasterImageService.pngData(
             from: solidSurface(width: 320, height: 180)
         ))

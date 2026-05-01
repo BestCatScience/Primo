@@ -3,7 +3,8 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentRuntime
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
+import PrimoWorkspaceRuntime
 
 private enum DocumentWorkspaceClientKey: DependencyKey {
     static var liveValue: DocumentWorkspaceClient {

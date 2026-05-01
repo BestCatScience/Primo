@@ -1,17 +1,17 @@
 import ComposableArchitecture
 import PrimoCoreTypes
 import PrimoDocumentDomain
-import PrimoBrushInfrastructure
+import PrimoBrushRuntime
 
 private enum TextFontLibraryClientKey: DependencyKey {
-    static var liveValue: PrimoBrushInfrastructure.TextFontLibraryClient {
+    static var liveValue: TextFontLibraryClient {
         @Dependency(\.fileClient) var fileClient
         return .live(fileClient: fileClient)
     }
 }
 
 extension DependencyValues {
-    var textFontLibraryClient: PrimoBrushInfrastructure.TextFontLibraryClient {
+    var textFontLibraryClient: TextFontLibraryClient {
         get { self[TextFontLibraryClientKey.self] }
         set { self[TextFontLibraryClientKey.self] = newValue }
     }

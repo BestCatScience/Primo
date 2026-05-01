@@ -5,11 +5,10 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
-import PrimoDocumentEngineInfrastructure
 import PrimoDocumentGPUContracts
+import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 @testable import Primo
 
 extension PrimoRootFeature.Action {

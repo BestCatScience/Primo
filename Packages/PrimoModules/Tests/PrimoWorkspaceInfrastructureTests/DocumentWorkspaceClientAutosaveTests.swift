@@ -3,6 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoWorkspaceApplication
 import PrimoWorkspaceInfrastructure
 import Testing
 
@@ -33,7 +34,7 @@ struct DocumentWorkspaceClientAutosaveTests {
             UUID(uuidString: "00000000-0000-0000-0000-000000000111")!,
             UUID(uuidString: "00000000-0000-0000-0000-000000000222")!,
         ])
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(documentsDirectory: documents),
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { generatedIDs.next() }),
@@ -81,7 +82,7 @@ struct DocumentWorkspaceClientAutosaveTests {
             pixelData: Data([0x10, 0x20, 0x30, 0xFF])
         )
         let recorder = PreviewCallRecorder()
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(documentsDirectory: documents),
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000222")! }),
@@ -132,7 +133,7 @@ struct DocumentWorkspaceClientAutosaveTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let recorder = PreviewCallRecorder()
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(documentsDirectory: documents),
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000222")! }),
@@ -167,7 +168,7 @@ struct DocumentWorkspaceClientAutosaveTests {
         let originalFingerprint = try fileFingerprint(at: destinationURL)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(
                 documentsDirectory: documents,
                 copyItem: { source, destination in
@@ -210,7 +211,7 @@ struct DocumentWorkspaceClientAutosaveTests {
         let originalFingerprint = try fileFingerprint(at: destinationURL)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(documentsDirectory: documents),
             dateClient: DateClient(now: { Date(timeIntervalSince1970: 20) }),
             uuidClient: UUIDClient(generate: { UUID(uuidString: "00000000-0000-0000-0000-000000000555")! }),
@@ -240,7 +241,7 @@ struct DocumentWorkspaceClientAutosaveTests {
         let originalFingerprint = try fileFingerprint(at: destinationURL)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let client = DocumentWorkspaceClient.live(
+        let client = DocumentWorkspaceClient.infrastructureLive(
             fileClient: fileClient(
                 documentsDirectory: documents,
                 readData: { url in

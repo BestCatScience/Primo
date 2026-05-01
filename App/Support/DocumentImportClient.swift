@@ -1,10 +1,11 @@
 import ComposableArchitecture
 import Foundation
 import PrimoDocumentContracts
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
+import PrimoWorkspaceRuntime
 
 private enum DocumentImportClientKey: DependencyKey {
-    static var liveValue: PrimoWorkspaceInfrastructure.DocumentImportClient {
+    static var liveValue: DocumentImportClient {
         @Dependency(\.fileClient) var fileClient
         @Dependency(\.uuidClient) var uuidClient
         @Dependency(\.securityScopedResourceClient) var securityScopedResourceClient
@@ -17,7 +18,7 @@ private enum DocumentImportClientKey: DependencyKey {
 }
 
 extension DependencyValues {
-    var documentImportClient: PrimoWorkspaceInfrastructure.DocumentImportClient {
+    var documentImportClient: DocumentImportClient {
         get { self[DocumentImportClientKey.self] }
         set { self[DocumentImportClientKey.self] = newValue }
     }

@@ -2,7 +2,6 @@ import ComposableArchitecture
 import Foundation
 import PrimoAIImageApplication
 import PrimoAIImageDomain
-import PrimoAIImageInfrastructure
 
 @Reducer
 struct AIImageFeature {

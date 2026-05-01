@@ -100,6 +100,8 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   app と runtime の境界になる query / mutation / stroke / history / persistence / export / text / GPU contract
 - `PrimoDocumentApplication`
   document editing、layer mutation、raster image、content service などの use case
+- `PrimoDocumentRuntime`
+  app-facing façade for live document runtime, rendering, Metal presentation, preview, timelapse, and stroke helpers
 - `PrimoDocumentEngineInfrastructure`
   `SwiftDocumentRuntime`、`DocumentEngineLive`、`DocumentRuntimeComposition`、timelapse export、runtime GPU service wiring
 - `PrimoDocumentMetalRuntimeInfrastructure`
@@ -114,12 +116,12 @@ Primo は、アプリ層を薄い orchestration 層に寄せ、実際の documen
   stroke session use case と CPU 側 stroke geometry / raster service
 - `PrimoCanvasInputDomain` / `PrimoCanvasPresentationDomain` / `PrimoCanvasPresentationInfrastructure`
   canvas input、presentation state、UIKit / Metal presentation views
-- `PrimoWorkspaceDomain` / `PrimoWorkspaceApplication` / `PrimoWorkspaceInfrastructure`
-  workspace catalog、autosave、load、reservation、persistence
-- `PrimoBrushDomain` / `PrimoBrushFileFormats` / `PrimoBrushInfrastructure`
-  brush settings、Photoshop brush / tip formats、brush import
-- `PrimoAIImageDomain` / `PrimoAIImageApplication` / `PrimoAIImageInfrastructure`
-  AI 画像編集 backend。Gemini 系 image model と OpenAI Image model の command、preview preparation、commerce / remote client を扱います。
+- `PrimoWorkspaceDomain` / `PrimoWorkspaceApplication` / `PrimoWorkspaceRuntime`
+  workspace catalog、autosave、load、reservation、persistence の public boundary と live façade
+- `PrimoBrushDomain` / `PrimoBrushFileFormats` / `PrimoBrushRuntimeContracts` / `PrimoBrushRuntime`
+  brush settings、Photoshop brush / tip formats、brush import の public boundary と live façade
+- `PrimoAIImageDomain` / `PrimoAIImageApplication` / `PrimoAIImageRuntime`
+  AI image editing settings、commerce、remote edit の public boundary と live façade
 - `PrimoLocalization`
   共通ローカライズ型
 

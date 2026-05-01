@@ -8,7 +8,6 @@ import PrimoDocumentMutationContracts
 import PrimoDocumentPersistenceContracts
 import PrimoDocumentPresentationContracts
 import PrimoDocumentDomain
-import PrimoDocumentInfrastructure
 import PrimoDocumentPersistenceInfrastructure
 import PrimoDocumentStrokeInfrastructure
 import PrimoDocumentTimelapseInfrastructure

@@ -373,25 +373,35 @@ struct GpuSideEffectIsolationArchitectureTests {
     }
 
     @Test
-    func appTargetUsesDocumentRuntimeFacadeInsteadOfDocumentInfrastructureProducts() throws {
+    func appAndRootTestsUseRuntimeFacadesInsteadOfInfrastructureProducts() throws {
         let repoRoot = try Self.repoRoot()
-        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
         let bannedImports = Set([
+            "PrimoAIImageInfrastructure",
+            "PrimoBrushInfrastructure",
             "PrimoCanvasPresentationInfrastructure",
             "PrimoDocumentEngineInfrastructure",
             "PrimoDocumentInfrastructure",
+            "PrimoDocumentMetalLayerInfrastructure",
+            "PrimoDocumentMetalRuntimeInfrastructure",
+            "PrimoDocumentMetalStrokeInfrastructure",
+            "PrimoDocumentMetalSurfaceInfrastructure",
+            "PrimoDocumentPersistenceInfrastructure",
             "PrimoDocumentMetalRuntimeInfrastructure",
             "PrimoDocumentRenderingInfrastructure",
             "PrimoDocumentStrokeInfrastructure",
-            "PrimoDocumentTimelapseInfrastructure"
+            "PrimoDocumentTimelapseInfrastructure",
+            "PrimoWorkspaceInfrastructure"
         ])
-        for source in try Self.swiftSources(under: appRoot) {
-            let body = try String(contentsOf: source, encoding: .utf8)
-            let imports = Self.swiftImports(in: body)
-            #expect(
-                imports.isDisjoint(with: bannedImports),
-                "\(source.path) should import PrimoDocumentRuntime instead of concrete document infrastructure modules"
-            )
+        for rootName in ["App", "PrimoTests"] {
+            let root = repoRoot.appendingPathComponent(rootName, isDirectory: true)
+            for source in try Self.swiftSources(under: root) {
+                let body = try String(contentsOf: source, encoding: .utf8)
+                let imports = Self.swiftImports(in: body)
+                #expect(
+                    imports.isDisjoint(with: bannedImports),
+                    "\(source.path) should import runtime/application facades instead of concrete infrastructure modules"
+                )
+            }
         }
 
         let projectYML = try String(
@@ -400,16 +410,36 @@ struct GpuSideEffectIsolationArchitectureTests {
         )
         let appTargetBlock = try #require(Self.yamlTargetBlock(named: "Primo", in: projectYML))
         let bannedProducts = [
+            "product: PrimoAIImageInfrastructure",
+            "product: PrimoBrushInfrastructure",
             "product: PrimoCanvasPresentationInfrastructure",
             "product: PrimoDocumentEngineInfrastructure",
             "product: PrimoDocumentInfrastructure",
+            "product: PrimoDocumentMetalLayerInfrastructure",
+            "product: PrimoDocumentMetalRuntimeInfrastructure",
+            "product: PrimoDocumentMetalStrokeInfrastructure",
+            "product: PrimoDocumentMetalSurfaceInfrastructure",
+            "product: PrimoDocumentPersistenceInfrastructure",
             "product: PrimoDocumentRenderingInfrastructure",
             "product: PrimoDocumentStrokeInfrastructure",
-            "product: PrimoDocumentTimelapseInfrastructure"
+            "product: PrimoDocumentTimelapseInfrastructure",
+            "product: PrimoWorkspaceInfrastructure"
         ]
         #expect(appTargetBlock.contains("product: PrimoDocumentRuntime"))
         for product in bannedProducts {
-            #expect(!appTargetBlock.contains(product), "App target should depend on PrimoDocumentRuntime instead of \(product)")
+            #expect(!projectYML.contains(product), "External targets should depend on runtime facades instead of \(product)")
+        }
+    }
+
+    @Test
+    func packageDoesNotPublishInfrastructureProducts() throws {
+        let repoRoot = try Self.repoRoot()
+        let package = try String(
+            contentsOf: repoRoot.appendingPathComponent("Packages/PrimoModules/Package.swift", isDirectory: false),
+            encoding: .utf8
+        )
+        for product in Self.infrastructureProductNames(in: package) {
+            #expect(!product.hasSuffix("Infrastructure"), "\(product) should remain an internal target, not a library product")
         }
     }
 
@@ -438,6 +468,7 @@ struct GpuSideEffectIsolationArchitectureTests {
             "GpuCanvasEyedropperSampler",
             "GpuLayerTransformProcessor",
             "BrushStrokeKernel",
+            "GpuRenderingSupport",
             "PrimoMetalSurfaceFiltering",
             "CanvasPresentationContainerView",
             "CanvasPixelSurfaceView"
@@ -805,6 +836,16 @@ struct GpuSideEffectIsolationArchitectureTests {
             let nameIndex = parts.index(after: declarationIndex)
             guard parts.indices.contains(nameIndex) else { return nil }
             return String(parts[nameIndex])
+        }
+    }
+
+    private static func infrastructureProductNames(in source: String) -> [String] {
+        source.split(separator: "\n").compactMap { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix(".library(name: ") else { return nil }
+            let parts = trimmed.split(separator: "\"")
+            guard parts.count > 1 else { return nil }
+            return String(parts[1])
         }
     }
 

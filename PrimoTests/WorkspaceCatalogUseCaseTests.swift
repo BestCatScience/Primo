@@ -2,7 +2,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
+import PrimoWorkspaceApplication
 import XCTest
 @testable import Primo
 

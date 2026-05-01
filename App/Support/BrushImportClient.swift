@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import Foundation
 import PrimoBrushFileFormats
-import PrimoBrushInfrastructure
+import PrimoBrushRuntime
 import PrimoCoreTypes
 import PrimoDocumentDomain
 import PrimoLocalization
@@ -58,7 +58,7 @@ struct BrushImportClient: Sendable {
         textFontLibraryClient: TextFontLibraryClient,
         securityScopedResourceClient: SecurityScopedResourceClient
     ) -> BrushImportClient {
-        let packageBrushTipLibraryClient = PrimoBrushInfrastructure.BrushTipLibraryClient(
+        let packageBrushTipLibraryClient = PrimoBrushRuntime.BrushTipLibraryClient(
             loadRaster: brushTipLibraryClient.loadRaster,
             prepareBrushTipFile: brushTipLibraryClient.prepareBrushTipFile,
             importPhotoshopBrushSamples: { url in
@@ -67,11 +67,11 @@ struct BrushImportClient: Sendable {
                 }
             }
         )
-        let packageTextFontLibraryClient = PrimoBrushInfrastructure.TextFontLibraryClient(
+        let packageTextFontLibraryClient = PrimoBrushRuntime.TextFontLibraryClient(
             loadAvailableFonts: textFontLibraryClient.loadAvailableFonts,
             importFonts: textFontLibraryClient.importFonts
         )
-        let service = PrimoBrushInfrastructure.BrushImportService.live(
+        let service = PrimoBrushRuntime.BrushImportService.live(
             brushTipLibraryClient: packageBrushTipLibraryClient,
             textFontLibraryClient: packageTextFontLibraryClient,
             securityScopedResourceClient: securityScopedResourceClient

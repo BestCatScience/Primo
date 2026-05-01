@@ -16,6 +16,7 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 import PrimoDocumentStrokeInfrastructure
+import PrimoDocumentMetalStrokeInfrastructure
 
 public struct DocumentRuntimeComposition: Sendable {
     public let queryGateway: DocumentQueryGateway
@@ -476,6 +477,20 @@ public enum BrushStrokeKernel {
 
     public static func noise(x: CGFloat, y: CGFloat) -> CGFloat {
         PrimoDocumentStrokeInfrastructure.BrushStrokeKernel.noise(x: x, y: y)
+    }
+}
+
+public enum GpuRenderingSupport {
+    public static func shouldUseIncrementalPreviewUpdate(for brush: BrushRuntimeSettings) -> Bool {
+        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.shouldUseIncrementalPreviewUpdate(for: brush)
+    }
+
+    public static func shouldUseGpuOnlyResponsivePreview(for brush: BrushRuntimeSettings) -> Bool {
+        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.shouldUseGpuOnlyResponsivePreview(for: brush)
+    }
+
+    public static func responsivePreviewBrush(from brush: BrushRuntimeSettings) -> BrushRuntimeSettings {
+        PrimoDocumentMetalStrokeInfrastructure.GpuRenderingSupport.responsivePreviewBrush(from: brush)
     }
 }
 

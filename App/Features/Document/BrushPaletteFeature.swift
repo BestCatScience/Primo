@@ -2,7 +2,7 @@ import ComposableArchitecture
 import Foundation
 import PrimoBrushDomain
 import PrimoBrushFileFormats
-import PrimoBrushInfrastructure
+import PrimoBrushRuntimeContracts
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import SwiftUI

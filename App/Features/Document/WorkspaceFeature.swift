@@ -5,7 +5,6 @@ import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
 import PrimoWorkspaceApplication
-import PrimoWorkspaceInfrastructure
 
 @Reducer
 struct WorkspaceFeature {
@@ -49,11 +48,11 @@ struct WorkspaceFeature {
     typealias ApplicationFeedback = ApplicationFeature.Feedback
     typealias WorkspacePersistenceUseCase = PrimoWorkspaceApplication.WorkspacePersistenceUseCase
     typealias WorkspaceCatalogUseCase = PrimoWorkspaceApplication.WorkspaceCatalogUseCase
-    typealias WorkspaceBackingStoreService = PrimoWorkspaceInfrastructure.WorkspaceBackingStoreService
-    typealias WorkspaceCatalogService = PrimoWorkspaceInfrastructure.WorkspaceCatalogService
-    typealias WorkspaceArtifactService = PrimoWorkspaceInfrastructure.WorkspaceArtifactService
-    typealias WorkspaceIdentityService = PrimoWorkspaceInfrastructure.WorkspaceIdentityService
-    typealias WorkspaceApplicationServices = PrimoWorkspaceInfrastructure.WorkspaceApplicationServices
+    typealias WorkspaceBackingStoreService = PrimoWorkspaceApplication.WorkspaceBackingStoreService
+    typealias WorkspaceCatalogService = PrimoWorkspaceApplication.WorkspaceCatalogService
+    typealias WorkspaceArtifactService = PrimoWorkspaceApplication.WorkspaceArtifactService
+    typealias WorkspaceIdentityService = PrimoWorkspaceApplication.WorkspaceIdentityService
+    typealias WorkspaceApplicationServices = PrimoWorkspaceApplication.WorkspaceApplicationServices
 
     @Dependency(\.documentImportClient) var documentImportClient
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway

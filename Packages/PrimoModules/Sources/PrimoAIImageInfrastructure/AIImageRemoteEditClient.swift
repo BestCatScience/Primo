@@ -6,7 +6,7 @@ import PrimoDocumentApplication
 
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public extension AIImageRemoteEditClient {
-    static func live(httpClient: HTTPClient) -> AIImageRemoteEditClient {
+    static func infrastructureLive(httpClient: HTTPClient) -> AIImageRemoteEditClient {
         AIImageRemoteEditClient { request, prompt, model in
             do {
                 let imageData = try await performEditRequest(
@@ -557,6 +557,13 @@ public extension AIImageRemoteEditClient {
         }
 
         return nil
+    }
+}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+public extension AIImageRuntimeFactory {
+    static func remoteEditClient(httpClient: HTTPClient) -> AIImageRemoteEditClient {
+        AIImageRemoteEditClient.infrastructureLive(httpClient: httpClient)
     }
 }
 

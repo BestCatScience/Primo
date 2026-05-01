@@ -1,7 +1,7 @@
 import ComposableArchitecture
 import PrimoCoreTypes
 import PrimoAIImageApplication
-import PrimoAIImageInfrastructure
+import PrimoAIImageRuntime
 
 private enum AIImageSettingsClientKey: DependencyKey {
     static var liveValue: AIImageSettingsClient {
