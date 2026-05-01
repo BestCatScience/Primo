@@ -5,6 +5,7 @@ import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentPersistenceContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentRuntime
 import PrimoDocumentStrokeApplication
 import PrimoWorkspaceApplication
@@ -171,6 +172,13 @@ private enum DocumentRenderingWorkflowKey: DependencyKey {
     }
 }
 
+private enum SurfaceHandleReleaserKey: DependencyKey {
+    static var liveValue: any SurfaceHandleReleasing {
+        @Dependency(\.documentRuntime) var runtime
+        return runtime.surfaceHandleReleaser
+    }
+}
+
 private extension DependencyValues {
     mutating func setDocumentRuntimeAndRefreshServices(_ runtime: DocumentRuntime) {
         self[DocumentRuntimeKey.self] = runtime
@@ -202,6 +210,7 @@ private extension DependencyValues {
         )
         self[DocumentTextLayerServiceKey.self] = runtime.textLayerService
         self[DocumentRenderingWorkflowKey.self] = runtime.renderingWorkflow
+        self[SurfaceHandleReleaserKey.self] = runtime.surfaceHandleReleaser
     }
 }
 
@@ -239,6 +248,11 @@ extension DependencyValues {
     var documentRenderingWorkflow: DocumentRenderingWorkflow {
         get { self[DocumentRenderingWorkflowKey.self] }
         set { self[DocumentRenderingWorkflowKey.self] = newValue }
+    }
+
+    var surfaceHandleReleaser: any SurfaceHandleReleasing {
+        get { self[SurfaceHandleReleaserKey.self] }
+        set { self[SurfaceHandleReleaserKey.self] = newValue }
     }
 
     var canvasPreviewRenderer: any CanvasPreviewRendering {

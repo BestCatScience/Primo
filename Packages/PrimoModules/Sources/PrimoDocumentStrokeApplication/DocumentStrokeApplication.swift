@@ -3,6 +3,7 @@ import PrimoDocumentApplication
 import PrimoBrushRuntimeContracts
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 
@@ -98,16 +99,16 @@ public struct StrokeCommitPendingSnapshot: Sendable {
 
 public struct StrokeCommitWorkflowResult<Selection: Equatable & Sendable, Feedback: Equatable & Sendable>: Sendable {
     public let contract: DocumentMutationWorkflowOutcome<Selection, Feedback>
-    public let transferredSurfaceHandle: MetalBufferHandle?
+    public let transferredPreviewLease: StrokePreviewLease
     public let pendingCommittedSnapshot: StrokeCommitPendingSnapshot?
 
     public init(
         contract: DocumentMutationWorkflowOutcome<Selection, Feedback>,
-        transferredSurfaceHandle: MetalBufferHandle?,
+        transferredPreviewLease: StrokePreviewLease,
         pendingCommittedSnapshot: StrokeCommitPendingSnapshot?
     ) {
         self.contract = contract
-        self.transferredSurfaceHandle = transferredSurfaceHandle
+        self.transferredPreviewLease = transferredPreviewLease
         self.pendingCommittedSnapshot = pendingCommittedSnapshot
     }
 }
@@ -172,7 +173,7 @@ public struct DocumentStrokeCommitWorkflowService: Sendable {
                             refresh: mutation.refreshViaDirtyPresentation ? .dirty : .current,
                             updatesWorkspaceArtifacts: false
                         ),
-                        transferredSurfaceHandle: mutation.surface.handle.buffer,
+                        transferredPreviewLease: StrokePreviewLease(surfaceHandle: mutation.surface.handle.buffer),
                         pendingCommittedSnapshot: commitBaseSnapshot.map {
                             StrokeCommitPendingSnapshot(baseSnapshot: $0, surface: mutation.surface)
                         }

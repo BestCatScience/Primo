@@ -84,8 +84,7 @@ final class ImageImportOpsTests: XCTestCase {
                     }
                 }
                 return .success(output)
-            },
-            releaseSurfaceHandle: { _ in }
+            }
         )
     }
 

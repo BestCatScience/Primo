@@ -73,7 +73,11 @@ package struct DocumentRuntimeComposition: Sendable {
     package let layerEffectsGateway: DocumentLayerEffectsGateway
     package let editingGateway: DocumentEditingGateway
     package let strokeSessionUseCase: DocumentStrokeSessionUseCase
-    package let gpuOperationGateway: DocumentGpuOperationGateway
+    package let canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations
+    package let selectionMaskOperations: DocumentSelectionMaskOperations
+    package let layerTransformOperations: DocumentLayerTransformOperations
+    package let renderingOperations: DocumentRenderingOperations
+    package let surfaceHandleReleaser: DocumentSurfaceHandleReleaser
 
     package init(
         queryGateway: DocumentQueryGateway,
@@ -88,7 +92,11 @@ package struct DocumentRuntimeComposition: Sendable {
         layerEffectsGateway: DocumentLayerEffectsGateway,
         editingGateway: DocumentEditingGateway,
         strokeSessionUseCase: DocumentStrokeSessionUseCase,
-        gpuOperationGateway: DocumentGpuOperationGateway
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations,
+        selectionMaskOperations: DocumentSelectionMaskOperations,
+        layerTransformOperations: DocumentLayerTransformOperations,
+        renderingOperations: DocumentRenderingOperations,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser
     ) {
         self.queryGateway = queryGateway
         self.renderGateway = renderGateway
@@ -102,7 +110,11 @@ package struct DocumentRuntimeComposition: Sendable {
         self.layerEffectsGateway = layerEffectsGateway
         self.editingGateway = editingGateway
         self.strokeSessionUseCase = strokeSessionUseCase
-        self.gpuOperationGateway = gpuOperationGateway
+        self.canvasPreviewOperations = canvasPreviewOperations
+        self.selectionMaskOperations = selectionMaskOperations
+        self.layerTransformOperations = layerTransformOperations
+        self.renderingOperations = renderingOperations
+        self.surfaceHandleReleaser = surfaceHandleReleaser
     }
 
     package init(_ infrastructure: PrimoDocumentEngineInfrastructure.DocumentRuntimeComposition) {
@@ -119,7 +131,11 @@ package struct DocumentRuntimeComposition: Sendable {
             layerEffectsGateway: infrastructure.layerEffectsGateway,
             editingGateway: infrastructure.editingGateway,
             strokeSessionUseCase: infrastructure.strokeSessionUseCase,
-            gpuOperationGateway: infrastructure.gpuOperationGateway
+            canvasPreviewOperations: infrastructure.canvasPreviewOperations,
+            selectionMaskOperations: infrastructure.selectionMaskOperations,
+            layerTransformOperations: infrastructure.layerTransformOperations,
+            renderingOperations: infrastructure.renderingOperations,
+            surfaceHandleReleaser: infrastructure.surfaceHandleReleaser
         )
     }
 
@@ -136,7 +152,11 @@ package struct DocumentRuntimeComposition: Sendable {
         layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
         editingGateway: DocumentEditingGateway? = nil,
         strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        gpuOperationGateway: DocumentGpuOperationGateway? = nil
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
+        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
+        layerTransformOperations: DocumentLayerTransformOperations? = nil,
+        renderingOperations: DocumentRenderingOperations? = nil,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
     ) -> DocumentRuntimeComposition {
         DocumentRuntimeComposition(
             queryGateway: queryGateway ?? self.queryGateway,
@@ -151,7 +171,11 @@ package struct DocumentRuntimeComposition: Sendable {
             layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
             editingGateway: editingGateway ?? self.editingGateway,
             strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
-            gpuOperationGateway: gpuOperationGateway ?? self.gpuOperationGateway
+            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
+            renderingOperations: renderingOperations ?? self.renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
         )
     }
 }
@@ -366,7 +390,6 @@ public struct DocumentRenderingWorkflow: Sendable {
     private let croppedSelectionMaskHandler: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
     private let scaledPixelDataHandler: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
     private let translatedPixelDataHandler: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
-    private let releaseSurfaceHandleHandler: @Sendable (MetalBufferHandle?) -> Void
 
     public init(
         compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
@@ -375,8 +398,7 @@ public struct DocumentRenderingWorkflow: Sendable {
         alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
         croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
         scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>,
-        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>,
-        releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
     ) {
         self.compositedPaperPreviewRGBAHandler = compositedPaperPreviewRGBA
         self.compositedPreviewPixelDataHandler = compositedPreviewPixelData
@@ -385,19 +407,23 @@ public struct DocumentRenderingWorkflow: Sendable {
         self.croppedSelectionMaskHandler = croppedSelectionMask
         self.scaledPixelDataHandler = scaledPixelData
         self.translatedPixelDataHandler = translatedPixelData
-        self.releaseSurfaceHandleHandler = releaseSurfaceHandle
+    }
+
+    public init(operations: DocumentRenderingOperations) {
+        self.init(
+            compositedPaperPreviewRGBA: operations.compositedPaperPreviewRGBA,
+            compositedPreviewPixelData: operations.compositedPreviewPixelData,
+            processedLayerPixelData: operations.processedLayerPixelData,
+            alphaMask: operations.alphaMask,
+            croppedSelectionMask: operations.croppedSelectionMask,
+            scaledPixelData: operations.scaledPixelData,
+            translatedPixelData: operations.translatedPixelData
+        )
     }
 
     package init(gpuOperations: DocumentGpuOperationGateway) {
         self.init(
-            compositedPaperPreviewRGBA: gpuOperations.compositedPaperPreviewRGBA,
-            compositedPreviewPixelData: gpuOperations.compositedPreviewPixelData,
-            processedLayerPixelData: gpuOperations.processedLayerPixelData,
-            alphaMask: gpuOperations.alphaMask,
-            croppedSelectionMask: gpuOperations.croppedSelectionMask,
-            scaledPixelData: gpuOperations.scaledPixelData,
-            translatedPixelData: gpuOperations.translatedPixelData,
-            releaseSurfaceHandle: gpuOperations.releaseSurfaceHandle
+            operations: gpuOperations.renderingOperations
         )
     }
 
@@ -451,9 +477,6 @@ public struct DocumentRenderingWorkflow: Sendable {
         translatedPixelDataHandler(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
     }
 
-    public func releaseSurfaceHandle(_ handle: MetalBufferHandle?) {
-        releaseSurfaceHandleHandler(handle)
-    }
 }
 
 public struct DocumentRuntime: Sendable {
@@ -475,6 +498,7 @@ public struct DocumentRuntime: Sendable {
     public let canvasPresentationEnvironment: CanvasPresentationEnvironment
     public let presentationReader: DocumentPresentationReader
     public let renderingWorkflow: DocumentRenderingWorkflow
+    public let surfaceHandleReleaser: any SurfaceHandleReleasing
     public let textLayerService: DocumentTextLayerService
     public let exportClient: DocumentExportClient
     public let persistenceClient: DocumentPersistenceClient
@@ -497,6 +521,7 @@ public struct DocumentRuntime: Sendable {
         canvasPresentationEnvironment: CanvasPresentationEnvironment,
         presentationReader: DocumentPresentationReader,
         renderingWorkflow: DocumentRenderingWorkflow,
+        surfaceHandleReleaser: any SurfaceHandleReleasing,
         textLayerService: DocumentTextLayerService,
         exportClient: DocumentExportClient,
         persistenceClient: DocumentPersistenceClient
@@ -518,6 +543,7 @@ public struct DocumentRuntime: Sendable {
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
         self.presentationReader = presentationReader
         self.renderingWorkflow = renderingWorkflow
+        self.surfaceHandleReleaser = surfaceHandleReleaser
         self.textLayerService = textLayerService
         self.exportClient = exportClient
         self.persistenceClient = persistenceClient
@@ -556,14 +582,17 @@ public struct DocumentRuntime: Sendable {
             documentMutationGateway: composition.mutationGateway,
             textLayerGateway: composition.textLayerGateway
         )
-        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
-        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: composition.gpuOperationGateway)
-        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: composition.gpuOperationGateway)
+        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
+        let layerTransformProcessor = GpuLayerTransformProcessor(
+            layerTransformOperations: composition.layerTransformOperations,
+            selectionOperations: composition.selectionMaskOperations
+        )
+        let selectionMaskProcessor = GpuCanvasPreviewRenderer(operations: composition.canvasPreviewOperations)
         let canvasEditingWorkflow = CanvasEditingWorkflowService(
             documentContentService: contentService,
             layerTransformProcessor: layerTransformProcessor
         )
-        let selectionWorkflow = SelectionWorkflowService(gpuOperations: composition.gpuOperationGateway)
+        let selectionWorkflow = SelectionWorkflowService(operations: composition.selectionMaskOperations)
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
             eyedropperSampler: GpuCanvasEyedropperSampler(),
@@ -574,7 +603,7 @@ public struct DocumentRuntime: Sendable {
             lightweightPresentation: composition.queryGateway.lightweightPresentation,
             presentation: composition.queryGateway.presentation
         )
-        let renderingWorkflow = DocumentRenderingWorkflow(gpuOperations: composition.gpuOperationGateway)
+        let renderingWorkflow = DocumentRenderingWorkflow(operations: composition.renderingOperations)
         let textLayerService = DocumentTextLayerService(
             textLayerData: composition.textLayerGateway.textLayerData,
             setTextLayer: composition.textLayerGateway.setTextLayer,
@@ -697,6 +726,7 @@ public struct DocumentRuntime: Sendable {
             canvasPresentationEnvironment: canvasPresentationEnvironment,
             presentationReader: presentationReader,
             renderingWorkflow: renderingWorkflow,
+            surfaceHandleReleaser: composition.surfaceHandleReleaser,
             textLayerService: textLayerService,
             exportClient: exportClient,
             persistenceClient: persistenceClient
@@ -858,11 +888,15 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
     private let renderer: PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer
 
     public init() {
-        self.init(gpuOperations: DocumentGpuOperationGatewayFactory.live())
+        self.init(operations: DocumentGpuOperationGatewayFactory.live().canvasPreviewRenderingOperations)
+    }
+
+    package init(operations: DocumentCanvasPreviewRenderingOperations) {
+        self.renderer = PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer(operations: operations)
     }
 
     package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.renderer = PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer(gpuOperations: gpuOperations)
+        self.init(operations: gpuOperations.canvasPreviewRenderingOperations)
     }
 
     public func eyedropperLoupeSurface(
@@ -960,11 +994,28 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     private let processor: PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor
 
     public init() {
-        self.init(gpuOperations: DocumentGpuOperationGatewayFactory.live())
+        let gpuOperations = DocumentGpuOperationGatewayFactory.live()
+        self.init(
+            layerTransformOperations: gpuOperations.layerTransformOperations,
+            selectionOperations: gpuOperations.selectionMaskOperations
+        )
+    }
+
+    package init(
+        layerTransformOperations: DocumentLayerTransformOperations,
+        selectionOperations: DocumentSelectionMaskOperations
+    ) {
+        self.processor = PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor(
+            layerTransformOperations: layerTransformOperations,
+            selectionOperations: selectionOperations
+        )
     }
 
     package init(gpuOperations: DocumentGpuOperationGateway) {
-        self.processor = PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor(gpuOperations: gpuOperations)
+        self.init(
+            layerTransformOperations: gpuOperations.layerTransformOperations,
+            selectionOperations: gpuOperations.selectionMaskOperations
+        )
     }
 
     public func transformedLayerPixels(

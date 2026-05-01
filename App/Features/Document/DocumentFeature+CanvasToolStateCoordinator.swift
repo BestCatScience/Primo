@@ -6,6 +6,7 @@ import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentStrokeApplication
 import UIKit
 
@@ -13,7 +14,7 @@ extension DocumentFeature {
     static let canvasToolStateCoordinator = CanvasToolStateCoordinator()
 
     enum StrokeCommitResolution {
-        case committed(DocumentMutationContract, transferredSurfaceHandle: MetalBufferHandle?)
+        case committed(DocumentMutationContract, transferredPreviewLease: StrokePreviewLease)
         case failed(DocumentMutationFailure)
     }
 
@@ -103,7 +104,7 @@ extension DocumentFeature {
                 }
                 return .committed(
                     commit.contract,
-                    transferredSurfaceHandle: commit.transferredSurfaceHandle
+                    transferredPreviewLease: commit.transferredPreviewLease
                 )
             case let .failure(failure):
                 return .failed(failure)
@@ -128,14 +129,14 @@ extension DocumentFeature {
 
         func resetPreviewState(
             state: inout DocumentEditingState,
-            preserving transferredSurfaceHandle: MetalBufferHandle? = nil,
-            releaseSurfaceHandle: (MetalBufferHandle?) -> Void
+            preserving transferredPreviewLease: StrokePreviewLease = .none,
+            releaseSurfaceLease: (StrokePreviewLease) -> Void
         ) {
-            let previewSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
+            let previewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
             state.canvas.activeStroke = nil
             resetPreview(state: &state)
-            if previewSurfaceHandle != transferredSurfaceHandle {
-                releaseSurfaceHandle(previewSurfaceHandle)
+            if previewLease != transferredPreviewLease {
+                releaseSurfaceLease(previewLease)
             }
         }
 
@@ -193,9 +194,9 @@ extension DocumentFeature {
         func applyPreviewMutation(
             _ mutation: GpuPreviewMutation,
             state: inout DocumentEditingState,
-            releaseSurfaceHandle: (MetalBufferHandle?) -> Void
+            releaseSurfaceLease: (StrokePreviewLease) -> Void
         ) {
-            let previousSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
+            let previousPreviewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
             let previousRenderState = state.canvas.strokeSession.renderState
             if let baseSnapshotToCapture = mutation.baseSnapshotToCapture {
                 state.canvas.captureStrokeBaseSnapshot(baseSnapshotToCapture)
@@ -218,9 +219,9 @@ extension DocumentFeature {
                 previewBrush: mutation.previewBrush,
                 sampleCount: mutation.sampleCount
             )
-            let nextSurfaceHandle = state.canvas.strokeSession.renderState?.surfaceHandle
-            if previousSurfaceHandle != nextSurfaceHandle {
-                releaseSurfaceHandle(previousSurfaceHandle)
+            let nextPreviewLease = state.canvas.strokeSession.renderState?.previewLease ?? .none
+            if previousPreviewLease != nextPreviewLease {
+                releaseSurfaceLease(previousPreviewLease)
             }
         }
     }

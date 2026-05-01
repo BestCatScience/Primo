@@ -9,10 +9,16 @@ import PrimoDocumentDomain
 import simd
 
 public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
-    private let gpuOperations: DocumentGpuOperationGateway
+    private let operations: DocumentCanvasPreviewRenderingOperations
 
-    public init(gpuOperations: DocumentGpuOperationGateway = DocumentGpuOperationGatewayFactory.live()) {
-        self.gpuOperations = gpuOperations
+    public init(
+        operations: DocumentCanvasPreviewRenderingOperations = DocumentGpuOperationGatewayFactory.live().canvasPreviewRenderingOperations
+    ) {
+        self.operations = operations
+    }
+
+    public init(gpuOperations: DocumentGpuOperationGateway) {
+        self.init(operations: gpuOperations.canvasPreviewRenderingOperations)
     }
 
     public func eyedropperLoupeSurface(
@@ -25,7 +31,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         paperStyle: CanvasPaperStyle,
         blendWithPaper: Bool
     ) -> DocumentCompositeSurface? {
-        guard let rgba = gpuOperations.eyedropperLoupeRGBA(
+        guard let rgba = operations.eyedropperLoupeRGBA(
             sourcePixelData,
             canvasWidth,
             canvasHeight,
@@ -41,7 +47,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
     }
 
     public func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
-        guard let rgba = gpuOperations.selectionOverlayRGBA(maskData, width, height).value else {
+        guard let rgba = operations.selectionOverlayRGBA(maskData, width, height).value else {
             return nil
         }
         return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
@@ -52,7 +58,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         activeLayerIndex: Int,
         adjustedActiveLayerPixels: Data
     ) -> Data? {
-        gpuOperations.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels).value
+        operations.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels).value
     }
 
     public func paperCompositeSurface(
@@ -61,7 +67,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         height: Int,
         paperStyle: CanvasPaperStyle
     ) -> DocumentCompositeSurface? {
-        guard let rgba = gpuOperations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).value else {
+        guard let rgba = operations.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).value else {
             return nil
         }
         return DocumentCompositeSurface(unsafeUncheckedWidth: width, height: height, pixelData: rgba)
@@ -75,7 +81,7 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
     ) -> DocumentCompositeSurface? {
         let samples = stroke.points.map(\.stylusSample)
         guard !samples.isEmpty else { return nil }
-        return gpuOperations.shapePreviewSurface(
+        return operations.shapePreviewSurface(
             samples,
             brushSettings(for: style),
             canvasWidth,
@@ -88,14 +94,14 @@ public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformP
         canvasWidth: Int,
         canvasHeight: Int
     ) -> DocumentCompositeSurface? {
-        gpuOperations.textLayerSurface(
+        operations.textLayerSurface(
             textLayer,
             CGSize(width: canvasWidth, height: canvasHeight)
         ).value
     }
 
     public func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
-        gpuOperations.textLayoutRect(textLayer, canvasSize)
+        operations.textLayoutRect(textLayer, canvasSize)
     }
 
     private func brushSettings(for style: PreviewStrokeStyle) -> BrushRuntimeSettings {
@@ -246,10 +252,22 @@ public struct GpuCanvasEyedropperSampler: CanvasEyedropperSampling {
 }
 
 public struct GpuLayerTransformProcessor: LayerTransformProcessing {
-    private let gpuOperations: DocumentGpuOperationGateway
+    private let layerTransformOperations: DocumentLayerTransformOperations
+    private let selectionOperations: DocumentSelectionMaskOperations
 
-    public init(gpuOperations: DocumentGpuOperationGateway = DocumentGpuOperationGatewayFactory.live()) {
-        self.gpuOperations = gpuOperations
+    public init(
+        layerTransformOperations: DocumentLayerTransformOperations = DocumentGpuOperationGatewayFactory.live().layerTransformOperations,
+        selectionOperations: DocumentSelectionMaskOperations = DocumentGpuOperationGatewayFactory.live().selectionMaskOperations
+    ) {
+        self.layerTransformOperations = layerTransformOperations
+        self.selectionOperations = selectionOperations
+    }
+
+    public init(gpuOperations: DocumentGpuOperationGateway) {
+        self.init(
+            layerTransformOperations: gpuOperations.layerTransformOperations,
+            selectionOperations: gpuOperations.selectionMaskOperations
+        )
     }
 
     public func transformedLayerPixels(
@@ -288,8 +306,8 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             bounds = selection.bounds
         } else {
             guard
-                let alphaMask = gpuOperations.alphaMask(source, canvasWidth, canvasHeight).value,
-                let cropped = gpuOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
+                let alphaMask = selectionOperations.alphaMask(source, canvasWidth, canvasHeight).value,
+                let cropped = selectionOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
             else {
                 return nil
             }
@@ -308,7 +326,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             quadOffsets: quadOffsets
         )
 
-        return gpuOperations.transformedLayerPixelData(
+        return layerTransformOperations.transformedLayerPixelData(
             TransformedLayerPixelDataRequest(
                 source: source,
                 canvasWidth: canvasWidth,
@@ -336,8 +354,8 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             return selection.bounds
         }
         guard
-            let alphaMask = gpuOperations.alphaMask(pixelData, canvasWidth, canvasHeight).value,
-            let cropped = gpuOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
+            let alphaMask = selectionOperations.alphaMask(pixelData, canvasWidth, canvasHeight).value,
+            let cropped = selectionOperations.croppedSelectionMask(alphaMask, canvasWidth, canvasHeight)
         else {
             return nil
         }
@@ -358,7 +376,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
+        let selectionWorkflow = SelectionWorkflowService(operations: selectionOperations)
         guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
@@ -372,7 +390,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
             mode: mode,
             quadOffsets: quadOffsets
         )
-        guard let transformed = gpuOperations.transformedSelectionMask(
+        guard let transformed = selectionOperations.transformedSelectionMask(
             TransformedSelectionMaskRequest(
                 expandedSelectionMask: mask,
                 canvasWidth: canvasWidth,
@@ -394,7 +412,7 @@ public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     }
 
     private func expandedMask(from selection: CanvasSelection, canvasWidth: Int, canvasHeight: Int) -> [UInt8]? {
-        SelectionWorkflowService(gpuOperations: gpuOperations)
+        SelectionWorkflowService(operations: selectionOperations)
             .expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
     }
 }

@@ -490,6 +490,7 @@ struct GpuSideEffectIsolationArchitectureTests {
         #expect(!body.contains("public let gpuOperationGateway:"))
         #expect(!body.contains("public let textLayerGateway:"))
         #expect(!body.contains("public let mutationGateway:"))
+        #expect(!body.contains("releaseSurfaceHandleHandler"), "DocumentRenderingWorkflow should not carry resource-release authority")
         #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
 
         let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
@@ -526,6 +527,44 @@ struct GpuSideEffectIsolationArchitectureTests {
             "CanvasPixelSurfaceView"
         ]
         #expect(publicSymbols == expectedSymbols)
+    }
+
+    @Test
+    func runtimeCompositionStoresNarrowGpuCapabilities() throws {
+        let repoRoot = try Self.repoRoot()
+        let compositionFiles = [
+            "Packages/PrimoModules/Sources/PrimoDocumentEngineInfrastructure/DocumentRuntimeComposition.swift",
+            "Packages/PrimoModules/Sources/PrimoDocumentRuntime/DocumentRuntimeFacade.swift"
+        ]
+
+        for file in compositionFiles {
+            let url = repoRoot.appendingPathComponent(file, isDirectory: false)
+            let body = try String(contentsOf: url, encoding: .utf8)
+
+            #expect(!body.contains("package let gpuOperationGateway"), "\(file) should not store the broad GPU gateway")
+            #expect(body.contains("canvasPreviewOperations"), "\(file) should store preview GPU capability explicitly")
+            #expect(body.contains("selectionMaskOperations"), "\(file) should store selection-mask GPU capability explicitly")
+            #expect(body.contains("layerTransformOperations"), "\(file) should store layer-transform GPU capability explicitly")
+            #expect(body.contains("surfaceHandleReleaser"), "\(file) should keep resource release as a separate capability")
+        }
+    }
+
+    @Test
+    func appStrokeWorkflowUsesPreviewLeaseInsteadOfMetalHandles() throws {
+        let repoRoot = try Self.repoRoot()
+        let appStrokeFiles = [
+            "App/Features/Document/CanvasEditingWorkflowReducer+StrokeWorkflow.swift",
+            "App/Features/Document/DocumentFeature+CanvasToolStateCoordinator.swift"
+        ]
+
+        for file in appStrokeFiles {
+            let url = repoRoot.appendingPathComponent(file, isDirectory: false)
+            let body = try String(contentsOf: url, encoding: .utf8)
+
+            #expect(!body.contains("MetalBufferHandle"), "\(file) should not pass rendering resource handles through App workflow")
+            #expect(!body.contains("releaseSurfaceHandle"), "\(file) should release preview resources through lease abstractions")
+            #expect(body.contains("StrokePreviewLease"), "\(file) should use the App-facing preview lease abstraction")
+        }
     }
 
     @Test

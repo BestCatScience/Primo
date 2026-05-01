@@ -632,18 +632,7 @@ extension DocumentRuntime {
             documentContentService: contentService,
             layerTransformProcessor: layerTransformProcessor
         )
-        let selectionWorkflow = SelectionWorkflowService(
-            combinedSelectionMask: gpuOperationGateway.combinedSelectionMask,
-            expandedSelectionMask: gpuOperationGateway.expandedSelectionMask,
-            lassoSelection: gpuOperationGateway.lassoSelection,
-            autoSelection: gpuOperationGateway.autoSelection,
-            colorRangeSelection: gpuOperationGateway.colorRangeSelection,
-            expandedMask: gpuOperationGateway.expandedMask,
-            contractedMask: gpuOperationGateway.contractedMask,
-            featheredMask: gpuOperationGateway.featheredMask,
-            invertMask: gpuOperationGateway.invertMask,
-            croppedSelectionMask: gpuOperationGateway.croppedSelectionMask
-        )
+        let selectionWorkflow = SelectionWorkflowService(operations: gpuOperationGateway.selectionMaskOperations)
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
             eyedropperSampler: GpuCanvasEyedropperSampler(),
@@ -742,16 +731,8 @@ extension DocumentRuntime {
                 lightweightPresentation: queryGateway.lightweightPresentation,
                 presentation: queryGateway.presentation
             ),
-            renderingWorkflow: DocumentRenderingWorkflow(
-                compositedPaperPreviewRGBA: gpuOperationGateway.compositedPaperPreviewRGBA,
-                compositedPreviewPixelData: gpuOperationGateway.compositedPreviewPixelData,
-                processedLayerPixelData: gpuOperationGateway.processedLayerPixelData,
-                alphaMask: gpuOperationGateway.alphaMask,
-                croppedSelectionMask: gpuOperationGateway.croppedSelectionMask,
-                scaledPixelData: gpuOperationGateway.scaledPixelData,
-                translatedPixelData: gpuOperationGateway.translatedPixelData,
-                releaseSurfaceHandle: gpuOperationGateway.releaseSurfaceHandle
-            ),
+            renderingWorkflow: DocumentRenderingWorkflow(operations: gpuOperationGateway.renderingOperations),
+            surfaceHandleReleaser: gpuOperationGateway.surfaceHandleReleaser,
             textLayerService: DocumentTextLayerService(
                 textLayerData: documentTextLayerService.textLayerData,
                 setTextLayer: documentTextLayerService.setTextLayer,

@@ -21,7 +21,11 @@ package struct DocumentRuntimeComposition: Sendable {
     package let layerEffectsGateway: DocumentLayerEffectsGateway
     package let editingGateway: DocumentEditingGateway
     package let strokeSessionUseCase: DocumentStrokeSessionUseCase
-    package let gpuOperationGateway: DocumentGpuOperationGateway
+    package let canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations
+    package let selectionMaskOperations: DocumentSelectionMaskOperations
+    package let layerTransformOperations: DocumentLayerTransformOperations
+    package let renderingOperations: DocumentRenderingOperations
+    package let surfaceHandleReleaser: DocumentSurfaceHandleReleaser
 
     package init(
         queryGateway: DocumentQueryGateway,
@@ -36,7 +40,11 @@ package struct DocumentRuntimeComposition: Sendable {
         layerEffectsGateway: DocumentLayerEffectsGateway,
         editingGateway: DocumentEditingGateway,
         strokeSessionUseCase: DocumentStrokeSessionUseCase,
-        gpuOperationGateway: DocumentGpuOperationGateway
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations,
+        selectionMaskOperations: DocumentSelectionMaskOperations,
+        layerTransformOperations: DocumentLayerTransformOperations,
+        renderingOperations: DocumentRenderingOperations,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser
     ) {
         self.queryGateway = queryGateway
         self.renderGateway = renderGateway
@@ -50,7 +58,11 @@ package struct DocumentRuntimeComposition: Sendable {
         self.layerEffectsGateway = layerEffectsGateway
         self.editingGateway = editingGateway
         self.strokeSessionUseCase = strokeSessionUseCase
-        self.gpuOperationGateway = gpuOperationGateway
+        self.canvasPreviewOperations = canvasPreviewOperations
+        self.selectionMaskOperations = selectionMaskOperations
+        self.layerTransformOperations = layerTransformOperations
+        self.renderingOperations = renderingOperations
+        self.surfaceHandleReleaser = surfaceHandleReleaser
     }
 
     package func withOverrides(
@@ -66,7 +78,11 @@ package struct DocumentRuntimeComposition: Sendable {
         layerEffectsGateway: DocumentLayerEffectsGateway? = nil,
         editingGateway: DocumentEditingGateway? = nil,
         strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        gpuOperationGateway: DocumentGpuOperationGateway? = nil
+        canvasPreviewOperations: DocumentCanvasPreviewRenderingOperations? = nil,
+        selectionMaskOperations: DocumentSelectionMaskOperations? = nil,
+        layerTransformOperations: DocumentLayerTransformOperations? = nil,
+        renderingOperations: DocumentRenderingOperations? = nil,
+        surfaceHandleReleaser: DocumentSurfaceHandleReleaser? = nil
     ) -> DocumentRuntimeComposition {
         DocumentRuntimeComposition(
             queryGateway: queryGateway ?? self.queryGateway,
@@ -81,7 +97,11 @@ package struct DocumentRuntimeComposition: Sendable {
             layerEffectsGateway: layerEffectsGateway ?? self.layerEffectsGateway,
             editingGateway: editingGateway ?? self.editingGateway,
             strokeSessionUseCase: strokeSessionUseCase ?? self.strokeSessionUseCase,
-            gpuOperationGateway: gpuOperationGateway ?? self.gpuOperationGateway
+            canvasPreviewOperations: canvasPreviewOperations ?? self.canvasPreviewOperations,
+            selectionMaskOperations: selectionMaskOperations ?? self.selectionMaskOperations,
+            layerTransformOperations: layerTransformOperations ?? self.layerTransformOperations,
+            renderingOperations: renderingOperations ?? self.renderingOperations,
+            surfaceHandleReleaser: surfaceHandleReleaser ?? self.surfaceHandleReleaser
         )
     }
 }
@@ -99,6 +119,8 @@ package enum DocumentRuntimeCompositionFactory {
         )
         let strokeUseCases = DocumentStrokeUseCasesLive.live()
 
+        let gpuOperations = DocumentGpuOperationGatewayFactory.live()
+
         return DocumentRuntimeComposition(
             queryGateway: runtime.queryGateway,
             renderGateway: runtime.renderGateway,
@@ -114,7 +136,11 @@ package enum DocumentRuntimeCompositionFactory {
             ),
             editingGateway: runtime.makeEditingGateway(),
             strokeSessionUseCase: strokeUseCases.session,
-            gpuOperationGateway: DocumentGpuOperationGatewayFactory.live()
+            canvasPreviewOperations: gpuOperations.canvasPreviewRenderingOperations,
+            selectionMaskOperations: gpuOperations.selectionMaskOperations,
+            layerTransformOperations: gpuOperations.layerTransformOperations,
+            renderingOperations: gpuOperations.renderingOperations,
+            surfaceHandleReleaser: gpuOperations.surfaceHandleReleaser
         )
     }
 }

@@ -7,6 +7,7 @@ import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentStrokeApplication
 
 extension CanvasEditingWorkflowReducer {
@@ -106,21 +107,21 @@ extension CanvasEditingWorkflowReducer {
         func complete(
             _ resolution: StrokeCommitResolution,
             state: inout DocumentEditingState,
-            resetPreview: (inout DocumentEditingState, MetalBufferHandle?) -> Void,
+            resetPreview: (inout DocumentEditingState, StrokePreviewLease) -> Void,
             completeMutation: (inout DocumentEditingState, DocumentMutationContract) -> Effect<Action>,
             applyFailureFeedback: (DocumentMutationFailure, inout DocumentEditingState) -> Effect<Action>,
             cancelEffects: () -> Effect<Action>
         ) -> Effect<Action> {
-            let transferredSurfaceHandle: MetalBufferHandle?
-            if case let .committed(_, handle) = resolution {
-                transferredSurfaceHandle = handle
+            let transferredPreviewLease: StrokePreviewLease
+            if case let .committed(_, lease) = resolution {
+                transferredPreviewLease = lease
             } else {
-                transferredSurfaceHandle = nil
+                transferredPreviewLease = .none
             }
             if case .failed = resolution {
                 state.canvas.isAwaitingCommittedRender = false
             }
-            resetPreview(&state, transferredSurfaceHandle)
+            resetPreview(&state, transferredPreviewLease)
             switch resolution {
             case let .committed(contract, _):
                 return completeMutation(&state, contract)
@@ -198,12 +199,12 @@ extension CanvasEditingWorkflowReducer {
             keepsSelectionCleared: Bool,
             refreshViaDirtyPresentation: Bool,
             resolveContext: (DocumentEditingState) -> CanvasStrokeContext?,
-            resetPreview: (inout DocumentEditingState, MetalBufferHandle?) -> Void,
+            resetPreview: (inout DocumentEditingState, StrokePreviewLease) -> Void,
             resolveCommit: (inout DocumentEditingState, [StylusSample], CanvasStrokeContext, Bool, Bool) -> StrokeCommitResolution,
             completeCommit: (StrokeCommitResolution, inout DocumentEditingState) -> Effect<Action>
         ) -> Effect<Action> {
             guard let context = resolveContext(state) else {
-                resetPreview(&state, nil)
+                resetPreview(&state, .none)
                 return .none
             }
             let commitResolution = resolveCommit(
@@ -271,14 +272,14 @@ extension CanvasEditingWorkflowReducer {
 
     func resetStrokePreviewState(
         state: inout DocumentEditingState,
-        preserving transferredSurfaceHandle: MetalBufferHandle? = nil
+        preserving transferredPreviewLease: StrokePreviewLease = .none
     ) {
         _ = canvasStrokeInteractionService.cancel()
         documentCanvasStrokeStateCoordinator.resetPreviewState(
             state: &state,
-            preserving: transferredSurfaceHandle
-        ) { handle in
-            documentRenderingWorkflow.releaseSurfaceHandle(handle)
+            preserving: transferredPreviewLease
+        ) { lease in
+            surfaceHandleReleaser.releaseSurfaceLease(lease)
         }
     }
 
@@ -377,8 +378,8 @@ extension CanvasEditingWorkflowReducer {
             documentCanvasStrokeStateCoordinator.applyPreviewMutation(
                 mutation,
                 state: &state,
-                releaseSurfaceHandle: { handle in
-                    documentRenderingWorkflow.releaseSurfaceHandle(handle)
+                releaseSurfaceLease: { lease in
+                    surfaceHandleReleaser.releaseSurfaceLease(lease)
                 }
             )
             return .none
@@ -425,10 +426,10 @@ extension CanvasEditingWorkflowReducer {
         canvasStrokeEffectCoordinator.complete(
             resolution,
             state: &state,
-            resetPreview: { state, transferredSurfaceHandle in
+            resetPreview: { state, transferredPreviewLease in
                 resetStrokePreviewState(
                     state: &state,
-                    preserving: transferredSurfaceHandle
+                    preserving: transferredPreviewLease
                 )
             },
             completeMutation: { state, contract in
@@ -574,10 +575,10 @@ extension CanvasEditingWorkflowReducer {
             resolveContext: { state in
                 canvasStrokeContext(in: state)
             },
-            resetPreview: { state, transferredSurfaceHandle in
+            resetPreview: { state, transferredPreviewLease in
                 resetStrokePreviewState(
                     state: &state,
-                    preserving: transferredSurfaceHandle
+                    preserving: transferredPreviewLease
                 )
             },
             resolveCommit: { state, samples, context, keepsSelectionCleared, refreshViaDirtyPresentation in

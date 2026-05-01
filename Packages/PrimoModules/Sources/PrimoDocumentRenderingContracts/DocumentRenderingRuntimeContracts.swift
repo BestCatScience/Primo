@@ -282,3 +282,193 @@ public struct DocumentGpuOperationGateway: Sendable {
         self.releaseSurfaceHandle = releaseSurfaceHandle
     }
 }
+
+public struct DocumentCanvasPreviewRenderingOperations: Sendable {
+    public let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    public let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    public let selectionOverlayRGBA: @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>
+    public let eyedropperLoupeRGBA: @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>
+    public let shapePreviewSurface: @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>
+    public let textLayerSurface: @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>
+    public let textLayoutRect: @Sendable (TextLayerData, CGSize) -> CGRect?
+
+    public init(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
+        selectionOverlayRGBA: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<Data>,
+        eyedropperLoupeRGBA: @escaping @Sendable (Data, Int, Int, Int, Int, Int, CanvasPaperStyle, Bool) -> DocumentRenderingResult<Data>,
+        shapePreviewSurface: @escaping @Sendable ([StylusSample], BrushRuntimeSettings, Int, Int) -> DocumentRenderingResult<DocumentCompositeSurface>,
+        textLayerSurface: @escaping @Sendable (TextLayerData, CGSize) -> DocumentRenderingResult<DocumentCompositeSurface>,
+        textLayoutRect: @escaping @Sendable (TextLayerData, CGSize) -> CGRect?
+    ) {
+        self.compositedPaperPreviewRGBA = compositedPaperPreviewRGBA
+        self.compositedPreviewPixelData = compositedPreviewPixelData
+        self.selectionOverlayRGBA = selectionOverlayRGBA
+        self.eyedropperLoupeRGBA = eyedropperLoupeRGBA
+        self.shapePreviewSurface = shapePreviewSurface
+        self.textLayerSurface = textLayerSurface
+        self.textLayoutRect = textLayoutRect
+    }
+}
+
+public struct DocumentSelectionMaskOperations: Sendable {
+    public let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    public let combinedSelectionMask: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let expandedSelectionMask: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    public let lassoSelection: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let autoSelection: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
+    public let colorRangeSelection: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
+    public let expandedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let contractedMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let featheredMask: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let invertMask: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
+    public let transformedSelectionMask: @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+
+    public init(
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
+        combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>,
+        lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>,
+        colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>,
+        expandedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        invertMask: @escaping @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>,
+        transformedSelectionMask: @escaping @Sendable (TransformedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    ) {
+        self.alphaMask = alphaMask
+        self.croppedSelectionMask = croppedSelectionMask
+        self.combinedSelectionMask = combinedSelectionMask
+        self.expandedSelectionMask = expandedSelectionMask
+        self.lassoSelection = lassoSelection
+        self.autoSelection = autoSelection
+        self.colorRangeSelection = colorRangeSelection
+        self.expandedMask = expandedMask
+        self.contractedMask = contractedMask
+        self.featheredMask = featheredMask
+        self.invertMask = invertMask
+        self.transformedSelectionMask = transformedSelectionMask
+    }
+}
+
+public struct DocumentLayerTransformOperations: Sendable {
+    public let transformedLayerPixelData: @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
+
+    public init(
+        transformedLayerPixelData: @escaping @Sendable (TransformedLayerPixelDataRequest) -> DocumentRenderingResult<Data>
+    ) {
+        self.transformedLayerPixelData = transformedLayerPixelData
+    }
+}
+
+public struct DocumentRenderingOperations: Sendable {
+    public let compositedPaperPreviewRGBA: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    public let compositedPreviewPixelData: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    public let processedLayerPixelData: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
+    public let alphaMask: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    public let croppedSelectionMask: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    public let scaledPixelData: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    public let translatedPixelData: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+
+    public init(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
+        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>,
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
+        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>,
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    ) {
+        self.compositedPaperPreviewRGBA = compositedPaperPreviewRGBA
+        self.compositedPreviewPixelData = compositedPreviewPixelData
+        self.processedLayerPixelData = processedLayerPixelData
+        self.alphaMask = alphaMask
+        self.croppedSelectionMask = croppedSelectionMask
+        self.scaledPixelData = scaledPixelData
+        self.translatedPixelData = translatedPixelData
+    }
+}
+
+public struct StrokePreviewLease: Equatable, Sendable {
+    package let surfaceHandle: MetalBufferHandle?
+
+    public static let none = StrokePreviewLease(surfaceHandle: nil)
+
+    package init(surfaceHandle: MetalBufferHandle?) {
+        self.surfaceHandle = surfaceHandle
+    }
+
+    public var isPresent: Bool {
+        surfaceHandle != nil
+    }
+}
+
+public protocol SurfaceHandleReleasing: Sendable {
+    func releaseSurfaceLease(_ lease: StrokePreviewLease)
+}
+
+public struct DocumentSurfaceHandleReleaser: SurfaceHandleReleasing {
+    private let releaseSurfaceHandleHandler: @Sendable (MetalBufferHandle?) -> Void
+
+    public init(releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void) {
+        self.releaseSurfaceHandleHandler = releaseSurfaceHandle
+    }
+
+    public func releaseSurfaceLease(_ lease: StrokePreviewLease) {
+        releaseSurfaceHandleHandler(lease.surfaceHandle)
+    }
+}
+
+public extension DocumentGpuOperationGateway {
+    var canvasPreviewRenderingOperations: DocumentCanvasPreviewRenderingOperations {
+        DocumentCanvasPreviewRenderingOperations(
+            compositedPaperPreviewRGBA: compositedPaperPreviewRGBA,
+            compositedPreviewPixelData: compositedPreviewPixelData,
+            selectionOverlayRGBA: selectionOverlayRGBA,
+            eyedropperLoupeRGBA: eyedropperLoupeRGBA,
+            shapePreviewSurface: shapePreviewSurface,
+            textLayerSurface: textLayerSurface,
+            textLayoutRect: textLayoutRect
+        )
+    }
+
+    var selectionMaskOperations: DocumentSelectionMaskOperations {
+        DocumentSelectionMaskOperations(
+            alphaMask: alphaMask,
+            croppedSelectionMask: croppedSelectionMask,
+            combinedSelectionMask: combinedSelectionMask,
+            expandedSelectionMask: expandedSelectionMask,
+            lassoSelection: lassoSelection,
+            autoSelection: autoSelection,
+            colorRangeSelection: colorRangeSelection,
+            expandedMask: expandedMask,
+            contractedMask: contractedMask,
+            featheredMask: featheredMask,
+            invertMask: invertMask,
+            transformedSelectionMask: transformedSelectionMask
+        )
+    }
+
+    var layerTransformOperations: DocumentLayerTransformOperations {
+        DocumentLayerTransformOperations(transformedLayerPixelData: transformedLayerPixelData)
+    }
+
+    var renderingOperations: DocumentRenderingOperations {
+        DocumentRenderingOperations(
+            compositedPaperPreviewRGBA: compositedPaperPreviewRGBA,
+            compositedPreviewPixelData: compositedPreviewPixelData,
+            processedLayerPixelData: processedLayerPixelData,
+            alphaMask: alphaMask,
+            croppedSelectionMask: croppedSelectionMask,
+            scaledPixelData: scaledPixelData,
+            translatedPixelData: translatedPixelData
+        )
+    }
+
+    var surfaceHandleReleaser: DocumentSurfaceHandleReleaser {
+        DocumentSurfaceHandleReleaser(releaseSurfaceHandle: releaseSurfaceHandle)
+    }
+}

@@ -2,12 +2,14 @@ import Foundation
 import PrimoBrushRuntimeContracts
 import PrimoDocumentMutationContracts
 import PrimoDocumentPresentationContracts
+import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentGPUContracts
 
 public struct StrokeSessionRenderState: Equatable, Sendable {
     public let baseRevision: Int
     public let layerIndex: Int
+    public let previewLease: StrokePreviewLease
     public let surfaceHandle: MetalBufferHandle
     public let dirtyRect: LayerPixelRect
     public let isApproximatePreview: Bool
@@ -27,6 +29,7 @@ public struct StrokeSessionRenderState: Equatable, Sendable {
     ) {
         self.baseRevision = baseRevision
         self.layerIndex = layerIndex
+        self.previewLease = StrokePreviewLease(surfaceHandle: surfaceHandle)
         self.surfaceHandle = surfaceHandle
         self.dirtyRect = dirtyRect
         self.isApproximatePreview = isApproximatePreview

@@ -1147,7 +1147,7 @@ struct DocumentStrokeApplicationTests {
         #expect(appliedPayloads.values.count == 1)
         #expect(appliedPayloads.values[0].gpuBufferHandle == handle)
         #expect(result.contract.refresh == .dirty)
-        #expect(result.transferredSurfaceHandle == handle)
+        #expect(result.transferredPreviewLease.isPresent)
         #expect(result.pendingCommittedSnapshot?.baseSnapshot == snapshot)
     }
 

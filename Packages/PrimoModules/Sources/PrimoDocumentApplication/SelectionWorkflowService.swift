@@ -41,18 +41,24 @@ public struct SelectionWorkflowService: Sendable {
         self.croppedSelectionMaskHandler = croppedSelectionMask
     }
 
+    public init(operations: DocumentSelectionMaskOperations) {
+        self.init(
+            combinedSelectionMask: operations.combinedSelectionMask,
+            expandedSelectionMask: operations.expandedSelectionMask,
+            lassoSelection: operations.lassoSelection,
+            autoSelection: operations.autoSelection,
+            colorRangeSelection: operations.colorRangeSelection,
+            expandedMask: operations.expandedMask,
+            contractedMask: operations.contractedMask,
+            featheredMask: operations.featheredMask,
+            invertMask: operations.invertMask,
+            croppedSelectionMask: operations.croppedSelectionMask
+        )
+    }
+
     package init(gpuOperations: DocumentGpuOperationGateway) {
         self.init(
-            combinedSelectionMask: gpuOperations.combinedSelectionMask,
-            expandedSelectionMask: gpuOperations.expandedSelectionMask,
-            lassoSelection: gpuOperations.lassoSelection,
-            autoSelection: gpuOperations.autoSelection,
-            colorRangeSelection: gpuOperations.colorRangeSelection,
-            expandedMask: gpuOperations.expandedMask,
-            contractedMask: gpuOperations.contractedMask,
-            featheredMask: gpuOperations.featheredMask,
-            invertMask: gpuOperations.invertMask,
-            croppedSelectionMask: gpuOperations.croppedSelectionMask
+            operations: gpuOperations.selectionMaskOperations
         )
     }
 
