@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 
 extension DocumentFeature {
     typealias InpaintCrop = PrimoDocumentApplication.InpaintCrop
@@ -26,9 +27,8 @@ extension DocumentFeature {
         canvasHeight: Int,
         selection: CanvasSelection,
         padding: Int = 64,
-        gpuOperations: DocumentGpuOperationGateway
+        selectionWorkflow: SelectionWorkflowService
     ) -> InpaintCrop? {
-        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
         guard let expandedMask = selectionWorkflow.expandedMask(
             from: selection,
             canvasWidth: canvasWidth,
@@ -87,7 +87,7 @@ extension DocumentFeature {
     static func fittedLayerPixelData(
         fromImageData imageData: Data,
         canvasSize: CGSize,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> Data? {
         guard
             canvasSize.width > 0,
@@ -142,7 +142,7 @@ extension DocumentFeature {
     private static func composedSurface(
         _ source: DocumentCompositeSurface,
         in canvasSize: CGSize,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> DocumentCompositeSurface? {
         let width = max(Int(canvasSize.width.rounded()), 1)
         let height = max(Int(canvasSize.height.rounded()), 1)

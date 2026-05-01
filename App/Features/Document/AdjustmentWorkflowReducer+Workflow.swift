@@ -2,6 +2,7 @@ import Foundation
 import ComposableArchitecture
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 
 extension AdjustmentWorkflowReducer {
     struct AdjustmentWorkflowService {
@@ -43,7 +44,7 @@ extension AdjustmentWorkflowReducer {
     static func processedActiveLayerPixels(
         in state: State,
         request: LayerProcessingRequest,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> Data? {
         guard
             let snapshot = state.canvas.renderSnapshot,
@@ -62,7 +63,7 @@ extension AdjustmentWorkflowReducer {
     static func previewAdjustedActiveLayer(
         state: inout State,
         transform: (Data) -> Data?,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) {
         let adjustedPixels = adjustedActiveLayerPixels(in: state, transform: transform)
         handleAdjustmentPreview(
@@ -75,7 +76,7 @@ extension AdjustmentWorkflowReducer {
     static func previewAdjustedActiveLayer(
         state: inout State,
         request: LayerProcessingRequest?,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) {
         let adjustedPixels = request.flatMap { request in
             processedActiveLayerPixels(
@@ -94,7 +95,7 @@ extension AdjustmentWorkflowReducer {
     static func handleAdjustmentPreview(
         state: inout State,
         adjustedPixels: Data?,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) {
         guard
             let adjustedPixels,

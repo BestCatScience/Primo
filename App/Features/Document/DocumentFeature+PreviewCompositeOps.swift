@@ -2,12 +2,13 @@ import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentRuntime
 
 extension DocumentFeature {
     static func renderedCompositeSurface(
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> DocumentCompositeSurface {
         renderedCompositeSurfaceIfAvailable(
             snapshot: snapshot,
@@ -27,7 +28,7 @@ extension DocumentFeature {
     static func renderedCompositeSurfaceIfAvailable(
         snapshot: MetalDocumentSnapshot,
         paperStyle: CanvasPaperStyle,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> DocumentCompositeSurface? {
         let expectedByteCount = snapshot.width * snapshot.height * 4
         guard snapshot.width > 0,

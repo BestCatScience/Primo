@@ -11,7 +11,7 @@ import UIKit
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Dependency(\.mainQueueClient) private var mainQueueClient
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
     enum AIImageFocusedField: Hashable {
         case prompt
     }

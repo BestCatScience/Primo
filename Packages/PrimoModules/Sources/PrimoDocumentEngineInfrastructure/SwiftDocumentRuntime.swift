@@ -1684,10 +1684,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
         createFolder(name: name, anchorLayerIndex: anchorLayerIndex.rawValue)
     }
 
-    func createFolder(name: String, layerIndex: Int) -> DocumentIndexedMutationResult {
-        createFolder(name: name, anchorLayerIndex: layerIndex >= 0 ? layerIndex : nil)
-    }
-
     private func createFolder(name: String, anchorLayerIndex: Int?) -> DocumentIndexedMutationResult {
         if let anchorLayerIndex, !store.snapshot.layers.indices.contains(anchorLayerIndex) {
             return .failure(.invalidLayerIndex(anchorLayerIndex))
@@ -1760,10 +1756,6 @@ final class SwiftDocumentRuntime: @unchecked Sendable {
 
     func assignLayerToFolder(index: ExistingLayerIndex, folderID: ExistingFolderID?) -> DocumentMutationResult {
         assignLayerToFolder(index: index.rawValue, folderID: folderID?.rawValue)
-    }
-
-    func assignLayerToFolder(index: Int, folderID: Int) -> DocumentMutationResult {
-        assignLayerToFolder(index: index, folderID: folderID >= 0 ? folderID : nil)
     }
 
     private func assignLayerToFolder(index: Int, folderID: Int?) -> DocumentMutationResult {
@@ -2393,7 +2385,7 @@ extension SwiftDocumentRuntime {
         case let .mergeLayerDown(index):
             _ = mergeLayerDown(index: index.rawValue)
         case let .createFolder(folderID, name, anchorLayerIndex):
-            let resolved = (try? createFolder(name: name, layerIndex: anchorLayerIndex?.rawValue ?? -1).get()) ?? -1
+            let resolved = (try? createFolder(name: name, anchorLayerIndex: anchorLayerIndex?.rawValue).get()) ?? -1
             folderIDMap[folderID] = resolved
         case let .deleteFolder(folderID):
             if let resolved = folderIDMap[folderID] { _ = deleteFolder(folderID: resolved) }
@@ -2404,7 +2396,7 @@ extension SwiftDocumentRuntime {
         case let .setFolderExpanded(folderID, isExpanded):
             if let resolved = folderIDMap[folderID] { _ = setFolderExpanded(folderID: resolved, isExpanded: isExpanded) }
         case let .assignLayerToFolder(index, folderID):
-            let resolvedFolderID = folderID.flatMap { folderIDMap[$0] } ?? -1
+            let resolvedFolderID = folderID.flatMap { folderIDMap[$0] }
             _ = assignLayerToFolder(index: index.rawValue, folderID: resolvedFolderID)
         case let .setLayerName(index, name):
             _ = setLayerName(index: index.rawValue, name: name)

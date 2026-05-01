@@ -1,5 +1,6 @@
 import Foundation
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 
 extension DocumentFeature {
     struct CanvasPreviewStateCoordinator {
@@ -34,7 +35,7 @@ extension DocumentFeature {
             baseSnapshot: MetalDocumentSnapshot,
             activeLayerIndex: Int,
             adjustedActiveLayerPixels: Data,
-            gpuOperations: DocumentGpuOperationGateway,
+            gpuOperations: DocumentRenderingWorkflow,
             to state: inout DocumentEditingState
         ) -> Bool {
             guard let composite = gpuOperations.compositedPreviewPixelData(

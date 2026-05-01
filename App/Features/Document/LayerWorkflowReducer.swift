@@ -15,11 +15,12 @@ struct LayerWorkflowReducer: Reducer {
 
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.documentContentService) var documentContentService
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
     @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentPresentationReader) var documentPresentationReader
     @Dependency(\.canvasStrokeInteractionService) var canvasStrokeInteractionService
-    @Dependency(\.textLayerGateway) var textLayerGateway
+    @Dependency(\.documentTextLayerService) var documentTextLayerService
+    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
 
     enum EditingAction: Equatable {
         case clearActiveLayerButtonTapped
@@ -82,7 +83,7 @@ struct LayerWorkflowReducer: Reducer {
         case let .layerSidebar(.delegate(.moveLayerToFolder(index, folderID))):
             return handleLayerFolderAssignment(state: &state, index: index, folderID: folderID)
         case let .layerSidebar(.delegate(.removeLayerFromFolder(index))):
-            return handleLayerFolderAssignment(state: &state, index: index, folderID: -1)
+            return handleLayerFolderAssignment(state: &state, index: index, folderID: nil)
         case let .layerSidebar(.delegate(.mergeDown(index))):
             return handleLayerMergeDown(state: &state, index: index)
         case let .brushPalette(.delegate(.applyText(draft))):

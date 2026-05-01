@@ -6,10 +6,54 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 
 public struct SelectionWorkflowService: Sendable {
-    public let gpuOperations: DocumentGpuOperationGateway
+    private let combinedSelectionMaskHandler: @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let expandedSelectionMaskHandler: @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>
+    private let lassoSelectionHandler: @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let autoSelectionHandler: @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>
+    private let colorRangeSelectionHandler: @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>
+    private let expandedMaskHandler: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let contractedMaskHandler: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let featheredMaskHandler: @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let invertMaskHandler: @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>
+    private let croppedSelectionMaskHandler: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
 
-    public init(gpuOperations: DocumentGpuOperationGateway) {
-        self.gpuOperations = gpuOperations
+    public init(
+        combinedSelectionMask: @escaping @Sendable ([UInt8], [UInt8], DocumentSelectionCombineMode, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        expandedSelectionMask: @escaping @Sendable (ExpandedSelectionMaskRequest) -> DocumentRenderingResult<[UInt8]>,
+        lassoSelection: @escaping @Sendable ([CGPoint], Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        autoSelection: @escaping @Sendable (Data, Int, Int, Int, Int, FillThresholdMode, Double, Double, Int) -> DocumentRenderingResult<[UInt8]>,
+        colorRangeSelection: @escaping @Sendable (Data, Int, Int, ColorRangeSelectionRequest) -> DocumentRenderingResult<[UInt8]>,
+        expandedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        contractedMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        featheredMask: @escaping @Sendable ([UInt8], Int, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        invertMask: @escaping @Sendable ([UInt8]) -> DocumentRenderingResult<[UInt8]>,
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    ) {
+        self.combinedSelectionMaskHandler = combinedSelectionMask
+        self.expandedSelectionMaskHandler = expandedSelectionMask
+        self.lassoSelectionHandler = lassoSelection
+        self.autoSelectionHandler = autoSelection
+        self.colorRangeSelectionHandler = colorRangeSelection
+        self.expandedMaskHandler = expandedMask
+        self.contractedMaskHandler = contractedMask
+        self.featheredMaskHandler = featheredMask
+        self.invertMaskHandler = invertMask
+        self.croppedSelectionMaskHandler = croppedSelectionMask
+    }
+
+    package init(gpuOperations: DocumentGpuOperationGateway) {
+        self.init(
+            combinedSelectionMask: gpuOperations.combinedSelectionMask,
+            expandedSelectionMask: gpuOperations.expandedSelectionMask,
+            lassoSelection: gpuOperations.lassoSelection,
+            autoSelection: gpuOperations.autoSelection,
+            colorRangeSelection: gpuOperations.colorRangeSelection,
+            expandedMask: gpuOperations.expandedMask,
+            contractedMask: gpuOperations.contractedMask,
+            featheredMask: gpuOperations.featheredMask,
+            invertMask: gpuOperations.invertMask,
+            croppedSelectionMask: gpuOperations.croppedSelectionMask
+        )
     }
 
     public func combinedSelection(
@@ -33,7 +77,7 @@ public struct SelectionWorkflowService: Sendable {
             guard
                 let baseMask = expandedMask(from: existing, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
                 let incomingMask = expandedMask(from: incoming, canvasWidth: canvasWidth, canvasHeight: canvasHeight),
-                let combined = gpuOperations.combinedSelectionMask(
+                let combined = combinedSelectionMaskHandler(
                     baseMask,
                     incomingMask,
                     mode == .add ? .add : .subtract,
@@ -60,7 +104,7 @@ public struct SelectionWorkflowService: Sendable {
             return [UInt8](repeating: 0, count: canvasGeometry.maskByteCount)
         }
 
-        return gpuOperations.expandedSelectionMask(
+        return expandedSelectionMaskHandler(
             ExpandedSelectionMaskRequest(
                 maskData: selection.maskData,
                 maskWidth: selection.maskWidth,
@@ -147,7 +191,7 @@ public struct SelectionWorkflowService: Sendable {
         guard let canvasGeometry = canvasGeometry(from: canvasSize) else { return nil }
         let canvasWidth = canvasGeometry.width
         let canvasHeight = canvasGeometry.height
-        guard let mask = gpuOperations.lassoSelection(polygon, canvasWidth, canvasHeight).value else {
+        guard let mask = lassoSelectionHandler(polygon, canvasWidth, canvasHeight).value else {
             return nil
         }
         return croppedSelection(from: mask, width: canvasWidth, height: canvasHeight, mode: .lasso)
@@ -177,7 +221,7 @@ public struct SelectionWorkflowService: Sendable {
         let startY = min(max(Int(point.y.rounded()), 0), height - 1)
         guard layer.pixelData.count == geometry.rgbaByteCount else { return nil }
 
-        guard let selected = gpuOperations.autoSelection(
+        guard let selected = autoSelectionHandler(
             layer.pixelData,
             width,
             height,
@@ -214,7 +258,7 @@ public struct SelectionWorkflowService: Sendable {
         }
 
         guard pixelData.count == geometry.rgbaByteCount else { return nil }
-        guard let selected = gpuOperations.colorRangeSelection(pixelData, width, height, request).value else {
+        guard let selected = colorRangeSelectionHandler(pixelData, width, height, request).value else {
             return nil
         }
 
@@ -227,26 +271,26 @@ public struct SelectionWorkflowService: Sendable {
     public func expandedSelectionMask(_ source: [UInt8], width: Int, height: Int, expansion: Int) -> [UInt8] {
         guard expansion > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.expandedMask(source, width, height, expansion).value
+        return expandedMaskHandler(source, width, height, expansion).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func contractedSelectionMask(_ source: [UInt8], width: Int, height: Int, contraction: Int) -> [UInt8] {
         guard contraction > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.contractedMask(source, width, height, contraction).value
+        return contractedMaskHandler(source, width, height, contraction).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func featheredSelectionMask(_ source: [UInt8], width: Int, height: Int, radius: Int) -> [UInt8] {
         guard radius > 0 else { return source }
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else { return source }
-        return gpuOperations.featheredMask(source, width, height, radius).value
+        return featheredMaskHandler(source, width, height, radius).value
             ?? [UInt8](repeating: 0, count: geometry.maskByteCount)
     }
 
     public func invertedSelectionMask(_ source: [UInt8]) -> [UInt8] {
-        gpuOperations.invertMask(source).value
+        invertMaskHandler(source).value
             ?? [UInt8](repeating: 0, count: source.count)
     }
 
@@ -254,7 +298,7 @@ public struct SelectionWorkflowService: Sendable {
         guard let geometry = PixelGeometry(width: width, height: height), source.count == geometry.maskByteCount else {
             return nil
         }
-        guard let cropped = gpuOperations.croppedSelectionMask(source, width, height) else {
+        guard let cropped = croppedSelectionMaskHandler(source, width, height) else {
             return nil
         }
 

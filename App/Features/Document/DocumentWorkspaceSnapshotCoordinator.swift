@@ -1,6 +1,7 @@
 import Foundation
 import PrimoDocumentContracts
 import PrimoDocumentDomain
+import PrimoDocumentRuntime
 
 extension DocumentFeature {
     static let workspaceSnapshotCoordinator = WorkspaceSnapshotCoordinator()
@@ -9,14 +10,14 @@ extension DocumentFeature {
         func snapshot(
             state: DocumentEditingState,
             documentExportGateway: DocumentExportGateway,
-            documentGpuOperationGateway: DocumentGpuOperationGateway
+            documentRenderingWorkflow: DocumentRenderingWorkflow
         ) -> WorkspaceDocumentSnapshot {
             let paperStyle = canvasToolStateCoordinator.resolvedPaperStyle(for: state)
             let previewSurface = state.canvas.renderSnapshot.flatMap {
                 renderedCompositeSurfaceIfAvailable(
                     snapshot: $0,
                     paperStyle: paperStyle,
-                    gpuOperations: documentGpuOperationGateway
+                    gpuOperations: documentRenderingWorkflow
                 )
             } ?? documentExportGateway.compositeSurface(paperStyle)
             return WorkspaceDocumentSnapshot(

@@ -486,6 +486,11 @@ struct GpuSideEffectIsolationArchitectureTests {
         let body = try String(contentsOf: facade, encoding: .utf8)
         #expect(!body.contains("@_exported import"), "PrimoDocumentRuntime should expose explicit App-facing wrappers instead of reexporting infrastructure modules")
         #expect(!body.contains("public typealias"), "PrimoDocumentRuntime should wrap App-facing infrastructure APIs instead of typealiasing them")
+        #expect(!body.contains("public let queryGateway:"))
+        #expect(!body.contains("public let gpuOperationGateway:"))
+        #expect(!body.contains("public let textLayerGateway:"))
+        #expect(!body.contains("public let mutationGateway:"))
+        #expect(!body.contains("public init(gpuOperations:"), "Runtime facade wrappers should not expose raw GPU gateway injection publicly")
 
         let publicSymbols = Set(Self.publicTopLevelSymbols(in: body))
         let expectedSymbols: Set<String> = [
@@ -500,6 +505,11 @@ struct GpuSideEffectIsolationArchitectureTests {
             "DocumentPresentationRequest",
             "DocumentMutationSuccess",
             "DocumentHistoryState",
+            "DocumentPresentationReader",
+            "DocumentRenderingWorkflow",
+            "DocumentTextLayerService",
+            "DocumentPersistenceClient",
+            "DocumentExportClient",
             "DocumentProjectPreview",
             "DocumentProjectPreviewLoader",
             "TimelapseExportProgress",
@@ -516,6 +526,28 @@ struct GpuSideEffectIsolationArchitectureTests {
             "CanvasPixelSurfaceView"
         ]
         #expect(publicSymbols == expectedSymbols)
+    }
+
+    @Test
+    func appDoesNotUseRawDocumentGatewayDependencies() throws {
+        let repoRoot = try Self.repoRoot()
+        let appRoot = repoRoot.appendingPathComponent("App", isDirectory: true)
+        let banned = [
+            "documentGpuOperationGateway",
+            "documentQueryGateway",
+            "textLayerGateway",
+            "DocumentGpuOperationGateway",
+            "DocumentQueryGateway",
+            "TextLayerGateway",
+            "DocumentMutationGateway"
+        ]
+
+        for source in try Self.swiftSources(under: appRoot) {
+            let body = try String(contentsOf: source, encoding: .utf8)
+            for token in banned {
+                #expect(!body.contains(token), "\(source.path) should depend on runtime/application facades instead of \(token)")
+            }
+        }
     }
 
     @Test
@@ -722,9 +754,12 @@ struct GpuSideEffectIsolationArchitectureTests {
             ),
             encoding: .utf8
         )
-        #expect(composition.contains("public let queryGateway: DocumentQueryGateway"))
-        #expect(composition.contains("public let renderGateway: DocumentRenderGateway"))
-        #expect(composition.contains("public let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
+        #expect(composition.contains("package let queryGateway: DocumentQueryGateway"))
+        #expect(composition.contains("package let renderGateway: DocumentRenderGateway"))
+        #expect(composition.contains("package let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
+        #expect(!composition.contains("public let queryGateway: DocumentQueryGateway"))
+        #expect(!composition.contains("public let renderGateway: DocumentRenderGateway"))
+        #expect(!composition.contains("public let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
     }
 
     @Test

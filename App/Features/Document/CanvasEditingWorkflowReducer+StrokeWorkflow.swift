@@ -275,7 +275,7 @@ extension CanvasEditingWorkflowReducer {
             state: &state,
             preserving: transferredSurfaceHandle
         ) { handle in
-            documentGpuOperationGateway.releaseSurfaceHandle(handle)
+            documentRenderingWorkflow.releaseSurfaceHandle(handle)
         }
     }
 
@@ -375,7 +375,7 @@ extension CanvasEditingWorkflowReducer {
                 mutation,
                 state: &state,
                 releaseSurfaceHandle: { handle in
-                    documentGpuOperationGateway.releaseSurfaceHandle(handle)
+                    documentRenderingWorkflow.releaseSurfaceHandle(handle)
                 }
             )
             return .none

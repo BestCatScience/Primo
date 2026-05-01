@@ -9,7 +9,7 @@ extension DocumentLifecycleReducer {
         DocumentFeature.workspaceSnapshotCoordinator.snapshot(
             state: state,
             documentExportGateway: documentExportGateway,
-            documentGpuOperationGateway: documentGpuOperationGateway
+            documentRenderingWorkflow: documentRenderingWorkflow
         )
     }
 
@@ -251,7 +251,7 @@ extension DocumentLifecycleReducer {
             state.layerSidebar = LayerSidebarFeature.State()
             state.brushPalette = BrushPaletteFeature.State()
             DocumentFeature.toolPanelStateCoordinator.resetPanels(in: &state)
-            _ = documentMutationWorkflowSupport.applyPresentation(documentQueryGateway.presentation(), to: &state)
+            _ = documentMutationWorkflowSupport.applyPresentation(documentPresentationReader.presentation(), to: &state)
             return .send(
                 .delegate(
                     .freshDocumentMutationSucceeded(

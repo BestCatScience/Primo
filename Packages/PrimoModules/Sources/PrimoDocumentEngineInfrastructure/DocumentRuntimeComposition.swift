@@ -8,22 +8,22 @@ import PrimoDocumentDomain
 import PrimoDocumentRenderingInfrastructure
 import PrimoDocumentStrokeApplication
 
-public struct DocumentRuntimeComposition: Sendable {
-    public let queryGateway: DocumentQueryGateway
-    public let renderGateway: DocumentRenderGateway
-    public let dirtyUpdateQueue: DocumentDirtyUpdateQueue
-    public let mutationGateway: DocumentMutationGateway
-    public let strokeGateway: StrokeInputGateway
-    public let historyGateway: DocumentHistoryGateway
-    public let persistenceGateway: DocumentPersistenceGateway
-    public let exportGateway: DocumentExportGateway
-    public let textLayerGateway: TextLayerGateway
-    public let layerEffectsGateway: DocumentLayerEffectsGateway
-    public let editingGateway: DocumentEditingGateway
-    public let strokeSessionUseCase: DocumentStrokeSessionUseCase
-    public let gpuOperationGateway: DocumentGpuOperationGateway
+package struct DocumentRuntimeComposition: Sendable {
+    package let queryGateway: DocumentQueryGateway
+    package let renderGateway: DocumentRenderGateway
+    package let dirtyUpdateQueue: DocumentDirtyUpdateQueue
+    package let mutationGateway: DocumentMutationGateway
+    package let strokeGateway: StrokeInputGateway
+    package let historyGateway: DocumentHistoryGateway
+    package let persistenceGateway: DocumentPersistenceGateway
+    package let exportGateway: DocumentExportGateway
+    package let textLayerGateway: TextLayerGateway
+    package let layerEffectsGateway: DocumentLayerEffectsGateway
+    package let editingGateway: DocumentEditingGateway
+    package let strokeSessionUseCase: DocumentStrokeSessionUseCase
+    package let gpuOperationGateway: DocumentGpuOperationGateway
 
-    public init(
+    package init(
         queryGateway: DocumentQueryGateway,
         renderGateway: DocumentRenderGateway,
         dirtyUpdateQueue: DocumentDirtyUpdateQueue,
@@ -53,7 +53,7 @@ public struct DocumentRuntimeComposition: Sendable {
         self.gpuOperationGateway = gpuOperationGateway
     }
 
-    public func withOverrides(
+    package func withOverrides(
         queryGateway: DocumentQueryGateway? = nil,
         renderGateway: DocumentRenderGateway? = nil,
         dirtyUpdateQueue: DocumentDirtyUpdateQueue? = nil,
@@ -86,8 +86,8 @@ public struct DocumentRuntimeComposition: Sendable {
     }
 }
 
-public enum DocumentRuntimeCompositionFactory {
-    public static func live(
+package enum DocumentRuntimeCompositionFactory {
+    package static func live(
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live
@@ -120,7 +120,7 @@ public enum DocumentRuntimeCompositionFactory {
 }
 
 extension DocumentEngineLive {
-    public func makeEditingGateway() -> DocumentEditingGateway {
+    package func makeEditingGateway() -> DocumentEditingGateway {
         let useCase = DocumentEditorUseCase()
 
         return DocumentEditingGateway { request in

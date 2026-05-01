@@ -867,7 +867,7 @@ extension ContentView {
             pixelData: layer.pixelData,
             canvasWidth: snapshot.width,
             canvasHeight: snapshot.height,
-            gpuOperations: documentGpuOperationGateway
+            gpuOperations: documentRenderingWorkflow
         )
     }
 

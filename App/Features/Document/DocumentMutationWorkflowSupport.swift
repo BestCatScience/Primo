@@ -104,7 +104,7 @@ struct DocumentMutationWorkflowSupport<Action> {
 extension DocumentLifecycleReducer {
     var documentMutationWorkflowSupport: DocumentMutationWorkflowSupport<Action> {
         DocumentMutationWorkflowSupport(
-            presentationProvider: { documentQueryGateway.presentation() },
+            presentationProvider: { documentPresentationReader.presentation() },
             refreshRequestedAction: .delegate(.presentationRefreshRequested),
             feedbackAction: { .delegate(.documentMutationFeedback($0)) },
             presentationAppliedAction: .delegate(.presentationApplied)
@@ -140,7 +140,7 @@ extension DocumentLifecycleReducer {
 extension CanvasEditingWorkflowReducer {
     var documentMutationWorkflowSupport: DocumentMutationWorkflowSupport<Action> {
         DocumentMutationWorkflowSupport(
-            presentationProvider: { documentQueryGateway.presentation() },
+            presentationProvider: { documentPresentationReader.presentation() },
             refreshRequestedAction: .delegate(.presentationRefreshRequested),
             feedbackAction: { .delegate(.documentMutationFeedback($0)) },
             presentationAppliedAction: .delegate(.presentationApplied)
@@ -180,7 +180,7 @@ extension CanvasEditingWorkflowReducer {
 extension LayerWorkflowReducer {
     var documentMutationWorkflowSupport: DocumentMutationWorkflowSupport<Action> {
         DocumentMutationWorkflowSupport(
-            presentationProvider: { documentQueryGateway.presentation() },
+            presentationProvider: { documentPresentationReader.presentation() },
             refreshRequestedAction: .delegate(.presentationRefreshRequested),
             feedbackAction: { .delegate(.documentMutationFeedback($0)) },
             presentationAppliedAction: .delegate(.presentationApplied)
@@ -220,7 +220,7 @@ extension LayerWorkflowReducer {
 extension AdjustmentWorkflowReducer {
     var documentMutationWorkflowSupport: DocumentMutationWorkflowSupport<Action> {
         DocumentMutationWorkflowSupport(
-            presentationProvider: { documentQueryGateway.presentation() },
+            presentationProvider: { documentPresentationReader.presentation() },
             refreshRequestedAction: .delegate(.presentationRefreshRequested),
             feedbackAction: { .delegate(.documentMutationFeedback($0)) },
             presentationAppliedAction: .delegate(.presentationApplied)
@@ -248,7 +248,7 @@ extension AdjustmentWorkflowReducer {
 extension AIImageWorkflowReducer {
     var documentMutationWorkflowSupport: DocumentMutationWorkflowSupport<Action> {
         DocumentMutationWorkflowSupport(
-            presentationProvider: { documentQueryGateway.presentation() },
+            presentationProvider: { documentPresentationReader.presentation() },
             refreshRequestedAction: .delegate(.presentationRefreshRequested),
             feedbackAction: { .delegate(.documentMutationFeedback($0)) },
             presentationAppliedAction: .delegate(.presentationApplied)

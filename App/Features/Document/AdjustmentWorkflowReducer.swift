@@ -6,9 +6,9 @@ struct AdjustmentWorkflowReducer: Reducer {
     typealias DocumentMutationContract = DocumentFeature.DocumentMutationContract
     typealias LayerMutationFinalization = DocumentFeature.LayerMutationFinalization
 
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
     @Dependency(\.documentMutationWorkflowService) var documentMutationWorkflowService
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentPresentationReader) var documentPresentationReader
 
     enum EditingAction: Equatable {
         case gradientMapSelected(GradientMapPreset)
@@ -42,56 +42,56 @@ struct AdjustmentWorkflowReducer: Reducer {
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .gradientMapSettings($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.hueSaturationBrightnessPreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .hueSaturationBrightness($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.brightnessContrastPreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .brightnessContrast($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.levelsPreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .levels($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.toneCurvePreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .toneCurve($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.colorBalancePreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .colorBalance($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.thresholdPreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .threshold($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.posterizePreviewChanged(settings)):
             Self.previewAdjustedActiveLayer(
                 state: &state,
                 request: settings.map { .posterize($0) },
-                gpuOperations: documentGpuOperationGateway
+                gpuOperations: documentRenderingWorkflow
             )
             return .none
         case let .editing(.gradientMapSelected(preset)):

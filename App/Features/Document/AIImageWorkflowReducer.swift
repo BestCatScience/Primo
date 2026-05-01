@@ -20,9 +20,10 @@ struct AIImageWorkflowReducer: Reducer {
     @Dependency(\.appLanguageClient) var appLanguageClient
     @Dependency(\.dateClient) var dateClient
     @Dependency(\.documentContentService) var documentContentService
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
-    @Dependency(\.textLayerGateway) var textLayerGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
+    @Dependency(\.documentPresentationReader) var documentPresentationReader
+    @Dependency(\.documentTextLayerService) var documentTextLayerService
+    @Dependency(\.selectionWorkflowService) var selectionWorkflowService
     @Dependency(\.uuidClient) var uuidClient
 
     enum Action: Equatable {

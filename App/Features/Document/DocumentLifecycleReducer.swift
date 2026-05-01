@@ -11,9 +11,9 @@ struct DocumentLifecycleReducer: Reducer {
 
     @Dependency(\.documentCanvasCommandService) var documentCanvasCommandService
     @Dependency(\.documentExportGateway) var documentExportGateway
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
     @Dependency(\.documentHistoryCommandService) var documentHistoryCommandService
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentPresentationReader) var documentPresentationReader
 
     enum Action: Equatable {
         case freshDocumentMutationRequested(DocumentFeature.FreshDocumentMutationRequest)

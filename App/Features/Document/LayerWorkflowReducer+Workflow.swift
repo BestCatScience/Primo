@@ -314,7 +314,7 @@ extension LayerWorkflowReducer {
     func handleLayerFolderAssignment(
         state: inout State,
         index: Int,
-        folderID: Int
+        folderID: Int?
     ) -> Effect<Action> {
         performDocumentMutation(
             state: &state,
@@ -349,7 +349,7 @@ extension LayerWorkflowReducer {
         guard let importedPixelData = DocumentFeature.fittedLayerPixelData(
             fromImageData: data,
             canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            gpuOperations: documentRenderingWorkflow
         ) else {
             return .send(.delegate(.documentMutationFeedback(.couldNotImportPhoto(nil))))
         }
@@ -468,7 +468,7 @@ extension LayerWorkflowReducer {
         guard let maskData = DocumentFeature.layerMaskData(
             from: state.canvas.selection,
             canvasSize: state.canvas.canvasSize,
-            gpuOperations: documentGpuOperationGateway
+            selectionWorkflow: selectionWorkflowService
         ) else {
             return .send(.delegate(.documentMutationFeedback(.createLayerMaskNeedsSelection)))
         }

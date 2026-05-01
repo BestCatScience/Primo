@@ -8,12 +8,12 @@ extension PresentationRefreshReducer {
         DocumentFeature.workspaceSnapshotCoordinator.snapshot(
             state: state,
             documentExportGateway: documentExportGateway,
-            documentGpuOperationGateway: documentGpuOperationGateway
+            documentRenderingWorkflow: documentRenderingWorkflow
         )
     }
 
     func startupPresentationBootstrapEffect() -> Effect<Action> {
-        .run { [documentPersistenceGateway, documentQueryGateway, processEnvironmentClient] send in
+        .run { [documentPersistenceGateway, documentPresentationReader, processEnvironmentClient] send in
             let startupClock = ContinuousClock()
             let bootstrapStart = startupClock.now
 
@@ -22,7 +22,7 @@ extension PresentationRefreshReducer {
                 "Loading lightweight presentation",
                 processEnvironmentClient: processEnvironmentClient
             )
-            let lightweightPresentation = documentQueryGateway.lightweightPresentation()
+            let lightweightPresentation = documentPresentationReader.lightweightPresentation()
             let bootstrapDuration = bootstrapStart.duration(to: startupClock.now)
             AppDiagnostics.debug(
                 PrimoRootFeature.startupLogger,
@@ -36,7 +36,7 @@ extension PresentationRefreshReducer {
     }
 
     func deferredPresentationLoadEffect() -> Effect<Action> {
-        .run { [documentQueryGateway, processEnvironmentClient] send in
+        .run { [documentPresentationReader, processEnvironmentClient] send in
             let clock = ContinuousClock()
             do {
                 try await Task.sleep(for: .milliseconds(600))
@@ -50,7 +50,7 @@ extension PresentationRefreshReducer {
                 "Loading full presentation after initial launch",
                 processEnvironmentClient: processEnvironmentClient
             )
-            let presentation = documentQueryGateway.presentation()
+            let presentation = documentPresentationReader.presentation()
             let presentationDuration = presentationStart.duration(to: clock.now)
             AppDiagnostics.debug(
                 PrimoRootFeature.startupLogger,
@@ -63,8 +63,8 @@ extension PresentationRefreshReducer {
     }
 
     func deferredPresentationRefreshEffect() -> Effect<Action> {
-        .run { [documentQueryGateway] send in
-            await send(.presentationLoaded(documentQueryGateway.presentation()))
+        .run { [documentPresentationReader] send in
+            await send(.presentationLoaded(documentPresentationReader.presentation()))
         }
         .cancellable(id: ApplicationFeature.CancelID.deferredPresentationRefresh, cancelInFlight: true)
     }

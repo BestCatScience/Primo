@@ -24,15 +24,15 @@ public struct DocumentProjectPreview: Equatable, Sendable {
 /// under the lock, executed outside it, then applied under the lock again.
 /// Keep `Runtime` mutations inside `withRuntime` / `replaceRuntime`; move this
 /// boundary to an actor only if the gateway surface becomes async end-to-end.
-public final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
+package final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
     private let lock = NSLock()
     private var runtime: Runtime
 
-    public init(runtime: Runtime) {
+    package init(runtime: Runtime) {
         self.runtime = runtime
     }
 
-    public func withRuntime<T>(
+    package func withRuntime<T>(
         _ body: (Runtime) throws -> T
     ) rethrows -> T {
         lock.lock()
@@ -40,7 +40,7 @@ public final class LockedDocumentRuntimeBox<Runtime>: @unchecked Sendable {
         return try body(runtime)
     }
 
-    public func replaceRuntime(with newRuntime: Runtime) {
+    package func replaceRuntime(with newRuntime: Runtime) {
         lock.lock()
         defer { lock.unlock() }
         runtime = newRuntime

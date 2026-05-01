@@ -453,6 +453,129 @@ extension DocumentExportGateway {
     }
 }
 
+private struct TestCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
+    let gateway: DocumentGpuOperationGateway
+
+    func eyedropperLoupeSurface(
+        sourcePixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        centerX: Int,
+        centerY: Int,
+        gridSize: Int,
+        paperStyle: CanvasPaperStyle,
+        blendWithPaper: Bool
+    ) -> DocumentCompositeSurface? {
+        gateway.eyedropperLoupeRGBA(
+            sourcePixelData,
+            canvasWidth,
+            canvasHeight,
+            centerX,
+            centerY,
+            gridSize,
+            paperStyle,
+            blendWithPaper
+        ).value.flatMap { DocumentCompositeSurface(validatingWidth: gridSize, height: gridSize, pixelData: $0) }
+    }
+
+    func selectionOverlaySurface(maskData: Data, width: Int, height: Int) -> DocumentCompositeSurface? {
+        gateway.selectionOverlayRGBA(maskData, width, height).value.flatMap {
+            DocumentCompositeSurface(validatingWidth: width, height: height, pixelData: $0)
+        }
+    }
+
+    func compositePreviewImageData(
+        snapshot: MetalDocumentSnapshot,
+        activeLayerIndex: Int,
+        adjustedActiveLayerPixels: Data
+    ) -> Data? {
+        gateway.compositedPreviewPixelData(snapshot, activeLayerIndex, adjustedActiveLayerPixels).value
+    }
+
+    func paperCompositeSurface(pixelData: Data, width: Int, height: Int, paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+        gateway.compositedPaperPreviewRGBA(pixelData, width, height, paperStyle).value.flatMap {
+            DocumentCompositeSurface(validatingWidth: width, height: height, pixelData: $0)
+        }
+    }
+
+    func shapePreviewSurface(stroke: Stroke, style: PreviewStrokeStyle, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
+        nil
+    }
+
+    func transformedTextPreviewSurface(textLayer: TextLayerData, canvasWidth: Int, canvasHeight: Int) -> DocumentCompositeSurface? {
+        nil
+    }
+
+    func transformedTextLayoutRect(textLayer: TextLayerData, canvasSize: CGSize) -> CGRect? {
+        nil
+    }
+}
+
+private struct TestLayerTransformProcessor: LayerTransformProcessing {
+    let gateway: DocumentGpuOperationGateway
+
+    func transformedLayerPixels(
+        source: Data,
+        canvasWidth: Int,
+        canvasHeight: Int,
+        selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets
+    ) -> Data? {
+        let sourceQuad = TransformQuad(
+            topLeft: .zero,
+            topRight: CGPoint(x: canvasWidth, y: 0),
+            bottomLeft: CGPoint(x: 0, y: canvasHeight),
+            bottomRight: CGPoint(x: canvasWidth, y: canvasHeight)
+        )
+        let destinationQuad = quadOffsets.applying(to: sourceQuad)
+        gateway.transformedLayerPixelData(
+            TransformedLayerPixelDataRequest(
+                source: source,
+                canvasWidth: canvasWidth,
+                canvasHeight: canvasHeight,
+                expandedSelectionMask: selection.map { Array($0.maskData) },
+                translation: translation,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                rotationDegrees: rotationDegrees,
+                pivot: pivot ?? sourceQuad.center,
+                sourceQuad: sourceQuad,
+                destinationQuad: destinationQuad,
+                usesFreeformQuad: !quadOffsets.isZero
+            )
+        ).value
+    }
+
+    func transformedSelection(
+        _ selection: CanvasSelection?,
+        translation: CGSize,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        rotationDegrees: Double,
+        pivot: CGPoint?,
+        mode: CanvasTransformMode,
+        quadOffsets: TransformQuadOffsets,
+        canvasSize: CGSize
+    ) -> CanvasSelection? {
+        nil
+    }
+
+    func transformationBounds(
+        selection: CanvasSelection?,
+        pixelData: Data,
+        canvasWidth: Int,
+        canvasHeight: Int
+    ) -> CGRect? {
+        nil
+    }
+}
+
 extension DocumentRuntime {
     static func stub(
         queryGateway: DocumentQueryGateway = .stub(),
@@ -462,11 +585,14 @@ extension DocumentRuntime {
         historyGateway: DocumentHistoryGateway = .stub(),
         persistenceGateway: DocumentPersistenceGateway = .stub(),
         exportGateway: DocumentExportGateway = .stub(),
-        textLayerGateway: TextLayerGateway = .stub(),
+        documentTextLayerService: TextLayerGateway = .stub(),
         layerEffectsGateway: DocumentLayerEffectsGateway = .stub(),
         editingGateway: DocumentEditingGateway? = nil,
         strokeSessionUseCase: DocumentStrokeSessionUseCase? = nil,
-        gpuOperationGateway: DocumentGpuOperationGateway = .stub()
+        gpuOperationGateway: DocumentGpuOperationGateway = .stub(),
+        canvasPreviewRenderer: (any CanvasPreviewRendering)? = nil,
+        layerTransformProcessor: (any LayerTransformProcessing)? = nil,
+        selectionMaskProcessor: (any SelectionMaskProcessing)? = nil
     ) -> Self {
         let resolvedEditingGateway = editingGateway ?? DocumentEditingGateway.stub()
         let canvasCommands = DocumentCanvasCommandService(
@@ -485,22 +611,34 @@ extension DocumentRuntime {
             documentEditingGateway: resolvedEditingGateway,
             documentLayerEffectsGateway: layerEffectsGateway,
             documentMutationGateway: mutationGateway,
-            textLayerGateway: textLayerGateway
+            documentTextLayerService: documentTextLayerService
         )
         let contentService = DocumentContentService(
-            documentQueryGateway: queryGateway,
+            documentPresentationReader: queryGateway,
             documentRenderGateway: renderGateway,
             documentMutationGateway: mutationGateway,
-            textLayerGateway: textLayerGateway
+            documentTextLayerService: documentTextLayerService
         )
-        let canvasPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
-        let layerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: gpuOperationGateway)
-        let selectionMaskProcessor = GpuCanvasPreviewRenderer(gpuOperations: gpuOperationGateway)
+        let defaultCanvasPreviewRenderer = TestCanvasPreviewRenderer(gateway: gpuOperationGateway)
+        let canvasPreviewRenderer = canvasPreviewRenderer ?? defaultCanvasPreviewRenderer
+        let layerTransformProcessor = layerTransformProcessor ?? TestLayerTransformProcessor(gateway: gpuOperationGateway)
+        let selectionMaskProcessor = selectionMaskProcessor ?? defaultCanvasPreviewRenderer
         let canvasEditingWorkflow = CanvasEditingWorkflowService(
             documentContentService: contentService,
             layerTransformProcessor: layerTransformProcessor
         )
-        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperationGateway)
+        let selectionWorkflow = SelectionWorkflowService(
+            combinedSelectionMask: gpuOperationGateway.combinedSelectionMask,
+            expandedSelectionMask: gpuOperationGateway.expandedSelectionMask,
+            lassoSelection: gpuOperationGateway.lassoSelection,
+            autoSelection: gpuOperationGateway.autoSelection,
+            colorRangeSelection: gpuOperationGateway.colorRangeSelection,
+            expandedMask: gpuOperationGateway.expandedMask,
+            contractedMask: gpuOperationGateway.contractedMask,
+            featheredMask: gpuOperationGateway.featheredMask,
+            invertMask: gpuOperationGateway.invertMask,
+            croppedSelectionMask: gpuOperationGateway.croppedSelectionMask
+        )
         let canvasPresentationEnvironment = CanvasPresentationEnvironment(
             previewRenderer: canvasPreviewRenderer,
             eyedropperSampler: GpuCanvasEyedropperSampler(),
@@ -540,7 +678,7 @@ extension DocumentRuntime {
                     case let .mergeLayerDown(index):
                         return .mutation(layerEffectsGateway.mergeLayerDown(index).map { .completed })
                     case let .setTextLayer(index, textLayer):
-                        return .mutation(textLayerGateway.setTextLayer(index, textLayer).map { .completed })
+                        return .mutation(documentTextLayerService.setTextLayer(index, textLayer).map { .completed })
                     case let .applyProcessing(index, request):
                         return .mutation(mutationGateway.applyLayerProcessing(index, request).map { .completed })
                     }
@@ -595,11 +733,37 @@ extension DocumentRuntime {
             layerTransformProcessor: layerTransformProcessor,
             selectionMaskProcessor: selectionMaskProcessor,
             canvasPresentationEnvironment: canvasPresentationEnvironment,
-            exportGateway: exportGateway,
-            persistenceGateway: persistenceGateway,
-            queryGateway: queryGateway,
-            gpuOperationGateway: gpuOperationGateway,
-            textLayerGateway: textLayerGateway
+            presentationReader: DocumentPresentationReader(
+                lightweightPresentation: queryGateway.lightweightPresentation,
+                presentation: queryGateway.presentation
+            ),
+            renderingWorkflow: DocumentRenderingWorkflow(
+                compositedPaperPreviewRGBA: gpuOperationGateway.compositedPaperPreviewRGBA,
+                compositedPreviewPixelData: gpuOperationGateway.compositedPreviewPixelData,
+                processedLayerPixelData: gpuOperationGateway.processedLayerPixelData,
+                alphaMask: gpuOperationGateway.alphaMask,
+                croppedSelectionMask: gpuOperationGateway.croppedSelectionMask,
+                scaledPixelData: gpuOperationGateway.scaledPixelData,
+                translatedPixelData: gpuOperationGateway.translatedPixelData,
+                releaseSurfaceHandle: gpuOperationGateway.releaseSurfaceHandle
+            ),
+            textLayerService: DocumentTextLayerService(
+                textLayerData: documentTextLayerService.textLayerData,
+                setTextLayer: documentTextLayerService.setTextLayer,
+                clearTextLayerData: documentTextLayerService.clearTextLayerData
+            ),
+            exportClient: DocumentExportClient(
+                compositeSurface: exportGateway.compositeSurface,
+                compositePNGData: exportGateway.compositePNGData,
+                timelapseCapture: exportGateway.timelapseCapture
+            ),
+            persistenceClient: DocumentPersistenceClient(
+                saveProject: persistenceGateway.saveProject,
+                loadProject: persistenceGateway.loadProject,
+                setPaperStyle: persistenceGateway.setPaperStyle,
+                newCanvas: persistenceGateway.newCanvas,
+                prewarmDrawingResources: persistenceGateway.prewarmDrawingResources
+            )
         )
     }
 }

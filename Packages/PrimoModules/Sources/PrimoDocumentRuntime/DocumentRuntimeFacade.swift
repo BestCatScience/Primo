@@ -239,6 +239,223 @@ public enum DocumentCommandOutcome: Sendable {
     case none
 }
 
+public struct DocumentPresentationReader: Sendable {
+    private let lightweightPresentationHandler: @Sendable () -> PaintDocumentPresentation
+    private let presentationHandler: @Sendable () -> PaintDocumentPresentation
+
+    public init(
+        lightweightPresentation: @escaping @Sendable () -> PaintDocumentPresentation,
+        presentation: @escaping @Sendable () -> PaintDocumentPresentation
+    ) {
+        self.lightweightPresentationHandler = lightweightPresentation
+        self.presentationHandler = presentation
+    }
+
+    public func lightweightPresentation() -> PaintDocumentPresentation {
+        lightweightPresentationHandler()
+    }
+
+    public func presentation() -> PaintDocumentPresentation {
+        presentationHandler()
+    }
+}
+
+public struct DocumentTextLayerService: Sendable {
+    private let textLayerDataHandler: @Sendable (Int) -> TextLayerData?
+    private let setTextLayerHandler: @Sendable (Int, TextLayerData) -> DocumentMutationResult
+    private let clearTextLayerDataHandler: @Sendable (Int) -> Void
+
+    public init(
+        textLayerData: @escaping @Sendable (Int) -> TextLayerData?,
+        setTextLayer: @escaping @Sendable (Int, TextLayerData) -> DocumentMutationResult,
+        clearTextLayerData: @escaping @Sendable (Int) -> Void
+    ) {
+        self.textLayerDataHandler = textLayerData
+        self.setTextLayerHandler = setTextLayer
+        self.clearTextLayerDataHandler = clearTextLayerData
+    }
+
+    public func textLayerData(_ index: Int) -> TextLayerData? {
+        textLayerDataHandler(index)
+    }
+
+    public func setTextLayer(_ index: Int, _ textLayer: TextLayerData) -> DocumentMutationResult {
+        setTextLayerHandler(index, textLayer)
+    }
+
+    public func clearTextLayerData(_ index: Int) {
+        clearTextLayerDataHandler(index)
+    }
+}
+
+public struct DocumentPersistenceClient: Sendable {
+    private let saveProjectHandler: @Sendable (URL, CanvasPaperStyle) throws -> Void
+    private let loadProjectHandler: @Sendable (URL) throws -> LoadedPaintProject
+    private let setPaperStyleHandler: @Sendable (CanvasPaperStyle) -> Void
+    private let newCanvasHandler: @Sendable (Int, Int) -> Void
+    private let prewarmDrawingResourcesHandler: @Sendable () -> Void
+
+    public init(
+        saveProject: @escaping @Sendable (URL, CanvasPaperStyle) throws -> Void,
+        loadProject: @escaping @Sendable (URL) throws -> LoadedPaintProject,
+        setPaperStyle: @escaping @Sendable (CanvasPaperStyle) -> Void,
+        newCanvas: @escaping @Sendable (Int, Int) -> Void,
+        prewarmDrawingResources: @escaping @Sendable () -> Void
+    ) {
+        self.saveProjectHandler = saveProject
+        self.loadProjectHandler = loadProject
+        self.setPaperStyleHandler = setPaperStyle
+        self.newCanvasHandler = newCanvas
+        self.prewarmDrawingResourcesHandler = prewarmDrawingResources
+    }
+
+    public func saveProject(_ url: URL, _ paperStyle: CanvasPaperStyle) throws {
+        try saveProjectHandler(url, paperStyle)
+    }
+
+    public func loadProject(_ url: URL) throws -> LoadedPaintProject {
+        try loadProjectHandler(url)
+    }
+
+    public func setPaperStyle(_ paperStyle: CanvasPaperStyle) {
+        setPaperStyleHandler(paperStyle)
+    }
+
+    public func newCanvas(_ width: Int, _ height: Int) {
+        newCanvasHandler(width, height)
+    }
+
+    public func prewarmDrawingResources() {
+        prewarmDrawingResourcesHandler()
+    }
+}
+
+public struct DocumentExportClient: Sendable {
+    private let compositeSurfaceHandler: @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?
+    private let compositePNGDataHandler: @Sendable (CanvasPaperStyle) -> Data?
+    private let timelapseCaptureHandler: @Sendable () -> TimelapseCapture?
+
+    public init(
+        compositeSurface: @escaping @Sendable (CanvasPaperStyle) -> DocumentCompositeSurface?,
+        compositePNGData: @escaping @Sendable (CanvasPaperStyle) -> Data?,
+        timelapseCapture: @escaping @Sendable () -> TimelapseCapture?
+    ) {
+        self.compositeSurfaceHandler = compositeSurface
+        self.compositePNGDataHandler = compositePNGData
+        self.timelapseCaptureHandler = timelapseCapture
+    }
+
+    public func compositeSurface(_ paperStyle: CanvasPaperStyle) -> DocumentCompositeSurface? {
+        compositeSurfaceHandler(paperStyle)
+    }
+
+    public func compositePNGData(_ paperStyle: CanvasPaperStyle) -> Data? {
+        compositePNGDataHandler(paperStyle)
+    }
+
+    public func timelapseCapture() -> TimelapseCapture? {
+        timelapseCaptureHandler()
+    }
+}
+
+public struct DocumentRenderingWorkflow: Sendable {
+    private let compositedPaperPreviewRGBAHandler: @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>
+    private let compositedPreviewPixelDataHandler: @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>
+    private let processedLayerPixelDataHandler: @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>
+    private let alphaMaskHandler: @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>
+    private let croppedSelectionMaskHandler: @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?
+    private let scaledPixelDataHandler: @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    private let translatedPixelDataHandler: @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>
+    private let releaseSurfaceHandleHandler: @Sendable (MetalBufferHandle?) -> Void
+
+    public init(
+        compositedPaperPreviewRGBA: @escaping @Sendable (Data, Int, Int, CanvasPaperStyle) -> DocumentRenderingResult<Data>,
+        compositedPreviewPixelData: @escaping @Sendable (MetalDocumentSnapshot, Int, Data) -> DocumentRenderingResult<Data>,
+        processedLayerPixelData: @escaping @Sendable (Data, Int, Int, LayerProcessingRequest) -> DocumentRenderingResult<Data>,
+        alphaMask: @escaping @Sendable (Data, Int, Int) -> DocumentRenderingResult<[UInt8]>,
+        croppedSelectionMask: @escaping @Sendable ([UInt8], Int, Int) -> DocumentCroppedSelectionMask?,
+        scaledPixelData: @escaping @Sendable (Data, Int, Int, Int, Int) -> DocumentRenderingResult<Data>,
+        translatedPixelData: @escaping @Sendable (Data, Int, Int, Int, Int, Int, Int) -> DocumentRenderingResult<Data>,
+        releaseSurfaceHandle: @escaping @Sendable (MetalBufferHandle?) -> Void
+    ) {
+        self.compositedPaperPreviewRGBAHandler = compositedPaperPreviewRGBA
+        self.compositedPreviewPixelDataHandler = compositedPreviewPixelData
+        self.processedLayerPixelDataHandler = processedLayerPixelData
+        self.alphaMaskHandler = alphaMask
+        self.croppedSelectionMaskHandler = croppedSelectionMask
+        self.scaledPixelDataHandler = scaledPixelData
+        self.translatedPixelDataHandler = translatedPixelData
+        self.releaseSurfaceHandleHandler = releaseSurfaceHandle
+    }
+
+    package init(gpuOperations: DocumentGpuOperationGateway) {
+        self.init(
+            compositedPaperPreviewRGBA: gpuOperations.compositedPaperPreviewRGBA,
+            compositedPreviewPixelData: gpuOperations.compositedPreviewPixelData,
+            processedLayerPixelData: gpuOperations.processedLayerPixelData,
+            alphaMask: gpuOperations.alphaMask,
+            croppedSelectionMask: gpuOperations.croppedSelectionMask,
+            scaledPixelData: gpuOperations.scaledPixelData,
+            translatedPixelData: gpuOperations.translatedPixelData,
+            releaseSurfaceHandle: gpuOperations.releaseSurfaceHandle
+        )
+    }
+
+    public func compositedPaperPreviewRGBA(
+        _ pixelData: Data,
+        _ width: Int,
+        _ height: Int,
+        _ paperStyle: CanvasPaperStyle
+    ) -> DocumentRenderingResult<Data> {
+        compositedPaperPreviewRGBAHandler(pixelData, width, height, paperStyle)
+    }
+
+    public func compositedPreviewPixelData(
+        _ snapshot: MetalDocumentSnapshot,
+        _ activeLayerIndex: Int,
+        _ adjustedActiveLayerPixels: Data
+    ) -> DocumentRenderingResult<Data> {
+        compositedPreviewPixelDataHandler(snapshot, activeLayerIndex, adjustedActiveLayerPixels)
+    }
+
+    public func processedLayerPixelData(
+        _ source: Data,
+        _ width: Int,
+        _ height: Int,
+        _ request: LayerProcessingRequest
+    ) -> DocumentRenderingResult<Data> {
+        processedLayerPixelDataHandler(source, width, height, request)
+    }
+
+    public func alphaMask(_ pixelData: Data, _ width: Int, _ height: Int) -> DocumentRenderingResult<[UInt8]> {
+        alphaMaskHandler(pixelData, width, height)
+    }
+
+    public func croppedSelectionMask(_ mask: [UInt8], _ width: Int, _ height: Int) -> DocumentCroppedSelectionMask? {
+        croppedSelectionMaskHandler(mask, width, height)
+    }
+
+    public func scaledPixelData(_ source: Data, _ width: Int, _ height: Int, _ targetWidth: Int, _ targetHeight: Int) -> DocumentRenderingResult<Data> {
+        scaledPixelDataHandler(source, width, height, targetWidth, targetHeight)
+    }
+
+    public func translatedPixelData(
+        _ source: Data,
+        _ width: Int,
+        _ height: Int,
+        _ targetWidth: Int,
+        _ targetHeight: Int,
+        _ offsetX: Int,
+        _ offsetY: Int
+    ) -> DocumentRenderingResult<Data> {
+        translatedPixelDataHandler(source, width, height, targetWidth, targetHeight, offsetX, offsetY)
+    }
+
+    public func releaseSurfaceHandle(_ handle: MetalBufferHandle?) {
+        releaseSurfaceHandleHandler(handle)
+    }
+}
+
 public struct DocumentRuntime: Sendable {
     private let executeHandler: @Sendable (DocumentCommand) async -> DocumentCommandOutcome
     private let observePresentationHandler: @Sendable () -> AsyncStream<PaintDocumentPresentation>
@@ -256,11 +473,11 @@ public struct DocumentRuntime: Sendable {
     public let layerTransformProcessor: any LayerTransformProcessing
     public let selectionMaskProcessor: any SelectionMaskProcessing
     public let canvasPresentationEnvironment: CanvasPresentationEnvironment
-    public let exportGateway: DocumentExportGateway
-    public let persistenceGateway: DocumentPersistenceGateway
-    public let queryGateway: DocumentQueryGateway
-    public let gpuOperationGateway: DocumentGpuOperationGateway
-    public let textLayerGateway: TextLayerGateway
+    public let presentationReader: DocumentPresentationReader
+    public let renderingWorkflow: DocumentRenderingWorkflow
+    public let textLayerService: DocumentTextLayerService
+    public let exportClient: DocumentExportClient
+    public let persistenceClient: DocumentPersistenceClient
 
     public init(
         execute: @escaping @Sendable (DocumentCommand) async -> DocumentCommandOutcome,
@@ -278,11 +495,11 @@ public struct DocumentRuntime: Sendable {
         layerTransformProcessor: any LayerTransformProcessing,
         selectionMaskProcessor: any SelectionMaskProcessing,
         canvasPresentationEnvironment: CanvasPresentationEnvironment,
-        exportGateway: DocumentExportGateway,
-        persistenceGateway: DocumentPersistenceGateway,
-        queryGateway: DocumentQueryGateway,
-        gpuOperationGateway: DocumentGpuOperationGateway,
-        textLayerGateway: TextLayerGateway
+        presentationReader: DocumentPresentationReader,
+        renderingWorkflow: DocumentRenderingWorkflow,
+        textLayerService: DocumentTextLayerService,
+        exportClient: DocumentExportClient,
+        persistenceClient: DocumentPersistenceClient
     ) {
         self.executeHandler = execute
         self.observePresentationHandler = observePresentation
@@ -299,11 +516,11 @@ public struct DocumentRuntime: Sendable {
         self.layerTransformProcessor = layerTransformProcessor
         self.selectionMaskProcessor = selectionMaskProcessor
         self.canvasPresentationEnvironment = canvasPresentationEnvironment
-        self.exportGateway = exportGateway
-        self.persistenceGateway = persistenceGateway
-        self.queryGateway = queryGateway
-        self.gpuOperationGateway = gpuOperationGateway
-        self.textLayerGateway = textLayerGateway
+        self.presentationReader = presentationReader
+        self.renderingWorkflow = renderingWorkflow
+        self.textLayerService = textLayerService
+        self.exportClient = exportClient
+        self.persistenceClient = persistenceClient
     }
 
     public func execute(_ command: DocumentCommand) async -> DocumentCommandOutcome {
@@ -352,6 +569,28 @@ public struct DocumentRuntime: Sendable {
             eyedropperSampler: GpuCanvasEyedropperSampler(),
             selectionProcessor: selectionMaskProcessor,
             layerTransformProcessor: layerTransformProcessor
+        )
+        let presentationReader = DocumentPresentationReader(
+            lightweightPresentation: composition.queryGateway.lightweightPresentation,
+            presentation: composition.queryGateway.presentation
+        )
+        let renderingWorkflow = DocumentRenderingWorkflow(gpuOperations: composition.gpuOperationGateway)
+        let textLayerService = DocumentTextLayerService(
+            textLayerData: composition.textLayerGateway.textLayerData,
+            setTextLayer: composition.textLayerGateway.setTextLayer,
+            clearTextLayerData: composition.textLayerGateway.clearTextLayerData
+        )
+        let persistenceClient = DocumentPersistenceClient(
+            saveProject: composition.persistenceGateway.saveProject,
+            loadProject: composition.persistenceGateway.loadProject,
+            setPaperStyle: composition.persistenceGateway.setPaperStyle,
+            newCanvas: composition.persistenceGateway.newCanvas,
+            prewarmDrawingResources: composition.persistenceGateway.prewarmDrawingResources
+        )
+        let exportClient = DocumentExportClient(
+            compositeSurface: composition.exportGateway.compositeSurface,
+            compositePNGData: composition.exportGateway.compositePNGData,
+            timelapseCapture: composition.exportGateway.timelapseCapture
         )
         let presentationBroadcaster = DocumentRuntimePresentationBroadcaster {
             composition.queryGateway.lightweightPresentation()
@@ -456,11 +695,11 @@ public struct DocumentRuntime: Sendable {
             layerTransformProcessor: layerTransformProcessor,
             selectionMaskProcessor: selectionMaskProcessor,
             canvasPresentationEnvironment: canvasPresentationEnvironment,
-            exportGateway: composition.exportGateway,
-            persistenceGateway: composition.persistenceGateway,
-            queryGateway: composition.queryGateway,
-            gpuOperationGateway: composition.gpuOperationGateway,
-            textLayerGateway: composition.textLayerGateway
+            presentationReader: presentationReader,
+            renderingWorkflow: renderingWorkflow,
+            textLayerService: textLayerService,
+            exportClient: exportClient,
+            persistenceClient: persistenceClient
         )
     }
 }
@@ -618,7 +857,11 @@ private extension TimelapseExportError {
 public struct GpuCanvasPreviewRenderer: CanvasPreviewRendering, CanvasTransformPreviewRendering, SelectionMaskProcessing {
     private let renderer: PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer
 
-    public init(gpuOperations: DocumentGpuOperationGateway = DocumentGpuOperationGatewayFactory.live()) {
+    public init() {
+        self.init(gpuOperations: DocumentGpuOperationGatewayFactory.live())
+    }
+
+    package init(gpuOperations: DocumentGpuOperationGateway) {
         self.renderer = PrimoDocumentRenderingInfrastructure.GpuCanvasPreviewRenderer(gpuOperations: gpuOperations)
     }
 
@@ -716,7 +959,11 @@ public struct GpuCanvasEyedropperSampler: CanvasEyedropperSampling {
 public struct GpuLayerTransformProcessor: LayerTransformProcessing {
     private let processor: PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor
 
-    public init(gpuOperations: DocumentGpuOperationGateway = DocumentGpuOperationGatewayFactory.live()) {
+    public init() {
+        self.init(gpuOperations: DocumentGpuOperationGatewayFactory.live())
+    }
+
+    package init(gpuOperations: DocumentGpuOperationGateway) {
         self.processor = PrimoDocumentRenderingInfrastructure.GpuLayerTransformProcessor(gpuOperations: gpuOperations)
     }
 

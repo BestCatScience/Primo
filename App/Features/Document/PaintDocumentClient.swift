@@ -123,38 +123,50 @@ private enum CanvasPresentationEnvironmentKey: DependencyKey {
     }
 }
 
-private enum DocumentQueryGatewayKey: DependencyKey {
-    static var liveValue: DocumentQueryGateway {
+private enum DocumentPresentationReaderKey: DependencyKey {
+    static var liveValue: DocumentPresentationReader {
         @Dependency(\.documentRuntime) var runtime
-        return runtime.queryGateway
+        return runtime.presentationReader
     }
 }
 
 private enum DocumentPersistenceGatewayKey: DependencyKey {
     static var liveValue: DocumentPersistenceGateway {
         @Dependency(\.documentRuntime) var runtime
-        return runtime.persistenceGateway
+        let client = runtime.persistenceClient
+        return DocumentPersistenceGateway(
+            saveProject: client.saveProject,
+            loadProject: client.loadProject,
+            setPaperStyle: client.setPaperStyle,
+            newCanvas: client.newCanvas,
+            prewarmDrawingResources: client.prewarmDrawingResources
+        )
     }
 }
 
 private enum DocumentExportGatewayKey: DependencyKey {
     static var liveValue: DocumentExportGateway {
         @Dependency(\.documentRuntime) var runtime
-        return runtime.exportGateway
+        let client = runtime.exportClient
+        return DocumentExportGateway(
+            compositeSurface: client.compositeSurface,
+            compositePNGData: client.compositePNGData,
+            timelapseCapture: client.timelapseCapture
+        )
     }
 }
 
-private enum TextLayerGatewayKey: DependencyKey {
-    static var liveValue: TextLayerGateway {
+private enum DocumentTextLayerServiceKey: DependencyKey {
+    static var liveValue: DocumentTextLayerService {
         @Dependency(\.documentRuntime) var runtime
-        return runtime.textLayerGateway
+        return runtime.textLayerService
     }
 }
 
-private enum DocumentGpuOperationGatewayKey: DependencyKey {
-    static var liveValue: DocumentGpuOperationGateway {
+private enum DocumentRenderingWorkflowKey: DependencyKey {
+    static var liveValue: DocumentRenderingWorkflow {
         @Dependency(\.documentRuntime) var runtime
-        return runtime.gpuOperationGateway
+        return runtime.renderingWorkflow
     }
 }
 
@@ -174,11 +186,21 @@ private extension DependencyValues {
         self[SelectionMaskProcessorKey.self] = runtime.selectionMaskProcessor
         self[LayerTransformProcessorKey.self] = runtime.layerTransformProcessor
         self[CanvasPresentationEnvironmentKey.self] = runtime.canvasPresentationEnvironment
-        self[DocumentQueryGatewayKey.self] = runtime.queryGateway
-        self[DocumentPersistenceGatewayKey.self] = runtime.persistenceGateway
-        self[DocumentExportGatewayKey.self] = runtime.exportGateway
-        self[TextLayerGatewayKey.self] = runtime.textLayerGateway
-        self[DocumentGpuOperationGatewayKey.self] = runtime.gpuOperationGateway
+        self[DocumentPresentationReaderKey.self] = runtime.presentationReader
+        self[DocumentPersistenceGatewayKey.self] = DocumentPersistenceGateway(
+            saveProject: runtime.persistenceClient.saveProject,
+            loadProject: runtime.persistenceClient.loadProject,
+            setPaperStyle: runtime.persistenceClient.setPaperStyle,
+            newCanvas: runtime.persistenceClient.newCanvas,
+            prewarmDrawingResources: runtime.persistenceClient.prewarmDrawingResources
+        )
+        self[DocumentExportGatewayKey.self] = DocumentExportGateway(
+            compositeSurface: runtime.exportClient.compositeSurface,
+            compositePNGData: runtime.exportClient.compositePNGData,
+            timelapseCapture: runtime.exportClient.timelapseCapture
+        )
+        self[DocumentTextLayerServiceKey.self] = runtime.textLayerService
+        self[DocumentRenderingWorkflowKey.self] = runtime.renderingWorkflow
     }
 }
 
@@ -188,9 +210,9 @@ extension DependencyValues {
         set { setDocumentRuntimeAndRefreshServices(newValue) }
     }
 
-    var documentQueryGateway: DocumentQueryGateway {
-        get { self[DocumentQueryGatewayKey.self] }
-        set { self[DocumentQueryGatewayKey.self] = newValue }
+    var documentPresentationReader: DocumentPresentationReader {
+        get { self[DocumentPresentationReaderKey.self] }
+        set { self[DocumentPresentationReaderKey.self] = newValue }
     }
 
     var documentPersistenceGateway: DocumentPersistenceGateway {
@@ -203,9 +225,9 @@ extension DependencyValues {
         set { self[DocumentExportGatewayKey.self] = newValue }
     }
 
-    var textLayerGateway: TextLayerGateway {
-        get { self[TextLayerGatewayKey.self] }
-        set { self[TextLayerGatewayKey.self] = newValue }
+    var documentTextLayerService: DocumentTextLayerService {
+        get { self[DocumentTextLayerServiceKey.self] }
+        set { self[DocumentTextLayerServiceKey.self] = newValue }
     }
 
     var canvasStrokeInteractionService: CanvasStrokeInteractionService {
@@ -213,9 +235,9 @@ extension DependencyValues {
         set { self[CanvasStrokeInteractionServiceKey.self] = newValue }
     }
 
-    var documentGpuOperationGateway: DocumentGpuOperationGateway {
-        get { self[DocumentGpuOperationGatewayKey.self] }
-        set { self[DocumentGpuOperationGatewayKey.self] = newValue }
+    var documentRenderingWorkflow: DocumentRenderingWorkflow {
+        get { self[DocumentRenderingWorkflowKey.self] }
+        set { self[DocumentRenderingWorkflowKey.self] = newValue }
     }
 
     var canvasPreviewRenderer: any CanvasPreviewRendering {

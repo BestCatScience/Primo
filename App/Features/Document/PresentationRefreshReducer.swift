@@ -9,9 +9,9 @@ struct PresentationRefreshReducer: Reducer {
     typealias WorkspaceDocumentSnapshot = DocumentFeature.WorkspaceDocumentSnapshot
 
     @Dependency(\.documentExportGateway) var documentExportGateway
-    @Dependency(\.documentGpuOperationGateway) var documentGpuOperationGateway
+    @Dependency(\.documentRenderingWorkflow) var documentRenderingWorkflow
     @Dependency(\.documentPersistenceGateway) var documentPersistenceGateway
-    @Dependency(\.documentQueryGateway) var documentQueryGateway
+    @Dependency(\.documentPresentationReader) var documentPresentationReader
     @Dependency(\.processEnvironmentClient) var processEnvironmentClient
 
     enum Action: Equatable {

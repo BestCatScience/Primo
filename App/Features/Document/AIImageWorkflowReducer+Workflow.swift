@@ -3,6 +3,7 @@ import Foundation
 import PrimoCoreTypes
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 import PrimoAIImageApplication
 import PrimoAIImageDomain
 
@@ -22,9 +23,8 @@ extension AIImageWorkflowReducer {
         func validate(
             command: SubmitAIImageEditCommand,
             state: DocumentEditingState,
-            gpuOperations: DocumentGpuOperationGateway
+            selectionWorkflow: SelectionWorkflowService
         ) -> Result<AIImageValidatedEdit, AIImageValidationFailure> {
-            let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
             guard
                 let snapshot = state.canvas.renderSnapshot,
                 let layer = snapshot.layers.first(where: { $0.index == command.descriptor.inputLayerIndex })
@@ -160,7 +160,7 @@ extension AIImageWorkflowReducer {
         switch aiImageRequestContract.validate(
             command: request,
             state: state.editing,
-            gpuOperations: documentGpuOperationGateway
+            selectionWorkflow: selectionWorkflowService
         ) {
         case let .failure(error):
             return .send(.delegate(.documentMutationFeedback(error.feedback)))

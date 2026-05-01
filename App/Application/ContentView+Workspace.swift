@@ -281,7 +281,7 @@ extension ContentView {
         return DocumentFeature.renderedCompositeSurfaceIfAvailable(
             snapshot: snapshot,
             paperStyle: store.document.editing.canvas.paperStyle,
-            gpuOperations: documentGpuOperationGateway
+            gpuOperations: documentRenderingWorkflow
         )
     }
 

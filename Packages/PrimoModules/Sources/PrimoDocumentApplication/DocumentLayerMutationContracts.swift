@@ -89,7 +89,7 @@ public enum LayerStructureCommand: Equatable, Sendable {
     case moveLayer(index: Int, destinationIndex: Int)
     case createFolder(name: String, anchorLayerIndex: Int)
     case deleteFolder(folderID: Int)
-    case assignLayerToFolder(index: Int, folderID: Int)
+    case assignLayerToFolder(index: Int, folderID: Int?)
 }
 
 public enum LayerAttributeCommand: Equatable, Sendable {
@@ -246,7 +246,7 @@ public struct LayerStructureCommandValidator: Sendable {
             guard let index = context.existingLayerIndex(index) else {
                 return .failure(.invalidLayerIndex(index))
             }
-            guard folderID >= 0 else {
+            guard let folderID else {
                 return .success(.assignLayerToFolder(index: index, folderID: nil))
             }
             guard let folderID = context.existingFolderID(folderID) else {

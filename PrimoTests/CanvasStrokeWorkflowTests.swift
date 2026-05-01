@@ -27,25 +27,13 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         )
     }
 
-    func testDocumentGpuGatewayOverrideRefreshesDerivedGpuDependencies() {
+    func testDocumentRuntimeOverrideRefreshesDerivedRenderingDependencies() {
         let oldGateway = markedGateway(1)
         let newGateway = markedGateway(9)
 
         let outputs = withDependencies {
             $0.documentRuntime = .stub(gpuOperationGateway: oldGateway)
-            let oldPreviewRenderer = GpuCanvasPreviewRenderer(gpuOperations: oldGateway)
-            let oldLayerTransformProcessor = GpuLayerTransformProcessor(gpuOperations: oldGateway)
-            $0.canvasPreviewRenderer = oldPreviewRenderer
-            $0.selectionMaskProcessor = oldPreviewRenderer
-            $0.layerTransformProcessor = oldLayerTransformProcessor
-            $0.canvasPresentationEnvironment = CanvasPresentationEnvironment(
-                previewRenderer: oldPreviewRenderer,
-                eyedropperSampler: $0.canvasEyedropperSampler,
-                selectionProcessor: oldPreviewRenderer,
-                layerTransformProcessor: oldLayerTransformProcessor
-            )
-
-            $0.documentGpuOperationGateway = newGateway
+            $0.documentRuntime = .stub(gpuOperationGateway: newGateway)
         } operation: {
             DerivedGpuDependencyProbe().outputs()
         }
@@ -219,7 +207,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let snapshot = DocumentFeature.workspaceSnapshotCoordinator.snapshot(
             state: state,
             documentExportGateway: .stub(compositeSurface: { _ in fallbackSurface }),
-            documentGpuOperationGateway: .stub()
+            documentRenderingWorkflow: .stub()
         )
 
         XCTAssertEqual(snapshot.previewSurface, fallbackSurface)
@@ -1344,7 +1332,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         let service = DocumentContentService(
-            documentQueryGateway: .stub(
+            documentPresentationReader: .stub(
                 presentation: .testValue(activeLayerIndex: 3)
             ),
             documentMutationGateway: .stub(
@@ -1364,7 +1352,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("replace failed"))
                 }
             ),
-            textLayerGateway: .stub()
+            documentTextLayerService: .stub()
         )
         let result = service.applyPixels(
             Data([0x00]),
@@ -1379,7 +1367,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
 
     func testLayerContentTransactionSurfacesRollbackFailure() {
         let service = DocumentContentService(
-            documentQueryGateway: .stub(
+            documentPresentationReader: .stub(
                 presentation: .testValue(activeLayerIndex: 3)
             ),
             documentMutationGateway: .stub(
@@ -1394,7 +1382,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("replace failed"))
                 }
             ),
-            textLayerGateway: .stub()
+            documentTextLayerService: .stub()
         )
         let result = service.applyPixels(
             Data([0x00]),
@@ -1421,7 +1409,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
         let setActiveLayerCalls = TestRecorder<Int>()
 
         let service = DocumentContentService(
-            documentQueryGateway: .stub(
+            documentPresentationReader: .stub(
                 presentation: .testValue(activeLayerIndex: 2)
             ),
             documentMutationGateway: .stub(
@@ -1441,7 +1429,7 @@ final class CanvasStrokeWorkflowTests: XCTestCase {
                     .failure(.bridgeMutationFailed("apply failed"))
                 }
             ),
-            textLayerGateway: .stub()
+            documentTextLayerService: .stub()
         )
         _ = service.applyPixels(
             Data([0x00, 0x00, 0x00, 0x00]),

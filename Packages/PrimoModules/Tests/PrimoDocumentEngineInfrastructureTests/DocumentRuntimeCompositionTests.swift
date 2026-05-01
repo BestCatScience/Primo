@@ -85,12 +85,15 @@ struct DocumentRuntimeCompositionTests {
         )
         let body = try String(contentsOf: compositionURL, encoding: .utf8)
 
-        #expect(body.contains("public let queryGateway: DocumentQueryGateway"))
-        #expect(body.contains("public let renderGateway: DocumentRenderGateway"))
-        #expect(body.contains("public let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
-        #expect(body.contains("public let mutationGateway: DocumentMutationGateway"))
-        #expect(body.contains("public let strokeGateway: StrokeInputGateway"))
-        #expect(body.contains("public func withOverrides("))
+        #expect(body.contains("package struct DocumentRuntimeComposition"))
+        #expect(body.contains("package let queryGateway: DocumentQueryGateway"))
+        #expect(body.contains("package let renderGateway: DocumentRenderGateway"))
+        #expect(body.contains("package let dirtyUpdateQueue: DocumentDirtyUpdateQueue"))
+        #expect(body.contains("package let mutationGateway: DocumentMutationGateway"))
+        #expect(body.contains("package let strokeGateway: StrokeInputGateway"))
+        #expect(body.contains("package func withOverrides("))
+        #expect(!body.contains("public let queryGateway: DocumentQueryGateway"))
+        #expect(!body.contains("public func withOverrides("))
         #expect(!body.contains("public var queryGateway: DocumentQueryGateway"))
     }
 

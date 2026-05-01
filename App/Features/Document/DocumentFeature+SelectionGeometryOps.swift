@@ -2,17 +2,17 @@ import CoreGraphics
 import Foundation
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 
 extension DocumentFeature {
     static func layerMaskData(
         from selection: CanvasSelection?,
         canvasSize: CGSize,
-        gpuOperations: DocumentGpuOperationGateway
+        selectionWorkflow: SelectionWorkflowService
     ) -> Data? {
         guard let selection else { return nil }
         let canvasWidth = max(Int(canvasSize.width.rounded()), 1)
         let canvasHeight = max(Int(canvasSize.height.rounded()), 1)
-        let selectionWorkflow = SelectionWorkflowService(gpuOperations: gpuOperations)
         guard let mask = selectionWorkflow.expandedMask(from: selection, canvasWidth: canvasWidth, canvasHeight: canvasHeight) else {
             return nil
         }
@@ -24,7 +24,7 @@ extension DocumentFeature {
         pixelData: Data,
         canvasWidth: Int,
         canvasHeight: Int,
-        gpuOperations: DocumentGpuOperationGateway
+        gpuOperations: DocumentRenderingWorkflow
     ) -> CGRect? {
         if let selection, !selection.isEmpty {
             return selection.bounds

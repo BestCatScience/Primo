@@ -10,37 +10,37 @@ import PrimoDocumentRenderingContracts
 import PrimoDocumentDomain
 import PrimoDocumentInfrastructure
 
-public struct DocumentEngineLive: Sendable {
-    public let queryGateway: DocumentQueryGateway
-    public let renderGateway: DocumentRenderGateway
-    public let dirtyUpdateQueue: DocumentDirtyUpdateQueue
-    public let mutationGateway: DocumentMutationGateway
-    public let strokeGateway: StrokeInputGateway
-    public let historyGateway: DocumentHistoryGateway
-    public let persistenceGateway: DocumentPersistenceGateway
-    public let exportGateway: DocumentExportGateway
-    public let textLayerGateway: TextLayerGateway
+package struct DocumentEngineLive: Sendable {
+    package let queryGateway: DocumentQueryGateway
+    package let renderGateway: DocumentRenderGateway
+    package let dirtyUpdateQueue: DocumentDirtyUpdateQueue
+    package let mutationGateway: DocumentMutationGateway
+    package let strokeGateway: StrokeInputGateway
+    package let historyGateway: DocumentHistoryGateway
+    package let persistenceGateway: DocumentPersistenceGateway
+    package let exportGateway: DocumentExportGateway
+    package let textLayerGateway: TextLayerGateway
 
-    public let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
-    public let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
-    public let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult
-    public let deleteFolder: @Sendable (Int) -> DocumentMutationResult
-    public let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
-    public let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let assignLayerToFolder: @Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult
-    public let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
-    public let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
-    public let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
-    public let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
+    package let duplicateLayer: @Sendable (Int, String) -> DocumentIndexedMutationResult
+    package let moveLayer: @Sendable (Int, Int) -> DocumentMutationResult
+    package let createFolder: @Sendable (String, LayerAnchorIndex) -> DocumentIndexedMutationResult
+    package let deleteFolder: @Sendable (Int) -> DocumentMutationResult
+    package let setFolderVisibility: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let setFolderName: @Sendable (Int, String) -> DocumentMutationResult
+    package let setFolderExpanded: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let assignLayerToFolder: @Sendable (ExistingLayerIndex, ExistingFolderID?) -> DocumentMutationResult
+    package let setLayerLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let setLayerAlphaLocked: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let setLayerClipped: @Sendable (Int, Bool) -> DocumentMutationResult
+    package let setLayerOpacity: @Sendable (Int, Double) -> DocumentMutationResult
+    package let setLayerBlendMode: @Sendable (Int, LayerBlendMode) -> DocumentMutationResult
+    package let mergeLayerDown: @Sendable (Int) -> DocumentMutationResult
 }
 
-public enum DocumentEngineFactory {
+package enum DocumentEngineFactory {
     private static let logger = Logger(subsystem: "com.primo.app", category: "DocumentEngineFactory")
 
-    public static func live(
+    package static func live(
         fileClient: PrimoCoreTypes.FileClient = .live,
         dateClient: PrimoCoreTypes.DateClient = .live,
         uuidClient: PrimoCoreTypes.UUIDClient = .live

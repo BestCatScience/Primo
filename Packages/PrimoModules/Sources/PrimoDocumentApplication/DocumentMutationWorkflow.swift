@@ -100,7 +100,7 @@ public struct DocumentMutationWorkflowService: Sendable {
         execute(.structure(.moveLayer(index: index, destinationIndex: destinationIndex)))
     }
 
-    public func assignLayer(_ index: Int, toFolder folderID: Int) -> DocumentMutationResult {
+    public func assignLayer(_ index: Int, toFolder folderID: Int?) -> DocumentMutationResult {
         execute(.structure(.assignLayerToFolder(index: index, folderID: folderID)))
     }
 

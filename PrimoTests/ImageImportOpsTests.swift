@@ -1,6 +1,7 @@
 import CoreGraphics
 import PrimoDocumentApplication
 import PrimoDocumentContracts
+import PrimoDocumentRuntime
 import XCTest
 @testable import Primo
 
@@ -43,37 +44,20 @@ final class ImageImportOpsTests: XCTestCase {
             DocumentFeature.fittedLayerPixelData(
                 fromImageData: encoded,
                 canvasSize: CGSize(width: 6, height: 4),
-                gpuOperations: imageImportGpuOperations()
+                gpuOperations: imageImportRenderingWorkflow()
             )
         )
 
         XCTAssertEqual(fitted.count, 6 * 4 * 4)
     }
 
-    private func imageImportGpuOperations() -> DocumentGpuOperationGateway {
-        DocumentGpuOperationGateway(
+    private func imageImportRenderingWorkflow() -> DocumentRenderingWorkflow {
+        DocumentRenderingWorkflow(
             compositedPaperPreviewRGBA: { _, _, _, _ in imageImportRenderingFailure() },
             compositedPreviewPixelData: { _, _, _ in imageImportRenderingFailure() },
-            compositedPreviewIncrementalUpdate: { _, _, _, _ in imageImportRenderingFailure() },
-            selectionOverlayRGBA: { _, _, _ in imageImportRenderingFailure() },
-            eyedropperLoupeRGBA: { _, _, _, _, _, _, _, _ in imageImportRenderingFailure() },
-            shapePreviewSurface: { _, _, _, _ in imageImportRenderingFailure() },
-            textLayerSurface: { _, _ in imageImportRenderingFailure() },
-            textLayoutRect: { _, _ in nil },
             processedLayerPixelData: { _, _, _, _ in imageImportRenderingFailure() },
             alphaMask: { _, _, _ in imageImportRenderingFailure() },
             croppedSelectionMask: { _, _, _ in nil },
-            combinedSelectionMask: { _, _, _, _, _ in imageImportRenderingFailure() },
-            expandedSelectionMask: { _ in imageImportRenderingFailure() },
-            lassoSelection: { _, _, _ in imageImportRenderingFailure() },
-            autoSelection: { _, _, _, _, _, _, _, _, _ in imageImportRenderingFailure() },
-            colorRangeSelection: { _, _, _, _ in imageImportRenderingFailure() },
-            expandedMask: { _, _, _, _ in imageImportRenderingFailure() },
-            contractedMask: { _, _, _, _ in imageImportRenderingFailure() },
-            featheredMask: { _, _, _, _ in imageImportRenderingFailure() },
-            invertMask: { _ in imageImportRenderingFailure() },
-            transformedSelectionMask: { _ in imageImportRenderingFailure() },
-            transformedLayerPixelData: { _ in imageImportRenderingFailure() },
             scaledPixelData: { data, _, _, targetWidth, targetHeight in
                 let pixel = data.prefix(4)
                 return .success(Data(Array(repeating: Array(pixel), count: targetWidth * targetHeight).flatMap { $0 }))
